@@ -1,0 +1,88 @@
+version: v1
+taxonomy:
+  categories:
+    - code: OM
+      name: Omission
+      definition: "Required step not performed by end of trial."
+      weight: 2
+      examples:
+        - "Never runs FIRE TEST A/B before engine start (S02)."
+        - "Never turns on OBOGS/FLOW before taxi (S14)."
+    - code: CO
+      name: Commission
+      definition: "Performs a non-required or unnecessary action not on the checklist."
+      weight: 1
+      examples:
+        - "Toggles lighting or weapon switches unrelated to startup."
+        - "Changes radar modes during startup without need."
+    - code: OR
+      name: Order Error
+      definition: "Executes a canonical step in the wrong relative order."
+      weight: 2
+      examples:
+        - "Sets INS to GND/CV before left engine stabilized >60% RPM (S12 before S11)."
+        - "Powers DDIs/HUD before battery/APU are on (S08 before S01-S03)."
+    - code: PA
+      name: Parameter/Setting Error
+      definition: "Step executed with wrong value/position/magnitude."
+      weight: 1
+      examples:
+        - "Sets BINGO fuel to unreasonable value (S21)."
+        - "Radar altimeter bug set to 5000 ft instead of low pattern altitude (S23)."
+    - code: SV
+      name: State Violation
+      definition: "Performs a step while its required preconditions are not satisfied."
+      weight: 2
+      examples:
+        - "Right throttle moved to IDLE with RPM <25% (S05)."
+        - "ENG CRANK LEFT before right engine in nominal range (S10)."
+  trial_flags:
+    - code: DE
+      name: Dead-End / Stuck
+      scope: trial
+      definition: "Learner reaches a state where progress stops without external help."
+      notes: "Logged at trial-level; typically marks trial as failed."
+    - code: HR
+      name: Help Request / External Intervention
+      scope: trial
+      definition: "Learner requests external help or instructor intervenes."
+      notes: "Logged for analysis; may or may not invalidate the trial depending on protocol."
+
+scoring:
+  base_weights:
+    OM: 2
+    CO: 1
+    OR: 2
+    PA: 1
+    SV: 2
+  critical_step_multiplier: 1.5
+  rounding: ceil
+  per_step_formula: "(2*OM + 1*CO + 2*OR + 1*PA + 2*SV) * (critical ? 1.5 : 1)"
+  notes:
+    - "Apply critical multiplier after summing category weights."
+    - "If multiplier yields fraction, round up (ceil)."
+    - "At most one occurrence per category per step is recommended."
+
+decision_rules:
+  description: "Stub hooks for automated detection; human-coded until telemetry rules are implemented."
+  rules:
+    - id: rule_sv_s05_rpm_threshold
+      category: SV
+      target_step: S05
+      placeholder: true
+      logic: "IF observation.rpm.right < 0.25 WHEN throttle_right moves OFF->IDLE THEN SV"
+    - id: rule_or_ins_before_rpm
+      category: OR
+      target_step: S12
+      placeholder: true
+      logic: "IF INS knob set before left engine rpm > 0.60 THEN OR (and possibly SV)"
+    - id: rule_om_step_not_completed
+      category: OM
+      target_step: "*"
+      placeholder: true
+      logic: "IF step not observed by trial end THEN OM"
+
+metadata:
+  source_document: "Doc/Evaluation/fa18c_error_coding_guide.md"
+  maintained_by: "SimTutor Core"
+  notes: "Values align with the scoring sheet template; criticality per step lives in procedure pack."
