@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v1/observation.schema.json",
+  "title": "Observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "observation_id", "timestamp", "source", "payload"],
+  "properties": {
+    "version": { "type": "string", "const": "v1" },
+    "observation_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "description": "Environment adapter emitting the observation" },
+    "procedure_hint": { "type": ["string", "null"], "description": "Optional suggested step id (e.g., S05)" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "payload": { "type": "object", "description": "Opaque environment-specific observation data" },
+    "attachments": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "description": "URIs to blobs such as screenshots or telemetry files"
+    },
+    "metadata": { "type": "object", "description": "Free-form adapter metadata" }
+  }
+}
