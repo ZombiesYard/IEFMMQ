@@ -1,0 +1,161 @@
+pack_id: fa18c_startup
+version: v1
+title: "F/A-18C Cold Start (MVP subset)"
+description: >
+  Cold-start to taxi-ready procedure for the F/A-18C Lot 20. Derived from
+  Doc/Evaluation/fa18c_startup_master.md and Appendix - Training Task Syllabus.md.
+metadata:
+  source_documents:
+    - Doc/Evaluation/fa18c_startup_master.md
+    - Doc/Evaluation/Appendix - Training Task Syllabus.md
+  notes: >
+    This MVP covers steps S01-S10 (phases P1-P4) sufficient for an initial cold
+    start. Remaining steps can be appended later using the same schema.
+
+prerequisites:
+  - "Aircraft cold and dark at ramp or carrier; parking brake set."
+  - "Ground crew clear; chocks as per mission setup."
+  - "Mission radios preset for training frequencies."
+  - "Pilot seated with VR hardware on; UFC and DDIs visible."
+
+completion_conditions:
+  - "Both engines running and stabilized in green ranges."
+  - "INS alignment started in correct mode (GND or CV)."
+  - "Radar and OBOGS configured; safety-critical errors resolved."
+  - "Ready for taxi clearance per instructor/system."
+
+steps:
+  - id: S01
+    phase: P1
+    official_step: "Set the BATTERY switch to ON and confirm both Left and Right Generators are ON."
+    short_explanation: "Power the jet: battery ON, generators confirmed ON."
+    cockpit_area: "Right console"
+    critical: false
+    preconditions: []
+    completion_conditions:
+      - "BATTERY switch ON."
+      - "Left/Right GEN switches in NORM/ON."
+    tutor_prompts:
+      - "Ensure aircraft power is applied: flip BATTERY to ON; verify both generator switches are ON."
+
+  - id: S02
+    phase: P1
+    official_step: "Move and hold the fire detection switch to FIRE TEST A... then FIRE TEST B after 10s."
+    short_explanation: "Run fire detection tests A and B; listen for caution tones."
+    cockpit_area: "Left console"
+    critical: true
+    preconditions:
+      - "Aircraft powered (BATTERY ON, generators ON)."
+    completion_conditions:
+      - "Fire test A completed with correct aural/visual indications."
+      - "Fire test B completed after ~10s pause."
+    tutor_prompts:
+      - "Hold FIRE TEST switch to A until tones finish, wait 10s, then repeat for B."
+
+  - id: S03
+    phase: P1
+    official_step: "APU switch to ON and wait for green APU READY light."
+    short_explanation: "Start APU; wait for APU READY."
+    cockpit_area: "Left console"
+    critical: false
+    preconditions:
+      - "Power available (S01 complete)."
+    completion_conditions:
+      - "APU switch ON."
+      - "APU READY light illuminated."
+    tutor_prompts:
+      - "Set APU switch to ON; watch for green APU READY before engine crank."
+
+  - id: S04
+    phase: P2
+    official_step: "Move the ENG CRANK switch to the right to start the right engine."
+    short_explanation: "ENG CRANK to RIGHT to start right engine."
+    cockpit_area: "Left console"
+    critical: true
+    preconditions:
+      - "APU READY light on."
+    completion_conditions:
+      - "ENG CRANK switch set to RIGHT; right engine spool-up observed."
+    tutor_prompts:
+      - "With APU READY, set ENG CRANK to RIGHT to begin right engine start."
+
+  - id: S05
+    phase: P2
+    official_step: "Move the right throttle from OFF to IDLE when the right engine is above 25% rpm."
+    short_explanation: "Advance right throttle to IDLE at ≥25% RPM."
+    cockpit_area: "Throttles / IFEI"
+    critical: true
+    preconditions:
+      - "Right engine RPM rising from S04."
+    completion_conditions:
+      - "Right throttle at IDLE."
+      - "Throttle moved when RPM ≥25%."
+    tutor_prompts:
+      - "Monitor IFEI; when right RPM passes 25%, lift and move right throttle to IDLE."
+
+  - id: S06
+    phase: P2
+    official_step: "Once right engine RPM is over 60%, rotate the BLEED AIR knob 360° clockwise, from NORM to NORM."
+    short_explanation: "Cycle BLEED AIR knob 360° after right RPM >60%."
+    cockpit_area: "Right console"
+    critical: false
+    preconditions:
+      - "Right engine stabilized above 60% RPM."
+    completion_conditions:
+      - "BLEED AIR knob rotated full clockwise back to NORM."
+    tutor_prompts:
+      - "After right RPM >60%, rotate BLEED AIR knob through a full clockwise turn to NORM."
+
+  - id: S07
+    phase: P2
+    official_step: "Test the CAUTION, WARNING and ADVISORY lights."
+    short_explanation: "Run caution/warning/advisory lights test."
+    cockpit_area: "Right console"
+    critical: false
+    preconditions:
+      - "Right engine stabilized; electrical power available."
+    completion_conditions:
+      - "Light test executed with all annunciators verified."
+    tutor_prompts:
+      - "Press the lights test; confirm caution, warning, and advisory lamps illuminate."
+
+  - id: S08
+    phase: P3
+    official_step: "Turn on power to both DDIs, MPCD and HUD; select FCS (left DDI) and BIT (right DDI)."
+    short_explanation: "Power DDIs/MPCD/HUD; set FCS left, BIT right."
+    cockpit_area: "Center instrument panel"
+    critical: false
+    preconditions:
+      - "Right engine running; electrical power stable."
+    completion_conditions:
+      - "Left DDI shows FCS page; right DDI shows BIT page."
+      - "MPCD and HUD powered."
+    tutor_prompts:
+      - "Power DDIs/MPCD/HUD; set left DDI to FCS and right DDI to BIT."
+
+  - id: S09
+    phase: P3
+    official_step: "Set COMM 1 and COMM 2 radios as required for the mission."
+    short_explanation: "Configure COMM1/COMM2 to mission presets."
+    cockpit_area: "UFC / comm panels"
+    critical: false
+    preconditions:
+      - "Displays powered (S08 complete)."
+    completion_conditions:
+      - "COMM1 and COMM2 set to assigned frequencies/presets."
+    tutor_prompts:
+      - "Use UFC/comm panels to set COMM1 and COMM2 to the mission frequencies."
+
+  - id: S10
+    phase: P4
+    official_step: "Move the ENG CRANK switch to the left after confirming normal right engine parameters."
+    short_explanation: "Verify right engine parameters, then ENG CRANK to LEFT."
+    cockpit_area: "Left console / IFEI"
+    critical: true
+    preconditions:
+      - "Right engine stabilized: RPM 63–70%, TEMP 190–590°C, FF 420–900 PPH, nozzle 73–84%, OIL 45–110 psi."
+    completion_conditions:
+      - "ENG CRANK switch set to LEFT; left engine spool-up observed."
+    tutor_prompts:
+      - "If right engine parameters are in green ranges, move ENG CRANK to LEFT for left engine start."
+
