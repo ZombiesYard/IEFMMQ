@@ -9,10 +9,12 @@ packages = [
   { include = "adapters" },
   { include = "packs" },
   { include = "tools" },
+  { include = "simtutor" },
 ]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+jsonschema = "^4.23.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4"

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v1/tutor_request.schema.json",
+  "title": "TutorRequest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "request_id", "timestamp", "actor", "intent"],
+  "properties": {
+    "version": { "type": "string", "const": "v1" },
+    "request_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "actor": { "type": "string", "enum": ["learner", "instructor", "system"] },
+    "intent": { "type": "string", "description": "High-level intent, e.g., ask_hint, submit_answer, report_state" },
+    "message": { "type": ["string", "null"], "description": "Natural language content if present" },
+    "observation_ref": { "type": ["string", "null"], "format": "uuid", "description": "Links to an Observation" },
+    "context": { "type": "object", "description": "Structured context from UI/adapter" },
+    "metadata": { "type": "object", "description": "Transport or routing metadata" }
+  }
+}
