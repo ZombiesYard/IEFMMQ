@@ -19,10 +19,10 @@ prerequisites:
   - "Pilot seated with VR hardware on; UFC and DDIs visible."
 
 completion_conditions:
+  - "Right engine running with parameters verified in green ranges."
+  - "Left engine crank sequence initiated and monitored per checklist."
   - "Both engines running and stabilized in green ranges."
-  - "INS alignment started in correct mode (GND or CV)."
-  - "Radar and OBOGS configured; safety-critical errors resolved."
-  - "Ready for taxi clearance per instructor/system."
+  - "Safety-critical cautions resolved for current configuration (MVP S01-S10 scope)."
 
 steps:
   - id: S01
@@ -30,7 +30,7 @@ steps:
     official_step: "Set the BATTERY switch to ON and confirm both Left and Right Generators are ON."
     short_explanation: "Power the jet: battery ON, generators confirmed ON."
     cockpit_area: "Right console"
-    critical: false
+    critical: true
     preconditions: []
     completion_conditions:
       - "BATTERY switch ON."
@@ -40,7 +40,7 @@ steps:
 
   - id: S02
     phase: P1
-    official_step: "Move and hold the fire detection switch to FIRE TEST A... then FIRE TEST B after 10s."
+    official_step: "Move and hold the fire detection switch to FIRE TEST A and wait for all the audio caution messages to play. Once complete, wait 10 seconds and then do the same for FIRE TEST B."
     short_explanation: "Run fire detection tests A and B; listen for caution tones."
     cockpit_area: "Left console"
     critical: true
@@ -57,7 +57,7 @@ steps:
     official_step: "APU switch to ON and wait for green APU READY light."
     short_explanation: "Start APU; wait for APU READY."
     cockpit_area: "Left console"
-    critical: false
+    critical: true
     preconditions:
       - "Power available (S01 complete)."
     completion_conditions:
