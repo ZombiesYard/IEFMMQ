@@ -1,8 +1,20 @@
 [
   {
+    "payload": { "battery": "ON", "generators": "ON" },
+    "procedure_hint": "S01"
+  },
+  {
+    "payload": { "fire_test": "A_B_done" },
+    "procedure_hint": "S02"
+  },
+  {
     "payload": { "rpm_right": 0.0, "apu_ready": true },
     "tags": ["apu_ready"],
     "procedure_hint": "S03"
+  },
+  {
+    "payload": { "crank": "RIGHT" },
+    "procedure_hint": "S04"
   },
   {
     "payload": { "rpm_right": 0.28, "throttle_right": "IDLE" },

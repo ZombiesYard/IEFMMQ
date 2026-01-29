@@ -61,4 +61,3 @@ class MockEnvAdapter:
 
     def remaining(self) -> int:
         return len(self._script) - self._cursor
-

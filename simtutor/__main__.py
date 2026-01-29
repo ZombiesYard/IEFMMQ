@@ -5,6 +5,8 @@ from typing import Iterable, Mapping
 
 from jsonschema import Draft202012Validator
 
+from simtutor.runner import replay_log, run_simulation
+
 
 SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schemas" / "v1"
 
@@ -65,13 +67,29 @@ def main() -> int:
         help="Schema name to validate against (default: event)",
     )
 
+    run = sub.add_parser("run", help="Run mock scenario and write event log")
+    run.add_argument("--pack", required=True, help="Path to pack.yaml")
+    run.add_argument("--scenario", required=True, help="Path to mock scenario JSON")
+    run.add_argument("--output", help="Output log path (default logs/run_<ts>.jsonl)")
+
+    rep = sub.add_parser("replay", help="Replay event log and validate trajectory")
+    rep.add_argument("file", help="Event log JSONL")
+    rep.add_argument("--pack", required=True, help="Path to pack.yaml for validation")
+
     args = parser.parse_args()
     if args.command == "validate":
         return validate(args.files, args.schema)
+    if args.command == "run":
+        log_path = run_simulation(args.pack, args.scenario, args.output)
+        print(f"[RUN] wrote {log_path}")
+        return 0
+    if args.command == "replay":
+        ok, msg = replay_log(args.file, args.pack)
+        print(f"[REPLAY] {msg}")
+        return 0 if ok else 1
     parser.print_help()
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
