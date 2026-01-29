@@ -1,0 +1,19 @@
+[
+  {
+    "payload": { "rpm_right": 0.0, "apu_ready": true },
+    "tags": ["apu_ready"],
+    "procedure_hint": "S03"
+  },
+  {
+    "payload": { "rpm_right": 0.28, "throttle_right": "IDLE" },
+    "procedure_hint": "S05"
+  },
+  {
+    "payload": { "rpm_right": 0.65, "bleed_air_knob": "cycled" },
+    "procedure_hint": "S06"
+  },
+  {
+    "payload": { "ddi_left": "FCS", "ddi_right": "BIT" },
+    "procedure_hint": "S08"
+  }
+]
