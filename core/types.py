@@ -88,4 +88,3 @@ class Event:
 
 
 __all__ = ["Observation", "TutorRequest", "TutorResponse", "Event", "CONTRACT_VERSION"]
-
