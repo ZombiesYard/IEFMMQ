@@ -1,0 +1,16 @@
+{
+  "documents": [
+    {
+      "doc_id": "doc",
+      "source_path": "logs\\test_index\\doc.md",
+      "chunks": [
+        {
+          "chunk_id": "doc_0",
+          "heading": "Title",
+          "page": null,
+          "text": "Engine start checklist\nTurn battery on."
+        }
+      ]
+    }
+  ]
+}
