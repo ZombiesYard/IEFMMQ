@@ -76,6 +76,11 @@ def main() -> int:
     rep.add_argument("file", help="Event log JSONL")
     rep.add_argument("--pack", required=True, help="Path to pack.yaml for validation")
 
+    score = sub.add_parser("score", help="Score an event log using taxonomy")
+    score.add_argument("file", help="Event log JSONL")
+    score.add_argument("--pack", required=True, help="Path to pack.yaml")
+    score.add_argument("--taxonomy", required=True, help="Path to taxonomy.yaml")
+
     args = parser.parse_args()
     if args.command == "validate":
         return validate(args.files, args.schema)
@@ -87,6 +92,12 @@ def main() -> int:
         ok, msg = replay_log(args.file, args.pack)
         print(f"[REPLAY] {msg}")
         return 0 if ok else 1
+    if args.command == "score":
+        from simtutor.runner import score_run
+
+        result = score_run(args.file, args.pack, args.taxonomy)
+        print(json.dumps(result, indent=2))
+        return 0
     parser.print_help()
     return 0
 

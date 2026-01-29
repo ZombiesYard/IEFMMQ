@@ -25,7 +25,19 @@
     "procedure_hint": "S06"
   },
   {
+    "payload": { "lights_test": "done" },
+    "procedure_hint": "S07"
+  },
+  {
     "payload": { "ddi_left": "FCS", "ddi_right": "BIT" },
     "procedure_hint": "S08"
+  },
+  {
+    "payload": { "comm1": "set", "comm2": "set" },
+    "procedure_hint": "S09"
+  },
+  {
+    "payload": { "crank": "LEFT", "rpm_right": 0.68 },
+    "procedure_hint": "S10"
   }
 ]

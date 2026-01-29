@@ -8,12 +8,15 @@ def test_mock_env_sequence_advances_and_finishes():
     obs2 = env.get_observation()
     obs3 = env.get_observation()
     obs4 = env.get_observation()
-    obs5 = env.get_observation()
-    obs6 = env.get_observation()
-    assert obs5.payload["throttle_right"] == "IDLE"
-    env.get_observation()  # S08
-    obs8 = env.get_observation()
-    assert obs8 is None
+    # consume rest; ensure throttle event present
+    throttle_seen = False
+    while True:
+        ob = env.get_observation()
+        if ob is None:
+            break
+        if ob.payload.get("throttle_right") == "IDLE":
+            throttle_seen = True
+    assert throttle_seen
     assert env.remaining() == 0
 
 
