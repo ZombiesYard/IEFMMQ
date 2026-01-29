@@ -81,6 +81,12 @@ def main() -> int:
     score.add_argument("--pack", required=True, help="Path to pack.yaml")
     score.add_argument("--taxonomy", required=True, help="Path to taxonomy.yaml")
 
+    batch = sub.add_parser("batch", help="Run batch scenarios and export CSV")
+    batch.add_argument("--pack", required=True, help="Path to pack.yaml")
+    batch.add_argument("--taxonomy", default="packs/fa18c_startup/taxonomy.yaml", help="Path to taxonomy.yaml")
+    batch.add_argument("--scenarios", nargs="*", help="Scenario JSON files (default: mock_scenarios/*.json)")
+    batch.add_argument("--output-dir", default="logs", help="Directory to store logs/results.csv")
+
     args = parser.parse_args()
     if args.command == "validate":
         return validate(args.files, args.schema)
@@ -97,6 +103,24 @@ def main() -> int:
 
         result = score_run(args.file, args.pack, args.taxonomy)
         print(json.dumps(result, indent=2))
+        return 0
+    if args.command == "batch":
+        from simtutor.runner import batch_run
+        import csv
+        import glob
+
+        scenarios = args.scenarios or glob.glob("mock_scenarios/*.json")
+        results = batch_run(args.pack, scenarios, args.output_dir, args.taxonomy)
+        out_dir = Path(args.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = out_dir / "results.csv"
+        if results:
+            fieldnames = list(results[0].keys())
+            with csv_path.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(results)
+        print(f"[BATCH] wrote {csv_path} from {len(results)} scenarios")
         return 0
     parser.print_help()
     return 0
