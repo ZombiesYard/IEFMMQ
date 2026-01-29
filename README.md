@@ -1,4 +1,4 @@
-# SimTutor Core v0.1 �� F/A-18C Cold Start (Mock-first)
+# SimTutor Core v0.1 F/A-18C Cold Start (Mock-first)
 
 Simulator-agnostic tutoring backend with clean architecture (domain core + ports/adapters), mock environment, scoring, replayable event logs, and batch harness. Packs are derived from `Doc/Evaluation` sources.
 
@@ -13,7 +13,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - `logs/`, `artifacts/` run outputs.
 
 ## Quickstart
-1) Python ��3.10. Install deps:
+1) Python 3.10. Install deps:
    ```sh
    python -m pip install -e .
    ```
@@ -21,7 +21,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
    ```sh
    python -m tools.index_docs --output Doc/Evaluation/index.json
    ```
-3) Run a single mock scenario �� log:
+3) Run a single mock scenario  log:
    ```sh
    python -m simtutor run --pack packs/fa18c_startup/pack.yaml \
        --scenario mock_scenarios/correct_process.json \
@@ -57,9 +57,9 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
 
 ## Packs (fa18c_startup)
-- `pack.yaml` steps S01�CS10 mapped from `fa18c_startup_master.md` (phase, wording, preconditions placeholders).
+- `pack.yaml` steps S01CS10 mapped from `fa18c_startup_master.md` (phase, wording, preconditions placeholders).
 - `taxonomy.yaml` error categories OM/CO/OR/PA/SV, weights, critical multiplier.
-- `ui_map.yaml` abstract targets �� DCS `pnt_*`.
+- `ui_map.yaml` abstract targets  DCS `pnt_*`.
 - Instruments: NASATLX, quiz stored under `Doc/Evaluation`.
 
 ## Engines
