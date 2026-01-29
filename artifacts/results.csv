@@ -1,0 +1,4 @@
+Count_OM,Count_CO,Count_OR,Count_PA,Count_SV,Error_OM,Error_CO,Error_OR,Error_PA,Error_SV,TotalErrorScore,completed_steps,max_observed_step_index,scenario,log_path
+0,0,0,0,0,0,0,0,0,0,0,"['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10']",9,correct_process,artifacts\correct_process.jsonl
+1,0,0,0,0,3,0,0,0,0,3,['S01'],1,missing_steps,artifacts\missing_steps.jsonl
+0,0,0,0,1,0,0,0,0,2,2,"['S01', 'S02', 'S03', 'S04', 'S05', 'S06']",5,premature_acceleration,artifacts\premature_acceleration.jsonl

@@ -100,3 +100,23 @@ def replay_log(log_path: str, pack_path: str) -> Tuple[bool, str]:
 def score_run(log_path: str, pack_path: str, taxonomy_path: str) -> dict:
     events = JsonlEventStore.load(log_path)
     return score_log(events, pack_path, taxonomy_path)
+
+
+def batch_run(
+    pack_path: str,
+    scenarios: list[str],
+    output_dir: str = "logs",
+    taxonomy_path: str = "packs/fa18c_startup/taxonomy.yaml",
+) -> list[dict]:
+    results = []
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for scenario in scenarios:
+        stem = Path(scenario).stem
+        log_path = out_dir / f"{stem}.jsonl"
+        run_simulation(pack_path, scenario, str(log_path))
+        score = score_run(str(log_path), pack_path, taxonomy_path)
+        score["scenario"] = stem
+        score["log_path"] = str(log_path)
+        results.append(score)
+    return results
