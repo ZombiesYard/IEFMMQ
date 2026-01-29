@@ -11,6 +11,7 @@ from adapters.mock_env import MockEnvAdapter
 from core.event_store import JsonlEventStore
 from core.procedure import ProcedureEngine
 from core.types import Event
+from core.scoring import score_log, _load_taxonomy
 
 
 def _load_steps(pack_path: Path):
@@ -94,3 +95,8 @@ def replay_log(log_path: str, pack_path: str) -> Tuple[bool, str]:
         else:
             continue
     return True, "ok"
+
+
+def score_run(log_path: str, pack_path: str, taxonomy_path: str) -> dict:
+    events = JsonlEventStore.load(log_path)
+    return score_log(events, pack_path, taxonomy_path)
