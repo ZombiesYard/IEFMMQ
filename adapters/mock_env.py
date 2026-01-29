@@ -1,0 +1,64 @@
+"""
+Mock environment adapter that replays scripted observations from JSON files.
+
+Usage:
+    env = MockEnvAdapter("mock_scenarios/correct_process.json")
+    obs = env.get_observation()  # returns Observation or None when finished
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import List, Optional
+
+from core.types import Observation
+
+
+class MockEnvAdapter:
+    def __init__(self, scenario_path: str):
+        self.scenario_path = Path(scenario_path)
+        self._script = self._load_script(self.scenario_path)
+        self._cursor = 0
+
+    @staticmethod
+    def _load_script(path: Path) -> List[dict]:
+        if not path.exists():
+            raise FileNotFoundError(path)
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError("Scenario must be a list of observation dicts")
+        return data
+
+    def reset(self) -> None:
+        self._cursor = 0
+
+    def get_observation(self) -> Optional[Observation]:
+        """Return next Observation in the script or None if exhausted."""
+        if self._cursor >= len(self._script):
+            return None
+        entry = self._script[self._cursor]
+        self._cursor += 1
+        return self._build_observation(entry)
+
+    def _build_observation(self, entry: dict) -> Observation:
+        payload = entry.get("payload", {})
+        tags = entry.get("tags", [])
+        procedure_hint = entry.get("procedure_hint")
+        source = entry.get("source", "mock_env")
+        obs = Observation(
+            source=source,
+            payload=payload,
+            tags=tags,
+            procedure_hint=procedure_hint,
+            metadata=entry.get("metadata", {}),
+            attachments=entry.get("attachments", []),
+        )
+        if "timestamp" in entry:
+            obs.timestamp = entry["timestamp"]
+        return obs
+
+    def remaining(self) -> int:
+        return len(self._script) - self._cursor
+

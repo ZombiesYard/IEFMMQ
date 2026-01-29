@@ -1,0 +1,15 @@
+[
+  {
+    "payload": { "rpm_right": 0.12, "throttle_right": "IDLE_EARLY" },
+    "tags": ["state_violation"],
+    "procedure_hint": "S05"
+  },
+  {
+    "payload": { "rpm_right": 0.35, "throttle_right": "IDLE" },
+    "procedure_hint": "S05"
+  },
+  {
+    "payload": { "rpm_right": 0.6, "bleed_air_knob": "skipped" },
+    "procedure_hint": "S06"
+  }
+]

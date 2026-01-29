@@ -1,0 +1,15 @@
+[
+  {
+    "payload": { "battery": "ON", "generators": "ON" },
+    "procedure_hint": "S01"
+  },
+  {
+    "payload": { "apu_ready": true },
+    "tags": ["apu_ready"],
+    "procedure_hint": "S03"
+  },
+  {
+    "payload": { "rpm_right": 0.65, "bleed_air_knob": "cycled" },
+    "procedure_hint": "S06"
+  }
+]
