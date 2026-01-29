@@ -7,7 +7,7 @@ step back to active. Only one step may be active at a time.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Sequence
@@ -36,7 +36,20 @@ class ProcedureEngine:
     def __init__(self, steps: Sequence[dict]):
         if not steps:
             raise ValueError("steps must not be empty")
-        self._order = [s["id"] for s in steps]
+        for idx, step in enumerate(steps):
+            if not isinstance(step, dict) or "id" not in step:
+                raise ValueError(f"Step at index {idx} is missing required 'id' key")
+        order = [s["id"] for s in steps]
+        if len(order) != len(set(order)):
+            seen = set()
+            dupes = set()
+            for sid in order:
+                if sid in seen:
+                    dupes.add(sid)
+                else:
+                    seen.add(sid)
+            raise ValueError(f"Duplicate step IDs detected: {sorted(dupes)}")
+        self._order = order
         self._steps: Dict[str, StepState] = {sid: StepState(step_id=sid) for sid in self._order}
         self.events: List[dict] = []
 
@@ -61,6 +74,14 @@ class ProcedureEngine:
 
     # --- public API
     def activate_next(self) -> StepState:
+        """
+        Ensure there is an active step and return it.
+        If there is already an active step, this method returns the existing
+        active step without modifying state or emitting a "step_activated"
+        event. If there is no active step, the next pending step in order is
+        marked as active, its activation time is recorded, and a
+        "step_activated" event is emitted.
+        """
         active = self._active_id()
         if active:
             return self._steps[active]
@@ -95,7 +116,11 @@ class ProcedureEngine:
         active = self._active_id()
         if active:
             # put current active back to pending before rewinding
-            self._steps[active].status = StepStatus.PENDING
+            st_active = self._steps[active]
+            st_active.status = StepStatus.PENDING
+            st_active.activated_at = None
+            st_active.prompt_count = 0
+            self._emit("step_reset", st_active.step_id, reason="rewind")
         last_done = self._last_done()
         if not last_done:
             raise RuntimeError("No completed step to rewind to")
@@ -110,6 +135,8 @@ class ProcedureEngine:
         sid = step_id or self._active_id()
         if not sid:
             raise RuntimeError("No active step for prompt request")
+        if sid not in self._steps:
+            raise RuntimeError(f"Unknown step_id '{sid}' for prompt request")
         st = self._steps[sid]
         st.prompt_count += 1
         return st.prompt_count
@@ -130,8 +157,16 @@ class ProcedureEngine:
 
     # inspection helpers
     def status(self, step_id: str) -> StepStatus:
+        if step_id not in self._steps:
+            raise KeyError(f"Unknown step_id {step_id!r}")
         return self._steps[step_id].status
 
     def active_step(self) -> Optional[str]:
         return self._active_id()
+
+    def set_activation_time(self, step_id: str, when: datetime) -> None:
+        """Set activation timestamp for a step (primarily for tests)."""
+        if step_id not in self._steps:
+            raise KeyError(f"Unknown step_id {step_id!r}")
+        self._steps[step_id].activated_at = when
 
