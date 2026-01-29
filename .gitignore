@@ -4,5 +4,6 @@
 /packs/__pycache__/
 /tools/__pycache__/
 /tests/__pycache__/
+/tests/.tmp_overlay/
 simtutor/__pycache__/
 logs/*.jsonl
