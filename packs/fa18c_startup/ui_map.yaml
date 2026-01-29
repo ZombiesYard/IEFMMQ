@@ -1,0 +1,31 @@
+version: v1
+cockpit_elements:
+  battery_switch:
+    description: "Battery switch ON/OFF/ORIDE"
+    dcs_id: "pnt_404"
+  generator_left_switch:
+    description: "Left generator switch NORM/OFF"
+    dcs_id: "pnt_402"
+  generator_right_switch:
+    description: "Right generator switch NORM/OFF"
+    dcs_id: "pnt_403"
+  fire_test_switch:
+    description: "Fire and Bleed Air Test Switch"
+    dcs_id: "pnt_331"
+  apu_switch:
+    description: "APU control switch"
+    dcs_id: "pnt_375"
+  eng_crank_switch:
+    description: "Engine crank switch (LEFT/RIGHT/NORM)"
+    dcs_id: "pnt_377"
+  bleed_air_knob:
+    description: "BLEED AIR knob"
+    dcs_id: "pnt_411"
+  lights_test_button:
+    description: "Lights Test Switch TEST/OFF"
+    dcs_id: "pnt_416"
+
+default_overlay:
+  style: "highlight"
+  color: "#00ffcc"
+  thickness: 2
