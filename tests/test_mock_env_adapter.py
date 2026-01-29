@@ -4,12 +4,16 @@ from adapters.mock_env import MockEnvAdapter
 def test_mock_env_sequence_advances_and_finishes():
     env = MockEnvAdapter("mock_scenarios/correct_process.json")
     obs1 = env.get_observation()
-    assert obs1.procedure_hint == "S03"
+    assert obs1.procedure_hint == "S01"
     obs2 = env.get_observation()
-    assert obs2.payload["throttle_right"] == "IDLE"
     obs3 = env.get_observation()
     obs4 = env.get_observation()
-    assert env.get_observation() is None
+    obs5 = env.get_observation()
+    obs6 = env.get_observation()
+    assert obs5.payload["throttle_right"] == "IDLE"
+    env.get_observation()  # S08
+    obs8 = env.get_observation()
+    assert obs8 is None
     assert env.remaining() == 0
 
 
@@ -18,7 +22,12 @@ def test_reset_replays_sequence():
     env.get_observation()
     env.reset()
     obs1 = env.get_observation()
-    assert obs1.payload["throttle_right"] == "IDLE_EARLY"
+    # first obs is now S01; advance to premature throttle
+    env.get_observation()  # S02
+    env.get_observation()  # S03
+    env.get_observation()  # S04
+    obs5 = env.get_observation()
+    assert obs5.payload["throttle_right"] == "IDLE_EARLY"
 
 
 def test_missing_steps_scenario_loaded():
@@ -26,4 +35,3 @@ def test_missing_steps_scenario_loaded():
     obs = env.get_observation()
     assert obs.payload["battery"] == "ON"
     assert env.remaining() == 2
-
