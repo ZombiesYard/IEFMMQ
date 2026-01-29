@@ -7,7 +7,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - `ports/` contracts for environment/model/knowledge/event store, etc.
 - `adapters/` mock env, DCS UDP stub, model stub, local knowledge adapter.
 - `packs/fa18c_startup/` procedure/taxonomy/ui_map + instruments.
-- `schemas/v1/` JSON Schemas for Observation/TutorRequest/TutorResponse/Event.
+- `simtutor/schemas/v1/` JSON Schemas for Observation/TutorRequest/TutorResponse/Event.
 - `mock_scenarios/` scripted observation sequences.
 - `tools/index_docs.py` offline indexer for `Doc/Evaluation` md/pdf.
 - `logs/`, `artifacts/` run outputs.
@@ -52,7 +52,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
    ```
 
 ## Data Contracts (v1)
-- JSON Schemas in `schemas/v1/*.schema.json`
+- JSON Schemas in `simtutor/schemas/v1/*.schema.json`
 - Python dataclasses in `core/types.py`
   - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
 

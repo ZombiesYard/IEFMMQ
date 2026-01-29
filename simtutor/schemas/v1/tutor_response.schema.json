@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v1/tutor_response.schema.json",
+  "title": "TutorResponse v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "response_id", "timestamp", "actor", "status"],
+  "properties": {
+    "version": { "type": "string", "const": "v1" },
+    "response_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "actor": { "type": "string", "enum": ["tutor", "system"] },
+    "in_reply_to": { "type": ["string", "null"], "format": "uuid", "description": "TutorRequest.request_id this responds to" },
+    "status": { "type": "string", "enum": ["ok", "pending", "error"] },
+    "message": { "type": ["string", "null"], "description": "Learner-facing text" },
+    "actions": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Structured tutor actions (e.g., overlay highlight instructions)"
+    },
+    "explanations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional explanatory bullet points"
+    },
+    "metadata": { "type": "object", "description": "Transport or routing metadata" }
+  }
+}
