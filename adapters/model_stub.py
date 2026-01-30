@@ -9,15 +9,13 @@ Modes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from core.types import TutorResponse, Observation, TutorRequest
 from ports.model_port import ModelPort
 
 
-@dataclass
 class ModelStub(ModelPort):
-    mode: str = "A"
+    def __init__(self, mode: str = "A") -> None:
+        self.mode = mode
 
     def plan_next_step(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         message, card = self._card_for(observation, request)
@@ -28,6 +26,7 @@ class ModelStub(ModelPort):
         return TutorResponse(message=message, actions=[], metadata={"card": card})
 
     def _card_for(self, observation: Observation, request: TutorRequest | None, explain: bool = False):
+        # request kept for ModelPort signature consistency (future use)
         hint = observation.procedure_hint or "unknown"
         base = f"Next step: {hint}" if not explain else f"Error noted at {hint}"
 

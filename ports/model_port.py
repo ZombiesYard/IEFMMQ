@@ -4,7 +4,7 @@ Model port defines interfaces for tutor reasoning (LLM/VLM/RAG).
 
 from __future__ import annotations
 
-from typing import Protocol, List, Dict, Any
+from typing import Protocol
 
 from core.types import TutorResponse, TutorRequest, Observation
 
