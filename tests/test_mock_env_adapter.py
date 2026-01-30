@@ -1,8 +1,25 @@
+import json
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+
 from adapters.mock_env import MockEnvAdapter
 
 
+SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "mock_scenarios"
+TEMP_DIR = Path("tests/.tmp_mock_env")
+
+
+def write_temp_scenario(data) -> Path:
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    path = TEMP_DIR / f"scenario_{uuid4().hex}.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
 def test_mock_env_sequence_advances_and_finishes():
-    env = MockEnvAdapter("mock_scenarios/correct_process.json")
+    env = MockEnvAdapter(str(SCENARIOS_DIR / "correct_process.json"))
     obs1 = env.get_observation()
     assert obs1.procedure_hint == "S01"
     obs2 = env.get_observation()
@@ -21,7 +38,7 @@ def test_mock_env_sequence_advances_and_finishes():
 
 
 def test_reset_replays_sequence():
-    env = MockEnvAdapter("mock_scenarios/premature_acceleration.json")
+    env = MockEnvAdapter(str(SCENARIOS_DIR / "premature_acceleration.json"))
     env.get_observation()
     env.reset()
     obs1 = env.get_observation()
@@ -34,7 +51,31 @@ def test_reset_replays_sequence():
 
 
 def test_missing_steps_scenario_loaded():
-    env = MockEnvAdapter("mock_scenarios/missing_steps.json")
+    env = MockEnvAdapter(str(SCENARIOS_DIR / "missing_steps.json"))
     obs = env.get_observation()
     assert obs.payload["battery"] == "ON"
     assert env.remaining() == 2
+
+
+def test_missing_scenario_path_raises():
+    missing = SCENARIOS_DIR / "does_not_exist.json"
+    with pytest.raises(FileNotFoundError):
+        MockEnvAdapter(str(missing))
+
+
+def test_scenario_not_a_list_raises():
+    path = write_temp_scenario({"not": "a list"})
+    with pytest.raises(ValueError, match="Scenario must be a list"):
+        MockEnvAdapter(str(path))
+
+
+def test_scenario_entry_not_dict_raises():
+    path = write_temp_scenario([{"payload": {}}, "bad"])
+    with pytest.raises(ValueError, match="entry at index 1"):
+        MockEnvAdapter(str(path))
+
+
+def test_scenario_path_is_directory_raises():
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(ValueError, match="not a file"):
+        MockEnvAdapter(str(TEMP_DIR))
