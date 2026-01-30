@@ -135,7 +135,7 @@ def batch_run(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     seen = {}
-    for idx, scenario in enumerate(scenarios, start=1):
+    for scenario in scenarios:
         scenario_path = Path(scenario)
         stem = scenario_path.stem
         suffix = "" if stem not in seen else f"_{seen[stem] + 1}"
