@@ -1,7 +1,10 @@
+"""
+Simulation runner utilities for producing and validating event logs.
+"""
+
 from __future__ import annotations
 
-import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Tuple
 
@@ -14,7 +17,7 @@ from core.types import Event
 from core.scoring import score_log, _load_taxonomy
 
 
-def _load_steps(pack_path: Path):
+def _load_steps(pack_path: Path) -> list[dict]:
     data = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
     return data["steps"]
 
@@ -27,7 +30,7 @@ def run_simulation(pack_path: str, scenario_path: str, log_path: str | None = No
     env = MockEnvAdapter(str(scenario_path))
 
     if log_path is None:
-        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         log_path = Path("logs") / f"run_{ts}.jsonl"
     else:
         log_path = Path(log_path)
@@ -68,32 +71,52 @@ def replay_log(log_path: str, pack_path: str) -> Tuple[bool, str]:
     order = [s["id"] for s in steps]
     status = {sid: "pending" for sid in order}
     active = None
-    events = JsonlEventStore.load(log_path)
+    try:
+        events = JsonlEventStore.load(log_path)
+    except Exception as exc:
+        return False, f"failed to load log: {exc}"
     for ev in events:
         kind = ev.get("kind") or ev.get("type")
         payload = ev.get("payload", {})
         if kind == "step_activated":
-            sid = payload["step_id"]
+            sid = payload.get("step_id")
+            if not sid:
+                return False, "missing step_id for step_activated"
+            if sid not in status:
+                return False, f"unknown step_id {sid}"
             if status[sid] != "pending":
                 return False, f"step {sid} activated from {status[sid]}"
             if active:
                 return False, f"step {sid} activated while {active} active"
+            next_pending = next((s for s in order if status[s] == "pending"), None)
+            if next_pending and sid != next_pending:
+                return False, f"step {sid} activated out of order; expected {next_pending}"
             status[sid] = "active"
             active = sid
         elif kind == "step_completed":
-            sid = payload["step_id"]
+            sid = payload.get("step_id")
+            if not sid:
+                return False, "missing step_id for step_completed"
+            if sid not in status:
+                return False, f"unknown step_id {sid}"
             if active != sid:
                 return False, f"complete {sid} but active {active}"
             status[sid] = "done"
             active = None
         elif kind == "step_blocked":
-            sid = payload["step_id"]
+            sid = payload.get("step_id")
+            if not sid:
+                return False, "missing step_id for step_blocked"
+            if sid not in status:
+                return False, f"unknown step_id {sid}"
             if active != sid:
                 return False, f"block {sid} but active {active}"
             status[sid] = "blocked"
             active = None
         else:
             continue
+    if active:
+        return False, f"ended with active {active}"
     return True, "ok"
 
 

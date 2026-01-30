@@ -6,5 +6,6 @@
 /tests/__pycache__/
 /tests/.tmp_overlay/
 /tests/.tmp_mock_env/
+/tests/.tmp_logs/
 simtutor/__pycache__/
 logs/*.jsonl
