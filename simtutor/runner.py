@@ -138,8 +138,12 @@ def batch_run(
     for scenario in scenarios:
         scenario_path = Path(scenario)
         stem = scenario_path.stem
-        suffix = "" if stem not in seen else f"_{seen[stem] + 1}"
-        seen[stem] = seen.get(stem, 0) + 1
+        if stem not in seen:
+            seen[stem] = 0
+            suffix = ""
+        else:
+            seen[stem] += 1
+            suffix = f"_{seen[stem]}"
         log_name = f"{stem}{suffix}.jsonl"
         log_path = out_dir / log_name
         run_simulation(pack_path, scenario, str(log_path))
