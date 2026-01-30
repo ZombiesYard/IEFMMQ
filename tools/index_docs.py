@@ -1,6 +1,9 @@
 """
 Index markdown/pdf documents into a simple JSON structure for offline retrieval.
 
+Note: this module is a placeholder for future LLM integration and is not
+referenced by the runtime code paths today.
+
 Usage:
   python -m tools.index_docs --output index.json
   # defaults to indexing all docs under Doc/Evaluation
