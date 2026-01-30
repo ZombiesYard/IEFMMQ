@@ -9,3 +9,4 @@
 /tests/.tmp_logs/
 simtutor/__pycache__/
 logs/*.jsonl
+/artifacts/

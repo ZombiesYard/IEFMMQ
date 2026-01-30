@@ -134,9 +134,14 @@ def batch_run(
     results = []
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    for scenario in scenarios:
-        stem = Path(scenario).stem
-        log_path = out_dir / f"{stem}.jsonl"
+    seen = {}
+    for idx, scenario in enumerate(scenarios, start=1):
+        scenario_path = Path(scenario)
+        stem = scenario_path.stem
+        suffix = "" if stem not in seen else f"_{seen[stem] + 1}"
+        seen[stem] = seen.get(stem, 0) + 1
+        log_name = f"{stem}{suffix}.jsonl"
+        log_path = out_dir / log_name
         run_simulation(pack_path, scenario, str(log_path))
         score = score_run(str(log_path), pack_path, taxonomy_path)
         score["scenario"] = stem

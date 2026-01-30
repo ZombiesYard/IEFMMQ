@@ -14,7 +14,8 @@ DEFAULT_INDEX_PATH = Path("Doc") / "Evaluation" / "index.json"
 
 class LocalKnowledgeAdapter(KnowledgePort):
     def __init__(self, index_path: str | Path | None = None):
-        self.retriever = BM25Retriever(str(index_path or DEFAULT_INDEX_PATH))
+        path = DEFAULT_INDEX_PATH if index_path is None else index_path
+        self.retriever = BM25Retriever(str(path))
 
     def query(self, text: str, k: int = 5):
         return self.retriever.query(text, k)

@@ -119,12 +119,15 @@ def main() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         csv_path = out_dir / "results.csv"
         if results:
-            fieldnames = list(results[0].keys())
+            fieldnames = sorted({k for r in results for k in r.keys()})
             with csv_path.open("w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
                 writer.writeheader()
                 writer.writerows(results)
-        print(f"[BATCH] wrote {csv_path} from {len(results)} scenarios")
+            print(f"[BATCH] wrote {csv_path} from {len(results)} scenarios")
+        else:
+            csv_path.write_text("", encoding="utf-8")
+            print(f"[BATCH] no scenarios; wrote empty {csv_path}")
         return 0
     parser.print_help()
     return 0
