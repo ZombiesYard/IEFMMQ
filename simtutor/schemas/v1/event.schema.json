@@ -1,25 +1,4 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://simtutor.dev/schemas/v1/event.schema.json",
-  "title": "Event v1",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["version", "event_id", "timestamp", "kind", "payload"],
-  "properties": {
-    "version": { "type": "string", "const": "v1" },
-    "event_id": { "type": "string", "format": "uuid" },
-    "timestamp": { "type": "string", "format": "date-time" },
-    "kind": {
-      "type": "string",
-      "enum": ["observation", "tutor_request", "tutor_response", "score", "system", "custom"]
-    },
-    "related_id": {
-      "type": ["string", "null"],
-      "format": "uuid",
-      "description": "Links to Observation/TutorRequest/TutorResponse for tracing"
-    },
-    "payload": { "type": "object", "description": "Envelope contents; validated separately if desired" },
-    "tags": { "type": "array", "items": { "type": "string" } },
-    "metadata": { "type": "object", "description": "Transport or routing metadata" }
-  }
+  "$ref": "../../schemas/v1/event.schema.json"
 }
