@@ -33,10 +33,12 @@ class DcsAdapter:
         Placeholder for future capability handshake.
         VRHilite.lua does not reply, so this is a no-op for now.
         """
-        return None
+        return
 
     def highlight(self, pnt_code: str) -> None:
         """Send highlight command for a DCS cockpit point code."""
+        if not isinstance(pnt_code, str) or not pnt_code.strip():
+            raise ValueError(f"Invalid pnt_code: {pnt_code!r}")
         msg = f"HILITE {pnt_code}".encode("utf-8")
         self.sock.sendto(msg, self.server)
 
@@ -56,15 +58,23 @@ class DcsAdapter:
         elif action == "highlight" and element:
             self.highlight(element)
         else:
-            raise ValueError("Invalid overlay intent")
+            raise ValueError(
+                f"Invalid overlay intent: action={action!r}, element_id={element!r}"
+            )
 
         if expect_reply:
             try:
                 data, _ = self.sock.recvfrom(4096)
                 return {"reply": data.decode("utf-8")}
-            except socket.timeout:
+            except (socket.timeout, ConnectionResetError):
                 return None
         return None
 
     def close(self):
         self.sock.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
