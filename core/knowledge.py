@@ -47,6 +47,8 @@ class BM25Retriever(KnowledgePort):
     def _score(self, query_terms: List[str], idx: int) -> float:
         k1 = 1.5
         b = 0.75
+        if self.avgdl == 0.0:
+            return 0.0
         terms = self.docs_terms[idx]
         dl = sum(terms.values()) or 1
         score = 0.0

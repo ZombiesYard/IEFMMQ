@@ -40,10 +40,22 @@ class OverlayPlanner:
     def __init__(self, ui_map_path: str):
         with open(ui_map_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        self.elements = data.get("cockpit_elements", {})
-        self.default_style = data.get("default_overlay", {})
+        if not isinstance(data, dict):
+            raise ValueError("UI map must be a YAML mapping")
+        if "version" in data and data["version"] != "v1":
+            raise ValueError(f"Unsupported UI map version: {data['version']!r}")
+        elements = data.get("cockpit_elements", {})
+        if not isinstance(elements, dict):
+            raise ValueError("UI map 'cockpit_elements' must be a mapping")
+        default_style = data.get("default_overlay", {})
+        if default_style is not None and not isinstance(default_style, dict):
+            raise ValueError("UI map 'default_overlay' must be a mapping if provided")
+        self.elements = elements
+        self.default_style = default_style
 
     def plan(self, target: str, intent: str = "highlight") -> OverlayIntent:
+        if intent not in {"highlight", "clear", "pulse"}:
+            raise ValueError(f"Unknown overlay intent: {intent!r}")
         entry = self.elements.get(target)
         if not entry or "dcs_id" not in entry:
             raise KeyError(f"Unknown target '{target}' in UI map")

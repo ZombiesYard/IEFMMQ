@@ -11,6 +11,7 @@ packages = [
   { include = "tools" },
   { include = "simtutor" },
 ]
+include = ["simtutor/schemas/v1/*.schema.json"]
 
 [tool.poetry.dependencies]
 python = "^3.10"

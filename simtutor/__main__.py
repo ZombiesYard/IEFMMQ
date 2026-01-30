@@ -1,25 +1,29 @@
 import argparse
 import json
+from importlib import resources
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping, Tuple
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 
 from simtutor.runner import replay_log, run_simulation
 
 
-SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schemas" / "v1"
+SCHEMA_PACKAGE = "simtutor.schemas.v1"
 
 
 def _load_schema(name: str) -> Mapping:
-    path = SCHEMA_DIR / f"{name}.schema.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Schema not found: {path}")
-    with path.open("r", encoding="utf-8") as f:
+    try:
+        schema_path = resources.files(SCHEMA_PACKAGE) / f"{name}.schema.json"
+    except ModuleNotFoundError as exc:
+        raise FileNotFoundError(f"Schema package not found: {SCHEMA_PACKAGE}") from exc
+    if not schema_path.is_file():
+        raise FileNotFoundError(f"Schema not found: {schema_path}")
+    with schema_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _iter_jsonl(path: Path) -> Iterable[dict]:
+def _iter_jsonl(path: Path) -> Iterable[Tuple[int, Any]]:
     with path.open("r", encoding="utf-8") as f:
         for lineno, line in enumerate(f, start=1):
             line = line.strip()
@@ -33,7 +37,7 @@ def _iter_jsonl(path: Path) -> Iterable[dict]:
 
 def validate(files: list[str], schema_name: str) -> int:
     schema = _load_schema(schema_name)
-    validator = Draft202012Validator(schema)
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     had_error = False
 
     for file in files:
@@ -115,12 +119,15 @@ def main() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         csv_path = out_dir / "results.csv"
         if results:
-            fieldnames = list(results[0].keys())
+            fieldnames = sorted({k for r in results for k in r.keys()})
             with csv_path.open("w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
                 writer.writeheader()
                 writer.writerows(results)
-        print(f"[BATCH] wrote {csv_path} from {len(results)} scenarios")
+            print(f"[BATCH] wrote {csv_path} from {len(results)} scenarios")
+        else:
+            csv_path.write_text("", encoding="utf-8")
+            print(f"[BATCH] no scenarios; wrote empty {csv_path}")
         return 0
     parser.print_help()
     return 0

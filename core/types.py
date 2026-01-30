@@ -1,7 +1,7 @@
 """
 Versioned data contracts for simulator-agnostic messaging.
 
-These dataclasses mirror the JSON Schemas in `schemas/v1`. They provide a
+These dataclasses mirror the JSON Schemas in `simtutor/schemas/v1`. They provide a
 type-safe representation for internal code while keeping serialization stable.
 """
 

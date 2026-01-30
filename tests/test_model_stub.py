@@ -17,3 +17,11 @@ def test_stub_mode_c_adds_rag_note():
     assert "RAG" in res.metadata["card"]
     assert "S06" in res.message
 
+
+def test_stub_mode_b_sets_llm_card():
+    obs = Observation(procedure_hint="S07")
+    stub = ModelStub(mode="B")
+    res = stub.plan_next_step(obs)
+    assert "[LLM-STUB]" in res.metadata["card"]
+    assert "S07" in res.message
+

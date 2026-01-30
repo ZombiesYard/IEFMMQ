@@ -14,7 +14,7 @@ evaluated using dot-delimited paths into the payload or top-level fields.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 
@@ -31,6 +31,14 @@ def _get_var(data: Dict[str, Any], path: str) -> Optional[Any]:
         else:
             return None
     return current
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _missing_keys(rule: Dict[str, Any], keys: Iterable[str]) -> List[str]:
+    return [key for key in keys if key not in rule]
 
 
 @dataclass
@@ -59,25 +67,49 @@ class GatingEngine:
     ) -> Tuple[bool, Optional[str]]:
         op = rule.get("op")
         if op == "var_gte":
+            missing = _missing_keys(rule, ("var", "value"))
+            if missing:
+                return False, f"rule var_gte missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if val is None or val < rule["value"]:
-                return False, f"{rule['var']}<{rule['value']}"
+            if val is None:
+                return False, f"{rule['var']} missing"
+            if not _is_number(val) or not _is_number(rule["value"]):
+                return False, f"{rule['var']} not numeric"
+            if val < rule["value"]:
+                return False, f"{rule['var']} ({val}) < {rule['value']}"
             return True, None
         if op == "arg_in_range":
+            missing = _missing_keys(rule, ("var", "min", "max"))
+            if missing:
+                return False, f"rule arg_in_range missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if val is None or val < rule["min"] or val > rule["max"]:
-                return False, f"{rule['var']} not in [{rule['min']},{rule['max']}]"
+            if val is None:
+                return False, f"{rule['var']} missing"
+            if not _is_number(val) or not _is_number(rule["min"]) or not _is_number(rule["max"]):
+                return False, f"{rule['var']} not numeric"
+            if val < rule["min"] or val > rule["max"]:
+                return False, f"{rule['var']} ({val}) not in [{rule['min']},{rule['max']}]"
             return True, None
         if op == "flag_true":
+            missing = _missing_keys(rule, ("var",))
+            if missing:
+                return False, f"rule flag_true missing keys: {missing}"
             val = _get_var(latest, rule["var"])
+            if val is None:
+                return False, f"{rule['var']} missing"
             if not bool(val):
                 return False, f"{rule['var']} not true"
             return True, None
         if op == "time_since":
+            missing = _missing_keys(rule, ("tag", "at_least"))
+            if missing:
+                return False, f"rule time_since missing keys: {missing}"
             tag = rule["tag"]
             at_least = rule["at_least"]
+            if not _is_number(at_least):
+                return False, "time_since at_least not numeric"
             last_ts = None
-            for obs in reversed(history):
+            for obs in reversed(history[:-1]):
                 tags = obs.get("tags") or []
                 if tag in tags:
                     last_ts = _parse_time(obs["timestamp"])

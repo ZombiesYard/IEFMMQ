@@ -1,23 +1,25 @@
 import json
-from pathlib import Path
+from importlib import resources
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 
 from core.types import CONTRACT_VERSION, Event, Observation, TutorRequest, TutorResponse
 
 
-SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schemas" / "v1"
+SCHEMA_PACKAGE = "simtutor.schemas.v1"
 
 
 def load_schema(name: str) -> dict:
-    path = SCHEMA_DIR / f"{name}.schema.json"
-    with path.open("r", encoding="utf-8") as f:
+    schema_path = resources.files(SCHEMA_PACKAGE) / f"{name}.schema.json"
+    if not schema_path.is_file():
+        raise FileNotFoundError(f"Schema not found: {schema_path}")
+    with schema_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def validate(obj: dict, schema_name: str) -> None:
     schema = load_schema(schema_name)
-    Draft202012Validator(schema).validate(obj)
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(obj)
 
 
 def test_observation_schema_accepts_defaults():

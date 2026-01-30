@@ -52,6 +52,9 @@ def score_log(log_events: List[dict], pack_path: str, taxonomy_path: str) -> dic
             sid = payload["step_id"]
             max_seen_idx = max(max_seen_idx, order.get(sid, -1))
         if kind == "observation":
+            hinted = payload.get("procedure_hint") or payload.get("payload", {}).get("procedure_hint")
+            if hinted in order:
+                max_seen_idx = max(max_seen_idx, order[hinted])
             tags = payload.get("tags") or payload.get("payload", {}).get("tags") or []
             if "state_violation" in tags:
                 sv_count += 1
@@ -61,7 +64,9 @@ def score_log(log_events: List[dict], pack_path: str, taxonomy_path: str) -> dic
 
     def apply_weight(count: int, weight: int, critical: bool) -> int:
         score = count * weight * (critical_multiplier if critical else 1)
-        return math.ceil(score) if rounding == "ceil" else score
+        if rounding != "ceil":
+            raise ValueError(f"Unsupported rounding mode: {rounding}")
+        return math.ceil(score)
 
     counts = {"OM": om_count, "CO": 0, "OR": 0, "PA": 0, "SV": sv_count}
     errors = {
