@@ -14,7 +14,7 @@ from adapters.mock_env import MockEnvAdapter
 from core.event_store import JsonlEventStore
 from core.procedure import ProcedureEngine
 from core.types import Event
-from core.scoring import score_log, _load_taxonomy
+from core.scoring import score_log
 
 
 def _load_steps(pack_path: Path) -> list[dict]:
