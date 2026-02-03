@@ -122,6 +122,10 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
       if obs:
           print(obs.payload)
   ```
+- Record to JSONL event log:
+  ```sh
+  python -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30 --print
+  ```
 
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
