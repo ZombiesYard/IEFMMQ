@@ -109,6 +109,21 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   ```
   This copies from `DCS/Scripts` in the repo to `Saved Games\DCS\Scripts`.
 
+## DCS Telemetry (UDP -> Observation)
+- SimTutor.lua sends JSON telemetry over UDP (default 127.0.0.1:7780, 20 Hz).
+- PC receiver example:
+  ```python
+  from adapters.dcs.telemetry.receiver import DcsTelemetryReceiver
+  with DcsTelemetryReceiver() as rx:
+      obs = rx.get_observation()
+      if obs:
+          print(obs.payload)
+  ```
+- Record to JSONL event log:
+  ```sh
+  python -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30 --print
+  ```
+
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
 - `Doc/Evaluation/Appendix - Training Task Syllabus.md`
