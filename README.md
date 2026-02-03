@@ -107,10 +107,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   ```sh
   python -m tools.install_dcs_hook --dcs-variant DCS
   ```
-- Optional hook install (Saved Games `Scripts/Hooks/SimTutor.lua`):
-  ```sh
-  python -m tools.install_dcs_hook --use-hook
-  ```
+  This copies from `DCS\Scripts` in the repo to `Saved Games\DCS\Scripts`.
 
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`

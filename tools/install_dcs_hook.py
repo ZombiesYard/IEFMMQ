@@ -15,8 +15,14 @@ SIMTUTOR_EXPORT_SNIPPET = (
 @dataclass(frozen=True)
 class InstallResult:
     export_patched: bool
-    hook_installed: bool
+    export_backup: Path | None
     files_copied: bool
+
+
+@dataclass(frozen=True)
+class PatchResult:
+    changed: bool
+    backup_path: Path | None
 
 
 def _repo_root() -> Path:
@@ -37,25 +43,33 @@ def _backup_file(path: Path) -> Path:
     return backup_path
 
 
-def patch_export(export_path: Path, snippet: str = SIMTUTOR_EXPORT_SNIPPET) -> bool:
+def patch_export(export_path: Path, snippet: str = SIMTUTOR_EXPORT_SNIPPET) -> PatchResult:
     if export_path.exists():
-        content = export_path.read_text(encoding="utf-8", errors="ignore")
+        try:
+            content = export_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise RuntimeError(
+                f"Export.lua is not valid UTF-8: {export_path}. "
+                "Please fix or re-save the file before patching."
+            ) from exc
     else:
         content = ""
 
     if "SimTutor/SimTutor.lua" in content or snippet in content:
-        return False
+        return PatchResult(changed=False, backup_path=None)
 
     _ensure_parent(export_path)
+    backup_path = None
     if export_path.exists():
-        _backup_file(export_path)
+        backup_path = _backup_file(export_path)
+        print(f"Backed up {export_path} to {backup_path}")
 
     new_content = content
     if new_content and not new_content.endswith("\n"):
         new_content += "\n"
     new_content += snippet + "\n"
     export_path.write_text(new_content, encoding="utf-8")
-    return True
+    return PatchResult(changed=True, backup_path=backup_path)
 
 
 def install_scripting_files(source_root: Path, saved_games_dir: Path) -> bool:
@@ -77,17 +91,6 @@ def install_scripting_files(source_root: Path, saved_games_dir: Path) -> bool:
     return copied
 
 
-def install_hook_template(source_root: Path, saved_games_dir: Path) -> bool:
-    template = source_root / "adapters" / "dcs" / "hooks" / "SimTutor.lua"
-    if not template.exists():
-        raise FileNotFoundError(f"Missing hook template: {template}")
-
-    target = saved_games_dir / "Scripts" / "Hooks" / "SimTutor.lua"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(template, target)
-    return True
-
-
 def resolve_saved_games_dir(saved_games: str | None, dcs_variant: str) -> Path:
     if saved_games:
         return Path(saved_games).expanduser()
@@ -98,22 +101,20 @@ def run_install(
     source_root: Path,
     saved_games_dir: Path,
     install_export: bool,
-    install_hook: bool,
 ) -> InstallResult:
     files_copied = install_scripting_files(source_root, saved_games_dir)
     export_patched = False
-    hook_installed = False
+    export_backup: Path | None = None
 
     if install_export:
         export_path = saved_games_dir / "Scripts" / "Export.lua"
-        export_patched = patch_export(export_path)
-
-    if install_hook:
-        hook_installed = install_hook_template(source_root, saved_games_dir)
+        export_result = patch_export(export_path)
+        export_patched = export_result.changed
+        export_backup = export_result.backup_path
 
     return InstallResult(
         export_patched=export_patched,
-        hook_installed=hook_installed,
+        export_backup=export_backup,
         files_copied=files_copied,
     )
 
@@ -130,7 +131,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--saved-games",
         type=str,
         default=None,
-        help="Saved Games directory (defaults to %USERPROFILE%/Saved Games/<variant>).",
+        help="Saved Games directory (defaults to <home>/Saved Games/<variant>).",
     )
     parser.add_argument(
         "--dcs-variant",
@@ -143,11 +144,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not patch Export.lua.",
     )
-    parser.add_argument(
-        "--use-hook",
-        action="store_true",
-        help="Install Hooks/SimTutor.lua template.",
-    )
     return parser
 
 
@@ -158,22 +154,23 @@ def main() -> int:
     source_root = Path(args.source_root).expanduser()
     saved_games_dir = resolve_saved_games_dir(args.saved_games, args.dcs_variant)
 
-    result = run_install(
-        source_root=source_root,
-        saved_games_dir=saved_games_dir,
-        install_export=not args.no_export,
-        install_hook=args.use_hook,
-    )
+    try:
+        result = run_install(
+            source_root=source_root,
+            saved_games_dir=saved_games_dir,
+            install_export=not args.no_export,
+        )
+    except (FileNotFoundError, RuntimeError) as exc:
+        print(f"Install failed: {exc}")
+        return 1
 
     print(
         "SimTutor install complete: "
         f"files_copied={result.files_copied}, "
-        f"export_patched={result.export_patched}, "
-        f"hook_installed={result.hook_installed}"
+        f"export_patched={result.export_patched}"
     )
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
