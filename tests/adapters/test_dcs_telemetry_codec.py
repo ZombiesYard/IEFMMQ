@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 
 from adapters.dcs.telemetry.codec import decode_dcs_observation, encode_dcs_observation
 from adapters.dcs.telemetry.receiver import DcsTelemetryReceiver
@@ -35,10 +37,18 @@ def test_encode_round_trip() -> None:
     assert decoded.aircraft == obs.aircraft
 
 
+def test_decode_invalid_payload_raises() -> None:
+    payload = _sample_payload()
+    payload.pop("cockpit")
+    data = json.dumps(payload).encode("utf-8")
+    with pytest.raises(ValueError, match="dcs_observation invalid"):
+        decode_dcs_observation(data)
+
+
 def test_receiver_drops_out_of_order() -> None:
     with DcsTelemetryReceiver(host="127.0.0.1", port=0) as receiver:
-        obs1 = receiver._process_frame(DcsObservation(**_sample_payload(seq=2)), ("127.0.0.1", 1234))
-        obs2 = receiver._process_frame(DcsObservation(**_sample_payload(seq=1)), ("127.0.0.1", 1234))
+        obs1 = receiver.process_frame(DcsObservation(**_sample_payload(seq=2)), ("127.0.0.1", 1234))
+        obs2 = receiver.process_frame(DcsObservation(**_sample_payload(seq=1)), ("127.0.0.1", 1234))
         assert obs1 is not None
         assert obs2 is None
 

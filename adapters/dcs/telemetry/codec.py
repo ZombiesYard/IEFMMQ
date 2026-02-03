@@ -27,8 +27,13 @@ _SCHEMA = _load_schema()
 _VALIDATOR = Draft202012Validator(_SCHEMA, format_checker=FormatChecker())
 
 
+def _error_path_key(error: Exception) -> tuple[str, ...]:
+    path = getattr(error, "path", ())
+    return tuple(str(p) for p in path)
+
+
 def validate_dcs_observation(payload: Mapping[str, Any]) -> None:
-    errors = sorted(_VALIDATOR.iter_errors(payload), key=lambda e: e.path)
+    errors = sorted(_VALIDATOR.iter_errors(payload), key=_error_path_key)
     if errors:
         err = errors[0]
         location = ".".join([str(p) for p in err.path]) or "<root>"

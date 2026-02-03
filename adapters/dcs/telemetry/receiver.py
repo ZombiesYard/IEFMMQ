@@ -38,6 +38,9 @@ class DcsTelemetryReceiver:
         metadata = {"seq": seq, "gap": gap, "from_addr": f"{addr[0]}:{addr[1]}"}
         return Observation(source=self.source, payload=frame.to_dict(), metadata=metadata)
 
+    def process_frame(self, frame: DcsObservation, addr: Tuple[str, int]) -> Optional[Observation]:
+        return self._process_frame(frame, addr)
+
     def get_observation(self) -> Optional[Observation]:
         try:
             data, addr = self.sock.recvfrom(65535)

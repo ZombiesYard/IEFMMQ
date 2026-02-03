@@ -18,22 +18,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_arg_parser().parse_args()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     interval = 1.0 / max(1, args.hz)
     seq = args.seq
-    for i in range(args.count):
-        frame = {
-            "schema_version": "v2",
-            "seq": seq,
-            "sim_time": float(i),
-            "aircraft": "FA-18C",
-            "cockpit": {"speed": 250.0 + i, "gear": "up"},
-        }
-        payload = json.dumps(frame).encode("utf-8")
-        sock.sendto(payload, (args.host, args.port))
-        seq += 1
-        if i < args.count - 1:
-            time.sleep(interval)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        for i in range(args.count):
+            frame = {
+                "schema_version": "v2",
+                "seq": seq,
+                "sim_time": float(i),
+                "aircraft": "FA-18C",
+                "cockpit": {"speed": 250.0 + i, "gear": "up"},
+            }
+            payload = json.dumps(frame).encode("utf-8")
+            sock.sendto(payload, (args.host, args.port))
+            seq += 1
+            if i < args.count - 1:
+                time.sleep(interval)
     print(f"sent {args.count} frame(s) to {args.host}:{args.port}")
     return 0
 

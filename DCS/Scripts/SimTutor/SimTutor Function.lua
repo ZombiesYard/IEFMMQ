@@ -219,6 +219,9 @@ function SimTutor._extend_package_paths()
     end
     local base = st_lfs.currentdir()
     local sep = package.config:sub(1, 1)
+    if base:sub(-1) ~= sep then
+        base = base .. sep
+    end
     local lua_socket_path = base .. "LuaSocket" .. sep .. "?.lua"
     local lua_socket_cpath = base .. "LuaSocket" .. sep .. "?.dll"
     if not string.find(package.path, lua_socket_path, 1, true) then
@@ -244,7 +247,12 @@ function SimTutor._load_json()
     if not ok or not st_lfs then
         return ok_json, json_mod
     end
-    local path = st_lfs.currentdir() .. "Scripts\\JSON.lua"
+    local base = st_lfs.currentdir()
+    local sep = package.config:sub(1, 1)
+    if base:sub(-1) ~= sep then
+        base = base .. sep
+    end
+    local path = base .. "Scripts" .. sep .. "JSON.lua"
     return pcall(function()
         return loadfile(path)()
     end)
