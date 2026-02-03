@@ -102,6 +102,13 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   ```
   Mirrors `DCS/Scripts/HilteTest.py` / `HiliteClearTest.py`.
 
+## DCS Export Injection (SimTutor.lua)
+- Install SimTutor DCS scripts into Saved Games and patch `Export.lua`:
+  ```sh
+  python -m tools.install_dcs_hook --dcs-variant DCS
+  ```
+  This copies from `DCS/Scripts` in the repo to `Saved Games\DCS\Scripts`.
+
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
 - `Doc/Evaluation/Appendix - Training Task Syllabus.md`
