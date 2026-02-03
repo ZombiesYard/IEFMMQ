@@ -23,10 +23,13 @@ def main() -> int:
             return 0
 
         print(f"listening on {args.host}:{args.port} ...")
-        while True:
-            obs = rx.get_observation()
-            if obs:
-                print(json.dumps(obs.payload, ensure_ascii=False))
+        try:
+            while True:
+                obs = rx.get_observation()
+                if obs:
+                    print(json.dumps(obs.payload, ensure_ascii=False))
+        except KeyboardInterrupt:
+            print("stopped")
     return 0
 
 

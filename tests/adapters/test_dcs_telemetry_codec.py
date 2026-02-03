@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 
 from adapters.dcs.telemetry.codec import decode_dcs_observation, encode_dcs_observation
 from adapters.dcs.telemetry.receiver import DcsTelemetryReceiver
@@ -37,12 +36,9 @@ def test_encode_round_trip() -> None:
 
 
 def test_receiver_drops_out_of_order() -> None:
-    receiver = DcsTelemetryReceiver(host="127.0.0.1", port=0)
-    try:
+    with DcsTelemetryReceiver(host="127.0.0.1", port=0) as receiver:
         obs1 = receiver._process_frame(DcsObservation(**_sample_payload(seq=2)), ("127.0.0.1", 1234))
         obs2 = receiver._process_frame(DcsObservation(**_sample_payload(seq=1)), ("127.0.0.1", 1234))
         assert obs1 is not None
         assert obs2 is None
-    finally:
-        receiver.close()
 

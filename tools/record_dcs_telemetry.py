@@ -14,14 +14,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", required=True, help="Output JSONL path")
     parser.add_argument("--host", default="0.0.0.0", help="UDP bind host (default 0.0.0.0)")
     parser.add_argument("--port", type=int, default=7780, help="UDP bind port (default 7780)")
-    parser.add_argument("--duration", type=float, default=0, help="Seconds to record (0=until max-frames)")
-    parser.add_argument("--max-frames", type=int, default=0, help="Max frames to record (0=until duration)")
+    parser.add_argument("--duration", type=float, default=0, help="Seconds to record (0=requires max-frames)")
+    parser.add_argument("--max-frames", type=int, default=0, help="Max frames to record (0=requires duration)")
     parser.add_argument("--print", action="store_true", help="Print each frame payload to stdout")
     return parser
 
 
 def main() -> int:
     args = build_arg_parser().parse_args()
+    if args.duration <= 0 and args.max_frames <= 0:
+        raise SystemExit("Please set --duration or --max-frames (both are 0 by default).")
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
 
