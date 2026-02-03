@@ -107,7 +107,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   ```sh
   python -m tools.install_dcs_hook --dcs-variant DCS
   ```
-  This copies from `DCS\Scripts` in the repo to `Saved Games\DCS\Scripts`.
+  This copies from `DCS/Scripts` in the repo to `Saved Games\DCS\Scripts`.
 
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`

@@ -1,3 +1,11 @@
+"""
+Install SimTutor DCS Export hook files into a Saved Games DCS folder.
+
+Usage:
+  python -m tools.install_dcs_hook --saved-games "C:\\Users\\you\\Saved Games\\DCS"
+  python -m tools.install_dcs_hook --dcs-variant DCS.openbeta
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -80,15 +88,15 @@ def install_scripting_files(source_root: Path, saved_games_dir: Path) -> bool:
     target_dir = saved_games_dir / "Scripts" / "SimTutor"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    copied = False
+    any_copied = False
     for name in ["SimTutor.lua", "SimTutor Function.lua"]:
         src = source_dir / name
         if not src.exists():
             raise FileNotFoundError(f"Missing source file: {src}")
         dst = target_dir / name
         shutil.copy2(src, dst)
-        copied = True
-    return copied
+        any_copied = True
+    return any_copied
 
 
 def resolve_saved_games_dir(saved_games: str | None, dcs_variant: str) -> Path:

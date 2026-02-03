@@ -6,6 +6,7 @@ import pytest
 
 from tools.install_dcs_hook import (
     SIMTUTOR_EXPORT_SNIPPET,
+    install_scripting_files,
     patch_export,
     run_install,
 )
@@ -41,6 +42,13 @@ def test_patch_export_idempotent(tmp_path: Path) -> None:
     assert second.changed is False
     content = export_path.read_text(encoding="utf-8")
     assert content.count(SIMTUTOR_EXPORT_SNIPPET) == 1
+
+
+def test_patch_export_invalid_utf8_raises(tmp_path: Path) -> None:
+    export_path = tmp_path / "Export.lua"
+    export_path.write_bytes(b"\xff\xfe\xfa")
+    with pytest.raises(RuntimeError, match="not valid UTF-8"):
+        patch_export(export_path)
 
 
 def test_patch_export_creates_when_missing(tmp_path: Path) -> None:
@@ -85,3 +93,31 @@ def test_run_install_missing_source_dir_raises(tmp_path: Path) -> None:
             saved_games_dir=tmp_path / "Saved Games" / "DCS",
             install_export=False,
         )
+
+
+def test_run_install_no_export_copies_only(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
+    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
+    _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    result = run_install(
+        source_root=repo_root,
+        saved_games_dir=saved_games_dir,
+        install_export=False,
+    )
+
+    assert result.files_copied is True
+    assert result.export_patched is False
+    assert result.export_backup is None
+
+
+def test_install_scripting_files_missing_one_file_raises(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
+    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+
+    with pytest.raises(FileNotFoundError, match="SimTutor Function.lua"):
+        install_scripting_files(repo_root, saved_games_dir)
