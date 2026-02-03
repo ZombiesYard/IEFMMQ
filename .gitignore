@@ -8,6 +8,11 @@ tests/__pycache__
 /tests/.tmp_overlay/
 /tests/.tmp_mock_env/
 /tests/.tmp_logs/
+adapters/dcs/__pycache__/
+adapters/dcs/telemetry/__pycache__/
+simtutor/schemas/__pycache__/
+simtutor/schemas/v2/__pycache__/
+tests/adapters/__pycache__/
 simtutor/__pycache__/
 logs/*.jsonl
 /artifacts/

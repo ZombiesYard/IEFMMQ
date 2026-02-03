@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/dcs_observation.json",
+  "title": "DCS Observation v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "seq", "sim_time", "aircraft", "cockpit"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "sim_time": { "type": "number" },
+    "aircraft": { "type": "string" },
+    "cockpit": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["number", "string", "boolean", "null"]
+      }
+    },
+    "raw": { "type": ["object", "null"] }
+  }
+}
