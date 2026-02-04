@@ -144,3 +144,11 @@ def test_missing_var_path_blocks():
     assert not res.allowed
     assert "missing" in res.reason
 
+
+def test_vars_preferred_for_bare_keys():
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"battery_on": True}})
+    engine = GatingEngine([{"op": "flag_true", "var": "battery_on"}])
+    res = engine.evaluate([obs])
+    assert res.allowed
+

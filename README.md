@@ -60,6 +60,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - `pack.yaml` steps S01CS10 mapped from `fa18c_startup_master.md` (phase, wording, preconditions placeholders).
 - `taxonomy.yaml` error categories OM/CO/OR/PA/SV, weights, critical multiplier.
 - `ui_map.yaml` abstract targets  DCS `pnt_*`.
+- `telemetry_map.yaml` stable var mappings for gating/LLM/overlay (vars.*).
 - Instruments: NASATLX, quiz stored under `Doc/Evaluation`.
 
 ## Engines
