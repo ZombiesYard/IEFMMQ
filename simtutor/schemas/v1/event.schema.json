@@ -23,7 +23,10 @@
         "ui.clear_requested",
         "ui.clear_ack",
         "ui.user_clicked",
-        "ui.card_rendered"
+        "ui.card_rendered",
+        "step_activated",
+        "step_completed",
+        "step_blocked"
       ]
     },
     "t_wall": { "type": ["number", "null"] },

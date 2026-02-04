@@ -21,7 +21,10 @@ class VarResolverError(ValueError):
 
 
 def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
-    node = ast.parse(expr, mode="eval")
+    try:
+        node = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        raise VarResolverError(f"Invalid expression: {expr}") from exc
 
     def resolve_attr(value: Any, attr: str) -> Any:
         if isinstance(value, dict):

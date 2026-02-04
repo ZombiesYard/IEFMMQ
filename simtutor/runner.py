@@ -5,8 +5,10 @@ Simulation runner utilities for producing and validating event logs.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Tuple
+import warnings
 
 import yaml
 
@@ -16,7 +18,7 @@ from adapters.event_store.telemetry_writer import TelemetryWriter
 from core.procedure import ProcedureEngine
 from core.types import Event
 from core.scoring import score_log
-from core.interaction_metrics import compute_interaction_metrics
+from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
 
 
 def _load_steps(pack_path: Path) -> list[dict]:
@@ -178,7 +180,8 @@ def batch_run(
         try:
             events = JsonlEventStore.load(log_path)
             score.update(compute_interaction_metrics(events).to_dict())
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            warnings.warn(f"failed to compute interaction metrics for {log_path}: {exc}")
+            score.update(InteractionMetrics().to_dict())
         results.append(score)
     return results
