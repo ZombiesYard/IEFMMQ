@@ -124,6 +124,51 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   python -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30 --print
   ```
 
+## DCS-BIOS Bridge (Hub Script -> SimTutor)
+1) Generate catalog + Lua control list:
+   ```sh
+   python -m adapters.dcs_bios.catalog_loader \
+       --aircraft FA-18C_hornet \
+       --input DCS/Scripts/DCS-BIOS/doc/json/FA-18C_hornet.json \
+       --output artifacts/dcs_bios_catalog_FA-18C_hornet.json \
+       --controls-lua artifacts/dcs_bios_controls_FA-18C_hornet.lua
+   ```
+2) Load `DCS/Scripts/SimTutor/SimTutorDcsBiosHub.lua` into DCS-BIOS Hub.
+   - Set `CONTROL_LIST_PATH` or `CONTROL_LIST_DIR` to the generated `artifacts/dcs_bios_controls_*.lua`.
+   - Default UDP target: `127.0.0.1:7790`.
+   - Set `SEND_DELTA_ONLY = true` to reduce bandwidth (receiver merges cache).
+3) Receive on PC:
+   ```python
+   from adapters.dcs_bios.receiver import DcsBiosReceiver
+   with DcsBiosReceiver() as rx:
+       obs = rx.get_observation()
+       if obs:
+           print(obs.payload["bios"])
+   ```
+4) Raw DCS-BIOS export decode (if you see hex bytes):
+   ```python
+   from adapters.dcs_bios.receiver import DcsBiosRawReceiver
+   with DcsBiosRawReceiver(
+       aircraft="FA-18C_hornet",
+       control_reference_dir="DCS/Scripts/DCS-BIOS/doc/json",
+   ) as rx:
+       obs = rx.get_observation()
+       if obs:
+           print(obs.payload["bios"])
+   ```
+   Or CLI:
+   ```sh
+   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet
+   ```
+   Note: the raw export stream is incremental; the first frame may be partial
+   (e.g., `_ACFT_NAME` truncated). For a single fuller snapshot, wait for enough
+   keys before exiting:
+   ```sh
+   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet \
+       --once --wait 15 --min-keys 500 \
+       --output artifacts/dcs_bios_frame_once.json
+   ```
+
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
 - `Doc/Evaluation/Appendix - Training Task Syllabus.md`

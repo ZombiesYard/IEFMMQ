@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/dcs_bios_frame.json",
+  "title": "DCS-BIOS Frame v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "seq", "t_wall", "aircraft", "bios"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "t_wall": { "type": "number" },
+    "aircraft": { "type": "string" },
+    "bios": { "type": "object" },
+    "delta": { "type": "object" }
+  }
+}
+
