@@ -83,15 +83,18 @@ def main() -> int:
                     output_fh.flush()
                 return 0
             print(f"listening on {args.host}:{args.port} ...")
-            while True:
-                obs = rx.get_observation()
-                if obs:
-                    text = json.dumps(obs.payload, ensure_ascii=False)
-                    print(text)
-                    if output_fh:
-                        output_fh.write(text)
-                        output_fh.write("\n")
-                        output_fh.flush()
+            try:
+                while True:
+                    obs = rx.get_observation()
+                    if obs:
+                        text = json.dumps(obs.payload, ensure_ascii=False)
+                        print(text)
+                        if output_fh:
+                            output_fh.write(text)
+                            output_fh.write("\n")
+                            output_fh.flush()
+            except KeyboardInterrupt:
+                pass
         return 0
     finally:
         if output_fh:

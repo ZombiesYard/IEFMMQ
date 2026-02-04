@@ -4,8 +4,7 @@ from adapters.dcs_bios.receiver import DcsBiosReceiver
 
 
 def test_receiver_merges_state() -> None:
-    rx = DcsBiosReceiver(host="127.0.0.1", port=0, merge_full_state=True)
-    try:
+    with DcsBiosReceiver(host="127.0.0.1", port=0, merge_full_state=True) as rx:
         obs1 = rx._process_payload(
             {"seq": 1, "t_wall": 1.0, "aircraft": "FA-18C", "bios": {"A": 1}},
             ("127.0.0.1", 1000),
@@ -19,13 +18,10 @@ def test_receiver_merges_state() -> None:
         assert obs2.payload["bios"]["A"] == 1
         assert obs2.payload["bios"]["B"] == 2
         assert obs2.payload["delta"] == {"B": 2}
-    finally:
-        rx.close()
 
 
 def test_receiver_drops_out_of_order() -> None:
-    rx = DcsBiosReceiver(host="127.0.0.1", port=0, merge_full_state=True)
-    try:
+    with DcsBiosReceiver(host="127.0.0.1", port=0, merge_full_state=True) as rx:
         obs1 = rx._process_payload(
             {"seq": 2, "t_wall": 1.0, "aircraft": "FA-18C", "bios": {"A": 1}},
             ("127.0.0.1", 1000),
@@ -36,6 +32,3 @@ def test_receiver_drops_out_of_order() -> None:
         )
         assert obs1 is not None
         assert obs2 is None
-    finally:
-        rx.close()
-

@@ -23,6 +23,7 @@ local function json_escape(s)
     s = s:gsub("\n", "\\n")
     s = s:gsub("\r", "\\r")
     s = s:gsub("\t", "\\t")
+    s = s:gsub("/", "\\/")
     return s
 end
 
@@ -35,16 +36,23 @@ local function json_encode_value(v)
     elseif t == "table" then
         local is_array = true
         local n = 0
+        local max = 0
         for k, _ in pairs(v) do
-            n = n + 1
-            if type(k) ~= "number" then
+            if type(k) ~= "number" or k < 1 or k % 1 ~= 0 then
                 is_array = false
                 break
             end
+            if k > max then
+                max = k
+            end
+            n = n + 1
+        end
+        if is_array and n ~= max then
+            is_array = false
         end
         local items = {}
         if is_array then
-            for i = 1, n do
+            for i = 1, max do
                 items[#items + 1] = json_encode_value(v[i])
             end
             return "[" .. table.concat(items, ",") .. "]"
@@ -115,10 +123,21 @@ local function load_controls_for_aircraft(aircraft)
     return true
 end
 
+local socket_gettime = nil
+
 local function get_wall_time()
-    local seconds = os.time() or 0
-    local frac = os.clock() or 0
-    return seconds + (frac - math.floor(frac))
+    if socket_gettime == nil then
+        local ok, socket = pcall(require, "socket")
+        if ok and socket and type(socket.gettime) == "function" then
+            socket_gettime = socket.gettime
+        else
+            socket_gettime = false
+        end
+    end
+    if socket_gettime then
+        return socket_gettime()
+    end
+    return os.time() or 0
 end
 
 local function build_delta()
@@ -173,4 +192,3 @@ hub.registerOutputCallback(function()
     }
     send_udp(json_encode(payload))
 end)
-

@@ -50,13 +50,12 @@ def test_raw_receiver_decodes_frame(tmp_path: Path) -> None:
     ref_path = tmp_path / "controls.json"
     _build_sample_reference(ref_path)
 
-    rx = DcsBiosRawReceiver(
+    with DcsBiosRawReceiver(
         host="127.0.0.1",
         port=0,
         control_reference_paths=[str(ref_path)],
         include_metadata=False,
-    )
-    try:
+    ) as rx:
         # Frame: write 4 bytes at addr 0, then 2 bytes at addr 4.
         frame = (
             b"\x00\x00\x04\x00" + b"A\x00\x00\x00" + b"\x04\x00\x02\x00" + b"\x34\x12"
@@ -66,6 +65,3 @@ def test_raw_receiver_decodes_frame(tmp_path: Path) -> None:
         delta = rx._apply_frame(frames[0])
         assert delta["_ACFT_NAME"] == "A"
         assert delta["SWITCH_1"] == 0x1234
-    finally:
-        rx.close()
-

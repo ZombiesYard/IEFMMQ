@@ -234,7 +234,7 @@ class DcsBiosRawReceiver:
         return frames
 
     def _read_uint16(self, address: int) -> int:
-        if address < 0 or address + 1 >= len(self._state):
+        if address < 0 or address >= len(self._state) - 1:
             return 0
         return self._state[address] | (self._state[address + 1] << 8)
 
