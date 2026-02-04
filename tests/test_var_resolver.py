@@ -59,7 +59,7 @@ def test_var_resolver_rejects_is_operator() -> None:
         source="dcs_bios",
         bios={"VALUE": 1},
     )
-    
+
     with pytest.raises(VarResolverError, match="Unsupported comparison operator.*Is"):
         resolver.resolve(frame)
 
@@ -82,7 +82,7 @@ def test_var_resolver_rejects_is_not_operator() -> None:
         source="dcs_bios",
         bios={"VALUE": 1},
     )
-    
+
     with pytest.raises(VarResolverError, match="Unsupported comparison operator.*IsNot"):
         resolver.resolve(frame)
 
@@ -105,7 +105,7 @@ def test_var_resolver_rejects_in_operator() -> None:
         source="dcs_bios",
         bios={"VALUE": 1},
     )
-    
+
     with pytest.raises(VarResolverError, match="Unsupported comparison operator.*In"):
         resolver.resolve(frame)
 
@@ -128,6 +128,6 @@ def test_var_resolver_rejects_not_in_operator() -> None:
         source="dcs_bios",
         bios={"VALUE": 1},
     )
-    
+
     with pytest.raises(VarResolverError, match="Unsupported comparison operator.*NotIn"):
         resolver.resolve(frame)
