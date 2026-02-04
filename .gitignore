@@ -21,3 +21,5 @@ DCS/Scripts/Hooks/scratchpad-hook.lua
 DCS/Scripts/Hooks/TheWay.lua
 DCS/Scripts/Scratchpad
 DCS/Scripts/TheWay
+DCS/Scripts/DCS-BIOS
+adapters/dcs_bios/__pycache__
