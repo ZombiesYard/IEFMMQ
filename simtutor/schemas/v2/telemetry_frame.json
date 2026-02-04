@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/telemetry_frame.json",
+  "title": "Telemetry Frame v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "seq", "t_wall", "source"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "t_sim": { "type": ["number", "null"] },
+    "t_wall": { "type": "number" },
+    "source": {
+      "type": "string",
+      "enum": ["lo", "dcs_bios", "derived"]
+    },
+    "aircraft": { "type": ["string", "null"] },
+    "lo": { "type": ["object", "null"] },
+    "bios": {
+      "type": ["object", "null"],
+      "additionalProperties": { "type": ["number", "string", "boolean", "null"] }
+    },
+    "cockpit_args": {
+      "type": ["object", "null"],
+      "additionalProperties": { "type": "number" }
+    },
+    "vars": {
+      "type": "object",
+      "additionalProperties": { "type": ["number", "string", "boolean", "null"] }
+    },
+    "raw": { "type": ["object", "null"] }
+  }
+}

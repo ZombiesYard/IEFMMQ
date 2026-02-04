@@ -12,6 +12,7 @@ import yaml
 
 from adapters.mock_env import MockEnvAdapter
 from core.event_store import JsonlEventStore
+from adapters.event_store.telemetry_writer import TelemetryWriter
 from core.procedure import ProcedureEngine
 from core.types import Event
 from core.scoring import score_log
@@ -117,6 +118,29 @@ def replay_log(log_path: str, pack_path: str) -> Tuple[bool, str]:
             continue
     if active:
         return False, f"ended with active {active}"
+    return True, "ok"
+
+
+def replay_telemetry(log_paths: list[str]) -> Tuple[bool, str]:
+    for path in log_paths:
+        last_seq = None
+        last_t_wall = None
+        try:
+            for frame in TelemetryWriter.iter_frames(path):
+                seq = frame.get("seq")
+                t_wall = frame.get("t_wall")
+                if not isinstance(seq, int):
+                    return False, f"{path} missing seq"
+                if not isinstance(t_wall, (int, float)):
+                    return False, f"{path} missing t_wall"
+                if last_seq is not None and seq <= last_seq:
+                    return False, f"{path} non-monotonic seq at {seq}"
+                if last_t_wall is not None and t_wall < last_t_wall:
+                    return False, f"{path} non-monotonic t_wall at {t_wall}"
+                last_seq = seq
+                last_t_wall = t_wall
+        except Exception as exc:
+            return False, f"{path} failed to read: {exc}"
     return True, "ok"
 
 
