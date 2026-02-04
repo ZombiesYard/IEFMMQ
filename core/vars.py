@@ -58,21 +58,33 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
         if isinstance(n, ast.Compare):
             left = eval_node(n.left)
             for op, comp in zip(n.ops, n.comparators):
+                # Check for unsupported operators before evaluating comparator
+                if not isinstance(op, (ast.Eq, ast.NotEq, ast.Gt, ast.GtE, ast.Lt, ast.LtE)):
+                    raise VarResolverError(
+                        f"Unsupported comparison operator: {op.__class__.__name__}. "
+                        f"Only ==, !=, >, >=, <, <= are supported."
+                    )
                 right = eval_node(comp)
                 if left is None or right is None:
                     return False
-                if isinstance(op, ast.Eq) and not (left == right):
-                    return False
-                if isinstance(op, ast.NotEq) and not (left != right):
-                    return False
-                if isinstance(op, ast.Gt) and not (left > right):
-                    return False
-                if isinstance(op, ast.GtE) and not (left >= right):
-                    return False
-                if isinstance(op, ast.Lt) and not (left < right):
-                    return False
-                if isinstance(op, ast.LtE) and not (left <= right):
-                    return False
+                if isinstance(op, ast.Eq):
+                    if not (left == right):
+                        return False
+                elif isinstance(op, ast.NotEq):
+                    if not (left != right):
+                        return False
+                elif isinstance(op, ast.Gt):
+                    if not (left > right):
+                        return False
+                elif isinstance(op, ast.GtE):
+                    if not (left >= right):
+                        return False
+                elif isinstance(op, ast.Lt):
+                    if not (left < right):
+                        return False
+                elif isinstance(op, ast.LtE):
+                    if not (left <= right):
+                        return False
                 left = right
             return True
         if isinstance(n, ast.BinOp):
