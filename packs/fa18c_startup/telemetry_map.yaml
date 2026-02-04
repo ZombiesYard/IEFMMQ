@@ -1,0 +1,27 @@
+vars:
+  # Power
+  battery_on: "bios.BATTERY_SW == 2"
+  ext_pwr_on: "bios.EXT_PWR_SW == 1"
+  l_gen_on: "bios.L_GEN_SW == 1"
+  r_gen_on: "bios.R_GEN_SW == 1"
+  power_available: "derived((vars.battery_on or vars.ext_pwr_on) and vars.l_gen_on and vars.r_gen_on)"
+
+  # APU
+  apu_on: "bios.APU_CONTROL_SW == 1"
+  apu_ready: "bios.APU_READY_LT == 1"
+
+  # Engine start
+  engine_crank_right: "bios.ENGINE_CRANK_SW == 1"
+  engine_crank_left: "bios.ENGINE_CRANK_SW == 2"
+  bleed_air_norm: "bios.BLEED_AIR_KNOB == 2"
+
+  # Displays / avionics
+  left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
+  right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"
+  mpcd_on: "bios.AMPCD_BRT_CTL > 0"
+  hud_on: "bios.HUD_SYM_BRT > 0"
+
+  # Key switches
+  fire_test_active: "bios.FIRE_TEST_SW == 1"
+  ins_mode: "bios.INS_SW"
+  radar_on: "bios.RADAR_SW > 0"

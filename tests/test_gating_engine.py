@@ -144,3 +144,90 @@ def test_missing_var_path_blocks():
     assert not res.allowed
     assert "missing" in res.reason
 
+
+def test_vars_preferred_for_bare_keys():
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"battery_on": True}})
+    engine = GatingEngine([{"op": "flag_true", "var": "battery_on"}])
+    res = engine.evaluate([obs])
+    assert res.allowed
+
+
+def test_bare_key_resolves_from_top_level_vars():
+    """Test that bare keys can resolve from top-level vars when payload.vars doesn't have it."""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = {
+        "observation_id": "x",
+        "timestamp": iso(now),
+        "source": "mock",
+        "payload": {},
+        "tags": [],
+        "version": "v1",
+        "vars": {"engine_rpm": 0.5},
+    }
+    engine = GatingEngine([{"op": "var_gte", "var": "engine_rpm", "value": 0.4}])
+    res = engine.evaluate([obs])
+    assert res.allowed
+
+
+def test_bare_key_prefers_payload_vars_over_top_level():
+    """Test that payload.vars takes precedence over top-level vars for bare keys."""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = {
+        "observation_id": "x",
+        "timestamp": iso(now),
+        "source": "mock",
+        "payload": {"vars": {"throttle": 0.8}},
+        "tags": [],
+        "version": "v1",
+        "vars": {"throttle": 0.3},
+    }
+    engine = GatingEngine([{"op": "var_gte", "var": "throttle", "value": 0.7}])
+    res = engine.evaluate([obs])
+    # Should use payload.vars.throttle (0.8), not top-level vars.throttle (0.3)
+    assert res.allowed
+
+
+def test_vars_prefix_resolves_from_payload_vars():
+    """Test that vars.key paths resolve from payload.vars."""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"gear_down": True}})
+    engine = GatingEngine([{"op": "flag_true", "var": "vars.gear_down"}])
+    res = engine.evaluate([obs])
+    assert res.allowed
+
+
+def test_vars_prefix_resolves_from_top_level_vars():
+    """Test that vars.key paths can resolve from top-level vars when payload.vars doesn't have it."""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = {
+        "observation_id": "x",
+        "timestamp": iso(now),
+        "source": "mock",
+        "payload": {},
+        "tags": [],
+        "version": "v1",
+        "vars": {"flaps_position": 0.5},
+    }
+    engine = GatingEngine([{"op": "var_gte", "var": "vars.flaps_position", "value": 0.4}])
+    res = engine.evaluate([obs])
+    assert res.allowed
+
+
+def test_vars_prefix_prefers_payload_over_top_level():
+    """Test that vars.key prefers payload.vars over top-level vars."""
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = {
+        "observation_id": "x",
+        "timestamp": iso(now),
+        "source": "mock",
+        "payload": {"vars": {"altitude": 5000}},
+        "tags": [],
+        "version": "v1",
+        "vars": {"altitude": 1000},
+    }
+    engine = GatingEngine([{"op": "var_gte", "var": "vars.altitude", "value": 4000}])
+    res = engine.evaluate([obs])
+    # Should use payload.vars.altitude (5000), not top-level vars.altitude (1000)
+    assert res.allowed
+

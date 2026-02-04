@@ -9,6 +9,7 @@ Supported DSL operations (v1):
 
 Input observations are dicts (matching Observation.to_dict()) and can be
 evaluated using dot-delimited paths into the payload or top-level fields.
+Stable vars are preferred when available (vars.<key> or bare <key>).
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ def _parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def _get_var(data: Dict[str, Any], path: str) -> Optional[Any]:
+def _get_by_path(data: Dict[str, Any], path: str) -> Optional[Any]:
     parts = path.split(".")
     current: Any = data
     for part in parts:
@@ -31,6 +32,26 @@ def _get_var(data: Dict[str, Any], path: str) -> Optional[Any]:
         else:
             return None
     return current
+
+
+def _get_var(data: Dict[str, Any], path: str) -> Optional[Any]:
+    # Prefer stable vars when a bare key is used.
+    if "." not in path:
+        val = _get_by_path(data, f"payload.vars.{path}")
+        if val is not None:
+            return val
+        val = _get_by_path(data, f"vars.{path}")
+        if val is not None:
+            return val
+    # Direct vars.<key> lookup (payload.vars or top-level vars).
+    if path.startswith("vars."):
+        val = _get_by_path(data, f"payload.{path}")
+        if val is not None:
+            return val
+        val = _get_by_path(data, path)
+        if val is not None:
+            return val
+    return _get_by_path(data, path)
 
 
 def _is_number(value: Any) -> bool:
