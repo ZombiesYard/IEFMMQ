@@ -8,6 +8,7 @@ tests/__pycache__
 /tests/.tmp_overlay/
 /tests/.tmp_mock_env/
 /tests/.tmp_logs/
+/tests/.tmp_telemetry/
 adapters/dcs/__pycache__/
 adapters/dcs/telemetry/__pycache__/
 simtutor/schemas/__pycache__/
@@ -23,3 +24,4 @@ DCS/Scripts/Scratchpad
 DCS/Scripts/TheWay
 DCS/Scripts/DCS-BIOS
 adapters/dcs_bios/__pycache__
+adapters/event_store/__pycache__

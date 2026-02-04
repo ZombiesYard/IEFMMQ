@@ -9,14 +9,25 @@ from jsonschema import Draft202012Validator, FormatChecker
 from simtutor.runner import replay_log, run_simulation
 
 
-SCHEMA_PACKAGE = "simtutor.schemas.v1"
+SCHEMA_INDEX = {
+    "event": ("simtutor.schemas.v1", "event.schema.json"),
+    "observation": ("simtutor.schemas.v1", "observation.schema.json"),
+    "tutor_request": ("simtutor.schemas.v1", "tutor_request.schema.json"),
+    "tutor_response": ("simtutor.schemas.v1", "tutor_response.schema.json"),
+    "dcs_observation": ("simtutor.schemas.v2", "dcs_observation.json"),
+    "dcs_bios_frame": ("simtutor.schemas.v2", "dcs_bios_frame.json"),
+    "telemetry_frame": ("simtutor.schemas.v2", "telemetry_frame.json"),
+}
 
 
 def _load_schema(name: str) -> Mapping:
+    if name not in SCHEMA_INDEX:
+        raise FileNotFoundError(f"Unknown schema: {name}")
+    schema_pkg, schema_file = SCHEMA_INDEX[name]
     try:
-        schema_path = resources.files(SCHEMA_PACKAGE) / f"{name}.schema.json"
+        schema_path = resources.files(schema_pkg) / schema_file
     except ModuleNotFoundError as exc:
-        raise FileNotFoundError(f"Schema package not found: {SCHEMA_PACKAGE}") from exc
+        raise FileNotFoundError(f"Schema package not found: {schema_pkg}") from exc
     if not schema_path.is_file():
         raise FileNotFoundError(f"Schema not found: {schema_path}")
     with schema_path.open("r", encoding="utf-8") as f:
@@ -66,7 +77,7 @@ def main() -> int:
     val.add_argument("files", nargs="+", help="One or more JSONL files")
     val.add_argument(
         "--schema",
-        choices=["event", "observation", "tutor_request", "tutor_response"],
+        choices=sorted(SCHEMA_INDEX.keys()),
         default="event",
         help="Schema name to validate against (default: event)",
     )
@@ -77,8 +88,9 @@ def main() -> int:
     run.add_argument("--output", help="Output log path (default logs/run_<ts>.jsonl)")
 
     rep = sub.add_parser("replay", help="Replay event log and validate trajectory")
-    rep.add_argument("file", help="Event log JSONL")
-    rep.add_argument("--pack", required=True, help="Path to pack.yaml for validation")
+    rep.add_argument("file", nargs="?", help="Event log JSONL")
+    rep.add_argument("--pack", help="Path to pack.yaml for validation")
+    rep.add_argument("--telemetry", nargs="*", help="Telemetry JSONL logs (validate seq/t_wall order)")
 
     score = sub.add_parser("score", help="Score an event log using taxonomy")
     score.add_argument("file", help="Event log JSONL")
@@ -99,7 +111,18 @@ def main() -> int:
         print(f"[RUN] wrote {log_path}")
         return 0
     if args.command == "replay":
-        ok, msg = replay_log(args.file, args.pack)
+        if args.telemetry:
+            from simtutor.runner import replay_telemetry
+
+            ok, msg = replay_telemetry(args.telemetry)
+        else:
+            if not args.file:
+                print("[REPLAY] missing event log file")
+                return 1
+            if not args.pack:
+                print("[REPLAY] missing --pack for event replay")
+                return 1
+            ok, msg = replay_log(args.file, args.pack)
         print(f"[REPLAY] {msg}")
         return 0 if ok else 1
     if args.command == "score":

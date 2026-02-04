@@ -77,6 +77,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 ## Experiment Harness
 - Single run: `python -m simtutor run ...`
 - Replay: `python -m simtutor replay ...`
+- Replay telemetry: `python -m simtutor replay --telemetry logs/telemetry_*.jsonl`
 - Score: `python -m simtutor score ...`
 - Batch: `python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts`
   - Optional: `--taxonomy packs/fa18c_startup/taxonomy.yaml`
