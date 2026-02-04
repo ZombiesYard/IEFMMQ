@@ -16,6 +16,7 @@ from adapters.event_store.telemetry_writer import TelemetryWriter
 from core.procedure import ProcedureEngine
 from core.types import Event
 from core.scoring import score_log
+from core.interaction_metrics import compute_interaction_metrics
 
 
 def _load_steps(pack_path: Path) -> list[dict]:
@@ -174,5 +175,10 @@ def batch_run(
         score = score_run(str(log_path), pack_path, taxonomy_path)
         score["scenario"] = stem
         score["log_path"] = str(log_path)
+        try:
+            events = JsonlEventStore.load(log_path)
+            score.update(compute_interaction_metrics(events).to_dict())
+        except Exception:
+            pass
         results.append(score)
     return results
