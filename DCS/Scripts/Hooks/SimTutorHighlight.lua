@@ -26,8 +26,10 @@ end
 
 local CMD_HOST, CMD_PORT = "127.0.0.1", 7781
 local ACK_HOST, ACK_PORT = "127.0.0.1", 7782
+-- AUTO_CLEAR clears any existing highlight before each new highlight (even if target is unchanged).
+-- This differs from the Python sender which only clears when switching targets.
 local AUTO_CLEAR = true
-local HILITE_ID = "9101"
+local HILITE_ID = 9101
 
 local udp_cmd = assert(socket.udp())
 assert(udp_cmd:setsockname(CMD_HOST, CMD_PORT))
@@ -96,6 +98,10 @@ local function handle_command(cmd)
   local cmd_id = cmd.cmd_id
   local action = cmd.action
   local target = cmd.target
+  if not cmd_id or type(cmd_id) ~= "string" then
+    loge("Invalid command: missing/invalid cmd_id")
+    return
+  end
   if action == "clear" then
     local ok, err = do_clear()
     send_ack(cmd_id, ok and "ok" or "failed", err)

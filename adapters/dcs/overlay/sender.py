@@ -27,6 +27,7 @@ class DcsOverlaySender:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(timeout)
         self.ack_receiver = ack_receiver
+        # auto_clear only clears when switching targets (not on every highlight).
         self.auto_clear = auto_clear
         self.session_id = session_id
         self.event_sink = event_sink
@@ -75,7 +76,11 @@ class DcsOverlaySender:
 
         if not expect_ack or not self.ack_receiver:
             return None
-        ack = self.ack_receiver.wait_for(cmd["cmd_id"], timeout=self.sock.gettimeout() or 0.5)
+        wait_timeout = self.sock.gettimeout()
+        if wait_timeout is None:
+            wait_timeout = 0.5
+        # Note: ack_receiver has its own socket timeout for individual recv calls.
+        ack = self.ack_receiver.wait_for(cmd["cmd_id"], timeout=wait_timeout)
         if ack:
             event = self.ack_receiver.to_event(ack, intent=intent.intent, target=target)
             self._emit_event(event)
