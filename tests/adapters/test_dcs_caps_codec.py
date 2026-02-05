@@ -75,3 +75,42 @@ def test_apply_caps_to_sender() -> None:
     apply_caps_to_overlay_sender(sender, caps)
     assert sender.enabled is False
     assert sender.ack_enabled is False
+
+
+def test_negotiate_emits_event() -> None:
+    events = []
+    server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server.bind(("127.0.0.1", 0))
+    host, port = server.getsockname()
+    server.settimeout(1.0)
+
+    caps_payload = {
+        "schema_version": "v2",
+        "telemetry": True,
+        "overlay": True,
+        "overlay_ack": True,
+        "clickable_actions": False,
+        "vlm_frame": False,
+    }
+
+    def server_thread():
+        try:
+            data, addr = server.recvfrom(4096)
+            _ = decode(data)
+            server.sendto(encode(caps_payload), addr)
+        finally:
+            server.close()
+
+    th = threading.Thread(target=server_thread, daemon=True)
+    th.start()
+
+    caps = negotiate(
+        host=host,
+        port=port,
+        timeout=1.0,
+        session_id="sess-1",
+        event_sink=events.append,
+    )
+    assert caps is not None
+    assert events
+    assert events[0].kind == "capabilities_negotiated"
