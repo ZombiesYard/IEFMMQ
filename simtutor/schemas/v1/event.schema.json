@@ -26,7 +26,10 @@
         "ui.card_rendered",
         "step_activated",
         "step_completed",
-        "step_blocked"
+        "step_blocked",
+        "overlay_requested",
+        "overlay_applied",
+        "overlay_failed"
       ]
     },
     "t_wall": { "type": ["number", "null"] },

@@ -17,6 +17,8 @@ SCHEMA_INDEX = {
     "dcs_observation": ("simtutor.schemas.v2", "dcs_observation.json"),
     "dcs_bios_frame": ("simtutor.schemas.v2", "dcs_bios_frame.json"),
     "telemetry_frame": ("simtutor.schemas.v2", "telemetry_frame.json"),
+    "dcs_overlay_command": ("simtutor.schemas.v2", "dcs_overlay_command.json"),
+    "dcs_overlay_ack": ("simtutor.schemas.v2", "dcs_overlay_ack.json"),
 }
 
 
