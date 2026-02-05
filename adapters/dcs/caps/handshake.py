@@ -4,7 +4,7 @@ import json
 import socket
 import time
 from importlib import resources
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Callable
 
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -75,13 +75,12 @@ def negotiate(
     version: str = "0.2.0",
     requested: Optional[dict] = None,
     session_id: Optional[str] = None,
-    event_sink: Optional[callable] = None,
+    event_sink: Optional[Callable[[Event], None]] = None,
 ) -> Optional[dict]:
     hello = build_hello(version=version, requested=requested)
     data = encode(hello)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(timeout)
-    try:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(timeout)
         sock.sendto(data, (host, port))
         try:
             resp, _ = sock.recvfrom(4096)
@@ -99,8 +98,6 @@ def negotiate(
                 )
             )
         return caps
-    finally:
-        sock.close()
 
 
 def apply_caps_to_overlay_sender(sender: Any, caps: Mapping[str, Any]) -> None:
