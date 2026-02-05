@@ -20,6 +20,8 @@ class DcsOverlaySender:
         ack_receiver: Optional[DcsOverlayAckReceiver] = None,
         timeout: float = 0.5,
         auto_clear: bool = True,
+        enabled: bool = True,
+        ack_enabled: bool = True,
         session_id: str | None = None,
         event_sink: Optional[Callable[[Event], None]] = None,
     ) -> None:
@@ -29,6 +31,8 @@ class DcsOverlaySender:
         self.ack_receiver = ack_receiver
         # auto_clear only clears when switching targets (not on every highlight).
         self.auto_clear = auto_clear
+        self.enabled = enabled
+        self.ack_enabled = ack_enabled
         self.session_id = session_id
         self.event_sink = event_sink
         self._last_target: Optional[str] = None
@@ -54,6 +58,19 @@ class DcsOverlaySender:
         self._emit_event(evt)
 
     def send_intent(self, intent: OverlayIntent, expect_ack: bool = True) -> Optional[dict]:
+        if not self.enabled:
+            evt = Event(
+                kind="overlay_failed",
+                payload={
+                    "reason": "overlay disabled",
+                    "intent": intent.intent,
+                    "target": intent.element_id,
+                },
+                t_wall=time.time(),
+                session_id=self.session_id,
+            )
+            self._emit_event(evt)
+            return None
         target = intent.element_id
         if self.auto_clear and intent.intent == "highlight" and self._last_target and self._last_target != target:
             clear_payload = {
@@ -74,7 +91,7 @@ class DcsOverlaySender:
         elif intent.intent == "clear":
             self._last_target = None
 
-        if not expect_ack or not self.ack_receiver:
+        if not self.ack_enabled or not expect_ack or not self.ack_receiver:
             return None
         wait_timeout = self.sock.gettimeout()
         if wait_timeout is None:

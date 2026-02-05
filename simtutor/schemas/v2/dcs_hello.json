@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/dcs_hello.json",
+  "title": "DCS Hello v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "client", "version", "requested"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "client": { "type": "string", "const": "simtutor" },
+    "version": { "type": "string" },
+    "requested": {
+      "type": "object",
+      "properties": {
+        "telemetry": { "type": ["boolean", "null"] },
+        "overlay": { "type": ["boolean", "null"] },
+        "ack": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": true
+    }
+  }
+}
+

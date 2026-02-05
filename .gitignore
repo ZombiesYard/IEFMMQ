@@ -27,3 +27,4 @@ adapters/dcs_bios/__pycache__
 adapters/event_store/__pycache__
 tests/adapters/__pycache__
 adapters/dcs/overlay/__pycache__
+adapters/dcs/caps/__pycache__

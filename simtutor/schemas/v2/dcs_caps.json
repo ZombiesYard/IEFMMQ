@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/dcs_caps.json",
+  "title": "DCS Caps v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "telemetry", "overlay", "overlay_ack", "clickable_actions", "vlm_frame"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "telemetry": { "type": "boolean" },
+    "overlay": { "type": "boolean" },
+    "overlay_ack": { "type": "boolean" },
+    "clickable_actions": { "type": "boolean" },
+    "vlm_frame": { "type": "boolean" }
+  }
+}
+
