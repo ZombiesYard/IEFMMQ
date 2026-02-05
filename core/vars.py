@@ -64,6 +64,9 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
                     if bool(eval_node(v)):
                         return True
                 return False
+            raise VarResolverError(
+                f"Unsupported boolean operator:{type(n.op).__name__} in expression: {expr}"
+            )
         if isinstance(n, ast.Compare):
             left = eval_node(n.left)
             for op, comp in zip(n.ops, n.comparators):
