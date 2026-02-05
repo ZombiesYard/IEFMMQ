@@ -147,8 +147,14 @@ def replay_telemetry(log_paths: list[str]) -> Tuple[bool, str]:
     return True, "ok"
 
 
-def score_run(log_path: str, pack_path: str, taxonomy_path: str) -> dict:
-    events = JsonlEventStore.load(log_path)
+def score_run(
+    log_path: str,
+    pack_path: str,
+    taxonomy_path: str,
+    events: list[dict] | None = None,
+) -> dict:
+    if events is None:
+        events = JsonlEventStore.load(log_path)
     return score_log(events, pack_path, taxonomy_path)
 
 
@@ -174,11 +180,11 @@ def batch_run(
         log_name = f"{stem}{suffix}.jsonl"
         log_path = out_dir / log_name
         run_simulation(pack_path, scenario, str(log_path))
-        score = score_run(str(log_path), pack_path, taxonomy_path)
+        events = JsonlEventStore.load(log_path)
+        score = score_run(str(log_path), pack_path, taxonomy_path, events=events)
         score["scenario"] = stem
         score["log_path"] = str(log_path)
         try:
-            events = JsonlEventStore.load(log_path)
             score.update(compute_interaction_metrics(events).to_dict())
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             warnings.warn(f"failed to compute interaction metrics for {log_path}: {exc}")

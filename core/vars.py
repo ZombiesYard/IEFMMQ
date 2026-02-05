@@ -93,7 +93,12 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
                 return left / right
         raise VarResolverError(f"Unsupported expression: {ast.dump(n, include_attributes=False)}")
 
-    return eval_node(node)
+    try:
+        return eval_node(node)
+    except VarResolverError:
+        raise
+    except Exception as exc:
+        raise VarResolverError(f"Failed to evaluate expression: {expr}") from exc
 
 
 @dataclass
