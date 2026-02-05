@@ -104,6 +104,21 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   ```
   Mirrors `DCS/Scripts/HilteTest.py` / `HiliteClearTest.py`.
 
+## DCS Overlay (SimTutorHighlight)
+- Install hook: copy `DCS/Scripts/Hooks/SimTutorHighlight.lua` to
+  `Saved Games\\DCS\\Scripts\\Hooks\\SimTutorHighlight.lua`.
+- PC sender/ack example:
+  ```python
+  from adapters.dcs.overlay.ack_receiver import DcsOverlayAckReceiver
+  from adapters.dcs.overlay.sender import DcsOverlaySender
+  from core.overlay import OverlayIntent
+
+  with DcsOverlayAckReceiver() as ack_rx, DcsOverlaySender(ack_receiver=ack_rx) as sender:
+      intent = OverlayIntent(intent="highlight", target="battery", element_id="pnt_331")
+      sender.send_intent(intent, expect_ack=True)
+      sender.send_intent(OverlayIntent(intent="clear", target="battery", element_id="pnt_331"))
+  ```
+
 ## DCS Export Injection (SimTutor.lua)
 - Install SimTutor DCS scripts into Saved Games and patch `Export.lua`:
   ```sh

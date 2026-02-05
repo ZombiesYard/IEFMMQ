@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/dcs_overlay_command.json",
+  "title": "DCS Overlay Command v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cmd_id", "action", "target"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "cmd_id": { "type": "string", "format": "uuid" },
+    "action": { "type": "string", "enum": ["highlight", "clear"] },
+    "target": { "type": "string" }
+  }
+}
+
