@@ -100,3 +100,25 @@ def test_sender_auto_clear_on_switch(monkeypatch) -> None:
     assert cmds[1]["target"] == "pnt_100"
     assert cmds[2]["action"] == "highlight"
     assert cmds[2]["target"] == "pnt_200"
+
+
+def test_sender_disabled_emits_failed_event(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
+    sender = DcsOverlaySender(
+        host="127.0.0.1",
+        port=7781,
+        enabled=False,
+        ack_receiver=None,
+        event_sink=events.append,
+    )
+    intent = OverlayIntent(intent="highlight", target="battery_switch", element_id="pnt_331")
+    ack = sender.send_intent(intent, expect_ack=True)
+
+    assert ack is None
+    assert dummy.sent == []
+    assert len(events) == 1
+    assert events[0].kind == "overlay_failed"
+    assert events[0].payload["reason"] == "overlay disabled"
+    assert events[0].payload["target"] == "pnt_331"

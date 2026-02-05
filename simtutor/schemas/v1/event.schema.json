@@ -29,7 +29,8 @@
         "step_blocked",
         "overlay_requested",
         "overlay_applied",
-        "overlay_failed"
+        "overlay_failed",
+        "capabilities_negotiated"
       ]
     },
     "t_wall": { "type": ["number", "null"] },

@@ -126,6 +126,19 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   ```
   This copies from `DCS/Scripts` in the repo to `Saved Games\DCS\Scripts`.
 
+## DCS Capabilities Handshake
+- DCS listens for HELLO on UDP `127.0.0.1:7793` and replies with caps.
+- PC example:
+  ```python
+  from adapters.dcs.caps.handshake import negotiate, apply_caps_to_overlay_sender
+  from adapters.dcs.overlay.sender import DcsOverlaySender
+
+  caps = negotiate()
+  sender = DcsOverlaySender()
+  if caps:
+      apply_caps_to_overlay_sender(sender, caps)
+  ```
+
 ## DCS Telemetry (UDP -> Observation)
 - SimTutor.lua sends JSON telemetry over UDP (default 127.0.0.1:7780, 20 Hz).
 - PC receiver example:

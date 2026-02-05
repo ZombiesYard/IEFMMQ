@@ -10,12 +10,30 @@ SimTutor.telemetry = SimTutor.telemetry or {
     include_raw = false,
     debug_log = false,
 }
+SimTutor.caps = SimTutor.caps or {
+    telemetry = true,
+    overlay = false,
+    overlay_ack = false,
+    clickable_actions = false,
+    vlm_frame = false,
+}
+SimTutor.handshake = SimTutor.handshake or {
+    enabled = true,
+    host = "127.0.0.1",
+    port = 7793,
+}
 SimTutor._telemetry = SimTutor._telemetry or {
     socket = nil,
     socket_lib = nil,
     json = nil,
     last_send = 0,
     seq = 0,
+    last_error_log = 0,
+}
+SimTutor._handshake = SimTutor._handshake or {
+    socket = nil,
+    socket_lib = nil,
+    json = nil,
     last_error_log = 0,
 }
 
@@ -65,6 +83,7 @@ function SimTutor.install_export_chain()
     function LuaExportStart()
         SimTutor.safe_call(upstream_start, "upstream LuaExportStart")
         SimTutor.safe_call(SimTutor._init_telemetry, "SimTutor._init_telemetry")
+        SimTutor.safe_call(SimTutor._init_handshake, "SimTutor._init_handshake")
         SimTutor.log_info("LuaExportStart")
     end
 
@@ -75,11 +94,13 @@ function SimTutor.install_export_chain()
     function LuaExportAfterNextFrame()
         SimTutor.safe_call(upstream_after, "upstream LuaExportAfterNextFrame")
         SimTutor.safe_call(SimTutor._telemetry_tick, "SimTutor._telemetry_tick")
+        SimTutor.safe_call(SimTutor._handshake_tick, "SimTutor._handshake_tick")
     end
 
     function LuaExportStop()
         SimTutor.safe_call(upstream_stop, "upstream LuaExportStop")
         SimTutor.safe_call(SimTutor._shutdown_telemetry, "SimTutor._shutdown_telemetry")
+        SimTutor.safe_call(SimTutor._shutdown_handshake, "SimTutor._shutdown_handshake")
         SimTutor.log_info("LuaExportStop")
     end
 end
@@ -129,6 +150,107 @@ function SimTutor._shutdown_telemetry()
     end
     SimTutor._telemetry.socket = nil
     SimTutor._telemetry.socket_lib = nil
+end
+
+function SimTutor._init_handshake()
+    if not SimTutor.handshake.enabled then
+        return
+    end
+    SimTutor._extend_package_paths()
+    SimTutor._load_config()
+    local ok, socket_lib = pcall(require, "socket")
+    if not ok then
+        SimTutor.log_error("Handshake disabled: socket not available")
+        SimTutor.handshake.enabled = false
+        return
+    end
+    local ok_json, json_mod = SimTutor._load_json()
+    if not ok_json then
+        SimTutor.log_error("Handshake disabled: JSON.lua not available")
+        SimTutor.handshake.enabled = false
+        return
+    end
+    local udp = socket_lib.udp()
+    udp:setsockname(SimTutor.handshake.host, SimTutor.handshake.port)
+    udp:settimeout(0)
+    SimTutor._handshake.socket = udp
+    SimTutor._handshake.socket_lib = socket_lib
+    SimTutor._handshake.json = json_mod
+    SimTutor._handshake.last_error_log = 0
+    SimTutor.log_info(
+        string.format(
+            "Handshake listening host=%s port=%s",
+            tostring(SimTutor.handshake.host),
+            tostring(SimTutor.handshake.port)
+        )
+    )
+end
+
+function SimTutor._shutdown_handshake()
+    local udp = SimTutor._handshake.socket
+    if udp then
+        pcall(function()
+            udp:close()
+        end)
+    end
+    SimTutor._handshake.socket = nil
+    SimTutor._handshake.socket_lib = nil
+end
+
+function SimTutor._build_caps()
+    local caps = {
+        schema_version = "v2",
+        telemetry = (SimTutor.telemetry.enabled and SimTutor.caps.telemetry) and true or false,
+        overlay = SimTutor.caps.overlay and true or false,
+        overlay_ack = SimTutor.caps.overlay_ack and true or false,
+        clickable_actions = SimTutor.caps.clickable_actions and true or false,
+        vlm_frame = SimTutor.caps.vlm_frame and true or false,
+    }
+    if not caps.overlay then
+        caps.overlay_ack = false
+    end
+    return caps
+end
+
+function SimTutor._handle_hello(payload, addr, port)
+    if not payload or type(payload) ~= "table" then
+        return
+    end
+    if payload.client ~= "simtutor" then
+        return
+    end
+    local caps = SimTutor._build_caps()
+    local ok, json_str = pcall(function() return SimTutor._handshake.json:encode(caps) end)
+    if not ok then
+        SimTutor._handshake_log_error("Failed to encode caps: " .. tostring(json_str))
+        return
+    end
+    pcall(function()
+        SimTutor._handshake.socket:sendto(json_str, addr, port)
+    end)
+end
+
+function SimTutor._handshake_tick()
+    if not SimTutor.handshake.enabled then
+        return
+    end
+    local udp = SimTutor._handshake.socket
+    local json = SimTutor._handshake.json
+    if not udp or not json then
+        return
+    end
+    while true do
+        local data, addr, port = udp:receivefrom()
+        if not data then
+            break
+        end
+        local ok, payload = pcall(function() return json:decode(data) end)
+        if ok and payload then
+            SimTutor._handle_hello(payload, addr, port)
+        else
+            SimTutor._handshake_log_error("Invalid hello payload")
+        end
+    end
 end
 
 local function _set_if_number(target, key, value)
@@ -279,6 +401,16 @@ function SimTutor._load_config()
             SimTutor.telemetry[k] = v
         end
     end
+    if type(cfg.caps) == "table" then
+        for k, v in pairs(cfg.caps) do
+            SimTutor.caps[k] = v
+        end
+    end
+    if type(cfg.handshake) == "table" then
+        for k, v in pairs(cfg.handshake) do
+            SimTutor.handshake[k] = v
+        end
+    end
 end
 
 function SimTutor._telemetry_log_error(message)
@@ -288,5 +420,15 @@ function SimTutor._telemetry_log_error(message)
         return
     end
     SimTutor._telemetry.last_error_log = now
+    SimTutor.log_error(message)
+end
+
+function SimTutor._handshake_log_error(message)
+    local socket_lib = SimTutor._handshake.socket_lib
+    local now = socket_lib and socket_lib.gettime() or 0
+    if (now - SimTutor._handshake.last_error_log) < 5 then
+        return
+    end
+    SimTutor._handshake.last_error_log = now
     SimTutor.log_error(message)
 end
