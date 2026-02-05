@@ -76,6 +76,8 @@ class TutorResponse:
 class Event:
     event_id: str = field(default_factory=_uuid)
     timestamp: str = field(default_factory=_now_iso)
+    t_wall: Optional[float] = None
+    session_id: Optional[str] = None
     kind: str = "custom"
     payload: Dict[str, Any] = field(default_factory=dict)
     version: str = CONTRACT_VERSION

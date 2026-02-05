@@ -10,6 +10,7 @@
     "seq": { "type": "integer", "minimum": 0 },
     "t_sim": { "type": ["number", "null"] },
     "t_wall": { "type": "number" },
+    "session_id": { "type": ["string", "null"] },
     "source": {
       "type": "string",
       "enum": ["lo", "dcs_bios", "derived"]

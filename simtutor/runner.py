@@ -5,8 +5,10 @@ Simulation runner utilities for producing and validating event logs.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Tuple
+import warnings
 
 import yaml
 
@@ -16,6 +18,7 @@ from adapters.event_store.telemetry_writer import TelemetryWriter
 from core.procedure import ProcedureEngine
 from core.types import Event
 from core.scoring import score_log
+from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
 
 
 def _load_steps(pack_path: Path) -> list[dict]:
@@ -144,8 +147,14 @@ def replay_telemetry(log_paths: list[str]) -> Tuple[bool, str]:
     return True, "ok"
 
 
-def score_run(log_path: str, pack_path: str, taxonomy_path: str) -> dict:
-    events = JsonlEventStore.load(log_path)
+def score_run(
+    log_path: str,
+    pack_path: str,
+    taxonomy_path: str,
+    events: list[dict] | None = None,
+) -> dict:
+    if events is None:
+        events = JsonlEventStore.load(log_path)
     return score_log(events, pack_path, taxonomy_path)
 
 
@@ -171,8 +180,14 @@ def batch_run(
         log_name = f"{stem}{suffix}.jsonl"
         log_path = out_dir / log_name
         run_simulation(pack_path, scenario, str(log_path))
-        score = score_run(str(log_path), pack_path, taxonomy_path)
+        events = JsonlEventStore.load(log_path)
+        score = score_run(str(log_path), pack_path, taxonomy_path, events=events)
         score["scenario"] = stem
         score["log_path"] = str(log_path)
+        try:
+            score.update(compute_interaction_metrics(events).to_dict())
+        except (json.JSONDecodeError, ValueError) as exc:
+            warnings.warn(f"failed to compute interaction metrics for {log_path}: {exc}")
+            score.update(InteractionMetrics().to_dict())
         results.append(score)
     return results

@@ -11,8 +11,26 @@
     "timestamp": { "type": "string", "format": "date-time" },
     "kind": {
       "type": "string",
-      "enum": ["observation", "tutor_request", "tutor_response", "score", "system", "custom"]
+      "enum": [
+        "observation",
+        "tutor_request",
+        "tutor_response",
+        "score",
+        "system",
+        "custom",
+        "ui.highlight_requested",
+        "ui.highlight_ack",
+        "ui.clear_requested",
+        "ui.clear_ack",
+        "ui.user_clicked",
+        "ui.card_rendered",
+        "step_activated",
+        "step_completed",
+        "step_blocked"
+      ]
     },
+    "t_wall": { "type": ["number", "null"] },
+    "session_id": { "type": ["string", "null"] },
     "related_id": {
       "type": ["string", "null"],
       "format": "uuid",

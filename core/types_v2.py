@@ -29,6 +29,7 @@ class TelemetryFrame:
     t_wall: float = 0.0
     source: str = "derived"
     t_sim: Optional[float] = None
+    session_id: Optional[str] = None
     aircraft: Optional[str] = None
     lo: Optional[Dict[str, Any]] = None
     bios: Optional[Dict[str, Any]] = None
