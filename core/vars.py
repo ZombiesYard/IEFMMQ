@@ -21,6 +21,12 @@ class VarResolverError(ValueError):
 
 
 def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
+    """
+    Evaluate a restricted expression with consistent None handling:
+    - Arithmetic: if any operand is None, return None.
+    - Boolean ops: use truthiness (None -> False).
+    - Comparisons: if either side is None, return False.
+    """
     try:
         node = ast.parse(expr, mode="eval")
     except SyntaxError as exc:
@@ -90,6 +96,8 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
             if isinstance(n.op, ast.Mult):
                 return left * right
             if isinstance(n.op, ast.Div):
+                if right == 0:
+                    raise VarResolverError(f"Division by zero in expression: {expr}")
                 return left / right
         raise VarResolverError(f"Unsupported expression: {ast.dump(n, include_attributes=False)}")
 
@@ -114,6 +122,7 @@ class VarResolver:
         return cls(rules=dict(rules))
 
     def resolve(self, frame: TelemetryFrame | Mapping[str, Any]) -> Dict[str, Any]:
+        """Resolve vars in rule order; forward references are not supported."""
         if isinstance(frame, TelemetryFrame):
             data = frame.to_dict()
         else:
@@ -136,7 +145,10 @@ class VarResolver:
                 expr_text = expr.strip()
                 if expr_text.startswith("derived(") and expr_text.endswith(")"):
                     expr_text = expr_text[len("derived(") : -1].strip()
-                value = _safe_eval(expr_text, context)
+                try:
+                    value = _safe_eval(expr_text, context)
+                except VarResolverError as exc:
+                    raise VarResolverError(f"Failed to resolve var '{key}': {exc}") from exc
             else:
                 value = expr
             resolved[key] = value
@@ -144,6 +156,7 @@ class VarResolver:
         return resolved
 
     def apply(self, frame: TelemetryFrame | Mapping[str, Any]) -> TelemetryFrame | Dict[str, Any]:
+        """Apply resolved vars; mutates TelemetryFrame in place, Mapping returns a new dict."""
         resolved = self.resolve(frame)
         if isinstance(frame, TelemetryFrame):
             frame.vars = resolved

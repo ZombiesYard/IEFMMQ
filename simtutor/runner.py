@@ -186,7 +186,7 @@ def batch_run(
         score["log_path"] = str(log_path)
         try:
             score.update(compute_interaction_metrics(events).to_dict())
-        except (OSError, json.JSONDecodeError, ValueError) as exc:
+        except (json.JSONDecodeError, ValueError) as exc:
             warnings.warn(f"failed to compute interaction metrics for {log_path}: {exc}")
             score.update(InteractionMetrics().to_dict())
         results.append(score)
