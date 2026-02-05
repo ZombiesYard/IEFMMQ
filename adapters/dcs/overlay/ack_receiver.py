@@ -19,6 +19,7 @@ class DcsOverlayAckReceiver:
     ) -> None:
         self.server = (host, port)
         self.session_id = session_id
+        self._pending: list[dict] = []
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(self.server)
         self.sock.settimeout(timeout)
@@ -38,12 +39,24 @@ class DcsOverlayAckReceiver:
         except ValueError:
             return None
 
+    def _pop_pending(self, cmd_id: str) -> Optional[dict]:
+        for idx, ack in enumerate(self._pending):
+            if ack.get("cmd_id") == cmd_id:
+                return self._pending.pop(idx)
+        return None
+
     def wait_for(self, cmd_id: str, timeout: float = 1.0) -> Optional[dict]:
+        pending = self._pop_pending(cmd_id)
+        if pending:
+            return pending
         deadline = time.time() + max(0.0, timeout)
-        while time.time() <= deadline:
+        while time.time() < deadline:
             ack = self.recv()
-            if ack and ack.get("cmd_id") == cmd_id:
+            if not ack:
+                continue
+            if ack.get("cmd_id") == cmd_id:
                 return ack
+            self._pending.append(ack)
         return None
 
     def to_event(self, ack: dict, *, intent: str | None = None, target: str | None = None) -> Event:

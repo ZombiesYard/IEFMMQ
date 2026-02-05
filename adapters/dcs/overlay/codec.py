@@ -43,10 +43,16 @@ def validate_ack(payload: Mapping[str, Any]) -> None:
 
 
 def command_from_intent(intent: OverlayIntent, cmd_id: str | None = None) -> dict:
+    if intent.intent == "clear":
+        action = "clear"
+    elif intent.intent == "highlight":
+        action = "highlight"
+    else:
+        raise ValueError(f"Unsupported overlay intent: {intent.intent!r}")
     return {
         "schema_version": "v2",
         "cmd_id": cmd_id or str(uuid4()),
-        "action": "clear" if intent.intent == "clear" else "highlight",
+        "action": action,
         "target": intent.element_id,
     }
 

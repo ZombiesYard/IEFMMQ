@@ -18,7 +18,7 @@ if not ok_socket then
   return
 end
 
-local ok_json, JSON = pcall(function() return loadfile("Scripts\\JSON.lua")() end)
+local ok_json, JSON = pcall(function() return loadfile("Scripts/JSON.lua")() end)
 if not ok_json then
   loge("JSON.lua not available: " .. tostring(JSON))
   return
@@ -49,13 +49,19 @@ local function missionEval(chunk)
   return res, nil
 end
 
+local function as_lua_string(value)
+  return string.format("%q", tostring(value))
+end
+
 local function send_ack(cmd_id, status, reason)
   local payload = {
     schema_version = "v2",
     cmd_id = cmd_id,
     status = status,
-    reason = reason,
   }
+  if reason ~= nil then
+    payload.reason = reason
+  end
   local ok, json_str = pcall(function() return JSON:encode(payload) end)
   if not ok then
     loge("Failed to encode ack: " .. tostring(json_str))
@@ -70,7 +76,7 @@ local function do_highlight(pnt)
   if AUTO_CLEAR then
     missionEval(('a_cockpit_remove_highlight(%d)'):format(HILITE_ID))
   end
-  local code = ('a_cockpit_highlight(%d, "%s", 0, "")'):format(HILITE_ID, pnt)
+  local code = ('a_cockpit_highlight(%d, %s, 0, "")'):format(HILITE_ID, as_lua_string(pnt))
   local _, err = missionEval(code)
   if err then
     return false, err
