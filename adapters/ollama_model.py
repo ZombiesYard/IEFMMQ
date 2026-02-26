@@ -11,61 +11,10 @@ import json
 from time import perf_counter
 from typing import Any, Mapping
 
-from core.llm_schema import get_help_response_schema, validate_help_response
+from adapters.help_response_parser import parse_help_response
+from core.llm_schema import get_help_response_schema
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
-
-
-def _strip_code_fence(text: str) -> str:
-    stripped = text.strip()
-    if stripped.startswith("```") and stripped.endswith("```"):
-        lines = stripped.splitlines()
-        if len(lines) >= 2 and lines[0].startswith("```"):
-            return "\n".join(lines[1:-1]).strip()
-    return stripped
-
-
-def _json_extract(raw_text: str) -> str:
-    text = _strip_code_fence(raw_text)
-    if text.startswith("{") and text.endswith("}"):
-        return text
-
-    in_string = False
-    escaped = False
-    depth = 0
-    start = -1
-    for i, ch in enumerate(text):
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "}":
-            if depth == 0:
-                continue
-            depth -= 1
-            if depth == 0 and start >= 0:
-                return text[start : i + 1]
-    raise ValueError("Model output does not contain JSON object")
-
-
-def _parse_help_response(raw_text: str) -> dict[str, Any]:
-    extracted = _json_extract(raw_text)
-    obj = json.loads(extracted)
-    if not isinstance(obj, dict):
-        raise ValueError("HelpResponse must be a JSON object")
-    validate_help_response(obj)
-    return obj
-
 
 class OllamaModel(ModelPort):
     def __init__(
@@ -104,7 +53,7 @@ class OllamaModel(ModelPort):
         try:
             messages = self._build_messages(observation, request)
             raw_text = self._chat(messages)
-            help_obj = _parse_help_response(raw_text)
+            help_obj = parse_help_response(raw_text)
             self._validate_context_bounds(help_obj, request)
             actions = [
                 {"type": "overlay", "intent": "highlight", "target": target}
@@ -235,4 +184,3 @@ class OllamaModel(ModelPort):
 
 
 __all__ = ["OllamaModel"]
-
