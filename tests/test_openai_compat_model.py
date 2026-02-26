@@ -28,6 +28,8 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert res.metadata["provider"] == "openai_compat"
     assert res.metadata["model"] == "Qwen3.5-32B-Instruct"
     assert isinstance(res.metadata["latency_ms"], int)
+    assert res.metadata["json_repaired"] is False
+    assert res.metadata["json_repair_reasons"] == []
     validate_help_response(res.metadata["help_response"])
 
     call = fake.calls[0]
@@ -105,6 +107,25 @@ def test_prompt_is_stable_for_same_input() -> None:
     prompt1 = fake.calls[0]["json"]["messages"][1]["content"]
     prompt2 = fake.calls[1]["json"]["messages"][1]["content"]
     assert prompt1 == prompt2
+
+
+def test_explain_error_prefix_suffix_repair_marks_metadata() -> None:
+    help_obj = _help_obj_ok()
+    payload = _openai_chat_payload_from_help_obj(help_obj)
+    payload["choices"][0]["message"]["content"] = (
+        "Here is the result:\n"
+        + payload["choices"][0]["message"]["content"]
+        + "\nDone."
+    )
+    fake = FakeClient(responses=[FakeResponse(payload)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert res.metadata["json_repaired"] is True
+    assert "dropped_prefix_text" in res.metadata["json_repair_reasons"]
+    assert "dropped_suffix_text" in res.metadata["json_repair_reasons"]
 
 
 def test_explain_error_step_id_not_in_candidate_steps_fallback_no_overlay() -> None:

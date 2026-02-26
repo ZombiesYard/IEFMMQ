@@ -8,7 +8,7 @@ import json
 from time import perf_counter
 from typing import Any, Mapping
 
-from adapters.help_response_parser import parse_help_response
+from adapters.help_response_parser import parse_help_response_with_meta
 from core.llm_schema import get_help_response_schema
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
@@ -59,7 +59,7 @@ class BaseHelpModel(ModelPort):
         try:
             messages = self._build_messages(observation, request)
             raw_text = self._chat(messages)
-            help_obj = parse_help_response(raw_text)
+            help_obj, extraction = parse_help_response_with_meta(raw_text)
             self._validate_context_bounds(help_obj, request)
             actions = [
                 {"type": "overlay", "intent": "highlight", "target": target}
@@ -76,6 +76,8 @@ class BaseHelpModel(ModelPort):
                     "model": self.model_name,
                     "latency_ms": int((perf_counter() - start) * 1000),
                     "help_response": help_obj,
+                    "json_repaired": extraction.json_repaired,
+                    "json_repair_reasons": list(extraction.repair_reasons),
                 },
             )
         except Exception as exc:
