@@ -40,11 +40,18 @@ def _strip_balanced_code_fence(raw: str) -> tuple[str, bool]:
         return text, False
 
     lines = text.splitlines()
-    if len(lines) < 2:
-        return text, False
-    if not lines[0].startswith("```"):
-        return text, False
-    inner = "\n".join(lines[1:-1]).strip()
+    if len(lines) >= 2:
+        if not lines[0].startswith("```"):
+            return text, False
+        inner = "\n".join(lines[1:-1]).strip()
+        return inner, True
+
+    # Inline balanced fence, e.g. ```json {"k":1} ```
+    inner = text[3:-3].strip()
+    if inner.lower().startswith("json"):
+        rest = inner[4:]
+        if not rest or rest[0].isspace() or rest[0] in "{[":
+            inner = rest.strip()
     return inner, True
 
 
@@ -130,4 +137,3 @@ __all__ = [
     "extract_first_json",
     "parse_first_json",
 ]
-

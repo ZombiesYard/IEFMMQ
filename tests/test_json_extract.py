@@ -34,6 +34,13 @@ def test_extract_first_json_code_fence_records_repair_reason() -> None:
     assert result.repair_reasons == (REPAIR_REMOVE_CODE_FENCE,)
 
 
+def test_extract_first_json_inline_code_fence_records_repair_reason() -> None:
+    result = extract_first_json('```json {"k":1} ```')
+    assert result.json_text == '{"k":1}'
+    assert result.json_repaired is True
+    assert result.repair_reasons == (REPAIR_REMOVE_CODE_FENCE,)
+
+
 def test_extract_first_json_prefix_suffix_records_repair_reasons() -> None:
     result = extract_first_json('prefix {"k":1} suffix')
     assert result.json_text == '{"k":1}'
@@ -90,4 +97,3 @@ def test_parse_help_response_with_meta_rejects_half_legal_json_overlay_not_execu
     raw = "Here:\n" + json.dumps(payload, ensure_ascii=False) + "\nThanks."
     with pytest.raises(ValidationError):
         parse_help_response_with_meta(raw)
-
