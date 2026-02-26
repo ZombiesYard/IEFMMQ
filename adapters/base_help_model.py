@@ -45,6 +45,12 @@ class BaseHelpModel(ModelPort):
         if self._owns_client and hasattr(self._client, "close"):
             self._client.close()
 
+    def __enter__(self) -> "BaseHelpModel":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     def plan_next_step(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         return self.explain_error(observation, request)
 
