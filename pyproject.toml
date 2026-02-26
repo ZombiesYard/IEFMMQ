@@ -19,6 +19,7 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.10"
 jsonschema = "^4.23.0"
+httpx = "^0.28.1"
 PyYAML = "^6.0.1"
 PyPDF2 = "^3.0.1"
 
