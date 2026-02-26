@@ -45,5 +45,5 @@ def test_parse_help_response_parses_embedded_json_text() -> None:
 
 
 def test_json_extract_raises_on_missing_object() -> None:
-    with pytest.raises(ValueError, match="does not contain JSON object"):
+    with pytest.raises(ValueError, match="does not contain JSON object/array"):
         json_extract("no json here")

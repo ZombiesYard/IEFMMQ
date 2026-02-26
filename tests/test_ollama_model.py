@@ -25,6 +25,8 @@ def test_explain_error_success_with_valid_help_response() -> None:
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3.5:35b"
     assert isinstance(res.metadata["latency_ms"], int)
+    assert res.metadata["json_repaired"] is True
+    assert "removed_code_fence" in res.metadata["json_repair_reasons"]
     validate_help_response(res.metadata["help_response"])
 
     call = fake.calls[0]
@@ -134,4 +136,6 @@ def test_explain_error_alternate_response_format() -> None:
     assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3.5:35b"
+    assert res.metadata["json_repaired"] is False
+    assert res.metadata["json_repair_reasons"] == []
     validate_help_response(res.metadata["help_response"])

@@ -7,9 +7,9 @@ raw model text -> code fence strip -> JSON object extract -> json.loads -> schem
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from adapters.json_extract import JsonExtractionResult, extract_first_json, parse_first_json
 from core.llm_schema import validate_help_response
 
 
@@ -23,45 +23,20 @@ def strip_code_fence(text: str) -> str:
 
 
 def json_extract(raw_text: str) -> str:
-    text = strip_code_fence(raw_text)
-    if text.startswith("{") and text.endswith("}"):
-        return text
-
-    in_string = False
-    escaped = False
-    depth = 0
-    start = -1
-    for i, ch in enumerate(text):
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_string = False
-            continue
-        if ch == '"':
-            in_string = True
-        elif ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "}":
-            if depth == 0:
-                continue
-            depth -= 1
-            if depth == 0 and start >= 0:
-                return text[start : i + 1]
-    raise ValueError("Model output does not contain JSON object")
+    return extract_first_json(raw_text).json_text
 
 
 def parse_help_response(raw_text: str) -> dict[str, Any]:
-    extracted = json_extract(raw_text)
-    obj = json.loads(extracted)
-    if not isinstance(obj, dict):
-        raise ValueError("HelpResponse must be a JSON object")
-    validate_help_response(obj)
+    obj, _ = parse_help_response_with_meta(raw_text)
     return obj
 
 
-__all__ = ["json_extract", "parse_help_response", "strip_code_fence"]
+def parse_help_response_with_meta(raw_text: str) -> tuple[dict[str, Any], JsonExtractionResult]:
+    obj, extraction = parse_first_json(raw_text)
+    if not isinstance(obj, dict):
+        raise ValueError("HelpResponse must be a JSON object")
+    validate_help_response(obj)
+    return obj, extraction
+
+
+__all__ = ["json_extract", "parse_help_response", "parse_help_response_with_meta", "strip_code_fence"]
