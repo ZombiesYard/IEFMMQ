@@ -1,8 +1,9 @@
 """
 HelpResponse schema builder and validator for LLM outputs.
 
-The schema is generated dynamically from pack/ui map artifacts so the validator
-stays simulator-agnostic and pack-driven.
+Unlike v1/v2 transport schemas stored under `simtutor/schemas/`, this schema is
+generated dynamically from pack/ui map/taxonomy artifacts so enum constraints stay
+simulator-agnostic and pack-driven at runtime.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
 _REQUIRED_PROPERTY_RE = re.compile(r"'([^']+)' is a required property")
+_HELP_RESPONSE_SCHEMA_ID = "https://simtutor.dev/schemas/v2/help_response.generated.json"
 
 
 def _repo_root() -> Path:
@@ -115,7 +117,11 @@ def build_help_response_schema(
 
     schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://simtutor.dev/schemas/v2/help_response.json",
+        "$id": _HELP_RESPONSE_SCHEMA_ID,
+        "$comment": (
+            "Runtime-generated schema: enums come from pack.yaml/ui_map.yaml/taxonomy.yaml "
+            "and are therefore not persisted as a static schema artifact."
+        ),
         "title": "HelpResponse",
         "type": "object",
         "additionalProperties": False,

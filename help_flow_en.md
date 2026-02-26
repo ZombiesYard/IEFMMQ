@@ -21,7 +21,7 @@ Its purpose is to freeze cross-module behavior and data boundaries for aligned i
 4. If ModelPort is available, call Qwen and request `HelpResponse` (JSON-only).
 5. Run `json_extract -> minimal repair -> schema validate`.
 6. Map `HelpResponse` to internal `TutorResponse` (see Section 4).
-7. If overlay intent is valid and target is in allowlist, send overlay.
+7. If overlay targets are valid and in allowlist, send overlay.
 8. Record the full event chain (see Section 6).
 9. If any step fails, enter deterministic fallback (see Section 5).
 
@@ -49,29 +49,41 @@ For `TutorRequest.intent=help`, context passed to model/rule engine may only inc
 
 ### 4.1 HelpResponse (LLM Structured Output, JSON-only)
 
-Recommended minimal fields (to be formalized in schema later):
+Current v0.3 schema fields (implemented in `core/llm_schema.py`):
 
-- `status`: `ok | needs_clarification | unsafe | error`
-- `message`: Short learner-facing guidance text
-- `next_step_id`: Candidate step (must be in `candidate_steps`)
-- `overlay`: Optional object
-  - `intent`: `highlight | clear`
-  - `target`: must be in `overlay_target_allowlist`
-- `rationale`: Optional internal explanation
-- `rejected_actions`: Optional list of unsafe actions rejected by system
+- `diagnosis` (object, required)
+  - `step_id`: must be in `candidate_steps`
+  - `error_category`: must be in taxonomy categories/trial flags
+- `next` (object, required)
+  - `step_id`: must be in `candidate_steps`
+- `overlay` (object, required)
+  - `targets`: non-empty unique array, each target must be in `overlay_target_allowlist`
+- `explanations` (array, required)
+  - non-empty strings for learner-facing/internal guidance
+- `confidence` (number, required)
+  - range `[0.0, 1.0]`
+
+Notes:
+
+- This schema is runtime-generated (not a static JSON artifact) because enum sets are injected from `pack.yaml`, `ui_map.yaml`, and `taxonomy.yaml`.
+- Validation pipeline remains `json_extract -> minimal repair -> schema validate`.
 
 ### 4.2 Mapping to TutorResponse (`core/types.py`)
 
 - `TutorResponse.status`:
   - `ok`: HelpResponse is valid and executable
   - `error`: model unavailable, invalid output, validation failure, or policy rejection
-- `TutorResponse.message` <- `HelpResponse.message` (or fallback message)
+- `TutorResponse.message`:
+  - Prefer first entry of `HelpResponse.explanations`
+  - Use fallback text when explanations are unavailable
+- `TutorResponse.explanations` <- `HelpResponse.explanations`
 - `TutorResponse.actions`:
   - Only overlay actions are allowed (`highlight/clear`)
   - `click/execute` actions are forbidden
 - `TutorResponse.metadata`:
   - Record `provider=qwen|fallback`
-  - Record validation/repair result and `rejected_actions` (if any)
+  - Record validation/repair result plus `diagnosis`, `next`, and `confidence`
+  - Record `rejected_actions` from policy stage (if any)
 
 ## 5. Failure and Degradation (Deterministic Fallback)
 
@@ -80,7 +92,7 @@ Trigger conditions (any one):
 - Qwen unreachable/timeout/auth failure
 - Non-JSON output or output cannot be minimally repaired
 - JSON schema validation failure (including enum/required fields)
-- `next_step_id` or `overlay.target` not in candidate set/allowlist
+- `diagnosis.step_id`, `next.step_id`, or any `overlay.targets[*]` not in candidate set/allowlist
 - Output contains unsafe actions (click/auto-execution)
 
 Fallback behavior (deterministic):
@@ -110,7 +122,7 @@ Additional constraints:
 ## 7. Safety Boundary (Hard Constraint)
 
 - Allowed:
-  - overlay `highlight|clear|pulse`
+  - overlay `highlight|clear`
 - Forbidden:
   - any auto-click, auto-execution, or control injection (including `performClickableAction`)
 - Enforced order:

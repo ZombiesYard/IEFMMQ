@@ -72,3 +72,56 @@ def test_validate_help_response_reports_type_error_path() -> None:
     with pytest.raises(ValidationError, match=r"\$\.confidence"):
         validate_help_response(payload)
 
+
+def test_validate_help_response_rejects_empty_overlay_targets() -> None:
+    payload = _valid_help_response()
+    payload["overlay"]["targets"] = []
+
+    with pytest.raises(ValidationError, match=r"\$\.overlay\.targets"):
+        validate_help_response(payload)
+
+
+def test_validate_help_response_rejects_duplicate_overlay_targets() -> None:
+    payload = _valid_help_response()
+    payload["overlay"]["targets"] = ["apu_switch", "apu_switch"]
+
+    with pytest.raises(ValidationError, match=r"\$\.overlay\.targets"):
+        validate_help_response(payload)
+
+
+def test_validate_help_response_rejects_empty_explanation_string() -> None:
+    payload = _valid_help_response()
+    payload["explanations"] = [""]
+
+    with pytest.raises(ValidationError, match=r"\$\.explanations\[0\]"):
+        validate_help_response(payload)
+
+
+@pytest.mark.parametrize("confidence", [-0.01, 1.01])
+def test_validate_help_response_rejects_confidence_out_of_range(confidence: float) -> None:
+    payload = _valid_help_response()
+    payload["confidence"] = confidence
+
+    with pytest.raises(ValidationError, match=r"\$\.confidence"):
+        validate_help_response(payload)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "extra_key", "expected_path"),
+    [
+        ("diagnosis", "unexpected", r"\$\.diagnosis"),
+        ("next", "unexpected", r"\$\.next"),
+        ("overlay", "unexpected", r"\$\.overlay"),
+    ],
+)
+def test_validate_help_response_rejects_additional_properties(
+    field_name: str,
+    extra_key: str,
+    expected_path: str,
+) -> None:
+    payload = _valid_help_response()
+    payload[field_name][extra_key] = "x"
+
+    with pytest.raises(ValidationError, match=expected_path):
+        validate_help_response(payload)
+
