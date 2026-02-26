@@ -60,14 +60,14 @@ Recommended minimal fields (to be formalized in schema later):
 - `rationale`: Optional internal explanation
 - `rejected_actions`: Optional list of unsafe actions rejected by system
 
-### 4.2 Mapping to TutorResponse (`core/types_v2.py`)
+### 4.2 Mapping to TutorResponse (`core/types.py`)
 
 - `TutorResponse.status`:
   - `ok`: HelpResponse is valid and executable
   - `error`: model unavailable, invalid output, validation failure, or policy rejection
 - `TutorResponse.message` <- `HelpResponse.message` (or fallback message)
 - `TutorResponse.actions`:
-  - Only overlay actions are allowed (`highlight/clear/pulse`)
+  - Only overlay actions are allowed (`highlight/clear`)
   - `click/execute` actions are forbidden
 - `TutorResponse.metadata`:
   - Record `provider=qwen|fallback`
@@ -122,9 +122,4 @@ Additional constraints:
 - Help main sequence, minimal input set, output mapping, failure fallback, event types, and safety boundary are all frozen.
 - This document can be used directly as implementation and testing baseline.
 - v0.1/v0.2 compatibility is preserved: no change to existing required contract fields.
-
-## 9. Acceptance Mapping (ST-001)
-
-- `help_flow.md` created: done.  
-- DoD, failure strategy, and event categories covered: done.  
 
