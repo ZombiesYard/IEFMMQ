@@ -127,7 +127,7 @@ class OllamaModel(ModelPort):
             return TutorResponse(
                 status="error",
                 in_reply_to=request.request_id if request else None,
-                message="无法生成有效帮助，请检查当前步骤并重试。",
+                message="Unable to generate help response,please check current system status and try again.",
                 actions=[],
                 metadata={
                     "provider": "ollama",
