@@ -8,7 +8,7 @@ provider migration (Ollama -> OpenAI-compatible) does not require core changes.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import os
+import os,math
 from typing import Mapping
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
@@ -119,6 +119,14 @@ def load_model_access_config(env: Mapping[str, str] | None = None) -> ModelAcces
             f"Invalid {ENV_MODEL_TIMEOUT_S}: {timeout_raw!r}. Must be a positive number."
         ) from exc
     if timeout_s <= 0:
+        raise ModelConfigError(
+            f"Invalid {ENV_MODEL_TIMEOUT_S}: {timeout_raw!r}. Must be a positive number."
+        )
+    if math.isnan(timeout_s):
+        raise ModelConfigError(
+            f"Invalid {ENV_MODEL_TIMEOUT_S}: {timeout_raw!r}. Must be a positive number."
+        )
+    if math.isinf(timeout_s):
         raise ModelConfigError(
             f"Invalid {ENV_MODEL_TIMEOUT_S}: {timeout_raw!r}. Must be a positive number."
         )
