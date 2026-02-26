@@ -25,7 +25,7 @@ def test_extract_first_json_plain_array_no_repair() -> None:
     result = extract_first_json('[{"k":1}]')
     assert result.json_text == '[{"k":1}]'
     assert result.json_repaired is False
-
+    assert result.repair_reasons == ()
 
 def test_extract_first_json_code_fence_records_repair_reason() -> None:
     result = extract_first_json("```json\n{\"k\":1}\n```")
