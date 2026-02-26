@@ -4,14 +4,14 @@ from core.types import Observation
 from tests._fakes import (
     FakeClient,
     FakeResponse,
-    help_obj_ok,
-    openai_chat_payload_from_help_obj,
-    request_help,
+    _help_obj_ok,
+    _openai_chat_payload_from_help_obj,
+    _request_help,
 )
 
 
 def test_explain_error_success_200_valid_help_response() -> None:
-    fake = FakeClient(responses=[FakeResponse(openai_chat_payload_from_help_obj(help_obj_ok()), status_code=200)])
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
     model = OpenAICompatModel(
         model_name="Qwen3.5-32B-Instruct",
         base_url="http://127.0.0.1:8000",
@@ -21,7 +21,7 @@ def test_explain_error_success_200_valid_help_response() -> None:
     )
     obs = Observation(source="mock", procedure_hint="S03")
 
-    res = model.explain_error(obs, request_help())
+    res = model.explain_error(obs, _request_help())
 
     assert res.status == "ok"
     assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
@@ -42,7 +42,7 @@ def test_explain_error_http_429_fallback_no_overlay() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake)
 
-    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request_help())
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
 
     assert res.status == "error"
     assert res.actions == []
@@ -53,7 +53,7 @@ def test_explain_error_http_5xx_fallback_no_overlay() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=500)])
     model = OpenAICompatModel(client=fake)
 
-    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request_help())
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
 
     assert res.status == "error"
     assert res.actions == []
@@ -64,7 +64,7 @@ def test_explain_error_timeout_fallback_no_overlay() -> None:
     fake = FakeClient(to_raise=TimeoutError("request timeout"))
     model = OpenAICompatModel(client=fake)
 
-    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request_help())
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
 
     assert res.status == "error"
     assert res.actions == []
@@ -83,7 +83,7 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     fake = FakeClient(responses=[FakeResponse(payload)])
     model = OpenAICompatModel(client=fake)
 
-    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request_help())
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
 
     assert res.status == "error"
     assert res.actions == []
@@ -91,11 +91,11 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
 
 
 def test_prompt_is_stable_for_same_input() -> None:
-    payload = openai_chat_payload_from_help_obj(help_obj_ok())
+    payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
     fake = FakeClient(responses=[FakeResponse(payload), FakeResponse(payload)])
     model = OpenAICompatModel(client=fake)
     obs = Observation(source="mock", procedure_hint="S03")
-    req = request_help()
+    req = _request_help()
 
     res1 = model.explain_error(obs, req)
     res2 = model.explain_error(obs, req)
@@ -108,11 +108,11 @@ def test_prompt_is_stable_for_same_input() -> None:
 
 
 def test_explain_error_step_id_not_in_candidate_steps_fallback_no_overlay() -> None:
-    help_obj = help_obj_ok()
+    help_obj = _help_obj_ok()
     help_obj["next"]["step_id"] = "S01"
-    fake = FakeClient(responses=[FakeResponse(openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(client=fake)
-    req = request_help()
+    req = _request_help()
     req.context["candidate_steps"] = ["S02", "S03"]
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
@@ -123,11 +123,11 @@ def test_explain_error_step_id_not_in_candidate_steps_fallback_no_overlay() -> N
 
 
 def test_explain_error_overlay_target_not_in_allowlist_fallback_no_overlay() -> None:
-    help_obj = help_obj_ok()
+    help_obj = _help_obj_ok()
     help_obj["overlay"]["targets"] = ["battery_switch"]
-    fake = FakeClient(responses=[FakeResponse(openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(client=fake)
-    req = request_help()
+    req = _request_help()
     req.context["overlay_target_allowlist"] = ["apu_switch"]
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
@@ -135,4 +135,3 @@ def test_explain_error_overlay_target_not_in_allowlist_fallback_no_overlay() -> 
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
-

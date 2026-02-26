@@ -47,7 +47,7 @@ class FakeClient:
         return self._responses.pop(0)
 
 
-def help_obj_ok() -> dict[str, Any]:
+def _help_obj_ok() -> dict[str, Any]:
     return {
         "diagnosis": {"step_id": "S02", "error_category": "OM"},
         "next": {"step_id": "S03"},
@@ -57,7 +57,7 @@ def help_obj_ok() -> dict[str, Any]:
     }
 
 
-def request_help() -> TutorRequest:
+def _request_help() -> TutorRequest:
     return TutorRequest(
         intent="help",
         message="I am stuck at startup.",
@@ -70,7 +70,7 @@ def request_help() -> TutorRequest:
     )
 
 
-def openai_chat_payload_from_help_obj(help_obj: dict[str, Any]) -> dict[str, Any]:
+def _openai_chat_payload_from_help_obj(help_obj: dict[str, Any]) -> dict[str, Any]:
     return {
         "choices": [
             {
@@ -84,13 +84,12 @@ def openai_chat_payload_from_help_obj(help_obj: dict[str, Any]) -> dict[str, Any
     }
 
 
-def ollama_message_payload_from_help_obj(help_obj: dict[str, Any], fenced: bool = False) -> dict[str, Any]:
+def _ollama_message_payload_from_help_obj(help_obj: dict[str, Any], fenced: bool = False) -> dict[str, Any]:
     content = json.dumps(help_obj, ensure_ascii=False)
     if fenced:
         content = f"```json\n{content}\n```"
     return {"message": {"content": content}}
 
 
-def ollama_response_payload_from_help_obj(help_obj: dict[str, Any]) -> dict[str, Any]:
+def _ollama_response_payload_from_help_obj(help_obj: dict[str, Any]) -> dict[str, Any]:
     return {"response": json.dumps(help_obj, ensure_ascii=False)}
-
