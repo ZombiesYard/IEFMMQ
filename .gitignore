@@ -29,4 +29,5 @@ tests/adapters/__pycache__
 adapters/dcs/overlay/__pycache__
 adapters/dcs/caps/__pycache__
 help_flow.md
+__pycache__
 /.tmp/

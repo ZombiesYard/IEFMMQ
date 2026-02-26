@@ -107,6 +107,8 @@ def main() -> int:
     batch.add_argument("--scenarios", nargs="*", help="Scenario JSON files (default: mock_scenarios/*.json)")
     batch.add_argument("--output-dir", default="logs", help="Directory to store logs/results.csv")
 
+    sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
+
     args = parser.parse_args()
     if args.command == "validate":
         return validate(args.files, args.schema)
@@ -155,6 +157,16 @@ def main() -> int:
         else:
             csv_path.write_text("", encoding="utf-8")
             print(f"[BATCH] no scenarios; wrote empty {csv_path}")
+        return 0
+    if args.command == "model-config":
+        from simtutor.config import ModelConfigError, load_model_access_config
+
+        try:
+            cfg = load_model_access_config()
+        except ModelConfigError as exc:
+            print(f"[MODEL_CONFIG] error: {exc}")
+            return 1
+        print(f"[MODEL_CONFIG] {cfg.public_startup_info()}")
         return 0
     parser.print_help()
     return 0
