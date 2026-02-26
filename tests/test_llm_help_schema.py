@@ -41,11 +41,34 @@ def test_validate_help_response_accepts_valid_payload() -> None:
     validate_help_response(_valid_help_response())
 
 
+@pytest.mark.parametrize("confidence", [0.0, 1.0])
+def test_validate_help_response_accepts_confidence_boundaries(confidence: float) -> None:
+    payload = _valid_help_response()
+    payload["confidence"] = confidence
+
+    validate_help_response(payload)
+
+
+def test_validate_help_response_accepts_multiple_overlay_targets() -> None:
+    payload = _valid_help_response()
+    payload["overlay"]["targets"] = ["apu_switch", "battery_switch"]
+
+    validate_help_response(payload)
+
+
 def test_validate_help_response_reports_missing_field_path() -> None:
     payload = _valid_help_response()
     del payload["diagnosis"]["error_category"]
 
     with pytest.raises(ValidationError, match=r"\$\.diagnosis\.error_category"):
+        validate_help_response(payload)
+
+
+def test_validate_help_response_reports_missing_top_level_required_field_path() -> None:
+    payload = _valid_help_response()
+    del payload["diagnosis"]
+
+    with pytest.raises(ValidationError, match=r"\$\.diagnosis"):
         validate_help_response(payload)
 
 
@@ -94,6 +117,14 @@ def test_validate_help_response_rejects_empty_explanation_string() -> None:
     payload["explanations"] = [""]
 
     with pytest.raises(ValidationError, match=r"\$\.explanations\[0\]"):
+        validate_help_response(payload)
+
+
+def test_validate_help_response_rejects_empty_explanations_array() -> None:
+    payload = _valid_help_response()
+    payload["explanations"] = []
+
+    with pytest.raises(ValidationError, match=r"\$\.explanations"):
         validate_help_response(payload)
 
 
