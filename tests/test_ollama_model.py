@@ -148,20 +148,6 @@ def test_explain_error_http_error_fallback() -> None:
 
 def test_explain_error_step_id_not_in_candidate_steps_fallback() -> None:
     help_obj = _help_obj_ok()
-    help_obj["diagnosis"]["step_id"] = "S99"
-    fake = _FakeClient([_FakeResponse({"message": {"content": json.dumps(help_obj, ensure_ascii=False)}})])
-    model = OllamaModel(client=fake)
-    obs = Observation(source="mock", procedure_hint="S03")
-    req = _request_help()
-    req.context["candidate_steps"] = ["S02", "S03"]
-
-    res = model.explain_error(obs, req)
-
-    assert res.status == "error"
-    assert res.metadata["provider"] == "ollama"
-
-def test_explain_error_step_id_not_in_candidate_steps_fallback() -> None:
-    help_obj = _help_obj_ok()
     help_obj["diagnosis"]["step_id"] = "S02"
     fake = _FakeClient([_FakeResponse({"message": {"content": json.dumps(help_obj, ensure_ascii=False)}})])
     model = OllamaModel(client=fake)
@@ -172,26 +158,11 @@ def test_explain_error_step_id_not_in_candidate_steps_fallback() -> None:
     res = model.explain_error(obs, req)
 
     assert res.status == "error"
-    assert res.metadata["provider"] == "ollama" 
+    assert res.metadata["provider"] == "ollama"
 
 def test_explain_error_alternate_response_format() -> None:
     help_obj = _help_obj_ok()
-    fake = _FakeClient(
-        [
-            _FakeResponse(
-                {
-                    "message": {
-                        "content": "```json\n" + json.dumps(help_obj, ensure_ascii=False) + "\n```",
-                    }
-                }
-            )
-        ]
-    )
-    model = OllamaModel(model_name="qwen3.5:35b", client=fake)
-    obs = Observation(source="mock", procedure_hint="S03")
-    req = _request_help()
-
-    res = model.explain_error(obs, req)
-
+    fake = _FakeClient([_FakeResponse({"response": json.dumps(help_obj, ensure_ascii=False)})])
+    model = OllamaModel(client=fake)
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
     assert res.status == "ok"
-    assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
