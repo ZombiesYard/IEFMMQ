@@ -159,7 +159,7 @@ def main() -> int:
             print(f"[BATCH] no scenarios; wrote empty {csv_path}")
         return 0
     if args.command == "model-config":
-        from config import ModelConfigError, load_model_access_config
+        from simtutor.config import ModelConfigError, load_model_access_config
 
         try:
             cfg = load_model_access_config()

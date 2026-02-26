@@ -1,7 +1,7 @@
 import pytest
 import sys
 
-from config import (
+from simtutor.config import (
     ENV_LANG,
     ENV_MODEL_API_KEY,
     ENV_MODEL_BASE_URL,
@@ -86,8 +86,24 @@ def test_startup_info_is_non_sensitive() -> None:
     assert "model=qwen3.5:35b" in info
     assert "timeout_s=45" in info
     assert "lang=en" in info
+    assert "base_url=http://127.0.0.1:8000/v1" in info
     assert "sk-local-secret" not in info
     assert "api_key" not in info
+
+
+def test_startup_info_redacts_base_url_credentials_query_and_fragment() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "https://user:pass@example.com:8443/v1?token=abc#frag"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    cfg = load_model_access_config(env)
+    info = cfg.public_startup_info()
+
+    assert "user:pass@" not in info
+    assert "token=abc" not in info
+    assert "#frag" not in info
+    assert "base_url=https://example.com:8443/v1" in info
 
 
 def test_cli_model_config_reports_missing_env(monkeypatch, capsys) -> None:
@@ -127,3 +143,24 @@ def test_cli_model_config_prints_non_sensitive_info(monkeypatch, capsys) -> None
     assert "timeout_s=20" in out
     assert "lang=zh" in out
     assert "sk-super-secret" not in out
+
+
+def test_cli_model_config_redacts_sensitive_base_url_parts(monkeypatch, capsys) -> None:
+    monkeypatch.setenv(ENV_MODEL_PROVIDER, "openai_compat")
+    monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3.5-32B-Instruct")
+    monkeypatch.setenv(
+        ENV_MODEL_BASE_URL, "https://alice:secret@api.example.local:8443/v1?api_key=abc#x"
+    )
+    monkeypatch.setenv(ENV_MODEL_TIMEOUT_S, "20")
+    monkeypatch.setenv(ENV_LANG, "zh")
+    monkeypatch.setenv(ENV_MODEL_API_KEY, "sk-super-secret")
+
+    monkeypatch.setattr(sys, "argv", ["simtutor", "model-config"])
+    code = main()
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "alice:secret@" not in out
+    assert "api_key=abc" not in out
+    assert "#x" not in out
+    assert "base_url=https://api.example.local:8443/v1" in out
