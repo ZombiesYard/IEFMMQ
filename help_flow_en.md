@@ -55,7 +55,7 @@ Recommended minimal fields (to be formalized in schema later):
 - `message`: Short learner-facing guidance text
 - `next_step_id`: Candidate step (must be in `candidate_steps`)
 - `overlay`: Optional object
-  - `intent`: `highlight | clear | pulse`
+  - `intent`: `highlight | clear`
   - `target`: must be in `overlay_target_allowlist`
 - `rationale`: Optional internal explanation
 - `rejected_actions`: Optional list of unsafe actions rejected by system
