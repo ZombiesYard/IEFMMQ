@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 import yaml
 
@@ -35,14 +35,80 @@ def _to_number(value: Any) -> float | None:
     return None
 
 
+def _normalize_str_tuple(values: Any) -> tuple[str, ...]:
+    if not isinstance(values, Iterable) or isinstance(values, (str, bytes, bytearray)):
+        return ()
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in values:
+        if not isinstance(item, str) or not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return tuple(out)
+
+
+def _normalize_str_frozenset(values: Any) -> frozenset[str]:
+    return frozenset(_normalize_str_tuple(values))
+
+
+def _normalize_int_pairs(values: Any) -> tuple[tuple[str, int], ...]:
+    items = values.items() if isinstance(values, Mapping) else values
+    if not isinstance(items, Iterable):
+        return ()
+    out: dict[str, int] = {}
+    for item in items:
+        if (
+            not isinstance(item, tuple)
+            or len(item) != 2
+            or not isinstance(item[0], str)
+            or not item[0]
+            or not isinstance(item[1], (int, float))
+        ):
+            continue
+        out[item[0]] = max(0, int(item[1]))
+    return tuple(sorted(out.items(), key=lambda kv: kv[0]))
+
+
+def _normalize_float_pairs(values: Any) -> tuple[tuple[str, float], ...]:
+    items = values.items() if isinstance(values, Mapping) else values
+    if not isinstance(items, Iterable):
+        return ()
+    out: dict[str, float] = {}
+    for item in items:
+        if (
+            not isinstance(item, tuple)
+            or len(item) != 2
+            or not isinstance(item[0], str)
+            or not item[0]
+            or not isinstance(item[1], (int, float))
+        ):
+            continue
+        out[item[0]] = max(0.0, float(item[1]))
+    return tuple(sorted(out.items(), key=lambda kv: kv[0]))
+
+
 @dataclass(frozen=True)
 class DeltaPolicy:
     ignore_bios_prefixes: tuple[str, ...] = ()
     ignore_bios_keys: frozenset[str] = frozenset()
-    debounce_ms_by_key: dict[str, int] = field(default_factory=dict)
-    epsilon_by_key: dict[str, float] = field(default_factory=dict)
+    debounce_ms_by_key: tuple[tuple[str, int], ...] = field(default_factory=tuple)
+    epsilon_by_key: tuple[tuple[str, float], ...] = field(default_factory=tuple)
     max_changes_per_window: int = 12
     important_bios_keys: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "ignore_bios_prefixes", _normalize_str_tuple(self.ignore_bios_prefixes))
+        object.__setattr__(self, "ignore_bios_keys", _normalize_str_frozenset(self.ignore_bios_keys))
+        object.__setattr__(self, "debounce_ms_by_key", _normalize_int_pairs(self.debounce_ms_by_key))
+        object.__setattr__(self, "epsilon_by_key", _normalize_float_pairs(self.epsilon_by_key))
+        if not isinstance(self.max_changes_per_window, int):
+            object.__setattr__(self, "max_changes_per_window", int(self.max_changes_per_window))
+        if self.max_changes_per_window < 1:
+            object.__setattr__(self, "max_changes_per_window", 1)
+        object.__setattr__(self, "important_bios_keys", _normalize_str_frozenset(self.important_bios_keys))
 
     @classmethod
     def from_yaml(cls, path: str | Path | None = None) -> "DeltaPolicy":
@@ -58,36 +124,14 @@ class DeltaPolicy:
         if not isinstance(raw, dict):
             raise DeltaPolicyError(f"delta policy must be mapping: {p}")
 
-        prefixes = tuple(
-            x for x in raw.get("ignore_bios_prefixes", []) if isinstance(x, str) and x
-        )
-        keys = frozenset(x for x in raw.get("ignore_bios_keys", []) if isinstance(x, str) and x)
-
-        debounce_ms: dict[str, int] = {}
-        for key, value in (raw.get("debounce_ms_by_key") or {}).items():
-            if isinstance(key, str) and key and isinstance(value, (int, float)):
-                debounce_ms[key] = max(0, int(value))
-
-        epsilon: dict[str, float] = {}
-        for key, value in (raw.get("epsilon_by_key") or {}).items():
-            if isinstance(key, str) and key and isinstance(value, (int, float)):
-                epsilon[key] = max(0.0, float(value))
-
         max_changes = raw.get("max_changes_per_window", 12)
-        if not isinstance(max_changes, (int, float)):
-            max_changes = 12
-        max_changes_int = max(1, int(max_changes))
-
-        important = frozenset(
-            x for x in (raw.get("important_bios_keys") or []) if isinstance(x, str) and x
-        )
         return cls(
-            ignore_bios_prefixes=prefixes,
-            ignore_bios_keys=keys,
-            debounce_ms_by_key=debounce_ms,
-            epsilon_by_key=epsilon,
-            max_changes_per_window=max_changes_int,
-            important_bios_keys=important,
+            ignore_bios_prefixes=raw.get("ignore_bios_prefixes", []),
+            ignore_bios_keys=raw.get("ignore_bios_keys", []),
+            debounce_ms_by_key=raw.get("debounce_ms_by_key", {}),
+            epsilon_by_key=raw.get("epsilon_by_key", {}),
+            max_changes_per_window=max_changes if isinstance(max_changes, (int, float)) else 12,
+            important_bios_keys=raw.get("important_bios_keys", []),
         )
 
     def should_ignore_key(self, key: str) -> bool:
@@ -96,10 +140,16 @@ class DeltaPolicy:
         return any(key.startswith(prefix) for prefix in self.ignore_bios_prefixes)
 
     def debounce_ms_for(self, key: str) -> int:
-        return int(self.debounce_ms_by_key.get(key, 0))
+        for stored_key, value in self.debounce_ms_by_key:
+            if stored_key == key:
+                return int(value)
+        return 0
 
     def epsilon_for(self, key: str) -> float:
-        return float(self.epsilon_by_key.get(key, 0.0))
+        for stored_key, value in self.epsilon_by_key:
+            if stored_key == key:
+                return float(value)
+        return 0.0
 
 
 @dataclass

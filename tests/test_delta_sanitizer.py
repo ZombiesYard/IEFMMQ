@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -102,3 +103,26 @@ def test_from_yaml_invalid_yaml_raises_delta_policy_error() -> None:
     invalid = FIXTURE_DIR / "delta_policy_invalid_yaml.yaml"
     with pytest.raises(DeltaPolicyError, match="contains invalid YAML"):
         DeltaPolicy.from_yaml(invalid)
+
+
+def test_delta_policy_normalizes_mutable_inputs_to_immutable_fields() -> None:
+    debounce = {"ENGINE_CRANK_SW": 300}
+    epsilon = {"SAI_PITCH": 8.0}
+    policy = DeltaPolicy(
+        ignore_bios_prefixes=["A_", "B_"],
+        ignore_bios_keys=["K1", "K2"],
+        debounce_ms_by_key=debounce,
+        epsilon_by_key=epsilon,
+        important_bios_keys=["BATTERY_SW"],
+    )
+
+    debounce["ENGINE_CRANK_SW"] = 999
+    epsilon["SAI_PITCH"] = 99.0
+
+    assert policy.debounce_ms_for("ENGINE_CRANK_SW") == 300
+    assert policy.epsilon_for("SAI_PITCH") == 8.0
+    assert isinstance(policy.debounce_ms_by_key, tuple)
+    assert isinstance(policy.epsilon_by_key, tuple)
+
+    with pytest.raises(FrozenInstanceError):
+        policy.max_changes_per_window = 999  # type: ignore[misc]

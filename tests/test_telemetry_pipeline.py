@@ -272,3 +272,41 @@ def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monk
     assert first.payload["delta_summary"]["delta_count"] == 1
     assert second.payload["delta_summary"]["delta_count"] == 0
     assert second.metadata["delta_dropped_count"] == 1
+
+
+def test_enrich_bios_observation_rejects_mismatched_policy_and_sanitizer() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={"seq": 301, "t_wall": 301.0, "bios": {"BATTERY_SW": 2}, "delta": {"BATTERY_SW": 2}},
+    )
+    policy_a = DeltaPolicy(max_changes_per_window=8)
+    policy_b = DeltaPolicy(max_changes_per_window=12)
+    sanitizer = DeltaSanitizer(policy_a)
+
+    with pytest.raises(ValueError, match="delta_policy does not match delta_sanitizer.policy"):
+        enrich_bios_observation(
+            obs,
+            _resolver(),
+            mapper=_mapper(),
+            delta_policy=policy_b,
+            delta_sanitizer=sanitizer,
+        )
+
+
+def test_enrich_bios_observation_rejects_mismatched_policy_and_aggregator() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={"seq": 302, "t_wall": 302.0, "bios": {"BATTERY_SW": 2}, "delta": {"BATTERY_SW": 2}},
+    )
+    policy_a = DeltaPolicy(max_changes_per_window=8)
+    policy_b = DeltaPolicy(max_changes_per_window=12)
+    aggregator = DeltaAggregator(policy_b, mapper=_mapper(), window_size=5)
+
+    with pytest.raises(ValueError, match="delta_aggregator.policy does not match effective delta policy"):
+        enrich_bios_observation(
+            obs,
+            _resolver(),
+            mapper=_mapper(),
+            delta_policy=policy_a,
+            delta_aggregator=aggregator,
+        )

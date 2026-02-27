@@ -143,6 +143,30 @@ def _normalize_hook_tags(raw: Any) -> Sequence[str]:
     return raw
 
 
+def _resolve_delta_policy_and_sanitizer(
+    *,
+    delta_policy: DeltaPolicy | None,
+    delta_sanitizer: DeltaSanitizer | None,
+    delta_aggregator: DeltaAggregator | None,
+) -> tuple[DeltaPolicy, DeltaSanitizer]:
+    if delta_sanitizer is not None:
+        policy = delta_sanitizer.policy
+        if delta_policy is not None and delta_policy != policy:
+            raise ValueError("delta_policy does not match delta_sanitizer.policy")
+        sanitizer = delta_sanitizer
+    elif delta_policy is not None:
+        policy = delta_policy
+        sanitizer = DeltaSanitizer(policy)
+    else:
+        sanitizer = _get_default_delta_sanitizer()
+        policy = sanitizer.policy
+
+    if delta_aggregator is not None and delta_aggregator.policy != policy:
+        raise ValueError("delta_aggregator.policy does not match effective delta policy")
+
+    return policy, sanitizer
+
+
 def enrich_bios_observation(
     obs: Observation,
     resolver: VarResolver,
@@ -183,15 +207,11 @@ def enrich_bios_observation(
     resolved_vars = resolver.resolve(payload)
     selected_vars = _select_vars(resolved_vars, selected_var_keys)
 
-    if delta_sanitizer is not None:
-        sanitizer = delta_sanitizer
-        policy = delta_policy or sanitizer.policy
-    elif delta_policy is not None:
-        policy = delta_policy
-        sanitizer = DeltaSanitizer(policy)
-    else:
-        sanitizer = _get_default_delta_sanitizer()
-        policy = sanitizer.policy
+    policy, sanitizer = _resolve_delta_policy_and_sanitizer(
+        delta_policy=delta_policy,
+        delta_sanitizer=delta_sanitizer,
+        delta_aggregator=delta_aggregator,
+    )
 
     seq = _as_int(payload.get("seq"))
     t_wall = _as_float(payload.get("t_wall"))
