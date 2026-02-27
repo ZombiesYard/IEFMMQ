@@ -35,6 +35,10 @@ steps:
     completion_conditions:
       - "BATTERY switch ON."
       - "Left/Right GEN switches in NORM/ON."
+    ui_targets:
+      - battery_switch
+      - generator_left_switch
+      - generator_right_switch
     tutor_prompts:
       - "Ensure aircraft power is applied: flip BATTERY to ON; verify both generator switches are ON."
 
@@ -49,6 +53,8 @@ steps:
     completion_conditions:
       - "Fire test A completed with correct aural/visual indications."
       - "Fire test B completed after ~10s pause."
+    ui_targets:
+      - fire_test_switch
     tutor_prompts:
       - "Hold FIRE TEST switch to A until tones finish, wait 10s, then repeat for B."
 
@@ -63,6 +69,8 @@ steps:
     completion_conditions:
       - "APU switch ON."
       - "APU READY light illuminated."
+    ui_targets:
+      - apu_switch
     tutor_prompts:
       - "Set APU switch to ON; watch for green APU READY before engine crank."
 
@@ -76,33 +84,38 @@ steps:
       - "APU READY light on."
     completion_conditions:
       - "ENG CRANK switch set to RIGHT; right engine spool-up observed."
+    ui_targets:
+      - eng_crank_switch
     tutor_prompts:
       - "With APU READY, set ENG CRANK to RIGHT to begin right engine start."
 
   - id: S05
     phase: P2
     official_step: "Move the right throttle from OFF to IDLE when the right engine is above 25% rpm."
-    short_explanation: "Advance right throttle to IDLE at ≥25% RPM."
+    short_explanation: "Advance right throttle to IDLE at >=25% RPM."
     cockpit_area: "Throttles / IFEI"
     critical: true
     preconditions:
       - "Right engine RPM rising from S04."
     completion_conditions:
       - "Right throttle at IDLE."
-      - "Throttle moved when RPM ≥25%."
+      - "Throttle moved when RPM >=25%."
+    ui_targets: []
     tutor_prompts:
       - "Monitor IFEI; when right RPM passes 25%, lift and move right throttle to IDLE."
 
   - id: S06
     phase: P2
-    official_step: "Once right engine RPM is over 60%, rotate the BLEED AIR knob 360° clockwise, from NORM to NORM."
-    short_explanation: "Cycle BLEED AIR knob 360° after right RPM >60%."
+    official_step: "Once right engine RPM is over 60%, rotate the BLEED AIR knob 360 deg clockwise, from NORM to NORM."
+    short_explanation: "Cycle BLEED AIR knob 360 deg after right RPM >60%."
     cockpit_area: "Right console"
     critical: false
     preconditions:
       - "Right engine stabilized above 60% RPM."
     completion_conditions:
       - "BLEED AIR knob rotated full clockwise back to NORM."
+    ui_targets:
+      - bleed_air_knob
     tutor_prompts:
       - "After right RPM >60%, rotate BLEED AIR knob through a full clockwise turn to NORM."
 
@@ -116,6 +129,8 @@ steps:
       - "Right engine stabilized; electrical power available."
     completion_conditions:
       - "Light test executed with all annunciators verified."
+    ui_targets:
+      - lights_test_button
     tutor_prompts:
       - "Press the lights test; confirm caution, warning, and advisory lamps illuminate."
 
@@ -130,6 +145,13 @@ steps:
     completion_conditions:
       - "Left DDI shows FCS page; right DDI shows BIT page."
       - "MPCD and HUD powered."
+    ui_targets:
+      - left_mdi_brightness_selector
+      - right_mdi_brightness_selector
+      - ampcd_off_brightness_knob
+      - hud_symbology_brightness_knob
+      - left_mdi_pb5
+      - right_mdi_pb5
     tutor_prompts:
       - "Power DDIs/MPCD/HUD; set left DDI to FCS and right DDI to BIT."
 
@@ -143,6 +165,11 @@ steps:
       - "Displays powered (S08 complete)."
     completion_conditions:
       - "COMM1 and COMM2 set to assigned frequencies/presets."
+    ui_targets:
+      - ufc_comm1_channel_selector_pull
+      - ufc_comm1_channel_selector_rotate
+      - ufc_comm2_channel_selector_pull
+      - ufc_comm2_channel_selector_rotate
     tutor_prompts:
       - "Use UFC/comm panels to set COMM1 and COMM2 to the mission frequencies."
 
@@ -153,9 +180,10 @@ steps:
     cockpit_area: "Left console / IFEI"
     critical: true
     preconditions:
-      - "Right engine stabilized: RPM 63–70%, TEMP 190–590°C, FF 420–900 PPH, nozzle 73–84%, OIL 45–110 psi."
+      - "Right engine stabilized: RPM 63-70%, TEMP 190-590 degC, FF 420-900 PPH, nozzle 73-84%, OIL 45-110 psi."
     completion_conditions:
       - "ENG CRANK switch set to LEFT; left engine spool-up observed."
+    ui_targets:
+      - eng_crank_switch
     tutor_prompts:
       - "If right engine parameters are in green ranges, move ENG CRANK to LEFT for left engine start."
-
