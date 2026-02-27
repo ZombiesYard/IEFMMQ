@@ -24,6 +24,39 @@ cockpit_elements:
   lights_test_button:
     description: "Lights Test Switch TEST/OFF"
     dcs_id: "pnt_416"
+  left_mdi_brightness_selector:
+    description: "Left MDI Brightness Selector Knob OFF/NIGHT/DAY"
+    dcs_id: "pnt_51"
+  right_mdi_brightness_selector:
+    description: "Right MDI Brightness Selector Knob OFF/NIGHT/DAY"
+    dcs_id: "pnt_76"
+  ampcd_off_brightness_knob:
+    description: "AMPCD Off/Brightness Control Knob"
+    dcs_id: "pnt_203"
+  hud_symbology_brightness_knob:
+    description: "HUD Symbology Brightness Control Knob"
+    dcs_id: "pnt_141"
+  left_mdi_pb5:
+    description: "Left MDI PB 5"
+    dcs_id: "pnt_58"
+  right_mdi_pb5:
+    description: "Right MDI PB 5"
+    dcs_id: "pnt_83"
+  fcs_bit_switch:
+    description: "FCS BIT Switch on right wall"
+    dcs_id: "pnt_470"
+  ufc_comm1_channel_selector_rotate:
+    description: "UFC COMM 1 Channel Selector Knob rotate"
+    dcs_id: "pnt_124"
+  ufc_comm1_channel_selector_pull:
+    description: "UFC COMM 1 Channel Selector Knob push/pull function"
+    dcs_id: "pnt_125"
+  ufc_comm2_channel_selector_rotate:
+    description: "UFC COMM 2 Channel Selector Knob rotate"
+    dcs_id: "pnt_126"
+  ufc_comm2_channel_selector_pull:
+    description: "UFC COMM 2 Channel Selector Knob push/pull function"
+    dcs_id: "pnt_127"
 
 default_overlay:
   style: "highlight"
