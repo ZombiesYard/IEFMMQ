@@ -85,12 +85,19 @@ def _select_vars(resolved: Mapping[str, Any], keys: Sequence[str] | None) -> dic
 
 
 def _build_delta_summary(delta: Mapping[str, Any], max_keys: int) -> dict[str, Any]:
-    keys = [key for key in delta.keys() if isinstance(key, str) and key]
-    sample = keys[: max(0, max_keys)]
+    sample_limit = max(0, max_keys)
+    sample: list[str] = []
+    valid_count = 0
+    for key in delta.keys():
+        if not isinstance(key, str) or not key:
+            continue
+        valid_count += 1
+        if len(sample) < sample_limit:
+            sample.append(key)
     return {
-        "delta_count": len(keys),
+        "delta_count": valid_count,
         "changed_keys_sample": sample,
-        "truncated": len(sample) < len(keys),
+        "truncated": valid_count > len(sample),
     }
 
 
@@ -117,6 +124,7 @@ def enrich_bios_observation(
     max_recent_ui_targets: int = 8,
     tag_hook: TagHook | None = None,
     debug_cache: TelemetryDebugCache | None = None,
+    include_bios_hash: bool | None = None,
 ) -> Observation:
     """
     Enrich a DCS-BIOS observation into a compact payload for tutor/prompt pipeline.
@@ -129,6 +137,8 @@ def enrich_bios_observation(
 
     Large raw bios state is excluded from payload and can optionally be cached
     in-memory for debug by passing `debug_cache`.
+    BIOS hash calculation is optional; by default it is enabled when `debug_cache`
+    is provided, or can be forced with `include_bios_hash=True`.
     """
     payload = obs.payload if isinstance(obs.payload, MutableMapping) else {}
     bios = payload.get("bios")
@@ -158,8 +168,11 @@ def enrich_bios_observation(
     if "delta_count" not in metadata:
         metadata["delta_count"] = delta_summary["delta_count"]
 
-    bios_hash = _stable_hash_mapping(bios_map)
-    metadata["bios_hash"] = bios_hash
+    should_hash = include_bios_hash if include_bios_hash is not None else debug_cache is not None
+    bios_hash: str | None = None
+    if should_hash:
+        bios_hash = _stable_hash_mapping(bios_map)
+        metadata["bios_hash"] = bios_hash
 
     if debug_cache is not None:
         debug_cache.last_seq = compact_payload["seq"]
@@ -170,18 +183,17 @@ def enrich_bios_observation(
     extra_tags = tag_hook(obs, compact_payload) if tag_hook else ()
     merged_tags = _merge_tags(obs.tags, extra_tags)
 
-    enriched = Observation(
+    return Observation(
+        observation_id=obs.observation_id,
+        timestamp=obs.timestamp,
         source=obs.source,
         payload=compact_payload,
+        version=obs.version,
         procedure_hint=obs.procedure_hint,
         tags=merged_tags,
         attachments=list(obs.attachments),
         metadata=metadata,
     )
-    enriched.observation_id = obs.observation_id
-    enriched.timestamp = obs.timestamp
-    enriched.version = obs.version
-    return enriched
 
 
 __all__ = [

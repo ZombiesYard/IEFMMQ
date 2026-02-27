@@ -70,8 +70,7 @@ def test_enrich_bios_observation_compacts_payload_and_keeps_metadata() -> None:
     assert enriched.metadata["seq"] == 42
     assert enriched.metadata["gap"] == 0
     assert enriched.metadata["delta_count"] == 4
-    assert isinstance(enriched.metadata.get("bios_hash"), str)
-    assert len(enriched.metadata["bios_hash"]) == 64
+    assert "bios_hash" not in enriched.metadata
 
     json.dumps(enriched.to_dict(), ensure_ascii=False)
 
@@ -108,3 +107,26 @@ def test_enrich_bios_observation_supports_tag_hook_and_debug_cache() -> None:
     assert cache.last_bios.get("BATTERY_SW") == 2
     assert cache.last_delta == {"BATTERY_SW": 2}
     assert cache.last_bios_hash == enriched.metadata["bios_hash"]
+
+
+def test_enrich_bios_observation_can_force_bios_hash_without_debug_cache() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 9,
+            "t_wall": 9.0,
+            "bios": {"BATTERY_SW": 2},
+            "delta": {"BATTERY_SW": 2},
+        },
+        metadata={"seq": 9, "gap": 0, "delta_count": 1},
+    )
+
+    enriched = enrich_bios_observation(
+        obs,
+        _resolver(),
+        mapper=_mapper(),
+        include_bios_hash=True,
+    )
+
+    assert isinstance(enriched.metadata.get("bios_hash"), str)
+    assert len(enriched.metadata["bios_hash"]) == 64
