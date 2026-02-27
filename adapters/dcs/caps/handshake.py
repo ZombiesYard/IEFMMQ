@@ -84,7 +84,9 @@ def negotiate(
         sock.sendto(data, (host, port))
         try:
             resp, _ = sock.recvfrom(4096)
-        except socket.timeout:
+        except (socket.timeout, ConnectionResetError):
+            # Windows UDP can raise ConnectionResetError (WinError 10054)
+            # when the peer/port is unavailable; treat as no caps reply.
             return None
         caps = decode(resp)
         validate_caps(caps)

@@ -13,7 +13,7 @@ from tests._fakes import (
 def test_explain_error_success_200_valid_help_response() -> None:
     fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
     model = OpenAICompatModel(
-        model_name="Qwen3.5-32B-Instruct",
+        model_name="Qwen3-8B-Instruct",
         base_url="http://127.0.0.1:8000",
         timeout_s=15.0,
         api_key="sk-local",
@@ -26,15 +26,17 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert res.status == "ok"
     assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
     assert res.metadata["provider"] == "openai_compat"
-    assert res.metadata["model"] == "Qwen3.5-32B-Instruct"
+    assert res.metadata["model"] == "Qwen3-8B-Instruct"
     assert isinstance(res.metadata["latency_ms"], int)
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
+    assert res.metadata["evidence_guardrail_applied"] is False
+    assert res.metadata["evidence_guardrail_reasons"] == []
     validate_help_response(res.metadata["help_response"])
 
     call = fake.calls[0]
     assert call["url"] == "http://127.0.0.1:8000/v1/chat/completions"
-    assert call["json"]["model"] == "Qwen3.5-32B-Instruct"
+    assert call["json"]["model"] == "Qwen3-8B-Instruct"
     assert call["json"]["temperature"] == 0
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0
@@ -49,6 +51,35 @@ def test_explain_error_http_429_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"] = []
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_invalid_evidence_ref_clears_overlay() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"][0]["ref"] = "UNKNOWN.ref"
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert res.actions == []
+    assert res.explanations[0].startswith("\u9700\u8981\u66f4\u591a\u4fe1\u606f/\u8bf7\u786e\u8ba4")
+    assert res.metadata["evidence_guardrail_applied"] is True
+    assert "invalid_target_evidence_refs:apu_switch" in res.metadata["evidence_guardrail_reasons"]
+    assert res.metadata["help_response"]["overlay"]["targets"] == []
 
 
 def test_explain_error_http_5xx_fallback_no_overlay() -> None:

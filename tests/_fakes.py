@@ -51,7 +51,18 @@ def _help_obj_ok() -> dict[str, Any]:
     return {
         "diagnosis": {"step_id": "S02", "error_category": "OM"},
         "next": {"step_id": "S03"},
-        "overlay": {"targets": ["apu_switch"]},
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [
+                {
+                    "target": "apu_switch",
+                    "type": "delta",
+                    "ref": "RECENT_UI_TARGETS.apu_switch",
+                    "quote": "Recent delta indicates APU switch activity.",
+                    "grounding_confidence": 0.9,
+                }
+            ],
+        },
         "explanations": ["APU is off, switch APU to ON before engine crank."],
         "confidence": 0.93,
     }
@@ -63,7 +74,9 @@ def _request_help() -> TutorRequest:
         message="I am stuck at startup.",
         context={
             "vars": {"battery_on": True, "apu_on": False},
-            "recent_deltas": [{"k": "apu_on", "from": 1, "to": 0}],
+            "recent_deltas": [{"k": "apu_on", "mapped_ui_target": "apu_switch", "from": 1, "to": 0}],
+            "gates": {"S03": {"status": "allowed", "reason": "prerequisites_met"}},
+            "rag_topk": [{"id": "doc_001", "snippet": "APU switch to ON and wait for APU READY."}],
             "candidate_steps": ["S02", "S03"],
             "overlay_target_allowlist": ["apu_switch", "battery_switch"],
         },
