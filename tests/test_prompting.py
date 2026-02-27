@@ -37,6 +37,8 @@ def test_prompt_contains_enum_constraints_and_delta_summary() -> None:
 
     assert payload["allowed_step_ids"] == ["S02", "S03"]
     assert payload["allowed_overlay_targets"] == ["apu_switch", "battery_switch"]
+    assert payload["allowed_error_categories"]
+    assert payload["output_example_json"]["diagnosis"]["error_category"] in payload["allowed_error_categories"]
     summary = payload["recent_deltas_summary"]
     assert summary["top_k"] == MAX_DELTA_SUMMARY_ITEMS
     assert len(summary["items"]) == 2
@@ -47,6 +49,7 @@ def test_prompt_contains_strict_json_output_constraints() -> None:
     prompt = build_help_prompt(_base_context(), "en")
     assert "must output exactly one strict JSON object" in prompt
     assert "no prose, no markdown, no code fences" in prompt
+    assert "diagnosis.error_category must be chosen from allowed_error_categories." in prompt
     assert '"diagnosis":{"step_id":"...","error_category":"..."}' in prompt
 
 
@@ -95,11 +98,22 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
     assert result.metadata["prompt_tokens_est"] <= 180
 
 
-def test_budget_trim_records_terminal_and_log(capsys, caplog) -> None:
+def test_budget_trim_logs_by_default_without_terminal_print(capsys, caplog) -> None:
     ctx = _base_context()
     ctx["vars"] = {f"v_{i:03d}": "y" * 120 for i in range(80)}
     with caplog.at_level("WARNING"):
         build_help_prompt_result(ctx, "zh", max_prompt_chars=700, max_prompt_tokens_est=120)
+    out = capsys.readouterr().out
+    assert out == ""
+    assert "Prompt trimmed to fit budget" in caplog.text
+
+
+def test_budget_trim_can_print_terminal_when_enabled(monkeypatch, capsys, caplog) -> None:
+    ctx = _base_context()
+    ctx["vars"] = {f"v_{i:03d}": "z" * 120 for i in range(80)}
+    monkeypatch.setenv("SIMTUTOR_PROMPT_TRIM_PRINT", "1")
+    with caplog.at_level("WARNING"):
+        build_help_prompt_result(ctx, "en", max_prompt_chars=700, max_prompt_tokens_est=120)
     out = capsys.readouterr().out
     assert "[PROMPT] Prompt trimmed to fit budget" in out
     assert "Prompt trimmed to fit budget" in caplog.text

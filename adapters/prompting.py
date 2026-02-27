@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -126,9 +127,10 @@ def _build_delta_summary(context: Mapping[str, Any], top_k: int = MAX_DELTA_SUMM
 def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
         return list(fallback)
+    allowed = set(fallback)
     out: list[str] = []
     for v in values:
-        if isinstance(v, str) and v and v in fallback:
+        if isinstance(v, str) and v and v in allowed:
             out.append(v)
     if out:
         return out
@@ -136,9 +138,10 @@ def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
 
 
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
+    rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
         f"{header}\n"
-        f"Rules:\n- {rules[0]}\n- {rules[1]}\n- {rules[2]}\n"
+        f"Rules:\n{rendered_rules}\n"
         f"Context and constraints JSON:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
         "Output must follow this schema shape exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
@@ -150,7 +153,8 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
 
 
 def _record_trim_event(message: str) -> None:
-    print(f"[PROMPT] {message}")
+    if os.getenv("SIMTUTOR_PROMPT_TRIM_PRINT", "").strip().lower() in {"1", "true", "yes", "on"}:
+        print(f"[PROMPT] {message}")
     _LOGGER.warning(message)
 
 
@@ -164,7 +168,8 @@ def build_help_prompt_result(
     schema = get_help_response_schema()
     step_enum = list(schema["properties"]["next"]["properties"]["step_id"]["enum"])
     target_enum = list(schema["properties"]["overlay"]["properties"]["targets"]["items"]["enum"])
-    category_enum = list(schema["properties"]["diagnosis"]["properties"]["error_category"]["enum"])
+    schema_category_enum = list(schema["properties"]["diagnosis"]["properties"]["error_category"]["enum"])
+    category_enum = _normalize_enum_list(context.get("error_category_enum"), schema_category_enum)
 
     candidate_steps = _normalize_enum_list(context.get("candidate_steps"), step_enum)
     overlay_targets = _normalize_enum_list(context.get("overlay_target_allowlist"), target_enum)
@@ -184,6 +189,7 @@ def build_help_prompt_result(
     payload = {
         "allowed_step_ids": candidate_steps,
         "allowed_overlay_targets": overlay_targets,
+        "allowed_error_categories": category_enum,
         "current_vars_selected": selected_vars,
         "recent_deltas_summary": recent_deltas_summary,
         "output_example_json": example_obj,
@@ -197,6 +203,7 @@ def build_help_prompt_result(
         rules = [
             "必须从 allowed_step_ids 中选择 diagnosis.step_id 与 next.step_id。",
             "必须从 allowed_overlay_targets 中选择 overlay.targets。",
+            "必须从 allowed_error_categories 中选择 diagnosis.error_category。",
             "若不确定，也必须返回合法 JSON，不得输出自然语言段落。",
         ]
     else:
@@ -208,6 +215,7 @@ def build_help_prompt_result(
         rules = [
             "diagnosis.step_id and next.step_id must be chosen from allowed_step_ids.",
             "overlay.targets must be chosen from allowed_overlay_targets.",
+            "diagnosis.error_category must be chosen from allowed_error_categories.",
             "If uncertain, still return valid JSON only.",
         ]
 
@@ -258,6 +266,7 @@ def build_help_prompt_result(
         compact_payload = {
             "allowed_step_ids": payload["allowed_step_ids"],
             "allowed_overlay_targets": payload["allowed_overlay_targets"],
+            "allowed_error_categories": payload["allowed_error_categories"],
             "output_example_json": payload["output_example_json"],
         }
         prompt = (
