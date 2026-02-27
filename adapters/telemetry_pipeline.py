@@ -9,7 +9,7 @@ from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from core.types import Observation
 from core.vars import VarResolver
 
-TagHook = Callable[[Observation, Mapping[str, Any]], Sequence[str]]
+TagHook = Callable[[Observation, Mapping[str, Any]], Sequence[str] | None]
 
 DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "battery_on",
@@ -72,7 +72,7 @@ def _as_float(value: Any) -> float | None:
 
 
 def _select_vars(resolved: Mapping[str, Any], keys: Sequence[str] | None) -> dict[str, Any]:
-    selected = list(keys) if keys else list(DEFAULT_SELECTED_VAR_KEYS)
+    selected = list(DEFAULT_SELECTED_VAR_KEYS) if keys is None else list(keys)
     out: dict[str, Any] = {}
     for key in selected:
         if key in resolved:
@@ -112,6 +112,16 @@ def _merge_tags(existing: Sequence[str], extra: Sequence[str]) -> list[str]:
         seen.add(raw)
         out.append(raw)
     return out
+
+
+def _normalize_hook_tags(raw: Any) -> Sequence[str]:
+    if raw is None:
+        return ()
+    if isinstance(raw, (str, bytes, bytearray)):
+        raise TypeError("tag_hook must return a sequence of strings, not a string/bytes value")
+    if not isinstance(raw, Sequence):
+        raise TypeError(f"tag_hook must return a sequence of strings or None, got {type(raw).__name__}")
+    return raw
 
 
 def enrich_bios_observation(
@@ -180,7 +190,8 @@ def enrich_bios_observation(
         debug_cache.last_delta = dict(delta_map)
         debug_cache.last_bios_hash = bios_hash
 
-    extra_tags = tag_hook(obs, compact_payload) if tag_hook else ()
+    hook_tags = tag_hook(obs, compact_payload) if tag_hook else ()
+    extra_tags = _normalize_hook_tags(hook_tags)
     merged_tags = _merge_tags(obs.tags, extra_tags)
 
     return Observation(

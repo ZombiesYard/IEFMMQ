@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.telemetry_pipeline import TelemetryDebugCache, enrich_bios_observation
 from core.types import Observation
@@ -130,3 +132,56 @@ def test_enrich_bios_observation_can_force_bios_hash_without_debug_cache() -> No
 
     assert isinstance(enriched.metadata.get("bios_hash"), str)
     assert len(enriched.metadata["bios_hash"]) == 64
+
+
+def test_enrich_bios_observation_selected_var_keys_empty_means_select_none() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 10,
+            "t_wall": 10.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_RPM_R": " 30"},
+            "delta": {"BATTERY_SW": 2},
+        },
+    )
+
+    enriched = enrich_bios_observation(
+        obs,
+        _resolver(),
+        mapper=_mapper(),
+        selected_var_keys=[],
+    )
+
+    assert enriched.payload["vars"] == {}
+
+
+def test_enrich_bios_observation_tag_hook_none_treated_as_no_extra_tags() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        tags=["live"],
+        payload={"seq": 11, "t_wall": 11.0, "bios": {"BATTERY_SW": 2}, "delta": {"BATTERY_SW": 2}},
+    )
+
+    enriched = enrich_bios_observation(
+        obs,
+        _resolver(),
+        mapper=_mapper(),
+        tag_hook=lambda _obs, _payload: None,
+    )
+
+    assert enriched.tags == ["live"]
+
+
+def test_enrich_bios_observation_tag_hook_invalid_return_raises_clear_error() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={"seq": 12, "t_wall": 12.0, "bios": {"BATTERY_SW": 2}, "delta": {"BATTERY_SW": 2}},
+    )
+
+    with pytest.raises(TypeError, match="tag_hook must return a sequence of strings or None"):
+        enrich_bios_observation(
+            obs,
+            _resolver(),
+            mapper=_mapper(),
+            tag_hook=lambda _obs, _payload: 123,  # type: ignore[return-value]
+        )
