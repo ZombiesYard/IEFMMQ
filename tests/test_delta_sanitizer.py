@@ -81,6 +81,24 @@ def test_flush_uses_emit_time_for_debounce_window() -> None:
     assert s4.dropped_by_reason.get("debounce", 0) == 1
 
 
+def test_flush_without_raw_delta_updates_raw_and_drop_counts_consistently() -> None:
+    policy = DeltaPolicy(
+        debounce_ms_by_key={"ENGINE_CRANK_SW": 300},
+        max_changes_per_window=10,
+    )
+    sanitizer = DeltaSanitizer(policy)
+
+    sanitizer.sanitize_delta({"ENGINE_CRANK_SW": 1}, t_wall=1.000, seq=1)
+    sanitizer.sanitize_delta({"ENGINE_CRANK_SW": 2}, t_wall=1.100, seq=2)  # debounced, pending
+    flushed = sanitizer.sanitize_delta({}, t_wall=1.500, seq=3)  # flush pending
+
+    assert flushed.kept == {"ENGINE_CRANK_SW": 2}
+    assert flushed.raw_count == 1
+    assert flushed.kept_count == 1
+    assert flushed.dropped_count == 0
+    assert flushed.dropped_by_reason == {}
+
+
 def test_invalid_keys_counted_in_dropped_total() -> None:
     policy = DeltaPolicy()
     sanitizer = DeltaSanitizer(policy)

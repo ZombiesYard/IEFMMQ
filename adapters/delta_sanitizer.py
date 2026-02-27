@@ -198,6 +198,7 @@ class DeltaSanitizer:
         kept: dict[str, Any] = {}
         dropped: dict[str, int] = {}
         touched_keys: set[str] = set()
+        flushed_count = 0
 
         for key, value in raw_delta.items():
             if not isinstance(key, str) or not key:
@@ -245,13 +246,14 @@ class DeltaSanitizer:
                 if last_emit is None or (now_ms - last_emit) < debounce_ms:
                     continue
                 kept[key] = value
+                flushed_count += 1
                 self._last_seen_value[key] = value
                 self._last_emitted_ms[key] = now_ms
                 del self._pending[key]
 
-        raw_count = len(raw_delta)
+        raw_count = len(raw_delta) + flushed_count
         kept_count = len(kept)
-        dropped_count = max(0, raw_count - kept_count)
+        dropped_count = sum(dropped.values())
         return SanitizedDelta(
             kept=kept,
             dropped_by_reason=dropped,
