@@ -6,7 +6,7 @@ import yaml
 BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
 UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
-REQUIRED_NON_EMPTY_STEPS = {"S01", "S02", "S03", "S04", "S06", "S07", "S08", "S09"}
+REQUIRED_NON_EMPTY_STEPS = ("S01", "S02", "S03", "S04", "S06", "S07", "S08", "S09", "S10")
 
 
 def _load_yaml(path: Path) -> dict:
