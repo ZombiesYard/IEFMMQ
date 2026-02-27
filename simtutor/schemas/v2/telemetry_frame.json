@@ -27,7 +27,12 @@
     },
     "vars": {
       "type": "object",
-      "additionalProperties": { "type": ["number", "string", "boolean", "null"] }
+      "additionalProperties": {
+        "anyOf": [
+          { "type": ["number", "string", "boolean", "null"] },
+          { "type": "array", "items": { "type": "string" } }
+        ]
+      }
     },
     "raw": { "type": ["object", "null"] }
   }
