@@ -1,10 +1,13 @@
 from pathlib import Path
 
-from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
+import pytest
+
+from adapters.delta_sanitizer import DeltaPolicy, DeltaPolicyError, DeltaSanitizer
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = REPO_ROOT / "packs" / "fa18c_startup" / "delta_policy.yaml"
+FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures"
 
 
 def test_time_and_counter_noise_fields_are_filtered() -> None:
@@ -59,3 +62,43 @@ def test_rapid_jitter_is_debounced_and_last_value_kept() -> None:
     assert s2.dropped_by_reason.get("debounce", 0) == 1
     assert s3.kept == {}
     assert s4.kept == {"ENGINE_CRANK_SW": 2}
+
+
+def test_flush_uses_emit_time_for_debounce_window() -> None:
+    policy = DeltaPolicy(
+        debounce_ms_by_key={"ENGINE_CRANK_SW": 300},
+        max_changes_per_window=10,
+    )
+    sanitizer = DeltaSanitizer(policy)
+
+    sanitizer.sanitize_delta({"ENGINE_CRANK_SW": 1}, t_wall=1.000, seq=1)
+    sanitizer.sanitize_delta({"ENGINE_CRANK_SW": 2}, t_wall=1.100, seq=2)
+    sanitizer.sanitize_delta({}, t_wall=1.600, seq=3)  # flush pending value
+    s4 = sanitizer.sanitize_delta({"ENGINE_CRANK_SW": 3}, t_wall=1.650, seq=4)
+
+    assert s4.kept == {}
+    assert s4.dropped_by_reason.get("debounce", 0) == 1
+
+
+def test_invalid_keys_counted_in_dropped_total() -> None:
+    policy = DeltaPolicy()
+    sanitizer = DeltaSanitizer(policy)
+
+    out = sanitizer.sanitize_delta({1: "x", "": "y"}, t_wall=1.0, seq=1)
+
+    assert out.raw_count == 2
+    assert out.kept_count == 0
+    assert out.dropped_count == 2
+    assert out.dropped_by_reason.get("invalid_key", 0) == 2
+
+
+def test_from_yaml_missing_file_raises_delta_policy_error() -> None:
+    missing = FIXTURE_DIR / "missing_delta_policy.yaml"
+    with pytest.raises(DeltaPolicyError, match="read failed"):
+        DeltaPolicy.from_yaml(missing)
+
+
+def test_from_yaml_invalid_yaml_raises_delta_policy_error() -> None:
+    invalid = FIXTURE_DIR / "delta_policy_invalid_yaml.yaml"
+    with pytest.raises(DeltaPolicyError, match="contains invalid YAML"):
+        DeltaPolicy.from_yaml(invalid)

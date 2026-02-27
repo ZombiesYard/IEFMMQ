@@ -1,0 +1,4 @@
+ignore_bios_keys:
+  - BATTERY_SW
+debounce_ms_by_key:
+  ENGINE_CRANK_SW: [300

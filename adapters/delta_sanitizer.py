@@ -7,6 +7,10 @@ from typing import Any, Mapping
 import yaml
 
 
+class DeltaPolicyError(ValueError):
+    pass
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -44,11 +48,15 @@ class DeltaPolicy:
     def from_yaml(cls, path: str | Path | None = None) -> "DeltaPolicy":
         p = Path(path) if path else _default_policy_path()
         try:
-            raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-        except OSError:
-            raw = {}
+            raw_text = p.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise DeltaPolicyError(f"delta policy read failed: {p}") from exc
+        try:
+            raw = yaml.safe_load(raw_text) or {}
+        except yaml.YAMLError as exc:
+            raise DeltaPolicyError(f"delta policy contains invalid YAML: {p}") from exc
         if not isinstance(raw, dict):
-            raise ValueError(f"delta policy must be mapping: {p}")
+            raise DeltaPolicyError(f"delta policy must be mapping: {p}")
 
         prefixes = tuple(
             x for x in raw.get("ignore_bios_prefixes", []) if isinstance(x, str) and x
@@ -175,7 +183,7 @@ class DeltaSanitizer:
 
         # Flush pending values after debounce window closes, while avoiding duplicates.
         if now_ms is not None:
-            for key, (value, seen_ms) in list(self._pending.items()):
+            for key, (value, _seen_ms) in list(self._pending.items()):
                 if key in touched_keys:
                     continue
                 debounce_ms = self.policy.debounce_ms_for(key)
@@ -184,10 +192,10 @@ class DeltaSanitizer:
                     continue
                 kept[key] = value
                 self._last_seen_value[key] = value
-                self._last_emitted_ms[key] = seen_ms
+                self._last_emitted_ms[key] = now_ms
                 del self._pending[key]
 
-        raw_count = sum(1 for key in raw_delta.keys() if isinstance(key, str) and key)
+        raw_count = len(raw_delta)
         kept_count = len(kept)
         dropped_count = max(0, raw_count - kept_count)
         return SanitizedDelta(
@@ -213,6 +221,7 @@ def sanitize_delta(
 
 __all__ = [
     "DeltaPolicy",
+    "DeltaPolicyError",
     "DeltaSanitizer",
     "SanitizedDelta",
     "sanitize_delta",

@@ -6,6 +6,7 @@ import pytest
 from adapters.delta_aggregator import DeltaAggregator
 from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
+import adapters.telemetry_pipeline as telemetry_pipeline
 from adapters.telemetry_pipeline import TelemetryDebugCache, enrich_bios_observation
 from core.types import Event
 from core.types import Observation
@@ -240,3 +241,34 @@ def test_enrich_bios_observation_sanitizes_delta_and_emits_stats_event() -> None
     assert len(events) == 1
     assert events[0].kind == "delta_sanitized"
     assert "recent_key_changes_topk" not in events[0].payload
+
+
+def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+
+    obs1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 201,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+    )
+    obs2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 202,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+    )
+
+    first = enrich_bios_observation(obs1, _resolver(), mapper=_mapper())
+    second = enrich_bios_observation(obs2, _resolver(), mapper=_mapper())
+
+    assert first.payload["delta_summary"]["delta_count"] == 1
+    assert second.payload["delta_summary"]["delta_count"] == 0
+    assert second.metadata["delta_dropped_count"] == 1

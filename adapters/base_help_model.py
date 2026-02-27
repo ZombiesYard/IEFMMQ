@@ -266,14 +266,14 @@ class BaseHelpModel(ModelPort):
             return 0
         context = request.context
         direct = context.get("delta_dropped_count")
-        if isinstance(direct, int):
+        if isinstance(direct, int) and not isinstance(direct, bool):
             return max(0, direct)
         delta_summary = context.get("delta_summary")
         if isinstance(delta_summary, Mapping):
             dropped_stats = delta_summary.get("dropped_stats")
             if isinstance(dropped_stats, Mapping):
                 dropped = dropped_stats.get("dropped_total")
-                if isinstance(dropped, int):
+                if isinstance(dropped, int) and not isinstance(dropped, bool):
                     return max(0, dropped)
         return 0
 

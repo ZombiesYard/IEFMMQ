@@ -202,3 +202,28 @@ def test_explain_error_metadata_reads_delta_dropped_count_from_context() -> None
 
     assert res.status == "ok"
     assert res.metadata["delta_dropped_count"] == 7
+
+
+def test_explain_error_metadata_ignores_bool_delta_dropped_count_direct() -> None:
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["delta_dropped_count"] = True
+    req.context["delta_summary"] = {"dropped_stats": {"dropped_total": 3}}
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["delta_dropped_count"] == 3
+
+
+def test_explain_error_metadata_ignores_bool_nested_dropped_total() -> None:
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["delta_summary"] = {"dropped_stats": {"dropped_total": True}}
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["delta_dropped_count"] == 0

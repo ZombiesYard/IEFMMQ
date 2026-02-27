@@ -41,6 +41,9 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "vars_source_missing",
 )
 
+_DEFAULT_DELTA_POLICY: DeltaPolicy | None = None
+_DEFAULT_DELTA_SANITIZER: DeltaSanitizer | None = None
+
 
 @dataclass
 class TelemetryDebugCache:
@@ -55,6 +58,20 @@ class TelemetryDebugCache:
 def _stable_hash_mapping(data: Mapping[str, Any]) -> str:
     encoded = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _get_default_delta_policy() -> DeltaPolicy:
+    global _DEFAULT_DELTA_POLICY
+    if _DEFAULT_DELTA_POLICY is None:
+        _DEFAULT_DELTA_POLICY = DeltaPolicy.from_yaml()
+    return _DEFAULT_DELTA_POLICY
+
+
+def _get_default_delta_sanitizer() -> DeltaSanitizer:
+    global _DEFAULT_DELTA_SANITIZER
+    if _DEFAULT_DELTA_SANITIZER is None:
+        _DEFAULT_DELTA_SANITIZER = DeltaSanitizer(_get_default_delta_policy())
+    return _DEFAULT_DELTA_SANITIZER
 
 
 def _as_int(value: Any) -> int | None:
@@ -166,8 +183,15 @@ def enrich_bios_observation(
     resolved_vars = resolver.resolve(payload)
     selected_vars = _select_vars(resolved_vars, selected_var_keys)
 
-    policy = delta_policy or DeltaPolicy.from_yaml()
-    sanitizer = delta_sanitizer or DeltaSanitizer(policy)
+    if delta_sanitizer is not None:
+        sanitizer = delta_sanitizer
+        policy = delta_policy or sanitizer.policy
+    elif delta_policy is not None:
+        policy = delta_policy
+        sanitizer = DeltaSanitizer(policy)
+    else:
+        sanitizer = _get_default_delta_sanitizer()
+        policy = sanitizer.policy
 
     seq = _as_int(payload.get("seq"))
     t_wall = _as_float(payload.get("t_wall"))
