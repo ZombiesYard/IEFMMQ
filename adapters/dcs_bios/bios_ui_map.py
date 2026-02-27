@@ -24,7 +24,16 @@ def _default_ui_map_path() -> Path:
 
 
 def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BiosUiMapError(f"{label} read failed: {path}") from exc
+
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError as exc:
+        raise BiosUiMapError(f"{label} contains invalid YAML: {path}") from exc
+
     if not isinstance(data, dict):
         raise BiosUiMapError(f"{label} must be a YAML mapping: {path}")
     return data

@@ -48,3 +48,17 @@ def test_loader_rejects_target_not_in_ui_map() -> None:
 
     with pytest.raises(BiosUiMapError, match="unknown ui target"):
         BiosUiMapper.from_yaml(bios_map, ui_map)
+
+
+def test_loader_wraps_missing_file_as_bios_ui_map_error() -> None:
+    missing_bios_map = FIXTURE_DIR / "missing_bios_to_ui.yaml"
+
+    with pytest.raises(BiosUiMapError, match="read failed"):
+        BiosUiMapper.from_yaml(missing_bios_map, UI_MAP_PATH)
+
+
+def test_loader_wraps_invalid_yaml_as_bios_ui_map_error() -> None:
+    invalid_bios_map = FIXTURE_DIR / "bios_to_ui_invalid_yaml.yaml"
+
+    with pytest.raises(BiosUiMapError, match="contains invalid YAML"):
+        BiosUiMapper.from_yaml(invalid_bios_map, UI_MAP_PATH)
