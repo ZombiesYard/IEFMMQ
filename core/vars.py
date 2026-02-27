@@ -7,6 +7,7 @@ Maps raw telemetry (bios/lo/etc) to stable vars used by packs and gating.
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Mapping
@@ -18,6 +19,92 @@ from core.types_v2 import TelemetryFrame
 
 class VarResolverError(ValueError):
     pass
+
+
+_NUMERIC_RE = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)$")
+_REF_ROOTS = {"bios", "lo", "cockpit_args", "vars"}
+_MISSING = object()
+
+
+def _to_number(value: Any) -> int | float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if _NUMERIC_RE.match(text):
+            if "." in text:
+                return float(text)
+            return int(text)
+    return None
+
+
+def _is_missing_value(value: Any) -> bool:
+    if value is None:
+        return True
+    return isinstance(value, str) and not value.strip()
+
+
+def _attribute_chain(node: ast.AST) -> list[str] | None:
+    parts: list[str] = []
+    current = node
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if not isinstance(current, ast.Name):
+        return None
+    parts.append(current.id)
+    parts.reverse()
+    return parts
+
+
+class _SourceRefCollector(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.refs: set[str] = set()
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        chain = _attribute_chain(node)
+        if chain and chain[0] in _REF_ROOTS:
+            self.refs.add(".".join(chain))
+            return
+        self.generic_visit(node)
+
+
+def _extract_source_refs(expr: str) -> set[str]:
+    try:
+        root = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        raise VarResolverError(f"Invalid expression: {expr}") from exc
+    collector = _SourceRefCollector()
+    collector.visit(root)
+    return collector.refs
+
+
+def _read_ref(ctx: Mapping[str, Any], ref: str) -> Any:
+    parts = ref.split(".")
+    current: Any = ctx.get(parts[0], _MISSING)
+    if current is _MISSING:
+        return _MISSING
+    for part in parts[1:]:
+        if isinstance(current, Mapping):
+            current = current.get(part, _MISSING)
+            if current is _MISSING:
+                return _MISSING
+            continue
+        return _MISSING
+    return current
+
+
+def _find_missing_refs(expr: str, ctx: Mapping[str, Any]) -> list[str]:
+    missing: list[str] = []
+    for ref in sorted(_extract_source_refs(expr)):
+        value = _read_ref(ctx, ref)
+        if value is _MISSING or _is_missing_value(value):
+            missing.append(ref)
+    return missing
 
 
 def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
@@ -47,6 +134,14 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
         if isinstance(n, ast.Attribute):
             base = eval_node(n.value)
             return resolve_attr(base, n.attr)
+        if isinstance(n, ast.Call):
+            if not isinstance(n.func, ast.Name) or n.func.id != "num":
+                raise VarResolverError(
+                    "Unsupported function call. Only num(value) is supported in expressions."
+                )
+            if len(n.args) != 1 or n.keywords:
+                raise VarResolverError("num(...) expects exactly one positional argument.")
+            return _to_number(eval_node(n.args[0]))
         if isinstance(n, ast.UnaryOp):
             operand = eval_node(n.operand)
             if isinstance(n.op, ast.Not):
@@ -86,22 +181,38 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
                     if not (left != right):
                         return False
                 elif isinstance(op, ast.Gt):
-                    if not (left > right):
+                    try:
+                        ok = left > right
+                    except TypeError:
+                        return False
+                    if not ok:
                         return False
                 elif isinstance(op, ast.GtE):
-                    if not (left >= right):
+                    try:
+                        ok = left >= right
+                    except TypeError:
+                        return False
+                    if not ok:
                         return False
                 elif isinstance(op, ast.Lt):
-                    if not (left < right):
+                    try:
+                        ok = left < right
+                    except TypeError:
+                        return False
+                    if not ok:
                         return False
                 elif isinstance(op, ast.LtE):
-                    if not (left <= right):
+                    try:
+                        ok = left <= right
+                    except TypeError:
+                        return False
+                    if not ok:
                         return False
                 left = right
             return True
         if isinstance(n, ast.BinOp):
-            left = eval_node(n.left)
-            right = eval_node(n.right)
+            left = _to_number(eval_node(n.left))
+            right = _to_number(eval_node(n.right))
             if left is None or right is None:
                 return None
             if isinstance(n.op, ast.Add):
@@ -150,17 +261,23 @@ class VarResolver:
             "vars": dict(data.get("vars") or {}),
         }
         resolved = dict(context["vars"])
+        source_missing_vars: set[str] = set()
 
         for key, expr in self.rules.items():
             if expr is None:
                 resolved[key] = None
                 context["vars"] = resolved
+                if key != "vars_source_missing":
+                    source_missing_vars.add(key)
                 continue
+            missing_refs: list[str] = []
             if isinstance(expr, str):
                 expr_text = expr.strip()
                 if expr_text.startswith("derived(") and expr_text.endswith(")"):
                     expr_text = expr_text[len("derived(") : -1].strip()
+                
                 try:
+                    missing_refs = _find_missing_refs(expr_text, context)
                     value = _safe_eval(expr_text, context)
                 except VarResolverError as exc:
                     raise VarResolverError(f"Failed to resolve var '{key}': {exc}") from exc
@@ -168,6 +285,9 @@ class VarResolver:
                 value = expr
             resolved[key] = value
             context["vars"] = resolved
+            if key != "vars_source_missing" and (value is None or missing_refs):
+                source_missing_vars.add(key)
+        resolved["vars_source_missing"] = sorted(source_missing_vars)
         return resolved
 
     def apply(self, frame: TelemetryFrame | Mapping[str, Any]) -> TelemetryFrame | Dict[str, Any]:

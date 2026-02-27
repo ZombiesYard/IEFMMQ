@@ -15,6 +15,29 @@ vars:
   engine_crank_left: "bios.ENGINE_CRANK_SW == 2"
   bleed_air_norm: "bios.BLEED_AIR_KNOB == 2"
 
+  # Engine instruments (IFEI + external nozzle position)
+  rpm_r: "derived(num(bios.IFEI_RPM_R))"
+  rpm_l: "derived(num(bios.IFEI_RPM_L))"
+  temp_r: "derived(num(bios.IFEI_TEMP_R))"
+  temp_l: "derived(num(bios.IFEI_TEMP_L))"
+  ff_r: "derived(num(bios.IFEI_FF_R))"
+  ff_l: "derived(num(bios.IFEI_FF_L))"
+  oil_r: "derived(num(bios.IFEI_OIL_PRESS_R))"
+  oil_l: "derived(num(bios.IFEI_OIL_PRESS_L))"
+  noz_r: "derived((num(bios.EXT_NOZZLE_POS_R) * 100) / 65535)"
+  noz_l: "derived((num(bios.EXT_NOZZLE_POS_L) * 100) / 65535)"
+
+  # Startup thresholds and right-engine nominal checks (S05/S06/S10)
+  rpm_r_gte_25: "derived(vars.rpm_r >= 25)"
+  rpm_r_gte_60: "derived(vars.rpm_r >= 60)"
+  rpm_l_gte_60: "derived(vars.rpm_l >= 60)"
+  rpm_r_in_range: "derived(vars.rpm_r >= 63 and vars.rpm_r <= 70)"
+  temp_r_in_range: "derived(vars.temp_r >= 190 and vars.temp_r <= 590)"
+  ff_r_in_range: "derived(vars.ff_r >= 420 and vars.ff_r <= 900)"
+  oil_r_in_range: "derived(vars.oil_r >= 45 and vars.oil_r <= 110)"
+  noz_r_in_range: "derived(vars.noz_r >= 73 and vars.noz_r <= 84)"
+  right_engine_nominal_start_params: "derived(vars.rpm_r_in_range and vars.temp_r_in_range and vars.ff_r_in_range and vars.oil_r_in_range and vars.noz_r_in_range)"
+
   # Displays / avionics
   left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
   right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"

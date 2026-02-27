@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,6 +7,11 @@ import yaml
 
 from core.types_v2 import TelemetryFrame
 from core.vars import VarResolver, VarResolverError
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PACK_TELEMETRY_MAP_PATH = REPO_ROOT / "packs" / "fa18c_startup" / "telemetry_map.yaml"
+SAMPLE_FRAME_ONCE_PATH = REPO_ROOT / "artifacts" / "dcs_bios_frame_once.json"
+SAMPLE_RAW_JSONL_PATH = REPO_ROOT / "logs" / "dcs_bios_raw_15s.jsonl"
 
 
 def _tmp_dir() -> Path:
@@ -131,3 +137,87 @@ def test_var_resolver_rejects_not_in_operator() -> None:
 
     with pytest.raises(VarResolverError, match="Unsupported comparison operator.*NotIn"):
         resolver.resolve(frame)
+
+
+def test_var_resolver_num_cast_and_missing_helper() -> None:
+    mapping = {
+        "vars": {
+            "rpm_r": "derived(num(bios.IFEI_RPM_R))",
+            "rpm_r_gte_25": "derived(vars.rpm_r >= 25)",
+        }
+    }
+    tmp_path = _tmp_dir()
+    path = tmp_path / "telemetry_map.yaml"
+    path.write_text(yaml.safe_dump(mapping), encoding="utf-8")
+    resolver = VarResolver.from_yaml(path)
+
+    frame_ok = TelemetryFrame(
+        seq=1,
+        t_wall=1.0,
+        source="dcs_bios",
+        bios={"IFEI_RPM_R": " 27"},
+    )
+    vars_ok = resolver.resolve(frame_ok)
+    assert vars_ok["rpm_r"] == 27
+    assert vars_ok["rpm_r_gte_25"] is True
+    assert vars_ok["vars_source_missing"] == []
+
+    frame_missing = TelemetryFrame(seq=2, t_wall=2.0, source="dcs_bios", bios={})
+    vars_missing = resolver.resolve(frame_missing)
+    assert vars_missing["rpm_r"] is None
+    assert vars_missing["rpm_r_gte_25"] is False
+    assert "rpm_r" in vars_missing["vars_source_missing"]
+    assert "rpm_r_gte_25" in vars_missing["vars_source_missing"]
+
+
+def test_var_resolver_pack_map_resolves_from_dcs_bios_frame_once() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+    frame = json.loads(SAMPLE_FRAME_ONCE_PATH.read_text(encoding="utf-8"))
+
+    vars_out = resolver.resolve(frame)
+    required = ("rpm_r", "rpm_l", "temp_r", "ff_r", "oil_r", "noz_r", "rpm_r_gte_25")
+    for key in required:
+        assert key in vars_out
+
+    assert isinstance(vars_out["rpm_r"], (int, float))
+    assert isinstance(vars_out["temp_r"], (int, float))
+    assert vars_out["rpm_r"] >= 0
+    assert vars_out["temp_r"] >= 0
+    assert vars_out["rpm_r_gte_25"] == (vars_out["rpm_r"] >= 25)
+    assert isinstance(vars_out["vars_source_missing"], list)
+    for key in ("ff_r", "oil_r", "noz_r"):
+        assert (vars_out[key] is None) == (key in vars_out["vars_source_missing"])
+
+
+def test_var_resolver_pack_map_resolves_from_raw_jsonl_samples() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+    lines = [line for line in SAMPLE_RAW_JSONL_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert lines, "expected non-empty bios raw jsonl sample"
+
+    for line in lines[:30]:
+        frame = json.loads(line)
+        vars_out = resolver.resolve(frame)
+        assert isinstance(vars_out["vars_source_missing"], list)
+        for key in ("rpm_r", "rpm_l", "temp_r", "ff_r", "oil_r", "noz_r", "rpm_r_gte_25"):
+            assert key in vars_out
+
+
+def test_var_resolver_none_rule_counts_as_source_missing() -> None:
+    mapping = {
+        "vars": {
+            "manual_placeholder": None,
+            "manual_ready": "derived(vars.manual_placeholder == 1)",
+        }
+    }
+    tmp_path = _tmp_dir()
+    path = tmp_path / "telemetry_map.yaml"
+    path.write_text(yaml.safe_dump(mapping), encoding="utf-8")
+    resolver = VarResolver.from_yaml(path)
+
+    frame = TelemetryFrame(seq=1, t_wall=1.0, source="derived", bios={})
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["manual_placeholder"] is None
+    assert vars_out["manual_ready"] is False
+    assert "manual_placeholder" in vars_out["vars_source_missing"]
+    assert "manual_ready" in vars_out["vars_source_missing"]

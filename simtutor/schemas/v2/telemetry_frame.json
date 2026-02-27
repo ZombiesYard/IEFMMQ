@@ -27,6 +27,12 @@
     },
     "vars": {
       "type": "object",
+      "properties": {
+        "vars_source_missing": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
       "additionalProperties": { "type": ["number", "string", "boolean", "null"] }
     },
     "raw": { "type": ["object", "null"] }
