@@ -1,0 +1,14 @@
+version: v1
+cockpit_elements:
+  t_a:
+    description: "A"
+    dcs_id: "pnt_1"
+  t_b:
+    description: "B"
+    dcs_id: "pnt_2"
+  t_c:
+    description: "C"
+    dcs_id: "pnt_3"
+  t_d:
+    description: "D"
+    dcs_id: "pnt_4"

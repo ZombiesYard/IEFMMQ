@@ -1,0 +1,4 @@
+version: v1
+mappings:
+  BAD_KEY:
+    - missing_target
