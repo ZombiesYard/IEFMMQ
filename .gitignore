@@ -31,3 +31,4 @@ adapters/dcs/caps/__pycache__
 help_flow.md
 __pycache__
 /.tmp/
+tests/.tmp_bios_ui_map

@@ -1,0 +1,10 @@
+version: v1
+mappings:
+  KEY_A:
+    - t_a
+    - t_b
+  KEY_B:
+    targets:
+      - t_b
+      - t_c
+  KEY_C: t_d

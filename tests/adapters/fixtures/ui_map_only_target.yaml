@@ -1,0 +1,5 @@
+version: v1
+cockpit_elements:
+  only_target:
+    description: "Only"
+    dcs_id: "pnt_1"
