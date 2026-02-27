@@ -36,12 +36,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=5,
         help="Exit if key count stops growing for N frames (default 5)",
     )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=0.0,
+        help="Seconds to record in continuous mode (default 0=until Ctrl+C)",
+    )
     parser.add_argument("--output", help="Write decoded frame(s) to file (JSON or JSONL)")
     return parser
 
 
 def main() -> int:
     args = build_arg_parser().parse_args()
+    if args.duration < 0:
+        raise SystemExit("--duration must be >= 0")
+    if args.once and args.duration > 0:
+        raise SystemExit("--duration cannot be combined with --once")
     output_fh = None
     try:
         if args.output:
@@ -83,8 +93,11 @@ def main() -> int:
                     output_fh.flush()
                 return 0
             print(f"listening on {args.host}:{args.port} ...")
+            start = time.time()
             try:
                 while True:
+                    if args.duration > 0 and (time.time() - start) >= args.duration:
+                        break
                     obs = rx.get_observation()
                     if obs:
                         text = json.dumps(obs.payload, ensure_ascii=False)

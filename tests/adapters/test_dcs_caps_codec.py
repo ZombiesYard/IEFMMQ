@@ -62,6 +62,48 @@ def test_negotiate_round_trip() -> None:
     assert caps["overlay"] is True
 
 
+def test_negotiate_returns_none_on_timeout(monkeypatch) -> None:
+    class DummySocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def settimeout(self, _timeout: float) -> None:
+            return None
+
+        def sendto(self, _data: bytes, _addr) -> None:
+            return None
+
+        def recvfrom(self, _size: int):
+            raise socket.timeout
+
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: DummySocket())
+    assert negotiate(timeout=0.01) is None
+
+
+def test_negotiate_returns_none_on_connection_reset(monkeypatch) -> None:
+    class DummySocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def settimeout(self, _timeout: float) -> None:
+            return None
+
+        def sendto(self, _data: bytes, _addr) -> None:
+            return None
+
+        def recvfrom(self, _size: int):
+            raise ConnectionResetError(10054, "Connection reset by peer")
+
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: DummySocket())
+    assert negotiate(timeout=0.01) is None
+
+
 def test_apply_caps_to_sender() -> None:
     class Dummy:
         enabled = True

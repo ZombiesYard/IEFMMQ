@@ -4,11 +4,11 @@ Shared base implementation for HelpResponse-capable model adapters.
 
 from __future__ import annotations
 
-import json
 from time import perf_counter
 from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_meta
+from adapters.prompting import build_help_prompt
 from core.llm_schema import get_help_response_schema
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
@@ -113,33 +113,22 @@ class BaseHelpModel(ModelPort):
         if not isinstance(allowlist, list) or not allowlist:
             allowlist = list(schema_targets)
 
-        prompt_data = {
-            "intent": "help.explain_error",
-            "lang": self.lang,
-            "contract": {
-                "json_only": True,
-                "required_fields": ["diagnosis", "next", "overlay", "explanations", "confidence"],
-                "error_category_enum": schema_categories,
-                "candidate_steps": candidate_steps,
-                "overlay_target_allowlist": allowlist,
-            },
+        prompt_context = {
+            "intent": request.intent if request else "help",
+            "message": request.message if request else None,
+            "candidate_steps": candidate_steps,
+            "overlay_target_allowlist": allowlist,
+            "vars": context.get("vars"),
+            "recent_deltas": context.get("recent_deltas"),
+            "recent_actions": context.get("recent_actions"),
+            "rag_topk": context.get("rag_topk"),
             "observation": {
                 "procedure_hint": observation.procedure_hint,
                 "source": observation.source,
-                "vars": context.get("vars"),
-                "recent_deltas": context.get("recent_deltas"),
             },
-            "request": {
-                "intent": request.intent if request else "help",
-                "message": request.message if request else None,
-                "rag_topk": context.get("rag_topk"),
-            },
+            "error_category_enum": schema_categories,
         }
-        user_prompt = (
-            "Return exactly one JSON object and nothing else. "
-            "No markdown, no code fence, no extra text.\n"
-            f"{json.dumps(prompt_data, ensure_ascii=False, sort_keys=True)}"
-        )
+        user_prompt = build_help_prompt(prompt_context, self.lang)
         return [
             {"role": "system", "content": "You are SimTutor. Reply with JSON only."},
             {"role": "user", "content": user_prompt},

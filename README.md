@@ -190,6 +190,11 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
    ```sh
    python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet
    ```
+   Record for a fixed duration (seconds):
+   ```sh
+   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet \
+       --duration 15 --output logs/dcs_bios_raw_15s.jsonl
+   ```
    Note: the raw export stream is incremental; the first frame may be partial
    (e.g., `_ACFT_NAME` truncated). For a single fuller snapshot, wait for enough
    keys before exiting:
