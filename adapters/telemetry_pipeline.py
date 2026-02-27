@@ -8,7 +8,7 @@ from typing import Any, Callable, Mapping, MutableMapping, Sequence
 from adapters.delta_aggregator import DeltaAggregator, aggregate_delta_window, emit_delta_sanitized_event
 from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
-from core.types import Observation
+from core.types import Event, Observation
 from core.vars import VarResolver
 
 TagHook = Callable[[Observation, Mapping[str, Any]], Sequence[str] | None]
@@ -181,7 +181,7 @@ def enrich_bios_observation(
     delta_policy: DeltaPolicy | None = None,
     delta_sanitizer: DeltaSanitizer | None = None,
     delta_aggregator: DeltaAggregator | None = None,
-    delta_event_sink: Callable[[Any], None] | None = None,
+    delta_event_sink: Callable[[Event], None] | None = None,
 ) -> Observation:
     """
     Enrich a DCS-BIOS observation into a compact payload for tutor/prompt pipeline.
