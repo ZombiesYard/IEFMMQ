@@ -1,0 +1,55 @@
+version: v1
+
+# DCS-BIOS delta sanitization/aggregation policy for FA-18C startup tutoring.
+# Goal: keep prompt-facing deltas small and stable.
+ignore_bios_prefixes:
+  - "IFEI_CLOCK_"
+  - "CLOCK_ELAPSED_"
+  - "SBY_COMPASS_"
+
+ignore_bios_keys:
+  - "_UPDATE_COUNTER"
+  - "_ACFT_NAME"
+  - "EXT_STROBE_LIGHTS"
+  - "IFEI_T"
+  - "IFEI_TIMER_S"
+  - "IFEI_TIMER_M"
+
+debounce_ms_by_key:
+  EXT_STROBE_LIGHTS: 1000
+  SBY_COMPASS_PITCH: 500
+  SBY_COMPASS_BANK: 500
+  SBY_COMPASS_HDG: 500
+  SAI_PITCH: 300
+  SAI_RATE_OF_TURN: 300
+
+epsilon_by_key:
+  SBY_COMPASS_PITCH: 10.0
+  SBY_COMPASS_BANK: 10.0
+  SBY_COMPASS_HDG: 10.0
+  SAI_PITCH: 8.0
+  SAI_RATE_OF_TURN: 8.0
+
+# Hard cap for prompt-facing key changes in one aggregation window.
+max_changes_per_window: 12
+
+# Priority keys for recent_key_changes_topk sorting.
+important_bios_keys:
+  - BATTERY_SW
+  - EXT_PWR_SW
+  - L_GEN_SW
+  - R_GEN_SW
+  - APU_CONTROL_SW
+  - ENGINE_CRANK_SW
+  - FIRE_TEST_SW
+  - BLEED_AIR_KNOB
+  - IFEI_RPM_R
+  - IFEI_RPM_L
+  - IFEI_TEMP_R
+  - IFEI_TEMP_L
+  - IFEI_FF_R
+  - IFEI_FF_L
+  - IFEI_OIL_PRESS_R
+  - IFEI_OIL_PRESS_L
+  - EXT_NOZZLE_POS_R
+  - EXT_NOZZLE_POS_L

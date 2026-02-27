@@ -57,8 +57,11 @@ class BaseHelpModel(ModelPort):
     def explain_error(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         start = perf_counter()
         prompt_meta: dict[str, Any] = {}
+        delta_dropped_count = self._extract_delta_dropped_count(request)
+        prompt_budget_used = 0
         try:
             messages, prompt_meta = self._build_messages(observation, request)
+            prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
             raw_text = self._chat(messages)
             help_obj, extraction = parse_help_response_with_meta(raw_text)
             self._validate_context_bounds(help_obj, request)
@@ -82,6 +85,8 @@ class BaseHelpModel(ModelPort):
                     "json_repair_reasons": list(extraction.repair_reasons),
                     "evidence_guardrail_applied": bool(evidence_guardrail_reasons),
                     "evidence_guardrail_reasons": evidence_guardrail_reasons,
+                    "prompt_budget_used": prompt_budget_used,
+                    "delta_dropped_count": delta_dropped_count,
                     "prompt_build": prompt_meta,
                 },
             )
@@ -97,6 +102,8 @@ class BaseHelpModel(ModelPort):
                     "latency_ms": int((perf_counter() - start) * 1000),
                     "error_type": type(exc).__name__,
                     "error": str(exc),
+                    "prompt_budget_used": prompt_budget_used,
+                    "delta_dropped_count": delta_dropped_count,
                     "prompt_build": prompt_meta,
                 },
             )
@@ -253,6 +260,22 @@ class BaseHelpModel(ModelPort):
         if details:
             return "Need more information/please confirm: " + ", ".join(details)
         return "Need more information/please confirm current critical step states."
+
+    def _extract_delta_dropped_count(self, request: TutorRequest | None) -> int:
+        if request is None or not isinstance(request.context, dict):
+            return 0
+        context = request.context
+        direct = context.get("delta_dropped_count")
+        if isinstance(direct, int):
+            return max(0, direct)
+        delta_summary = context.get("delta_summary")
+        if isinstance(delta_summary, Mapping):
+            dropped_stats = delta_summary.get("dropped_stats")
+            if isinstance(dropped_stats, Mapping):
+                dropped = dropped_stats.get("dropped_total")
+                if isinstance(dropped, int):
+                    return max(0, dropped)
+        return 0
 
     def _chat(self, messages: list[dict[str, str]]) -> str:  # pragma: no cover - implemented by subclasses
         raise NotImplementedError

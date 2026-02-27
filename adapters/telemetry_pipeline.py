@@ -5,6 +5,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
+from adapters.delta_aggregator import DeltaAggregator, aggregate_delta_window, emit_delta_sanitized_event
+from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from core.types import Observation
 from core.vars import VarResolver
@@ -135,6 +137,10 @@ def enrich_bios_observation(
     tag_hook: TagHook | None = None,
     debug_cache: TelemetryDebugCache | None = None,
     include_bios_hash: bool | None = None,
+    delta_policy: DeltaPolicy | None = None,
+    delta_sanitizer: DeltaSanitizer | None = None,
+    delta_aggregator: DeltaAggregator | None = None,
+    delta_event_sink: Callable[[Any], None] | None = None,
 ) -> Observation:
     """
     Enrich a DCS-BIOS observation into a compact payload for tutor/prompt pipeline.
@@ -160,13 +166,34 @@ def enrich_bios_observation(
     resolved_vars = resolver.resolve(payload)
     selected_vars = _select_vars(resolved_vars, selected_var_keys)
 
-    mapped_targets = mapper.map_delta(delta_map) if mapper else []
-    recent_ui_targets = mapped_targets[: max(0, max_recent_ui_targets)]
-    delta_summary = _build_delta_summary(delta_map, max_delta_keys)
+    policy = delta_policy or DeltaPolicy.from_yaml()
+    sanitizer = delta_sanitizer or DeltaSanitizer(policy)
+
+    seq = _as_int(payload.get("seq"))
+    t_wall = _as_float(payload.get("t_wall"))
+    sanitized = sanitizer.sanitize_delta(delta_map, t_wall=t_wall, seq=seq)
+
+    if delta_aggregator is not None:
+        summary = delta_aggregator.add(sanitized)
+    else:
+        summary = aggregate_delta_window([sanitized], policy=policy, mapper=mapper)
+
+    if delta_event_sink is not None:
+        emit_delta_sanitized_event(summary, related_id=obs.observation_id, event_sink=delta_event_sink)
+
+    recent_ui_targets = summary.recent_ui_targets[: max(0, max_recent_ui_targets)]
+    fallback_summary = _build_delta_summary(sanitized.kept, max_delta_keys)
+    delta_summary = {
+        **fallback_summary,
+        "delta_count": sanitized.kept_count,
+        "raw_delta_count": sanitized.raw_count,
+        "dropped_stats": summary.dropped_stats,
+        "recent_key_changes_topk": summary.recent_key_changes_topk,
+    }
 
     compact_payload = {
-        "seq": _as_int(payload.get("seq")),
-        "t_wall": _as_float(payload.get("t_wall")),
+        "seq": seq,
+        "t_wall": t_wall,
         "vars": selected_vars,
         "delta_summary": delta_summary,
         "recent_ui_targets": recent_ui_targets,
@@ -176,7 +203,8 @@ def enrich_bios_observation(
     if "seq" not in metadata and compact_payload["seq"] is not None:
         metadata["seq"] = compact_payload["seq"]
     if "delta_count" not in metadata:
-        metadata["delta_count"] = delta_summary["delta_count"]
+        metadata["delta_count"] = sanitized.raw_count
+    metadata["delta_dropped_count"] = int(summary.dropped_stats.get("dropped_total", 0))
 
     should_hash = include_bios_hash if include_bios_hash is not None else debug_cache is not None
     bios_hash: str | None = None

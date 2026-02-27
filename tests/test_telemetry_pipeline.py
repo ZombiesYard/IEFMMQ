@@ -3,8 +3,11 @@ from pathlib import Path
 
 import pytest
 
+from adapters.delta_aggregator import DeltaAggregator
+from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.telemetry_pipeline import TelemetryDebugCache, enrich_bios_observation
+from core.types import Event
 from core.types import Observation
 from core.vars import VarResolver
 
@@ -19,6 +22,10 @@ def _resolver() -> VarResolver:
 
 def _mapper() -> BiosUiMapper:
     return BiosUiMapper.from_yaml(PACK_DIR / "bios_to_ui.yaml", PACK_DIR / "ui_map.yaml")
+
+
+def _delta_policy() -> DeltaPolicy:
+    return DeltaPolicy.from_yaml(PACK_DIR / "delta_policy.yaml")
 
 
 def test_enrich_bios_observation_compacts_payload_and_keeps_metadata() -> None:
@@ -185,3 +192,51 @@ def test_enrich_bios_observation_tag_hook_invalid_return_raises_clear_error() ->
             mapper=_mapper(),
             tag_hook=lambda _obs, _payload: 123,  # type: ignore[return-value]
         )
+
+
+def test_enrich_bios_observation_sanitizes_delta_and_emits_stats_event() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 101,
+            "t_wall": 101.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "IFEI_CLOCK_S": "59",
+                "EXT_STROBE_LIGHTS": 1,
+            },
+            "delta": {
+                "BATTERY_SW": 2,
+                "IFEI_CLOCK_S": "59",
+                "EXT_STROBE_LIGHTS": 1,
+            },
+        },
+        metadata={"seq": 101, "gap": 0, "delta_count": 3},
+    )
+    policy = _delta_policy()
+    sanitizer = DeltaSanitizer(policy)
+    aggregator = DeltaAggregator(policy, mapper=_mapper(), window_size=5)
+    events: list[Event] = []
+
+    enriched = enrich_bios_observation(
+        obs,
+        _resolver(),
+        mapper=_mapper(),
+        delta_policy=policy,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=aggregator,
+        delta_event_sink=lambda event: events.append(event),
+    )
+
+    summary = enriched.payload["delta_summary"]
+    assert summary["raw_delta_count"] == 3
+    assert summary["delta_count"] == 1
+    assert summary["dropped_stats"]["dropped_total"] == 2
+    assert summary["dropped_stats"]["dropped_by_reason"]["blacklist"] == 2
+    assert summary["recent_key_changes_topk"][0]["key"] == "BATTERY_SW"
+    assert enriched.payload["recent_ui_targets"] == ["battery_switch"]
+    assert enriched.metadata["delta_dropped_count"] == 2
+
+    assert len(events) == 1
+    assert events[0].kind == "delta_sanitized"
+    assert "recent_key_changes_topk" not in events[0].payload
