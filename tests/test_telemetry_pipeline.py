@@ -246,6 +246,7 @@ def test_enrich_bios_observation_sanitizes_delta_and_emits_stats_event() -> None
 def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
 
     obs1 = Observation(
         source="dcs_bios",
@@ -272,6 +273,57 @@ def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monk
     assert first.payload["delta_summary"]["delta_count"] == 1
     assert second.payload["delta_summary"]["delta_count"] == 0
     assert second.metadata["delta_dropped_count"] == 1
+
+
+def test_enrich_bios_observation_policy_scoped_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    policy = DeltaPolicy(debounce_ms_by_key={"SAI_RATE_OF_TURN": 300}, epsilon_by_key={})
+
+    obs1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 211,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+    )
+    obs2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 212,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+    )
+
+    first = enrich_bios_observation(obs1, _resolver(), mapper=_mapper(), delta_policy=policy)
+    second = enrich_bios_observation(obs2, _resolver(), mapper=_mapper(), delta_policy=policy)
+
+    assert first.payload["delta_summary"]["delta_count"] == 1
+    assert second.payload["delta_summary"]["delta_count"] == 0
+    assert second.metadata["delta_dropped_count"] == 1
+
+
+def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_raw() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 401,
+            "t_wall": 401.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+            "delta": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+        },
+        metadata={"seq": 401, "gap": 0},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+
+    assert enriched.payload["delta_summary"]["delta_count"] == 1
+    assert enriched.payload["delta_summary"]["raw_delta_count"] == 2
+    assert enriched.metadata["delta_count"] == 1
+    assert enriched.metadata["raw_delta_count"] == 2
 
 
 def test_enrich_bios_observation_rejects_mismatched_policy_and_sanitizer() -> None:

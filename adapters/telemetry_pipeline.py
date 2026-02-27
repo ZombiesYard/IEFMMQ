@@ -43,6 +43,7 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
 
 _DEFAULT_DELTA_POLICY: DeltaPolicy | None = None
 _DEFAULT_DELTA_SANITIZER: DeltaSanitizer | None = None
+_POLICY_SCOPED_SANITIZERS: dict[DeltaPolicy, DeltaSanitizer] = {}
 
 
 @dataclass
@@ -72,6 +73,14 @@ def _get_default_delta_sanitizer() -> DeltaSanitizer:
     if _DEFAULT_DELTA_SANITIZER is None:
         _DEFAULT_DELTA_SANITIZER = DeltaSanitizer(_get_default_delta_policy())
     return _DEFAULT_DELTA_SANITIZER
+
+
+def _get_policy_scoped_sanitizer(policy: DeltaPolicy) -> DeltaSanitizer:
+    sanitizer = _POLICY_SCOPED_SANITIZERS.get(policy)
+    if sanitizer is None:
+        sanitizer = DeltaSanitizer(policy)
+        _POLICY_SCOPED_SANITIZERS[policy] = sanitizer
+    return sanitizer
 
 
 def _as_int(value: Any) -> int | None:
@@ -156,7 +165,8 @@ def _resolve_delta_policy_and_sanitizer(
         sanitizer = delta_sanitizer
     elif delta_policy is not None:
         policy = delta_policy
-        sanitizer = DeltaSanitizer(policy)
+        # Reuse a sanitizer per policy so debounce state persists across calls.
+        sanitizer = _get_policy_scoped_sanitizer(policy)
     else:
         sanitizer = _get_default_delta_sanitizer()
         policy = sanitizer.policy
@@ -196,6 +206,8 @@ def enrich_bios_observation(
     in-memory for debug by passing `debug_cache`.
     BIOS hash calculation is optional; by default it is enabled when `debug_cache`
     is provided, or can be forced with `include_bios_hash=True`.
+    If only `delta_policy` is provided (without `delta_sanitizer`), a policy-scoped
+    sanitizer instance is reused so debounce/pending state is preserved across calls.
     """
     payload = obs.payload if isinstance(obs.payload, MutableMapping) else {}
     bios = payload.get("bios")
@@ -247,7 +259,9 @@ def enrich_bios_observation(
     if "seq" not in metadata and compact_payload["seq"] is not None:
         metadata["seq"] = compact_payload["seq"]
     if "delta_count" not in metadata:
-        metadata["delta_count"] = sanitized.raw_count
+        metadata["delta_count"] = sanitized.kept_count
+    if "raw_delta_count" not in metadata:
+        metadata["raw_delta_count"] = sanitized.raw_count
     metadata["delta_dropped_count"] = int(summary.dropped_stats.get("dropped_total", 0))
 
     should_hash = include_bios_hash if include_bios_hash is not None else debug_cache is not None
