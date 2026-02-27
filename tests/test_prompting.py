@@ -1,4 +1,4 @@
-import json
+﻿import json
 
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
@@ -31,7 +31,7 @@ def _extract_constraints_json(prompt: str) -> dict:
     return json.loads(prompt[start:end])
 
 
-def test_prompt_contains_enum_constraints_and_delta_summary() -> None:
+def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -> None:
     prompt = build_help_prompt(_base_context(), "en")
     payload = _extract_constraints_json(prompt)
 
@@ -43,6 +43,14 @@ def test_prompt_contains_enum_constraints_and_delta_summary() -> None:
     assert summary["top_k"] == MAX_DELTA_SUMMARY_ITEMS
     assert len(summary["items"]) == 2
     assert summary["items"][0]["ui_target"] == "apu_switch"
+    evidence = payload["EVIDENCE_SOURCES"]
+    assert set(evidence.keys()) == {"VARS", "GATES", "RECENT_UI_TARGETS", "RAG_SNIPPETS"}
+    assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
+
+    sample_evidence = payload["output_example_json"]["overlay"]["evidence"][0]
+    assert sample_evidence["type"] in {"var", "gate", "rag", "delta"}
+    assert sample_evidence["ref"] in payload["allowed_evidence_refs"]
+    assert len(sample_evidence["quote"]) <= 120
 
 
 def test_prompt_contains_strict_json_output_constraints() -> None:
@@ -50,14 +58,19 @@ def test_prompt_contains_strict_json_output_constraints() -> None:
     assert "must output exactly one strict JSON object" in prompt
     assert "no prose, no markdown, no code fences" in prompt
     assert "diagnosis.error_category must be chosen from allowed_error_categories." in prompt
+    assert "Each target must have at least one evidence item" in prompt
     assert '"diagnosis":{"step_id":"...","error_category":"..."}' in prompt
+    assert (
+        '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...",'
+        '"ref":"...","quote":"...","grounding_confidence":0.0}]}'
+    ) in prompt
 
 
 def test_prompt_lang_switch_zh_and_en() -> None:
     prompt_zh = build_help_prompt(_base_context(), "zh")
     prompt_en = build_help_prompt(_base_context(), "en")
 
-    assert "你是 SimTutor 助教" in prompt_zh
+    assert "\u4f60\u662f SimTutor \u52a9\u6559" in prompt_zh
     assert "You are SimTutor tutor assistant" in prompt_en
 
 
@@ -96,6 +109,7 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
     assert result.metadata["trim_reasons"]
     assert len(result.prompt) <= 900
     assert result.metadata["prompt_tokens_est"] <= 180
+    assert isinstance(result.metadata["allowed_evidence_refs"], list)
 
 
 def test_budget_trim_logs_by_default_without_terminal_print(capsys, caplog) -> None:

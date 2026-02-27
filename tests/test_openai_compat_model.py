@@ -30,6 +30,8 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert isinstance(res.metadata["latency_ms"], int)
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
+    assert res.metadata["evidence_guardrail_applied"] is False
+    assert res.metadata["evidence_guardrail_reasons"] == []
     validate_help_response(res.metadata["help_response"])
 
     call = fake.calls[0]
@@ -49,6 +51,35 @@ def test_explain_error_http_429_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"] = []
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_invalid_evidence_ref_clears_overlay() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"][0]["ref"] = "UNKNOWN.ref"
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert res.actions == []
+    assert res.explanations[0].startswith("\u9700\u8981\u66f4\u591a\u4fe1\u606f/\u8bf7\u786e\u8ba4")
+    assert res.metadata["evidence_guardrail_applied"] is True
+    assert "invalid_target_evidence_refs:apu_switch" in res.metadata["evidence_guardrail_reasons"]
+    assert res.metadata["help_response"]["overlay"]["targets"] == []
 
 
 def test_explain_error_http_5xx_fallback_no_overlay() -> None:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Shared base implementation for HelpResponse-capable model adapters.
 """
 
@@ -62,6 +62,7 @@ class BaseHelpModel(ModelPort):
             raw_text = self._chat(messages)
             help_obj, extraction = parse_help_response_with_meta(raw_text)
             self._validate_context_bounds(help_obj, request)
+            evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
             actions = [
                 {"type": "overlay", "intent": "highlight", "target": target}
                 for target in help_obj["overlay"]["targets"]
@@ -79,6 +80,8 @@ class BaseHelpModel(ModelPort):
                     "help_response": help_obj,
                     "json_repaired": extraction.json_repaired,
                     "json_repair_reasons": list(extraction.repair_reasons),
+                    "evidence_guardrail_applied": bool(evidence_guardrail_reasons),
+                    "evidence_guardrail_reasons": evidence_guardrail_reasons,
                     "prompt_build": prompt_meta,
                 },
             )
@@ -124,6 +127,7 @@ class BaseHelpModel(ModelPort):
             "vars": context.get("vars"),
             "recent_deltas": context.get("recent_deltas"),
             "recent_actions": context.get("recent_actions"),
+            "gates": context.get("gates"),
             "rag_topk": context.get("rag_topk"),
             "observation": {
                 "procedure_hint": observation.procedure_hint,
@@ -160,6 +164,95 @@ class BaseHelpModel(ModelPort):
             for idx, target in enumerate(help_obj["overlay"]["targets"]):
                 if target not in allowed_targets:
                     raise ValueError(f"overlay.targets[{idx}]={target!r} not in overlay_target_allowlist")
+
+    def _enforce_evidence_guardrail(
+        self,
+        help_obj: dict[str, Any],
+        prompt_meta: Mapping[str, Any],
+    ) -> list[str]:
+        overlay = help_obj.get("overlay")
+        if not isinstance(overlay, dict):
+            return ["missing_overlay"]
+
+        targets_raw = overlay.get("targets")
+        if not isinstance(targets_raw, list):
+            return ["invalid_overlay_targets_type"]
+        targets = [target for target in targets_raw if isinstance(target, str)]
+        if not targets:
+            return []
+
+        evidence_raw = overlay.get("evidence")
+        if not isinstance(evidence_raw, list):
+            evidence_raw = []
+
+        targets_set = set(targets)
+        refs_by_target: dict[str, set[str]] = {}
+        unexpected_evidence_targets: set[str] = set()
+
+        for item in evidence_raw:
+            if not isinstance(item, Mapping):
+                continue
+            target = item.get("target")
+            ref = item.get("ref")
+            if not isinstance(target, str):
+                continue
+            if target not in targets_set:
+                unexpected_evidence_targets.add(target)
+                continue
+            if isinstance(ref, str) and ref:
+                refs_by_target.setdefault(target, set()).add(ref)
+
+        allowed_refs = prompt_meta.get("allowed_evidence_refs")
+        allowed_ref_set = (
+            {ref for ref in allowed_refs if isinstance(ref, str) and ref}
+            if isinstance(allowed_refs, list)
+            else set()
+        )
+
+        missing_targets: list[str] = []
+        invalid_ref_targets: list[str] = []
+        for target in targets:
+            refs = refs_by_target.get(target, set())
+            if not refs:
+                missing_targets.append(target)
+                continue
+            if not allowed_ref_set:
+                invalid_ref_targets.append(target)
+                continue
+            if not refs.issubset(allowed_ref_set):
+                invalid_ref_targets.append(target)
+
+        reasons: list[str] = []
+        if missing_targets:
+            reasons.append(f"missing_target_evidence:{','.join(sorted(set(missing_targets)))}")
+        if invalid_ref_targets:
+            reasons.append(f"invalid_target_evidence_refs:{','.join(sorted(set(invalid_ref_targets)))}")
+        if unexpected_evidence_targets:
+            reasons.append(
+                "evidence_target_not_in_overlay_targets:" + ",".join(sorted(unexpected_evidence_targets))
+            )
+        if not reasons:
+            return []
+
+        help_obj["overlay"]["targets"] = []
+        help_obj["overlay"]["evidence"] = []
+        details = sorted(set(missing_targets + invalid_ref_targets))
+        clarification = self._build_clarification_message(details)
+        explanations = help_obj.get("explanations")
+        if isinstance(explanations, list):
+            explanations.insert(0, clarification)
+        else:
+            help_obj["explanations"] = [clarification]
+        return reasons
+
+    def _build_clarification_message(self, details: list[str]) -> str:
+        if self.lang == "zh":
+            if details:
+                return "\u9700\u8981\u66f4\u591a\u4fe1\u606f/\u8bf7\u786e\u8ba4: " + ", ".join(details)
+            return "\u9700\u8981\u66f4\u591a\u4fe1\u606f/\u8bf7\u786e\u8ba4\u5f53\u524d\u5173\u952e\u6b65\u9aa4\u72b6\u6001\u3002"
+        if details:
+            return "Need more information/please confirm: " + ", ".join(details)
+        return "Need more information/please confirm current critical step states."
 
     def _chat(self, messages: list[dict[str, str]]) -> str:  # pragma: no cover - implemented by subclasses
         raise NotImplementedError

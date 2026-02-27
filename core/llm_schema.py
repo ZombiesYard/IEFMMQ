@@ -115,6 +115,50 @@ def build_help_response_schema(
     if not error_categories:
         raise ValueError("error_categories must be non-empty")
 
+    evidence_item_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["target", "type", "ref", "quote", "grounding_confidence"],
+        "properties": {
+            "target": {"type": "string", "enum": list(overlay_targets)},
+            "type": {"type": "string", "enum": ["var", "gate", "rag", "delta"]},
+            "ref": {"type": "string", "minLength": 1},
+            "quote": {"type": "string", "minLength": 1, "maxLength": 120},
+            "grounding_confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        },
+    }
+
+    overlay_target_evidence_rules: list[dict[str, Any]] = []
+    for target in overlay_targets:
+        overlay_target_evidence_rules.append(
+            {
+                "if": {
+                    "type": "object",
+                    "properties": {
+                        "targets": {
+                            "type": "array",
+                            "contains": {"const": target},
+                        }
+                    },
+                    "required": ["targets"],
+                },
+                "then": {
+                    "type": "object",
+                    "properties": {
+                        "evidence": {
+                            "type": "array",
+                            "contains": {
+                                "type": "object",
+                                "properties": {"target": {"const": target}},
+                                "required": ["target"],
+                            },
+                        }
+                    },
+                    "required": ["evidence"],
+                },
+            }
+        )
+
     schema: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": _HELP_RESPONSE_SCHEMA_ID,
@@ -147,15 +191,21 @@ def build_help_response_schema(
             "overlay": {
                 "type": "object",
                 "additionalProperties": False,
-                "required": ["targets"],
+                "required": ["targets", "evidence"],
                 "properties": {
                     "targets": {
                         "type": "array",
-                        "minItems": 1,
+                        "minItems": 0,
                         "uniqueItems": True,
                         "items": {"type": "string", "enum": list(overlay_targets)},
                     },
+                    "evidence": {
+                        "type": "array",
+                        "minItems": 0,
+                        "items": evidence_item_schema,
+                    }
                 },
+                "allOf": overlay_target_evidence_rules,
             },
             "explanations": {
                 "type": "array",

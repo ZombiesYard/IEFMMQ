@@ -22,6 +22,8 @@ MAX_PROMPT_CHARS = 7000
 MAX_PROMPT_TOKENS_EST = 1800
 MAX_DELTA_SUMMARY_ITEMS = 20
 DEFAULT_MAX_VARS_ITEMS = 20
+MAX_RAG_SNIPPETS = 5
+MAX_RAG_SNIPPET_CHARS = 220
 
 
 @dataclass(frozen=True)
@@ -124,6 +126,52 @@ def _build_delta_summary(context: Mapping[str, Any], top_k: int = MAX_DELTA_SUMM
     }
 
 
+def _build_gates_summary(context: Mapping[str, Any]) -> list[dict[str, Any]]:
+    gates = context.get("gates")
+    if not isinstance(gates, Mapping):
+        return []
+    out: list[dict[str, Any]] = []
+    for key in sorted(gates.keys(), key=lambda x: str(x)):
+        value = gates[key]
+        if isinstance(value, Mapping):
+            status = value.get("status", "unknown")
+            reason = value.get("reason")
+        else:
+            status = "allowed" if bool(value) else "blocked"
+            reason = None
+        out.append(
+            {
+                "gate_id": _sanitize_scalar(str(key)),
+                "status": _sanitize_scalar(status),
+                "reason": _sanitize_scalar(reason),
+            }
+        )
+    return out
+
+
+def _build_rag_snippets(context: Mapping[str, Any], max_items: int = MAX_RAG_SNIPPETS) -> list[dict[str, Any]]:
+    rag_topk = context.get("rag_topk")
+    if not isinstance(rag_topk, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in rag_topk:
+        if len(out) >= max_items:
+            break
+        if isinstance(item, Mapping):
+            snippet_id = item.get("id") or f"snippet_{len(out)}"
+            snippet = str(item.get("snippet", ""))
+        else:
+            snippet_id = f"snippet_{len(out)}"
+            snippet = str(item)
+        out.append(
+            {
+                "id": _sanitize_scalar(str(snippet_id)),
+                "snippet": _sanitize_scalar(snippet[:MAX_RAG_SNIPPET_CHARS]),
+            }
+        )
+    return out
+
+
 def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
         return list(fallback)
@@ -137,6 +185,67 @@ def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     return list(fallback)
 
 
+def _build_evidence_sources(
+    selected_vars: Mapping[str, Any],
+    gates_summary: list[dict[str, Any]],
+    recent_deltas_summary: Mapping[str, Any],
+    rag_snippets: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[str]]:
+    vars_block: list[dict[str, Any]] = []
+    for key in sorted(selected_vars.keys(), key=lambda x: str(x)):
+        vars_block.append({"ref": f"VARS.{key}", "value": selected_vars[key]})
+
+    gates_block: list[dict[str, Any]] = []
+    for gate in gates_summary:
+        gate_id = gate.get("gate_id", "unknown")
+        gates_block.append(
+            {
+                "ref": f"GATES.{gate_id}",
+                "status": gate.get("status"),
+                "reason": gate.get("reason"),
+            }
+        )
+
+    recent_block: list[dict[str, Any]] = []
+    for item in recent_deltas_summary.get("items", []):
+        ui_target = item.get("ui_target", "UNKNOWN")
+        recent_block.append(
+            {
+                "ref": f"RECENT_UI_TARGETS.{ui_target}",
+                "ui_target": ui_target,
+                "count": item.get("count"),
+                "last_action": item.get("last_action"),
+                "last_from": item.get("last_from"),
+                "last_to": item.get("last_to"),
+            }
+        )
+
+    rag_block: list[dict[str, Any]] = []
+    for item in rag_snippets:
+        snippet_id = item.get("id", "snippet")
+        rag_block.append(
+            {
+                "ref": f"RAG_SNIPPETS.{snippet_id}",
+                "id": snippet_id,
+                "snippet": item.get("snippet"),
+            }
+        )
+
+    evidence = {
+        "VARS": vars_block,
+        "GATES": gates_block,
+        "RECENT_UI_TARGETS": recent_block,
+        "RAG_SNIPPETS": rag_block,
+    }
+    allowed_refs = [
+        entry["ref"]
+        for block in (vars_block, gates_block, recent_block, rag_block)
+        for entry in block
+        if isinstance(entry, Mapping) and isinstance(entry.get("ref"), str)
+    ]
+    return evidence, allowed_refs
+
+
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -146,7 +255,7 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
         "Output must follow this schema shape exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
-        '"overlay":{"targets":["..."]},'
+        '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
         '"explanations":["..."],'
         '"confidence":0.0}'
     )
@@ -176,24 +285,10 @@ def build_help_prompt_result(
     max_vars = DEFAULT_MAX_VARS_ITEMS
     selected_vars = _pick_vars(context.get("vars"), max_items=max_vars)
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
+    gates_summary = _build_gates_summary(context)
+    rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
 
-    next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
-    example_obj = {
-        "diagnosis": {"step_id": candidate_steps[0], "error_category": category_enum[0]},
-        "next": {"step_id": next_step},
-        "overlay": {"targets": [overlay_targets[0]]},
-        "explanations": ["Use concise guidance." if lang == "en" else "请给出简洁指导。"],
-        "confidence": 0.75,
-    }
-
-    payload = {
-        "allowed_step_ids": candidate_steps,
-        "allowed_overlay_targets": overlay_targets,
-        "allowed_error_categories": category_enum,
-        "current_vars_selected": selected_vars,
-        "recent_deltas_summary": recent_deltas_summary,
-        "output_example_json": example_obj,
-    }
+    payload: dict[str, Any] = {}
 
     if lang == "zh":
         header = (
@@ -204,6 +299,9 @@ def build_help_prompt_result(
             "必须从 allowed_step_ids 中选择 diagnosis.step_id 与 next.step_id。",
             "必须从 allowed_overlay_targets 中选择 overlay.targets。",
             "必须从 allowed_error_categories 中选择 diagnosis.error_category。",
+            "只允许引用 EVIDENCE_SOURCES 中出现的 ref。",
+            "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
+            "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "若不确定，也必须返回合法 JSON，不得输出自然语言段落。",
         ]
     else:
@@ -216,12 +314,58 @@ def build_help_prompt_result(
             "diagnosis.step_id and next.step_id must be chosen from allowed_step_ids.",
             "overlay.targets must be chosen from allowed_overlay_targets.",
             "diagnosis.error_category must be chosen from allowed_error_categories.",
+            "Only refs that appear in EVIDENCE_SOURCES are allowed.",
+            "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
+            "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "If uncertain, still return valid JSON only.",
         ]
 
     trim_reasons: list[str] = []
 
+    allowed_refs: list[str] = []
+
     def _render_and_measure() -> tuple[str, int, int]:
+        nonlocal payload, allowed_refs
+        evidence_sources, refs = _build_evidence_sources(
+            selected_vars=selected_vars,
+            gates_summary=gates_summary,
+            recent_deltas_summary=recent_deltas_summary,
+            rag_snippets=rag_snippets,
+        )
+        allowed_refs = refs
+        next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
+        example_refs = [allowed_refs[0]] if allowed_refs else []
+        example_targets = [overlay_targets[0]] if example_refs else []
+        example_overlay_evidence = (
+            [
+                {
+                    "target": overlay_targets[0],
+                    "type": "delta",
+                    "ref": example_refs[0],
+                    "quote": "Recent delta supports this target.",
+                    "grounding_confidence": 0.9,
+                }
+            ]
+            if example_refs
+            else []
+        )
+        example_obj = {
+            "diagnosis": {"step_id": candidate_steps[0], "error_category": category_enum[0]},
+            "next": {"step_id": next_step},
+            "overlay": {"targets": example_targets, "evidence": example_overlay_evidence},
+            "explanations": ["Use concise guidance." if lang == "en" else "请给出简洁指导。"],
+            "confidence": 0.75,
+        }
+        payload = {
+            "allowed_step_ids": candidate_steps,
+            "allowed_overlay_targets": overlay_targets,
+            "allowed_error_categories": category_enum,
+            "current_vars_selected": selected_vars,
+            "recent_deltas_summary": recent_deltas_summary,
+            "EVIDENCE_SOURCES": evidence_sources,
+            "allowed_evidence_refs": allowed_refs,
+            "output_example_json": example_obj,
+        }
         prompt_text = _compose_prompt(header, rules, payload)
         return prompt_text, len(prompt_text), _estimate_tokens(prompt_text)
 
@@ -233,25 +377,24 @@ def build_help_prompt_result(
             if "trimmed_delta_summary" not in trim_reasons:
                 trim_reasons.append("trimmed_delta_summary")
             changed = True
+        elif rag_snippets:
+            rag_snippets = rag_snippets[:-1]
+            if "trimmed_rag_snippets" not in trim_reasons:
+                trim_reasons.append("trimmed_rag_snippets")
+            changed = True
         elif max_vars > 0:
             max_vars = max(0, max_vars - 5)
             selected_vars = _pick_vars(context.get("vars"), max_items=max_vars)
-            payload["current_vars_selected"] = selected_vars
             if "trimmed_vars" not in trim_reasons:
                 trim_reasons.append("trimmed_vars")
             changed = True
         elif len(candidate_steps) > 1:
             candidate_steps = candidate_steps[:-1]
-            payload["allowed_step_ids"] = candidate_steps
-            payload["output_example_json"]["diagnosis"]["step_id"] = candidate_steps[0]
-            payload["output_example_json"]["next"]["step_id"] = candidate_steps[-1]
             if "trimmed_step_enum" not in trim_reasons:
                 trim_reasons.append("trimmed_step_enum")
             changed = True
         elif len(overlay_targets) > 1:
             overlay_targets = overlay_targets[:-1]
-            payload["allowed_overlay_targets"] = overlay_targets
-            payload["output_example_json"]["overlay"]["targets"] = [overlay_targets[0]]
             if "trimmed_overlay_enum" not in trim_reasons:
                 trim_reasons.append("trimmed_overlay_enum")
             changed = True
@@ -264,10 +407,11 @@ def build_help_prompt_result(
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
         compact_payload = {
-            "allowed_step_ids": payload["allowed_step_ids"],
-            "allowed_overlay_targets": payload["allowed_overlay_targets"],
-            "allowed_error_categories": payload["allowed_error_categories"],
-            "output_example_json": payload["output_example_json"],
+            "allowed_step_ids": candidate_steps,
+            "allowed_overlay_targets": overlay_targets,
+            "allowed_error_categories": category_enum,
+            "allowed_evidence_refs": allowed_refs,
+            "output_example_json": payload.get("output_example_json", {}),
         }
         prompt = (
             f"{compact_header}\n"
@@ -302,6 +446,8 @@ def build_help_prompt_result(
         "trim_reasons": trim_reasons,
         "delta_summary_top_k": recent_deltas_summary["top_k"],
         "delta_summary_items": len(recent_deltas_summary["items"]),
+        "evidence_refs_count": len(allowed_refs),
+        "allowed_evidence_refs": list(allowed_refs),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
 
