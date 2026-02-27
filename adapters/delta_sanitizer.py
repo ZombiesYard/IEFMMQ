@@ -50,6 +50,10 @@ def _normalize_str_tuple(values: Any) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _normalize_sorted_str_tuple(values: Any) -> tuple[str, ...]:
+    return tuple(sorted(_normalize_str_tuple(values)))
+
+
 def _normalize_str_frozenset(values: Any) -> frozenset[str]:
     return frozenset(_normalize_str_tuple(values))
 
@@ -100,7 +104,7 @@ class DeltaPolicy:
     important_bios_keys: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "ignore_bios_prefixes", _normalize_str_tuple(self.ignore_bios_prefixes))
+        object.__setattr__(self, "ignore_bios_prefixes", _normalize_sorted_str_tuple(self.ignore_bios_prefixes))
         object.__setattr__(self, "ignore_bios_keys", _normalize_str_frozenset(self.ignore_bios_keys))
         object.__setattr__(self, "debounce_ms_by_key", _normalize_int_pairs(self.debounce_ms_by_key))
         object.__setattr__(self, "epsilon_by_key", _normalize_float_pairs(self.epsilon_by_key))

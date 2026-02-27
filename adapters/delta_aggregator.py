@@ -152,7 +152,7 @@ def emit_delta_sanitized_event(
             "dropped_stats": summary.dropped_stats,
         },
     )
-    if event_sink:
+    if event_sink is not None:
         event_sink(event)
     return event
 

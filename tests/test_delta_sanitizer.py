@@ -126,3 +126,11 @@ def test_delta_policy_normalizes_mutable_inputs_to_immutable_fields() -> None:
 
     with pytest.raises(FrozenInstanceError):
         policy.max_changes_per_window = 999  # type: ignore[misc]
+
+
+def test_delta_policy_prefix_order_does_not_affect_equality() -> None:
+    p1 = DeltaPolicy(ignore_bios_prefixes=["SBY_", "IFEI_", "CLOCK_"])
+    p2 = DeltaPolicy(ignore_bios_prefixes=["CLOCK_", "SBY_", "IFEI_"])
+
+    assert p1 == p2
+    assert p1.ignore_bios_prefixes == ("CLOCK_", "IFEI_", "SBY_")
