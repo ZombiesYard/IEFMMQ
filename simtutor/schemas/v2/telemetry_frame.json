@@ -27,12 +27,13 @@
     },
     "vars": {
       "type": "object",
-      "additionalProperties": {
-        "anyOf": [
-          { "type": ["number", "string", "boolean", "null"] },
-          { "type": "array", "items": { "type": "string" } }
-        ]
-      }
+      "properties": {
+        "vars_source_missing": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": { "type": ["number", "string", "boolean", "null"] }
     },
     "raw": { "type": ["object", "null"] }
   }

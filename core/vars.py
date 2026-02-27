@@ -267,6 +267,8 @@ class VarResolver:
             if expr is None:
                 resolved[key] = None
                 context["vars"] = resolved
+                if key != "vars_source_missing":
+                    source_missing_vars.add(key)
                 continue
             missing_refs: list[str] = []
             if isinstance(expr, str):
