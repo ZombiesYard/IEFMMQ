@@ -8,7 +8,7 @@ from time import perf_counter
 from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_meta
-from adapters.prompting import build_help_prompt
+from adapters.prompting import build_help_prompt_result
 from core.llm_schema import get_help_response_schema
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
@@ -56,8 +56,9 @@ class BaseHelpModel(ModelPort):
 
     def explain_error(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         start = perf_counter()
+        prompt_meta: dict[str, Any] = {}
         try:
-            messages = self._build_messages(observation, request)
+            messages, prompt_meta = self._build_messages(observation, request)
             raw_text = self._chat(messages)
             help_obj, extraction = parse_help_response_with_meta(raw_text)
             self._validate_context_bounds(help_obj, request)
@@ -78,6 +79,7 @@ class BaseHelpModel(ModelPort):
                     "help_response": help_obj,
                     "json_repaired": extraction.json_repaired,
                     "json_repair_reasons": list(extraction.repair_reasons),
+                    "prompt_build": prompt_meta,
                 },
             )
         except Exception as exc:
@@ -92,6 +94,7 @@ class BaseHelpModel(ModelPort):
                     "latency_ms": int((perf_counter() - start) * 1000),
                     "error_type": type(exc).__name__,
                     "error": str(exc),
+                    "prompt_build": prompt_meta,
                 },
             )
 
@@ -99,7 +102,7 @@ class BaseHelpModel(ModelPort):
         self,
         observation: Observation,
         request: TutorRequest | None,
-    ) -> list[dict[str, str]]:
+    ) -> tuple[list[dict[str, str]], dict[str, Any]]:
         schema = get_help_response_schema()
         schema_step_ids = schema["properties"]["next"]["properties"]["step_id"]["enum"]
         schema_targets = schema["properties"]["overlay"]["properties"]["targets"]["items"]["enum"]
@@ -128,11 +131,14 @@ class BaseHelpModel(ModelPort):
             },
             "error_category_enum": schema_categories,
         }
-        user_prompt = build_help_prompt(prompt_context, self.lang)
-        return [
-            {"role": "system", "content": "You are SimTutor. Reply with JSON only."},
-            {"role": "user", "content": user_prompt},
-        ]
+        prompt_result = build_help_prompt_result(prompt_context, self.lang)
+        return (
+            [
+                {"role": "system", "content": "You are SimTutor. Reply with JSON only."},
+                {"role": "user", "content": prompt_result.prompt},
+            ],
+            prompt_result.metadata,
+        )
 
     def _validate_context_bounds(self, help_obj: Mapping[str, Any], request: TutorRequest | None) -> None:
         if request is None or not isinstance(request.context, dict):

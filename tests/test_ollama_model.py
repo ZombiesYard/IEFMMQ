@@ -14,7 +14,7 @@ from tests._fakes import (
 def test_explain_error_success_with_valid_help_response() -> None:
     help_obj = _help_obj_ok()
     fake = FakeClient(responses=[FakeResponse(_ollama_message_payload_from_help_obj(help_obj, fenced=True))])
-    model = OllamaModel(model_name="qwen3.5:35b", client=fake)
+    model = OllamaModel(model_name="qwen3:8b", client=fake)
     obs = Observation(source="mock", procedure_hint="S03")
     req = _request_help()
 
@@ -23,15 +23,17 @@ def test_explain_error_success_with_valid_help_response() -> None:
     assert res.status == "ok"
     assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
     assert res.metadata["provider"] == "ollama"
-    assert res.metadata["model"] == "qwen3.5:35b"
+    assert res.metadata["model"] == "qwen3:8b"
     assert isinstance(res.metadata["latency_ms"], int)
     assert res.metadata["json_repaired"] is True
     assert "removed_code_fence" in res.metadata["json_repair_reasons"]
+    assert "prompt_build" in res.metadata
+    assert "max_prompt_chars" in res.metadata["prompt_build"]
     validate_help_response(res.metadata["help_response"])
 
     call = fake.calls[0]
     assert call["url"].endswith("/api/chat")
-    assert call["json"]["model"] == "qwen3.5:35b"
+    assert call["json"]["model"] == "qwen3:8b"
     assert call["json"]["stream"] is False
     assert call["json"]["options"]["temperature"] == 0
 
@@ -46,7 +48,7 @@ def test_explain_error_bad_output_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "ollama"
-    assert res.metadata["model"] == "qwen3.5:35b"
+    assert res.metadata["model"] == "qwen3:8b"
     assert isinstance(res.metadata["latency_ms"], int)
 
 
@@ -135,7 +137,7 @@ def test_explain_error_alternate_response_format() -> None:
     assert res.status == "ok"
     assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
     assert res.metadata["provider"] == "ollama"
-    assert res.metadata["model"] == "qwen3.5:35b"
+    assert res.metadata["model"] == "qwen3:8b"
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
     validate_help_response(res.metadata["help_response"])

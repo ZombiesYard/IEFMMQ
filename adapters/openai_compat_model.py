@@ -14,7 +14,7 @@ class OpenAICompatModel(BaseHelpModel):
 
     def __init__(
         self,
-        model_name: str = "Qwen3.5-32B-Instruct",
+        model_name: str = "Qwen3-8B-Instruct",
         base_url: str = "http://127.0.0.1:8000",
         timeout_s: float = 20.0,
         lang: str = "zh",

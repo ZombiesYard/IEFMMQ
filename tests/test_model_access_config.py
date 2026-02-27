@@ -2,6 +2,8 @@ import pytest
 import sys
 
 from simtutor.config import (
+    DEFAULT_MODEL_NAME_OLLAMA,
+    DEFAULT_MODEL_NAME_OPENAI_COMPAT,
     ENV_LANG,
     ENV_MODEL_API_KEY,
     ENV_MODEL_BASE_URL,
@@ -17,7 +19,7 @@ from simtutor.__main__ import main
 def _base_env() -> dict[str, str]:
     return {
         ENV_MODEL_PROVIDER: "ollama",
-        ENV_MODEL_NAME: "qwen3.5:35b",
+        ENV_MODEL_NAME: "qwen3:8b",
         ENV_MODEL_TIMEOUT_S: "30",
         ENV_LANG: "zh",
     }
@@ -83,7 +85,7 @@ def test_startup_info_is_non_sensitive() -> None:
 
     info = cfg.public_startup_info()
     assert "provider=openai_compat" in info
-    assert "model=qwen3.5:35b" in info
+    assert "model=qwen3:8b" in info
     assert "timeout_s=45" in info
     assert "lang=en" in info
     assert "base_url=http://127.0.0.1:8000/v1" in info
@@ -127,7 +129,7 @@ def test_cli_model_config_reports_missing_env(monkeypatch, capsys) -> None:
 
 def test_cli_model_config_prints_non_sensitive_info(monkeypatch, capsys) -> None:
     monkeypatch.setenv(ENV_MODEL_PROVIDER, "openai_compat")
-    monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3.5-32B-Instruct")
+    monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3-8B-Instruct")
     monkeypatch.setenv(ENV_MODEL_BASE_URL, "http://127.0.0.1:8000/v1")
     monkeypatch.setenv(ENV_MODEL_TIMEOUT_S, "20")
     monkeypatch.setenv(ENV_LANG, "zh")
@@ -139,7 +141,7 @@ def test_cli_model_config_prints_non_sensitive_info(monkeypatch, capsys) -> None
 
     assert code == 0
     assert "provider=openai_compat" in out
-    assert "model=Qwen3.5-32B-Instruct" in out
+    assert "model=Qwen3-8B-Instruct" in out
     assert "timeout_s=20" in out
     assert "lang=zh" in out
     assert "sk-super-secret" not in out
@@ -147,7 +149,7 @@ def test_cli_model_config_prints_non_sensitive_info(monkeypatch, capsys) -> None
 
 def test_cli_model_config_redacts_sensitive_base_url_parts(monkeypatch, capsys) -> None:
     monkeypatch.setenv(ENV_MODEL_PROVIDER, "openai_compat")
-    monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3.5-32B-Instruct")
+    monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3-8B-Instruct")
     monkeypatch.setenv(
         ENV_MODEL_BASE_URL, "https://alice:secret@api.example.local:8443/v1?api_key=abc#x"
     )
@@ -164,3 +166,23 @@ def test_cli_model_config_redacts_sensitive_base_url_parts(monkeypatch, capsys) 
     assert "api_key=abc" not in out
     assert "#x" not in out
     assert "base_url=https://api.example.local:8443/v1" in out
+
+
+def test_model_name_defaults_by_provider_when_env_missing() -> None:
+    env_openai = {
+        ENV_MODEL_PROVIDER: "openai_compat",
+        ENV_MODEL_BASE_URL: "http://127.0.0.1:8000/v1",
+        ENV_MODEL_API_KEY: "sk-local-secret",
+        ENV_MODEL_TIMEOUT_S: "30",
+        ENV_LANG: "zh",
+    }
+    cfg_openai = load_model_access_config(env_openai)
+    assert cfg_openai.model_name == DEFAULT_MODEL_NAME_OPENAI_COMPAT
+
+    env_ollama = {
+        ENV_MODEL_PROVIDER: "ollama",
+        ENV_MODEL_TIMEOUT_S: "30",
+        ENV_LANG: "zh",
+    }
+    cfg_ollama = load_model_access_config(env_ollama)
+    assert cfg_ollama.model_name == DEFAULT_MODEL_NAME_OLLAMA

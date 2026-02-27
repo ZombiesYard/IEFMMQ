@@ -13,7 +13,7 @@ from tests._fakes import (
 def test_explain_error_success_200_valid_help_response() -> None:
     fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
     model = OpenAICompatModel(
-        model_name="Qwen3.5-32B-Instruct",
+        model_name="Qwen3-8B-Instruct",
         base_url="http://127.0.0.1:8000",
         timeout_s=15.0,
         api_key="sk-local",
@@ -26,7 +26,7 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert res.status == "ok"
     assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
     assert res.metadata["provider"] == "openai_compat"
-    assert res.metadata["model"] == "Qwen3.5-32B-Instruct"
+    assert res.metadata["model"] == "Qwen3-8B-Instruct"
     assert isinstance(res.metadata["latency_ms"], int)
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
@@ -34,7 +34,7 @@ def test_explain_error_success_200_valid_help_response() -> None:
 
     call = fake.calls[0]
     assert call["url"] == "http://127.0.0.1:8000/v1/chat/completions"
-    assert call["json"]["model"] == "Qwen3.5-32B-Instruct"
+    assert call["json"]["model"] == "Qwen3-8B-Instruct"
     assert call["json"]["temperature"] == 0
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0

@@ -3,19 +3,21 @@
 This document freezes model-provider access in a provider-agnostic way so core
 logic does not change when switching runtime backends.
 
-## Provider A (Default for v0.3): Ollama
-
-- Use case: zero-cost local loop validation.
-- Provider value: `SIMTUTOR_MODEL_PROVIDER=ollama`
-- Typical local endpoint: `http://127.0.0.1:11434`
-- API key: not required.
-
-## Provider B (Migration Target): OpenAI-compatible API
+## Provider A (Primary): OpenAI-compatible API (Qwen3 Focus)
 
 - Use case: vLLM / llama.cpp server / TGI, all through OpenAI-compatible APIs.
 - Provider value: `SIMTUTOR_MODEL_PROVIDER=openai_compat`
 - Base URL required: `SIMTUTOR_MODEL_BASE_URL` (example: `http://127.0.0.1:8000/v1`)
 - API key required: `SIMTUTOR_MODEL_API_KEY`
+- Default model if `SIMTUTOR_MODEL_NAME` is omitted: `Qwen3-8B-Instruct`
+
+## Provider B (Fallback): Ollama
+
+- Use case: local fallback / compatibility.
+- Provider value: `SIMTUTOR_MODEL_PROVIDER=ollama`
+- Typical local endpoint: `http://127.0.0.1:11434`
+- API key: not required.
+- Default model if `SIMTUTOR_MODEL_NAME` is omitted: `qwen3:8b`
 
 ## Stub Provider
 

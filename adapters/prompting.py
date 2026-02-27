@@ -1,11 +1,13 @@
-"""
+﻿"""
 Help prompt builder with strict JSON/output constraints.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import re
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from core.llm_schema import get_help_response_schema
@@ -13,6 +15,18 @@ from core.llm_schema import get_help_response_schema
 _ABS_WIN_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 _ABS_POSIX_PATH_RE = re.compile(r"^/")
 _SENSITIVE_KEYWORDS = ("api_key", "apikey", "token", "secret", "password", "authorization")
+_LOGGER = logging.getLogger(__name__)
+
+MAX_PROMPT_CHARS = 7000
+MAX_PROMPT_TOKENS_EST = 1800
+MAX_DELTA_SUMMARY_ITEMS = 20
+DEFAULT_MAX_VARS_ITEMS = 20
+
+
+@dataclass(frozen=True)
+class PromptBuildResult:
+    prompt: str
+    metadata: dict[str, Any]
 
 
 def _is_sensitive_key(key: str) -> bool:
@@ -46,7 +60,7 @@ def _sanitize_obj(value: Any) -> Any:
     return _sanitize_scalar(value)
 
 
-def _pick_vars(value: Any, max_items: int = 20) -> dict[str, Any]:
+def _pick_vars(value: Any, max_items: int = DEFAULT_MAX_VARS_ITEMS) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         return {}
     sanitized = _sanitize_obj(value)
@@ -60,19 +74,19 @@ def _pick_vars(value: Any, max_items: int = 20) -> dict[str, Any]:
     return out
 
 
-def _build_recent_actions(context: Mapping[str, Any]) -> list[dict[str, Any]]:
-    actions = context.get("recent_actions")
-    if isinstance(actions, list):
-        sanitized = _sanitize_obj(actions)
-        if isinstance(sanitized, list):
-            return [a for a in sanitized if isinstance(a, dict)]
+def _estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
+    return (len(text) + 3) // 4
 
+
+def _build_delta_summary(context: Mapping[str, Any], top_k: int = MAX_DELTA_SUMMARY_ITEMS) -> dict[str, Any]:
     deltas = context.get("recent_deltas")
     if not isinstance(deltas, list):
-        return []
+        return {"top_k": top_k, "total_targets": 0, "items": []}
 
-    out: list[dict[str, Any]] = []
-    for item in deltas[:10]:
+    buckets: dict[str, dict[str, Any]] = {}
+    for item in deltas:
         if not isinstance(item, Mapping):
             continue
         ui_target = (
@@ -81,15 +95,32 @@ def _build_recent_actions(context: Mapping[str, Any]) -> list[dict[str, Any]]:
             or item.get("target")
             or item.get("k")
         )
-        out.append(
-            {
-                "action": item.get("action", "delta"),
-                "ui_target": _sanitize_scalar(ui_target),
-                "from": _sanitize_scalar(item.get("from")),
-                "to": _sanitize_scalar(item.get("to")),
+        ui_target_str = _sanitize_scalar(str(ui_target)) if ui_target is not None else "[UNKNOWN_TARGET]"
+        bucket = buckets.get(ui_target_str)
+        if bucket is None:
+            bucket = {
+                "ui_target": ui_target_str,
+                "count": 0,
+                "last_action": "delta",
+                "last_from": None,
+                "last_to": None,
             }
-        )
-    return out
+            buckets[ui_target_str] = bucket
+        bucket["count"] += 1
+        bucket["last_action"] = _sanitize_scalar(item.get("action", "delta"))
+        bucket["last_from"] = _sanitize_scalar(item.get("from"))
+        bucket["last_to"] = _sanitize_scalar(item.get("to"))
+
+    ranked = sorted(
+        buckets.values(),
+        key=lambda x: (-int(x.get("count", 0)), str(x.get("ui_target", ""))),
+    )
+    items = ranked[:top_k]
+    return {
+        "top_k": top_k,
+        "total_targets": len(ranked),
+        "items": items,
+    }
 
 
 def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
@@ -104,7 +135,32 @@ def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     return list(fallback)
 
 
-def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
+def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
+    return (
+        f"{header}\n"
+        f"Rules:\n- {rules[0]}\n- {rules[1]}\n- {rules[2]}\n"
+        f"Context and constraints JSON:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+        "Output must follow this schema shape exactly:\n"
+        '{"diagnosis":{"step_id":"...","error_category":"..."},'
+        '"next":{"step_id":"..."},'
+        '"overlay":{"targets":["..."]},'
+        '"explanations":["..."],'
+        '"confidence":0.0}'
+    )
+
+
+def _record_trim_event(message: str) -> None:
+    print(f"[PROMPT] {message}")
+    _LOGGER.warning(message)
+
+
+def build_help_prompt_result(
+    context: Mapping[str, Any],
+    lang: str,
+    *,
+    max_prompt_chars: int = MAX_PROMPT_CHARS,
+    max_prompt_tokens_est: int = MAX_PROMPT_TOKENS_EST,
+) -> PromptBuildResult:
     schema = get_help_response_schema()
     step_enum = list(schema["properties"]["next"]["properties"]["step_id"]["enum"])
     target_enum = list(schema["properties"]["overlay"]["properties"]["targets"]["items"]["enum"])
@@ -112,8 +168,9 @@ def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
 
     candidate_steps = _normalize_enum_list(context.get("candidate_steps"), step_enum)
     overlay_targets = _normalize_enum_list(context.get("overlay_target_allowlist"), target_enum)
-    selected_vars = _pick_vars(context.get("vars"))
-    recent_actions = _build_recent_actions(context)
+    max_vars = DEFAULT_MAX_VARS_ITEMS
+    selected_vars = _pick_vars(context.get("vars"), max_items=max_vars)
+    recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
 
     next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
     example_obj = {
@@ -128,7 +185,7 @@ def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
         "allowed_step_ids": candidate_steps,
         "allowed_overlay_targets": overlay_targets,
         "current_vars_selected": selected_vars,
-        "recent_actions": recent_actions,
+        "recent_deltas_summary": recent_deltas_summary,
         "output_example_json": example_obj,
     }
 
@@ -154,18 +211,101 @@ def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
             "If uncertain, still return valid JSON only.",
         ]
 
-    return (
-        f"{header}\n"
-        f"Rules:\n- {rules[0]}\n- {rules[1]}\n- {rules[2]}\n"
-        f"Context and constraints JSON:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2)}\n"
-        "Output must follow this schema shape exactly:\n"
-        '{"diagnosis":{"step_id":"...","error_category":"..."},'
-        '"next":{"step_id":"..."},'
-        '"overlay":{"targets":["..."]},'
-        '"explanations":["..."],'
-        '"confidence":0.0}'
-    )
+    trim_reasons: list[str] = []
+
+    def _render_and_measure() -> tuple[str, int, int]:
+        prompt_text = _compose_prompt(header, rules, payload)
+        return prompt_text, len(prompt_text), _estimate_tokens(prompt_text)
+
+    prompt, chars, tokens = _render_and_measure()
+    while chars > max_prompt_chars or tokens > max_prompt_tokens_est:
+        changed = False
+        if recent_deltas_summary["items"]:
+            recent_deltas_summary["items"] = recent_deltas_summary["items"][:-1]
+            if "trimmed_delta_summary" not in trim_reasons:
+                trim_reasons.append("trimmed_delta_summary")
+            changed = True
+        elif max_vars > 0:
+            max_vars = max(0, max_vars - 5)
+            selected_vars = _pick_vars(context.get("vars"), max_items=max_vars)
+            payload["current_vars_selected"] = selected_vars
+            if "trimmed_vars" not in trim_reasons:
+                trim_reasons.append("trimmed_vars")
+            changed = True
+        elif len(candidate_steps) > 1:
+            candidate_steps = candidate_steps[:-1]
+            payload["allowed_step_ids"] = candidate_steps
+            payload["output_example_json"]["diagnosis"]["step_id"] = candidate_steps[0]
+            payload["output_example_json"]["next"]["step_id"] = candidate_steps[-1]
+            if "trimmed_step_enum" not in trim_reasons:
+                trim_reasons.append("trimmed_step_enum")
+            changed = True
+        elif len(overlay_targets) > 1:
+            overlay_targets = overlay_targets[:-1]
+            payload["allowed_overlay_targets"] = overlay_targets
+            payload["output_example_json"]["overlay"]["targets"] = [overlay_targets[0]]
+            if "trimmed_overlay_enum" not in trim_reasons:
+                trim_reasons.append("trimmed_overlay_enum")
+            changed = True
+        if not changed:
+            break
+        prompt, chars, tokens = _render_and_measure()
+
+    if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
+        compact_header = "JSON only. Follow enum constraints strictly."
+        if lang == "zh":
+            compact_header = "仅输出 JSON；严格遵循枚举约束。"
+        compact_payload = {
+            "allowed_step_ids": payload["allowed_step_ids"],
+            "allowed_overlay_targets": payload["allowed_overlay_targets"],
+            "output_example_json": payload["output_example_json"],
+        }
+        prompt = (
+            f"{compact_header}\n"
+            f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+            "JSON only."
+        )
+        chars = len(prompt)
+        tokens = _estimate_tokens(prompt)
+        if "compact_template" not in trim_reasons:
+            trim_reasons.append("compact_template")
+
+    if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
+        hard_cap_chars = min(max_prompt_chars, max_prompt_tokens_est * 4)
+        prompt = prompt[:hard_cap_chars]
+        chars = len(prompt)
+        tokens = _estimate_tokens(prompt)
+        if "hard_truncate" not in trim_reasons:
+            trim_reasons.append("hard_truncate")
+
+    if trim_reasons:
+        _record_trim_event(
+            "Prompt trimmed to fit budget: "
+            f"reasons={trim_reasons}, chars={chars}/{max_prompt_chars}, tokens_est={tokens}/{max_prompt_tokens_est}"
+        )
+
+    meta = {
+        "max_prompt_chars": max_prompt_chars,
+        "max_prompt_tokens_est": max_prompt_tokens_est,
+        "prompt_chars": chars,
+        "prompt_tokens_est": tokens,
+        "prompt_trimmed": bool(trim_reasons),
+        "trim_reasons": trim_reasons,
+        "delta_summary_top_k": recent_deltas_summary["top_k"],
+        "delta_summary_items": len(recent_deltas_summary["items"]),
+    }
+    return PromptBuildResult(prompt=prompt, metadata=meta)
 
 
-__all__ = ["build_help_prompt"]
+def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
+    return build_help_prompt_result(context, lang).prompt
 
+
+__all__ = [
+    "MAX_DELTA_SUMMARY_ITEMS",
+    "MAX_PROMPT_CHARS",
+    "MAX_PROMPT_TOKENS_EST",
+    "PromptBuildResult",
+    "build_help_prompt",
+    "build_help_prompt_result",
+]

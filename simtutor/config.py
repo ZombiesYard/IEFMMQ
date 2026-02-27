@@ -8,13 +8,18 @@ provider migration (Ollama -> OpenAI-compatible) does not require core changes.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import os,math
+import math
+import os
 from typing import Mapping
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 
-SUPPORTED_PROVIDERS = ("ollama", "openai_compat", "stub")
+SUPPORTED_PROVIDERS = ("openai_compat", "stub", "ollama")
 SUPPORTED_LANGS = ("zh", "en")
+
+DEFAULT_MODEL_NAME_OPENAI_COMPAT = "Qwen3-8B-Instruct"
+DEFAULT_MODEL_NAME_OLLAMA = "qwen3:8b"
+DEFAULT_MODEL_NAME_STUB = "qwen3-stub"
 
 ENV_MODEL_PROVIDER = "SIMTUTOR_MODEL_PROVIDER"
 ENV_MODEL_NAME = "SIMTUTOR_MODEL_NAME"
@@ -95,6 +100,14 @@ def _optional_env(env: Mapping[str, str], name: str) -> str | None:
     return value or None
 
 
+def _default_model_for_provider(provider: str) -> str:
+    if provider == "openai_compat":
+        return DEFAULT_MODEL_NAME_OPENAI_COMPAT
+    if provider == "ollama":
+        return DEFAULT_MODEL_NAME_OLLAMA
+    return DEFAULT_MODEL_NAME_STUB
+
+
 def load_model_access_config(env: Mapping[str, str] | None = None) -> ModelAccessConfig:
     source = os.environ if env is None else env
 
@@ -105,7 +118,7 @@ def load_model_access_config(env: Mapping[str, str] | None = None) -> ModelAcces
             f"Invalid {ENV_MODEL_PROVIDER}: {provider!r}. Allowed values: {allowed}"
         )
 
-    model_name = _required_env(source, ENV_MODEL_NAME)
+    model_name = _optional_env(source, ENV_MODEL_NAME) or _default_model_for_provider(provider)
     timeout_raw = _required_env(source, ENV_MODEL_TIMEOUT_S)
     lang = _required_env(source, ENV_LANG)
     if lang not in SUPPORTED_LANGS:
@@ -154,6 +167,9 @@ def load_model_access_config(env: Mapping[str, str] | None = None) -> ModelAcces
 
 
 __all__ = [
+    "DEFAULT_MODEL_NAME_OPENAI_COMPAT",
+    "DEFAULT_MODEL_NAME_OLLAMA",
+    "DEFAULT_MODEL_NAME_STUB",
     "ENV_LANG",
     "ENV_MODEL_API_KEY",
     "ENV_MODEL_BASE_URL",

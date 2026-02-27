@@ -14,7 +14,7 @@ class OllamaModel(BaseHelpModel):
 
     def __init__(
         self,
-        model_name: str = "qwen3.5:35b",
+        model_name: str = "qwen3:8b",
         base_url: str = "http://127.0.0.1:11434",
         timeout_s: float = 20.0,
         lang: str = "zh",
