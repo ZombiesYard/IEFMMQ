@@ -275,8 +275,9 @@ class VarResolver:
                 expr_text = expr.strip()
                 if expr_text.startswith("derived(") and expr_text.endswith(")"):
                     expr_text = expr_text[len("derived(") : -1].strip()
-                missing_refs = _find_missing_refs(expr_text, context)
+                
                 try:
+                    missing_refs = _find_missing_refs(expr_text, context)
                     value = _safe_eval(expr_text, context)
                 except VarResolverError as exc:
                     raise VarResolverError(f"Failed to resolve var '{key}': {exc}") from exc
