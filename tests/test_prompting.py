@@ -2,6 +2,7 @@
 
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
+    MAX_RECENT_ACTIONS_SIGNAL_ITEMS,
     build_help_prompt,
     build_help_prompt_result,
 )
@@ -172,3 +173,13 @@ def test_prompt_recent_actions_signal_keeps_all_ui_targets_in_list_style() -> No
         "ufc_comm1_channel_selector_rotate",
         "ufc_comm1_channel_selector_pull",
     ]
+
+
+def test_prompt_recent_actions_signal_uses_dedicated_cap() -> None:
+    ctx = _base_context()
+    ctx["recent_actions"] = {"recent_buttons": [f"btn_{i:02d}" for i in range(30)]}
+
+    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    signal = payload["recent_actions_signal"]
+    assert len(signal["recent_buttons"]) == MAX_RECENT_ACTIONS_SIGNAL_ITEMS
+    assert signal["current_button"] == "btn_00"

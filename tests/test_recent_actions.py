@@ -131,3 +131,14 @@ def test_build_prompt_recent_deltas_rejects_bool_max_items() -> None:
     recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
     with pytest.raises(TypeError, match="max_items"):
         build_prompt_recent_deltas(recent, _bios_to_ui_mapping(), max_items=False)  # type: ignore[arg-type]
+
+
+def test_mapping_targets_string_is_not_split_into_characters() -> None:
+    recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
+    bios_to_ui = {"mappings": {"BATTERY_SW": {"targets": "battery_switch"}}}
+
+    targets = project_recent_ui_targets(recent, bios_to_ui, max_items=8)
+    assert targets == ["battery_switch"]
+
+    rows = build_prompt_recent_deltas(recent, bios_to_ui, max_items=8)
+    assert rows[0]["mapped_ui_target"] == "battery_switch"

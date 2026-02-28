@@ -86,7 +86,13 @@ def _normalize_targets(raw: Any) -> list[str]:
     if isinstance(raw, str):
         candidates = [raw]
     elif isinstance(raw, Mapping):
-        candidates = raw.get("targets", [])
+        raw_targets = raw.get("targets")
+        if isinstance(raw_targets, str):
+            candidates = [raw_targets]
+        elif isinstance(raw_targets, (list, tuple)):
+            candidates = list(raw_targets)
+        else:
+            candidates = []
     elif isinstance(raw, (list, tuple)):
         candidates = list(raw)
     else:

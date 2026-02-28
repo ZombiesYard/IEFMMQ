@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 MAX_PROMPT_CHARS = 7000
 MAX_PROMPT_TOKENS_EST = 1800
 MAX_DELTA_SUMMARY_ITEMS = 20
+MAX_RECENT_ACTIONS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
@@ -209,15 +210,15 @@ def _build_recent_actions_signal(context: Mapping[str, Any]) -> dict[str, Any]:
             continue
         seen.add(normalized)
         recent_buttons.append(normalized)
-        if len(recent_buttons) >= MAX_DELTA_SUMMARY_ITEMS:
+        if len(recent_buttons) >= MAX_RECENT_ACTIONS_SIGNAL_ITEMS:
             break
 
     if current_button is None and recent_buttons:
         current_button = recent_buttons[0]
     if current_button is not None and current_button not in recent_buttons:
         recent_buttons.insert(0, current_button)
-        if len(recent_buttons) > MAX_DELTA_SUMMARY_ITEMS:
-            recent_buttons = recent_buttons[:MAX_DELTA_SUMMARY_ITEMS]
+        if len(recent_buttons) > MAX_RECENT_ACTIONS_SIGNAL_ITEMS:
+            recent_buttons = recent_buttons[:MAX_RECENT_ACTIONS_SIGNAL_ITEMS]
 
     return {
         "current_button": current_button,
@@ -513,6 +514,7 @@ def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
 
 __all__ = [
     "MAX_DELTA_SUMMARY_ITEMS",
+    "MAX_RECENT_ACTIONS_SIGNAL_ITEMS",
     "MAX_PROMPT_CHARS",
     "MAX_PROMPT_TOKENS_EST",
     "PromptBuildResult",
