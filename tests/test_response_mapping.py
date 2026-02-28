@@ -79,6 +79,21 @@ def test_mapping_rejects_unknown_target_into_metadata() -> None:
     _validate_tutor_response(payload)
 
 
+def test_mapping_unknown_target_does_not_consume_limit_slot() -> None:
+    help_obj = {
+        "overlay": {"targets": ["unknown_target", "apu_switch", "battery_switch"]},
+        "explanations": ["Check highlighted controls."],
+    }
+
+    res = map_help_response_to_tutor_response(help_obj, max_overlay_targets=1)
+    payload = res.to_dict()
+
+    assert [a["target"] for a in payload["actions"]] == ["apu_switch"]
+    assert payload["metadata"]["rejected_targets"] == ["unknown_target"]
+    assert payload["metadata"]["dropped_targets"] == ["battery_switch"]
+    _validate_tutor_response(payload)
+
+
 def test_mapping_with_missing_or_empty_fields_still_returns_usable_tutor_response() -> None:
     res_missing = map_help_response_to_tutor_response({}, status="ok")
     payload_missing = res_missing.to_dict()

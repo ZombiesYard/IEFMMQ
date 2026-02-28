@@ -94,14 +94,26 @@ def map_help_response_to_tutor_response(
                 raw_targets = [item for item in targets if isinstance(item, str) and item]
 
     deduped_targets = _dedupe_preserve_order(raw_targets)
-    selected_targets = deduped_targets[:max_overlay_targets] if max_overlay_targets > 0 else []
-    dropped_for_limit = deduped_targets[max_overlay_targets:] if max_overlay_targets > 0 else deduped_targets
-    if dropped_for_limit:
-        metadata["dropped_targets"] = dropped_for_limit
 
     rejected_targets: list[str] = []
     actions: list[dict[str, Any]] = []
-    if not selected_targets:
+    if max_overlay_targets == 0:
+        if deduped_targets:
+            metadata["dropped_targets"] = list(deduped_targets)
+        effective_status = status
+        if status not in {"ok", "pending", "error"}:
+            effective_status = "error"
+            _append_mapping_error(metadata, f"invalid_status:{status}")
+        return TutorResponse(
+            status=effective_status,
+            in_reply_to=request.request_id if request else None,
+            message=message,
+            actions=actions,
+            explanations=explanations,
+            metadata=metadata,
+        )
+
+    if not deduped_targets:
         effective_status = status
         if status not in {"ok", "pending", "error"}:
             effective_status = "error"
@@ -127,12 +139,16 @@ def map_help_response_to_tutor_response(
         }
 
     if planner is None:
-        rejected_targets.extend(selected_targets)
+        rejected_targets.extend(deduped_targets)
         if planner_error:
             metadata["overlay_mapping_error"] = planner_error
     else:
         overlay_failures: list[dict[str, str]] = []
-        for target in selected_targets:
+        dropped_for_limit: list[str] = []
+        for idx, target in enumerate(deduped_targets):
+            if len(actions) >= max_overlay_targets:
+                dropped_for_limit.extend(deduped_targets[idx:])
+                break
             try:
                 actions.append(planner.plan(target, intent=effective_overlay_intent).to_action())
             except Exception as exc:
@@ -144,6 +160,8 @@ def map_help_response_to_tutor_response(
                         "error_code": _overlay_error_code(exc),
                     }
                 )
+        if dropped_for_limit:
+            metadata["dropped_targets"] = dropped_for_limit
         if overlay_failures:
             metadata["overlay_mapping_failures"] = overlay_failures
 
