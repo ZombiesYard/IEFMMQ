@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
+from weakref import WeakKeyDictionary
 
 from adapters.delta_aggregator import DeltaAggregator, aggregate_delta_window, emit_delta_sanitized_event
 from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
@@ -44,8 +46,9 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
 
 _DEFAULT_DELTA_POLICY: DeltaPolicy | None = None
 _DEFAULT_DELTA_SANITIZER: DeltaSanitizer | None = None
-_POLICY_SCOPED_SANITIZERS: dict[tuple[DeltaPolicy, str], DeltaSanitizer] = {}
-_SHARED_DELTA_SANITIZER_LOCKS: dict[DeltaSanitizer, threading.Lock] = {}
+_POLICY_SCOPED_SANITIZERS: OrderedDict[tuple[DeltaPolicy, str], DeltaSanitizer] = OrderedDict()
+_MAX_POLICY_SCOPED_SANITIZERS = 256
+_SHARED_DELTA_SANITIZER_LOCKS: WeakKeyDictionary[DeltaSanitizer, threading.Lock] = WeakKeyDictionary()
 _DEFAULT_DELTA_STREAM_ID = "__default__"
 _DEFAULT_DELTA_POLICY_LOCK = threading.Lock()
 _DEFAULT_DELTA_SANITIZER_LOCK = threading.Lock()
@@ -112,6 +115,11 @@ def _get_policy_scoped_sanitizer(policy: DeltaPolicy, *, stream_id: str) -> tupl
         if sanitizer is None:
             sanitizer = DeltaSanitizer(policy)
             _POLICY_SCOPED_SANITIZERS[cache_key] = sanitizer
+        _POLICY_SCOPED_SANITIZERS.move_to_end(cache_key)
+        while len(_POLICY_SCOPED_SANITIZERS) > max(1, int(_MAX_POLICY_SCOPED_SANITIZERS)):
+            _, evicted = _POLICY_SCOPED_SANITIZERS.popitem(last=False)
+            with _SHARED_DELTA_SANITIZER_LOCKS_LOCK:
+                _SHARED_DELTA_SANITIZER_LOCKS.pop(evicted, None)
     return sanitizer, _get_shared_sanitizer_lock(sanitizer)
 
 
@@ -212,7 +220,7 @@ def _resolve_delta_policy_and_sanitizer(
         if delta_policy is not None and delta_policy != policy:
             raise ValueError("delta_policy does not match delta_sanitizer.policy")
         sanitizer = delta_sanitizer
-        sanitizer_lock = None
+        sanitizer_lock = _get_shared_sanitizer_lock(sanitizer)
     elif delta_policy is not None:
         policy = delta_policy
         # Reuse a sanitizer per policy/stream so debounce state persists per stream.
@@ -258,13 +266,16 @@ def enrich_bios_observation(
     BIOS hash calculation is optional; by default it is enabled when `debug_cache`
     is provided, or can be forced with `include_bios_hash=True`.
     Delta sanitizer behavior:
-    - If `delta_sanitizer` is provided, that instance is used directly.
+    - If `delta_sanitizer` is provided, that instance is used directly and guarded
+      with a per-instance shared lock inside this module.
     - Otherwise, module-level cached sanitizers are reused and state is preserved.
       Cache scope is policy + effective stream id.
       Effective stream id is `delta_stream_id` if provided, else
       `obs.metadata.session_id` / `obs.metadata.stream_id`, else `"__default__"`.
     - Cached sanitizer creation/use is lock-protected for thread safety.
-    To force stateless sanitization, pass a freshly created `DeltaSanitizer` per call.
+      Policy-scoped cache is LRU-bounded by `_MAX_POLICY_SCOPED_SANITIZERS`.
+    To force stateless sanitization, pass a freshly created `DeltaSanitizer`
+    per call (and do not reuse it across observations).
     """
     payload = obs.payload if isinstance(obs.payload, MutableMapping) else {}
     bios = payload.get("bios")

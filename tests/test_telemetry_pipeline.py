@@ -1,4 +1,5 @@
 import json
+from collections import OrderedDict
 from pathlib import Path
 
 import pytest
@@ -296,7 +297,7 @@ def test_enrich_bios_observation_separates_per_obs_and_window_delta_summary() ->
 def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
-    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
     monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
 
     obs1 = Observation(
@@ -327,7 +328,7 @@ def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monk
 
 
 def test_enrich_bios_observation_policy_scoped_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
-    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
     monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
     policy = DeltaPolicy(debounce_ms_by_key={"SAI_RATE_OF_TURN": 300}, epsilon_by_key={})
 
@@ -361,7 +362,7 @@ def test_enrich_bios_observation_policy_scoped_sanitizer_keeps_state_across_call
 def test_enrich_bios_observation_default_cache_scoped_by_session_id(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
-    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
     monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
 
     obs_a1 = Observation(
@@ -407,7 +408,7 @@ def test_enrich_bios_observation_default_cache_scoped_by_session_id(monkeypatch)
 def test_enrich_bios_observation_delta_stream_id_overrides_metadata_scope(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
-    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
     monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
 
     obs = Observation(
@@ -510,3 +511,43 @@ def test_enrich_bios_observation_rejects_mismatched_policy_and_aggregator() -> N
             delta_policy=policy_a,
             delta_aggregator=aggregator,
         )
+
+
+def test_policy_scoped_sanitizer_cache_is_lru_bounded(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_MAX_POLICY_SCOPED_SANITIZERS", 2)
+    policy = DeltaPolicy(debounce_ms_by_key={"SAI_RATE_OF_TURN": 300})
+
+    s1, _ = telemetry_pipeline._get_policy_scoped_sanitizer(policy, stream_id="s1")
+    telemetry_pipeline._get_policy_scoped_sanitizer(policy, stream_id="s2")
+    telemetry_pipeline._get_policy_scoped_sanitizer(policy, stream_id="s3")
+
+    keys = list(telemetry_pipeline._POLICY_SCOPED_SANITIZERS.keys())
+    assert len(keys) == 2
+    assert (policy, "s1") not in keys
+    assert (policy, "s2") in keys
+    assert (policy, "s3") in keys
+    assert s1 not in telemetry_pipeline._SHARED_DELTA_SANITIZER_LOCKS
+
+
+def test_resolve_policy_and_sanitizer_returns_lock_for_caller_sanitizer() -> None:
+    policy = DeltaPolicy()
+    sanitizer = DeltaSanitizer(policy)
+
+    _, resolved, lock1 = telemetry_pipeline._resolve_delta_policy_and_sanitizer(
+        delta_policy=None,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=None,
+        delta_stream_id="stream-x",
+    )
+    _, _, lock2 = telemetry_pipeline._resolve_delta_policy_and_sanitizer(
+        delta_policy=None,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=None,
+        delta_stream_id="stream-y",
+    )
+
+    assert resolved is sanitizer
+    assert lock1 is not None
+    assert lock2 is lock1
