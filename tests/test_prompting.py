@@ -153,3 +153,22 @@ def test_prompt_contains_current_and_recent_button_signal() -> None:
     signal = payload["recent_actions_signal"]
     assert signal["current_button"] == "eng_crank_switch"
     assert signal["recent_buttons"] == ["eng_crank_switch", "battery_switch"]
+
+
+def test_prompt_recent_actions_signal_keeps_all_ui_targets_in_list_style() -> None:
+    ctx = _base_context()
+    ctx["recent_actions"] = [
+        {
+            "ui_targets": [
+                "ufc_comm1_channel_selector_rotate",
+                "ufc_comm1_channel_selector_pull",
+            ]
+        }
+    ]
+    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    signal = payload["recent_actions_signal"]
+    assert signal["current_button"] == "ufc_comm1_channel_selector_rotate"
+    assert signal["recent_buttons"] == [
+        "ufc_comm1_channel_selector_rotate",
+        "ufc_comm1_channel_selector_pull",
+    ]

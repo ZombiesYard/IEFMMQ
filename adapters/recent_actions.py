@@ -76,9 +76,9 @@ def _normalize_positive_int(value: Any, *, fallback: int) -> int:
     if isinstance(value, bool):
         return fallback
     if isinstance(value, int):
-        return max(1, value)
+        return max(0, value)
     if isinstance(value, float):
-        return max(1, int(value))
+        return max(0, int(value))
     return fallback
 
 
@@ -114,6 +114,15 @@ def _targets_for_key(bios_to_ui: BiosUiMapper | Mapping[str, Any], key: str) -> 
     else:
         raw = bios_to_ui.get(key) if isinstance(bios_to_ui, Mapping) else None
     return _normalize_targets(raw)
+
+
+def _coerce_nonnegative_limit(value: Any, *, name: str) -> int:
+    if isinstance(value, bool):
+        raise TypeError(f"{name} must be int-like, not bool")
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError) as exc:
+        raise TypeError(f"{name} must be int-like") from exc
 
 
 def _extract_frame_delta(item: Mapping[str, Any]) -> tuple[float | None, int | None, Mapping[str, Any]]:
@@ -215,7 +224,7 @@ class RecentDeltaRingBuffer:
                 )
             )
         self._trim(now_t_wall=wall)
-        return self.snapshot(now_t_wall=wall)
+        return [frame.to_dict() for frame in self._frames]
 
     def add_sanitized_delta(self, sanitized: SanitizedDelta) -> list[dict[str, Any]]:
         if not isinstance(sanitized, SanitizedDelta):
@@ -263,7 +272,7 @@ def project_recent_ui_targets(
     - preserve mapping target order for each key
     - de-duplicate by first occurrence
     """
-    limit = max(0, int(max_items))
+    limit = _coerce_nonnegative_limit(max_items, name="max_items")
     if not recent_deltas or limit == 0:
         return []
 
@@ -308,7 +317,7 @@ def build_prompt_recent_deltas(
     """
     Convert recent delta frames to prompt-friendly rows (newest first).
     """
-    limit = max(0, int(max_items))
+    limit = _coerce_nonnegative_limit(max_items, name="max_items")
     if not recent_deltas or limit == 0:
         return []
 

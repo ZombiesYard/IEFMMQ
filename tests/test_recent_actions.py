@@ -111,3 +111,23 @@ def test_build_prompt_recent_deltas_and_button_signal_respects_caps() -> None:
         "ufc_comm1_channel_selector_rotate",
         "ufc_comm1_channel_selector_pull",
     ]
+
+
+def test_recent_ring_buffer_max_items_zero_disables_storage() -> None:
+    ring = RecentDeltaRingBuffer(window_s=3.0, max_items=0)
+    assert ring.config.max_items == 0
+    snap = ring.add_delta({"BATTERY_SW": 2}, t_wall=10.0, seq=1)
+    assert snap == []
+    assert len(ring) == 0
+
+
+def test_project_recent_ui_targets_rejects_bool_max_items() -> None:
+    recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
+    with pytest.raises(TypeError, match="max_items"):
+        project_recent_ui_targets(recent, _bios_to_ui_mapping(), max_items=True)  # type: ignore[arg-type]
+
+
+def test_build_prompt_recent_deltas_rejects_bool_max_items() -> None:
+    recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
+    with pytest.raises(TypeError, match="max_items"):
+        build_prompt_recent_deltas(recent, _bios_to_ui_mapping(), max_items=False)  # type: ignore[arg-type]

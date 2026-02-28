@@ -197,7 +197,6 @@ def _build_recent_actions_signal(context: Mapping[str, Any]) -> dict[str, Any]:
                 for target_item in targets:
                     if isinstance(target_item, str) and target_item:
                         candidates.append(target_item)
-                        break
     else:
         candidates = []
 
