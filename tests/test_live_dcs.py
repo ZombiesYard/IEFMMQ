@@ -375,7 +375,7 @@ def test_stdin_help_trigger_reader_does_not_enqueue_after_stop_set_during_input(
     assert trigger.poll() is False
 
 
-def test_load_overlay_allowlist_raises_when_pack_ui_targets_narrow_to_zero(tmp_path: Path) -> None:
+def test_load_overlay_allowlist_raises_when_pack_ui_targets_contains_unknown_target(tmp_path: Path) -> None:
     ui_map = tmp_path / "ui_map.yaml"
     pack = tmp_path / "pack.yaml"
     ui_map.write_text(
@@ -395,9 +395,41 @@ def test_load_overlay_allowlist_raises_when_pack_ui_targets_narrow_to_zero(tmp_p
 
     try:
         _load_overlay_allowlist(pack, ui_map)
-        assert False, "expected ValueError when narrowed allowlist is empty"
+        assert False, "expected ValueError when pack.ui_targets contains unknown target"
     except ValueError as exc:
-        assert "narrows overlay allowlist to zero valid targets" in str(exc)
+        message = str(exc)
+        assert "pack.ui_targets[0]='not_in_ui_map'" in message
+        assert "not found in ui_map" in message
+
+
+def test_load_overlay_allowlist_raises_when_pack_ui_targets_mixes_valid_and_unknown(tmp_path: Path) -> None:
+    ui_map = tmp_path / "ui_map.yaml"
+    pack = tmp_path / "pack.yaml"
+    ui_map.write_text(
+        "version: v1\n"
+        "cockpit_elements:\n"
+        "  apu_switch:\n"
+        "    dcs_id: pnt_375\n"
+        "  battery_switch:\n"
+        "    dcs_id: pnt_404\n",
+        encoding="utf-8",
+    )
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "ui_targets:\n"
+        "  - apu_switch\n"
+        "  - typo_target\n",
+        encoding="utf-8",
+    )
+
+    try:
+        _load_overlay_allowlist(pack, ui_map)
+        assert False, "expected ValueError when pack.ui_targets has partial unknown targets"
+    except ValueError as exc:
+        message = str(exc)
+        assert "pack.ui_targets[1]='typo_target'" in message
+        assert "not found in ui_map" in message
 
 
 def test_load_overlay_allowlist_uses_step_ui_targets_union_when_top_level_missing(tmp_path: Path) -> None:

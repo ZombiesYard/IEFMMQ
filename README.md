@@ -209,10 +209,10 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - Supports live UDP and offline replay.
 - Supports `--dry-run-overlay` for prompt/logic iteration without sending UDP commands.
 
-Run with replay (single-sample/offline validation):
+Run with replay (single-sample/offline validation; supports JSONL and single-line JSON):
 ```sh
 python live_dcs.py \
-  --replay-bios artifacts/dcs_bios_frame_once.json \
+  --replay-bios artifacts/dcs_bios_frame_once.jsonl \
   --auto-help-once \
   --dry-run-overlay \
   --model-provider stub \

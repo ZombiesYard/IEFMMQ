@@ -129,11 +129,17 @@ def _load_overlay_allowlist(pack_path: Path, ui_map_path: Path) -> list[str]:
         raise ValueError(f"pack.ui_targets must be a list: {pack_path}")
 
     narrowed: set[str] = set()
+    invalid_targets: list[str] = []
     for idx, target in enumerate(pack_targets):
         if not isinstance(target, str) or not target:
             raise ValueError(f"pack.ui_targets[{idx}] must be non-empty string: {pack_path}")
-        if target in base:
-            narrowed.add(target)
+        if target not in base:
+            invalid_targets.append(f"pack.ui_targets[{idx}]={target!r}")
+            continue
+        narrowed.add(target)
+    if invalid_targets:
+        joined = ", ".join(invalid_targets)
+        raise ValueError(f"{joined} not found in ui_map: {pack_path}")
     if not narrowed:
         raise ValueError(
             "pack.ui_targets narrows overlay allowlist to zero valid targets; "
