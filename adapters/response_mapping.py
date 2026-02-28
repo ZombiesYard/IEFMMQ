@@ -8,6 +8,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
+import yaml
+
 from core.overlay import OverlayPlanner
 from core.types import TutorRequest, TutorResponse
 
@@ -132,7 +134,7 @@ def map_help_response_to_tutor_response(
     try:
         resolved_ui_map = _resolve_ui_map_path(ui_map_path)
         planner = _get_overlay_planner(str(resolved_ui_map))
-    except Exception as exc:  # pragma: no cover - defensive path
+    except (FileNotFoundError, ValueError, yaml.YAMLError) as exc:
         planner_error = {
             "error_type": type(exc).__name__,
             "error_code": _overlay_error_code(exc),
@@ -151,7 +153,7 @@ def map_help_response_to_tutor_response(
                 break
             try:
                 actions.append(planner.plan(target, intent=effective_overlay_intent).to_action())
-            except Exception as exc:
+            except (KeyError, ValueError) as exc:
                 rejected_targets.append(target)
                 overlay_failures.append(
                     {

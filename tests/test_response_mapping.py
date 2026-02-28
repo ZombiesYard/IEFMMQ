@@ -3,6 +3,7 @@ from importlib import resources
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
+import pytest
 
 import adapters.response_mapping as response_mapping
 from adapters.response_mapping import map_help_response_to_tutor_response
@@ -199,3 +200,31 @@ def test_mapping_sanitizes_planner_initialization_error_metadata() -> None:
     assert payload["metadata"]["overlay_mapping_error"]["error_code"] == "ui_map_not_found"
     assert payload["metadata"]["overlay_mapping_error"]["error_type"] == "FileNotFoundError"
     assert isinstance(payload["metadata"]["overlay_mapping_error"], dict)
+
+
+def test_mapping_reraises_unexpected_planner_init_exception(monkeypatch) -> None:
+    original_get = response_mapping._get_overlay_planner
+
+    def _raise_unexpected(_ui_map_path: str):
+        raise RuntimeError("unexpected init failure")
+
+    monkeypatch.setattr(response_mapping, "_get_overlay_planner", _raise_unexpected)
+    try:
+        with pytest.raises(RuntimeError, match="unexpected init failure"):
+            map_help_response_to_tutor_response({"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]})
+    finally:
+        monkeypatch.setattr(response_mapping, "_get_overlay_planner", original_get)
+
+
+def test_mapping_reraises_unexpected_plan_exception(monkeypatch) -> None:
+    class _BadPlanner:
+        def plan(self, target: str, intent: str = "highlight"):
+            raise RuntimeError(f"unexpected plan failure:{target}:{intent}")
+
+    original_get = response_mapping._get_overlay_planner
+    monkeypatch.setattr(response_mapping, "_get_overlay_planner", lambda _ui_map_path: _BadPlanner())
+    try:
+        with pytest.raises(RuntimeError, match="unexpected plan failure"):
+            map_help_response_to_tutor_response({"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]})
+    finally:
+        monkeypatch.setattr(response_mapping, "_get_overlay_planner", original_get)
