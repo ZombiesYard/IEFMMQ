@@ -100,6 +100,30 @@ def _load_overlay_allowlist(pack_path: Path, ui_map_path: Path) -> list[str]:
     pack = _load_yaml_mapping(pack_path, "pack.yaml")
     pack_targets = pack.get("ui_targets")
     if pack_targets is None:
+        step_targets: set[str] = set()
+        steps = pack.get("steps")
+        if isinstance(steps, list):
+            for step_idx, step in enumerate(steps):
+                if not isinstance(step, Mapping):
+                    raise ValueError(f"pack.steps[{step_idx}] must be a mapping: {pack_path}")
+                ui_targets = step.get("ui_targets")
+                if ui_targets is None:
+                    continue
+                if not isinstance(ui_targets, list):
+                    raise ValueError(f"pack.steps[{step_idx}].ui_targets must be a list: {pack_path}")
+                for target_idx, target in enumerate(ui_targets):
+                    if not isinstance(target, str) or not target:
+                        raise ValueError(
+                            f"pack.steps[{step_idx}].ui_targets[{target_idx}] must be non-empty string: {pack_path}"
+                        )
+                    if target not in base:
+                        raise ValueError(
+                            f"pack.steps[{step_idx}].ui_targets[{target_idx}]={target!r} not found in ui_map: "
+                            f"{pack_path}"
+                        )
+                    step_targets.add(target)
+        if step_targets:
+            return sorted(step_targets)
         return sorted(base)
     if not isinstance(pack_targets, list):
         raise ValueError(f"pack.ui_targets must be a list: {pack_path}")
@@ -449,7 +473,11 @@ class LiveDcsTutorLoop:
         )
 
         state_signature = {
-            "vars": vars_selected,
+            "vars_discrete": {
+                key: value
+                for key, value in sorted(vars_selected.items())
+                if isinstance(value, bool) or value is None
+            },
             "recent_buttons": recent_buttons,
             "candidate_steps": self.candidate_steps,
             "overlay_target_allowlist": self.overlay_allowlist,
@@ -623,12 +651,17 @@ class LiveDcsTutorLoop:
                 response.metadata["response_mapping"] = mapped_meta
 
             overlay_report = self._execute_or_dry_run_actions(response.actions)
-            self._help_cache = HelpCacheEntry(
-                state_key=state_key,
-                t_wall=now_wall,
-                response=copy.deepcopy(response),
-                overlay_report=dict(overlay_report),
-            )
+            provider = response.metadata.get("provider")
+            cacheable = response.status == "ok" and provider != "fallback"
+            if cacheable:
+                self._help_cache = HelpCacheEntry(
+                    state_key=state_key,
+                    t_wall=now_wall,
+                    response=copy.deepcopy(response),
+                    overlay_report=dict(overlay_report),
+                )
+            else:
+                self._help_cache = None
 
         if self.dry_run_overlay and overlay_report.get("dry_run"):
             print(

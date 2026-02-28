@@ -314,6 +314,39 @@ def test_load_overlay_allowlist_raises_when_pack_ui_targets_narrow_to_zero(tmp_p
         assert "narrows overlay allowlist to zero valid targets" in str(exc)
 
 
+def test_load_overlay_allowlist_uses_step_ui_targets_union_when_top_level_missing(tmp_path: Path) -> None:
+    ui_map = tmp_path / "ui_map.yaml"
+    pack = tmp_path / "pack.yaml"
+    ui_map.write_text(
+        "version: v1\n"
+        "cockpit_elements:\n"
+        "  apu_switch:\n"
+        "    dcs_id: pnt_375\n"
+        "  battery_switch:\n"
+        "    dcs_id: pnt_404\n"
+        "  fire_test_switch:\n"
+        "    dcs_id: pnt_331\n",
+        encoding="utf-8",
+    )
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    ui_targets:\n"
+        "      - battery_switch\n"
+        "  - id: S02\n"
+        "    ui_targets:\n"
+        "      - apu_switch\n"
+        "  - id: S03\n"
+        "    ui_targets: []\n",
+        encoding="utf-8",
+    )
+
+    allowlist = _load_overlay_allowlist(pack, ui_map)
+    assert allowlist == ["apu_switch", "battery_switch"]
+
+
 def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_model_error.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 13.0, apu_switch=0)])
@@ -337,3 +370,63 @@ def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> Non
     assert stats["model_calls"] == 1
     assert len(executor.calls) == 1
     assert executor.calls[0] == []
+
+
+def test_live_loop_cache_key_ignores_numeric_churn_when_discrete_state_unchanged(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_numeric_churn.jsonl"
+    frame1 = _bios_frame(1, 15.0, apu_switch=0)
+    frame2 = _bios_frame(2, 15.1, apu_switch=0)
+    frame1["bios"]["IFEI_RPM_R"] = "10"
+    frame1["delta"]["IFEI_RPM_R"] = "10"
+    frame2["bios"]["IFEI_RPM_R"] = "11"
+    frame2["delta"]["IFEI_RPM_R"] = "11"
+    _write_replay(replay_path, [frame1, frame2])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=30.0,
+        lang="en",
+    )
+    try:
+        stats = loop.run(max_frames=2, auto_help_every_n_frames=1)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 2
+    assert stats["model_calls"] == 1
+    assert stats["cache_hits"] == 1
+
+
+def test_live_loop_does_not_cache_error_response_and_retries_model_within_cooldown(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_retry_on_error.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            _bios_frame(1, 16.0, apu_switch=0),
+            _bios_frame(2, 16.1, apu_switch=0),
+        ],
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    model = FailingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=30.0,
+        lang="en",
+    )
+    try:
+        stats = loop.run(max_frames=2, auto_help_every_n_frames=1)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 2
+    assert stats["model_calls"] == 2
+    assert stats["cache_hits"] == 0
