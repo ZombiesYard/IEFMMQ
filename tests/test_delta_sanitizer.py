@@ -128,6 +128,29 @@ def test_from_yaml_bool_max_changes_uses_default() -> None:
     assert policy.max_changes_per_window == 12
 
 
+def test_constructor_bool_max_changes_uses_default() -> None:
+    policy = DeltaPolicy(max_changes_per_window=True)
+    assert policy.max_changes_per_window == 12
+
+
+def test_bool_values_in_pair_fields_are_ignored() -> None:
+    policy = DeltaPolicy(
+        debounce_ms_by_key={
+            "ENGINE_CRANK_SW": True,
+            "BATTERY_SW": 250,
+        },
+        epsilon_by_key={
+            "SAI_PITCH": False,
+            "RPM_R": 0.1,
+        },
+    )
+
+    assert policy.debounce_ms_for("ENGINE_CRANK_SW") == 0
+    assert policy.debounce_ms_for("BATTERY_SW") == 250
+    assert policy.epsilon_for("SAI_PITCH") == 0.0
+    assert policy.epsilon_for("RPM_R") == 0.1
+
+
 def test_delta_policy_normalizes_mutable_inputs_to_immutable_fields() -> None:
     debounce = {"ENGINE_CRANK_SW": 300}
     epsilon = {"SAI_PITCH": 8.0}

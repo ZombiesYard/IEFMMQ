@@ -69,6 +69,7 @@ def _normalize_int_pairs(values: Any) -> tuple[tuple[str, int], ...]:
             or len(item) != 2
             or not isinstance(item[0], str)
             or not item[0]
+            or isinstance(item[1], bool)
             or not isinstance(item[1], (int, float))
         ):
             continue
@@ -87,6 +88,7 @@ def _normalize_float_pairs(values: Any) -> tuple[tuple[str, float], ...]:
             or len(item) != 2
             or not isinstance(item[0], str)
             or not item[0]
+            or isinstance(item[1], bool)
             or not isinstance(item[1], (int, float))
         ):
             continue
@@ -108,10 +110,14 @@ class DeltaPolicy:
         object.__setattr__(self, "ignore_bios_keys", _normalize_str_frozenset(self.ignore_bios_keys))
         object.__setattr__(self, "debounce_ms_by_key", _normalize_int_pairs(self.debounce_ms_by_key))
         object.__setattr__(self, "epsilon_by_key", _normalize_float_pairs(self.epsilon_by_key))
-        if not isinstance(self.max_changes_per_window, int):
-            object.__setattr__(self, "max_changes_per_window", int(self.max_changes_per_window))
-        if self.max_changes_per_window < 1:
-            object.__setattr__(self, "max_changes_per_window", 1)
+        max_changes = self.max_changes_per_window
+        if isinstance(max_changes, bool):
+            max_changes = 12
+        elif not isinstance(max_changes, int):
+            max_changes = int(max_changes)
+        if max_changes < 1:
+            max_changes = 1
+        object.__setattr__(self, "max_changes_per_window", max_changes)
         object.__setattr__(self, "important_bios_keys", _normalize_str_frozenset(self.important_bios_keys))
 
     @classmethod
