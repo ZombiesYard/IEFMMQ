@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 MAX_PROMPT_CHARS = 7000
 MAX_PROMPT_TOKENS_EST = 1800
 MAX_DELTA_SUMMARY_ITEMS = 20
+MAX_RECENT_ACTIONS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
@@ -172,6 +173,59 @@ def _build_rag_snippets(context: Mapping[str, Any], max_items: int = MAX_RAG_SNI
     return out
 
 
+def _build_recent_actions_signal(context: Mapping[str, Any]) -> dict[str, Any]:
+    raw = context.get("recent_actions")
+    current_button: str | None = None
+    recent_buttons: list[str] = []
+
+    if isinstance(raw, Mapping):
+        current_raw = raw.get("current_button")
+        if isinstance(current_raw, str) and current_raw:
+            current_button = str(_sanitize_scalar(current_raw))
+        buttons_raw = raw.get("recent_buttons")
+        candidates = buttons_raw if isinstance(buttons_raw, list) else []
+    elif isinstance(raw, list):
+        candidates = []
+        for item in raw:
+            if not isinstance(item, Mapping):
+                continue
+            target = item.get("ui_target") or item.get("mapped_ui_target") or item.get("target")
+            if isinstance(target, str) and target:
+                candidates.append(target)
+                continue
+            targets = item.get("ui_targets")
+            if isinstance(targets, list):
+                for target_item in targets:
+                    if isinstance(target_item, str) and target_item:
+                        candidates.append(target_item)
+    else:
+        candidates = []
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not isinstance(candidate, str) or not candidate:
+            continue
+        normalized = str(_sanitize_scalar(candidate))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        recent_buttons.append(normalized)
+        if len(recent_buttons) >= MAX_RECENT_ACTIONS_SIGNAL_ITEMS:
+            break
+
+    if current_button is None and recent_buttons:
+        current_button = recent_buttons[0]
+    if current_button is not None and current_button not in recent_buttons:
+        recent_buttons.insert(0, current_button)
+        if len(recent_buttons) > MAX_RECENT_ACTIONS_SIGNAL_ITEMS:
+            recent_buttons = recent_buttons[:MAX_RECENT_ACTIONS_SIGNAL_ITEMS]
+
+    return {
+        "current_button": current_button,
+        "recent_buttons": recent_buttons,
+    }
+
+
 def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
         return list(fallback)
@@ -287,6 +341,7 @@ def build_help_prompt_result(
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
     gates_summary = _build_gates_summary(context)
     rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
+    recent_actions_signal = _build_recent_actions_signal(context)
 
     payload: dict[str, Any] = {}
 
@@ -362,6 +417,7 @@ def build_help_prompt_result(
             "allowed_error_categories": category_enum,
             "current_vars_selected": selected_vars,
             "recent_deltas_summary": recent_deltas_summary,
+            "recent_actions_signal": recent_actions_signal,
             "EVIDENCE_SOURCES": evidence_sources,
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": example_obj,
@@ -458,6 +514,7 @@ def build_help_prompt(context: Mapping[str, Any], lang: str) -> str:
 
 __all__ = [
     "MAX_DELTA_SUMMARY_ITEMS",
+    "MAX_RECENT_ACTIONS_SIGNAL_ITEMS",
     "MAX_PROMPT_CHARS",
     "MAX_PROMPT_TOKENS_EST",
     "PromptBuildResult",

@@ -2,9 +2,11 @@
 
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
+    MAX_RECENT_ACTIONS_SIGNAL_ITEMS,
     build_help_prompt,
     build_help_prompt_result,
 )
+from adapters.recent_actions import build_recent_button_signal
 
 
 def _base_context() -> dict:
@@ -131,3 +133,53 @@ def test_budget_trim_can_print_terminal_when_enabled(monkeypatch, capsys, caplog
     out = capsys.readouterr().out
     assert "[PROMPT] Prompt trimmed to fit budget" in out
     assert "Prompt trimmed to fit budget" in caplog.text
+
+
+def test_prompt_contains_current_and_recent_button_signal() -> None:
+    recent_deltas = [
+        {"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}},
+        {"t_wall": 11.0, "seq": 2, "delta": {"ENGINE_CRANK_SW": 1}},
+    ]
+    bios_to_ui = {
+        "mappings": {
+            "BATTERY_SW": ["battery_switch"],
+            "ENGINE_CRANK_SW": ["eng_crank_switch"],
+        }
+    }
+
+    ctx = _base_context()
+    ctx["recent_actions"] = build_recent_button_signal(recent_deltas, bios_to_ui, max_items=8)
+
+    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    signal = payload["recent_actions_signal"]
+    assert signal["current_button"] == "eng_crank_switch"
+    assert signal["recent_buttons"] == ["eng_crank_switch", "battery_switch"]
+
+
+def test_prompt_recent_actions_signal_keeps_all_ui_targets_in_list_style() -> None:
+    ctx = _base_context()
+    ctx["recent_actions"] = [
+        {
+            "ui_targets": [
+                "ufc_comm1_channel_selector_rotate",
+                "ufc_comm1_channel_selector_pull",
+            ]
+        }
+    ]
+    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    signal = payload["recent_actions_signal"]
+    assert signal["current_button"] == "ufc_comm1_channel_selector_rotate"
+    assert signal["recent_buttons"] == [
+        "ufc_comm1_channel_selector_rotate",
+        "ufc_comm1_channel_selector_pull",
+    ]
+
+
+def test_prompt_recent_actions_signal_uses_dedicated_cap() -> None:
+    ctx = _base_context()
+    ctx["recent_actions"] = {"recent_buttons": [f"btn_{i:02d}" for i in range(30)]}
+
+    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    signal = payload["recent_actions_signal"]
+    assert len(signal["recent_buttons"]) == MAX_RECENT_ACTIONS_SIGNAL_ITEMS
+    assert signal["current_button"] == "btn_00"

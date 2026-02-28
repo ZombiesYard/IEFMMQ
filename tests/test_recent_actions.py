@@ -2,7 +2,28 @@ import pytest
 
 from adapters.delta_aggregator import DeltaSummary
 from adapters.delta_sanitizer import SanitizedDelta
-from adapters.recent_actions import build_recent_actions
+from adapters.recent_actions import (
+    RecentDeltaRingBuffer,
+    build_prompt_recent_deltas,
+    build_recent_actions,
+    build_recent_button_signal,
+    project_recent_ui_targets,
+)
+
+
+def _bios_to_ui_mapping() -> dict:
+    return {
+        "mappings": {
+            "BATTERY_SW": ["battery_switch"],
+            "ENGINE_CRANK_SW": ["eng_crank_switch"],
+            "COMM1_CHAN": {
+                "targets": [
+                    "ufc_comm1_channel_selector_rotate",
+                    "ufc_comm1_channel_selector_pull",
+                ]
+            },
+        }
+    }
 
 
 def test_build_recent_actions_from_sanitized_delta() -> None:
@@ -40,3 +61,84 @@ def test_build_recent_actions_from_delta_summary() -> None:
 def test_build_recent_actions_rejects_raw_delta_mapping() -> None:
     with pytest.raises(TypeError, match="SanitizedDelta or DeltaSummary"):
         build_recent_actions({"BATTERY_SW": 2})  # type: ignore[arg-type]
+
+
+def test_recent_delta_ring_buffer_trims_by_window_and_max_items() -> None:
+    ring = RecentDeltaRingBuffer(window_s=3.0, max_items=2)
+
+    ring.add_delta({"BATTERY_SW": 2}, t_wall=10.0, seq=1)
+    ring.add_delta({"COMM1_CHAN": 11}, t_wall=11.0, seq=2)
+
+    snap_after_count_trim = ring.add_delta({"ENGINE_CRANK_SW": 1}, t_wall=12.0, seq=3)
+    assert [item["seq"] for item in snap_after_count_trim] == [2, 3]
+
+    snap_after_window_trim = ring.add_delta({"BATTERY_SW": 0}, t_wall=15.2, seq=4)
+    assert [item["seq"] for item in snap_after_window_trim] == [4]
+
+
+def test_project_recent_ui_targets_is_recency_first_and_stable() -> None:
+    recent = [
+        {"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2, "COMM1_CHAN": 11}},
+        {"t_wall": 11.0, "seq": 2, "delta": {"ENGINE_CRANK_SW": 1, "COMM1_CHAN": 12}},
+    ]
+
+    targets = project_recent_ui_targets(recent, _bios_to_ui_mapping(), max_items=8)
+
+    assert targets == [
+        "eng_crank_switch",
+        "ufc_comm1_channel_selector_rotate",
+        "ufc_comm1_channel_selector_pull",
+        "battery_switch",
+    ]
+
+
+def test_build_prompt_recent_deltas_and_button_signal_respects_caps() -> None:
+    recent = [
+        {"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}},
+        {"t_wall": 11.0, "seq": 2, "delta": {"ENGINE_CRANK_SW": 1, "COMM1_CHAN": 12}},
+    ]
+
+    rows = build_prompt_recent_deltas(recent, _bios_to_ui_mapping(), max_items=3)
+    assert len(rows) == 3
+    assert rows[0]["mapped_ui_target"] == "eng_crank_switch"
+    assert rows[1]["mapped_ui_target"] == "ufc_comm1_channel_selector_rotate"
+    assert rows[2]["mapped_ui_target"] == "ufc_comm1_channel_selector_pull"
+
+    signal = build_recent_button_signal(recent, _bios_to_ui_mapping(), max_items=3)
+    assert signal["current_button"] == "eng_crank_switch"
+    assert signal["recent_buttons"] == [
+        "eng_crank_switch",
+        "ufc_comm1_channel_selector_rotate",
+        "ufc_comm1_channel_selector_pull",
+    ]
+
+
+def test_recent_ring_buffer_max_items_zero_disables_storage() -> None:
+    ring = RecentDeltaRingBuffer(window_s=3.0, max_items=0)
+    assert ring.config.max_items == 0
+    snap = ring.add_delta({"BATTERY_SW": 2}, t_wall=10.0, seq=1)
+    assert snap == []
+    assert len(ring) == 0
+
+
+def test_project_recent_ui_targets_rejects_bool_max_items() -> None:
+    recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
+    with pytest.raises(TypeError, match="max_items"):
+        project_recent_ui_targets(recent, _bios_to_ui_mapping(), max_items=True)  # type: ignore[arg-type]
+
+
+def test_build_prompt_recent_deltas_rejects_bool_max_items() -> None:
+    recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
+    with pytest.raises(TypeError, match="max_items"):
+        build_prompt_recent_deltas(recent, _bios_to_ui_mapping(), max_items=False)  # type: ignore[arg-type]
+
+
+def test_mapping_targets_string_is_not_split_into_characters() -> None:
+    recent = [{"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2}}]
+    bios_to_ui = {"mappings": {"BATTERY_SW": {"targets": "battery_switch"}}}
+
+    targets = project_recent_ui_targets(recent, bios_to_ui, max_items=8)
+    assert targets == ["battery_switch"]
+
+    rows = build_prompt_recent_deltas(recent, bios_to_ui, max_items=8)
+    assert rows[0]["mapped_ui_target"] == "battery_switch"
