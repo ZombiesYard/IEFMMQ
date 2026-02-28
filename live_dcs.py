@@ -183,6 +183,17 @@ def _normalize_help_report(raw: Any) -> dict[str, Any]:
     return report
 
 
+def _dedupe_strings(items: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 @dataclass
 class HelpCacheEntry:
     state_key: str
@@ -515,14 +526,49 @@ class LiveDcsTutorLoop:
         if not isinstance(help_obj, Mapping):
             return list(response.actions), {}
 
+        filtered_help_obj: Mapping[str, Any] = help_obj
+        rejected_by_request_allowlist: list[str] = []
+        request_allowlist_raw = request.context.get("overlay_target_allowlist")
+        if isinstance(request_allowlist_raw, list):
+            request_allowlist = {
+                item for item in request_allowlist_raw if isinstance(item, str) and item
+            }
+            overlay = help_obj.get("overlay")
+            if request_allowlist and isinstance(overlay, Mapping):
+                raw_targets = overlay.get("targets")
+                if isinstance(raw_targets, list):
+                    allowed_targets: list[str] = []
+                    for target in raw_targets:
+                        if not isinstance(target, str) or not target:
+                            continue
+                        if target in request_allowlist:
+                            allowed_targets.append(target)
+                        else:
+                            rejected_by_request_allowlist.append(target)
+                    if rejected_by_request_allowlist:
+                        filtered_overlay = dict(overlay)
+                        filtered_overlay["targets"] = allowed_targets
+                        filtered_help_obj = dict(help_obj)
+                        filtered_help_obj["overlay"] = filtered_overlay
+
         mapped = map_help_response_to_tutor_response(
-            help_obj,
+            filtered_help_obj,
             request=request,
             status=response.status,
             max_overlay_targets=1,
             ui_map_path=self.ui_map_path,
         )
         mapped_meta = dict(mapped.metadata)
+        if rejected_by_request_allowlist:
+            deduped_rejected = _dedupe_strings(rejected_by_request_allowlist)
+            mapped_meta["rejected_targets_by_request_allowlist"] = deduped_rejected
+            existing_errors = mapped_meta.get("mapping_errors")
+            merged_errors: list[str] = []
+            if isinstance(existing_errors, list):
+                merged_errors = [item for item in existing_errors if isinstance(item, str) and item]
+            merged_errors.append("overlay_target_not_in_request_allowlist")
+            mapped_meta["mapping_errors"] = _dedupe_strings(merged_errors)
+            mapped_meta.setdefault("mapping_error", "overlay_target_not_in_request_allowlist")
         if not response.message and mapped.message:
             response.message = mapped.message
         if (not response.explanations) and mapped.explanations:
@@ -606,9 +652,18 @@ class LiveDcsTutorLoop:
             response.metadata = dict(response.metadata)
             response.metadata["cached_response_reused"] = True
             response.metadata["cache_age_s"] = round(now_wall - cached.t_wall, 3)
-            response.metadata["prompt_hash"] = request.metadata.get("prompt_hash")
-            response.metadata["prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
-            response.metadata["prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+            response.metadata.setdefault("generation_prompt_hash", response.metadata.get("prompt_hash"))
+            response.metadata.setdefault(
+                "generation_prompt_tokens_est",
+                response.metadata.get("prompt_tokens_est"),
+            )
+            response.metadata.setdefault(
+                "generation_prompt_trimmed",
+                response.metadata.get("prompt_trimmed"),
+            )
+            response.metadata["request_prompt_hash"] = request.metadata.get("prompt_hash")
+            response.metadata["request_prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+            response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
             overlay_report = self._execute_or_dry_run_actions(response.actions)
@@ -642,6 +697,18 @@ class LiveDcsTutorLoop:
             response.metadata["prompt_hash"] = request.metadata.get("prompt_hash")
             response.metadata["prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
             response.metadata["prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+            response.metadata.setdefault("generation_prompt_hash", response.metadata.get("prompt_hash"))
+            response.metadata.setdefault(
+                "generation_prompt_tokens_est",
+                response.metadata.get("prompt_tokens_est"),
+            )
+            response.metadata.setdefault(
+                "generation_prompt_trimmed",
+                response.metadata.get("prompt_trimmed"),
+            )
+            response.metadata["request_prompt_hash"] = request.metadata.get("prompt_hash")
+            response.metadata["request_prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+            response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
 

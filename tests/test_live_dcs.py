@@ -95,6 +95,34 @@ def _apu_element_id_from_ui_map() -> str:
     return str(ui_map["cockpit_elements"]["apu_switch"]["dcs_id"])
 
 
+def _default_pack_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "packs" / "fa18c_startup" / "pack.yaml"
+
+
+class OutOfAllowlistTargetModel:
+    def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+        return self.explain_error(observation, request)
+
+    def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+        return TutorResponse(
+            status="ok",
+            in_reply_to=request.request_id if request else None,
+            message="Check switch.",
+            actions=[],
+            explanations=["Check switch."],
+            metadata={
+                "provider": "mock_qwen",
+                "help_response": {
+                    "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                    "next": {"step_id": "S03"},
+                    "overlay": {"targets": ["battery_switch"]},
+                    "explanations": ["Check switch."],
+                    "confidence": 0.9,
+                },
+            },
+        )
+
+
 def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_one.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
@@ -174,9 +202,64 @@ def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path:
     assert stats["cache_hits"] == 1
     assert len(model.calls) == 1
     assert len(executor.calls) == 2
+    tutor_request_payloads = [event.payload for event in events if event.kind == "tutor_request"]
+    assert len(tutor_request_payloads) == 2
     tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
     assert len(tutor_response_payloads) == 2
     assert tutor_response_payloads[0]["response_id"] != tutor_response_payloads[1]["response_id"]
+    first_request_meta = tutor_request_payloads[0]["metadata"]
+    second_request_meta = tutor_request_payloads[1]["metadata"]
+    first_response_meta = tutor_response_payloads[0]["metadata"]
+    second_response_meta = tutor_response_payloads[1]["metadata"]
+    assert first_response_meta["generation_prompt_hash"] == first_request_meta["prompt_hash"]
+    assert second_response_meta["generation_prompt_hash"] == first_request_meta["prompt_hash"]
+    assert second_response_meta["prompt_hash"] == first_request_meta["prompt_hash"]
+    assert second_response_meta["request_prompt_hash"] == second_request_meta["prompt_hash"]
+    assert second_response_meta["request_prompt_tokens_est"] == second_request_meta["prompt_tokens_est"]
+    assert second_response_meta["request_prompt_trimmed"] == second_request_meta["prompt_trimmed"]
+
+
+def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_allowlist_filter.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    ui_targets:\n"
+        "      - apu_switch\n",
+        encoding="utf-8",
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    model = OutOfAllowlistTargetModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        pack_path=pack,
+        ui_map_path=Path(_default_pack_path()).parent / "ui_map.yaml",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert executor.calls[0] == []
+    tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
+    assert len(tutor_response_payloads) == 1
+    response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
+    assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
+    assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
 
 
 def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys) -> None:
