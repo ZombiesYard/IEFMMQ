@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import socket
+from pathlib import Path
 
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.overlay.sender import DcsOverlaySender
@@ -73,6 +74,66 @@ def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> N
     assert any(evt.kind == "overlay_failed" for evt in events)
 
 
+def test_executor_rejects_invalid_action_payload(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender)
+
+    report = executor.execute_actions(["bad-action-payload"])
+
+    assert dummy.sent == []
+    assert len(report.rejected) == 1
+    assert report.rejected[0]["reason"] == "invalid_action_payload"
+
+
+def test_executor_rejects_invalid_overlay_target(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender)
+
+    report = executor.execute_actions([{"type": "overlay", "target": ""}])
+
+    assert dummy.sent == []
+    assert len(report.rejected) == 1
+    assert report.rejected[0]["reason"] == "invalid_overlay_target"
+
+
+def test_executor_rejects_overlay_target_not_in_allowlist(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender)
+
+    report = executor.execute_actions([{"type": "overlay", "target": "unknown_target"}])
+
+    assert dummy.sent == []
+    assert len(report.rejected) == 1
+    assert report.rejected[0]["reason"] == "overlay_target_not_in_allowlist"
+
+
+def test_executor_pack_ui_targets_narrows_allowlist(monkeypatch, tmp_path: Path) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    pack_path = tmp_path / "pack.yaml"
+    pack_path.write_text(
+        "pack_id: test_pack\n"
+        "version: v1\n"
+        "ui_targets:\n"
+        "  - battery_switch\n",
+        encoding="utf-8",
+    )
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender, pack_path=pack_path)
+
+    report = executor.execute_actions([{"type": "overlay", "target": "apu_switch"}])
+
+    assert dummy.sent == []
+    assert len(report.rejected) == 1
+    assert report.rejected[0]["reason"] == "overlay_target_not_in_allowlist"
+
+
 def test_executor_max_targets_only_applies_to_overlay_execution(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
@@ -100,8 +161,9 @@ def test_executor_max_targets_only_applies_to_overlay_execution(monkeypatch) -> 
 def test_executor_dry_run_reports_preview_without_udp(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
     sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
-    executor = OverlayActionExecutor(sender=sender, dry_run=True, ttl_s=1.25, pulse_enabled=True)
+    executor = OverlayActionExecutor(sender=sender, dry_run=True, ttl_s=1.25, pulse_enabled=True, event_sink=events.append)
 
     report = executor.execute_actions([{"type": "overlay", "target": "apu_switch"}])
 
@@ -111,6 +173,7 @@ def test_executor_dry_run_reports_preview_without_udp(monkeypatch) -> None:
     assert report.dry_run[0]["element_id"] == "pnt_375"
     assert report.dry_run[0]["ttl_s"] == 1.25
     assert report.dry_run[0]["pulse_enabled"] is True
+    assert any(evt.kind == "overlay_dry_run" for evt in events)
 
 
 def test_executor_system_pulse_controls_clear_by_ttl(monkeypatch) -> None:
@@ -120,7 +183,7 @@ def test_executor_system_pulse_controls_clear_by_ttl(monkeypatch) -> None:
     sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
     executor = OverlayActionExecutor(sender=sender, pulse_enabled=True, ttl_s=0.5)
 
-    report = executor.execute_actions([{"type": "overlay", "target": "apu_switch", "intent": "pulse"}])
+    report = executor.execute_actions([{"type": "overlay", "target": "apu_switch"}])
 
     assert len(report.executed) == 1
     assert len(dummy.sent) == 2
@@ -129,3 +192,17 @@ def test_executor_system_pulse_controls_clear_by_ttl(monkeypatch) -> None:
     assert cmds[0]["target"] == "pnt_375"
     assert cmds[1]["action"] == "clear"
     assert cmds[1]["target"] == "pnt_375"
+
+
+def test_executor_does_not_mutate_external_sender_event_sink(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, event_sink=None)
+    events: list[Event] = []
+
+    executor = OverlayActionExecutor(sender=sender, event_sink=events.append)
+    report = executor.execute_actions([{"type": "overlay", "target": "apu_switch"}])
+
+    assert len(report.executed) == 1
+    assert sender.event_sink is None
+    assert events == []

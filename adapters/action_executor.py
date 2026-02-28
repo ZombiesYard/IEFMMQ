@@ -54,6 +54,16 @@ class ActionExecutionReport:
 
 
 class OverlayActionExecutor:
+    """
+    Execute tutor actions with overlay-only safety enforcement.
+
+    Notes:
+    - Only `type="overlay"` actions are executable.
+    - Target allowlist is enforced from `ui_map` (optionally narrowed by `pack.ui_targets`).
+    - `pulse_enabled=True` uses a blocking sleep; `execute_actions` blocks the calling thread
+      for `ttl_s` per executed target before issuing `clear`.
+    """
+
     def __init__(
         self,
         *,
@@ -94,8 +104,6 @@ class OverlayActionExecutor:
         else:
             self._sender = sender
             self._owns_sender = False
-            if self._sender.event_sink is None and event_sink is not None:
-                self._sender.event_sink = event_sink
 
     def close(self) -> None:
         if self._owns_sender:
@@ -167,7 +175,7 @@ class OverlayActionExecutor:
                     "pulse_enabled": self.pulse_enabled,
                 }
                 report.dry_run.append(preview)
-                self._emit("system", {"event": "overlay_dry_run", **preview})
+                self._emit("overlay_dry_run", preview)
                 executed_count += 1
                 continue
 
