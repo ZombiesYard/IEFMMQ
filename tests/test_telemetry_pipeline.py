@@ -1,10 +1,15 @@
 import json
+from collections import OrderedDict
 from pathlib import Path
 
 import pytest
 
+from adapters.delta_aggregator import DeltaAggregator
+from adapters.delta_sanitizer import DeltaPolicy, DeltaSanitizer
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
+import adapters.telemetry_pipeline as telemetry_pipeline
 from adapters.telemetry_pipeline import TelemetryDebugCache, enrich_bios_observation
+from core.types import Event
 from core.types import Observation
 from core.vars import VarResolver
 
@@ -19,6 +24,10 @@ def _resolver() -> VarResolver:
 
 def _mapper() -> BiosUiMapper:
     return BiosUiMapper.from_yaml(PACK_DIR / "bios_to_ui.yaml", PACK_DIR / "ui_map.yaml")
+
+
+def _delta_policy() -> DeltaPolicy:
+    return DeltaPolicy.from_yaml(PACK_DIR / "delta_policy.yaml")
 
 
 def test_enrich_bios_observation_compacts_payload_and_keeps_metadata() -> None:
@@ -185,3 +194,360 @@ def test_enrich_bios_observation_tag_hook_invalid_return_raises_clear_error() ->
             mapper=_mapper(),
             tag_hook=lambda _obs, _payload: 123,  # type: ignore[return-value]
         )
+
+
+def test_enrich_bios_observation_sanitizes_delta_and_emits_stats_event() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 101,
+            "t_wall": 101.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "IFEI_CLOCK_S": "59",
+                "EXT_STROBE_LIGHTS": 1,
+            },
+            "delta": {
+                "BATTERY_SW": 2,
+                "IFEI_CLOCK_S": "59",
+                "EXT_STROBE_LIGHTS": 1,
+            },
+        },
+        metadata={"seq": 101, "gap": 0, "delta_count": 3},
+    )
+    policy = _delta_policy()
+    sanitizer = DeltaSanitizer(policy)
+    aggregator = DeltaAggregator(policy, mapper=_mapper(), window_size=5)
+    events: list[Event] = []
+
+    enriched = enrich_bios_observation(
+        obs,
+        _resolver(),
+        mapper=_mapper(),
+        delta_policy=policy,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=aggregator,
+        delta_event_sink=lambda event: events.append(event),
+    )
+
+    summary = enriched.payload["delta_summary"]
+    assert summary["raw_delta_count"] == 3
+    assert summary["delta_count"] == 1
+    assert summary["dropped_stats"]["dropped_total"] == 2
+    assert summary["dropped_stats"]["dropped_by_reason"]["blacklist"] == 2
+    assert summary["recent_key_changes_topk"][0]["key"] == "BATTERY_SW"
+    assert enriched.payload["recent_ui_targets"] == ["battery_switch"]
+    assert enriched.metadata["delta_dropped_count"] == 2
+
+    assert len(events) == 1
+    assert events[0].kind == "delta_sanitized"
+    assert "recent_key_changes_topk" not in events[0].payload
+
+
+def test_enrich_bios_observation_separates_per_obs_and_window_delta_summary() -> None:
+    policy = _delta_policy()
+    sanitizer = DeltaSanitizer(policy)
+    aggregator = DeltaAggregator(policy, mapper=_mapper(), window_size=5)
+
+    obs1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 111,
+            "t_wall": 111.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "01"},
+            "delta": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "01"},
+        },
+    )
+    obs2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 112,
+            "t_wall": 112.0,
+            "bios": {"ENGINE_CRANK_SW": 1},
+            "delta": {"ENGINE_CRANK_SW": 1},
+        },
+    )
+
+    enrich_bios_observation(
+        obs1,
+        _resolver(),
+        mapper=_mapper(),
+        delta_policy=policy,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=aggregator,
+    )
+    second = enrich_bios_observation(
+        obs2,
+        _resolver(),
+        mapper=_mapper(),
+        delta_policy=policy,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=aggregator,
+    )
+
+    assert second.payload["delta_summary"]["dropped_stats"]["dropped_total"] == 0
+    assert second.payload["delta_window_summary"]["dropped_stats"]["dropped_total"] == 1
+    per_obs_keys = [row["key"] for row in second.payload["delta_summary"]["recent_key_changes_topk"]]
+    win_keys = [row["key"] for row in second.payload["delta_window_summary"]["recent_key_changes_topk"]]
+    assert per_obs_keys == ["ENGINE_CRANK_SW"]
+    assert "BATTERY_SW" in win_keys
+    assert second.metadata["delta_dropped_count"] == 0
+
+
+def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+
+    obs1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 201,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+    )
+    obs2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 202,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+    )
+
+    first = enrich_bios_observation(obs1, _resolver(), mapper=_mapper())
+    second = enrich_bios_observation(obs2, _resolver(), mapper=_mapper())
+
+    assert first.payload["delta_summary"]["delta_count"] == 1
+    assert second.payload["delta_summary"]["delta_count"] == 0
+    assert second.metadata["delta_dropped_count"] == 1
+
+
+def test_enrich_bios_observation_policy_scoped_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+    policy = DeltaPolicy(debounce_ms_by_key={"SAI_RATE_OF_TURN": 300}, epsilon_by_key={})
+
+    obs1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 211,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+    )
+    obs2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 212,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+    )
+
+    first = enrich_bios_observation(obs1, _resolver(), mapper=_mapper(), delta_policy=policy)
+    second = enrich_bios_observation(obs2, _resolver(), mapper=_mapper(), delta_policy=policy)
+
+    assert first.payload["delta_summary"]["delta_count"] == 1
+    assert second.payload["delta_summary"]["delta_count"] == 0
+    assert second.metadata["delta_dropped_count"] == 1
+
+
+def test_enrich_bios_observation_default_cache_scoped_by_session_id(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+
+    obs_a1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 221,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+        metadata={"session_id": "sess-a"},
+    )
+    obs_a2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 222,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+        metadata={"session_id": "sess-a"},
+    )
+    obs_b1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 223,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+        metadata={"session_id": "sess-b"},
+    )
+
+    first_a = enrich_bios_observation(obs_a1, _resolver(), mapper=_mapper())
+    second_a = enrich_bios_observation(obs_a2, _resolver(), mapper=_mapper())
+    first_b = enrich_bios_observation(obs_b1, _resolver(), mapper=_mapper())
+
+    assert first_a.payload["delta_summary"]["delta_count"] == 1
+    assert second_a.payload["delta_summary"]["delta_count"] == 0
+    assert first_b.payload["delta_summary"]["delta_count"] == 1
+
+
+def test_enrich_bios_observation_delta_stream_id_overrides_metadata_scope(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 231,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+        metadata={"session_id": "shared-session"},
+    )
+    first = enrich_bios_observation(obs, _resolver(), mapper=_mapper(), delta_stream_id="stream-a")
+
+    obs_next = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 232,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+        metadata={"session_id": "shared-session"},
+    )
+    second = enrich_bios_observation(obs_next, _resolver(), mapper=_mapper(), delta_stream_id="stream-b")
+
+    assert first.payload["delta_summary"]["delta_count"] == 1
+    assert second.payload["delta_summary"]["delta_count"] == 1
+
+
+def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_raw() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 401,
+            "t_wall": 401.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+            "delta": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+        },
+        metadata={"seq": 401, "gap": 0},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+
+    assert enriched.payload["delta_summary"]["delta_count"] == 1
+    assert enriched.payload["delta_summary"]["raw_delta_count"] == 2
+    assert enriched.metadata["delta_count"] == 1
+    assert enriched.metadata["raw_delta_count"] == 2
+
+
+def test_enrich_bios_observation_keeps_existing_delta_dropped_count_metadata() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 402,
+            "t_wall": 402.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+            "delta": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+        },
+        metadata={"delta_dropped_count": 99},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+    assert enriched.metadata["delta_dropped_count"] == 99
+
+
+def test_enrich_bios_observation_rejects_mismatched_policy_and_sanitizer() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={"seq": 301, "t_wall": 301.0, "bios": {"BATTERY_SW": 2}, "delta": {"BATTERY_SW": 2}},
+    )
+    policy_a = DeltaPolicy(max_changes_per_window=8)
+    policy_b = DeltaPolicy(max_changes_per_window=12)
+    sanitizer = DeltaSanitizer(policy_a)
+
+    with pytest.raises(ValueError, match="delta_policy does not match delta_sanitizer.policy"):
+        enrich_bios_observation(
+            obs,
+            _resolver(),
+            mapper=_mapper(),
+            delta_policy=policy_b,
+            delta_sanitizer=sanitizer,
+        )
+
+
+def test_enrich_bios_observation_rejects_mismatched_policy_and_aggregator() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={"seq": 302, "t_wall": 302.0, "bios": {"BATTERY_SW": 2}, "delta": {"BATTERY_SW": 2}},
+    )
+    policy_a = DeltaPolicy(max_changes_per_window=8)
+    policy_b = DeltaPolicy(max_changes_per_window=12)
+    aggregator = DeltaAggregator(policy_b, mapper=_mapper(), window_size=5)
+
+    with pytest.raises(ValueError, match="delta_aggregator.policy does not match effective delta policy"):
+        enrich_bios_observation(
+            obs,
+            _resolver(),
+            mapper=_mapper(),
+            delta_policy=policy_a,
+            delta_aggregator=aggregator,
+        )
+
+
+def test_policy_scoped_sanitizer_cache_is_lru_bounded(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_MAX_POLICY_SCOPED_SANITIZERS", 2)
+    policy = DeltaPolicy(debounce_ms_by_key={"SAI_RATE_OF_TURN": 300})
+
+    s1, _ = telemetry_pipeline._get_policy_scoped_sanitizer(policy, stream_id="s1")
+    telemetry_pipeline._get_policy_scoped_sanitizer(policy, stream_id="s2")
+    telemetry_pipeline._get_policy_scoped_sanitizer(policy, stream_id="s3")
+
+    keys = list(telemetry_pipeline._POLICY_SCOPED_SANITIZERS.keys())
+    assert len(keys) == 2
+    assert (policy, "s1") not in keys
+    assert (policy, "s2") in keys
+    assert (policy, "s3") in keys
+    assert s1 not in telemetry_pipeline._SHARED_DELTA_SANITIZER_LOCKS
+
+
+def test_resolve_policy_and_sanitizer_returns_lock_for_caller_sanitizer() -> None:
+    policy = DeltaPolicy()
+    sanitizer = DeltaSanitizer(policy)
+
+    _, resolved, lock1 = telemetry_pipeline._resolve_delta_policy_and_sanitizer(
+        delta_policy=None,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=None,
+        delta_stream_id="stream-x",
+    )
+    _, _, lock2 = telemetry_pipeline._resolve_delta_policy_and_sanitizer(
+        delta_policy=None,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=None,
+        delta_stream_id="stream-y",
+    )
+
+    assert resolved is sanitizer
+    assert lock1 is not None
+    assert lock2 is lock1

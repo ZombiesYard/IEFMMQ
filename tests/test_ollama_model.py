@@ -29,6 +29,9 @@ def test_explain_error_success_with_valid_help_response() -> None:
     assert "removed_code_fence" in res.metadata["json_repair_reasons"]
     assert res.metadata["evidence_guardrail_applied"] is False
     assert res.metadata["evidence_guardrail_reasons"] == []
+    assert isinstance(res.metadata["prompt_budget_used"], int)
+    assert res.metadata["prompt_budget_used"] > 0
+    assert res.metadata["delta_dropped_count"] == 0
     assert "prompt_build" in res.metadata
     assert "max_prompt_chars" in res.metadata["prompt_build"]
     validate_help_response(res.metadata["help_response"])
@@ -192,3 +195,16 @@ def test_explain_error_alternate_response_format() -> None:
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
     validate_help_response(res.metadata["help_response"])
+
+
+def test_explain_error_metadata_reads_delta_dropped_count_from_direct_context() -> None:
+    help_obj = _help_obj_ok()
+    fake = FakeClient(responses=[FakeResponse(_ollama_message_payload_from_help_obj(help_obj))])
+    model = OllamaModel(client=fake)
+    req = _request_help()
+    req.context["delta_dropped_count"] = 5
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["delta_dropped_count"] == 5

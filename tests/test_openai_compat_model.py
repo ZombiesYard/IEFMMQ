@@ -32,6 +32,9 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert res.metadata["json_repair_reasons"] == []
     assert res.metadata["evidence_guardrail_applied"] is False
     assert res.metadata["evidence_guardrail_reasons"] == []
+    assert isinstance(res.metadata["prompt_budget_used"], int)
+    assert res.metadata["prompt_budget_used"] > 0
+    assert res.metadata["delta_dropped_count"] == 0
     validate_help_response(res.metadata["help_response"])
 
     call = fake.calls[0]
@@ -187,3 +190,40 @@ def test_explain_error_overlay_target_not_in_allowlist_fallback_no_overlay() -> 
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_metadata_reads_delta_dropped_count_from_context() -> None:
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["delta_summary"] = {"dropped_stats": {"dropped_total": 7, "dropped_by_reason": {"blacklist": 7}}}
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["delta_dropped_count"] == 7
+
+
+def test_explain_error_metadata_ignores_bool_delta_dropped_count_direct() -> None:
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["delta_dropped_count"] = True
+    req.context["delta_summary"] = {"dropped_stats": {"dropped_total": 3}}
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["delta_dropped_count"] == 3
+
+
+def test_explain_error_metadata_ignores_bool_nested_dropped_total() -> None:
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(_help_obj_ok()), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["delta_summary"] = {"dropped_stats": {"dropped_total": True}}
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["delta_dropped_count"] == 0
