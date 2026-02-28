@@ -297,6 +297,7 @@ def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monk
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
     monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
 
     obs1 = Observation(
         source="dcs_bios",
@@ -327,6 +328,7 @@ def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monk
 
 def test_enrich_bios_observation_policy_scoped_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
     policy = DeltaPolicy(debounce_ms_by_key={"SAI_RATE_OF_TURN": 300}, epsilon_by_key={})
 
     obs1 = Observation(
@@ -354,6 +356,86 @@ def test_enrich_bios_observation_policy_scoped_sanitizer_keeps_state_across_call
     assert first.payload["delta_summary"]["delta_count"] == 1
     assert second.payload["delta_summary"]["delta_count"] == 0
     assert second.metadata["delta_dropped_count"] == 1
+
+
+def test_enrich_bios_observation_default_cache_scoped_by_session_id(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+
+    obs_a1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 221,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+        metadata={"session_id": "sess-a"},
+    )
+    obs_a2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 222,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+        metadata={"session_id": "sess-a"},
+    )
+    obs_b1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 223,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+        metadata={"session_id": "sess-b"},
+    )
+
+    first_a = enrich_bios_observation(obs_a1, _resolver(), mapper=_mapper())
+    second_a = enrich_bios_observation(obs_a2, _resolver(), mapper=_mapper())
+    first_b = enrich_bios_observation(obs_b1, _resolver(), mapper=_mapper())
+
+    assert first_a.payload["delta_summary"]["delta_count"] == 1
+    assert second_a.payload["delta_summary"]["delta_count"] == 0
+    assert first_b.payload["delta_summary"]["delta_count"] == 1
+
+
+def test_enrich_bios_observation_delta_stream_id_overrides_metadata_scope(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
+    monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
+    monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", {})
+    monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
+
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 231,
+            "t_wall": 1.000,
+            "bios": {"SAI_RATE_OF_TURN": 0},
+            "delta": {"SAI_RATE_OF_TURN": 0},
+        },
+        metadata={"session_id": "shared-session"},
+    )
+    first = enrich_bios_observation(obs, _resolver(), mapper=_mapper(), delta_stream_id="stream-a")
+
+    obs_next = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 232,
+            "t_wall": 1.100,
+            "bios": {"SAI_RATE_OF_TURN": 20},
+            "delta": {"SAI_RATE_OF_TURN": 20},
+        },
+        metadata={"session_id": "shared-session"},
+    )
+    second = enrich_bios_observation(obs_next, _resolver(), mapper=_mapper(), delta_stream_id="stream-b")
+
+    assert first.payload["delta_summary"]["delta_count"] == 1
+    assert second.payload["delta_summary"]["delta_count"] == 1
 
 
 def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_raw() -> None:
