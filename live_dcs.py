@@ -484,6 +484,24 @@ class LiveDcsTutorLoop:
             response.explanations = list(mapped.explanations)
         return list(mapped.actions), mapped_meta
 
+    def _new_response_from_cached(
+        self,
+        cached_response: TutorResponse,
+        *,
+        in_reply_to: str | None,
+    ) -> TutorResponse:
+        return TutorResponse(
+            status=cached_response.status,
+            in_reply_to=in_reply_to,
+            message=cached_response.message,
+            actions=copy.deepcopy(list(cached_response.actions)),
+            explanations=copy.deepcopy(list(cached_response.explanations)),
+            metadata=copy.deepcopy(dict(cached_response.metadata)),
+        )
+
+    def _executor_is_configured_dry_run(self) -> bool:
+        return bool(getattr(self.action_executor, "dry_run", False))
+
     def _dry_run_report_from_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> dict[str, Any]:
         previews: list[dict[str, Any]] = []
         for action in actions:
@@ -508,6 +526,9 @@ class LiveDcsTutorLoop:
         }
 
     def _execute_or_dry_run_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> dict[str, Any]:
+        if self.dry_run_overlay and self._executor_is_configured_dry_run():
+            overlay_raw_report = self.action_executor.execute_actions(actions)
+            return _normalize_help_report(overlay_raw_report)
         if self.dry_run_overlay:
             return self._dry_run_report_from_actions(actions)
         overlay_raw_report = self.action_executor.execute_actions(actions)
@@ -536,9 +557,8 @@ class LiveDcsTutorLoop:
 
         if use_cache and cached is not None:
             self._stats.cache_hits += 1
-            response = copy.deepcopy(cached.response)
+            response = self._new_response_from_cached(cached.response, in_reply_to=request.request_id)
             response.metadata = dict(response.metadata)
-            response.in_reply_to = request.request_id
             response.metadata["cached_response_reused"] = True
             response.metadata["cache_age_s"] = round(now_wall - cached.t_wall, 3)
             response.metadata["prompt_hash"] = request.metadata.get("prompt_hash")

@@ -57,9 +57,10 @@ class RecordingModel:
 
 
 class RecordingExecutor:
-    def __init__(self, *, include_dry_run: bool = False) -> None:
+    def __init__(self, *, include_dry_run: bool = False, dry_run: bool = False) -> None:
         self.calls: list[list[dict[str, Any]]] = []
         self.include_dry_run = include_dry_run
+        self.dry_run = dry_run
 
     def execute_actions(self, actions):
         actions_list = [dict(item) for item in actions if isinstance(item, dict)]
@@ -144,12 +145,14 @@ def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path:
     source = ReplayBiosReceiver(replay_path)
     model = RecordingModel()
     executor = RecordingExecutor()
+    events = []
     loop = LiveDcsTutorLoop(
         source=source,
         model=model,
         action_executor=executor,
         cooldown_s=30.0,
         lang="en",
+        event_sink=events.append,
     )
     try:
         stats = loop.run(max_frames=2, auto_help_every_n_frames=1)
@@ -162,6 +165,9 @@ def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path:
     assert stats["cache_hits"] == 1
     assert len(model.calls) == 1
     assert len(executor.calls) == 2
+    tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
+    assert len(tutor_response_payloads) == 2
+    assert tutor_response_payloads[0]["response_id"] != tutor_response_payloads[1]["response_id"]
 
 
 def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys) -> None:
@@ -185,6 +191,32 @@ def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys
         loop.close()
 
     assert len(executor.calls) == 0
+    out = capsys.readouterr().out
+    assert "dry_run_actions" in out
+    assert "apu_switch" in out
+
+
+def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_path: Path, capsys) -> None:
+    replay_path = tmp_path / "bios_dry_run_exec.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 11.5, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor(include_dry_run=True, dry_run=True)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        dry_run_overlay=True,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
     out = capsys.readouterr().out
     assert "dry_run_actions" in out
     assert "apu_switch" in out
