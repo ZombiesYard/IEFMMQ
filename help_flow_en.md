@@ -86,6 +86,7 @@ Notes:
   - Deduplicate `overlay.targets` and keep at most one primary highlight target by default
   - Unknown/unmappable targets are dropped and recorded under `TutorResponse.metadata.rejected_targets`
   - `click/execute` actions are forbidden
+  - Runtime execution is enforced by `adapters/action_executor.py`: allowlist check, `max_targets=1` default, and system-controlled TTL/pulse (LLM can only choose target)
 - `TutorResponse.metadata`:
   - Record `provider=qwen|fallback`
   - Record validation/repair result plus `diagnosis`, `next`, and `confidence`
