@@ -110,6 +110,11 @@ def _load_overlay_allowlist(pack_path: Path, ui_map_path: Path) -> list[str]:
             raise ValueError(f"pack.ui_targets[{idx}] must be non-empty string: {pack_path}")
         if target in base:
             narrowed.add(target)
+    if not narrowed:
+        raise ValueError(
+            "pack.ui_targets narrows overlay allowlist to zero valid targets; "
+            f"check ui_map consistency: {pack_path}"
+        )
     return sorted(narrowed)
 
 
@@ -209,6 +214,8 @@ class ReplayBiosReceiver:
             try:
                 obj = json.loads(text)
             except json.JSONDecodeError as exc:
+                self.is_exhausted = True
+                self.close()
                 raise ValueError(f"{self.path}:{self._lineno} invalid JSON: {exc}") from exc
             if isinstance(obj, Mapping):
                 return dict(obj)
@@ -583,9 +590,9 @@ class LiveDcsTutorLoop:
             missing_conditions = hint.get("missing_conditions", []) if isinstance(hint, Mapping) else []
             if not isinstance(missing_conditions, list):
                 missing_conditions = []
+            self._stats.model_calls += 1
             try:
                 response = self.model.explain_error(obs, request)
-                self._stats.model_calls += 1
             except Exception as exc:
                 response = TutorResponse(
                     status="error",

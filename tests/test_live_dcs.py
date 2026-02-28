@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 from core.types import Observation, TutorResponse
-from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver, StdinHelpTrigger
+from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver, StdinHelpTrigger, _load_overlay_allowlist
 
 
 def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
@@ -55,6 +55,14 @@ class RecordingModel:
                 },
             },
         )
+
+
+class FailingModel:
+    def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+        return self.explain_error(observation, request)
+
+    def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+        raise RuntimeError("model unavailable")
 
 
 class RecordingExecutor:
@@ -243,6 +251,8 @@ def test_replay_receiver_streams_and_only_parses_on_demand(tmp_path: Path) -> No
             assert False, "expected ValueError for invalid second line"
         except ValueError as exc:
             assert "invalid JSON" in str(exc)
+            assert source.is_exhausted is True
+            assert source._fh.closed is True
     finally:
         source.close()
 
@@ -277,3 +287,53 @@ def test_stdin_help_trigger_reader_does_not_enqueue_after_stop_set_during_input(
     monkeypatch.setattr(builtins, "input", _fake_input)
     trigger._reader()
     assert trigger.poll() is False
+
+
+def test_load_overlay_allowlist_raises_when_pack_ui_targets_narrow_to_zero(tmp_path: Path) -> None:
+    ui_map = tmp_path / "ui_map.yaml"
+    pack = tmp_path / "pack.yaml"
+    ui_map.write_text(
+        "version: v1\n"
+        "cockpit_elements:\n"
+        "  apu_switch:\n"
+        "    dcs_id: pnt_375\n",
+        encoding="utf-8",
+    )
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "ui_targets:\n"
+        "  - not_in_ui_map\n",
+        encoding="utf-8",
+    )
+
+    try:
+        _load_overlay_allowlist(pack, ui_map)
+        assert False, "expected ValueError when narrowed allowlist is empty"
+    except ValueError as exc:
+        assert "narrows overlay allowlist to zero valid targets" in str(exc)
+
+
+def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_model_error.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 13.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = FailingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 1
+    assert stats["model_calls"] == 1
+    assert len(executor.calls) == 1
+    assert executor.calls[0] == []
