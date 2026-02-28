@@ -74,6 +74,8 @@ def test_mapping_rejects_unknown_target_into_metadata() -> None:
     assert payload["metadata"]["rejected_targets"] == ["unknown_target"]
     assert payload["metadata"]["overlay_mapping_failures"][0]["target"] == "unknown_target"
     assert payload["metadata"]["overlay_mapping_failures"][0]["error_type"] == "KeyError"
+    assert payload["metadata"]["overlay_mapping_failures"][0]["error_code"] == "target_not_mapped"
+    assert "error" not in payload["metadata"]["overlay_mapping_failures"][0]
     _validate_tutor_response(payload)
 
 
@@ -168,3 +170,17 @@ def test_mapping_skips_planner_loading_when_no_selected_targets(monkeypatch) -> 
     assert payload["actions"] == []
     assert calls["count"] == 0
     assert "overlay_mapping_error" not in payload["metadata"]
+
+
+def test_mapping_sanitizes_planner_initialization_error_metadata() -> None:
+    bad_path = Path("this/path/does/not/exist/ui_map.yaml")
+    res = map_help_response_to_tutor_response(
+        {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]},
+        ui_map_path=bad_path,
+    )
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_mapping_error"]["error_code"] == "ui_map_not_found"
+    assert payload["metadata"]["overlay_mapping_error"]["error_type"] == "FileNotFoundError"
+    assert isinstance(payload["metadata"]["overlay_mapping_error"], dict)

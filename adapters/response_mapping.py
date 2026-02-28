@@ -51,6 +51,16 @@ def _append_mapping_error(metadata: dict[str, Any], reason: str) -> None:
         metadata["mapping_error"] = reason
 
 
+def _overlay_error_code(exc: Exception) -> str:
+    if isinstance(exc, FileNotFoundError):
+        return "ui_map_not_found"
+    if isinstance(exc, KeyError):
+        return "target_not_mapped"
+    if isinstance(exc, ValueError):
+        return "ui_map_invalid"
+    return "overlay_mapping_failed"
+
+
 def map_help_response_to_tutor_response(
     help_obj: Mapping[str, Any] | None,
     *,
@@ -106,12 +116,15 @@ def map_help_response_to_tutor_response(
         )
 
     planner: OverlayPlanner | None = None
-    planner_error: str | None = None
+    planner_error: dict[str, str] | None = None
     try:
         resolved_ui_map = _resolve_ui_map_path(ui_map_path)
         planner = _get_overlay_planner(str(resolved_ui_map))
     except Exception as exc:  # pragma: no cover - defensive path
-        planner_error = f"{type(exc).__name__}: {exc}"
+        planner_error = {
+            "error_type": type(exc).__name__,
+            "error_code": _overlay_error_code(exc),
+        }
 
     if planner is None:
         rejected_targets.extend(selected_targets)
@@ -128,7 +141,7 @@ def map_help_response_to_tutor_response(
                     {
                         "target": target,
                         "error_type": type(exc).__name__,
-                        "error": str(exc),
+                        "error_code": _overlay_error_code(exc),
                     }
                 )
         if overlay_failures:
