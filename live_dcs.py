@@ -212,6 +212,8 @@ class ReplayBiosReceiver:
                 raise ValueError(f"{self.path}:{self._lineno} invalid JSON: {exc}") from exc
             if isinstance(obj, Mapping):
                 return dict(obj)
+            # Ignore non-mapping JSON values and keep scanning the stream.
+            continue
 
     def _extract_frame(self, item: Mapping[str, Any]) -> dict[str, Any] | None:
         if item.get("schema_version") == "v2" and isinstance(item.get("bios"), Mapping):
@@ -252,12 +254,18 @@ class StdinHelpTrigger:
         self._stop = threading.Event()
         self._queue: queue.SimpleQueue[None] = queue.SimpleQueue()
         self._thread = threading.Thread(target=self._reader, daemon=True)
+        self._close_wait_timeout_s = 0.2
+        self.close_pending_input = False
 
     def start(self) -> None:
         self._thread.start()
 
     def close(self) -> None:
         self._stop.set()
+        if self._thread.is_alive():
+            # input() can block; wait briefly, then mark that stdin is still pending.
+            self._thread.join(timeout=self._close_wait_timeout_s)
+        self.close_pending_input = self._thread.is_alive()
 
     def poll(self) -> bool:
         try:
@@ -271,6 +279,8 @@ class StdinHelpTrigger:
             try:
                 line = input()
             except EOFError:
+                return
+            if self._stop.is_set():
                 return
             if line.strip().lower() in {"", "help", "h", "?"}:
                 self._queue.put(None)

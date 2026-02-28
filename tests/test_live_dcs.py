@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import json
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,7 @@ from typing import Any
 import yaml
 
 from core.types import Observation, TutorResponse
-from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
+from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver, StdinHelpTrigger
 
 
 def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
@@ -244,3 +245,35 @@ def test_replay_receiver_streams_and_only_parses_on_demand(tmp_path: Path) -> No
             assert "invalid JSON" in str(exc)
     finally:
         source.close()
+
+
+def test_replay_receiver_skips_non_mapping_json_values(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_non_mapping_values.jsonl"
+    replay_path.write_text(
+        "[]\n"
+        + json.dumps(_bios_frame(7, 20.0, apu_switch=1), ensure_ascii=False)
+        + "\n",
+        encoding="utf-8",
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        assert obs.payload["seq"] == 7
+    finally:
+        source.close()
+
+
+def test_stdin_help_trigger_reader_does_not_enqueue_after_stop_set_during_input(
+    monkeypatch,
+) -> None:
+    trigger = StdinHelpTrigger()
+
+    def _fake_input() -> str:
+        trigger._stop.set()
+        return "help"
+
+    monkeypatch.setattr(builtins, "input", _fake_input)
+    trigger._reader()
+    assert trigger.poll() is False
