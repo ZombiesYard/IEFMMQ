@@ -228,23 +228,24 @@ def enrich_bios_observation(
     seq = _as_int(payload.get("seq"))
     t_wall = _as_float(payload.get("t_wall"))
     sanitized = sanitizer.sanitize_delta(delta_map, t_wall=t_wall, seq=seq)
+    per_obs_summary = aggregate_delta_window([sanitized], policy=policy, mapper=mapper)
 
     if delta_aggregator is not None:
-        summary = delta_aggregator.add(sanitized)
+        window_summary = delta_aggregator.add(sanitized)
     else:
-        summary = aggregate_delta_window([sanitized], policy=policy, mapper=mapper)
+        window_summary = per_obs_summary
 
     if delta_event_sink is not None:
-        emit_delta_sanitized_event(summary, related_id=obs.observation_id, event_sink=delta_event_sink)
+        emit_delta_sanitized_event(window_summary, related_id=obs.observation_id, event_sink=delta_event_sink)
 
-    recent_ui_targets = summary.recent_ui_targets[: max(0, max_recent_ui_targets)]
+    recent_ui_targets = window_summary.recent_ui_targets[: max(0, max_recent_ui_targets)]
     fallback_summary = _build_delta_summary(sanitized.kept, max_delta_keys)
     delta_summary = {
         **fallback_summary,
         "delta_count": sanitized.kept_count,
         "raw_delta_count": sanitized.raw_count,
-        "dropped_stats": summary.dropped_stats,
-        "recent_key_changes_topk": summary.recent_key_changes_topk,
+        "dropped_stats": per_obs_summary.dropped_stats,
+        "recent_key_changes_topk": per_obs_summary.recent_key_changes_topk,
     }
 
     compact_payload = {
@@ -254,6 +255,14 @@ def enrich_bios_observation(
         "delta_summary": delta_summary,
         "recent_ui_targets": recent_ui_targets,
     }
+    if delta_aggregator is not None:
+        compact_payload["delta_window_summary"] = {
+            "window_size": window_summary.window_size,
+            "raw_changes_total": window_summary.raw_changes_total,
+            "kept_changes_total": window_summary.kept_changes_total,
+            "dropped_stats": window_summary.dropped_stats,
+            "recent_key_changes_topk": window_summary.recent_key_changes_topk,
+        }
 
     metadata = dict(obs.metadata or {})
     if "seq" not in metadata and compact_payload["seq"] is not None:
@@ -262,7 +271,8 @@ def enrich_bios_observation(
         metadata["delta_count"] = sanitized.kept_count
     if "raw_delta_count" not in metadata:
         metadata["raw_delta_count"] = sanitized.raw_count
-    metadata["delta_dropped_count"] = int(summary.dropped_stats.get("dropped_total", 0))
+    if "delta_dropped_count" not in metadata:
+        metadata["delta_dropped_count"] = sanitized.dropped_count
 
     should_hash = include_bios_hash if include_bios_hash is not None else debug_cache is not None
     bios_hash: str | None = None

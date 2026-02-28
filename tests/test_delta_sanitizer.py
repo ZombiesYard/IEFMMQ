@@ -123,6 +123,11 @@ def test_from_yaml_invalid_yaml_raises_delta_policy_error() -> None:
         DeltaPolicy.from_yaml(invalid)
 
 
+def test_from_yaml_bool_max_changes_uses_default() -> None:
+    policy = DeltaPolicy.from_yaml(FIXTURE_DIR / "delta_policy_bool_max_changes.yaml")
+    assert policy.max_changes_per_window == 12
+
+
 def test_delta_policy_normalizes_mutable_inputs_to_immutable_fields() -> None:
     debounce = {"ENGINE_CRANK_SW": 300}
     epsilon = {"SAI_PITCH": 8.0}

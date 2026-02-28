@@ -129,12 +129,14 @@ class DeltaPolicy:
             raise DeltaPolicyError(f"delta policy must be mapping: {p}")
 
         max_changes = raw.get("max_changes_per_window", 12)
+        if isinstance(max_changes, bool) or not isinstance(max_changes, (int, float)):
+            max_changes = 12
         return cls(
             ignore_bios_prefixes=raw.get("ignore_bios_prefixes", []),
             ignore_bios_keys=raw.get("ignore_bios_keys", []),
             debounce_ms_by_key=raw.get("debounce_ms_by_key", {}),
             epsilon_by_key=raw.get("epsilon_by_key", {}),
-            max_changes_per_window=max_changes if isinstance(max_changes, (int, float)) else 12,
+            max_changes_per_window=max_changes,
             important_bios_keys=raw.get("important_bios_keys", []),
         )
 

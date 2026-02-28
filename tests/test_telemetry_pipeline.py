@@ -243,6 +243,56 @@ def test_enrich_bios_observation_sanitizes_delta_and_emits_stats_event() -> None
     assert "recent_key_changes_topk" not in events[0].payload
 
 
+def test_enrich_bios_observation_separates_per_obs_and_window_delta_summary() -> None:
+    policy = _delta_policy()
+    sanitizer = DeltaSanitizer(policy)
+    aggregator = DeltaAggregator(policy, mapper=_mapper(), window_size=5)
+
+    obs1 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 111,
+            "t_wall": 111.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "01"},
+            "delta": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "01"},
+        },
+    )
+    obs2 = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 112,
+            "t_wall": 112.0,
+            "bios": {"ENGINE_CRANK_SW": 1},
+            "delta": {"ENGINE_CRANK_SW": 1},
+        },
+    )
+
+    enrich_bios_observation(
+        obs1,
+        _resolver(),
+        mapper=_mapper(),
+        delta_policy=policy,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=aggregator,
+    )
+    second = enrich_bios_observation(
+        obs2,
+        _resolver(),
+        mapper=_mapper(),
+        delta_policy=policy,
+        delta_sanitizer=sanitizer,
+        delta_aggregator=aggregator,
+    )
+
+    assert second.payload["delta_summary"]["dropped_stats"]["dropped_total"] == 0
+    assert second.payload["delta_window_summary"]["dropped_stats"]["dropped_total"] == 1
+    per_obs_keys = [row["key"] for row in second.payload["delta_summary"]["recent_key_changes_topk"]]
+    win_keys = [row["key"] for row in second.payload["delta_window_summary"]["recent_key_changes_topk"]]
+    assert per_obs_keys == ["ENGINE_CRANK_SW"]
+    assert "BATTERY_SW" in win_keys
+    assert second.metadata["delta_dropped_count"] == 0
+
+
 def test_enrich_bios_observation_default_sanitizer_keeps_state_across_calls(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
@@ -324,6 +374,22 @@ def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_
     assert enriched.payload["delta_summary"]["raw_delta_count"] == 2
     assert enriched.metadata["delta_count"] == 1
     assert enriched.metadata["raw_delta_count"] == 2
+
+
+def test_enrich_bios_observation_keeps_existing_delta_dropped_count_metadata() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 402,
+            "t_wall": 402.0,
+            "bios": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+            "delta": {"BATTERY_SW": 2, "IFEI_CLOCK_S": "59"},
+        },
+        metadata={"delta_dropped_count": 99},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+    assert enriched.metadata["delta_dropped_count"] == 99
 
 
 def test_enrich_bios_observation_rejects_mismatched_policy_and_sanitizer() -> None:
