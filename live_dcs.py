@@ -191,22 +191,27 @@ class ReplayBiosReceiver:
     def __init__(self, path: str | Path, source: str = "dcs_bios_replay") -> None:
         self.path = Path(path)
         self.source = source
-        self._items = list(self._iter_items(self.path))
-        self._idx = 0
+        self._fh = self.path.open("r", encoding="utf-8")
+        self._lineno = 0
         self.is_exhausted = False
 
-    def _iter_items(self, path: Path) -> Iterable[dict[str, Any]]:
-        with path.open("r", encoding="utf-8") as f:
-            for lineno, line in enumerate(f, start=1):
-                text = line.strip()
-                if not text:
-                    continue
-                try:
-                    obj = json.loads(text)
-                except json.JSONDecodeError as exc:
-                    raise ValueError(f"{path}:{lineno} invalid JSON: {exc}") from exc
-                if isinstance(obj, Mapping):
-                    yield dict(obj)
+    def _next_item(self) -> dict[str, Any] | None:
+        while True:
+            line = self._fh.readline()
+            if not line:
+                self.is_exhausted = True
+                self.close()
+                return None
+            self._lineno += 1
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                obj = json.loads(text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{self.path}:{self._lineno} invalid JSON: {exc}") from exc
+            if isinstance(obj, Mapping):
+                return dict(obj)
 
     def _extract_frame(self, item: Mapping[str, Any]) -> dict[str, Any] | None:
         if item.get("schema_version") == "v2" and isinstance(item.get("bios"), Mapping):
@@ -223,9 +228,10 @@ class ReplayBiosReceiver:
         return None
 
     def get_observation(self) -> Observation | None:
-        while self._idx < len(self._items):
-            item = self._items[self._idx]
-            self._idx += 1
+        while True:
+            item = self._next_item()
+            if item is None:
+                return None
             frame = self._extract_frame(item)
             if frame is None:
                 continue
@@ -234,10 +240,10 @@ class ReplayBiosReceiver:
             if seq is not None:
                 meta["seq"] = seq
             return Observation(source=self.source, payload=frame, metadata=meta)
-        self.is_exhausted = True
-        return None
 
     def close(self) -> None:
+        if not self._fh.closed:
+            self._fh.close()
         self.is_exhausted = True
 
 
@@ -439,12 +445,12 @@ class LiveDcsTutorLoop:
         if self.lang == "zh":
             if inferred_step_id and missing_conditions:
                 return (
-                    f"Fallback: likely stuck at {inferred_step_id}; "
-                    f"please satisfy: {'; '.join(missing_conditions)}."
+                    f"降级提示：你大概率卡在 {inferred_step_id}，"
+                    f"请先满足：{'; '.join(missing_conditions)}。"
                 )
             if inferred_step_id:
-                return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
-            return "Fallback: unable to infer current blocked step."
+                return f"降级提示：你大概率卡在 {inferred_step_id}，请先检查并执行该步骤。"
+            return "降级提示：暂时无法推断当前卡住步骤，请先检查关键前置条件后再触发 Help。"
         if inferred_step_id and missing_conditions:
             return (
                 f"Fallback: likely stuck at {inferred_step_id}; "
@@ -477,6 +483,35 @@ class LiveDcsTutorLoop:
         if (not response.explanations) and mapped.explanations:
             response.explanations = list(mapped.explanations)
         return list(mapped.actions), mapped_meta
+
+    def _dry_run_report_from_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> dict[str, Any]:
+        previews: list[dict[str, Any]] = []
+        for action in actions:
+            if not isinstance(action, Mapping):
+                continue
+            previews.append(
+                {
+                    "type": action.get("type"),
+                    "intent": action.get("intent"),
+                    "target": action.get("target"),
+                    "element_id": action.get("element_id"),
+                }
+            )
+        if previews:
+            for preview in previews:
+                self._emit_event(kind="overlay_dry_run", payload=preview, t_wall=time.time())
+        return {
+            "executed": [],
+            "rejected": [],
+            "dropped": [],
+            "dry_run": previews,
+        }
+
+    def _execute_or_dry_run_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> dict[str, Any]:
+        if self.dry_run_overlay:
+            return self._dry_run_report_from_actions(actions)
+        overlay_raw_report = self.action_executor.execute_actions(actions)
+        return _normalize_help_report(overlay_raw_report)
 
     def run_help_cycle(self) -> tuple[TutorResponse | None, dict[str, Any] | None]:
         obs = self._latest_enriched_obs
@@ -511,8 +546,7 @@ class LiveDcsTutorLoop:
             response.metadata["prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
-            overlay_raw_report = self.action_executor.execute_actions(response.actions)
-            overlay_report = _normalize_help_report(overlay_raw_report)
+            overlay_report = self._execute_or_dry_run_actions(response.actions)
         else:
             hint = request.context.get("deterministic_step_hint", {})
             inferred_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
@@ -551,8 +585,7 @@ class LiveDcsTutorLoop:
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
 
-            overlay_raw_report = self.action_executor.execute_actions(response.actions)
-            overlay_report = _normalize_help_report(overlay_raw_report)
+            overlay_report = self._execute_or_dry_run_actions(response.actions)
             self._help_cache = HelpCacheEntry(
                 state_key=state_key,
                 t_wall=now_wall,
@@ -667,8 +700,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="0.0.0.0", help="DCS-BIOS UDP bind host (default 0.0.0.0)")
     parser.add_argument("--port", type=int, default=7790, help="DCS-BIOS UDP bind port (default 7790)")
     parser.add_argument("--timeout", type=float, default=0.2, help="Receiver socket timeout seconds")
-    parser.add_argument("--merge-full-state", action="store_true", default=True, help="Merge BIOS deltas to full state")
-    parser.add_argument("--no-merge-full-state", dest="merge_full_state", action="store_false")
+    merge_group = parser.add_mutually_exclusive_group()
+    merge_group.add_argument(
+        "--merge-full-state",
+        dest="merge_full_state",
+        action="store_true",
+        help="Merge BIOS deltas to full state (default: enabled)",
+    )
+    merge_group.add_argument(
+        "--no-merge-full-state",
+        dest="merge_full_state",
+        action="store_false",
+        help="Disable full-state merge; use delta-only payload as bios state",
+    )
+    parser.set_defaults(merge_full_state=True)
 
     parser.add_argument("--pack", default=str(_default_pack_path()), help="pack.yaml path")
     parser.add_argument("--ui-map", default=str(_default_ui_map_path()), help="ui_map.yaml path")

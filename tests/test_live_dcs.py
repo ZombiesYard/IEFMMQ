@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from core.types import Observation, TutorResponse
 from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
 
@@ -76,6 +78,13 @@ def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _apu_element_id_from_ui_map() -> str:
+    repo_root = Path(__file__).resolve().parents[1]
+    ui_map_path = repo_root / "packs" / "fa18c_startup" / "ui_map.yaml"
+    ui_map = yaml.safe_load(ui_map_path.read_text(encoding="utf-8"))
+    return str(ui_map["cockpit_elements"]["apu_switch"]["dcs_id"])
+
+
 def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_one.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
@@ -114,7 +123,7 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
     assert executor.calls[0][0]["target"] == "apu_switch"
-    assert executor.calls[0][0]["element_id"] == "pnt_375"
+    assert executor.calls[0][0]["element_id"] == _apu_element_id_from_ui_map()
 
     kinds = [event.kind for event in events]
     assert "observation" in kinds
@@ -175,6 +184,31 @@ def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys
     finally:
         loop.close()
 
+    assert len(executor.calls) == 0
     out = capsys.readouterr().out
     assert "dry_run_actions" in out
     assert "apu_switch" in out
+
+
+def test_replay_receiver_streams_and_only_parses_on_demand(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_streaming.jsonl"
+    replay_path.write_text(
+        json.dumps(_bios_frame(1, 12.0, apu_switch=0), ensure_ascii=False)
+        + "\n"
+        + "{bad-json}\n",
+        encoding="utf-8",
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    try:
+        first = source.get_observation()
+        assert first is not None
+        assert first.payload["seq"] == 1
+
+        try:
+            source.get_observation()
+            assert False, "expected ValueError for invalid second line"
+        except ValueError as exc:
+            assert "invalid JSON" in str(exc)
+    finally:
+        source.close()

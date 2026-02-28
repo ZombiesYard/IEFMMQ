@@ -227,9 +227,12 @@ python live_dcs.py \
   --model-provider openai_compat \
   --model-name Qwen3-8B-Instruct \
   --model-base-url http://127.0.0.1:8000 \
-  --model-api-key "$env:SIMTUTOR_MODEL_API_KEY" \
+  --model-api-key "${SIMTUTOR_MODEL_API_KEY}" \
   --output logs/live_dcs_live.jsonl
 ```
+Note:
+- If you run inside WSL2 Ubuntu/bash, use `${SIMTUTOR_MODEL_API_KEY}`.
+- If you run from Windows PowerShell, use `$env:SIMTUTOR_MODEL_API_KEY`.
 
 Optional stdin help trigger:
 ```sh
