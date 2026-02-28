@@ -65,7 +65,7 @@ class BaseHelpModel(ModelPort):
         start = perf_counter()
         deterministic_inference = StepInferenceResult(
             inferred_step_id=observation.procedure_hint if isinstance(observation.procedure_hint, str) else None,
-            missing_conditions=[],
+            missing_conditions=(),
         )
         recent_ui_targets: list[str] = []
         deterministic_inference_error: str | None = None
@@ -178,7 +178,6 @@ class BaseHelpModel(ModelPort):
             "vars": context.get("vars"),
             "recent_deltas": context.get("recent_deltas"),
             "recent_actions": context.get("recent_actions"),
-            "recent_ui_targets": normalized_recent_ui_targets,
             "gates": context.get("gates"),
             "rag_topk": context.get("rag_topk"),
             "observation": {
@@ -216,7 +215,7 @@ class BaseHelpModel(ModelPort):
         if inference.inferred_step_id is None and isinstance(observation.procedure_hint, str) and observation.procedure_hint:
             inference = StepInferenceResult(
                 inferred_step_id=observation.procedure_hint,
-                missing_conditions=list(inference.missing_conditions),
+                missing_conditions=tuple(inference.missing_conditions),
             )
         return inference, recent_ui_targets
 

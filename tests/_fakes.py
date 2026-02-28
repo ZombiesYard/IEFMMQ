@@ -47,7 +47,7 @@ class FakeClient:
         return self._responses.pop(0)
 
 
-def extract_prompt_constraints_json(prompt: str) -> dict[str, Any]:
+def _extract_prompt_constraints_json(prompt: str) -> dict[str, Any]:
     marker = "Context and constraints JSON:\n"
     start = prompt.index(marker) + len(marker)
     end = prompt.index("\nOutput must follow this schema shape exactly:")

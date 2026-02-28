@@ -20,7 +20,7 @@ _MAX_RECENT_UI_TARGETS = 12
 @dataclass(frozen=True)
 class StepInferenceResult:
     inferred_step_id: str | None
-    missing_conditions: list[str]
+    missing_conditions: tuple[str, ...]
 
 
 def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]:
@@ -141,7 +141,7 @@ def infer_step_id(
     """
     step_ids = _ordered_step_ids(pack_steps)
     if not step_ids:
-        return StepInferenceResult(inferred_step_id=None, missing_conditions=[])
+        return StepInferenceResult(inferred_step_id=None, missing_conditions=())
 
     s01 = _pick_step_id(step_ids, "S01", 0)
     s02 = _pick_step_id(step_ids, "S02", 1)
@@ -279,7 +279,7 @@ def _result(
         filtered.append(item)
         if len(filtered) >= _MAX_MISSING_CONDITIONS:
             break
-    return StepInferenceResult(inferred_step_id=inferred_step_id, missing_conditions=filtered)
+    return StepInferenceResult(inferred_step_id=inferred_step_id, missing_conditions=tuple(filtered))
 
 
 def _as_bool(value: Any) -> bool | None:

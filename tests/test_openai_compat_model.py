@@ -4,10 +4,10 @@ from core.types import Observation
 from tests._fakes import (
     FakeClient,
     FakeResponse,
+    _extract_prompt_constraints_json,
     _help_obj_ok,
     _openai_chat_payload_from_help_obj,
     _request_help,
-    extract_prompt_constraints_json,
 )
 
 
@@ -44,7 +44,7 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert call["json"]["temperature"] == 0
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0
-    prompt_payload = extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
+    prompt_payload = _extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
     assert "deterministic_step_hint" in prompt_payload
     assert "inferred_step_id" in prompt_payload["deterministic_step_hint"]
 
@@ -194,6 +194,50 @@ def test_explain_error_handles_deterministic_inference_exception(monkeypatch) ->
     assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S03" in (res.message or "")
     assert res.metadata["deterministic_step_hint"]["inferred_step_id"] == "S03"
     assert res.metadata["deterministic_inference_error"] == "RuntimeError: inference boom"
+
+
+def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -> None:
+    fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
+    model = OpenAICompatModel(client=fake, lang="en")
+    req = _request_help()
+    req.context["candidate_steps"] = ["S03", "S04"]
+    req.context["vars"] = {"power_available": True, "apu_on": True, "apu_ready": False}
+    req.context["recent_ui_targets"] = ["apu_switch"]
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "error"
+    assert res.message == "You are likely stuck at S03. Please satisfy: vars.apu_ready==true."
+
+
+def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions() -> None:
+    fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
+    model = OpenAICompatModel(client=fake, lang="en")
+    req = _request_help()
+    req.context["vars"] = {
+        "power_available": True,
+        "apu_ready": True,
+        "engine_crank_right": True,
+        "rpm_r": 65,
+        "bleed_air_norm": True,
+    }
+    req.context["recent_ui_targets"] = ["bleed_air_knob", "eng_crank_switch"]
+
+    res = model.explain_error(Observation(source="mock"), req)
+
+    assert res.status == "error"
+    assert res.message == "You are likely stuck at S07. Please re-check and execute that step."
+
+
+def test_explain_error_en_fallback_without_inferred_step(monkeypatch) -> None:
+    fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
+    model = OpenAICompatModel(client=fake, lang="en")
+    monkeypatch.setattr("adapters.base_help_model.load_pack_steps", lambda: [])
+
+    res = model.explain_error(Observation(source="mock"), _request_help())
+
+    assert res.status == "error"
+    assert res.message == "Unable to generate help response, please check the current system status and try again."
 
 
 def test_prompt_is_stable_for_same_input() -> None:

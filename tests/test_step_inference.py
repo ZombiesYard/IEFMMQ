@@ -40,7 +40,7 @@ def test_infer_step_s02_when_fire_test_is_still_active() -> None:
         [],
     )
     assert result.inferred_step_id == "S02"
-    assert result.missing_conditions == ["vars.fire_test_active==false (complete FIRE TEST A/B)"]
+    assert result.missing_conditions == ("vars.fire_test_active==false (complete FIRE TEST A/B)",)
 
 
 def test_infer_step_s03_when_apu_not_ready() -> None:
@@ -70,7 +70,7 @@ def test_infer_step_s05_when_rpm_below_25() -> None:
         ["eng_crank_switch"],
     )
     assert result.inferred_step_id == "S05"
-    assert result.missing_conditions == ["vars.rpm_r>=25"]
+    assert result.missing_conditions == ("vars.rpm_r>=25",)
 
 
 def test_infer_step_s06_when_rpm_over_60_but_bleed_action_missing() -> None:
@@ -90,7 +90,7 @@ def test_infer_step_s06_when_rpm_between_25_and_60() -> None:
         ["eng_crank_switch"],
     )
     assert result.inferred_step_id == "S06"
-    assert result.missing_conditions == ["vars.rpm_r>=60"]
+    assert result.missing_conditions == ("vars.rpm_r>=60",)
 
 
 def test_infer_step_is_robust_on_invalid_inputs() -> None:
