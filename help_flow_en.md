@@ -81,7 +81,7 @@ Notes:
   - Use fallback text when explanations are unavailable
 - `TutorResponse.explanations` <- `HelpResponse.explanations`
 - `TutorResponse.actions`:
-  - Only overlay actions are allowed (`highlight/clear`)
+  - Only overlay actions are allowed (`highlight/clear/pulse`)
   - Mapping is done by `adapters/response_mapping.py` and must align with `OverlayIntent.to_action()`
   - Deduplicate `overlay.targets` and keep at most one primary highlight target by default
   - Unknown/unmappable targets are dropped and recorded under `TutorResponse.metadata.rejected_targets`
@@ -128,7 +128,7 @@ Additional constraints:
 ## 7. Safety Boundary (Hard Constraint)
 
 - Allowed:
-  - overlay `highlight|clear`
+  - overlay `highlight|clear|pulse`
 - Forbidden:
   - any auto-click, auto-execution, or control injection (including `performClickableAction`)
 - Enforced order:

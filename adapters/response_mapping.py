@@ -41,6 +41,16 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
     return deduped
 
 
+def _append_mapping_error(metadata: dict[str, Any], reason: str) -> None:
+    errors = metadata.get("mapping_errors")
+    if not isinstance(errors, list):
+        errors = []
+        metadata["mapping_errors"] = errors
+    errors.append(reason)
+    if "mapping_error" not in metadata:
+        metadata["mapping_error"] = reason
+
+
 def map_help_response_to_tutor_response(
     help_obj: Mapping[str, Any] | None,
     *,
@@ -59,7 +69,7 @@ def map_help_response_to_tutor_response(
     effective_overlay_intent = overlay_intent
     if overlay_intent not in allowed_intents:
         effective_overlay_intent = "highlight"
-        metadata["mapping_error"] = f"invalid_overlay_intent:{overlay_intent}"
+        _append_mapping_error(metadata, f"invalid_overlay_intent:{overlay_intent}")
 
     explanations_raw = help_obj.get("explanations") if isinstance(help_obj, Mapping) else None
     explanations = [item for item in explanations_raw if isinstance(item, str) and item] if isinstance(explanations_raw, list) else []
@@ -81,6 +91,20 @@ def map_help_response_to_tutor_response(
 
     rejected_targets: list[str] = []
     actions: list[dict[str, Any]] = []
+    if not selected_targets:
+        effective_status = status
+        if status not in {"ok", "pending", "error"}:
+            effective_status = "error"
+            _append_mapping_error(metadata, f"invalid_status:{status}")
+        return TutorResponse(
+            status=effective_status,
+            in_reply_to=request.request_id if request else None,
+            message=message,
+            actions=actions,
+            explanations=explanations,
+            metadata=metadata,
+        )
+
     planner: OverlayPlanner | None = None
     planner_error: str | None = None
     try:
@@ -116,7 +140,7 @@ def map_help_response_to_tutor_response(
     effective_status = status
     if status not in {"ok", "pending", "error"}:
         effective_status = "error"
-        metadata["mapping_error"] = f"invalid_status:{status}"
+        _append_mapping_error(metadata, f"invalid_status:{status}")
 
     return TutorResponse(
         status=effective_status,
