@@ -41,3 +41,21 @@ During load:
 - Invalid mapping fails fast (`BiosUiMapError`)
 
 This keeps overlay target resolution inside the allowlist boundary.
+
+## ST-011 Implementation Notes
+
+- Module: `adapters/recent_actions.py`
+- Ring buffer: `RecentDeltaRingBuffer(window_s, max_items)`
+  - `window_s`: keep only frames in recent N seconds
+  - `max_items`: hard cap frame count to avoid prompt explosion
+- Projection API:
+  - `project_recent_ui_targets(recent_deltas, bios_to_ui)`
+  - Output is recency-first and stable:
+    1. Newer frame first
+    2. Keep key order inside each frame
+    3. Keep target order in mapping
+    4. Deduplicate by first occurrence
+- Prompt helper:
+  - `build_recent_button_signal(...)` returns:
+    - `current_button`
+    - `recent_buttons`
