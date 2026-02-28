@@ -1,0 +1,180 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from core.types import Observation, TutorResponse
+from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
+
+
+def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
+    return {
+        "schema_version": "v2",
+        "seq": seq,
+        "t_wall": t_wall,
+        "aircraft": "FA-18C_hornet",
+        "bios": {
+            "BATTERY_SW": 2,
+            "L_GEN_SW": 1,
+            "R_GEN_SW": 1,
+            "APU_CONTROL_SW": apu_switch,
+            "APU_READY_LT": 0,
+            "ENGINE_CRANK_SW": 0,
+        },
+        "delta": {"APU_CONTROL_SW": apu_switch},
+    }
+
+
+class RecordingModel:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+        return self.explain_error(observation, request)
+
+    def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+        self.calls.append({"observation": observation, "request": request})
+        return TutorResponse(
+            status="ok",
+            in_reply_to=request.request_id if request else None,
+            message="Turn on APU.",
+            actions=[],
+            explanations=["Turn on APU."],
+            metadata={
+                "provider": "mock_qwen",
+                "help_response": {
+                    "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                    "next": {"step_id": "S03"},
+                    "overlay": {"targets": ["apu_switch"]},
+                    "explanations": ["Turn on APU."],
+                    "confidence": 0.9,
+                },
+            },
+        )
+
+
+class RecordingExecutor:
+    def __init__(self, *, include_dry_run: bool = False) -> None:
+        self.calls: list[list[dict[str, Any]]] = []
+        self.include_dry_run = include_dry_run
+
+    def execute_actions(self, actions):
+        actions_list = [dict(item) for item in actions if isinstance(item, dict)]
+        self.calls.append(actions_list)
+        report = {"executed": actions_list, "rejected": [], "dropped": [], "dry_run": []}
+        if self.include_dry_run:
+            report["dry_run"] = [{"target": item.get("target")} for item in actions_list]
+        return report
+
+    def close(self) -> None:  # pragma: no cover
+        return
+
+
+def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
+    text = "".join(json.dumps(frame, ensure_ascii=False) + "\n" for frame in frames)
+    path.write_text(text, encoding="utf-8")
+
+
+def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_one.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert stats["frames"] == 1
+    assert stats["help_cycles"] == 1
+    assert stats["model_calls"] == 1
+    assert len(model.calls) == 1
+    request = model.calls[0]["request"]
+    assert request is not None
+    assert request.intent == "help"
+    assert "candidate_steps" in request.context
+    assert "recent_deltas" in request.context
+    assert "recent_actions" in request.context
+    assert "deterministic_step_hint" in request.context
+    assert request.metadata["prompt_hash"]
+
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0]) == 1
+    assert executor.calls[0][0]["type"] == "overlay"
+    assert executor.calls[0][0]["target"] == "apu_switch"
+    assert executor.calls[0][0]["element_id"] == "pnt_375"
+
+    kinds = [event.kind for event in events]
+    assert "observation" in kinds
+    assert "tutor_request" in kinds
+    assert "tutor_response" in kinds
+
+
+def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_two.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            _bios_frame(1, 10.0, apu_switch=0),
+            _bios_frame(2, 10.1, apu_switch=0),
+        ],
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=30.0,
+        lang="en",
+    )
+    try:
+        stats = loop.run(max_frames=2, auto_help_every_n_frames=1)
+    finally:
+        loop.close()
+
+    assert stats["frames"] == 2
+    assert stats["help_cycles"] == 2
+    assert stats["model_calls"] == 1
+    assert stats["cache_hits"] == 1
+    assert len(model.calls) == 1
+    assert len(executor.calls) == 2
+
+
+def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys) -> None:
+    replay_path = tmp_path / "bios_dry_run.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 11.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor(include_dry_run=True)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        dry_run_overlay=True,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    out = capsys.readouterr().out
+    assert "dry_run_actions" in out
+    assert "apu_switch" in out

@@ -204,6 +204,39 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
        --output artifacts/dcs_bios_frame_once.json
    ```
 
+## Live DCS Tutor Loop (ST-015)
+- End-to-end runtime for `bios frame -> enrich -> help request -> model -> TutorResponse mapping -> overlay execution`.
+- Supports live UDP and offline replay.
+- Supports `--dry-run-overlay` for prompt/logic iteration without sending UDP commands.
+
+Run with replay (single-sample/offline validation):
+```sh
+python live_dcs.py \
+  --replay-bios artifacts/dcs_bios_frame_once.json \
+  --auto-help-once \
+  --dry-run-overlay \
+  --model-provider stub \
+  --output logs/live_dcs_replay.jsonl
+```
+
+Run with live DCS-BIOS UDP receiver:
+```sh
+python live_dcs.py \
+  --host 0.0.0.0 --port 7790 \
+  --auto-help-every-n-frames 20 \
+  --model-provider openai_compat \
+  --model-name Qwen3-8B-Instruct \
+  --model-base-url http://127.0.0.1:8000 \
+  --model-api-key "$env:SIMTUTOR_MODEL_API_KEY" \
+  --output logs/live_dcs_live.jsonl
+```
+
+Optional stdin help trigger:
+```sh
+python live_dcs.py --stdin-help --dry-run-overlay --model-provider stub
+```
+Then press `Enter` (or type `help`) to trigger a help cycle on current state.
+
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
 - `Doc/Evaluation/Appendix - Training Task Syllabus.md`
