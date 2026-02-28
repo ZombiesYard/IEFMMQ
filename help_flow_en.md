@@ -38,6 +38,9 @@ For `TutorRequest.intent=help`, context passed to model/rule engine may only inc
 - `candidate_steps`
   - Candidate `step_id` list provided by the procedure pack.
   - LLM must not create step IDs outside the pack.
+- `deterministic_step_hint`
+  - Locally inferred fallback hint `{inferred_step_id, missing_conditions, recent_ui_targets}` from pack steps + vars + recent ui targets.
+  - Used both as prompt guidance and deterministic fallback when model output is unavailable/invalid.
 - `overlay_target_allowlist`
   - Derived only from `ui_map.yaml` and optional `pack.ui_targets`.
   - Any target not in allowlist must be dropped.
@@ -98,7 +101,7 @@ Trigger conditions (any one):
 Fallback behavior (deterministic):
 
 - Produce `TutorResponse.status=error` with `metadata.provider=fallback`
-- Return a safe text hint (for example: "Please verify current step preconditions and retry Help.")
+- Return a safe deterministic text hint (for example: "You are likely stuck at S03; please satisfy vars.apu_ready==true and retry Help.")
 - By default, do not send overlay; only send a single safe highlight if local rule can prove a unique safe target
 - Log full failure reason without sensitive data
 

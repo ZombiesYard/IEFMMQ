@@ -9,6 +9,13 @@ from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_meta
 from adapters.prompting import build_help_prompt_result
+from adapters.step_inference import (
+    StepInferenceResult,
+    extract_recent_ui_targets,
+    infer_step_id,
+    load_pack_steps,
+    normalize_recent_ui_targets,
+)
 from core.llm_schema import get_help_response_schema
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
@@ -56,11 +63,28 @@ class BaseHelpModel(ModelPort):
 
     def explain_error(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         start = perf_counter()
+        deterministic_inference = StepInferenceResult(
+            inferred_step_id=observation.procedure_hint if isinstance(observation.procedure_hint, str) else None,
+            missing_conditions=(),
+        )
+        recent_ui_targets: list[str] = []
+        deterministic_inference_error: str | None = None
+        try:
+            deterministic_inference, recent_ui_targets = self._compute_deterministic_inference(observation, request)
+        except Exception as exc:
+            deterministic_inference_error = f"{type(exc).__name__}: {exc}"
+        deterministic_hint = self._serialize_deterministic_hint(deterministic_inference, recent_ui_targets)
         prompt_meta: dict[str, Any] = {}
         delta_dropped_count = self._extract_delta_dropped_count(request)
         prompt_budget_used = 0
         try:
-            messages, prompt_meta = self._build_messages(observation, request)
+            messages, prompt_meta = self._build_messages(
+                observation,
+                request,
+                deterministic_inference=deterministic_inference,
+                recent_ui_targets=recent_ui_targets,
+                deterministic_hint=deterministic_hint,
+            )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
             raw_text = self._chat(messages)
             help_obj, extraction = parse_help_response_with_meta(raw_text)
@@ -88,13 +112,16 @@ class BaseHelpModel(ModelPort):
                     "prompt_budget_used": prompt_budget_used,
                     "delta_dropped_count": delta_dropped_count,
                     "prompt_build": prompt_meta,
+                    "deterministic_step_hint": deterministic_hint,
+                    "deterministic_inference_error": deterministic_inference_error,
                 },
             )
         except Exception as exc:
+            fallback_message = self._build_deterministic_fallback_message(deterministic_inference)
             return TutorResponse(
                 status="error",
                 in_reply_to=request.request_id if request else None,
-                message="Unable to generate help response, please check the current system status and try again.",
+                message=fallback_message,
                 actions=[],
                 metadata={
                     "provider": self.provider,
@@ -105,6 +132,8 @@ class BaseHelpModel(ModelPort):
                     "prompt_budget_used": prompt_budget_used,
                     "delta_dropped_count": delta_dropped_count,
                     "prompt_build": prompt_meta,
+                    "deterministic_step_hint": deterministic_hint,
+                    "deterministic_inference_error": deterministic_inference_error,
                 },
             )
 
@@ -112,6 +141,10 @@ class BaseHelpModel(ModelPort):
         self,
         observation: Observation,
         request: TutorRequest | None,
+        *,
+        deterministic_inference: StepInferenceResult | None = None,
+        recent_ui_targets: list[str] | None = None,
+        deterministic_hint: Mapping[str, Any] | None = None,
     ) -> tuple[list[dict[str, str]], dict[str, Any]]:
         schema = get_help_response_schema()
         schema_step_ids = schema["properties"]["next"]["properties"]["step_id"]["enum"]
@@ -122,9 +155,20 @@ class BaseHelpModel(ModelPort):
         candidate_steps = context.get("candidate_steps")
         if not isinstance(candidate_steps, list) or not candidate_steps:
             candidate_steps = list(schema_step_ids)
+        inference = deterministic_inference
+        inferred_step_id = None
+        if inference is not None:
+            inferred_step_id = inference.inferred_step_id
+        candidate_steps = self._prioritize_inferred_step(candidate_steps, inferred_step_id)
         allowlist = context.get("overlay_target_allowlist")
         if not isinstance(allowlist, list) or not allowlist:
             allowlist = list(schema_targets)
+        normalized_recent_ui_targets = list(recent_ui_targets or [])
+        hint_payload = (
+            dict(deterministic_hint)
+            if isinstance(deterministic_hint, Mapping)
+            else self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
+        )
 
         prompt_context = {
             "intent": request.intent if request else "help",
@@ -141,15 +185,94 @@ class BaseHelpModel(ModelPort):
                 "source": observation.source,
             },
             "error_category_enum": schema_categories,
+            "deterministic_step_hint": hint_payload,
         }
         prompt_result = build_help_prompt_result(prompt_context, self.lang)
+        prompt_meta = dict(prompt_result.metadata)
+        prompt_meta["deterministic_step_hint"] = hint_payload
         return (
             [
                 {"role": "system", "content": "You are SimTutor. Reply with JSON only."},
                 {"role": "user", "content": prompt_result.prompt},
             ],
-            prompt_result.metadata,
+            prompt_meta,
         )
+
+    def _compute_deterministic_inference(
+        self,
+        observation: Observation,
+        request: TutorRequest | None,
+    ) -> tuple[StepInferenceResult, list[str]]:
+        context = request.context if request and isinstance(request.context, dict) else {}
+        inference_vars = self._pick_inference_vars(observation, context)
+        recent_ui_targets = extract_recent_ui_targets(context)
+        if not recent_ui_targets:
+            payload = observation.payload if isinstance(observation.payload, Mapping) else {}
+            recent_ui_targets = normalize_recent_ui_targets(payload.get("recent_ui_targets"))
+
+        pack_steps = load_pack_steps()
+        inference = infer_step_id(pack_steps, inference_vars, recent_ui_targets)
+        if inference.inferred_step_id is None and isinstance(observation.procedure_hint, str) and observation.procedure_hint:
+            inference = StepInferenceResult(
+                inferred_step_id=observation.procedure_hint,
+                missing_conditions=tuple(inference.missing_conditions),
+            )
+        return inference, recent_ui_targets
+
+    def _pick_inference_vars(
+        self,
+        observation: Observation,
+        context: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        vars_raw = context.get("vars")
+        if isinstance(vars_raw, Mapping):
+            return vars_raw
+        payload = observation.payload if isinstance(observation.payload, Mapping) else {}
+        payload_vars = payload.get("vars")
+        if isinstance(payload_vars, Mapping):
+            return payload_vars
+        return {}
+
+    def _prioritize_inferred_step(self, candidate_steps: list[Any], inferred_step_id: str | None) -> list[str]:
+        normalized: list[str] = [step for step in candidate_steps if isinstance(step, str) and step]
+        if not normalized or not inferred_step_id or inferred_step_id not in normalized:
+            return normalized
+        return [inferred_step_id] + [step for step in normalized if step != inferred_step_id]
+
+    def _serialize_deterministic_hint(
+        self,
+        inference: StepInferenceResult | None,
+        recent_ui_targets: list[str],
+    ) -> dict[str, Any]:
+        if inference is None:
+            inferred_step_id = None
+            missing_conditions: list[str] = []
+        else:
+            inferred_step_id = inference.inferred_step_id
+            missing_conditions = list(inference.missing_conditions)
+        return {
+            "inferred_step_id": inferred_step_id,
+            "missing_conditions": missing_conditions,
+            "recent_ui_targets": list(recent_ui_targets),
+        }
+
+    def _build_deterministic_fallback_message(self, inference: StepInferenceResult | None) -> str:
+        inferred_step_id = inference.inferred_step_id if inference else None
+        missing_conditions = list(inference.missing_conditions) if inference else []
+        if self.lang == "zh":
+            if inferred_step_id and missing_conditions:
+                return f"你大概率卡在 {inferred_step_id}，下一步请先满足：{'; '.join(missing_conditions)}。"
+            if inferred_step_id:
+                return f"你大概率卡在 {inferred_step_id}，下一步请按该步骤检查并执行。"
+            return "无法生成模型答复，请先检查当前步骤前置条件后再触发 Help。"
+        if inferred_step_id and missing_conditions:
+            return (
+                f"You are likely stuck at {inferred_step_id}. "
+                f"Please satisfy: {'; '.join(missing_conditions)}."
+            )
+        if inferred_step_id:
+            return f"You are likely stuck at {inferred_step_id}. Please re-check and execute that step."
+        return "Unable to generate help response, please check the current system status and try again."
 
     def _validate_context_bounds(self, help_obj: Mapping[str, Any], request: TutorRequest | None) -> None:
         if request is None or not isinstance(request.context, dict):
