@@ -214,7 +214,7 @@ def _resolve_delta_policy_and_sanitizer(
     delta_sanitizer: DeltaSanitizer | None,
     delta_aggregator: DeltaAggregator | None,
     delta_stream_id: str,
-) -> tuple[DeltaPolicy, DeltaSanitizer, threading.Lock | None]:
+) -> tuple[DeltaPolicy, DeltaSanitizer, threading.Lock]:
     if delta_sanitizer is not None:
         policy = delta_sanitizer.policy
         if delta_policy is not None and delta_policy != policy:
@@ -297,10 +297,7 @@ def enrich_bios_observation(
 
     seq = _as_int(payload.get("seq"))
     t_wall = _as_float(payload.get("t_wall"))
-    if sanitizer_lock is not None:
-        with sanitizer_lock:
-            sanitized = sanitizer.sanitize_delta(delta_map, t_wall=t_wall, seq=seq)
-    else:
+    with sanitizer_lock:
         sanitized = sanitizer.sanitize_delta(delta_map, t_wall=t_wall, seq=seq)
     per_obs_summary = aggregate_delta_window([sanitized], policy=policy, mapper=mapper)
 
