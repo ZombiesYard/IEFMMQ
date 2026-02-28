@@ -23,6 +23,7 @@ MAX_PROMPT_TOKENS_EST = 1800
 MAX_DELTA_SUMMARY_ITEMS = 20
 MAX_RECENT_ACTIONS_SIGNAL_ITEMS = 8
 MAX_MISSING_CONDITIONS_SIGNAL_ITEMS = 8
+MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
@@ -279,7 +280,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
                 continue
             seen_targets.add(normalized)
             recent_ui_targets.append(normalized)
-            if len(recent_ui_targets) >= MAX_RECENT_ACTIONS_SIGNAL_ITEMS:
+            if len(recent_ui_targets) >= MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS:
                 break
     else:
         recent_ui_targets = []

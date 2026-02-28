@@ -33,6 +33,16 @@ def test_infer_step_s02_when_fire_test_not_seen_and_apu_not_started() -> None:
     assert "recent_ui_targets has fire_test_switch" in result.missing_conditions
 
 
+def test_infer_step_s02_when_fire_test_is_still_active() -> None:
+    result = infer_step_id(
+        _pack_steps(),
+        {"power_available": True, "apu_on": False, "apu_ready": False, "fire_test_active": True, "rpm_r": 0},
+        [],
+    )
+    assert result.inferred_step_id == "S02"
+    assert result.missing_conditions == ["vars.fire_test_active==false (complete FIRE TEST A/B)"]
+
+
 def test_infer_step_s03_when_apu_not_ready() -> None:
     result = infer_step_id(
         _pack_steps(),
@@ -71,6 +81,16 @@ def test_infer_step_s06_when_rpm_over_60_but_bleed_action_missing() -> None:
     )
     assert result.inferred_step_id == "S06"
     assert "recent_ui_targets has bleed_air_knob" in result.missing_conditions
+
+
+def test_infer_step_s06_when_rpm_between_25_and_60() -> None:
+    result = infer_step_id(
+        _pack_steps(),
+        {"power_available": True, "apu_ready": True, "engine_crank_right": True, "rpm_r": 45},
+        ["eng_crank_switch"],
+    )
+    assert result.inferred_step_id == "S06"
+    assert result.missing_conditions == ["vars.rpm_r>=60"]
 
 
 def test_infer_step_is_robust_on_invalid_inputs() -> None:

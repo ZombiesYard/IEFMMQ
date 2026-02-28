@@ -74,6 +74,7 @@ class BaseHelpModel(ModelPort):
                 request,
                 deterministic_inference=deterministic_inference,
                 recent_ui_targets=recent_ui_targets,
+                deterministic_hint=deterministic_hint,
             )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
             raw_text = self._chat(messages)
@@ -132,6 +133,7 @@ class BaseHelpModel(ModelPort):
         *,
         deterministic_inference: StepInferenceResult | None = None,
         recent_ui_targets: list[str] | None = None,
+        deterministic_hint: Mapping[str, Any] | None = None,
     ) -> tuple[list[dict[str, str]], dict[str, Any]]:
         schema = get_help_response_schema()
         schema_step_ids = schema["properties"]["next"]["properties"]["step_id"]["enum"]
@@ -151,7 +153,11 @@ class BaseHelpModel(ModelPort):
         if not isinstance(allowlist, list) or not allowlist:
             allowlist = list(schema_targets)
         normalized_recent_ui_targets = list(recent_ui_targets or [])
-        deterministic_hint = self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
+        hint_payload = (
+            dict(deterministic_hint)
+            if isinstance(deterministic_hint, Mapping)
+            else self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
+        )
 
         prompt_context = {
             "intent": request.intent if request else "help",
@@ -169,11 +175,11 @@ class BaseHelpModel(ModelPort):
                 "source": observation.source,
             },
             "error_category_enum": schema_categories,
-            "deterministic_step_hint": deterministic_hint,
+            "deterministic_step_hint": hint_payload,
         }
         prompt_result = build_help_prompt_result(prompt_context, self.lang)
         prompt_meta = dict(prompt_result.metadata)
-        prompt_meta["deterministic_step_hint"] = deterministic_hint
+        prompt_meta["deterministic_step_hint"] = hint_payload
         return (
             [
                 {"role": "system", "content": "You are SimTutor. Reply with JSON only."},

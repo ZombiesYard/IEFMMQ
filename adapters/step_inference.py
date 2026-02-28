@@ -5,6 +5,7 @@ Deterministic startup step inference for model fallback and prompt hints.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -29,20 +30,27 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
     Returns an empty list when file/content is invalid so fallback remains safe.
     """
     path = Path(pack_path) if pack_path else _DEFAULT_PACK_PATH
+    cached_steps = _load_pack_steps_cached(str(path.resolve()))
+    return [dict(step) for step in cached_steps]
+
+
+@lru_cache(maxsize=8)
+def _load_pack_steps_cached(resolved_pack_path: str) -> tuple[dict[str, Any], ...]:
+    path = Path(resolved_pack_path)
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, yaml.YAMLError):
-        return []
+        return ()
     if not isinstance(data, Mapping):
-        return []
+        return ()
     steps = data.get("steps")
     if not isinstance(steps, list):
-        return []
+        return ()
     out: list[dict[str, Any]] = []
     for step in steps:
         if isinstance(step, Mapping):
             out.append(dict(step))
-    return out
+    return tuple(out)
 
 
 def normalize_recent_ui_targets(raw: Any, *, max_items: int = _MAX_RECENT_UI_TARGETS) -> list[str]:
@@ -216,7 +224,7 @@ def infer_step_id(
         return _result(s05, missing)
 
     if rpm_r_gte_60 is not True:
-        return _result(s05, ["vars.rpm_r>=60"])
+        return _result(s06, ["vars.rpm_r>=60"])
 
     bleed_recent = "bleed_air_knob" in recent_set
     if not bleed_recent or bleed_air_norm is not True:
