@@ -63,7 +63,16 @@ class BaseHelpModel(ModelPort):
 
     def explain_error(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         start = perf_counter()
-        deterministic_inference, recent_ui_targets = self._compute_deterministic_inference(observation, request)
+        deterministic_inference = StepInferenceResult(
+            inferred_step_id=observation.procedure_hint if isinstance(observation.procedure_hint, str) else None,
+            missing_conditions=[],
+        )
+        recent_ui_targets: list[str] = []
+        deterministic_inference_error: str | None = None
+        try:
+            deterministic_inference, recent_ui_targets = self._compute_deterministic_inference(observation, request)
+        except Exception as exc:
+            deterministic_inference_error = f"{type(exc).__name__}: {exc}"
         deterministic_hint = self._serialize_deterministic_hint(deterministic_inference, recent_ui_targets)
         prompt_meta: dict[str, Any] = {}
         delta_dropped_count = self._extract_delta_dropped_count(request)
@@ -104,6 +113,7 @@ class BaseHelpModel(ModelPort):
                     "delta_dropped_count": delta_dropped_count,
                     "prompt_build": prompt_meta,
                     "deterministic_step_hint": deterministic_hint,
+                    "deterministic_inference_error": deterministic_inference_error,
                 },
             )
         except Exception as exc:
@@ -123,6 +133,7 @@ class BaseHelpModel(ModelPort):
                     "delta_dropped_count": delta_dropped_count,
                     "prompt_build": prompt_meta,
                     "deterministic_step_hint": deterministic_hint,
+                    "deterministic_inference_error": deterministic_inference_error,
                 },
             )
 

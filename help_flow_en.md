@@ -39,7 +39,7 @@ For `TutorRequest.intent=help`, context passed to model/rule engine may only inc
   - Candidate `step_id` list provided by the procedure pack.
   - LLM must not create step IDs outside the pack.
 - `deterministic_step_hint`
-  - Locally inferred fallback hint `{inferred_step_id, missing_conditions}` from pack steps + vars + recent ui targets.
+  - Locally inferred fallback hint `{inferred_step_id, missing_conditions, recent_ui_targets}` from pack steps + vars + recent ui targets.
   - Used both as prompt guidance and deterministic fallback when model output is unavailable/invalid.
 - `overlay_target_allowlist`
   - Derived only from `ui_map.yaml` and optional `pack.ui_targets`.

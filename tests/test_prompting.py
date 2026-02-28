@@ -1,5 +1,3 @@
-﻿import json
-
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
     MAX_RECENT_ACTIONS_SIGNAL_ITEMS,
@@ -7,6 +5,7 @@ from adapters.prompting import (
     build_help_prompt_result,
 )
 from adapters.recent_actions import build_recent_button_signal
+from tests._fakes import extract_prompt_constraints_json
 
 
 def _base_context() -> dict:
@@ -26,16 +25,9 @@ def _base_context() -> dict:
     }
 
 
-def _extract_constraints_json(prompt: str) -> dict:
-    marker = "Context and constraints JSON:\n"
-    start = prompt.index(marker) + len(marker)
-    end = prompt.index("\nOutput must follow this schema shape exactly:")
-    return json.loads(prompt[start:end])
-
-
 def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -> None:
     prompt = build_help_prompt(_base_context(), "en")
-    payload = _extract_constraints_json(prompt)
+    payload = extract_prompt_constraints_json(prompt)
 
     assert payload["allowed_step_ids"] == ["S02", "S03"]
     assert payload["allowed_overlay_targets"] == ["apu_switch", "battery_switch"]
@@ -93,7 +85,7 @@ def test_delta_summary_top_k_is_capped_to_20() -> None:
         many.append({"mapped_ui_target": f"target_{i:02d}", "from": 0, "to": 1, "action": "toggle"})
     ctx["recent_deltas"] = many
 
-    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    payload = extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     summary = payload["recent_deltas_summary"]
     assert summary["top_k"] == MAX_DELTA_SUMMARY_ITEMS
     assert len(summary["items"]) == MAX_DELTA_SUMMARY_ITEMS
@@ -152,7 +144,7 @@ def test_prompt_contains_current_and_recent_button_signal() -> None:
     ctx = _base_context()
     ctx["recent_actions"] = build_recent_button_signal(recent_deltas, bios_to_ui, max_items=8)
 
-    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    payload = extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     signal = payload["recent_actions_signal"]
     assert signal["current_button"] == "eng_crank_switch"
     assert signal["recent_buttons"] == ["eng_crank_switch", "battery_switch"]
@@ -168,7 +160,7 @@ def test_prompt_recent_actions_signal_keeps_all_ui_targets_in_list_style() -> No
             ]
         }
     ]
-    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    payload = extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     signal = payload["recent_actions_signal"]
     assert signal["current_button"] == "ufc_comm1_channel_selector_rotate"
     assert signal["recent_buttons"] == [
@@ -181,7 +173,7 @@ def test_prompt_recent_actions_signal_uses_dedicated_cap() -> None:
     ctx = _base_context()
     ctx["recent_actions"] = {"recent_buttons": [f"btn_{i:02d}" for i in range(30)]}
 
-    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    payload = extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     signal = payload["recent_actions_signal"]
     assert len(signal["recent_buttons"]) == MAX_RECENT_ACTIONS_SIGNAL_ITEMS
     assert signal["current_button"] == "btn_00"
@@ -195,7 +187,7 @@ def test_prompt_contains_deterministic_step_hint_when_provided() -> None:
         "recent_ui_targets": ["apu_switch"],
     }
 
-    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    payload = extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     hint = payload["deterministic_step_hint"]
     assert hint["inferred_step_id"] == "S03"
     assert hint["missing_conditions"] == ["vars.apu_ready==true"]
