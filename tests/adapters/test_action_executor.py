@@ -3,7 +3,7 @@ from __future__ import annotations
 import socket
 from pathlib import Path
 
-from adapters.action_executor import OverlayActionExecutor
+from adapters.action_executor import OverlayActionExecutor, execute_overlay_actions
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from core.types import Event
 from tests.adapters.socket_stubs import DummySocket, decode_overlay_command
@@ -13,8 +13,9 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
     events: list[Event] = []
-    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, event_sink=events.append)
-    executor = OverlayActionExecutor(sender=sender, event_sink=events.append, max_targets=1)
+    sink = events.append
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, event_sink=sink)
+    executor = OverlayActionExecutor(sender=sender, event_sink=sink, max_targets=1)
 
     report = executor.execute_actions(
         [
@@ -34,7 +35,8 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
     assert cmd["target"] == "pnt_375"
     assert len(report.executed) == 1
     assert report.executed[0]["target"] == "apu_switch"
-    assert any(evt.kind == "overlay_requested" for evt in events)
+    overlay_requested_count = sum(1 for evt in events if evt.kind == "overlay_requested")
+    assert overlay_requested_count == 1
 
 
 def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> None:
@@ -184,3 +186,42 @@ def test_executor_does_not_mutate_external_sender_event_sink(monkeypatch) -> Non
     assert len(report.executed) == 1
     assert sender.event_sink is None
     assert any(evt.kind == "overlay_requested" for evt in events)
+
+
+def test_executor_rejects_when_external_sender_disabled(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, enabled=False)
+    executor = OverlayActionExecutor(sender=sender)
+
+    report = executor.execute_actions([{"type": "overlay", "target": "apu_switch"}])
+
+    assert dummy.sent == []
+    assert report.executed == []
+    assert len(report.rejected) == 1
+    assert report.rejected[0]["reason"] == "overlay_sender_disabled"
+
+
+def test_execute_overlay_actions_with_external_sender_returns_report_and_keeps_sender_open(monkeypatch) -> None:
+    class TrackingSender(DcsOverlaySender):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+            super().close()
+
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = TrackingSender(auto_clear=False, ack_enabled=False)
+
+    report = execute_overlay_actions(
+        [{"type": "overlay", "target": "apu_switch"}],
+        sender=sender,
+    )
+
+    assert set(report.keys()) == {"executed", "rejected", "dropped", "dry_run"}
+    assert len(report["executed"]) == 1
+    assert sender.closed is False
+    sender.close()

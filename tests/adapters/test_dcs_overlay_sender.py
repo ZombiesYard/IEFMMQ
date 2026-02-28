@@ -30,6 +30,7 @@ class FakeAckReceiver:
         kind = "overlay_applied" if ack.get("status") == "ok" else "overlay_failed"
         return Event(kind=kind, payload=payload, t_wall=0.0)
 
+
 def test_sender_sends_command_and_emits_events(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)

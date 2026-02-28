@@ -120,9 +120,22 @@ class OverlayActionExecutor:
             return
         self.event_sink(Event(kind=kind, payload=dict(payload), t_wall=time.time(), session_id=self.session_id))
 
+    def _same_sink(self, left: Callable[[Event], None] | None, right: Callable[[Event], None] | None) -> bool:
+        if left is None or right is None:
+            return False
+        if left is right:
+            return True
+        left_self = getattr(left, "__self__", None)
+        right_self = getattr(right, "__self__", None)
+        left_func = getattr(left, "__func__", None)
+        right_func = getattr(right, "__func__", None)
+        if left_self is None or right_self is None or left_func is None or right_func is None:
+            return False
+        return left_self is right_self and left_func is right_func
+
     def _sender_emits_to_executor_sink(self) -> bool:
         sender_sink = getattr(self._sender, "event_sink", None)
-        return bool(self.event_sink) and sender_sink is self.event_sink
+        return self._same_sink(sender_sink, self.event_sink)
 
     def _reject(self, report: ActionExecutionReport, *, reason: str, action_idx: int, action: Any) -> None:
         detail = {
@@ -181,6 +194,10 @@ class OverlayActionExecutor:
                 report.dry_run.append(preview)
                 self._emit("overlay_dry_run", preview)
                 executed_count += 1
+                continue
+
+            if getattr(self._sender, "enabled", True) is False:
+                self._reject(report, reason="overlay_sender_disabled", action_idx=idx, action=action)
                 continue
 
             ack = self._sender.send_intent(intent, expect_ack=self.expect_ack)
