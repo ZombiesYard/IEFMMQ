@@ -120,6 +120,10 @@ class OverlayActionExecutor:
             return
         self.event_sink(Event(kind=kind, payload=dict(payload), t_wall=time.time(), session_id=self.session_id))
 
+    def _sender_emits_to_executor_sink(self) -> bool:
+        sender_sink = getattr(self._sender, "event_sink", None)
+        return bool(self.event_sink) and sender_sink is self.event_sink
+
     def _reject(self, report: ActionExecutionReport, *, reason: str, action_idx: int, action: Any) -> None:
         detail = {
             "reason": reason,
@@ -180,6 +184,19 @@ class OverlayActionExecutor:
                 continue
 
             ack = self._sender.send_intent(intent, expect_ack=self.expect_ack)
+            if not self._sender_emits_to_executor_sink():
+                requested = {
+                    "action": "highlight",
+                    "target": intent.element_id,
+                    "target_name": target,
+                }
+                self._emit("overlay_requested", requested)
+                if isinstance(ack, Mapping):
+                    ack_payload = dict(ack)
+                    ack_payload["intent"] = "highlight"
+                    ack_payload["target"] = intent.element_id
+                    kind = "overlay_applied" if ack.get("status") == "ok" else "overlay_failed"
+                    self._emit(kind, ack_payload)
             applied = {
                 "target": target,
                 "element_id": intent.element_id,
