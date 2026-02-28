@@ -255,7 +255,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
 
     missing_raw = raw.get("missing_conditions")
     missing_conditions: list[str] = []
-    if isinstance(missing_raw, list):
+    if isinstance(missing_raw, (list, tuple)):
         seen: set[str] = set()
         for item in missing_raw:
             if not isinstance(item, str) or not item:
@@ -269,7 +269,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
                 break
 
     recent_targets = raw.get("recent_ui_targets")
-    if isinstance(recent_targets, list):
+    if isinstance(recent_targets, (list, tuple)):
         recent_ui_targets = []
         seen_targets: set[str] = set()
         for item in recent_targets:
