@@ -4,6 +4,7 @@ Map LLM HelpResponse payloads into v1 TutorResponse with safe overlay actions.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -17,6 +18,16 @@ def _repo_root() -> Path:
 
 def _default_ui_map_path() -> Path:
     return _repo_root() / "packs" / "fa18c_startup" / "ui_map.yaml"
+
+
+def _resolve_ui_map_path(ui_map_path: str | Path | None) -> Path:
+    path = Path(ui_map_path) if ui_map_path else _default_ui_map_path()
+    return path.resolve()
+
+
+@lru_cache(maxsize=8)
+def _get_overlay_planner(ui_map_path: str) -> OverlayPlanner:
+    return OverlayPlanner(ui_map_path)
 
 
 def _dedupe_preserve_order(items: list[str]) -> list[str]:
@@ -40,11 +51,15 @@ def map_help_response_to_tutor_response(
     overlay_intent: str = "highlight",
 ) -> TutorResponse:
     metadata: dict[str, Any] = {}
-    if isinstance(help_obj, Mapping):
-        metadata["help_response"] = dict(help_obj)
 
     if max_overlay_targets < 0:
         max_overlay_targets = 0
+
+    allowed_intents = {"highlight", "clear", "pulse"}
+    effective_overlay_intent = overlay_intent
+    if overlay_intent not in allowed_intents:
+        effective_overlay_intent = "highlight"
+        metadata["mapping_error"] = f"invalid_overlay_intent:{overlay_intent}"
 
     explanations_raw = help_obj.get("explanations") if isinstance(help_obj, Mapping) else None
     explanations = [item for item in explanations_raw if isinstance(item, str) and item] if isinstance(explanations_raw, list) else []
@@ -69,8 +84,8 @@ def map_help_response_to_tutor_response(
     planner: OverlayPlanner | None = None
     planner_error: str | None = None
     try:
-        resolved_ui_map = Path(ui_map_path) if ui_map_path else _default_ui_map_path()
-        planner = OverlayPlanner(str(resolved_ui_map))
+        resolved_ui_map = _resolve_ui_map_path(ui_map_path)
+        planner = _get_overlay_planner(str(resolved_ui_map))
     except Exception as exc:  # pragma: no cover - defensive path
         planner_error = f"{type(exc).__name__}: {exc}"
 
@@ -79,11 +94,21 @@ def map_help_response_to_tutor_response(
         if planner_error:
             metadata["overlay_mapping_error"] = planner_error
     else:
+        overlay_failures: list[dict[str, str]] = []
         for target in selected_targets:
             try:
-                actions.append(planner.plan(target, intent=overlay_intent).to_action())
-            except Exception:
+                actions.append(planner.plan(target, intent=effective_overlay_intent).to_action())
+            except Exception as exc:
                 rejected_targets.append(target)
+                overlay_failures.append(
+                    {
+                        "target": target,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    }
+                )
+        if overlay_failures:
+            metadata["overlay_mapping_failures"] = overlay_failures
 
     if rejected_targets:
         metadata["rejected_targets"] = rejected_targets
