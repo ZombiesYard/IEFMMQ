@@ -202,6 +202,21 @@ def test_mapping_sanitizes_planner_initialization_error_metadata() -> None:
     assert isinstance(payload["metadata"]["overlay_mapping_error"], dict)
 
 
+def test_mapping_sanitizes_yaml_parse_error_as_ui_map_invalid(tmp_path: Path) -> None:
+    bad_yaml = tmp_path / "ui_map_bad.yaml"
+    bad_yaml.write_text("version: v1\ncockpit_elements: [unclosed\n", encoding="utf-8")
+
+    res = map_help_response_to_tutor_response(
+        {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]},
+        ui_map_path=bad_yaml,
+    )
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_mapping_error"]["error_code"] == "ui_map_invalid"
+    assert payload["metadata"]["overlay_mapping_error"]["error_type"] == "ParserError"
+
+
 def test_mapping_reraises_unexpected_planner_init_exception(monkeypatch) -> None:
     original_get = response_mapping._get_overlay_planner
 

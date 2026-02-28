@@ -58,6 +58,8 @@ def _overlay_error_code(exc: Exception) -> str:
         return "ui_map_not_found"
     if isinstance(exc, KeyError):
         return "target_not_mapped"
+    if isinstance(exc, yaml.YAMLError):
+        return "ui_map_invalid"
     if isinstance(exc, ValueError):
         return "ui_map_invalid"
     return "overlay_mapping_failed"
