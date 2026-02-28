@@ -285,7 +285,7 @@ def _result(
 def _as_bool(value: Any) -> bool | None:
     if isinstance(value, bool):
         return value
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
+    if isinstance(value, (int, float)):
         return bool(value)
     if isinstance(value, str):
         normalized = value.strip().lower()
