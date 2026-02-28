@@ -82,6 +82,9 @@ Notes:
 - `TutorResponse.explanations` <- `HelpResponse.explanations`
 - `TutorResponse.actions`:
   - Only overlay actions are allowed (`highlight/clear`)
+  - Mapping is done by `adapters/response_mapping.py` and must align with `OverlayIntent.to_action()`
+  - Deduplicate `overlay.targets` and keep at most one primary highlight target by default
+  - Unknown/unmappable targets are dropped and recorded under `TutorResponse.metadata.rejected_targets`
   - `click/execute` actions are forbidden
 - `TutorResponse.metadata`:
   - Record `provider=qwen|fallback`

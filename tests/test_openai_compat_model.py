@@ -25,7 +25,11 @@ def test_explain_error_success_200_valid_help_response() -> None:
     res = model.explain_error(obs, _request_help())
 
     assert res.status == "ok"
-    assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
+    assert len(res.actions) == 1
+    assert res.actions[0]["type"] == "overlay"
+    assert res.actions[0]["intent"] == "highlight"
+    assert res.actions[0]["target"] == "apu_switch"
+    assert res.actions[0]["element_id"] == "pnt_375"
     assert res.metadata["provider"] == "openai_compat"
     assert res.metadata["model"] == "Qwen3-8B-Instruct"
     assert isinstance(res.metadata["latency_ms"], int)

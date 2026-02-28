@@ -21,7 +21,11 @@ def test_explain_error_success_with_valid_help_response() -> None:
     res = model.explain_error(obs, req)
 
     assert res.status == "ok"
-    assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
+    assert len(res.actions) == 1
+    assert res.actions[0]["type"] == "overlay"
+    assert res.actions[0]["intent"] == "highlight"
+    assert res.actions[0]["target"] == "apu_switch"
+    assert res.actions[0]["element_id"] == "pnt_375"
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3:8b"
     assert isinstance(res.metadata["latency_ms"], int)
@@ -189,7 +193,11 @@ def test_explain_error_alternate_response_format() -> None:
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
 
     assert res.status == "ok"
-    assert res.actions == [{"type": "overlay", "intent": "highlight", "target": "apu_switch"}]
+    assert len(res.actions) == 1
+    assert res.actions[0]["type"] == "overlay"
+    assert res.actions[0]["intent"] == "highlight"
+    assert res.actions[0]["target"] == "apu_switch"
+    assert res.actions[0]["element_id"] == "pnt_375"
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3:8b"
     assert res.metadata["json_repaired"] is False

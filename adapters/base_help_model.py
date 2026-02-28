@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_meta
 from adapters.prompting import build_help_prompt_result
+from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import (
     StepInferenceResult,
     extract_recent_ui_targets,
@@ -90,17 +91,10 @@ class BaseHelpModel(ModelPort):
             help_obj, extraction = parse_help_response_with_meta(raw_text)
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
-            actions = [
-                {"type": "overlay", "intent": "highlight", "target": target}
-                for target in help_obj["overlay"]["targets"]
-            ]
-            return TutorResponse(
-                status="ok",
-                in_reply_to=request.request_id if request else None,
-                message=help_obj["explanations"][0] if help_obj["explanations"] else None,
-                actions=actions,
-                explanations=list(help_obj["explanations"]),
-                metadata={
+            mapped = map_help_response_to_tutor_response(help_obj, request=request, status="ok")
+            metadata = dict(mapped.metadata)
+            metadata.update(
+                {
                     "provider": self.provider,
                     "model": self.model_name,
                     "latency_ms": int((perf_counter() - start) * 1000),
@@ -114,7 +108,15 @@ class BaseHelpModel(ModelPort):
                     "prompt_build": prompt_meta,
                     "deterministic_step_hint": deterministic_hint,
                     "deterministic_inference_error": deterministic_inference_error,
-                },
+                }
+            )
+            return TutorResponse(
+                status=mapped.status,
+                in_reply_to=mapped.in_reply_to,
+                message=mapped.message,
+                actions=list(mapped.actions),
+                explanations=list(mapped.explanations),
+                metadata=metadata,
             )
         except Exception as exc:
             fallback_message = self._build_deterministic_fallback_message(deterministic_inference)
