@@ -1,4 +1,6 @@
-﻿from adapters.openai_compat_model import OpenAICompatModel
+import json
+
+from adapters.openai_compat_model import OpenAICompatModel
 from core.llm_schema import validate_help_response
 from core.types import Observation
 from tests._fakes import (
@@ -8,6 +10,13 @@ from tests._fakes import (
     _openai_chat_payload_from_help_obj,
     _request_help,
 )
+
+
+def _extract_constraints_json(prompt: str) -> dict:
+    marker = "Context and constraints JSON:\n"
+    start = prompt.index(marker) + len(marker)
+    end = prompt.index("\nOutput must follow this schema shape exactly:")
+    return json.loads(prompt[start:end])
 
 
 def test_explain_error_success_200_valid_help_response() -> None:
@@ -43,6 +52,9 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert call["json"]["temperature"] == 0
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0
+    prompt_payload = _extract_constraints_json(call["json"]["messages"][1]["content"])
+    assert "deterministic_step_hint" in prompt_payload
+    assert "inferred_step_id" in prompt_payload["deterministic_step_hint"]
 
 
 def test_explain_error_http_429_fallback_no_overlay() -> None:
@@ -124,6 +136,23 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_fallback_message_uses_deterministic_inference() -> None:
+    fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["candidate_steps"] = ["S03", "S04"]
+    req.context["vars"] = {"power_available": True, "apu_on": True, "apu_ready": False}
+    req.context["recent_ui_targets"] = ["apu_switch"]
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
+
+    assert res.status == "error"
+    assert "S03" in (res.message or "")
+    hint = res.metadata["deterministic_step_hint"]
+    assert hint["inferred_step_id"] == "S03"
+    assert hint["missing_conditions"]
 
 
 def test_prompt_is_stable_for_same_input() -> None:

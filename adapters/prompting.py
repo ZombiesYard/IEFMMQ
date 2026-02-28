@@ -22,6 +22,7 @@ MAX_PROMPT_CHARS = 7000
 MAX_PROMPT_TOKENS_EST = 1800
 MAX_DELTA_SUMMARY_ITEMS = 20
 MAX_RECENT_ACTIONS_SIGNAL_ITEMS = 8
+MAX_MISSING_CONDITIONS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
@@ -239,6 +240,57 @@ def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     return list(fallback)
 
 
+def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]:
+    raw = context.get("deterministic_step_hint")
+    if not isinstance(raw, Mapping):
+        return {
+            "inferred_step_id": None,
+            "missing_conditions": [],
+            "recent_ui_targets": [],
+        }
+
+    inferred_raw = raw.get("inferred_step_id")
+    inferred_step_id = str(_sanitize_scalar(inferred_raw)) if isinstance(inferred_raw, str) and inferred_raw else None
+
+    missing_raw = raw.get("missing_conditions")
+    missing_conditions: list[str] = []
+    if isinstance(missing_raw, list):
+        seen: set[str] = set()
+        for item in missing_raw:
+            if not isinstance(item, str) or not item:
+                continue
+            normalized = str(_sanitize_scalar(item))
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            missing_conditions.append(normalized)
+            if len(missing_conditions) >= MAX_MISSING_CONDITIONS_SIGNAL_ITEMS:
+                break
+
+    recent_targets = raw.get("recent_ui_targets")
+    if isinstance(recent_targets, list):
+        recent_ui_targets = []
+        seen_targets: set[str] = set()
+        for item in recent_targets:
+            if not isinstance(item, str) or not item:
+                continue
+            normalized = str(_sanitize_scalar(item))
+            if normalized in seen_targets:
+                continue
+            seen_targets.add(normalized)
+            recent_ui_targets.append(normalized)
+            if len(recent_ui_targets) >= MAX_RECENT_ACTIONS_SIGNAL_ITEMS:
+                break
+    else:
+        recent_ui_targets = []
+
+    return {
+        "inferred_step_id": inferred_step_id,
+        "missing_conditions": missing_conditions,
+        "recent_ui_targets": recent_ui_targets,
+    }
+
+
 def _build_evidence_sources(
     selected_vars: Mapping[str, Any],
     gates_summary: list[dict[str, Any]],
@@ -342,6 +394,7 @@ def build_help_prompt_result(
     gates_summary = _build_gates_summary(context)
     rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
     recent_actions_signal = _build_recent_actions_signal(context)
+    deterministic_step_hint = _build_deterministic_step_hint(context)
 
     payload: dict[str, Any] = {}
 
@@ -357,6 +410,7 @@ def build_help_prompt_result(
             "只允许引用 EVIDENCE_SOURCES 中出现的 ref。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
+            "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
             "若不确定，也必须返回合法 JSON，不得输出自然语言段落。",
         ]
     else:
@@ -372,6 +426,7 @@ def build_help_prompt_result(
             "Only refs that appear in EVIDENCE_SOURCES are allowed.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
+            "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
             "If uncertain, still return valid JSON only.",
         ]
 
@@ -418,6 +473,7 @@ def build_help_prompt_result(
             "current_vars_selected": selected_vars,
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
+            "deterministic_step_hint": deterministic_step_hint,
             "EVIDENCE_SOURCES": evidence_sources,
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": example_obj,

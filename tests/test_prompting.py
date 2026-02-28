@@ -48,6 +48,8 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     evidence = payload["EVIDENCE_SOURCES"]
     assert set(evidence.keys()) == {"VARS", "GATES", "RECENT_UI_TARGETS", "RAG_SNIPPETS"}
     assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
+    assert payload["deterministic_step_hint"]["inferred_step_id"] is None
+    assert payload["deterministic_step_hint"]["missing_conditions"] == []
 
     sample_evidence = payload["output_example_json"]["overlay"]["evidence"][0]
     assert sample_evidence["type"] in {"var", "gate", "rag", "delta"}
@@ -183,3 +185,18 @@ def test_prompt_recent_actions_signal_uses_dedicated_cap() -> None:
     signal = payload["recent_actions_signal"]
     assert len(signal["recent_buttons"]) == MAX_RECENT_ACTIONS_SIGNAL_ITEMS
     assert signal["current_button"] == "btn_00"
+
+
+def test_prompt_contains_deterministic_step_hint_when_provided() -> None:
+    ctx = _base_context()
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S03",
+        "missing_conditions": ["vars.apu_ready==true"],
+        "recent_ui_targets": ["apu_switch"],
+    }
+
+    payload = _extract_constraints_json(build_help_prompt(ctx, "en"))
+    hint = payload["deterministic_step_hint"]
+    assert hint["inferred_step_id"] == "S03"
+    assert hint["missing_conditions"] == ["vars.apu_ready==true"]
+    assert hint["recent_ui_targets"] == ["apu_switch"]
