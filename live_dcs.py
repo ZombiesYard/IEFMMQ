@@ -369,6 +369,7 @@ class LiveDcsTutorLoop:
             if mapper is not None
             else BiosUiMapper.from_yaml(self.bios_to_ui_path, self.ui_map_path)
         )
+        self.pack_steps = load_pack_steps(self.pack_path)
         self.candidate_steps = _load_step_ids(self.pack_path)
         self.overlay_allowlist = _load_overlay_allowlist(self.pack_path, self.ui_map_path)
         self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
@@ -450,7 +451,7 @@ class LiveDcsTutorLoop:
             for item in recent_actions.get("recent_buttons", [])
             if isinstance(item, str) and item
         ]
-        inference = infer_step_id(self.candidate_steps, vars_selected, recent_buttons)
+        inference = infer_step_id(self.pack_steps, vars_selected, recent_buttons)
         deterministic_hint = {
             "inferred_step_id": inference.inferred_step_id,
             "missing_conditions": list(inference.missing_conditions),
