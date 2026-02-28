@@ -1,0 +1,958 @@
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import queue
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
+
+import yaml
+
+from adapters.action_executor import OverlayActionExecutor
+from adapters.dcs_bios.bios_ui_map import BiosUiMapper
+from adapters.dcs_bios.receiver import DcsBiosReceiver
+from adapters.model_stub import ModelStub
+from adapters.ollama_model import OllamaModel
+from adapters.openai_compat_model import OpenAICompatModel
+from adapters.prompting import build_help_prompt_result
+from adapters.recent_actions import (
+    RecentDeltaRingBuffer,
+    build_prompt_recent_deltas,
+    build_recent_button_signal,
+)
+from adapters.response_mapping import map_help_response_to_tutor_response
+from adapters.step_inference import infer_step_id, load_pack_steps
+from adapters.telemetry_pipeline import enrich_bios_observation
+from core.event_store import JsonlEventStore
+from core.types import Event, Observation, TutorRequest, TutorResponse
+from core.vars import VarResolver
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _default_pack_path() -> Path:
+    return _repo_root() / "packs" / "fa18c_startup" / "pack.yaml"
+
+
+def _default_ui_map_path() -> Path:
+    return _repo_root() / "packs" / "fa18c_startup" / "ui_map.yaml"
+
+
+def _default_telemetry_map_path() -> Path:
+    return _repo_root() / "packs" / "fa18c_startup" / "telemetry_map.yaml"
+
+
+def _default_bios_to_ui_path() -> Path:
+    return _repo_root() / "packs" / "fa18c_startup" / "bios_to_ui.yaml"
+
+
+class ObservationSource(Protocol):
+    def get_observation(self) -> Observation | None:
+        ...
+
+
+class ActionExecutorLike(Protocol):
+    def execute_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> Any:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
+def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"{label} must be a YAML mapping: {path}")
+    return data
+
+
+def _load_step_ids(pack_path: Path) -> list[str]:
+    steps = load_pack_steps(pack_path)
+    out: list[str] = []
+    seen: set[str] = set()
+    for step in steps:
+        step_id = step.get("id")
+        if not isinstance(step_id, str) or not step_id:
+            continue
+        if step_id in seen:
+            continue
+        seen.add(step_id)
+        out.append(step_id)
+    return out
+
+
+def _load_overlay_allowlist(pack_path: Path, ui_map_path: Path) -> list[str]:
+    ui_map = _load_yaml_mapping(ui_map_path, "ui_map.yaml")
+    cockpit_elements = ui_map.get("cockpit_elements")
+    if not isinstance(cockpit_elements, Mapping):
+        raise ValueError(f"ui_map.yaml missing cockpit_elements mapping: {ui_map_path}")
+    base = {key for key in cockpit_elements.keys() if isinstance(key, str) and key}
+
+    pack = _load_yaml_mapping(pack_path, "pack.yaml")
+    pack_targets = pack.get("ui_targets")
+    if pack_targets is None:
+        step_targets: set[str] = set()
+        steps = pack.get("steps")
+        if isinstance(steps, list):
+            for step_idx, step in enumerate(steps):
+                if not isinstance(step, Mapping):
+                    raise ValueError(f"pack.steps[{step_idx}] must be a mapping: {pack_path}")
+                ui_targets = step.get("ui_targets")
+                if ui_targets is None:
+                    continue
+                if not isinstance(ui_targets, list):
+                    raise ValueError(f"pack.steps[{step_idx}].ui_targets must be a list: {pack_path}")
+                for target_idx, target in enumerate(ui_targets):
+                    if not isinstance(target, str) or not target:
+                        raise ValueError(
+                            f"pack.steps[{step_idx}].ui_targets[{target_idx}] must be non-empty string: {pack_path}"
+                        )
+                    if target not in base:
+                        raise ValueError(
+                            f"pack.steps[{step_idx}].ui_targets[{target_idx}]={target!r} not found in ui_map: "
+                            f"{pack_path}"
+                        )
+                    step_targets.add(target)
+        if step_targets:
+            return sorted(step_targets)
+        return sorted(base)
+    if not isinstance(pack_targets, list):
+        raise ValueError(f"pack.ui_targets must be a list: {pack_path}")
+
+    narrowed: set[str] = set()
+    invalid_targets: list[str] = []
+    for idx, target in enumerate(pack_targets):
+        if not isinstance(target, str) or not target:
+            raise ValueError(f"pack.ui_targets[{idx}] must be non-empty string: {pack_path}")
+        if target not in base:
+            invalid_targets.append(f"pack.ui_targets[{idx}]={target!r}")
+            continue
+        narrowed.add(target)
+    if invalid_targets:
+        joined = ", ".join(invalid_targets)
+        raise ValueError(f"{joined} not found in ui_map: {pack_path}")
+    if not narrowed:
+        raise ValueError(
+            "pack.ui_targets narrows overlay allowlist to zero valid targets; "
+            f"check ui_map consistency: {pack_path}"
+        )
+    return sorted(narrowed)
+
+
+def _stable_hash_json(data: Mapping[str, Any]) -> str:
+    encoded = json.dumps(
+        data,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _coerce_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _coerce_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def _normalize_help_report(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, Mapping):
+        report = dict(raw)
+    elif hasattr(raw, "to_dict"):
+        report = dict(raw.to_dict())  # type: ignore[call-arg]
+    else:
+        report = {}
+    report.setdefault("executed", [])
+    report.setdefault("rejected", [])
+    report.setdefault("dropped", [])
+    report.setdefault("dry_run", [])
+    return report
+
+
+def _dedupe_strings(items: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+@dataclass
+class HelpCacheEntry:
+    state_key: str
+    t_wall: float
+    response: TutorResponse
+
+
+@dataclass
+class LiveLoopStats:
+    frames: int = 0
+    help_cycles: int = 0
+    model_calls: int = 0
+    cache_hits: int = 0
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "frames": self.frames,
+            "help_cycles": self.help_cycles,
+            "model_calls": self.model_calls,
+            "cache_hits": self.cache_hits,
+        }
+
+
+class ReplayBiosReceiver:
+    """
+    Replay BIOS frames from JSONL.
+
+    Supported line formats:
+    - raw frame object: {"schema_version":"v2","seq":...,"bios":...}
+    - Event envelope with observation payload
+    - Observation object serialized by Observation.to_dict()
+    """
+
+    def __init__(self, path: str | Path, source: str = "dcs_bios_replay") -> None:
+        self.path = Path(path)
+        self.source = source
+        self._fh = self.path.open("r", encoding="utf-8")
+        self._lineno = 0
+        self.is_exhausted = False
+
+    def _next_item(self) -> dict[str, Any] | None:
+        while True:
+            line = self._fh.readline()
+            if not line:
+                self.is_exhausted = True
+                self.close()
+                return None
+            self._lineno += 1
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                obj = json.loads(text)
+            except json.JSONDecodeError as exc:
+                self.is_exhausted = True
+                self.close()
+                raise ValueError(f"{self.path}:{self._lineno} invalid JSON: {exc}") from exc
+            if isinstance(obj, Mapping):
+                return dict(obj)
+            # Ignore non-mapping JSON values and keep scanning the stream.
+            continue
+
+    def _extract_frame(self, item: Mapping[str, Any]) -> dict[str, Any] | None:
+        if item.get("schema_version") == "v2" and isinstance(item.get("bios"), Mapping):
+            return dict(item)
+
+        payload = item.get("payload")
+        if isinstance(payload, Mapping):
+            if payload.get("schema_version") == "v2" and isinstance(payload.get("bios"), Mapping):
+                return dict(payload)
+            nested = payload.get("payload")
+            if isinstance(nested, Mapping):
+                if nested.get("schema_version") == "v2" and isinstance(nested.get("bios"), Mapping):
+                    return dict(nested)
+        return None
+
+    def get_observation(self) -> Observation | None:
+        while True:
+            item = self._next_item()
+            if item is None:
+                return None
+            frame = self._extract_frame(item)
+            if frame is None:
+                continue
+            seq = _coerce_int(frame.get("seq"))
+            meta: dict[str, Any] = {"replay": True}
+            if seq is not None:
+                meta["seq"] = seq
+            return Observation(source=self.source, payload=frame, metadata=meta)
+
+    def close(self) -> None:
+        if not self._fh.closed:
+            self._fh.close()
+        self.is_exhausted = True
+
+
+class StdinHelpTrigger:
+    def __init__(self) -> None:
+        self._stop = threading.Event()
+        self._queue: queue.SimpleQueue[None] = queue.SimpleQueue()
+        self._thread = threading.Thread(target=self._reader, daemon=True)
+        self._close_wait_timeout_s = 0.2
+        self.close_pending_input = False
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def close(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            # input() can block; wait briefly, then mark that stdin is still pending.
+            self._thread.join(timeout=self._close_wait_timeout_s)
+        self.close_pending_input = self._thread.is_alive()
+
+    def poll(self) -> bool:
+        try:
+            self._queue.get_nowait()
+            return True
+        except queue.Empty:
+            return False
+
+    def _reader(self) -> None:
+        while not self._stop.is_set():
+            try:
+                line = input()
+            except EOFError:
+                return
+            if self._stop.is_set():
+                return
+            if line.strip().lower() in {"", "help", "h", "?"}:
+                self._queue.put(None)
+
+
+class LiveDcsTutorLoop:
+    def __init__(
+        self,
+        *,
+        source: ObservationSource,
+        model: Any,
+        action_executor: ActionExecutorLike,
+        resolver: VarResolver | None = None,
+        mapper: BiosUiMapper | None = None,
+        pack_path: str | Path | None = None,
+        ui_map_path: str | Path | None = None,
+        telemetry_map_path: str | Path | None = None,
+        bios_to_ui_path: str | Path | None = None,
+        cooldown_s: float = 4.0,
+        session_id: str | None = None,
+        lang: str = "zh",
+        event_sink: Callable[[Event], None] | None = None,
+        dry_run_overlay: bool = False,
+    ) -> None:
+        self.source = source
+        self.model = model
+        self.action_executor = action_executor
+        self.cooldown_s = max(0.0, float(cooldown_s))
+        self.session_id = session_id
+        self.lang = "zh" if lang not in {"zh", "en"} else lang
+        self.event_sink = event_sink
+        self.dry_run_overlay = dry_run_overlay
+
+        self.pack_path = Path(pack_path) if pack_path else _default_pack_path()
+        self.ui_map_path = Path(ui_map_path) if ui_map_path else _default_ui_map_path()
+        self.telemetry_map_path = (
+            Path(telemetry_map_path) if telemetry_map_path else _default_telemetry_map_path()
+        )
+        self.bios_to_ui_path = Path(bios_to_ui_path) if bios_to_ui_path else _default_bios_to_ui_path()
+
+        self.resolver = resolver if resolver is not None else VarResolver.from_yaml(self.telemetry_map_path)
+        self.mapper = (
+            mapper
+            if mapper is not None
+            else BiosUiMapper.from_yaml(self.bios_to_ui_path, self.ui_map_path)
+        )
+        self.pack_steps = load_pack_steps(self.pack_path)
+        self.candidate_steps = _load_step_ids(self.pack_path)
+        self.overlay_allowlist = _load_overlay_allowlist(self.pack_path, self.ui_map_path)
+        self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
+
+        self._latest_raw_obs: Observation | None = None
+        self._latest_enriched_obs: Observation | None = None
+        self._help_cache: HelpCacheEntry | None = None
+        self._stats = LiveLoopStats()
+
+    @property
+    def stats(self) -> LiveLoopStats:
+        return self._stats
+
+    def close(self) -> None:
+        if hasattr(self.action_executor, "close"):
+            self.action_executor.close()
+        if hasattr(self.source, "close"):
+            self.source.close()
+        if hasattr(self.model, "close"):
+            self.model.close()
+
+    def _emit_event(
+        self,
+        *,
+        kind: str,
+        payload: Mapping[str, Any],
+        related_id: str | None = None,
+        t_wall: float | None = None,
+    ) -> None:
+        if self.event_sink is None:
+            return
+        event = Event(
+            kind=kind,
+            payload=dict(payload),
+            related_id=related_id,
+            t_wall=t_wall,
+            session_id=self.session_id,
+        )
+        self.event_sink(event)
+
+    def _ingest_observation(self, raw_obs: Observation) -> Observation:
+        self._latest_raw_obs = raw_obs
+        enriched = enrich_bios_observation(
+            raw_obs,
+            self.resolver,
+            mapper=self.mapper,
+            delta_stream_id=self.session_id,
+        )
+        self._latest_enriched_obs = enriched
+
+        payload = raw_obs.payload if isinstance(raw_obs.payload, Mapping) else {}
+        delta = payload.get("delta")
+        t_wall = _coerce_float(payload.get("t_wall"))
+        seq = _coerce_int(payload.get("seq"))
+        if isinstance(delta, Mapping) and t_wall is not None:
+            self.recent_ring.add_delta(delta, t_wall=t_wall, seq=seq)
+
+        self._emit_event(
+            kind="observation",
+            payload=enriched.to_dict(),
+            related_id=enriched.observation_id,
+            t_wall=t_wall,
+        )
+        return enriched
+
+    def _build_request(self, obs: Observation) -> tuple[TutorRequest, dict[str, Any], str]:
+        payload = obs.payload if isinstance(obs.payload, Mapping) else {}
+        vars_map = payload.get("vars")
+        if not isinstance(vars_map, Mapping):
+            vars_map = {}
+        vars_selected = dict(vars_map)
+
+        now_t_wall = _coerce_float(payload.get("t_wall"))
+        recent_frames = self.recent_ring.snapshot(now_t_wall=now_t_wall) if now_t_wall is not None else self.recent_ring.snapshot()
+        recent_deltas = build_prompt_recent_deltas(recent_frames, self.mapper, max_items=20)
+        recent_actions = build_recent_button_signal(recent_frames, self.mapper, max_items=8)
+        recent_buttons = [
+            item
+            for item in recent_actions.get("recent_buttons", [])
+            if isinstance(item, str) and item
+        ]
+        inference = infer_step_id(self.pack_steps, vars_selected, recent_buttons)
+        deterministic_hint = {
+            "inferred_step_id": inference.inferred_step_id,
+            "missing_conditions": list(inference.missing_conditions),
+            "recent_ui_targets": recent_buttons,
+        }
+
+        context = {
+            "vars": vars_selected,
+            "recent_deltas": recent_deltas,
+            "recent_actions": recent_actions,
+            "candidate_steps": list(self.candidate_steps),
+            "overlay_target_allowlist": list(self.overlay_allowlist),
+            "deterministic_step_hint": deterministic_hint,
+            "delta_summary": payload.get("delta_summary", {}),
+            "delta_dropped_count": obs.metadata.get("delta_dropped_count"),
+        }
+
+        prompt_result = build_help_prompt_result(context, self.lang)
+        prompt_hash = hashlib.sha256(prompt_result.prompt.encode("utf-8")).hexdigest()
+        req = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            observation_ref=obs.observation_id,
+            context=context,
+            metadata={
+                "prompt_hash": prompt_hash,
+                "prompt_tokens_est": int(prompt_result.metadata.get("prompt_tokens_est") or 0),
+                "prompt_trimmed": bool(prompt_result.metadata.get("prompt_trimmed")),
+            },
+        )
+
+        state_signature = {
+            "vars_discrete": {
+                key: value
+                for key, value in sorted(vars_selected.items())
+                if isinstance(value, bool) or value is None
+            },
+            "recent_buttons": recent_buttons,
+            "candidate_steps": self.candidate_steps,
+            "overlay_target_allowlist": self.overlay_allowlist,
+            "deterministic_step_hint": deterministic_hint,
+        }
+        state_key = _stable_hash_json(state_signature)
+        return req, prompt_result.metadata, state_key
+
+    def _fallback_message(self, inferred_step_id: str | None, missing_conditions: Sequence[str]) -> str:
+        if self.lang == "zh":
+            if inferred_step_id and missing_conditions:
+                return (
+                    f"降级提示：你大概率卡在 {inferred_step_id}，"
+                    f"请先满足：{'; '.join(missing_conditions)}。"
+                )
+            if inferred_step_id:
+                return f"降级提示：你大概率卡在 {inferred_step_id}，请先检查并执行该步骤。"
+            return "降级提示：暂时无法推断当前卡住步骤，请先检查关键前置条件后再触发 Help。"
+        if inferred_step_id and missing_conditions:
+            return (
+                f"Fallback: likely stuck at {inferred_step_id}; "
+                f"please satisfy: {'; '.join(missing_conditions)}."
+            )
+        if inferred_step_id:
+            return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
+        return "Fallback: unable to infer current blocked step."
+
+    def _map_response_actions(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+        help_obj = metadata.get("help_response")
+        if not isinstance(help_obj, Mapping):
+            return list(response.actions), {}
+
+        filtered_help_obj: Mapping[str, Any] = help_obj
+        rejected_by_request_allowlist: list[str] = []
+        request_allowlist_raw = request.context.get("overlay_target_allowlist")
+        if isinstance(request_allowlist_raw, list):
+            request_allowlist = {
+                item for item in request_allowlist_raw if isinstance(item, str) and item
+            }
+            overlay = help_obj.get("overlay")
+            if request_allowlist and isinstance(overlay, Mapping):
+                raw_targets = overlay.get("targets")
+                if isinstance(raw_targets, list):
+                    allowed_targets: list[str] = []
+                    for target in raw_targets:
+                        if not isinstance(target, str) or not target:
+                            continue
+                        if target in request_allowlist:
+                            allowed_targets.append(target)
+                        else:
+                            rejected_by_request_allowlist.append(target)
+                    if rejected_by_request_allowlist:
+                        filtered_overlay = dict(overlay)
+                        filtered_overlay["targets"] = allowed_targets
+                        filtered_help_obj = dict(help_obj)
+                        filtered_help_obj["overlay"] = filtered_overlay
+
+        mapped = map_help_response_to_tutor_response(
+            filtered_help_obj,
+            request=request,
+            status=response.status,
+            max_overlay_targets=1,
+            ui_map_path=self.ui_map_path,
+        )
+        mapped_meta = dict(mapped.metadata)
+        if rejected_by_request_allowlist:
+            deduped_rejected = _dedupe_strings(rejected_by_request_allowlist)
+            mapped_meta["rejected_targets_by_request_allowlist"] = deduped_rejected
+            existing_errors = mapped_meta.get("mapping_errors")
+            merged_errors: list[str] = []
+            if isinstance(existing_errors, list):
+                merged_errors = [item for item in existing_errors if isinstance(item, str) and item]
+            merged_errors.append("overlay_target_not_in_request_allowlist")
+            mapped_meta["mapping_errors"] = _dedupe_strings(merged_errors)
+            mapped_meta.setdefault("mapping_error", "overlay_target_not_in_request_allowlist")
+        if not response.message and mapped.message:
+            response.message = mapped.message
+        if (not response.explanations) and mapped.explanations:
+            response.explanations = list(mapped.explanations)
+        return list(mapped.actions), mapped_meta
+
+    def _new_response_from_cached(
+        self,
+        cached_response: TutorResponse,
+        *,
+        in_reply_to: str | None,
+    ) -> TutorResponse:
+        return TutorResponse(
+            status=cached_response.status,
+            in_reply_to=in_reply_to,
+            message=cached_response.message,
+            actions=copy.deepcopy(list(cached_response.actions)),
+            explanations=copy.deepcopy(list(cached_response.explanations)),
+            metadata=copy.deepcopy(dict(cached_response.metadata)),
+        )
+
+    def _executor_is_configured_dry_run(self) -> bool:
+        return bool(getattr(self.action_executor, "dry_run", False))
+
+    def _dry_run_report_from_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> dict[str, Any]:
+        previews: list[dict[str, Any]] = []
+        for action in actions:
+            if not isinstance(action, Mapping):
+                continue
+            previews.append(
+                {
+                    "type": action.get("type"),
+                    "intent": action.get("intent"),
+                    "target": action.get("target"),
+                    "element_id": action.get("element_id"),
+                }
+            )
+        if previews:
+            for preview in previews:
+                self._emit_event(kind="overlay_dry_run", payload=preview, t_wall=time.time())
+        return {
+            "executed": [],
+            "rejected": [],
+            "dropped": [],
+            "dry_run": previews,
+        }
+
+    def _execute_or_dry_run_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> dict[str, Any]:
+        if self.dry_run_overlay and self._executor_is_configured_dry_run():
+            overlay_raw_report = self.action_executor.execute_actions(actions)
+            return _normalize_help_report(overlay_raw_report)
+        if self.dry_run_overlay:
+            return self._dry_run_report_from_actions(actions)
+        overlay_raw_report = self.action_executor.execute_actions(actions)
+        return _normalize_help_report(overlay_raw_report)
+
+    def run_help_cycle(self) -> tuple[TutorResponse | None, dict[str, Any] | None]:
+        obs = self._latest_enriched_obs
+        if obs is None:
+            return None, None
+
+        request, prompt_meta, state_key = self._build_request(obs)
+        now_wall = time.time()
+        self._emit_event(
+            kind="tutor_request",
+            payload=request.to_dict(),
+            related_id=request.request_id,
+            t_wall=now_wall,
+        )
+        self._stats.help_cycles += 1
+
+        use_cache = False
+        cached = self._help_cache
+        if cached is not None and cached.state_key == state_key:
+            if (now_wall - cached.t_wall) <= self.cooldown_s:
+                use_cache = True
+
+        if use_cache and cached is not None:
+            self._stats.cache_hits += 1
+            response = self._new_response_from_cached(cached.response, in_reply_to=request.request_id)
+            response.metadata = dict(response.metadata)
+            response.metadata["cached_response_reused"] = True
+            response.metadata["cache_age_s"] = round(now_wall - cached.t_wall, 3)
+            response.metadata.setdefault("generation_prompt_hash", response.metadata.get("prompt_hash"))
+            response.metadata.setdefault(
+                "generation_prompt_tokens_est",
+                response.metadata.get("prompt_tokens_est"),
+            )
+            response.metadata.setdefault(
+                "generation_prompt_trimmed",
+                response.metadata.get("prompt_trimmed"),
+            )
+            response.metadata["request_prompt_hash"] = request.metadata.get("prompt_hash")
+            response.metadata["request_prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+            response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+            response.metadata["state_key"] = state_key
+            response.metadata["prompt_build"] = dict(prompt_meta)
+            overlay_report = self._execute_or_dry_run_actions(response.actions)
+        else:
+            hint = request.context.get("deterministic_step_hint", {})
+            inferred_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
+            missing_conditions = hint.get("missing_conditions", []) if isinstance(hint, Mapping) else []
+            if not isinstance(missing_conditions, list):
+                missing_conditions = []
+            self._stats.model_calls += 1
+            try:
+                response = self.model.explain_error(obs, request)
+            except Exception as exc:
+                response = TutorResponse(
+                    status="error",
+                    in_reply_to=request.request_id,
+                    message=self._fallback_message(
+                        inferred_step_id if isinstance(inferred_step_id, str) else None,
+                        [item for item in missing_conditions if isinstance(item, str)],
+                    ),
+                    actions=[],
+                    metadata={
+                        "provider": "fallback",
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    },
+                )
+
+            response.metadata = dict(response.metadata)
+            response.metadata.setdefault("provider", "fallback" if response.status == "error" else "unknown")
+            response.metadata["prompt_hash"] = request.metadata.get("prompt_hash")
+            response.metadata["prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+            response.metadata["prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+            response.metadata.setdefault("generation_prompt_hash", response.metadata.get("prompt_hash"))
+            response.metadata.setdefault(
+                "generation_prompt_tokens_est",
+                response.metadata.get("prompt_tokens_est"),
+            )
+            response.metadata.setdefault(
+                "generation_prompt_trimmed",
+                response.metadata.get("prompt_trimmed"),
+            )
+            response.metadata["request_prompt_hash"] = request.metadata.get("prompt_hash")
+            response.metadata["request_prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+            response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+            response.metadata["state_key"] = state_key
+            response.metadata["prompt_build"] = dict(prompt_meta)
+
+            mapped_actions, mapped_meta = self._map_response_actions(response, request)
+            response.actions = mapped_actions
+            if mapped_meta:
+                response.metadata["response_mapping"] = mapped_meta
+
+            overlay_report = self._execute_or_dry_run_actions(response.actions)
+            provider = response.metadata.get("provider")
+            cacheable = response.status == "ok" and provider != "fallback"
+            if cacheable:
+                self._help_cache = HelpCacheEntry(
+                    state_key=state_key,
+                    t_wall=now_wall,
+                    response=copy.deepcopy(response),
+                )
+            else:
+                self._help_cache = None
+
+        if self.dry_run_overlay and overlay_report.get("dry_run"):
+            print(
+                json.dumps(
+                    {"dry_run_actions": overlay_report["dry_run"]},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+
+        self._emit_event(
+            kind="tutor_response",
+            payload=response.to_dict(),
+            related_id=request.request_id,
+            t_wall=time.time(),
+        )
+        return response, overlay_report
+
+    def run(
+        self,
+        *,
+        max_frames: int = 0,
+        duration_s: float = 0.0,
+        auto_help_on_first_frame: bool = False,
+        auto_help_every_n_frames: int = 0,
+        help_trigger: StdinHelpTrigger | None = None,
+        idle_sleep_s: float = 0.01,
+    ) -> dict[str, int]:
+        if auto_help_every_n_frames < 0:
+            raise ValueError("auto_help_every_n_frames must be >= 0")
+        if max_frames < 0:
+            raise ValueError("max_frames must be >= 0")
+        if duration_s < 0:
+            raise ValueError("duration_s must be >= 0")
+
+        start = time.time()
+        first_help_done = False
+
+        while True:
+            if duration_s > 0 and (time.time() - start) >= duration_s:
+                break
+
+            obs = self.source.get_observation()
+            if obs is not None:
+                self._ingest_observation(obs)
+                self._stats.frames += 1
+                if auto_help_on_first_frame and not first_help_done:
+                    self.run_help_cycle()
+                    first_help_done = True
+                if auto_help_every_n_frames > 0:
+                    if self._stats.frames % auto_help_every_n_frames == 0:
+                        self.run_help_cycle()
+            else:
+                exhausted = bool(getattr(self.source, "is_exhausted", False))
+                if exhausted:
+                    break
+
+            if help_trigger is not None and help_trigger.poll():
+                self.run_help_cycle()
+
+            if max_frames > 0 and self._stats.frames >= max_frames:
+                break
+
+            if obs is None:
+                time.sleep(max(0.0, idle_sleep_s))
+
+        return self._stats.to_dict()
+
+
+def _new_default_log_path() -> Path:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    return Path("logs") / f"live_dcs_{ts}.jsonl"
+
+
+def _build_model_from_args(args: argparse.Namespace) -> Any:
+    provider = args.model_provider
+    lang = args.lang
+    if provider == "stub":
+        return ModelStub(mode=args.stub_mode)
+
+    timeout_s = float(args.model_timeout_s)
+    if provider == "openai_compat":
+        if not args.model_base_url:
+            raise ValueError("--model-base-url is required for openai_compat")
+        return OpenAICompatModel(
+            model_name=args.model_name,
+            base_url=args.model_base_url,
+            timeout_s=timeout_s,
+            lang=lang,
+            api_key=args.model_api_key,
+        )
+    if provider == "ollama":
+        base_url = args.model_base_url or "http://127.0.0.1:11434"
+        return OllamaModel(
+            model_name=args.model_name,
+            base_url=base_url,
+            timeout_s=timeout_s,
+            lang=lang,
+        )
+    raise ValueError(f"Unsupported model provider: {provider}")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run live DCS tutor loop (bios -> help -> overlay).")
+
+    parser.add_argument("--host", default="0.0.0.0", help="DCS-BIOS UDP bind host (default 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=7790, help="DCS-BIOS UDP bind port (default 7790)")
+    parser.add_argument("--timeout", type=float, default=0.2, help="Receiver socket timeout seconds")
+    merge_group = parser.add_mutually_exclusive_group()
+    merge_group.add_argument(
+        "--merge-full-state",
+        dest="merge_full_state",
+        action="store_true",
+        help="Merge BIOS deltas to full state (default: enabled)",
+    )
+    merge_group.add_argument(
+        "--no-merge-full-state",
+        dest="merge_full_state",
+        action="store_false",
+        help="Disable full-state merge; use delta-only payload as bios state",
+    )
+    parser.set_defaults(merge_full_state=True)
+
+    parser.add_argument("--pack", default=str(_default_pack_path()), help="pack.yaml path")
+    parser.add_argument("--ui-map", default=str(_default_ui_map_path()), help="ui_map.yaml path")
+    parser.add_argument("--telemetry-map", default=str(_default_telemetry_map_path()), help="telemetry_map.yaml path")
+    parser.add_argument("--bios-to-ui", default=str(_default_bios_to_ui_path()), help="bios_to_ui.yaml path")
+
+    parser.add_argument("--output", help="Event log JSONL output path")
+    parser.add_argument("--session-id", default=None, help="Optional event session id")
+
+    parser.add_argument("--cooldown-s", type=float, default=4.0, help="Cooldown window for same-state help reuse")
+    parser.add_argument("--max-frames", type=int, default=0, help="Max frames to process (0 means unlimited)")
+    parser.add_argument("--duration", type=float, default=0.0, help="Run duration in seconds (0 means unlimited)")
+
+    parser.add_argument("--auto-help-once", action="store_true", help="Auto trigger one help cycle after first frame")
+    parser.add_argument("--auto-help-every-n-frames", type=int, default=0, help="Auto help interval by frame count")
+    parser.add_argument("--stdin-help", action="store_true", help="Read stdin trigger: Enter/help/h/?")
+    parser.add_argument(
+        "--dry-run-overlay",
+        action="store_true",
+        help="Do not send UDP overlay commands; print planned actions only",
+    )
+
+    parser.add_argument("--replay-bios", help="Replay BIOS JSONL instead of listening UDP")
+
+    parser.add_argument("--model-provider", choices=["stub", "openai_compat", "ollama"], default="stub")
+    parser.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
+    parser.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
+    parser.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
+    parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
+    parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
+    parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    return parser
+
+
+def main() -> int:
+    args = build_arg_parser().parse_args()
+
+    output = Path(args.output) if args.output else _new_default_log_path()
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    source: ObservationSource
+    if args.replay_bios:
+        source = ReplayBiosReceiver(args.replay_bios)
+    else:
+        source = DcsBiosReceiver(
+            host=args.host,
+            port=args.port,
+            timeout=args.timeout,
+            merge_full_state=bool(args.merge_full_state),
+        )
+
+    model = _build_model_from_args(args)
+
+    with JsonlEventStore(output, mode="w") as store:
+        executor = OverlayActionExecutor(
+            ui_map_path=args.ui_map,
+            pack_path=args.pack,
+            dry_run=bool(args.dry_run_overlay),
+            session_id=args.session_id,
+            event_sink=store.append,
+        )
+        loop = LiveDcsTutorLoop(
+            source=source,
+            model=model,
+            action_executor=executor,
+            pack_path=args.pack,
+            ui_map_path=args.ui_map,
+            telemetry_map_path=args.telemetry_map,
+            bios_to_ui_path=args.bios_to_ui,
+            cooldown_s=args.cooldown_s,
+            session_id=args.session_id,
+            lang=args.lang,
+            event_sink=store.append,
+            dry_run_overlay=bool(args.dry_run_overlay),
+        )
+
+        trigger = StdinHelpTrigger() if args.stdin_help else None
+        if trigger is not None:
+            trigger.start()
+            print("[LIVE_DCS] stdin trigger enabled: press Enter/help/h/? to trigger help")
+        try:
+            stats = loop.run(
+                max_frames=args.max_frames,
+                duration_s=args.duration,
+                auto_help_on_first_frame=bool(args.auto_help_once),
+                auto_help_every_n_frames=args.auto_help_every_n_frames,
+                help_trigger=trigger,
+            )
+        finally:
+            if trigger is not None:
+                trigger.close()
+            loop.close()
+
+    print(f"[LIVE_DCS] wrote events to {output}")
+    print(f"[LIVE_DCS] stats={json.dumps(stats, ensure_ascii=False, sort_keys=True)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
