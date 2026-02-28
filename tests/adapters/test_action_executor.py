@@ -4,6 +4,7 @@ import socket
 from pathlib import Path
 
 import adapters.action_executor as action_executor_module
+import pytest
 from adapters.action_executor import OverlayActionExecutor, execute_overlay_actions
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from core.types import Event
@@ -257,3 +258,42 @@ def test_execute_overlay_actions_without_sender_owns_sender_lifecycle(monkeypatc
     assert owned_sender.closed is True
     assert len(owned_sender.send_calls) == 1
     assert owned_sender.send_calls[0][1] is False
+
+
+def test_executor_pack_path_rejects_non_mapping_yaml(tmp_path: Path) -> None:
+    class NoopSender:
+        def __init__(self):
+            self.enabled = True
+            self.event_sink = None
+
+    bad_pack = tmp_path / "pack_non_mapping.yaml"
+    bad_pack.write_text("- item1\n- item2\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="pack must be a mapping"):
+        OverlayActionExecutor(sender=NoopSender(), pack_path=bad_pack)
+
+
+def test_executor_pack_path_rejects_ui_targets_not_list(tmp_path: Path) -> None:
+    class NoopSender:
+        def __init__(self):
+            self.enabled = True
+            self.event_sink = None
+
+    bad_pack = tmp_path / "pack_ui_targets_not_list.yaml"
+    bad_pack.write_text("pack_id: x\nversion: v1\nui_targets: apu_switch\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="pack.ui_targets must be a list"):
+        OverlayActionExecutor(sender=NoopSender(), pack_path=bad_pack)
+
+
+def test_executor_pack_path_rejects_invalid_ui_targets_items(tmp_path: Path) -> None:
+    class NoopSender:
+        def __init__(self):
+            self.enabled = True
+            self.event_sink = None
+
+    bad_pack = tmp_path / "pack_ui_targets_bad_items.yaml"
+    bad_pack.write_text("pack_id: x\nversion: v1\nui_targets:\n  - apu_switch\n  - ''\n  - 123\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="pack.ui_targets must contain non-empty strings"):
+        OverlayActionExecutor(sender=NoopSender(), pack_path=bad_pack)
