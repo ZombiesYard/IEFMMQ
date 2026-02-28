@@ -1,29 +1,11 @@
 from __future__ import annotations
 
-import json
 import socket
 
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from core.overlay import OverlayIntent
 from core.types import Event
-
-
-class DummySocket:
-    def __init__(self) -> None:
-        self.sent: list[tuple[bytes, tuple[str, int]]] = []
-        self._timeout: float | None = None
-
-    def settimeout(self, timeout: float) -> None:
-        self._timeout = timeout
-
-    def gettimeout(self) -> float | None:
-        return self._timeout
-
-    def sendto(self, data: bytes, server) -> None:
-        self.sent.append((data, server))
-
-    def close(self) -> None:
-        return None
+from tests.adapters.socket_stubs import DummySocket, decode_overlay_command
 
 
 class FakeAckReceiver:
@@ -49,10 +31,6 @@ class FakeAckReceiver:
         return Event(kind=kind, payload=payload, t_wall=0.0)
 
 
-def _decode_cmd(data: bytes) -> dict:
-    return json.loads(data.decode("utf-8"))
-
-
 def test_sender_sends_command_and_emits_events(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
@@ -69,7 +47,7 @@ def test_sender_sends_command_and_emits_events(monkeypatch) -> None:
 
     assert ack is not None
     assert len(dummy.sent) == 1
-    cmd = _decode_cmd(dummy.sent[0][0])
+    cmd = decode_overlay_command(dummy.sent[0][0])
     assert cmd["action"] == "highlight"
     assert cmd["target"] == "pnt_331"
     assert ack_receiver.last_cmd_id == cmd["cmd_id"]
@@ -93,7 +71,7 @@ def test_sender_auto_clear_on_switch(monkeypatch) -> None:
     )
 
     assert len(dummy.sent) == 3
-    cmds = [_decode_cmd(item[0]) for item in dummy.sent]
+    cmds = [decode_overlay_command(item[0]) for item in dummy.sent]
     assert cmds[0]["action"] == "highlight"
     assert cmds[0]["target"] == "pnt_100"
     assert cmds[1]["action"] == "clear"
