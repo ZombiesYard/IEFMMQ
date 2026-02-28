@@ -205,7 +205,6 @@ class HelpCacheEntry:
     state_key: str
     t_wall: float
     response: TutorResponse
-    overlay_report: dict[str, Any]
 
 
 @dataclass
@@ -732,7 +731,6 @@ class LiveDcsTutorLoop:
                     state_key=state_key,
                     t_wall=now_wall,
                     response=copy.deepcopy(response),
-                    overlay_report=dict(overlay_report),
                 )
             else:
                 self._help_cache = None

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 from core.types import Observation, TutorResponse
@@ -332,13 +333,10 @@ def test_replay_receiver_streams_and_only_parses_on_demand(tmp_path: Path) -> No
         assert first is not None
         assert first.payload["seq"] == 1
 
-        try:
+        with pytest.raises(ValueError, match="invalid JSON"):
             source.get_observation()
-            assert False, "expected ValueError for invalid second line"
-        except ValueError as exc:
-            assert "invalid JSON" in str(exc)
-            assert source.is_exhausted is True
-            assert source._fh.closed is True
+        assert source.is_exhausted is True
+        assert source._fh.closed is True
     finally:
         source.close()
 
@@ -393,13 +391,11 @@ def test_load_overlay_allowlist_raises_when_pack_ui_targets_contains_unknown_tar
         encoding="utf-8",
     )
 
-    try:
+    with pytest.raises(ValueError) as exc_info:
         _load_overlay_allowlist(pack, ui_map)
-        assert False, "expected ValueError when pack.ui_targets contains unknown target"
-    except ValueError as exc:
-        message = str(exc)
-        assert "pack.ui_targets[0]='not_in_ui_map'" in message
-        assert "not found in ui_map" in message
+    message = str(exc_info.value)
+    assert "pack.ui_targets[0]='not_in_ui_map'" in message
+    assert "not found in ui_map" in message
 
 
 def test_load_overlay_allowlist_raises_when_pack_ui_targets_mixes_valid_and_unknown(tmp_path: Path) -> None:
@@ -423,13 +419,11 @@ def test_load_overlay_allowlist_raises_when_pack_ui_targets_mixes_valid_and_unkn
         encoding="utf-8",
     )
 
-    try:
+    with pytest.raises(ValueError) as exc_info:
         _load_overlay_allowlist(pack, ui_map)
-        assert False, "expected ValueError when pack.ui_targets has partial unknown targets"
-    except ValueError as exc:
-        message = str(exc)
-        assert "pack.ui_targets[1]='typo_target'" in message
-        assert "not found in ui_map" in message
+    message = str(exc_info.value)
+    assert "pack.ui_targets[1]='typo_target'" in message
+    assert "not found in ui_map" in message
 
 
 def test_load_overlay_allowlist_uses_step_ui_targets_union_when_top_level_missing(tmp_path: Path) -> None:
