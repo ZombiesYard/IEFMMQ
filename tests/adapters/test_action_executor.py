@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 from pathlib import Path
 
+import adapters.action_executor as action_executor_module
 from adapters.action_executor import OverlayActionExecutor, execute_overlay_actions
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from core.types import Event
@@ -225,3 +226,34 @@ def test_execute_overlay_actions_with_external_sender_returns_report_and_keeps_s
     assert len(report["executed"]) == 1
     assert sender.closed is False
     sender.close()
+
+
+def test_execute_overlay_actions_without_sender_owns_sender_lifecycle(monkeypatch) -> None:
+    class FakeOwnedSender:
+        instances: list["FakeOwnedSender"] = []
+
+        def __init__(self, session_id=None, event_sink=None):
+            self.session_id = session_id
+            self.event_sink = event_sink
+            self.enabled = True
+            self.closed = False
+            self.send_calls: list[tuple[object, bool]] = []
+            FakeOwnedSender.instances.append(self)
+
+        def send_intent(self, intent, expect_ack: bool = True):
+            self.send_calls.append((intent, expect_ack))
+            return {"schema_version": "v2", "cmd_id": "owned-cmd", "status": "ok"}
+
+        def close(self) -> None:
+            self.closed = True
+
+    monkeypatch.setattr(action_executor_module, "DcsOverlaySender", FakeOwnedSender)
+    report = execute_overlay_actions([{"type": "overlay", "target": "apu_switch"}], sender=None, expect_ack=False)
+
+    assert set(report.keys()) == {"executed", "rejected", "dropped", "dry_run"}
+    assert len(report["executed"]) == 1
+    assert len(FakeOwnedSender.instances) == 1
+    owned_sender = FakeOwnedSender.instances[0]
+    assert owned_sender.closed is True
+    assert len(owned_sender.send_calls) == 1
+    assert owned_sender.send_calls[0][1] is False
