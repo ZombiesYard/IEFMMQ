@@ -248,6 +248,55 @@ def _normalize_knowledge_snippet(raw: Mapping[str, Any], fallback_idx: int) -> d
     return normalized
 
 
+def _normalize_retrieve_meta(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {
+            "cache_hit": False,
+            "grounding_missing": False,
+            "grounding_reason": None,
+            "snippet_ids": [],
+            "index_path": None,
+            "grounding_error_type": None,
+            "index_error_type": None,
+        }
+
+    def _normalize_error_type(value: Any) -> str | None:
+        if isinstance(value, str):
+            return value or None
+        if value is None:
+            return None
+        scalar = _json_safe_scalar(value)
+        return str(scalar) if scalar is not None else None
+
+    index_path_raw = raw.get("index_path")
+    if isinstance(index_path_raw, Path):
+        index_path: str | None = str(index_path_raw)
+    else:
+        index_path_scalar = _json_safe_scalar(index_path_raw)
+        index_path = str(index_path_scalar) if index_path_scalar is not None else None
+
+    reason_raw = raw.get("grounding_reason")
+    grounding_reason = reason_raw if isinstance(reason_raw, str) and reason_raw else None
+
+    snippet_ids_raw = raw.get("snippet_ids")
+    snippet_ids: list[str] = []
+    if isinstance(snippet_ids_raw, (list, tuple)):
+        for item in snippet_ids_raw:
+            scalar = _json_safe_scalar(item)
+            if isinstance(scalar, str) and scalar:
+                snippet_ids.append(scalar)
+
+    return {
+        "cache_hit": bool(raw.get("cache_hit")),
+        "grounding_missing": bool(raw.get("grounding_missing")),
+        "grounding_reason": grounding_reason,
+        "snippet_ids": snippet_ids,
+        "index_path": index_path,
+        "grounding_error_type": _normalize_error_type(raw.get("grounding_error_type")),
+        "index_error_type": _normalize_error_type(raw.get("index_error_type")),
+    }
+
+
 def _normalize_help_report(raw: Any) -> dict[str, Any]:
     if isinstance(raw, Mapping):
         report = dict(raw)
@@ -589,11 +638,17 @@ class LiveDcsTutorLoop:
         try:
             knowledge = self._ensure_knowledge()
             if isinstance(knowledge, KnowledgeRetrieveWithMetaPort):
-                snippets, retrieve_meta = knowledge.retrieve_with_meta(
+                queried, raw_meta = knowledge.retrieve_with_meta(
                     query,
                     top_k=self.rag_top_k,
                     step_id=inferred_step_id,
                 )
+                snippets = [
+                    _normalize_knowledge_snippet(item, idx)
+                    for idx, item in enumerate(queried)
+                    if isinstance(item, Mapping)
+                ]
+                retrieve_meta = _normalize_retrieve_meta(raw_meta)
             else:
                 queried = knowledge.query(query, k=self.rag_top_k)
                 snippets = [
@@ -601,7 +656,8 @@ class LiveDcsTutorLoop:
                     for idx, item in enumerate(queried)
                     if isinstance(item, Mapping)
                 ]
-                retrieve_meta = {
+                retrieve_meta = _normalize_retrieve_meta(
+                    {
                     "cache_hit": False,
                     "grounding_missing": False,
                     "grounding_reason": None,
@@ -609,10 +665,12 @@ class LiveDcsTutorLoop:
                         item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)
                     ],
                     "index_path": self._knowledge_store_id(),
-                }
+                    }
+                )
         except Exception as exc:
             snippets = []
-            retrieve_meta = {
+            retrieve_meta = _normalize_retrieve_meta(
+                {
                 "cache_hit": False,
                 "grounding_missing": True,
                 "grounding_reason": "knowledge_retrieve_error",
@@ -621,7 +679,8 @@ class LiveDcsTutorLoop:
                 "index_path": self._knowledge_store_id()
                 if knowledge is not None
                 else str(self.knowledge_index_path),
-            }
+                }
+            )
 
         snippet_ids = [
             item.get("snippet_id")
