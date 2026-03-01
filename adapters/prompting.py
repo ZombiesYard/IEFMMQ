@@ -451,7 +451,6 @@ def build_help_prompt_result(
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
     gates_summary = _build_gates_summary(context)
     rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
-    final_rag_snippets = list(rag_snippets)
     rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)

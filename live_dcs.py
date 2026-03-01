@@ -658,27 +658,27 @@ class LiveDcsTutorLoop:
                 ]
                 retrieve_meta = _normalize_retrieve_meta(
                     {
-                    "cache_hit": False,
-                    "grounding_missing": False,
-                    "grounding_reason": None,
-                    "snippet_ids": [
-                        item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)
-                    ],
-                    "index_path": self._knowledge_store_id(),
+                        "cache_hit": False,
+                        "grounding_missing": False,
+                        "grounding_reason": None,
+                        "snippet_ids": [
+                            item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)
+                        ],
+                        "index_path": self._knowledge_store_id(),
                     }
                 )
         except Exception as exc:
             snippets = []
             retrieve_meta = _normalize_retrieve_meta(
                 {
-                "cache_hit": False,
-                "grounding_missing": True,
-                "grounding_reason": "knowledge_retrieve_error",
-                "grounding_error_type": type(exc).__name__,
-                "snippet_ids": [],
-                "index_path": self._knowledge_store_id()
-                if knowledge is not None
-                else str(self.knowledge_index_path),
+                    "cache_hit": False,
+                    "grounding_missing": True,
+                    "grounding_reason": "knowledge_retrieve_error",
+                    "grounding_error_type": type(exc).__name__,
+                    "snippet_ids": [],
+                    "index_path": self._knowledge_store_id()
+                    if knowledge is not None
+                    else str(self.knowledge_index_path),
                 }
             )
 
