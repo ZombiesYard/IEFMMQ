@@ -2,15 +2,25 @@ from __future__ import annotations
 
 import builtins
 import json
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import time
 
 import pytest
 import yaml
 
 from core.types import Observation, TutorResponse
-from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver, StdinHelpTrigger, _load_overlay_allowlist
+from live_dcs import (
+    CompositeHelpTrigger,
+    LiveDcsTutorLoop,
+    ReplayBiosReceiver,
+    StdinHelpTrigger,
+    UdpHelpTrigger,
+    _is_help_trigger_payload,
+    _load_overlay_allowlist,
+)
 from tools.index_docs import build_index
 
 
@@ -828,6 +838,66 @@ def test_replay_receiver_skips_non_mapping_json_values(tmp_path: Path) -> None:
         source.close()
 
 
+def test_replay_receiver_speed_realtime_paces_by_t_wall(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_speed_realtime.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            _bios_frame(1, 100.0, apu_switch=0),
+            _bios_frame(2, 100.3, apu_switch=1),
+        ],
+    )
+
+    sleeps: list[float] = []
+    fake_now = [1000.0]
+
+    def _fake_monotonic() -> float:
+        return fake_now[0]
+
+    def _fake_sleep(value: float) -> None:
+        sleep_s = float(value)
+        sleeps.append(sleep_s)
+        fake_now[0] += sleep_s
+
+    monkeypatch.setattr("live_dcs.time.monotonic", _fake_monotonic)
+    monkeypatch.setattr("live_dcs.time.sleep", _fake_sleep)
+
+    source = ReplayBiosReceiver(replay_path, speed=1.0)
+    try:
+        first = source.get_observation()
+        second = source.get_observation()
+        assert first is not None
+        assert second is not None
+        assert second.payload["seq"] == 2
+    finally:
+        source.close()
+
+    assert sleeps == pytest.approx([0.3], rel=1e-3, abs=1e-3)
+
+
+def test_replay_receiver_speed_zero_disables_pacing(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_speed_zero.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            _bios_frame(1, 200.0, apu_switch=0),
+            _bios_frame(2, 201.0, apu_switch=1),
+        ],
+    )
+
+    sleeps: list[float] = []
+    monkeypatch.setattr("live_dcs.time.sleep", lambda value: sleeps.append(float(value)))
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    try:
+        assert source.get_observation() is not None
+        assert source.get_observation() is not None
+    finally:
+        source.close()
+
+    assert sleeps == []
+
+
 def test_stdin_help_trigger_reader_does_not_enqueue_after_stop_set_during_input(
     monkeypatch,
 ) -> None:
@@ -840,6 +910,55 @@ def test_stdin_help_trigger_reader_does_not_enqueue_after_stop_set_during_input(
     monkeypatch.setattr(builtins, "input", _fake_input)
     trigger._reader()
     assert trigger.poll() is False
+
+
+def test_udp_help_trigger_receives_help_datagram() -> None:
+    trigger = UdpHelpTrigger(host="127.0.0.1", port=0, timeout=0.05)
+    trigger.start()
+    try:
+        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sender.sendto(b"help", ("127.0.0.1", trigger.bound_port))
+        sender.close()
+
+        deadline = time.time() + 1.0
+        fired = False
+        while time.time() < deadline:
+            if trigger.poll():
+                fired = True
+                break
+            time.sleep(0.01)
+        assert fired is True
+    finally:
+        trigger.close()
+
+
+def test_udp_help_payload_rejects_empty_and_accepts_explicit_help() -> None:
+    assert _is_help_trigger_payload("  ") is False
+    assert _is_help_trigger_payload("help") is True
+    assert _is_help_trigger_payload('{"intent":"help"}') is True
+
+
+def test_composite_help_trigger_does_not_drain_all_triggers_in_one_poll() -> None:
+    class QueueTrigger:
+        def __init__(self, queued: int) -> None:
+            self.queued = queued
+
+        def poll(self) -> bool:
+            if self.queued <= 0:
+                return False
+            self.queued -= 1
+            return True
+
+    first = QueueTrigger(queued=1)
+    second = QueueTrigger(queued=1)
+    trigger = CompositeHelpTrigger([first, second])
+
+    assert trigger.poll() is True
+    assert first.queued == 0
+    # second should remain queued for next loop iteration
+    assert second.queued == 1
+    assert trigger.poll() is True
+    assert second.queued == 0
 
 
 def test_load_overlay_allowlist_raises_when_pack_ui_targets_contains_unknown_target(tmp_path: Path) -> None:
