@@ -79,6 +79,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - Single run: `python -m simtutor run ...`
 - Replay: `python -m simtutor replay ...`
 - Replay telemetry: `python -m simtutor replay --telemetry logs/telemetry_*.jsonl`
+- Replay BIOS help loop: `python -m simtutor replay-bios --input logs/dcs_bios_raw.jsonl --auto-help-once`
 - Score: `python -m simtutor score ...`
 - Batch: `python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts`
   - Optional: `--taxonomy packs/fa18c_startup/taxonomy.yaml`
@@ -249,6 +250,19 @@ Optional stdin help trigger:
 python live_dcs.py --stdin-help --dry-run-overlay --model-provider stub
 ```
 Then press `Enter` (or type `help`) to trigger a help cycle on current state.
+
+Replay BIOS via `simtutor` CLI (default safe mode with dry-run overlay):
+```sh
+python -m simtutor replay-bios \
+  --input logs/dcs_bios_raw.jsonl \
+  --speed 1.0 \
+  --help-udp-port 7794 \
+  --model-provider stub \
+  --output logs/replay_bios.jsonl
+```
+Notes:
+- `--speed 1.0`: realtime pacing by frame `t_wall`; `--speed 0`: max speed.
+- `replay-bios` defaults to `--dry-run-overlay`; use `--no-dry-run-overlay` only when you really want to send overlay commands.
 
 Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - `grounding_snippet_ids`: snippet ids actually injected into prompt.

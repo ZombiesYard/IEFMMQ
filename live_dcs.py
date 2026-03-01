@@ -7,6 +7,7 @@ import json
 import math
 import os
 import queue
+import socket
 import threading
 import time
 from dataclasses import dataclass
@@ -72,6 +73,11 @@ class ActionExecutorLike(Protocol):
         ...
 
     def close(self) -> None:
+        ...
+
+
+class HelpTriggerLike(Protocol):
+    def poll(self) -> bool:
         ...
 
 
@@ -355,12 +361,17 @@ class ReplayBiosReceiver:
     - Observation object serialized by Observation.to_dict()
     """
 
-    def __init__(self, path: str | Path, source: str = "dcs_bios_replay") -> None:
+    def __init__(self, path: str | Path, source: str = "dcs_bios_replay", speed: float = 1.0) -> None:
         self.path = Path(path)
         self.source = source
+        self.speed = float(speed)
+        if not math.isfinite(self.speed) or self.speed < 0:
+            raise ValueError("speed must be a finite number >= 0")
         self._fh = self.path.open("r", encoding="utf-8")
         self._lineno = 0
         self.is_exhausted = False
+        self._replay_origin_t_wall: float | None = None
+        self._wall_start_monotonic: float | None = None
 
     def _next_item(self) -> dict[str, Any] | None:
         while True:
@@ -406,11 +417,31 @@ class ReplayBiosReceiver:
             frame = self._extract_frame(item)
             if frame is None:
                 continue
+            self._pace_by_frame_t_wall(frame)
             seq = _coerce_int(frame.get("seq"))
             meta: dict[str, Any] = {"replay": True}
             if seq is not None:
                 meta["seq"] = seq
             return Observation(source=self.source, payload=frame, metadata=meta)
+
+    def _pace_by_frame_t_wall(self, frame: Mapping[str, Any]) -> None:
+        if self.speed == 0:
+            return
+        frame_t_wall = _coerce_float(frame.get("t_wall"))
+        if frame_t_wall is None:
+            return
+
+        if self._replay_origin_t_wall is None or self._wall_start_monotonic is None:
+            self._replay_origin_t_wall = frame_t_wall
+            self._wall_start_monotonic = time.monotonic()
+            return
+
+        elapsed_replay_s = max(0.0, frame_t_wall - self._replay_origin_t_wall)
+        target_elapsed_s = elapsed_replay_s / self.speed
+        target_wall = self._wall_start_monotonic + target_elapsed_s
+        sleep_s = target_wall - time.monotonic()
+        if sleep_s > 0:
+            time.sleep(sleep_s)
 
     def close(self) -> None:
         if not self._fh.closed:
@@ -453,6 +484,90 @@ class StdinHelpTrigger:
                 return
             if line.strip().lower() in {"", "help", "h", "?"}:
                 self._queue.put(None)
+
+
+def _is_help_trigger_payload(text: str) -> bool:
+    normalized = text.strip().lower()
+    if normalized in {"", "help", "h", "?"}:
+        return True
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(obj, Mapping):
+        return False
+    intent = obj.get("intent")
+    if isinstance(intent, str) and intent.strip().lower() == "help":
+        return True
+    action = obj.get("action")
+    if isinstance(action, str) and action.strip().lower() == "help":
+        return True
+    event = obj.get("event")
+    if isinstance(event, str) and event.strip().lower() == "help":
+        return True
+    return False
+
+
+class UdpHelpTrigger:
+    def __init__(self, host: str = "127.0.0.1", port: int = 7794, timeout: float = 0.2) -> None:
+        if int(port) < 0:
+            raise ValueError("port must be >= 0")
+        self.host = host
+        self.port = int(port)
+        self.timeout = max(0.01, float(timeout))
+        self._stop = threading.Event()
+        self._queue: queue.SimpleQueue[None] = queue.SimpleQueue()
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._sock.settimeout(self.timeout)
+        self._sock.bind((self.host, self.port))
+        self._thread = threading.Thread(target=self._reader, daemon=True)
+
+    @property
+    def bound_port(self) -> int:
+        return int(self._sock.getsockname()[1])
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def poll(self) -> bool:
+        try:
+            self._queue.get_nowait()
+            return True
+        except queue.Empty:
+            return False
+
+    def close(self) -> None:
+        self._stop.set()
+        try:
+            self._sock.close()
+        except OSError:
+            pass
+        if self._thread.is_alive():
+            self._thread.join(timeout=self.timeout + 0.2)
+
+    def _reader(self) -> None:
+        while not self._stop.is_set():
+            try:
+                payload, _ = self._sock.recvfrom(4096)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            text = payload.decode("utf-8", errors="ignore")
+            if _is_help_trigger_payload(text):
+                self._queue.put(None)
+
+
+class CompositeHelpTrigger:
+    def __init__(self, triggers: Sequence[HelpTriggerLike]) -> None:
+        self._triggers = list(triggers)
+
+    def poll(self) -> bool:
+        fired = False
+        for trigger in self._triggers:
+            if trigger.poll():
+                fired = True
+        return fired
 
 
 class LiveDcsTutorLoop:
@@ -1045,7 +1160,7 @@ class LiveDcsTutorLoop:
         duration_s: float = 0.0,
         auto_help_on_first_frame: bool = False,
         auto_help_every_n_frames: int = 0,
-        help_trigger: StdinHelpTrigger | None = None,
+        help_trigger: HelpTriggerLike | None = None,
         idle_sleep_s: float = 0.01,
     ) -> dict[str, int]:
         if auto_help_every_n_frames < 0:
@@ -1169,6 +1284,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--auto-help-once", action="store_true", help="Auto trigger one help cycle after first frame")
     parser.add_argument("--auto-help-every-n-frames", type=int, default=0, help="Auto help interval by frame count")
     parser.add_argument("--stdin-help", action="store_true", help="Read stdin trigger: Enter/help/h/?")
+    parser.add_argument("--help-udp-host", default="127.0.0.1", help="UDP host for help trigger listener")
+    parser.add_argument(
+        "--help-udp-port",
+        type=int,
+        default=0,
+        help="UDP port for help trigger listener (0 disables UDP help trigger)",
+    )
+    parser.add_argument(
+        "--help-udp-timeout",
+        type=float,
+        default=0.2,
+        help="UDP help trigger socket timeout seconds",
+    )
     parser.add_argument(
         "--dry-run-overlay",
         action="store_true",
@@ -1176,6 +1304,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument("--replay-bios", help="Replay BIOS JSONL instead of listening UDP")
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=1.0,
+        help="Replay speed multiplier for --replay-bios (1.0 realtime, 0 max speed)",
+    )
 
     parser.add_argument("--model-provider", choices=["stub", "openai_compat", "ollama"], default="stub")
     parser.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
@@ -1195,7 +1329,7 @@ def main() -> int:
 
     source: ObservationSource
     if args.replay_bios:
-        source = ReplayBiosReceiver(args.replay_bios)
+        source = ReplayBiosReceiver(args.replay_bios, speed=args.speed)
     else:
         source = DcsBiosReceiver(
             host=args.host,
@@ -1231,10 +1365,35 @@ def main() -> int:
             dry_run_overlay=bool(args.dry_run_overlay),
         )
 
-        trigger = StdinHelpTrigger() if args.stdin_help else None
-        if trigger is not None:
-            trigger.start()
+        stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
+        udp_trigger = (
+            UdpHelpTrigger(
+                host=args.help_udp_host,
+                port=args.help_udp_port,
+                timeout=args.help_udp_timeout,
+            )
+            if args.help_udp_port > 0
+            else None
+        )
+        trigger_list: list[HelpTriggerLike] = []
+        if stdin_trigger is not None:
+            stdin_trigger.start()
+            trigger_list.append(stdin_trigger)
             print("[LIVE_DCS] stdin trigger enabled: press Enter/help/h/? to trigger help")
+        if udp_trigger is not None:
+            udp_trigger.start()
+            trigger_list.append(udp_trigger)
+            print(
+                f"[LIVE_DCS] udp trigger enabled: send 'help' to "
+                f"{args.help_udp_host}:{udp_trigger.bound_port}"
+            )
+        trigger: HelpTriggerLike | None
+        if len(trigger_list) == 1:
+            trigger = trigger_list[0]
+        elif trigger_list:
+            trigger = CompositeHelpTrigger(trigger_list)
+        else:
+            trigger = None
         try:
             stats = loop.run(
                 max_frames=args.max_frames,
@@ -1244,8 +1403,10 @@ def main() -> int:
                 help_trigger=trigger,
             )
         finally:
-            if trigger is not None:
-                trigger.close()
+            if stdin_trigger is not None:
+                stdin_trigger.close()
+            if udp_trigger is not None:
+                udp_trigger.close()
             loop.close()
 
     print(f"[LIVE_DCS] wrote events to {output}")

@@ -1,5 +1,7 @@
 import argparse
+from datetime import datetime, timezone
 import json
+import os
 from importlib import resources
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Tuple
@@ -73,6 +75,107 @@ def validate(files: list[str], schema_name: str) -> int:
     return 1 if had_error else 0
 
 
+def _new_replay_bios_log_path() -> Path:
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    return Path("logs") / f"replay_bios_{ts}.jsonl"
+
+
+def _build_replay_model_from_args(args: argparse.Namespace) -> Any:
+    from live_dcs import _build_model_from_args
+
+    return _build_model_from_args(args)
+
+
+def _run_replay_bios(args: argparse.Namespace) -> int:
+    from adapters.action_executor import OverlayActionExecutor
+    from core.event_store import JsonlEventStore
+    from live_dcs import (
+        CompositeHelpTrigger,
+        LiveDcsTutorLoop,
+        ReplayBiosReceiver,
+        StdinHelpTrigger,
+        UdpHelpTrigger,
+    )
+
+    output = Path(args.output) if args.output else _new_replay_bios_log_path()
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    source = ReplayBiosReceiver(args.input, speed=args.speed)
+    model = _build_replay_model_from_args(args)
+
+    with JsonlEventStore(output, mode="w") as store:
+        executor = OverlayActionExecutor(
+            ui_map_path=args.ui_map,
+            pack_path=args.pack,
+            dry_run=bool(args.dry_run_overlay),
+            session_id=args.session_id,
+            event_sink=store.append,
+        )
+        loop = LiveDcsTutorLoop(
+            source=source,
+            model=model,
+            action_executor=executor,
+            pack_path=args.pack,
+            ui_map_path=args.ui_map,
+            telemetry_map_path=args.telemetry_map,
+            bios_to_ui_path=args.bios_to_ui,
+            knowledge_index_path=args.knowledge_index,
+            rag_top_k=args.rag_top_k,
+            cooldown_s=args.cooldown_s,
+            session_id=args.session_id,
+            lang=args.lang,
+            event_sink=store.append,
+            dry_run_overlay=bool(args.dry_run_overlay),
+        )
+
+        stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
+        udp_trigger = (
+            UdpHelpTrigger(
+                host=args.help_udp_host,
+                port=args.help_udp_port,
+                timeout=args.help_udp_timeout,
+            )
+            if args.help_udp_port > 0
+            else None
+        )
+        triggers = []
+        if stdin_trigger is not None:
+            stdin_trigger.start()
+            triggers.append(stdin_trigger)
+            print("[REPLAY_BIOS] stdin trigger enabled: press Enter/help/h/?")
+        if udp_trigger is not None:
+            udp_trigger.start()
+            triggers.append(udp_trigger)
+            print(
+                f"[REPLAY_BIOS] udp trigger enabled: send 'help' to "
+                f"{args.help_udp_host}:{udp_trigger.bound_port}"
+            )
+        help_trigger = None
+        if len(triggers) == 1:
+            help_trigger = triggers[0]
+        elif len(triggers) > 1:
+            help_trigger = CompositeHelpTrigger(triggers)
+
+        try:
+            stats = loop.run(
+                max_frames=args.max_frames,
+                duration_s=args.duration,
+                auto_help_on_first_frame=bool(args.auto_help_once),
+                auto_help_every_n_frames=args.auto_help_every_n_frames,
+                help_trigger=help_trigger,
+            )
+        finally:
+            if stdin_trigger is not None:
+                stdin_trigger.close()
+            if udp_trigger is not None:
+                udp_trigger.close()
+            loop.close()
+
+    print(f"[REPLAY_BIOS] wrote events to {output}")
+    print(f"[REPLAY_BIOS] stats={json.dumps(stats, ensure_ascii=False, sort_keys=True)}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="simtutor", description="SimTutor CLI utilities")
     sub = parser.add_subparsers(dest="command")
@@ -108,6 +211,58 @@ def main() -> int:
     batch.add_argument("--output-dir", default="logs", help="Directory to store logs/results.csv")
 
     sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
+
+    rep_bios = sub.add_parser("replay-bios", help="Replay DCS-BIOS JSONL through live tutor pipeline")
+    rep_bios.add_argument("--input", required=True, help="Path to dcs_bios_raw.jsonl")
+    rep_bios.add_argument("--speed", type=float, default=1.0, help="Replay speed (1.0 realtime, 0 max speed)")
+
+    rep_bios.add_argument("--pack", default="packs/fa18c_startup/pack.yaml", help="pack.yaml path")
+    rep_bios.add_argument("--ui-map", default="packs/fa18c_startup/ui_map.yaml", help="ui_map.yaml path")
+    rep_bios.add_argument(
+        "--telemetry-map",
+        default="packs/fa18c_startup/telemetry_map.yaml",
+        help="telemetry_map.yaml path",
+    )
+    rep_bios.add_argument(
+        "--bios-to-ui",
+        default="packs/fa18c_startup/bios_to_ui.yaml",
+        help="bios_to_ui.yaml path",
+    )
+    rep_bios.add_argument("--knowledge-index", default="Doc/Evaluation/index.json", help="Grounding index.json path")
+    rep_bios.add_argument("--rag-top-k", type=int, default=5, help="Grounding snippet top-k")
+
+    rep_bios.add_argument("--output", help="Event log JSONL output path")
+    rep_bios.add_argument("--session-id", default=None, help="Optional event session id")
+    rep_bios.add_argument("--cooldown-s", type=float, default=4.0, help="Help cache cooldown seconds")
+    rep_bios.add_argument("--max-frames", type=int, default=0, help="Max frames to process (0 means unlimited)")
+    rep_bios.add_argument("--duration", type=float, default=0.0, help="Run duration seconds (0 means unlimited)")
+    rep_bios.add_argument("--auto-help-once", action="store_true", help="Auto trigger one help after first frame")
+    rep_bios.add_argument("--auto-help-every-n-frames", type=int, default=0, help="Auto help interval by frames")
+    rep_bios.add_argument("--stdin-help", action="store_true", help="Enable stdin help trigger")
+    rep_bios.add_argument("--help-udp-host", default="127.0.0.1", help="UDP host for help trigger")
+    rep_bios.add_argument("--help-udp-port", type=int, default=0, help="UDP port for help trigger (0 disabled)")
+    rep_bios.add_argument("--help-udp-timeout", type=float, default=0.2, help="UDP help trigger timeout seconds")
+    rep_bios.add_argument(
+        "--dry-run-overlay",
+        dest="dry_run_overlay",
+        action="store_true",
+        default=True,
+        help="Dry-run overlay (default enabled for replay safety)",
+    )
+    rep_bios.add_argument(
+        "--no-dry-run-overlay",
+        dest="dry_run_overlay",
+        action="store_false",
+        help="Disable dry-run overlay and send overlay commands",
+    )
+
+    rep_bios.add_argument("--model-provider", choices=["stub", "openai_compat", "ollama"], default="stub")
+    rep_bios.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
+    rep_bios.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
+    rep_bios.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
+    rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
+    rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
+    rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
 
     args = parser.parse_args()
     if args.command == "validate":
@@ -168,6 +323,12 @@ def main() -> int:
             return 1
         print(f"[MODEL_CONFIG] {cfg.public_startup_info()}")
         return 0
+    if args.command == "replay-bios":
+        try:
+            return _run_replay_bios(args)
+        except Exception as exc:
+            print(f"[REPLAY_BIOS] error: {exc}")
+            return 1
     parser.print_help()
     return 0
 
