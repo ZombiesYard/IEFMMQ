@@ -263,7 +263,7 @@ class LocalKnowledgeAdapter(KnowledgePort):
         snippets, _ = self.retrieve_with_meta(query, top_k=top_k, step_id=step_id)
         return snippets
 
-    def query(self, text: str, k: int = 5):
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
         return self.retrieve(text, top_k=k)
 
 

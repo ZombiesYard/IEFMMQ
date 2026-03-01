@@ -1,3 +1,5 @@
+import json
+
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
     MAX_RECENT_ACTIONS_SIGNAL_ITEMS,
@@ -108,6 +110,52 @@ def test_prompt_effective_grounding_marks_missing_when_no_rag_snippets_injected(
     assert result.metadata["grounding_applied"] is False
     assert result.metadata["grounding_missing"] is True
     assert result.metadata["grounding_reason"] == "no_rag_snippets"
+
+
+def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitted_prompt() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": "S03",
+            "snippet_id": "manual_s03_1",
+            "snippet": "APU switch to ON and wait for APU READY.",
+        }
+    ]
+    ctx["vars"] = {f"v_{i:03d}": "x" * 200 for i in range(120)}
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=560, max_prompt_tokens_est=140)
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert payload["grounding"]["applied"] is False
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["reason"] in {"rag_snippets_not_injected", "no_rag_snippets"}
+    assert result.metadata["rag_snippet_count"] == 0
+    assert result.metadata["rag_snippet_ids"] == []
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+
+
+def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": {"unexpected": "mapping"},
+            "snippet_id": "manual_s03_1",
+            "snippet": "APU switch to ON and wait for APU READY.",
+        }
+    ]
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    rag_block = payload["EVIDENCE_SOURCES"]["RAG_SNIPPETS"]
+    assert len(rag_block) == 1
+    assert "page_or_heading" not in rag_block[0]
 
 
 def test_prompt_contains_strict_json_output_constraints() -> None:

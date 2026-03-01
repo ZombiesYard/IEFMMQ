@@ -4,6 +4,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import queue
 import threading
@@ -190,6 +191,61 @@ def _coerce_int(value: Any) -> int | None:
     if isinstance(value, int):
         return value
     return None
+
+
+def _json_safe_scalar(value: Any) -> str | int | float | bool | None:
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
+        return str(value)
+    return str(value)
+
+
+def _normalize_knowledge_snippet(raw: Mapping[str, Any], fallback_idx: int) -> dict[str, Any]:
+    snippet_id_raw = raw.get("snippet_id")
+    if not isinstance(snippet_id_raw, str) or not snippet_id_raw:
+        snippet_id_raw = raw.get("id")
+    snippet_id = (
+        snippet_id_raw
+        if isinstance(snippet_id_raw, str) and snippet_id_raw
+        else f"snippet_{fallback_idx}"
+    )
+
+    snippet_raw = raw.get("snippet")
+    if snippet_raw is None:
+        snippet_raw = raw.get("text")
+    snippet = str(_json_safe_scalar(snippet_raw or ""))
+
+    doc_id_raw = raw.get("doc_id")
+    if doc_id_raw is None:
+        doc_id = "unknown_doc"
+    else:
+        doc_id = str(_json_safe_scalar(doc_id_raw))
+
+    section_raw = raw.get("section")
+    section_scalar = _json_safe_scalar(section_raw)
+    section = str(section_scalar) if section_scalar is not None else None
+
+    page_or_heading_raw = raw.get("page_or_heading")
+    if page_or_heading_raw is None:
+        page_or_heading_raw = raw.get("page")
+    if page_or_heading_raw is None:
+        page_or_heading_raw = section_raw
+    page_or_heading = _json_safe_scalar(page_or_heading_raw)
+
+    normalized: dict[str, Any] = {
+        "doc_id": doc_id,
+        "section": section,
+        "page_or_heading": page_or_heading,
+        "snippet": snippet,
+        "snippet_id": snippet_id,
+    }
+    score = raw.get("score")
+    if isinstance(score, (int, float)) and not isinstance(score, bool):
+        normalized["score"] = float(score) if math.isfinite(float(score)) else str(score)
+    return normalized
 
 
 def _normalize_help_report(raw: Any) -> dict[str, Any]:
@@ -541,7 +597,11 @@ class LiveDcsTutorLoop:
                 )
             else:
                 queried = knowledge.query(query, k=self.rag_top_k)
-                snippets = [dict(item) for item in queried if isinstance(item, Mapping)]
+                snippets = [
+                    _normalize_knowledge_snippet(item, idx)
+                    for idx, item in enumerate(queried)
+                    if isinstance(item, Mapping)
+                ]
                 retrieve_meta = {
                     "cache_hit": False,
                     "grounding_missing": False,
@@ -633,6 +693,8 @@ class LiveDcsTutorLoop:
 
         prompt_result = build_help_prompt_result(context, self.lang)
         prompt_hash = hashlib.sha256(prompt_result.prompt.encode("utf-8")).hexdigest()
+        prompt_grounding_missing = bool(prompt_result.metadata.get("grounding_missing"))
+        prompt_grounding_reason = prompt_result.metadata.get("grounding_reason")
         req = TutorRequest(
             actor="learner",
             intent="help",
@@ -644,8 +706,10 @@ class LiveDcsTutorLoop:
                 "prompt_tokens_est": int(prompt_result.metadata.get("prompt_tokens_est") or 0),
                 "prompt_trimmed": bool(prompt_result.metadata.get("prompt_trimmed")),
                 "grounding_query": grounding_meta.get("grounding_query"),
-                "grounding_missing": bool(prompt_result.metadata.get("grounding_missing")),
-                "grounding_reason": grounding_meta.get("grounding_reason"),
+                "grounding_missing": prompt_grounding_missing,
+                "grounding_reason": prompt_grounding_reason if isinstance(prompt_grounding_reason, str) else None,
+                "grounding_missing_requested": bool(grounding_meta.get("grounding_missing")),
+                "grounding_reason_requested": grounding_meta.get("grounding_reason"),
                 "grounding_error_type": grounding_meta.get("grounding_error_type"),
                 "grounding_snippet_ids": list(prompt_result.metadata.get("rag_snippet_ids") or []),
                 "grounding_cache_hit": bool(grounding_meta.get("grounding_cache_hit")),

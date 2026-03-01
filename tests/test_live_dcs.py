@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -106,6 +107,26 @@ class QueryOnlyKnowledge:
 class FailingKnowledge:
     def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
         raise RuntimeError("knowledge backend down")
+
+
+class EmptyKnowledge:
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        return []
+
+
+class NonSerializableKnowledge:
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        return [
+            {
+                "doc_id": Path("manual.md"),
+                "section": Path("S03"),
+                "page_or_heading": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                "snippet": {"text": "APU switch to ON"},
+                "snippet_id": Path("manual_s03_1"),
+                "score": 0.9,
+                "unexpected": {"nested": True},
+            }
+        ]
 
 
 def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
@@ -381,6 +402,75 @@ def test_live_loop_degrades_when_knowledge_adapter_raises(tmp_path: Path) -> Non
     assert req_meta["grounding_error_type"] == "RuntimeError"
     assert tutor_request_payload["context"]["rag_topk"] == []
     assert tutor_request_payload["context"]["grounding_reason"] == "knowledge_retrieve_error"
+
+
+def test_live_loop_uses_effective_grounding_reason_when_no_snippets_returned(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_no_snippets.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=EmptyKnowledge(),
+        rag_top_k=2,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is True
+    assert req_meta["grounding_reason"] == "no_rag_snippets"
+    assert req_meta["grounding_missing_requested"] is False
+    assert req_meta["grounding_reason_requested"] is None
+
+
+def test_live_loop_normalizes_query_only_snippets_to_json_safe_scalars(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_query_snippet_normalize.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=NonSerializableKnowledge(),
+        rag_top_k=2,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    rag_topk = tutor_request_payload["context"]["rag_topk"]
+    assert len(rag_topk) == 1
+    first = rag_topk[0]
+    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet", "snippet_id", "score"}
+    assert isinstance(first["doc_id"], str)
+    assert isinstance(first["section"], str)
+    assert isinstance(first["page_or_heading"], str)
+    assert isinstance(first["snippet"], str)
+    assert first["snippet_id"] == "snippet_0"
+    assert req_meta["grounding_snippet_ids"] == ["snippet_0"]
+    json.dumps(tutor_request_payload, ensure_ascii=False)
 
 
 def test_live_loop_does_not_initialize_local_knowledge_when_rag_disabled(tmp_path: Path, monkeypatch) -> None:

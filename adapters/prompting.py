@@ -50,6 +50,10 @@ def _sanitize_scalar(value: Any) -> Any:
     return value
 
 
+def _is_json_scalar(value: Any) -> bool:
+    return value is None or isinstance(value, (str, int, float, bool))
+
+
 def _sanitize_obj(value: Any) -> Any:
     if isinstance(value, Mapping):
         sanitized: dict[str, Any] = {}
@@ -184,7 +188,7 @@ def _build_rag_snippets(context: Mapping[str, Any], max_items: int = MAX_RAG_SNI
             normalized["doc_id"] = _sanitize_scalar(doc_id)
         if isinstance(section, str) and section:
             normalized["section"] = _sanitize_scalar(section)
-        if page_or_heading is not None:
+        if _is_json_scalar(page_or_heading):
             normalized["page_or_heading"] = _sanitize_scalar(page_or_heading)
         out.append(normalized)
     return out
@@ -442,6 +446,7 @@ def build_help_prompt_result(
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
     gates_summary = _build_gates_summary(context)
     rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
+    final_rag_snippets = list(rag_snippets)
     rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
@@ -568,18 +573,20 @@ def build_help_prompt_result(
         if not changed:
             break
         prompt, chars, tokens = _render_and_measure()
+    final_rag_snippets = list(rag_snippets)
 
     if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
+        final_rag_snippets = []
         compact_payload = {
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
             "allowed_error_categories": category_enum,
             "grounding": _build_grounding_payload(
                 context,
-                [],
+                final_rag_snippets,
                 rag_input_count=rag_input_count,
             ),
             "allowed_evidence_refs": allowed_refs,
@@ -611,7 +618,7 @@ def build_help_prompt_result(
 
     grounding_payload = _build_grounding_payload(
         context,
-        rag_snippets,
+        final_rag_snippets,
         rag_input_count=rag_input_count,
     )
 
@@ -626,10 +633,10 @@ def build_help_prompt_result(
         "delta_summary_items": len(recent_deltas_summary["items"]),
         "evidence_refs_count": len(allowed_refs),
         "allowed_evidence_refs": list(allowed_refs),
-        "rag_snippet_count": len(rag_snippets),
+        "rag_snippet_count": len(final_rag_snippets),
         "rag_snippet_ids": [
             str(item.get("id"))
-            for item in rag_snippets
+            for item in final_rag_snippets
             if isinstance(item, Mapping) and isinstance(item.get("id"), str)
         ],
         "grounding_applied": bool(grounding_payload["applied"]),
