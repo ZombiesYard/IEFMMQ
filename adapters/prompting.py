@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -51,7 +52,11 @@ def _sanitize_scalar(value: Any) -> Any:
 
 
 def _is_json_scalar(value: Any) -> bool:
-    return value is None or isinstance(value, (str, int, float, bool))
+    if value is None or isinstance(value, (str, int, bool)):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return False
 
 
 def _sanitize_obj(value: Any) -> Any:

@@ -45,7 +45,9 @@ def build_grounding_query(
     if title:
         parts.append(title)
     if inferred_step:
-        parts.append(inferred_step.strip())
+        step = inferred_step.strip()
+        if step:
+            parts.append(step)
     if missing_conditions:
         parts.extend(_dedupe_strings_keep_order([item.strip() for item in missing_conditions if item.strip()]))
     if recent_ui_targets:

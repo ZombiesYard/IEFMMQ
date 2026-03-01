@@ -35,7 +35,7 @@ from adapters.telemetry_pipeline import enrich_bios_observation
 from core.event_store import JsonlEventStore
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vars import VarResolver
-from ports.knowledge_port import KnowledgePort
+from ports.knowledge_port import KnowledgePort, KnowledgeRetrieveWithMetaPort
 
 
 def _repo_root() -> Path:
@@ -588,9 +588,8 @@ class LiveDcsTutorLoop:
         knowledge: KnowledgePort | None = None
         try:
             knowledge = self._ensure_knowledge()
-            retrieve_with_meta = getattr(knowledge, "retrieve_with_meta", None)
-            if callable(retrieve_with_meta):
-                snippets, retrieve_meta = retrieve_with_meta(
+            if isinstance(knowledge, KnowledgeRetrieveWithMetaPort):
+                snippets, retrieve_meta = knowledge.retrieve_with_meta(
                     query,
                     top_k=self.rag_top_k,
                     step_id=inferred_step_id,

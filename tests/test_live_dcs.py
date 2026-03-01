@@ -129,6 +129,41 @@ class NonSerializableKnowledge:
         ]
 
 
+class MetaKnowledge:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def retrieve_with_meta(
+        self,
+        query: str,
+        top_k: int = 5,
+        *,
+        step_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        self.calls.append({"query": query, "top_k": top_k, "step_id": step_id})
+        snippets = [
+            {
+                "doc_id": "meta_manual",
+                "section": "S03",
+                "page_or_heading": "S03",
+                "snippet": "APU switch ON.",
+                "snippet_id": "meta_s03_1",
+                "score": 1.0,
+            }
+        ]
+        meta = {
+            "cache_hit": True,
+            "grounding_missing": False,
+            "grounding_reason": None,
+            "snippet_ids": ["meta_s03_1"],
+            "index_path": "meta://store",
+        }
+        return snippets, meta
+
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        raise AssertionError("query() should not be called when retrieve_with_meta() is available")
+
+
 def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
     text = "".join(json.dumps(frame, ensure_ascii=False) + "\n" for frame in frames)
     path.write_text(text, encoding="utf-8")
@@ -471,6 +506,39 @@ def test_live_loop_normalizes_query_only_snippets_to_json_safe_scalars(tmp_path:
     assert first["snippet_id"] == "snippet_0"
     assert req_meta["grounding_snippet_ids"] == ["snippet_0"]
     json.dumps(tutor_request_payload, ensure_ascii=False)
+
+
+def test_live_loop_prefers_retrieve_with_meta_protocol_when_available(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_meta_knowledge.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    knowledge = MetaKnowledge()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=knowledge,
+        rag_top_k=2,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(knowledge.calls) == 1
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is False
+    assert req_meta["grounding_cache_hit"] is True
+    assert req_meta["grounding_index_path"] == "meta://store"
+    assert req_meta["grounding_snippet_ids"] == ["meta_s03_1"]
 
 
 def test_live_loop_does_not_initialize_local_knowledge_when_rag_disabled(tmp_path: Path, monkeypatch) -> None:

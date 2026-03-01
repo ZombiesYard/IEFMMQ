@@ -158,6 +158,32 @@ def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
     assert "page_or_heading" not in rag_block[0]
 
 
+def test_prompt_omits_page_or_heading_when_float_not_finite() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": float("nan"),
+            "snippet_id": "manual_s03_1",
+            "snippet": "APU switch to ON and wait for APU READY.",
+        },
+        {
+            "doc_id": "manual",
+            "section": "S04",
+            "page_or_heading": float("inf"),
+            "snippet_id": "manual_s04_1",
+            "snippet": "Engine crank after APU READY.",
+        },
+    ]
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    rag_block = payload["EVIDENCE_SOURCES"]["RAG_SNIPPETS"]
+    assert len(rag_block) == 2
+    assert "page_or_heading" not in rag_block[0]
+    assert "page_or_heading" not in rag_block[1]
+
+
 def test_prompt_contains_strict_json_output_constraints() -> None:
     prompt = build_help_prompt(_base_context(), "en")
     assert "must output exactly one strict JSON object" in prompt

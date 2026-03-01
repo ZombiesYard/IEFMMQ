@@ -148,3 +148,13 @@ def test_build_grounding_query_uses_required_components() -> None:
     assert query == (
         "F/A-18C Cold Start | S03 | vars.apu_ready==true | apu_switch | engine_crank_switch"
     )
+
+
+def test_build_grounding_query_ignores_blank_inferred_step() -> None:
+    query = build_grounding_query(
+        pack_title="F/A-18C Cold Start",
+        inferred_step="   ",
+        missing_conditions=["vars.apu_ready==true"],
+        recent_ui_targets=["apu_switch"],
+    )
+    assert query == "F/A-18C Cold Start | vars.apu_ready==true | apu_switch"
