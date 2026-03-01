@@ -252,7 +252,7 @@ Then press `Enter` (or type `help`) to trigger a help cycle on current state.
 
 Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - `grounding_snippet_ids`: snippet ids actually injected into prompt.
-- `grounding_missing`: `true` when index unavailable (flow degrades safely without crash).
+- `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
 
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
