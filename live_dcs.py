@@ -488,7 +488,8 @@ class StdinHelpTrigger:
 
 def _is_help_trigger_payload(text: str) -> bool:
     normalized = text.strip().lower()
-    if normalized in {"", "help", "h", "?"}:
+    # UDP trigger must be explicit to avoid accidental empty-datagram activation.
+    if normalized in {"help", "h", "?"}:
         return True
     try:
         obj = json.loads(text)
@@ -563,11 +564,10 @@ class CompositeHelpTrigger:
         self._triggers = list(triggers)
 
     def poll(self) -> bool:
-        fired = False
         for trigger in self._triggers:
             if trigger.poll():
-                fired = True
-        return fired
+                return True
+        return False
 
 
 class LiveDcsTutorLoop:

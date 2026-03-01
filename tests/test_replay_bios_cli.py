@@ -8,8 +8,10 @@ import time
 from pathlib import Path
 from typing import Any
 
+from adapters.model_stub import ModelStub
 from core.event_store import JsonlEventStore
 from core.types import Observation, TutorResponse
+from live_dcs import UdpHelpTrigger
 from simtutor.__main__ import main
 
 
@@ -34,15 +36,6 @@ def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
 def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
     text = "".join(json.dumps(frame, ensure_ascii=False) + "\n" for frame in frames)
     path.write_text(text, encoding="utf-8")
-
-
-def _reserve_udp_port() -> int:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-    finally:
-        sock.close()
 
 
 class OverlayModel:
@@ -79,9 +72,15 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
         ],
     )
     output_path = tmp_path / "replay_events.jsonl"
-    udp_port = _reserve_udp_port()
+    udp_state: dict[str, int] = {}
+
+    class EphemeralUdpHelpTrigger(UdpHelpTrigger):
+        def __init__(self, host: str = "127.0.0.1", port: int = 7794, timeout: float = 0.2) -> None:
+            super().__init__(host=host, port=0, timeout=timeout)
+            udp_state["port"] = self.bound_port
 
     monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: OverlayModel())
+    monkeypatch.setattr("live_dcs.UdpHelpTrigger", EphemeralUdpHelpTrigger)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -97,17 +96,20 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
             "--max-frames",
             "2",
             "--help-udp-port",
-            str(udp_port),
+            "1",
             "--lang",
             "en",
         ],
     )
 
     def _send_help() -> None:
-        time.sleep(0.05)
+        deadline = time.time() + 2.0
+        while "port" not in udp_state and time.time() < deadline:
+            time.sleep(0.01)
+        assert "port" in udp_state
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            sock.sendto(b"help", ("127.0.0.1", udp_port))
+            sock.sendto(b"help", ("127.0.0.1", udp_state["port"]))
         finally:
             sock.close()
 
@@ -123,3 +125,48 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
     assert "tutor_request" in kinds
     assert "tutor_response" in kinds
     assert "overlay_dry_run" in kinds
+
+
+def test_cli_replay_bios_closes_source_when_store_enter_fails(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_store_fail.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    output_path = tmp_path / "replay_fail.jsonl"
+
+    close_state = {"closed": False}
+
+    class CloseTrackingReceiver:
+        def __init__(self, *_args, **_kwargs) -> None:
+            return
+
+        def close(self) -> None:
+            close_state["closed"] = True
+
+    class FailingStore:
+        def __init__(self, *_args, **_kwargs) -> None:
+            return
+
+        def __enter__(self):
+            raise RuntimeError("store enter failed")
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr("live_dcs.ReplayBiosReceiver", CloseTrackingReceiver)
+    monkeypatch.setattr("core.event_store.JsonlEventStore", FailingStore)
+    monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: ModelStub(mode="A"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    code = main()
+    assert code == 1
+    assert close_state["closed"] is True

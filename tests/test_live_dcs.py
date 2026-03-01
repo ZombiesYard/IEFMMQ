@@ -13,10 +13,12 @@ import yaml
 
 from core.types import Observation, TutorResponse
 from live_dcs import (
+    CompositeHelpTrigger,
     LiveDcsTutorLoop,
     ReplayBiosReceiver,
     StdinHelpTrigger,
     UdpHelpTrigger,
+    _is_help_trigger_payload,
     _load_overlay_allowlist,
 )
 from tools.index_docs import build_index
@@ -918,6 +920,35 @@ def test_udp_help_trigger_receives_help_datagram() -> None:
         assert fired is True
     finally:
         trigger.close()
+
+
+def test_udp_help_payload_rejects_empty_and_accepts_explicit_help() -> None:
+    assert _is_help_trigger_payload("  ") is False
+    assert _is_help_trigger_payload("help") is True
+    assert _is_help_trigger_payload('{"intent":"help"}') is True
+
+
+def test_composite_help_trigger_does_not_drain_all_triggers_in_one_poll() -> None:
+    class QueueTrigger:
+        def __init__(self, queued: int) -> None:
+            self.queued = queued
+
+        def poll(self) -> bool:
+            if self.queued <= 0:
+                return False
+            self.queued -= 1
+            return True
+
+    first = QueueTrigger(queued=1)
+    second = QueueTrigger(queued=1)
+    trigger = CompositeHelpTrigger([first, second])
+
+    assert trigger.poll() is True
+    assert first.queued == 0
+    # second should remain queued for next loop iteration
+    assert second.queued == 1
+    assert trigger.poll() is True
+    assert second.queued == 0
 
 
 def test_load_overlay_allowlist_raises_when_pack_ui_targets_contains_unknown_target(tmp_path: Path) -> None:
