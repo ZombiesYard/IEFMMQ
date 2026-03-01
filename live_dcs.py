@@ -399,11 +399,9 @@ class LiveDcsTutorLoop:
             if mapper is not None
             else BiosUiMapper.from_yaml(self.bios_to_ui_path, self.ui_map_path)
         )
-        self.knowledge = (
-            knowledge_adapter
-            if knowledge_adapter is not None
-            else LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
-        )
+        self.knowledge: KnowledgePort | None = knowledge_adapter
+        if self.knowledge is None and self.rag_top_k > 0:
+            self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
         self.pack_steps = load_pack_steps(self.pack_path)
         self.candidate_steps = _load_step_ids(self.pack_path)
         self.overlay_allowlist = _load_overlay_allowlist(self.pack_path, self.ui_map_path)
@@ -425,6 +423,26 @@ class LiveDcsTutorLoop:
             self.source.close()
         if hasattr(self.model, "close"):
             self.model.close()
+
+    def _ensure_knowledge(self) -> KnowledgePort:
+        if self.knowledge is None:
+            self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
+        return self.knowledge
+
+    def _knowledge_store_id(self) -> str | None:
+        knowledge = self.knowledge
+        if knowledge is None:
+            return None
+        for attr_name in ("index_path", "store_id", "knowledge_id", "name"):
+            raw = getattr(knowledge, attr_name, None)
+            if raw is None:
+                continue
+            if isinstance(raw, Path):
+                return str(raw)
+            text = str(raw).strip()
+            if text:
+                return text
+        return None
 
     def _emit_event(
         self,
@@ -511,7 +529,8 @@ class LiveDcsTutorLoop:
 
         snippets: list[dict[str, Any]]
         retrieve_meta: dict[str, Any]
-        retrieve_with_meta = getattr(self.knowledge, "retrieve_with_meta", None)
+        knowledge = self._ensure_knowledge()
+        retrieve_with_meta = getattr(knowledge, "retrieve_with_meta", None)
         if callable(retrieve_with_meta):
             snippets, retrieve_meta = retrieve_with_meta(
                 query,
@@ -519,14 +538,14 @@ class LiveDcsTutorLoop:
                 step_id=inferred_step_id,
             )
         else:
-            queried = self.knowledge.query(query, k=self.rag_top_k)
+            queried = knowledge.query(query, k=self.rag_top_k)
             snippets = [dict(item) for item in queried if isinstance(item, Mapping)]
             retrieve_meta = {
                 "cache_hit": False,
                 "grounding_missing": False,
                 "grounding_reason": None,
                 "snippet_ids": [item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)],
-                "index_path": str(self.knowledge_index_path),
+                "index_path": self._knowledge_store_id(),
             }
 
         snippet_ids = [
@@ -539,13 +558,19 @@ class LiveDcsTutorLoop:
         if grounding_missing and not isinstance(grounding_reason, str):
             grounding_reason = "index_missing"
 
+        grounding_index_path = retrieve_meta.get("index_path")
+        if grounding_index_path is None and isinstance(knowledge, LocalKnowledgeAdapter):
+            grounding_index_path = str(self.knowledge_index_path)
+        elif isinstance(grounding_index_path, Path):
+            grounding_index_path = str(grounding_index_path)
+
         return snippets, {
             "grounding_query": query,
             "grounding_missing": grounding_missing,
             "grounding_reason": grounding_reason,
             "grounding_snippet_ids": snippet_ids,
             "grounding_cache_hit": bool(retrieve_meta.get("cache_hit")),
-            "grounding_index_path": str(retrieve_meta.get("index_path") or self.knowledge_index_path),
+            "grounding_index_path": grounding_index_path,
             "grounding_top_k": self.rag_top_k,
         }
 

@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from adapters.knowledge_local import LocalKnowledgeAdapter, build_grounding_query
+from adapters.knowledge_local import (
+    RETRIEVER_POOL_MAX_SIZE,
+    LocalKnowledgeAdapter,
+    build_grounding_query,
+)
 from tools.index_docs import build_index
 
 
@@ -91,6 +95,29 @@ def test_retrieve_without_index_marks_grounding_missing(tmp_path: Path) -> None:
     assert meta["grounding_missing"] is True
     assert meta["grounding_reason"] == "index_missing"
     assert meta["snippet_ids"] == []
+
+
+def test_retrieve_with_invalid_index_marks_load_error(tmp_path: Path) -> None:
+    bad = tmp_path / "bad_index.json"
+    bad.write_text("{invalid json", encoding="utf-8")
+    adapter = LocalKnowledgeAdapter(bad)
+
+    snippets, meta = adapter.retrieve_with_meta("battery apu", top_k=3, step_id="S03")
+    assert snippets == []
+    assert meta["grounding_missing"] is True
+    assert meta["grounding_reason"] == "index_load_error"
+    assert meta["index_error_type"] is not None
+
+
+def test_retriever_pool_is_bounded(tmp_path: Path) -> None:
+    for idx in range(RETRIEVER_POOL_MAX_SIZE + 4):
+        doc = tmp_path / f"doc_{idx}.md"
+        index_path = tmp_path / f"index_{idx}.json"
+        doc.write_text(f"# H{idx}\nBattery on {idx}\n", encoding="utf-8")
+        build_index([str(doc)], str(index_path))
+        LocalKnowledgeAdapter(index_path)
+
+    assert len(LocalKnowledgeAdapter._retriever_pool) <= RETRIEVER_POOL_MAX_SIZE
 
 
 def test_build_grounding_query_uses_required_components() -> None:

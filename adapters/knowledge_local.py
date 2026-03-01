@@ -5,7 +5,9 @@ Local knowledge adapter that serves BM25 retrieval from index.json.
 from __future__ import annotations
 
 import time
+import threading
 from dataclasses import dataclass
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 from collections.abc import Mapping
@@ -16,6 +18,7 @@ from ports.knowledge_port import KnowledgePort
 DEFAULT_INDEX_PATH = Path("Doc") / "Evaluation" / "index.json"
 DEFAULT_STEP_CACHE_TTL_S = 60.0
 DEFAULT_TOP_K = 5
+RETRIEVER_POOL_MAX_SIZE = 8
 
 
 def _dedupe_strings_keep_order(items: list[str]) -> list[str]:
@@ -58,7 +61,8 @@ class _StepCacheEntry:
 
 
 class LocalKnowledgeAdapter(KnowledgePort):
-    _retriever_pool: dict[str, BM25Retriever] = {}
+    _retriever_pool: "OrderedDict[str, BM25Retriever]" = OrderedDict()
+    _retriever_pool_lock = threading.RLock()
 
     def __init__(
         self,
@@ -73,22 +77,36 @@ class LocalKnowledgeAdapter(KnowledgePort):
         self._time_fn = time_fn or time.monotonic
         self._step_cache: dict[str, _StepCacheEntry] = {}
         self._last_retrieve_metadata: dict[str, Any] = {}
+        self._index_state: str = "unknown"
+        self._index_error_type: str | None = None
         self.retriever = self._load_retriever(self.index_path)
 
-    @classmethod
-    def _load_retriever(cls, path: Path) -> BM25Retriever | None:
+    def _load_retriever(self, path: Path) -> BM25Retriever | None:
         key = str(path.resolve())
-        cached = cls._retriever_pool.get(key)
-        if cached is not None:
-            return cached
         if not path.is_file():
+            self._index_state = "missing"
+            self._index_error_type = None
             return None
-        try:
-            retriever = BM25Retriever(path)
-        except Exception:
-            return None
-        cls._retriever_pool[key] = retriever
-        return retriever
+        with self._retriever_pool_lock:
+            cached = self._retriever_pool.get(key)
+            if cached is not None:
+                self._retriever_pool.move_to_end(key)
+                self._index_state = "ready"
+                self._index_error_type = None
+                return cached
+            try:
+                retriever = BM25Retriever(path)
+            except Exception as exc:
+                self._index_state = "load_error"
+                self._index_error_type = type(exc).__name__
+                return None
+            self._retriever_pool[key] = retriever
+            self._retriever_pool.move_to_end(key)
+            while len(self._retriever_pool) > RETRIEVER_POOL_MAX_SIZE:
+                self._retriever_pool.popitem(last=False)
+            self._index_state = "ready"
+            self._index_error_type = None
+            return retriever
 
     @property
     def has_index(self) -> bool:
@@ -141,12 +159,17 @@ class LocalKnowledgeAdapter(KnowledgePort):
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         k = max(0, int(top_k))
         if self.retriever is None:
+            if self._index_state == "load_error":
+                grounding_reason = "index_load_error"
+            else:
+                grounding_reason = "index_missing"
             meta = {
                 "query": query,
                 "top_k": k,
                 "cache_hit": False,
                 "grounding_missing": True,
-                "grounding_reason": "index_missing",
+                "grounding_reason": grounding_reason,
+                "index_error_type": self._index_error_type,
                 "snippet_ids": [],
                 "index_path": str(self.index_path),
             }
@@ -221,6 +244,7 @@ class LocalKnowledgeAdapter(KnowledgePort):
 __all__ = [
     "DEFAULT_INDEX_PATH",
     "DEFAULT_STEP_CACHE_TTL_S",
+    "RETRIEVER_POOL_MAX_SIZE",
     "LocalKnowledgeAdapter",
     "build_grounding_query",
 ]

@@ -303,7 +303,36 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_snippet_ids"] == ["manual_s03_1"]
+    assert req_meta["grounding_index_path"] is None
     assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s03_1"
+
+
+def test_live_loop_does_not_initialize_local_knowledge_when_rag_disabled(tmp_path: Path, monkeypatch) -> None:
+    replay_path = tmp_path / "bios_rag_disabled.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+
+    def _raise_local_knowledge(*_args, **_kwargs):
+        raise AssertionError("LocalKnowledgeAdapter should not be initialized when rag_top_k=0")
+
+    monkeypatch.setattr("live_dcs.LocalKnowledgeAdapter", _raise_local_knowledge)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        rag_top_k=0,
+    )
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 1
 
 
 def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path: Path) -> None:
