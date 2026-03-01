@@ -67,12 +67,19 @@ def test_retrieve_caches_same_step_within_60_seconds(tmp_path: Path) -> None:
     adapter.retrieve(query, top_k=3, step_id="S03")
     assert calls["count"] == 1
 
-    adapter.retrieve(query, top_k=3, step_id="S04")
+    alt_query = "S03 engine_crank_switch"
+    adapter.retrieve(alt_query, top_k=3, step_id="S03")
     assert calls["count"] == 2
+
+    adapter.retrieve(alt_query, top_k=3, step_id="S03")
+    assert calls["count"] == 2
+
+    adapter.retrieve(query, top_k=3, step_id="S04")
+    assert calls["count"] == 3
 
     now[0] += 31.0
     adapter.retrieve(query, top_k=3, step_id="S03")
-    assert calls["count"] == 3
+    assert calls["count"] == 4
 
 
 def test_retrieve_without_index_marks_grounding_missing(tmp_path: Path) -> None:

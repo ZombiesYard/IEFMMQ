@@ -85,6 +85,24 @@ class RecordingExecutor:
         return
 
 
+class QueryOnlyKnowledge:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        self.calls.append({"text": text, "k": k})
+        return [
+            {
+                "doc_id": "manual",
+                "section": "S03",
+                "page_or_heading": "S03",
+                "snippet": "APU switch to ON and wait for APU READY.",
+                "snippet_id": "manual_s03_1",
+                "score": 1.0,
+            }
+        ]
+
+
 def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
     text = "".join(json.dumps(frame, ensure_ascii=False) + "\n" for frame in frames)
     path.write_text(text, encoding="utf-8")
@@ -253,6 +271,39 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
     prompt_build = tutor_response_payload["metadata"]["prompt_build"]
     assert prompt_build["grounding_missing"] is True
     assert prompt_build["rag_snippet_ids"] == []
+
+
+def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_query_only_knowledge.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    knowledge = QueryOnlyKnowledge()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=knowledge,
+        rag_top_k=2,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(knowledge.calls) == 1
+    assert knowledge.calls[0]["k"] == 2
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is False
+    assert req_meta["grounding_snippet_ids"] == ["manual_s03_1"]
+    assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s03_1"
 
 
 def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path: Path) -> None:

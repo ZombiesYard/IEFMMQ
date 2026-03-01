@@ -169,7 +169,11 @@ class LocalKnowledgeAdapter(KnowledgePort):
         cache_key = step_id if isinstance(step_id, str) and step_id else None
         if cache_key is not None:
             cached = self._step_cache.get(cache_key)
-            if cached is not None and (now - cached.t_mono) <= self.step_cache_ttl_s:
+            if (
+                cached is not None
+                and (now - cached.t_mono) <= self.step_cache_ttl_s
+                and cached.query == query
+            ):
                 snippets = [dict(item) for item in cached.snippets[:k]]
                 meta = {
                     "query": query,

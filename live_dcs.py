@@ -34,6 +34,7 @@ from adapters.telemetry_pipeline import enrich_bios_observation
 from core.event_store import JsonlEventStore
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vars import VarResolver
+from ports.knowledge_port import KnowledgePort
 
 
 def _repo_root() -> Path:
@@ -367,7 +368,7 @@ class LiveDcsTutorLoop:
         lang: str = "zh",
         event_sink: Callable[[Event], None] | None = None,
         dry_run_overlay: bool = False,
-        knowledge_adapter: LocalKnowledgeAdapter | None = None,
+        knowledge_adapter: KnowledgePort | None = None,
         knowledge_index_path: str | Path | None = None,
         rag_top_k: int = 5,
     ) -> None:
@@ -510,8 +511,9 @@ class LiveDcsTutorLoop:
 
         snippets: list[dict[str, Any]]
         retrieve_meta: dict[str, Any]
-        if hasattr(self.knowledge, "retrieve_with_meta"):
-            snippets, retrieve_meta = self.knowledge.retrieve_with_meta(  # type: ignore[attr-defined]
+        retrieve_with_meta = getattr(self.knowledge, "retrieve_with_meta", None)
+        if callable(retrieve_with_meta):
+            snippets, retrieve_meta = retrieve_with_meta(
                 query,
                 top_k=self.rag_top_k,
                 step_id=inferred_step_id,
