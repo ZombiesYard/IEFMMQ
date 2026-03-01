@@ -88,10 +88,18 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - Build index: `python -m tools.index_docs --output Doc/Evaluation/index.json`
 - Query example (Python):
   ```python
-  from adapters.knowledge_local import LocalKnowledgeAdapter
+  from adapters.knowledge_local import LocalKnowledgeAdapter, build_grounding_query
   kg = LocalKnowledgeAdapter()  # defaults Doc/Evaluation/index.json
-  print(kg.query("battery on fire test", k=3))
+  query = build_grounding_query(
+      pack_title="F/A-18C Cold Start (MVP subset)",
+      inferred_step="S03",
+      missing_conditions=["vars.apu_ready==true"],
+      recent_ui_targets=["apu_switch"],
+  )
+  print(kg.retrieve(query, top_k=3, step_id="S03"))
   ```
+- `retrieve()` result fields: `doc_id/section/page_or_heading/snippet/snippet_id/score`.
+- Same `step_id` uses 60s retrieval cache by default.
 
 ## DCS Overlay Quick Test
 - With `VRHilite.lua` running in DCS (listening 127.0.0.1:7778):
@@ -228,6 +236,8 @@ python live_dcs.py \
   --model-name Qwen3-8B-Instruct \
   --model-base-url http://127.0.0.1:8000 \
   --model-api-key "${SIMTUTOR_MODEL_API_KEY}" \
+  --knowledge-index Doc/Evaluation/index.json \
+  --rag-top-k 5 \
   --output logs/live_dcs_live.jsonl
 ```
 Note:
@@ -239,6 +249,10 @@ Optional stdin help trigger:
 python live_dcs.py --stdin-help --dry-run-overlay --model-provider stub
 ```
 Then press `Enter` (or type `help`) to trigger a help cycle on current state.
+
+Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
+- `grounding_snippet_ids`: snippet ids actually injected into prompt.
+- `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
 
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`

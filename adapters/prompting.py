@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -41,6 +42,10 @@ def _is_sensitive_key(key: str) -> bool:
 
 
 def _sanitize_scalar(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        if math.isnan(value):
+            return "NaN"
+        return "Infinity" if value > 0 else "-Infinity"
     if not isinstance(value, str):
         return value
     if _ABS_WIN_PATH_RE.match(value) or _ABS_POSIX_PATH_RE.match(value):
@@ -48,6 +53,14 @@ def _sanitize_scalar(value: Any) -> Any:
     if "sk-" in value or "api_key" in value.lower() or "token=" in value.lower():
         return "[REDACTED_SECRET]"
     return value
+
+
+def _is_json_scalar(value: Any) -> bool:
+    if value is None or isinstance(value, (str, int, bool)):
+        return True
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return False
 
 
 def _sanitize_obj(value: Any) -> Any:
@@ -161,17 +174,32 @@ def _build_rag_snippets(context: Mapping[str, Any], max_items: int = MAX_RAG_SNI
         if len(out) >= max_items:
             break
         if isinstance(item, Mapping):
-            snippet_id = item.get("id") or f"snippet_{len(out)}"
+            snippet_id = item.get("snippet_id") or item.get("id") or f"snippet_{len(out)}"
             snippet = str(item.get("snippet", ""))
+            doc_id = item.get("doc_id")
+            section = item.get("section")
+            page_or_heading = item.get("page_or_heading")
+            if page_or_heading is None:
+                page_or_heading = item.get("page")
+            if page_or_heading is None:
+                page_or_heading = section
         else:
             snippet_id = f"snippet_{len(out)}"
             snippet = str(item)
-        out.append(
-            {
-                "id": _sanitize_scalar(str(snippet_id)),
-                "snippet": _sanitize_scalar(snippet[:MAX_RAG_SNIPPET_CHARS]),
-            }
-        )
+            doc_id = None
+            section = None
+            page_or_heading = None
+        normalized: dict[str, Any] = {
+            "id": _sanitize_scalar(str(snippet_id)),
+            "snippet": _sanitize_scalar(snippet[:MAX_RAG_SNIPPET_CHARS]),
+        }
+        if isinstance(doc_id, str) and doc_id:
+            normalized["doc_id"] = _sanitize_scalar(doc_id)
+        if isinstance(section, str) and section:
+            normalized["section"] = _sanitize_scalar(section)
+        if _is_json_scalar(page_or_heading):
+            normalized["page_or_heading"] = _sanitize_scalar(page_or_heading)
+        out.append(normalized)
     return out
 
 
@@ -330,13 +358,18 @@ def _build_evidence_sources(
     rag_block: list[dict[str, Any]] = []
     for item in rag_snippets:
         snippet_id = item.get("id", "snippet")
-        rag_block.append(
-            {
-                "ref": f"RAG_SNIPPETS.{snippet_id}",
-                "id": snippet_id,
-                "snippet": item.get("snippet"),
-            }
-        )
+        rag_entry: dict[str, Any] = {
+            "ref": f"RAG_SNIPPETS.{snippet_id}",
+            "id": snippet_id,
+            "snippet": item.get("snippet"),
+        }
+        if "doc_id" in item:
+            rag_entry["doc_id"] = item.get("doc_id")
+        if "section" in item:
+            rag_entry["section"] = item.get("section")
+        if "page_or_heading" in item:
+            rag_entry["page_or_heading"] = item.get("page_or_heading")
+        rag_block.append(rag_entry)
 
     evidence = {
         "VARS": vars_block,
@@ -353,12 +386,41 @@ def _build_evidence_sources(
     return evidence, allowed_refs
 
 
+def _build_grounding_payload(
+    context: Mapping[str, Any],
+    rag_snippets: list[dict[str, Any]],
+    *,
+    rag_input_count: int,
+) -> dict[str, Any]:
+    requested_missing = bool(context.get("grounding_missing"))
+    requested_reason = context.get("grounding_reason")
+    requested_reason_str = _sanitize_scalar(requested_reason) if isinstance(requested_reason, str) else None
+    applied = bool(rag_snippets)
+    missing_effective = requested_missing or (not applied)
+    reason_effective = requested_reason_str
+    if missing_effective and reason_effective is None:
+        if requested_missing:
+            reason_effective = "grounding_unavailable"
+        elif rag_input_count > 0:
+            reason_effective = "rag_snippets_not_injected"
+        else:
+            reason_effective = "no_rag_snippets"
+    return {
+        "requested_missing": requested_missing,
+        "missing": missing_effective,
+        "applied": applied,
+        "reason": reason_effective,
+        "query": _sanitize_scalar(context.get("grounding_query")),
+    }
+
+
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
         f"{header}\n"
         f"Rules:\n{rendered_rules}\n"
-        f"Context and constraints JSON:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+        f"Context and constraints JSON:\n"
+        f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
         "Output must follow this schema shape exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
@@ -394,6 +456,7 @@ def build_help_prompt_result(
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
     gates_summary = _build_gates_summary(context)
     rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
+    rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
 
@@ -475,6 +538,11 @@ def build_help_prompt_result(
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
+            "grounding": _build_grounding_payload(
+                context,
+                rag_snippets,
+                rag_input_count=rag_input_count,
+            ),
             "EVIDENCE_SOURCES": evidence_sources,
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": example_obj,
@@ -514,21 +582,30 @@ def build_help_prompt_result(
         if not changed:
             break
         prompt, chars, tokens = _render_and_measure()
+    final_rag_snippets = list(rag_snippets)
+    final_allowed_refs = list(allowed_refs)
 
     if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
+        final_rag_snippets = []
+        final_allowed_refs = []
         compact_payload = {
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
             "allowed_error_categories": category_enum,
-            "allowed_evidence_refs": allowed_refs,
+            "grounding": _build_grounding_payload(
+                context,
+                final_rag_snippets,
+                rag_input_count=rag_input_count,
+            ),
+            "allowed_evidence_refs": final_allowed_refs,
             "output_example_json": payload.get("output_example_json", {}),
         }
         prompt = (
             f"{compact_header}\n"
-            f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+            f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
             "JSON only."
         )
         chars = len(prompt)
@@ -550,6 +627,12 @@ def build_help_prompt_result(
             f"reasons={trim_reasons}, chars={chars}/{max_prompt_chars}, tokens_est={tokens}/{max_prompt_tokens_est}"
         )
 
+    grounding_payload = _build_grounding_payload(
+        context,
+        final_rag_snippets,
+        rag_input_count=rag_input_count,
+    )
+
     meta = {
         "max_prompt_chars": max_prompt_chars,
         "max_prompt_tokens_est": max_prompt_tokens_est,
@@ -559,8 +642,18 @@ def build_help_prompt_result(
         "trim_reasons": trim_reasons,
         "delta_summary_top_k": recent_deltas_summary["top_k"],
         "delta_summary_items": len(recent_deltas_summary["items"]),
-        "evidence_refs_count": len(allowed_refs),
-        "allowed_evidence_refs": list(allowed_refs),
+        "evidence_refs_count": len(final_allowed_refs),
+        "allowed_evidence_refs": list(final_allowed_refs),
+        "rag_snippet_count": len(final_rag_snippets),
+        "rag_snippet_ids": [
+            str(item.get("id"))
+            for item in final_rag_snippets
+            if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+        ],
+        "grounding_applied": bool(grounding_payload["applied"]),
+        "grounding_missing_requested": bool(grounding_payload["requested_missing"]),
+        "grounding_missing": bool(grounding_payload["missing"]),
+        "grounding_reason": grounding_payload["reason"],
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
 

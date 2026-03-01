@@ -1,3 +1,5 @@
+import json
+
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
     MAX_RECENT_ACTIONS_SIGNAL_ITEMS,
@@ -42,11 +44,163 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
     assert payload["deterministic_step_hint"]["inferred_step_id"] is None
     assert payload["deterministic_step_hint"]["missing_conditions"] == []
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["applied"] is False
 
     sample_evidence = payload["output_example_json"]["overlay"]["evidence"][0]
     assert sample_evidence["type"] in {"var", "gate", "rag", "delta"}
     assert sample_evidence["ref"] in payload["allowed_evidence_refs"]
     assert len(sample_evidence["quote"]) <= 120
+
+
+def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "fa18c_startup_master",
+            "section": "S03",
+            "page_or_heading": "S03",
+            "snippet_id": "fa18c_startup_master_12",
+            "snippet": "APU switch to ON and wait for the green APU READY light.",
+        }
+    ]
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    rag_block = payload["EVIDENCE_SOURCES"]["RAG_SNIPPETS"]
+    assert len(rag_block) == 1
+    assert rag_block[0]["id"] == "fa18c_startup_master_12"
+    assert rag_block[0]["doc_id"] == "fa18c_startup_master"
+    assert rag_block[0]["section"] == "S03"
+    assert rag_block[0]["page_or_heading"] == "S03"
+    assert "RAG_SNIPPETS.fa18c_startup_master_12" in payload["allowed_evidence_refs"]
+    assert payload["grounding"]["applied"] is True
+    assert payload["grounding"]["missing"] is False
+    assert result.metadata["rag_snippet_ids"] == ["fa18c_startup_master_12"]
+    assert result.metadata["grounding_applied"] is True
+    assert result.metadata["grounding_missing"] is False
+
+
+def test_prompt_metadata_marks_grounding_missing_when_context_flagged() -> None:
+    ctx = _base_context()
+    ctx["grounding_missing"] = True
+    ctx["grounding_reason"] = "index_missing"
+    ctx["grounding_query"] = "F/A-18C | S03 | apu_switch"
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    assert payload["grounding"]["requested_missing"] is True
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["applied"] is False
+    assert payload["grounding"]["reason"] == "index_missing"
+    assert payload["grounding"]["query"] == "F/A-18C | S03 | apu_switch"
+    assert result.metadata["grounding_missing_requested"] is True
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+
+
+def test_prompt_effective_grounding_marks_missing_when_no_rag_snippets_injected() -> None:
+    ctx = _base_context()
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    assert payload["grounding"]["requested_missing"] is False
+    assert payload["grounding"]["applied"] is False
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["reason"] == "no_rag_snippets"
+    assert result.metadata["grounding_missing_requested"] is False
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+    assert result.metadata["grounding_reason"] == "no_rag_snippets"
+
+
+def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitted_prompt() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": "S03",
+            "snippet_id": "manual_s03_1",
+            "snippet": "APU switch to ON and wait for APU READY.",
+        }
+    ]
+    ctx["vars"] = {f"v_{i:03d}": "x" * 200 for i in range(120)}
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=560, max_prompt_tokens_est=140)
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert payload["grounding"]["applied"] is False
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["reason"] in {"rag_snippets_not_injected", "no_rag_snippets"}
+    assert payload["allowed_evidence_refs"] == []
+    assert result.metadata["rag_snippet_count"] == 0
+    assert result.metadata["rag_snippet_ids"] == []
+    assert result.metadata["allowed_evidence_refs"] == []
+    assert result.metadata["evidence_refs_count"] == 0
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+
+
+def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": {"unexpected": "mapping"},
+            "snippet_id": "manual_s03_1",
+            "snippet": "APU switch to ON and wait for APU READY.",
+        }
+    ]
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    rag_block = payload["EVIDENCE_SOURCES"]["RAG_SNIPPETS"]
+    assert len(rag_block) == 1
+    assert "page_or_heading" not in rag_block[0]
+
+
+def test_prompt_omits_page_or_heading_when_float_not_finite() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": float("nan"),
+            "snippet_id": "manual_s03_1",
+            "snippet": "APU switch to ON and wait for APU READY.",
+        },
+        {
+            "doc_id": "manual",
+            "section": "S04",
+            "page_or_heading": float("inf"),
+            "snippet_id": "manual_s04_1",
+            "snippet": "Engine crank after APU READY.",
+        },
+    ]
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    rag_block = payload["EVIDENCE_SOURCES"]["RAG_SNIPPETS"]
+    assert len(rag_block) == 2
+    assert "page_or_heading" not in rag_block[0]
+    assert "page_or_heading" not in rag_block[1]
+
+
+def test_prompt_sanitizes_non_finite_float_vars_to_strict_json_scalars() -> None:
+    ctx = _base_context()
+    ctx["vars"]["nan_value"] = float("nan")
+    ctx["vars"]["pos_inf"] = float("inf")
+    ctx["vars"]["neg_inf"] = float("-inf")
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    selected = payload["current_vars_selected"]
+    assert selected["nan_value"] == "NaN"
+    assert selected["pos_inf"] == "Infinity"
+    assert selected["neg_inf"] == "-Infinity"
+    assert ":NaN" not in result.prompt
+    assert ":Infinity" not in result.prompt
+    assert ":-Infinity" not in result.prompt
 
 
 def test_prompt_contains_strict_json_output_constraints() -> None:
@@ -85,7 +239,13 @@ def test_delta_summary_top_k_is_capped_to_20() -> None:
         many.append({"mapped_ui_target": f"target_{i:02d}", "from": 0, "to": 1, "action": "toggle"})
     ctx["recent_deltas"] = many
 
-    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+    result = build_help_prompt_result(
+        ctx,
+        "en",
+        max_prompt_chars=20000,
+        max_prompt_tokens_est=6000,
+    )
+    payload = _extract_prompt_constraints_json(result.prompt)
     summary = payload["recent_deltas_summary"]
     assert summary["top_k"] == MAX_DELTA_SUMMARY_ITEMS
     assert len(summary["items"]) == MAX_DELTA_SUMMARY_ITEMS
