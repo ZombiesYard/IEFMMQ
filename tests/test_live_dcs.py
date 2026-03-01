@@ -849,7 +849,18 @@ def test_replay_receiver_speed_realtime_paces_by_t_wall(monkeypatch, tmp_path: P
     )
 
     sleeps: list[float] = []
-    monkeypatch.setattr("live_dcs.time.sleep", lambda value: sleeps.append(float(value)))
+    fake_now = [1000.0]
+
+    def _fake_monotonic() -> float:
+        return fake_now[0]
+
+    def _fake_sleep(value: float) -> None:
+        sleep_s = float(value)
+        sleeps.append(sleep_s)
+        fake_now[0] += sleep_s
+
+    monkeypatch.setattr("live_dcs.time.monotonic", _fake_monotonic)
+    monkeypatch.setattr("live_dcs.time.sleep", _fake_sleep)
 
     source = ReplayBiosReceiver(replay_path, speed=1.0)
     try:
@@ -861,8 +872,7 @@ def test_replay_receiver_speed_realtime_paces_by_t_wall(monkeypatch, tmp_path: P
     finally:
         source.close()
 
-    assert sleeps
-    assert max(sleeps) > 0.2
+    assert sleeps == pytest.approx([0.3], rel=1e-3, abs=1e-3)
 
 
 def test_replay_receiver_speed_zero_disables_pacing(monkeypatch, tmp_path: Path) -> None:
