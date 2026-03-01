@@ -78,10 +78,12 @@ def test_prompt_metadata_marks_grounding_missing_when_context_flagged() -> None:
     ctx = _base_context()
     ctx["grounding_missing"] = True
     ctx["grounding_reason"] = "index_missing"
+    ctx["grounding_query"] = "F/A-18C | S03 | apu_switch"
     result = build_help_prompt_result(ctx, "en")
     payload = _extract_prompt_constraints_json(result.prompt)
     assert payload["grounding"]["missing"] is True
     assert payload["grounding"]["reason"] == "index_missing"
+    assert payload["grounding"]["query"] == "F/A-18C | S03 | apu_switch"
     assert result.metadata["grounding_missing"] is True
 
 

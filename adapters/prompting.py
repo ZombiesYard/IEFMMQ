@@ -498,6 +498,7 @@ def build_help_prompt_result(
             "grounding": {
                 "missing": bool(context.get("grounding_missing")),
                 "reason": _sanitize_scalar(context.get("grounding_reason")),
+                "query": _sanitize_scalar(context.get("grounding_query")),
             },
             "EVIDENCE_SOURCES": evidence_sources,
             "allowed_evidence_refs": allowed_refs,
@@ -550,6 +551,7 @@ def build_help_prompt_result(
             "grounding": {
                 "missing": bool(context.get("grounding_missing")),
                 "reason": _sanitize_scalar(context.get("grounding_reason")),
+                "query": _sanitize_scalar(context.get("grounding_query")),
             },
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": payload.get("output_example_json", {}),

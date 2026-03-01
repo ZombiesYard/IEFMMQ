@@ -103,6 +103,11 @@ class QueryOnlyKnowledge:
         ]
 
 
+class FailingKnowledge:
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        raise RuntimeError("knowledge backend down")
+
+
 def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
     text = "".join(json.dumps(frame, ensure_ascii=False) + "\n" for frame in frames)
     path.write_text(text, encoding="utf-8")
@@ -264,7 +269,10 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is True
+    assert req_meta["grounding_reason"] == "index_missing"
     assert req_meta["grounding_snippet_ids"] == []
+    assert tutor_request_payload["context"]["grounding_reason"] == "index_missing"
+    assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
     assert tutor_request_payload["context"]["rag_topk"] == []
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
@@ -302,9 +310,45 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is False
+    assert req_meta["grounding_reason"] is None
     assert req_meta["grounding_snippet_ids"] == ["manual_s03_1"]
     assert req_meta["grounding_index_path"] is None
+    assert tutor_request_payload["context"]["grounding_reason"] is None
+    assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
     assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s03_1"
+
+
+def test_live_loop_degrades_when_knowledge_adapter_raises(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_knowledge_error.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=FailingKnowledge(),
+        rag_top_k=2,
+    )
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 1
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is True
+    assert req_meta["grounding_reason"] == "knowledge_retrieve_error"
+    assert req_meta["grounding_error_type"] == "RuntimeError"
+    assert tutor_request_payload["context"]["rag_topk"] == []
+    assert tutor_request_payload["context"]["grounding_reason"] == "knowledge_retrieve_error"
 
 
 def test_live_loop_does_not_initialize_local_knowledge_when_rag_disabled(tmp_path: Path, monkeypatch) -> None:

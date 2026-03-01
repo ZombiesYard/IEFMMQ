@@ -529,23 +529,39 @@ class LiveDcsTutorLoop:
 
         snippets: list[dict[str, Any]]
         retrieve_meta: dict[str, Any]
-        knowledge = self._ensure_knowledge()
-        retrieve_with_meta = getattr(knowledge, "retrieve_with_meta", None)
-        if callable(retrieve_with_meta):
-            snippets, retrieve_meta = retrieve_with_meta(
-                query,
-                top_k=self.rag_top_k,
-                step_id=inferred_step_id,
-            )
-        else:
-            queried = knowledge.query(query, k=self.rag_top_k)
-            snippets = [dict(item) for item in queried if isinstance(item, Mapping)]
+        knowledge: KnowledgePort | None = None
+        try:
+            knowledge = self._ensure_knowledge()
+            retrieve_with_meta = getattr(knowledge, "retrieve_with_meta", None)
+            if callable(retrieve_with_meta):
+                snippets, retrieve_meta = retrieve_with_meta(
+                    query,
+                    top_k=self.rag_top_k,
+                    step_id=inferred_step_id,
+                )
+            else:
+                queried = knowledge.query(query, k=self.rag_top_k)
+                snippets = [dict(item) for item in queried if isinstance(item, Mapping)]
+                retrieve_meta = {
+                    "cache_hit": False,
+                    "grounding_missing": False,
+                    "grounding_reason": None,
+                    "snippet_ids": [
+                        item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)
+                    ],
+                    "index_path": self._knowledge_store_id(),
+                }
+        except Exception as exc:
+            snippets = []
             retrieve_meta = {
                 "cache_hit": False,
-                "grounding_missing": False,
-                "grounding_reason": None,
-                "snippet_ids": [item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)],
-                "index_path": self._knowledge_store_id(),
+                "grounding_missing": True,
+                "grounding_reason": "knowledge_retrieve_error",
+                "grounding_error_type": type(exc).__name__,
+                "snippet_ids": [],
+                "index_path": self._knowledge_store_id()
+                if knowledge is not None
+                else str(self.knowledge_index_path),
             }
 
         snippet_ids = [
@@ -568,6 +584,7 @@ class LiveDcsTutorLoop:
             "grounding_query": query,
             "grounding_missing": grounding_missing,
             "grounding_reason": grounding_reason,
+            "grounding_error_type": retrieve_meta.get("grounding_error_type"),
             "grounding_snippet_ids": snippet_ids,
             "grounding_cache_hit": bool(retrieve_meta.get("cache_hit")),
             "grounding_index_path": grounding_index_path,
@@ -607,6 +624,8 @@ class LiveDcsTutorLoop:
             "deterministic_step_hint": deterministic_hint,
             "rag_topk": rag_topk,
             "grounding_missing": bool(grounding_meta.get("grounding_missing")),
+            "grounding_reason": grounding_meta.get("grounding_reason"),
+            "grounding_query": grounding_meta.get("grounding_query"),
             "delta_summary": payload.get("delta_summary", {}),
             "delta_dropped_count": obs.metadata.get("delta_dropped_count"),
         }
@@ -626,6 +645,7 @@ class LiveDcsTutorLoop:
                 "grounding_query": grounding_meta.get("grounding_query"),
                 "grounding_missing": bool(prompt_result.metadata.get("grounding_missing")),
                 "grounding_reason": grounding_meta.get("grounding_reason"),
+                "grounding_error_type": grounding_meta.get("grounding_error_type"),
                 "grounding_snippet_ids": list(prompt_result.metadata.get("rag_snippet_ids") or []),
                 "grounding_cache_hit": bool(grounding_meta.get("grounding_cache_hit")),
                 "grounding_index_path": grounding_meta.get("grounding_index_path"),
