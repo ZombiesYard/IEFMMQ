@@ -2,6 +2,7 @@ from pathlib import Path
 
 from adapters.knowledge_local import (
     RETRIEVER_POOL_MAX_SIZE,
+    STEP_CACHE_MAX_SIZE,
     LocalKnowledgeAdapter,
     build_grounding_query,
 )
@@ -64,26 +65,32 @@ def test_retrieve_caches_same_step_within_60_seconds(tmp_path: Path) -> None:
     adapter.retriever.query = _counted_query  # type: ignore[assignment]
 
     query = "S03 apu_ready apu_switch"
-    adapter.retrieve(query, top_k=3, step_id="S03")
+    adapter.retrieve(query, top_k=1, step_id="S03")
     assert calls["count"] == 1
 
     now[0] += 30.0
-    adapter.retrieve(query, top_k=3, step_id="S03")
+    adapter.retrieve(query, top_k=1, step_id="S03")
     assert calls["count"] == 1
+
+    adapter.retrieve(query, top_k=3, step_id="S03")
+    assert calls["count"] == 2
+
+    adapter.retrieve(query, top_k=2, step_id="S03")
+    assert calls["count"] == 2
 
     alt_query = "S03 engine_crank_switch"
     adapter.retrieve(alt_query, top_k=3, step_id="S03")
-    assert calls["count"] == 2
+    assert calls["count"] == 3
 
     adapter.retrieve(alt_query, top_k=3, step_id="S03")
-    assert calls["count"] == 2
+    assert calls["count"] == 3
 
     adapter.retrieve(query, top_k=3, step_id="S04")
-    assert calls["count"] == 3
+    assert calls["count"] == 4
 
     now[0] += 31.0
     adapter.retrieve(query, top_k=3, step_id="S03")
-    assert calls["count"] == 4
+    assert calls["count"] == 5
 
 
 def test_retrieve_without_index_marks_grounding_missing(tmp_path: Path) -> None:
@@ -118,6 +125,17 @@ def test_retriever_pool_is_bounded(tmp_path: Path) -> None:
         LocalKnowledgeAdapter(index_path)
 
     assert len(LocalKnowledgeAdapter._retriever_pool) <= RETRIEVER_POOL_MAX_SIZE
+
+
+def test_step_cache_is_bounded(tmp_path: Path) -> None:
+    doc = tmp_path / "doc_step_cache.md"
+    index_path = tmp_path / "index_step_cache.json"
+    doc.write_text("# H\nBattery on\n", encoding="utf-8")
+    build_index([str(doc)], str(index_path))
+    adapter = LocalKnowledgeAdapter(index_path, step_cache_ttl_s=9999.0)
+    for idx in range(STEP_CACHE_MAX_SIZE + 16):
+        adapter.retrieve(f"query-{idx}", top_k=1, step_id=f"S{idx:04d}")
+    assert len(adapter._step_cache) <= STEP_CACHE_MAX_SIZE
 
 
 def test_build_grounding_query_uses_required_components() -> None:

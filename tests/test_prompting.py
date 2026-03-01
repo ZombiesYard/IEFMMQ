@@ -77,7 +77,11 @@ def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
 def test_prompt_metadata_marks_grounding_missing_when_context_flagged() -> None:
     ctx = _base_context()
     ctx["grounding_missing"] = True
+    ctx["grounding_reason"] = "index_missing"
     result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["reason"] == "index_missing"
     assert result.metadata["grounding_missing"] is True
 
 
@@ -117,7 +121,13 @@ def test_delta_summary_top_k_is_capped_to_20() -> None:
         many.append({"mapped_ui_target": f"target_{i:02d}", "from": 0, "to": 1, "action": "toggle"})
     ctx["recent_deltas"] = many
 
-    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+    result = build_help_prompt_result(
+        ctx,
+        "en",
+        max_prompt_chars=20000,
+        max_prompt_tokens_est=6000,
+    )
+    payload = _extract_prompt_constraints_json(result.prompt)
     summary = payload["recent_deltas_summary"]
     assert summary["top_k"] == MAX_DELTA_SUMMARY_ITEMS
     assert len(summary["items"]) == MAX_DELTA_SUMMARY_ITEMS

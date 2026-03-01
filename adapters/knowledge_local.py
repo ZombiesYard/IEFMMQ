@@ -19,6 +19,7 @@ DEFAULT_INDEX_PATH = Path("Doc") / "Evaluation" / "index.json"
 DEFAULT_STEP_CACHE_TTL_S = 60.0
 DEFAULT_TOP_K = 5
 RETRIEVER_POOL_MAX_SIZE = 8
+STEP_CACHE_MAX_SIZE = 256
 
 
 def _dedupe_strings_keep_order(items: list[str]) -> list[str]:
@@ -58,6 +59,8 @@ class _StepCacheEntry:
     query: str
     t_mono: float
     snippets: list[dict[str, Any]]
+    requested_k: int
+    is_exhaustive: bool
 
 
 class LocalKnowledgeAdapter(KnowledgePort):
@@ -75,7 +78,8 @@ class LocalKnowledgeAdapter(KnowledgePort):
         self.index_path = Path(path)
         self.step_cache_ttl_s = max(0.0, float(step_cache_ttl_s))
         self._time_fn = time_fn or time.monotonic
-        self._step_cache: dict[str, _StepCacheEntry] = {}
+        self._step_cache: "OrderedDict[str, _StepCacheEntry]" = OrderedDict()
+        self._step_cache_lock = threading.RLock()
         self._last_retrieve_metadata: dict[str, Any] = {}
         self._index_state: str = "unknown"
         self._index_error_type: str | None = None
@@ -150,6 +154,18 @@ class LocalKnowledgeAdapter(KnowledgePort):
             normalized["score"] = float(score)
         return normalized
 
+    def _prune_step_cache(self, now: float) -> None:
+        if self.step_cache_ttl_s >= 0:
+            expired_keys = [
+                key
+                for key, entry in self._step_cache.items()
+                if (now - entry.t_mono) > self.step_cache_ttl_s
+            ]
+            for key in expired_keys:
+                self._step_cache.pop(key, None)
+        while len(self._step_cache) > STEP_CACHE_MAX_SIZE:
+            self._step_cache.popitem(last=False)
+
     def retrieve_with_meta(
         self,
         query: str,
@@ -191,35 +207,46 @@ class LocalKnowledgeAdapter(KnowledgePort):
         now = self._time_fn()
         cache_key = step_id if isinstance(step_id, str) and step_id else None
         if cache_key is not None:
-            cached = self._step_cache.get(cache_key)
-            if (
-                cached is not None
-                and (now - cached.t_mono) <= self.step_cache_ttl_s
-                and cached.query == query
-            ):
-                snippets = [dict(item) for item in cached.snippets[:k]]
-                meta = {
-                    "query": query,
-                    "top_k": k,
-                    "cache_hit": True,
-                    "cache_step_id": cache_key,
-                    "grounding_missing": False,
-                    "grounding_reason": None,
-                    "snippet_ids": [item["snippet_id"] for item in snippets if isinstance(item.get("snippet_id"), str)],
-                    "index_path": str(self.index_path),
-                }
-                self._last_retrieve_metadata = dict(meta)
-                return snippets, meta
+            with self._step_cache_lock:
+                self._prune_step_cache(now)
+                cached = self._step_cache.get(cache_key)
+                if (
+                    cached is not None
+                    and (now - cached.t_mono) <= self.step_cache_ttl_s
+                    and cached.query == query
+                    and (len(cached.snippets) >= k or cached.is_exhaustive)
+                ):
+                    self._step_cache.move_to_end(cache_key)
+                    snippets = [dict(item) for item in cached.snippets[:k]]
+                    meta = {
+                        "query": query,
+                        "top_k": k,
+                        "cache_hit": True,
+                        "cache_step_id": cache_key,
+                        "grounding_missing": False,
+                        "grounding_reason": None,
+                        "snippet_ids": [
+                            item["snippet_id"] for item in snippets if isinstance(item.get("snippet_id"), str)
+                        ],
+                        "index_path": str(self.index_path),
+                    }
+                    self._last_retrieve_metadata = dict(meta)
+                    return snippets, meta
 
         raw_results = self.retriever.query(query, k=k)
         snippets = [self._normalize_result(item, idx) for idx, item in enumerate(raw_results)]
         if cache_key is not None:
-            self._step_cache[cache_key] = _StepCacheEntry(
-                step_id=cache_key,
-                query=query,
-                t_mono=now,
-                snippets=[dict(item) for item in snippets],
-            )
+            with self._step_cache_lock:
+                self._step_cache[cache_key] = _StepCacheEntry(
+                    step_id=cache_key,
+                    query=query,
+                    t_mono=now,
+                    snippets=[dict(item) for item in snippets],
+                    requested_k=k,
+                    is_exhaustive=len(snippets) < k,
+                )
+                self._step_cache.move_to_end(cache_key)
+                self._prune_step_cache(now)
         meta = {
             "query": query,
             "top_k": k,
@@ -245,6 +272,7 @@ __all__ = [
     "DEFAULT_INDEX_PATH",
     "DEFAULT_STEP_CACHE_TTL_S",
     "RETRIEVER_POOL_MAX_SIZE",
+    "STEP_CACHE_MAX_SIZE",
     "LocalKnowledgeAdapter",
     "build_grounding_query",
 ]

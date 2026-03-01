@@ -495,6 +495,10 @@ def build_help_prompt_result(
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
+            "grounding": {
+                "missing": bool(context.get("grounding_missing")),
+                "reason": _sanitize_scalar(context.get("grounding_reason")),
+            },
             "EVIDENCE_SOURCES": evidence_sources,
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": example_obj,
@@ -543,6 +547,10 @@ def build_help_prompt_result(
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
             "allowed_error_categories": category_enum,
+            "grounding": {
+                "missing": bool(context.get("grounding_missing")),
+                "reason": _sanitize_scalar(context.get("grounding_reason")),
+            },
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": payload.get("output_example_json", {}),
         }
