@@ -134,8 +134,11 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     assert payload["grounding"]["applied"] is False
     assert payload["grounding"]["missing"] is True
     assert payload["grounding"]["reason"] in {"rag_snippets_not_injected", "no_rag_snippets"}
+    assert payload["allowed_evidence_refs"] == []
     assert result.metadata["rag_snippet_count"] == 0
     assert result.metadata["rag_snippet_ids"] == []
+    assert result.metadata["allowed_evidence_refs"] == []
+    assert result.metadata["evidence_refs_count"] == 0
     assert result.metadata["grounding_applied"] is False
     assert result.metadata["grounding_missing"] is True
 

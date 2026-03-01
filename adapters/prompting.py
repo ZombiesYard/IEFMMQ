@@ -579,12 +579,14 @@ def build_help_prompt_result(
             break
         prompt, chars, tokens = _render_and_measure()
     final_rag_snippets = list(rag_snippets)
+    final_allowed_refs = list(allowed_refs)
 
     if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
         final_rag_snippets = []
+        final_allowed_refs = []
         compact_payload = {
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
@@ -594,7 +596,7 @@ def build_help_prompt_result(
                 final_rag_snippets,
                 rag_input_count=rag_input_count,
             ),
-            "allowed_evidence_refs": allowed_refs,
+            "allowed_evidence_refs": final_allowed_refs,
             "output_example_json": payload.get("output_example_json", {}),
         }
         prompt = (
@@ -636,8 +638,8 @@ def build_help_prompt_result(
         "trim_reasons": trim_reasons,
         "delta_summary_top_k": recent_deltas_summary["top_k"],
         "delta_summary_items": len(recent_deltas_summary["items"]),
-        "evidence_refs_count": len(allowed_refs),
-        "allowed_evidence_refs": list(allowed_refs),
+        "evidence_refs_count": len(final_allowed_refs),
+        "allowed_evidence_refs": list(final_allowed_refs),
         "rag_snippet_count": len(final_rag_snippets),
         "rag_snippet_ids": [
             str(item.get("id"))
