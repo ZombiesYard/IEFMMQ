@@ -187,6 +187,22 @@ def test_prompt_omits_page_or_heading_when_float_not_finite() -> None:
     assert "page_or_heading" not in rag_block[1]
 
 
+def test_prompt_sanitizes_non_finite_float_vars_to_strict_json_scalars() -> None:
+    ctx = _base_context()
+    ctx["vars"]["nan_value"] = float("nan")
+    ctx["vars"]["pos_inf"] = float("inf")
+    ctx["vars"]["neg_inf"] = float("-inf")
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    selected = payload["current_vars_selected"]
+    assert selected["nan_value"] == "NaN"
+    assert selected["pos_inf"] == "Infinity"
+    assert selected["neg_inf"] == "-Infinity"
+    assert ":NaN" not in result.prompt
+    assert ":Infinity" not in result.prompt
+    assert ":-Infinity" not in result.prompt
+
+
 def test_prompt_contains_strict_json_output_constraints() -> None:
     prompt = build_help_prompt(_base_context(), "en")
     assert "must output exactly one strict JSON object" in prompt

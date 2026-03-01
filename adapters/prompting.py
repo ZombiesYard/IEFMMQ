@@ -42,6 +42,10 @@ def _is_sensitive_key(key: str) -> bool:
 
 
 def _sanitize_scalar(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        if math.isnan(value):
+            return "NaN"
+        return "Infinity" if value > 0 else "-Infinity"
     if not isinstance(value, str):
         return value
     if _ABS_WIN_PATH_RE.match(value) or _ABS_POSIX_PATH_RE.match(value):
@@ -415,7 +419,8 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
     return (
         f"{header}\n"
         f"Rules:\n{rendered_rules}\n"
-        f"Context and constraints JSON:\n{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+        f"Context and constraints JSON:\n"
+        f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
         "Output must follow this schema shape exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
@@ -600,7 +605,7 @@ def build_help_prompt_result(
         }
         prompt = (
             f"{compact_header}\n"
-            f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+            f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
             "JSON only."
         )
         chars = len(prompt)
