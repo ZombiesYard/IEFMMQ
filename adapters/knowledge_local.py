@@ -155,14 +155,13 @@ class LocalKnowledgeAdapter(KnowledgePort):
         return normalized
 
     def _prune_step_cache(self, now: float) -> None:
-        if self.step_cache_ttl_s >= 0:
-            expired_keys = [
-                key
-                for key, entry in self._step_cache.items()
-                if (now - entry.t_mono) > self.step_cache_ttl_s
-            ]
-            for key in expired_keys:
-                self._step_cache.pop(key, None)
+        expired_keys = [
+            key
+            for key, entry in self._step_cache.items()
+            if (now - entry.t_mono) > self.step_cache_ttl_s
+        ]
+        for key in expired_keys:
+            self._step_cache.pop(key, None)
         while len(self._step_cache) > STEP_CACHE_MAX_SIZE:
             self._step_cache.popitem(last=False)
 
