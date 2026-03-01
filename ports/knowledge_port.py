@@ -15,6 +15,7 @@ class KnowledgePort(Protocol):
         - section
         - page_or_heading
         - snippet
+        - snippet_id
         - score
         """
         ...

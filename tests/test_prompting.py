@@ -49,6 +49,38 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert len(sample_evidence["quote"]) <= 120
 
 
+def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
+    ctx = _base_context()
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "fa18c_startup_master",
+            "section": "S03",
+            "page_or_heading": "S03",
+            "snippet_id": "fa18c_startup_master_12",
+            "snippet": "APU switch to ON and wait for the green APU READY light.",
+        }
+    ]
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    rag_block = payload["EVIDENCE_SOURCES"]["RAG_SNIPPETS"]
+    assert len(rag_block) == 1
+    assert rag_block[0]["id"] == "fa18c_startup_master_12"
+    assert rag_block[0]["doc_id"] == "fa18c_startup_master"
+    assert rag_block[0]["section"] == "S03"
+    assert rag_block[0]["page_or_heading"] == "S03"
+    assert "RAG_SNIPPETS.fa18c_startup_master_12" in payload["allowed_evidence_refs"]
+    assert result.metadata["rag_snippet_ids"] == ["fa18c_startup_master_12"]
+    assert result.metadata["grounding_missing"] is False
+
+
+def test_prompt_metadata_marks_grounding_missing_when_context_flagged() -> None:
+    ctx = _base_context()
+    ctx["grounding_missing"] = True
+    result = build_help_prompt_result(ctx, "en")
+    assert result.metadata["grounding_missing"] is True
+
+
 def test_prompt_contains_strict_json_output_constraints() -> None:
     prompt = build_help_prompt(_base_context(), "en")
     assert "must output exactly one strict JSON object" in prompt

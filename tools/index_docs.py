@@ -73,16 +73,27 @@ def build_index(input_paths: List[str], output: str):
                 "chunks": [],
             }
             for idx, ch in enumerate(chunks):
+                snippet_id = f"{file.stem}_{idx}"
+                heading = ch.get("heading")
+                page = ch.get("page")
+                page_or_heading = page if page is not None else heading
                 doc_entry["chunks"].append(
                     {
-                        "chunk_id": f"{file.stem}_{idx}",
-                        "heading": ch.get("heading"),
-                        "page": ch.get("page"),
+                        "chunk_id": snippet_id,
+                        "snippet_id": snippet_id,
+                        "heading": heading,
+                        "section": heading,
+                        "page": page,
+                        "page_or_heading": page_or_heading,
                         "text": ch["text"],
                     }
                 )
             documents.append(doc_entry)
-    out = {"documents": documents}
+    out = {
+        "index_type": "bm25",
+        "tokenizer": "simple_alnum_lower",
+        "documents": documents,
+    }
     Path(output).parent.mkdir(parents=True, exist_ok=True)
     Path(output).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     return out

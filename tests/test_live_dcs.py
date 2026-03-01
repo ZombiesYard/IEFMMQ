@@ -10,6 +10,7 @@ import yaml
 
 from core.types import Observation, TutorResponse
 from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver, StdinHelpTrigger, _load_overlay_allowlist
+from tools.index_docs import build_index
 
 
 def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
@@ -171,6 +172,87 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert "observation" in kinds
     assert "tutor_request" in kinds
     assert "tutor_response" in kinds
+
+
+def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_grounding.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    doc = tmp_path / "grounding.md"
+    doc.write_text(
+        "# S03\nF/A-18C Cold Start MVP subset checklist.\nAPU switch ON and wait for APU READY.\n",
+        encoding="utf-8",
+    )
+    index_path = tmp_path / "index.json"
+    build_index([str(doc)], str(index_path))
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_index_path=index_path,
+        rag_top_k=3,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is False
+    assert req_meta["grounding_snippet_ids"]
+    rag_topk = tutor_request_payload["context"]["rag_topk"]
+    assert rag_topk
+    assert rag_topk[0]["snippet_id"]
+    assert rag_topk[0]["doc_id"] == "grounding"
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    prompt_build = tutor_response_payload["metadata"]["prompt_build"]
+    assert prompt_build["grounding_missing"] is False
+    assert prompt_build["rag_snippet_ids"] == req_meta["grounding_snippet_ids"]
+
+
+def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_no_index.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_index_path=tmp_path / "missing_index.json",
+        rag_top_k=3,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is True
+    assert req_meta["grounding_snippet_ids"] == []
+    assert tutor_request_payload["context"]["rag_topk"] == []
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    prompt_build = tutor_response_payload["metadata"]["prompt_build"]
+    assert prompt_build["grounding_missing"] is True
+    assert prompt_build["rag_snippet_ids"] == []
 
 
 def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path: Path) -> None:

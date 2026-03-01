@@ -161,17 +161,32 @@ def _build_rag_snippets(context: Mapping[str, Any], max_items: int = MAX_RAG_SNI
         if len(out) >= max_items:
             break
         if isinstance(item, Mapping):
-            snippet_id = item.get("id") or f"snippet_{len(out)}"
+            snippet_id = item.get("snippet_id") or item.get("id") or f"snippet_{len(out)}"
             snippet = str(item.get("snippet", ""))
+            doc_id = item.get("doc_id")
+            section = item.get("section")
+            page_or_heading = item.get("page_or_heading")
+            if page_or_heading is None:
+                page_or_heading = item.get("page")
+            if page_or_heading is None:
+                page_or_heading = section
         else:
             snippet_id = f"snippet_{len(out)}"
             snippet = str(item)
-        out.append(
-            {
-                "id": _sanitize_scalar(str(snippet_id)),
-                "snippet": _sanitize_scalar(snippet[:MAX_RAG_SNIPPET_CHARS]),
-            }
-        )
+            doc_id = None
+            section = None
+            page_or_heading = None
+        normalized: dict[str, Any] = {
+            "id": _sanitize_scalar(str(snippet_id)),
+            "snippet": _sanitize_scalar(snippet[:MAX_RAG_SNIPPET_CHARS]),
+        }
+        if isinstance(doc_id, str) and doc_id:
+            normalized["doc_id"] = _sanitize_scalar(doc_id)
+        if isinstance(section, str) and section:
+            normalized["section"] = _sanitize_scalar(section)
+        if page_or_heading is not None:
+            normalized["page_or_heading"] = _sanitize_scalar(page_or_heading)
+        out.append(normalized)
     return out
 
 
@@ -330,13 +345,18 @@ def _build_evidence_sources(
     rag_block: list[dict[str, Any]] = []
     for item in rag_snippets:
         snippet_id = item.get("id", "snippet")
-        rag_block.append(
-            {
-                "ref": f"RAG_SNIPPETS.{snippet_id}",
-                "id": snippet_id,
-                "snippet": item.get("snippet"),
-            }
-        )
+        rag_entry: dict[str, Any] = {
+            "ref": f"RAG_SNIPPETS.{snippet_id}",
+            "id": snippet_id,
+            "snippet": item.get("snippet"),
+        }
+        if "doc_id" in item:
+            rag_entry["doc_id"] = item.get("doc_id")
+        if "section" in item:
+            rag_entry["section"] = item.get("section")
+        if "page_or_heading" in item:
+            rag_entry["page_or_heading"] = item.get("page_or_heading")
+        rag_block.append(rag_entry)
 
     evidence = {
         "VARS": vars_block,
@@ -561,6 +581,13 @@ def build_help_prompt_result(
         "delta_summary_items": len(recent_deltas_summary["items"]),
         "evidence_refs_count": len(allowed_refs),
         "allowed_evidence_refs": list(allowed_refs),
+        "rag_snippet_count": len(rag_snippets),
+        "rag_snippet_ids": [
+            str(item.get("id"))
+            for item in rag_snippets
+            if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+        ],
+        "grounding_missing": bool(context.get("grounding_missing")),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
 

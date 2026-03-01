@@ -18,6 +18,7 @@ import yaml
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosReceiver
+from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
 from adapters.openai_compat_model import OpenAICompatModel
@@ -53,6 +54,10 @@ def _default_telemetry_map_path() -> Path:
 
 def _default_bios_to_ui_path() -> Path:
     return _repo_root() / "packs" / "fa18c_startup" / "bios_to_ui.yaml"
+
+
+def _default_knowledge_index_path() -> Path:
+    return _repo_root() / DEFAULT_INDEX_PATH
 
 
 class ObservationSource(Protocol):
@@ -146,6 +151,17 @@ def _load_overlay_allowlist(pack_path: Path, ui_map_path: Path) -> list[str]:
             f"check ui_map consistency: {pack_path}"
         )
     return sorted(narrowed)
+
+
+def _load_pack_title(pack_path: Path) -> str:
+    pack = _load_yaml_mapping(pack_path, "pack.yaml")
+    title = pack.get("title")
+    if isinstance(title, str) and title.strip():
+        return title.strip()
+    pack_id = pack.get("pack_id")
+    if isinstance(pack_id, str) and pack_id.strip():
+        return pack_id.strip()
+    return pack_path.stem
 
 
 def _stable_hash_json(data: Mapping[str, Any]) -> str:
@@ -351,6 +367,9 @@ class LiveDcsTutorLoop:
         lang: str = "zh",
         event_sink: Callable[[Event], None] | None = None,
         dry_run_overlay: bool = False,
+        knowledge_adapter: LocalKnowledgeAdapter | None = None,
+        knowledge_index_path: str | Path | None = None,
+        rag_top_k: int = 5,
     ) -> None:
         self.source = source
         self.model = model
@@ -367,12 +386,22 @@ class LiveDcsTutorLoop:
             Path(telemetry_map_path) if telemetry_map_path else _default_telemetry_map_path()
         )
         self.bios_to_ui_path = Path(bios_to_ui_path) if bios_to_ui_path else _default_bios_to_ui_path()
+        self.knowledge_index_path = (
+            Path(knowledge_index_path) if knowledge_index_path else _default_knowledge_index_path()
+        )
+        self.rag_top_k = max(0, int(rag_top_k))
+        self.pack_title = _load_pack_title(self.pack_path)
 
         self.resolver = resolver if resolver is not None else VarResolver.from_yaml(self.telemetry_map_path)
         self.mapper = (
             mapper
             if mapper is not None
             else BiosUiMapper.from_yaml(self.bios_to_ui_path, self.ui_map_path)
+        )
+        self.knowledge = (
+            knowledge_adapter
+            if knowledge_adapter is not None
+            else LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
         )
         self.pack_steps = load_pack_steps(self.pack_path)
         self.candidate_steps = _load_step_ids(self.pack_path)
@@ -440,6 +469,84 @@ class LiveDcsTutorLoop:
         )
         return enriched
 
+    def _build_grounding_context(
+        self,
+        deterministic_hint: Mapping[str, Any],
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        inferred_step_id = deterministic_hint.get("inferred_step_id")
+        if not isinstance(inferred_step_id, str) or not inferred_step_id:
+            inferred_step_id = None
+
+        missing_conditions_raw = deterministic_hint.get("missing_conditions", [])
+        missing_conditions = (
+            [item for item in missing_conditions_raw if isinstance(item, str) and item]
+            if isinstance(missing_conditions_raw, list)
+            else []
+        )
+        recent_targets_raw = deterministic_hint.get("recent_ui_targets", [])
+        recent_ui_targets = (
+            [item for item in recent_targets_raw if isinstance(item, str) and item]
+            if isinstance(recent_targets_raw, list)
+            else []
+        )
+
+        query = build_grounding_query(
+            pack_title=self.pack_title,
+            inferred_step=inferred_step_id,
+            missing_conditions=missing_conditions,
+            recent_ui_targets=recent_ui_targets,
+        )
+
+        if self.rag_top_k <= 0:
+            return [], {
+                "grounding_query": query,
+                "grounding_missing": True,
+                "grounding_reason": "rag_disabled",
+                "grounding_snippet_ids": [],
+                "grounding_cache_hit": False,
+                "grounding_index_path": str(self.knowledge_index_path),
+                "grounding_top_k": self.rag_top_k,
+            }
+
+        snippets: list[dict[str, Any]]
+        retrieve_meta: dict[str, Any]
+        if hasattr(self.knowledge, "retrieve_with_meta"):
+            snippets, retrieve_meta = self.knowledge.retrieve_with_meta(  # type: ignore[attr-defined]
+                query,
+                top_k=self.rag_top_k,
+                step_id=inferred_step_id,
+            )
+        else:
+            queried = self.knowledge.query(query, k=self.rag_top_k)
+            snippets = [dict(item) for item in queried if isinstance(item, Mapping)]
+            retrieve_meta = {
+                "cache_hit": False,
+                "grounding_missing": False,
+                "grounding_reason": None,
+                "snippet_ids": [item.get("snippet_id") for item in snippets if isinstance(item.get("snippet_id"), str)],
+                "index_path": str(self.knowledge_index_path),
+            }
+
+        snippet_ids = [
+            item.get("snippet_id")
+            for item in snippets
+            if isinstance(item.get("snippet_id"), str) and item.get("snippet_id")
+        ]
+        grounding_missing = bool(retrieve_meta.get("grounding_missing"))
+        grounding_reason = retrieve_meta.get("grounding_reason")
+        if grounding_missing and not isinstance(grounding_reason, str):
+            grounding_reason = "index_missing"
+
+        return snippets, {
+            "grounding_query": query,
+            "grounding_missing": grounding_missing,
+            "grounding_reason": grounding_reason,
+            "grounding_snippet_ids": snippet_ids,
+            "grounding_cache_hit": bool(retrieve_meta.get("cache_hit")),
+            "grounding_index_path": str(retrieve_meta.get("index_path") or self.knowledge_index_path),
+            "grounding_top_k": self.rag_top_k,
+        }
+
     def _build_request(self, obs: Observation) -> tuple[TutorRequest, dict[str, Any], str]:
         payload = obs.payload if isinstance(obs.payload, Mapping) else {}
         vars_map = payload.get("vars")
@@ -462,6 +569,7 @@ class LiveDcsTutorLoop:
             "missing_conditions": list(inference.missing_conditions),
             "recent_ui_targets": recent_buttons,
         }
+        rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
 
         context = {
             "vars": vars_selected,
@@ -470,6 +578,8 @@ class LiveDcsTutorLoop:
             "candidate_steps": list(self.candidate_steps),
             "overlay_target_allowlist": list(self.overlay_allowlist),
             "deterministic_step_hint": deterministic_hint,
+            "rag_topk": rag_topk,
+            "grounding_missing": bool(grounding_meta.get("grounding_missing")),
             "delta_summary": payload.get("delta_summary", {}),
             "delta_dropped_count": obs.metadata.get("delta_dropped_count"),
         }
@@ -486,6 +596,12 @@ class LiveDcsTutorLoop:
                 "prompt_hash": prompt_hash,
                 "prompt_tokens_est": int(prompt_result.metadata.get("prompt_tokens_est") or 0),
                 "prompt_trimmed": bool(prompt_result.metadata.get("prompt_trimmed")),
+                "grounding_query": grounding_meta.get("grounding_query"),
+                "grounding_missing": bool(prompt_result.metadata.get("grounding_missing")),
+                "grounding_reason": grounding_meta.get("grounding_reason"),
+                "grounding_snippet_ids": list(prompt_result.metadata.get("rag_snippet_ids") or []),
+                "grounding_cache_hit": bool(grounding_meta.get("grounding_cache_hit")),
+                "grounding_index_path": grounding_meta.get("grounding_index_path"),
             },
         )
 
@@ -861,6 +977,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ui-map", default=str(_default_ui_map_path()), help="ui_map.yaml path")
     parser.add_argument("--telemetry-map", default=str(_default_telemetry_map_path()), help="telemetry_map.yaml path")
     parser.add_argument("--bios-to-ui", default=str(_default_bios_to_ui_path()), help="bios_to_ui.yaml path")
+    parser.add_argument(
+        "--knowledge-index",
+        default=str(_default_knowledge_index_path()),
+        help="Grounding index.json path (BM25)",
+    )
+    parser.add_argument(
+        "--rag-top-k",
+        type=int,
+        default=5,
+        help="Grounding snippet top-k for prompt injection (default 5)",
+    )
 
     parser.add_argument("--output", help="Event log JSONL output path")
     parser.add_argument("--session-id", default=None, help="Optional event session id")
@@ -925,6 +1052,8 @@ def main() -> int:
             ui_map_path=args.ui_map,
             telemetry_map_path=args.telemetry_map,
             bios_to_ui_path=args.bios_to_ui,
+            knowledge_index_path=args.knowledge_index,
+            rag_top_k=args.rag_top_k,
             cooldown_s=args.cooldown_s,
             session_id=args.session_id,
             lang=args.lang,
