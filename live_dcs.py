@@ -584,7 +584,8 @@ class LiveDcsTutorLoop:
             "grounding_query": query,
             "grounding_missing": grounding_missing,
             "grounding_reason": grounding_reason,
-            "grounding_error_type": retrieve_meta.get("grounding_error_type"),
+            "grounding_error_type": retrieve_meta.get("grounding_error_type")
+            or retrieve_meta.get("index_error_type"),
             "grounding_snippet_ids": snippet_ids,
             "grounding_cache_hit": bool(retrieve_meta.get("cache_hit")),
             "grounding_index_path": grounding_index_path,

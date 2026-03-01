@@ -281,6 +281,38 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
     assert prompt_build["rag_snippet_ids"] == []
 
 
+def test_live_loop_surfaces_index_load_error_type_in_grounding_metadata(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_bad_index.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    bad_index = tmp_path / "bad_index.json"
+    bad_index.write_text("{invalid json", encoding="utf-8")
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_index_path=bad_index,
+        rag_top_k=3,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["grounding_missing"] is True
+    assert req_meta["grounding_reason"] == "index_load_error"
+    assert isinstance(req_meta["grounding_error_type"], str) and req_meta["grounding_error_type"]
+
+
 def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_query_only_knowledge.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

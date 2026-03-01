@@ -42,6 +42,8 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
     assert payload["deterministic_step_hint"]["inferred_step_id"] is None
     assert payload["deterministic_step_hint"]["missing_conditions"] == []
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["applied"] is False
 
     sample_evidence = payload["output_example_json"]["overlay"]["evidence"][0]
     assert sample_evidence["type"] in {"var", "gate", "rag", "delta"}
@@ -70,7 +72,10 @@ def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
     assert rag_block[0]["section"] == "S03"
     assert rag_block[0]["page_or_heading"] == "S03"
     assert "RAG_SNIPPETS.fa18c_startup_master_12" in payload["allowed_evidence_refs"]
+    assert payload["grounding"]["applied"] is True
+    assert payload["grounding"]["missing"] is False
     assert result.metadata["rag_snippet_ids"] == ["fa18c_startup_master_12"]
+    assert result.metadata["grounding_applied"] is True
     assert result.metadata["grounding_missing"] is False
 
 
@@ -81,10 +86,28 @@ def test_prompt_metadata_marks_grounding_missing_when_context_flagged() -> None:
     ctx["grounding_query"] = "F/A-18C | S03 | apu_switch"
     result = build_help_prompt_result(ctx, "en")
     payload = _extract_prompt_constraints_json(result.prompt)
+    assert payload["grounding"]["requested_missing"] is True
     assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["applied"] is False
     assert payload["grounding"]["reason"] == "index_missing"
     assert payload["grounding"]["query"] == "F/A-18C | S03 | apu_switch"
+    assert result.metadata["grounding_missing_requested"] is True
+    assert result.metadata["grounding_applied"] is False
     assert result.metadata["grounding_missing"] is True
+
+
+def test_prompt_effective_grounding_marks_missing_when_no_rag_snippets_injected() -> None:
+    ctx = _base_context()
+    result = build_help_prompt_result(ctx, "en")
+    payload = _extract_prompt_constraints_json(result.prompt)
+    assert payload["grounding"]["requested_missing"] is False
+    assert payload["grounding"]["applied"] is False
+    assert payload["grounding"]["missing"] is True
+    assert payload["grounding"]["reason"] == "no_rag_snippets"
+    assert result.metadata["grounding_missing_requested"] is False
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+    assert result.metadata["grounding_reason"] == "no_rag_snippets"
 
 
 def test_prompt_contains_strict_json_output_constraints() -> None:

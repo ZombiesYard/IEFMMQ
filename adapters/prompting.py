@@ -373,6 +373,34 @@ def _build_evidence_sources(
     return evidence, allowed_refs
 
 
+def _build_grounding_payload(
+    context: Mapping[str, Any],
+    rag_snippets: list[dict[str, Any]],
+    *,
+    rag_input_count: int,
+) -> dict[str, Any]:
+    requested_missing = bool(context.get("grounding_missing"))
+    requested_reason = context.get("grounding_reason")
+    requested_reason_str = _sanitize_scalar(requested_reason) if isinstance(requested_reason, str) else None
+    applied = bool(rag_snippets)
+    missing_effective = requested_missing or (not applied)
+    reason_effective = requested_reason_str
+    if missing_effective and reason_effective is None:
+        if requested_missing:
+            reason_effective = "grounding_unavailable"
+        elif rag_input_count > 0:
+            reason_effective = "rag_snippets_not_injected"
+        else:
+            reason_effective = "no_rag_snippets"
+    return {
+        "requested_missing": requested_missing,
+        "missing": missing_effective,
+        "applied": applied,
+        "reason": reason_effective,
+        "query": _sanitize_scalar(context.get("grounding_query")),
+    }
+
+
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -414,6 +442,7 @@ def build_help_prompt_result(
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
     gates_summary = _build_gates_summary(context)
     rag_snippets = _build_rag_snippets(context, max_items=MAX_RAG_SNIPPETS)
+    rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
 
@@ -495,11 +524,11 @@ def build_help_prompt_result(
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
-            "grounding": {
-                "missing": bool(context.get("grounding_missing")),
-                "reason": _sanitize_scalar(context.get("grounding_reason")),
-                "query": _sanitize_scalar(context.get("grounding_query")),
-            },
+            "grounding": _build_grounding_payload(
+                context,
+                rag_snippets,
+                rag_input_count=rag_input_count,
+            ),
             "EVIDENCE_SOURCES": evidence_sources,
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": example_obj,
@@ -548,11 +577,11 @@ def build_help_prompt_result(
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
             "allowed_error_categories": category_enum,
-            "grounding": {
-                "missing": bool(context.get("grounding_missing")),
-                "reason": _sanitize_scalar(context.get("grounding_reason")),
-                "query": _sanitize_scalar(context.get("grounding_query")),
-            },
+            "grounding": _build_grounding_payload(
+                context,
+                [],
+                rag_input_count=rag_input_count,
+            ),
             "allowed_evidence_refs": allowed_refs,
             "output_example_json": payload.get("output_example_json", {}),
         }
@@ -580,6 +609,12 @@ def build_help_prompt_result(
             f"reasons={trim_reasons}, chars={chars}/{max_prompt_chars}, tokens_est={tokens}/{max_prompt_tokens_est}"
         )
 
+    grounding_payload = _build_grounding_payload(
+        context,
+        rag_snippets,
+        rag_input_count=rag_input_count,
+    )
+
     meta = {
         "max_prompt_chars": max_prompt_chars,
         "max_prompt_tokens_est": max_prompt_tokens_est,
@@ -597,7 +632,10 @@ def build_help_prompt_result(
             for item in rag_snippets
             if isinstance(item, Mapping) and isinstance(item.get("id"), str)
         ],
-        "grounding_missing": bool(context.get("grounding_missing")),
+        "grounding_applied": bool(grounding_payload["applied"]),
+        "grounding_missing_requested": bool(grounding_payload["requested_missing"]),
+        "grounding_missing": bool(grounding_payload["missing"]),
+        "grounding_reason": grounding_payload["reason"],
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
 
