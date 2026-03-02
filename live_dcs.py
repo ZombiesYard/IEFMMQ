@@ -953,8 +953,19 @@ class LiveDcsTutorLoop:
                         else:
                             rejected_by_request_allowlist.append(target)
                     if rejected_by_request_allowlist:
+                        allowed_target_set = set(allowed_targets)
                         filtered_overlay = dict(overlay)
                         filtered_overlay["targets"] = allowed_targets
+                        evidence_raw = overlay.get("evidence")
+                        if isinstance(evidence_raw, list):
+                            filtered_evidence: list[Any] = []
+                            for item in evidence_raw:
+                                if isinstance(item, Mapping):
+                                    evidence_target = item.get("target")
+                                    if isinstance(evidence_target, str) and evidence_target not in allowed_target_set:
+                                        continue
+                                filtered_evidence.append(item)
+                            filtered_overlay["evidence"] = filtered_evidence
                         filtered_help_obj = dict(help_obj)
                         filtered_help_obj["overlay"] = filtered_overlay
 
