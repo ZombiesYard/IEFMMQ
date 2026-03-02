@@ -379,6 +379,99 @@ def _select_gates_for_context(
     return selected
 
 
+_FALLBACK_STEP_TARGETS: dict[str, str] = {
+    "S01": "battery_switch",
+    "S03": "apu_switch",
+    "S04": "eng_crank_switch",
+    "S06": "bleed_air_knob",
+}
+
+_FALLBACK_STEP_VAR_REFS: dict[str, str] = {
+    "S01": "VARS.battery_on",
+    "S03": "VARS.apu_on",
+    "S04": "VARS.engine_crank_right",
+    "S06": "VARS.bleed_air_norm",
+}
+
+_EVIDENCE_PREFIX_TO_TYPE: tuple[tuple[str, str], ...] = (
+    ("VARS.", "var"),
+    ("GATES.", "gate"),
+    ("RAG_SNIPPETS.", "rag"),
+    ("RECENT_UI_TARGETS.", "delta"),
+    ("DELTA_KEYS.", "delta"),
+)
+
+
+def _infer_evidence_type_from_ref(ref: str) -> str | None:
+    for prefix, evidence_type in _EVIDENCE_PREFIX_TO_TYPE:
+        if ref.startswith(prefix):
+            return evidence_type
+    return None
+
+
+def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
+    refs: set[str] = set()
+
+    vars_map = context.get("vars")
+    if isinstance(vars_map, Mapping):
+        for key in vars_map.keys():
+            if isinstance(key, str) and key:
+                refs.add(f"VARS.{key}")
+
+    gates = context.get("gates")
+    if isinstance(gates, Mapping):
+        for gate_id in gates.keys():
+            if isinstance(gate_id, str) and gate_id:
+                refs.add(f"GATES.{gate_id}")
+
+    recent_deltas = context.get("recent_deltas")
+    if isinstance(recent_deltas, list):
+        for item in recent_deltas:
+            if not isinstance(item, Mapping):
+                continue
+            target = item.get("ui_target")
+            if not isinstance(target, str) or not target:
+                target = item.get("mapped_ui_target")
+            if not isinstance(target, str) or not target:
+                target = item.get("target")
+            if isinstance(target, str) and target:
+                refs.add(f"RECENT_UI_TARGETS.{target}")
+            key = item.get("k")
+            if not isinstance(key, str) or not key:
+                key = item.get("bios_key")
+            if isinstance(key, str) and key:
+                refs.add(f"DELTA_KEYS.{key}")
+
+    delta_summary = context.get("delta_summary")
+    if isinstance(delta_summary, Mapping):
+        changed_keys = delta_summary.get("changed_keys_sample")
+        if isinstance(changed_keys, list):
+            for key in changed_keys:
+                if isinstance(key, str) and key:
+                    refs.add(f"DELTA_KEYS.{key}")
+        topk = delta_summary.get("recent_key_changes_topk")
+        if isinstance(topk, list):
+            for item in topk:
+                if not isinstance(item, Mapping):
+                    continue
+                key = item.get("key")
+                if isinstance(key, str) and key:
+                    refs.add(f"DELTA_KEYS.{key}")
+
+    rag_topk = context.get("rag_topk")
+    if isinstance(rag_topk, list):
+        for item in rag_topk:
+            if not isinstance(item, Mapping):
+                continue
+            snippet_id = item.get("snippet_id")
+            if not isinstance(snippet_id, str) or not snippet_id:
+                snippet_id = item.get("id")
+            if isinstance(snippet_id, str) and snippet_id:
+                refs.add(f"RAG_SNIPPETS.{snippet_id}")
+
+    return refs
+
+
 @dataclass
 class HelpCacheEntry:
     state_key: str
@@ -1075,6 +1168,142 @@ class LiveDcsTutorLoop:
             response.explanations = list(mapped.explanations)
         return list(mapped.actions), mapped_meta
 
+    def _build_safe_fallback_overlay_help_obj(
+        self,
+        request: TutorRequest,
+    ) -> tuple[dict[str, Any] | None, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return None, "missing_deterministic_hint"
+
+        inferred_step_id = hint.get("inferred_step_id")
+        if not isinstance(inferred_step_id, str) or not inferred_step_id:
+            return None, "missing_inferred_step_id"
+
+        fallback_target = _FALLBACK_STEP_TARGETS.get(inferred_step_id)
+        if fallback_target is None:
+            return None, f"unsupported_step:{inferred_step_id}"
+
+        request_allowlist = context.get("overlay_target_allowlist")
+        if isinstance(request_allowlist, list):
+            allowset = {item for item in request_allowlist if isinstance(item, str) and item}
+            if allowset and fallback_target not in allowset:
+                return None, f"target_not_in_request_allowlist:{fallback_target}"
+        if fallback_target not in set(self.overlay_allowlist):
+            return None, f"target_not_in_runtime_allowlist:{fallback_target}"
+
+        candidate_refs: list[str] = []
+        gate_blockers = hint.get("gate_blockers")
+        if isinstance(gate_blockers, list):
+            for blocker in gate_blockers:
+                if not isinstance(blocker, Mapping):
+                    continue
+                ref = blocker.get("ref")
+                if isinstance(ref, str) and ref:
+                    candidate_refs.append(ref)
+        candidate_refs.append(f"GATES.{inferred_step_id}.completion")
+        candidate_refs.append(f"GATES.{inferred_step_id}.precondition")
+        var_ref = _FALLBACK_STEP_VAR_REFS.get(inferred_step_id)
+        if isinstance(var_ref, str):
+            candidate_refs.append(var_ref)
+
+        allowed_refs = _collect_request_evidence_refs(context)
+        selected_ref: str | None = None
+        for ref in candidate_refs:
+            if ref in allowed_refs:
+                selected_ref = ref
+                break
+        if selected_ref is None:
+            return None, "no_verifiable_evidence_ref"
+
+        evidence_type = _infer_evidence_type_from_ref(selected_ref)
+        if evidence_type is None:
+            return None, f"unsupported_evidence_ref:{selected_ref}"
+
+        reason_text = None
+        if isinstance(gate_blockers, list):
+            for blocker in gate_blockers:
+                if not isinstance(blocker, Mapping):
+                    continue
+                if blocker.get("ref") == selected_ref:
+                    reason = blocker.get("reason")
+                    if isinstance(reason, str) and reason:
+                        reason_text = reason
+                        break
+                    reason_code = blocker.get("reason_code")
+                    if isinstance(reason_code, str) and reason_code:
+                        reason_text = reason_code
+                        break
+        if not reason_text:
+            reason_text = f"Deterministic blocker indicates target {fallback_target}."
+        quote = reason_text.strip()
+        if len(quote) > 120:
+            quote = quote[:117].rstrip() + "..."
+
+        fallback_help_obj = {
+            "diagnosis": {
+                "step_id": inferred_step_id,
+                "error_category": "OM",
+            },
+            "next": {
+                "step_id": inferred_step_id,
+            },
+            "overlay": {
+                "targets": [fallback_target],
+                "evidence": [
+                    {
+                        "target": fallback_target,
+                        "type": evidence_type,
+                        "ref": selected_ref,
+                        "quote": quote,
+                        "grounding_confidence": 0.51,
+                    }
+                ],
+            },
+            "explanations": [
+                (
+                    f"请先操作 {fallback_target}。"
+                    if self.lang == "zh"
+                    else f"Please operate {fallback_target} first."
+                )
+            ],
+            "confidence": 0.51,
+        }
+        return fallback_help_obj, f"deterministic_step:{inferred_step_id}"
+
+    def _apply_safe_fallback_overlay(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(request)
+        if not isinstance(fallback_help_obj, Mapping):
+            return False, fallback_reason
+
+        mapped = map_help_response_to_tutor_response(
+            fallback_help_obj,
+            request=request,
+            status=response.status,
+            max_overlay_targets=1,
+            ui_map_path=self.ui_map_path,
+        )
+        mapped_meta = dict(mapped.metadata)
+        if mapped_meta:
+            response.metadata["fallback_response_mapping"] = mapped_meta
+        if not mapped.actions:
+            mapping_errors = mapped_meta.get("mapping_errors")
+            if isinstance(mapping_errors, list) and mapping_errors:
+                return False, f"fallback_mapping_failed:{'|'.join(str(item) for item in mapping_errors[:3])}"
+            return False, "fallback_mapping_failed"
+
+        response.actions = list(mapped.actions)
+        if not response.message and mapped.message:
+            response.message = mapped.message
+        if not response.explanations and mapped.explanations:
+            response.explanations = list(mapped.explanations)
+        return True, fallback_reason
+
     def _new_response_from_cached(
         self,
         cached_response: TutorResponse,
@@ -1166,6 +1395,12 @@ class LiveDcsTutorLoop:
             response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
+            response.metadata.setdefault("retry_count", 0)
+            response.metadata.setdefault("retry_reason", None)
+            response.metadata.setdefault("repair_applied", False)
+            response.metadata.setdefault("repair_details", {})
+            response.metadata.setdefault("fallback_overlay_used", False)
+            response.metadata.setdefault("fallback_overlay_reason", "not_needed")
             overlay_report = self._execute_or_dry_run_actions(response.actions)
         else:
             hint = request.context.get("deterministic_step_hint", {})
@@ -1244,6 +1479,21 @@ class LiveDcsTutorLoop:
             response.actions = mapped_actions
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
+
+            fallback_overlay_used = False
+            fallback_overlay_reason = "not_needed"
+            if response.status == "error" and not response.actions:
+                fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
+                    response,
+                    request,
+                )
+
+            response.metadata.setdefault("retry_count", 0)
+            response.metadata.setdefault("retry_reason", None)
+            response.metadata.setdefault("repair_applied", False)
+            response.metadata.setdefault("repair_details", {})
+            response.metadata["fallback_overlay_used"] = fallback_overlay_used
+            response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
 
             overlay_report = self._execute_or_dry_run_actions(response.actions)
             provider = response.metadata.get("provider")

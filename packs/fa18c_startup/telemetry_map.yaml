@@ -1,6 +1,6 @@
 vars:
   # Power
-  battery_on: "bios.BATTERY_SW == 2"
+  battery_on: "bios.BATTERY_SW == 1 or bios.BATTERY_SW == 2"
   ext_pwr_on: "bios.EXT_PWR_SW == 1"
   l_gen_on: "bios.L_GEN_SW == 1"
   r_gen_on: "bios.R_GEN_SW == 1"

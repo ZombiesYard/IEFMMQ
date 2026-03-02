@@ -189,6 +189,28 @@ def test_var_resolver_pack_map_resolves_from_dcs_bios_frame_once() -> None:
         assert (vars_out[key] is None) == (key in vars_out["vars_source_missing"])
 
 
+def test_var_resolver_pack_battery_on_accepts_switch_value_1_or_2() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+    for switch in (1, 2):
+        frame = TelemetryFrame(
+            seq=switch,
+            t_wall=float(switch),
+            source="dcs_bios",
+            bios={"BATTERY_SW": switch},
+        )
+        vars_out = resolver.resolve(frame)
+        assert vars_out["battery_on"] is True
+
+    frame_off = TelemetryFrame(
+        seq=99,
+        t_wall=99.0,
+        source="dcs_bios",
+        bios={"BATTERY_SW": 0},
+    )
+    vars_off = resolver.resolve(frame_off)
+    assert vars_off["battery_on"] is False
+
+
 def test_var_resolver_pack_map_resolves_from_raw_jsonl_samples() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
     lines = [line for line in SAMPLE_RAW_JSONL_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]

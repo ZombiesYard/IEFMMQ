@@ -7,7 +7,7 @@ from __future__ import annotations
 from time import perf_counter
 from typing import Any, Mapping
 
-from adapters.help_response_parser import parse_help_response_with_meta
+from adapters.help_response_parser import parse_help_response_with_diagnostics
 from adapters.prompting import build_help_prompt_result
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import (
@@ -78,6 +78,9 @@ class BaseHelpModel(ModelPort):
         prompt_meta: dict[str, Any] = {}
         delta_dropped_count = self._extract_delta_dropped_count(request)
         prompt_budget_used = 0
+        retry_count = 0
+        retry_reason: str | None = None
+        repair_details = self._empty_repair_details()
         try:
             messages, prompt_meta = self._build_messages(
                 observation,
@@ -88,7 +91,14 @@ class BaseHelpModel(ModelPort):
             )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
             raw_text = self._chat(messages)
-            help_obj, extraction = parse_help_response_with_meta(raw_text)
+            try:
+                help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
+            except Exception as first_parse_exc:
+                retry_count = 1
+                retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
+                retry_messages = self._build_retry_messages(messages, first_parse_exc)
+                raw_text = self._chat(retry_messages)
+                help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
             mapped = map_help_response_to_tutor_response(help_obj, request=request, status="ok")
@@ -108,6 +118,12 @@ class BaseHelpModel(ModelPort):
                     "prompt_build": prompt_meta,
                     "deterministic_step_hint": deterministic_hint,
                     "deterministic_inference_error": deterministic_inference_error,
+                    "retry_count": retry_count,
+                    "retry_reason": retry_reason,
+                    "repair_applied": bool(repair_details.get("repair_applied")),
+                    "repair_details": repair_details,
+                    "fallback_overlay_used": False,
+                    "fallback_overlay_reason": None,
                 }
             )
             return TutorResponse(
@@ -136,6 +152,12 @@ class BaseHelpModel(ModelPort):
                     "prompt_build": prompt_meta,
                     "deterministic_step_hint": deterministic_hint,
                     "deterministic_inference_error": deterministic_inference_error,
+                    "retry_count": retry_count,
+                    "retry_reason": retry_reason,
+                    "repair_applied": bool(repair_details.get("repair_applied")),
+                    "repair_details": repair_details,
+                    "fallback_overlay_used": False,
+                    "fallback_overlay_reason": None,
                 },
             )
 
@@ -401,6 +423,38 @@ class BaseHelpModel(ModelPort):
                 if isinstance(dropped, int) and not isinstance(dropped, bool):
                     return max(0, dropped)
         return 0
+
+    def _build_retry_messages(
+        self,
+        messages: list[dict[str, str]],
+        parse_error: Exception,
+    ) -> list[dict[str, str]]:
+        error_text = f"{type(parse_error).__name__}: {parse_error}"
+        if len(error_text) > 240:
+            error_text = error_text[:240] + "..."
+        if self.lang == "zh":
+            retry_hint = (
+                "上一次输出未通过结构化校验。"
+                "请仅输出一个合法 JSON 对象，严格遵循 schema 与枚举，不要输出任何解释文本。"
+                f"上一轮错误：{error_text}"
+            )
+        else:
+            retry_hint = (
+                "Previous output failed structured validation. "
+                "Return exactly one valid JSON object that strictly follows schema/enums, with no prose. "
+                f"Previous error: {error_text}"
+            )
+        retry_messages = [dict(msg) for msg in messages]
+        retry_messages.append({"role": "user", "content": retry_hint})
+        return retry_messages
+
+    def _empty_repair_details(self) -> dict[str, Any]:
+        return {
+            "repair_applied": False,
+            "repaired_evidence_types": 0,
+            "dropped_unrepairable_evidence": 0,
+            "details": [],
+        }
 
     def _chat(self, messages: list[dict[str, str]]) -> str:  # pragma: no cover - implemented by subclasses
         raise NotImplementedError

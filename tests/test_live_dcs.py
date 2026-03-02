@@ -1268,7 +1268,43 @@ def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> Non
     assert stats["help_cycles"] == 1
     assert stats["model_calls"] == 1
     assert len(executor.calls) == 1
-    assert executor.calls[0] == []
+    assert len(executor.calls[0]) == 1
+    assert executor.calls[0][0]["type"] == "overlay"
+    assert executor.calls[0][0]["target"] == "apu_switch"
+
+
+def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_model_error_fallback_overlay.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = FailingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0]) == 1
+    action = executor.calls[0][0]
+    assert action["type"] == "overlay"
+    assert action["target"] == "apu_switch"
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    meta = tutor_response_payload["metadata"]
+    assert meta["fallback_overlay_used"] is True
+    assert isinstance(meta["fallback_overlay_reason"], str)
+    assert meta["fallback_overlay_reason"].startswith("deterministic_step:")
 
 
 def test_live_loop_cache_key_ignores_numeric_churn_when_discrete_state_unchanged(tmp_path: Path) -> None:

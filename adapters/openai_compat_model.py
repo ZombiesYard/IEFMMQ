@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from adapters.base_help_model import BaseHelpModel
+from core.llm_schema import get_help_response_schema
 
 
 class OpenAICompatModel(BaseHelpModel):
@@ -31,10 +32,19 @@ class OpenAICompatModel(BaseHelpModel):
         )
 
     def _chat(self, messages: list[dict[str, str]]) -> str:
+        schema = get_help_response_schema()
         payload = {
             "model": self.model_name,
             "messages": messages,
             "temperature": 0,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "HelpResponse",
+                    "strict": True,
+                    "schema": schema,
+                },
+            },
         }
         headers = {"Content-Type": "application/json"}
         if self.api_key:

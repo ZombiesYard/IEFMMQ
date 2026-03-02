@@ -46,6 +46,9 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert call["url"] == "http://127.0.0.1:8000/v1/chat/completions"
     assert call["json"]["model"] == "Qwen3-8B-Instruct"
     assert call["json"]["temperature"] == 0
+    assert call["json"]["response_format"]["type"] == "json_schema"
+    assert call["json"]["response_format"]["json_schema"]["name"] == "HelpResponse"
+    assert call["json"]["response_format"]["json_schema"]["strict"] is True
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0
     prompt_payload = _extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
@@ -132,6 +135,49 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_retries_once_after_structured_output_failure_and_recovers() -> None:
+    invalid_payload = {
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "not-json"},
+            }
+        ]
+    }
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(invalid_payload), FakeResponse(valid_payload)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(res.actions) == 1
+    assert len(fake.calls) == 2
+    assert res.metadata["retry_count"] == 1
+    assert isinstance(res.metadata["retry_reason"], str) and res.metadata["retry_reason"]
+
+
+def test_explain_error_retries_once_and_returns_error_when_structured_output_still_invalid() -> None:
+    invalid_payload = {
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "not-json"},
+            }
+        ]
+    }
+    fake = FakeClient(responses=[FakeResponse(invalid_payload), FakeResponse(invalid_payload)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert len(fake.calls) == 2
+    assert res.metadata["retry_count"] == 1
+    assert isinstance(res.metadata["retry_reason"], str) and "ValueError" in res.metadata["retry_reason"]
 
 
 def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -> None:
