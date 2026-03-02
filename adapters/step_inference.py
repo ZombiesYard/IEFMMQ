@@ -223,7 +223,7 @@ def infer_step_id(
         if engine_crank_right is not True:
             missing.insert(0, "vars.engine_crank_right==true")
         return _result(s05, missing)
-    if throttle_r_not_off is False:
+    if throttle_r_not_off is not True:
         return _result(s05, ["vars.throttle_r_not_off==true"])
 
     if rpm_r_gte_60 is not True:

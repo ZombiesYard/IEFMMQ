@@ -198,7 +198,12 @@ def test_explain_error_retries_once_and_returns_error_when_structured_output_sti
 
 def test_openai_compat_downgrades_request_when_json_schema_format_is_rejected() -> None:
     valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
-    fake = FakeClient(responses=[FakeResponse({}, status_code=400), FakeResponse(valid_payload, status_code=200)])
+    rejected = {
+        "error": {
+            "message": "Unknown field response_format: json_schema is not supported by this server",
+        }
+    }
+    fake = FakeClient(responses=[FakeResponse(rejected, status_code=400), FakeResponse(valid_payload, status_code=200)])
     model = OpenAICompatModel(client=fake)
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
@@ -209,6 +214,46 @@ def test_openai_compat_downgrades_request_when_json_schema_format_is_rejected() 
     second_payload = fake.calls[1]["json"]
     assert "response_format" in first_payload
     assert "response_format" not in second_payload
+
+
+def test_openai_compat_does_not_retry_on_unrelated_400_error() -> None:
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {"error": {"message": "Invalid model name Qwen/DoesNotExist"}},
+                status_code=400,
+            )
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert len(fake.calls) == 1
+
+
+def test_openai_compat_downgrades_when_400_text_indicates_response_format_unsupported() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                payload=None,
+                status_code=400,
+                text="Bad Request: response_format extra inputs are not permitted",
+                json_error=ValueError("not json"),
+            ),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    assert "response_format" in fake.calls[0]["json"]
+    assert "response_format" not in fake.calls[1]["json"]
 
 
 def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -> None:

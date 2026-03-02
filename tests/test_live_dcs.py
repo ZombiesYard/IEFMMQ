@@ -1420,3 +1420,33 @@ def test_live_dcs_cli_log_raw_llm_text_can_enable_when_env_default_off(monkeypat
     parser = build_arg_parser()
     args = parser.parse_args(["--log-raw-llm-text"])
     assert args.log_raw_llm_text is True
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected"),
+    [
+        ("true", True),
+        ("false", False),
+    ],
+)
+def test_live_dcs_cli_log_raw_llm_text_reads_common_boolean_env_values(
+    monkeypatch,
+    env_value: str,
+    expected: bool,
+) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", env_value)
+    parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.log_raw_llm_text is expected
+
+
+def test_live_dcs_cli_log_raw_llm_text_invalid_env_falls_back_false_with_warning(monkeypatch, caplog) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "abc")
+    with caplog.at_level("WARNING"):
+        parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.log_raw_llm_text is False
+    assert any(
+        "SIMTUTOR_LOG_RAW_LLM_TEXT" in record.message and "Invalid boolean environment value" in record.message
+        for record in caplog.records
+    )

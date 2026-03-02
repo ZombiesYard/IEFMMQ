@@ -35,6 +35,7 @@ from adapters.recent_actions import (
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
+from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vars import VarResolver
@@ -1677,7 +1678,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
-    log_raw_default = bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")))
+    log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
     log_raw_group = parser.add_mutually_exclusive_group()
     log_raw_group.add_argument(
         "--log-raw-llm-text",

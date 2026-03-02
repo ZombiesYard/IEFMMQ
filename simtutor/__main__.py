@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping, Tuple
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.env_bool import parse_env_bool
 from simtutor.runner import replay_log, run_simulation
 
 
@@ -275,7 +276,7 @@ def main() -> int:
     rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
-    replay_log_raw_default = bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")))
+    replay_log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
     replay_log_raw_group = rep_bios.add_mutually_exclusive_group()
     replay_log_raw_group.add_argument(
         "--log-raw-llm-text",
