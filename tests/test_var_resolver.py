@@ -209,14 +209,14 @@ def test_var_resolver_pack_battery_on_requires_switch_value_2() -> None:
     vars_off = resolver.resolve(frame_off)
     assert vars_off["battery_on"] is False
 
-    frame_oride = TelemetryFrame(
+    frame_override = TelemetryFrame(
         seq=100,
         t_wall=100.0,
         source="dcs_bios",
         bios={"BATTERY_SW": 0},
     )
-    vars_oride = resolver.resolve(frame_oride)
-    assert vars_oride["battery_on"] is False
+    vars_override = resolver.resolve(frame_override)
+    assert vars_override["battery_on"] is False
 
 
 def test_var_resolver_pack_engine_crank_switch_three_position_mapping() -> None:

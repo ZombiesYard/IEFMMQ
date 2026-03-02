@@ -1420,12 +1420,9 @@ class LiveDcsTutorLoop:
                     request,
                 )
 
-            response.metadata.setdefault("retry_count", 0)
-            response.metadata.setdefault("retry_reason", None)
-            response.metadata.setdefault("repair_applied", False)
-            response.metadata.setdefault("repair_details", {})
             response.metadata["fallback_overlay_used"] = fallback_overlay_used
             response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
+            _normalize_cached_response_metadata(response.metadata)
 
             overlay_report = self._execute_or_dry_run_actions(response.actions)
             provider = response.metadata.get("provider")
