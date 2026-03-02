@@ -105,3 +105,18 @@ def test_evaluate_pack_gates_accepts_generator_rules_iterable() -> None:
 
     assert gates["S99.precondition"]["status"] == "blocked"
     assert gates["S99.precondition"]["allowed"] is False
+
+
+def test_evaluate_pack_gates_treats_single_mapping_rule_as_one_rule() -> None:
+    precondition_gates = {
+        "S98": {"op": "flag_true", "var": "vars.apu_ready"},
+    }
+    completion_gates: dict[str, tuple[dict[str, object], ...]] = {}
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(apu_ready=False)],
+        precondition_gates=precondition_gates,  # type: ignore[arg-type]
+        completion_gates=completion_gates,
+    )
+
+    assert gates["S98.precondition"]["status"] == "blocked"
+    assert gates["S98.precondition"]["allowed"] is False

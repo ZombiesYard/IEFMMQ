@@ -1365,4 +1365,7 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
     assert isinstance(missing_conditions, list)
     assert isinstance(gate_blockers, list)
     assert all(not item.startswith("GATES.") for item in missing_conditions if isinstance(item, str))
-    assert any(item.startswith("GATES.S05.precondition:") for item in gate_blockers if isinstance(item, str))
+    assert any(
+        isinstance(item, dict) and item.get("ref") == "GATES.S05.precondition"
+        for item in gate_blockers
+    )

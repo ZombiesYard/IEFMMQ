@@ -267,7 +267,7 @@ Notes:
 Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - `grounding_snippet_ids`: snippet ids actually injected into prompt.
 - `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
-- `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`) and evidence refs source (`GATES.*`).
+- `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`); valid gate evidence refs are exactly `GATES.<gate_id>` where `<gate_id>` is a key in `context.gates` (for example `GATES.S05.precondition`).
 
 ### Overlay action evidence protocol
 Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).

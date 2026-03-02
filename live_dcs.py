@@ -359,7 +359,8 @@ def _select_gates_for_context(
         for gate_id, gate in all_gates.items()
         if isinstance(gate, Mapping) and gate.get("status") == "blocked"
     ]
-    allowed_ids = [gate_id for gate_id in all_gates.keys() if gate_id not in blocked_ids]
+    blocked_id_set = set(blocked_ids)
+    allowed_ids = [gate_id for gate_id in all_gates.keys() if gate_id not in blocked_id_set]
     for gate_id in sorted(blocked_ids):
         ordered_ids.append(gate_id)
     for gate_id in sorted(allowed_ids):
@@ -905,17 +906,19 @@ class LiveDcsTutorLoop:
             inferred_step_id=inference.inferred_step_id,
             max_items=8,
         )
-        inferred_gate_blockers: list[str] = []
+        inferred_gate_blockers: list[dict[str, str]] = []
         if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
             gate_id = f"{inference.inferred_step_id}.precondition"
             gate_info = all_gates.get(gate_id)
             if isinstance(gate_info, Mapping) and gate_info.get("status") == "blocked":
+                blocker: dict[str, str] = {"ref": f"GATES.{gate_id}"}
                 reason_code = gate_info.get("reason_code")
                 if isinstance(reason_code, str) and reason_code:
-                    inferred_gate_blockers.append(f"GATES.{gate_id}:{reason_code}")
+                    blocker["reason_code"] = reason_code
                 reason = gate_info.get("reason")
                 if isinstance(reason, str) and reason:
-                    inferred_gate_blockers.append(f"GATES.{gate_id}:{reason}")
+                    blocker["reason"] = reason
+                inferred_gate_blockers.append(blocker)
 
         missing_conditions = list(inference.missing_conditions)
         deterministic_hint = {
@@ -1173,10 +1176,28 @@ class LiveDcsTutorLoop:
             gate_blockers = hint.get("gate_blockers", []) if isinstance(hint, Mapping) else []
             if not isinstance(gate_blockers, list):
                 gate_blockers = []
+            gate_blocker_conditions: list[str] = []
+            for item in gate_blockers:
+                if isinstance(item, Mapping):
+                    reason = item.get("reason")
+                    if isinstance(reason, str) and reason:
+                        gate_blocker_conditions.append(reason)
+                        continue
+                    reason_code = item.get("reason_code")
+                    if isinstance(reason_code, str) and reason_code:
+                        gate_blocker_conditions.append(reason_code)
+                        continue
+                    ref = item.get("ref")
+                    if isinstance(ref, str) and ref:
+                        gate_blocker_conditions.append(ref)
+                        continue
+                elif isinstance(item, str) and item:
+                    # Backward compatibility for legacy string blockers.
+                    gate_blocker_conditions.append(item)
             fallback_conditions = _dedupe_strings(
                 [
                     item
-                    for item in [*missing_conditions, *gate_blockers]
+                    for item in [*missing_conditions, *gate_blocker_conditions]
                     if isinstance(item, str) and item
                 ]
             )

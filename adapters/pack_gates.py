@@ -126,7 +126,7 @@ def _coerce_rules_iterable(raw: Any) -> tuple[Mapping[str, Any], ...]:
     if raw is None:
         return ()
     if isinstance(raw, Mapping):
-        return ()
+        return (raw,)
     if isinstance(raw, (str, bytes)):
         return ()
     if not isinstance(raw, Iterable):
