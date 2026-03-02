@@ -98,7 +98,10 @@ def _collect_allowed_evidence_refs(request: TutorRequest | None) -> set[str]:
                 ui_target = item.get("target")
             if isinstance(ui_target, str) and ui_target:
                 refs.add(f"RECENT_UI_TARGETS.{ui_target}")
-            bios_key = item.get("bios_key")
+            bios_key = item.get("k")
+            if not isinstance(bios_key, str) or not bios_key:
+                # Backward compatibility for legacy fixtures/adapters.
+                bios_key = item.get("bios_key")
             if isinstance(bios_key, str) and bios_key:
                 refs.add(f"DELTA_KEYS.{bios_key}")
 

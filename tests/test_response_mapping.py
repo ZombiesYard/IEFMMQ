@@ -46,6 +46,18 @@ def _evidence(target: str, *, kind: str, ref: str, quote: str = "evidence") -> d
     return {"target": target, "type": kind, "ref": ref, "quote": quote}
 
 
+def _request_with_recent_delta_k_only() -> TutorRequest:
+    return TutorRequest(
+        intent="help",
+        context={
+            "vars": {"battery_on": True},
+            "recent_deltas": [
+                {"k": "APU_CONTROL_SW", "mapped_ui_target": "apu_switch"},
+            ],
+        },
+    )
+
+
 def test_mapping_generates_overlay_action_aligned_with_overlay_intent() -> None:
     help_obj = {
         "overlay": {
@@ -395,6 +407,23 @@ def test_mapping_rejects_overlay_when_evidence_ref_unknown() -> None:
         reason.startswith("unknown_evidence_ref:")
         for reason in payload["metadata"]["overlay_rejected_reasons"]
     )
+
+
+def test_mapping_accepts_delta_key_evidence_from_recent_deltas_k_field() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="DELTA_KEYS.APU_CONTROL_SW")],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_recent_delta_k_only())
+    payload = res.to_dict()
+
+    assert payload["actions"] != []
+    assert payload["actions"][0]["target"] == "apu_switch"
+    assert payload["actions"][0]["evidence_refs"] == ["DELTA_KEYS.APU_CONTROL_SW"]
+    assert payload["metadata"].get("overlay_rejected") is not True
 
 
 def test_mapping_rejects_overlay_when_no_verifiable_refs_from_request_context() -> None:
