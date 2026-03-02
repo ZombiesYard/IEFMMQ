@@ -394,3 +394,97 @@ def test_mapping_rejects_overlay_when_evidence_ref_unknown() -> None:
         reason.startswith("unknown_evidence_ref:")
         for reason in payload["metadata"]["overlay_rejected_reasons"]
     )
+
+
+def test_mapping_rejects_overlay_when_no_verifiable_refs_from_request_context() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=None)
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert payload["metadata"]["overlay_rejected_reasons"] == ["no_verifiable_evidence_refs"]
+
+
+@pytest.mark.parametrize(
+    "evidence_item",
+    [
+        "not-a-mapping",
+        {"type": "delta", "ref": "RECENT_UI_TARGETS.apu_switch"},
+        {"target": "apu_switch", "type": "unknown", "ref": "RECENT_UI_TARGETS.apu_switch"},
+        {"target": "apu_switch", "type": "delta"},
+    ],
+)
+def test_mapping_rejects_overlay_when_evidence_item_invalid(evidence_item: object) -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [evidence_item],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert "invalid_overlay_evidence_item" in payload["metadata"]["overlay_rejected_reasons"]
+
+
+def test_mapping_rejects_overlay_when_evidence_type_ref_prefix_mismatch() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="var", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert any(
+        reason.startswith("evidence_type_ref_mismatch:")
+        for reason in payload["metadata"]["overlay_rejected_reasons"]
+    )
+
+
+def test_mapping_rejects_overlay_when_evidence_target_not_declared_in_overlay_targets() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("battery_switch", kind="delta", ref="RECENT_UI_TARGETS.battery_switch")],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert "evidence_target_not_in_overlay_targets" in payload["metadata"]["overlay_rejected_reasons"]
+
+
+def test_mapping_rejects_overlay_when_target_has_no_valid_evidence_even_if_other_target_valid() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch", "battery_switch"],
+            "evidence": [
+                _evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch"),
+            ],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert "missing_target_evidence:battery_switch" in payload["metadata"]["overlay_rejected_reasons"]

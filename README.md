@@ -267,7 +267,7 @@ Notes:
 Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - `grounding_snippet_ids`: snippet ids actually injected into prompt.
 - `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
-- Evidence protocol hard gate: if `overlay.targets` has no verifiable `overlay.evidence` refs (from `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`), overlay actions are rejected and logged in response metadata.
+- Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
 
 ## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
