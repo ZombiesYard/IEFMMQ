@@ -56,8 +56,28 @@ class OpenAICompatModel(BaseHelpModel):
             headers=headers,
             timeout=self.timeout_s,
         )
+        status_code = getattr(response, "status_code", None)
+        if isinstance(status_code, int) and status_code == 400:
+            # Compatibility fallback for older vLLM builds that reject json_schema response_format.
+            fallback_payload = {
+                "model": self.model_name,
+                "messages": messages,
+                "temperature": 0,
+            }
+            response = self._client.post(
+                f"{self.base_url}/v1/chat/completions",
+                json=fallback_payload,
+                headers=headers,
+                timeout=self.timeout_s,
+            )
+
         response.raise_for_status()
         body = response.json()
+        if not isinstance(body, Mapping):
+            raise ValueError("OpenAI-compatible response must be a JSON object")
+        return self._extract_content_from_body(body)
+
+    def _extract_content_from_body(self, body: Mapping[str, object]) -> str:
         if not isinstance(body, Mapping):
             raise ValueError("OpenAI-compatible response must be a JSON object")
 

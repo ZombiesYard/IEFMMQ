@@ -93,6 +93,22 @@ def test_infer_step_s06_when_rpm_between_25_and_60() -> None:
     assert result.missing_conditions == ("vars.rpm_r>=60",)
 
 
+def test_infer_step_s05_when_throttle_not_moved_from_off_after_rpm_25() -> None:
+    result = infer_step_id(
+        _pack_steps(),
+        {
+            "power_available": True,
+            "apu_ready": True,
+            "engine_crank_right": True,
+            "rpm_r": 30,
+            "throttle_r_not_off": False,
+        },
+        ["eng_crank_switch"],
+    )
+    assert result.inferred_step_id == "S05"
+    assert result.missing_conditions == ("vars.throttle_r_not_off==true",)
+
+
 def test_infer_step_is_robust_on_invalid_inputs() -> None:
     result = infer_step_id(
         _pack_steps(),

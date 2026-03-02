@@ -180,6 +180,21 @@ def test_explain_error_retries_once_and_returns_error_when_structured_output_sti
     assert isinstance(res.metadata["retry_reason"], str) and "ValueError" in res.metadata["retry_reason"]
 
 
+def test_openai_compat_downgrades_request_when_json_schema_format_is_rejected() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse({}, status_code=400), FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    first_payload = fake.calls[0]["json"]
+    second_payload = fake.calls[1]["json"]
+    assert "response_format" in first_payload
+    assert "response_format" not in second_payload
+
+
 def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake, lang="zh")

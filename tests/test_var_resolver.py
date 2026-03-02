@@ -189,26 +189,92 @@ def test_var_resolver_pack_map_resolves_from_dcs_bios_frame_once() -> None:
         assert (vars_out[key] is None) == (key in vars_out["vars_source_missing"])
 
 
-def test_var_resolver_pack_battery_on_accepts_switch_value_1_or_2() -> None:
+def test_var_resolver_pack_battery_on_requires_switch_value_2() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
-    for switch in (1, 2):
-        frame = TelemetryFrame(
-            seq=switch,
-            t_wall=float(switch),
-            source="dcs_bios",
-            bios={"BATTERY_SW": switch},
-        )
-        vars_out = resolver.resolve(frame)
-        assert vars_out["battery_on"] is True
+    frame_on = TelemetryFrame(
+        seq=2,
+        t_wall=2.0,
+        source="dcs_bios",
+        bios={"BATTERY_SW": 2},
+    )
+    vars_on = resolver.resolve(frame_on)
+    assert vars_on["battery_on"] is True
 
     frame_off = TelemetryFrame(
         seq=99,
         t_wall=99.0,
         source="dcs_bios",
-        bios={"BATTERY_SW": 0},
+        bios={"BATTERY_SW": 1},
     )
     vars_off = resolver.resolve(frame_off)
     assert vars_off["battery_on"] is False
+
+    frame_oride = TelemetryFrame(
+        seq=100,
+        t_wall=100.0,
+        source="dcs_bios",
+        bios={"BATTERY_SW": 0},
+    )
+    vars_oride = resolver.resolve(frame_oride)
+    assert vars_oride["battery_on"] is False
+
+
+def test_var_resolver_pack_engine_crank_switch_three_position_mapping() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame_left = TelemetryFrame(
+        seq=201,
+        t_wall=201.0,
+        source="dcs_bios",
+        bios={"ENGINE_CRANK_SW": 0},
+    )
+    vars_left = resolver.resolve(frame_left)
+    assert vars_left["engine_crank_left"] is True
+    assert vars_left["engine_crank_right"] is False
+
+    frame_off = TelemetryFrame(
+        seq=202,
+        t_wall=202.0,
+        source="dcs_bios",
+        bios={"ENGINE_CRANK_SW": 1},
+    )
+    vars_off = resolver.resolve(frame_off)
+    assert vars_off["engine_crank_left"] is False
+    assert vars_off["engine_crank_right"] is False
+
+    frame_right = TelemetryFrame(
+        seq=203,
+        t_wall=203.0,
+        source="dcs_bios",
+        bios={"ENGINE_CRANK_SW": 2},
+    )
+    vars_right = resolver.resolve(frame_right)
+    assert vars_right["engine_crank_left"] is False
+    assert vars_right["engine_crank_right"] is True
+
+
+def test_var_resolver_pack_throttle_not_off_flags_track_internal_throttle_axes() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame_off = TelemetryFrame(
+        seq=301,
+        t_wall=301.0,
+        source="dcs_bios",
+        bios={"INT_THROTTLE_RIGHT": 0, "INT_THROTTLE_LEFT": 0},
+    )
+    vars_off = resolver.resolve(frame_off)
+    assert vars_off["throttle_r_not_off"] is False
+    assert vars_off["throttle_l_not_off"] is False
+
+    frame_idle = TelemetryFrame(
+        seq=302,
+        t_wall=302.0,
+        source="dcs_bios",
+        bios={"INT_THROTTLE_RIGHT": 1, "INT_THROTTLE_LEFT": 2},
+    )
+    vars_idle = resolver.resolve(frame_idle)
+    assert vars_idle["throttle_r_not_off"] is True
+    assert vars_idle["throttle_l_not_off"] is True
 
 
 def test_var_resolver_pack_map_resolves_from_raw_jsonl_samples() -> None:

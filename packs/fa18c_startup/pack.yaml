@@ -122,6 +122,10 @@ completion_gates:
       value: 25
       reason_code: s05_requires_rpm_r_gte_25
       reason: "Right engine RPM must be at least 25."
+    - op: flag_true
+      var: vars.throttle_r_not_off
+      reason_code: s05_requires_throttle_right_idle
+      reason: "Right throttle must be moved from OFF toward IDLE."
   S06:
     - op: flag_true
       var: vars.bleed_air_norm
@@ -234,6 +238,7 @@ steps:
     completion_conditions:
       - "Right throttle at IDLE."
       - "Throttle moved when RPM >=25%."
+    # No dedicated clickable cockpit element exists for throttle OFF->IDLE detent.
     ui_targets: []
     tutor_prompts:
       - "Monitor IFEI; when right RPM passes 25%, lift and move right throttle to IDLE."

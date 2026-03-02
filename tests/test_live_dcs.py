@@ -36,7 +36,7 @@ def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
             "R_GEN_SW": 1,
             "APU_CONTROL_SW": apu_switch,
             "APU_READY_LT": 0,
-            "ENGINE_CRANK_SW": 0,
+            "ENGINE_CRANK_SW": 1,
         },
         "delta": {"APU_CONTROL_SW": apu_switch},
     }
@@ -1371,7 +1371,7 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
     replay_path = tmp_path / "bios_gate_blockers_for_hint.jsonl"
     frame = _bios_frame(1, 18.0, apu_switch=1)
     frame["bios"]["APU_READY_LT"] = 1
-    frame["bios"]["ENGINE_CRANK_SW"] = 0
+    frame["bios"]["ENGINE_CRANK_SW"] = 1
     frame["bios"]["IFEI_RPM_R"] = 22
     frame["delta"]["IFEI_RPM_R"] = 22
     _write_replay(replay_path, [frame])

@@ -27,7 +27,7 @@ def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
             "R_GEN_SW": 1,
             "APU_CONTROL_SW": apu_switch,
             "APU_READY_LT": 0,
-            "ENGINE_CRANK_SW": 0,
+            "ENGINE_CRANK_SW": 1,
         },
         "delta": {"APU_CONTROL_SW": apu_switch},
     }

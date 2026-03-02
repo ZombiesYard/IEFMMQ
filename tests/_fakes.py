@@ -11,6 +11,10 @@ class FakeResponse:
         self._payload = payload
         self._status_code = status_code
 
+    @property
+    def status_code(self) -> int:
+        return self._status_code
+
     def raise_for_status(self) -> None:
         if self._status_code >= 400:
             raise RuntimeError(f"http {self._status_code}")
