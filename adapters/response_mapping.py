@@ -139,13 +139,14 @@ def _validate_overlay_evidence(
     if not targets:
         return True, [], {}, 0
 
+    allowed_refs = _collect_allowed_evidence_refs(request)
+    allowed_ref_count = len(allowed_refs)
+
     overlay = help_obj.get("overlay") if isinstance(help_obj, Mapping) else None
     evidence_raw = overlay.get("evidence") if isinstance(overlay, Mapping) else None
     if not isinstance(evidence_raw, list):
-        return False, ["missing_overlay_evidence"], {}, 0
+        return False, ["missing_overlay_evidence"], {}, allowed_ref_count
 
-    allowed_refs = _collect_allowed_evidence_refs(request)
-    allowed_ref_count = len(allowed_refs)
     if not allowed_refs:
         return False, ["no_verifiable_evidence_refs"], {}, allowed_ref_count
 
@@ -199,7 +200,7 @@ def _validate_overlay_evidence(
     if unknown_refs:
         reasons.append("unknown_evidence_ref:" + ",".join(sorted(unknown_refs)))
 
-    missing_targets = [target for target, refs in refs_by_target.items() if not refs]
+    missing_targets = sorted(target for target, refs in refs_by_target.items() if not refs)
     if missing_targets:
         reasons.append("missing_target_evidence:" + ",".join(missing_targets))
 

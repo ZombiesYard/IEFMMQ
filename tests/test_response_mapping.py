@@ -375,6 +375,7 @@ def test_mapping_rejects_overlay_when_targets_without_evidence() -> None:
     assert payload["actions"] == []
     assert payload["metadata"]["overlay_rejected"] is True
     assert "missing_overlay_evidence" in payload["metadata"]["overlay_rejected_reasons"]
+    assert payload["metadata"]["allowed_evidence_ref_count"] == 8
 
 
 def test_mapping_rejects_overlay_when_evidence_ref_unknown() -> None:
@@ -488,3 +489,22 @@ def test_mapping_rejects_overlay_when_target_has_no_valid_evidence_even_if_other
     assert payload["actions"] == []
     assert payload["metadata"]["overlay_rejected"] is True
     assert "missing_target_evidence:battery_switch" in payload["metadata"]["overlay_rejected_reasons"]
+
+
+def test_mapping_missing_target_evidence_reason_is_sorted_deterministically() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["battery_switch", "apu_switch"],
+            "evidence": [
+                _evidence("battery_switch", kind="var", ref="RECENT_UI_TARGETS.battery_switch"),
+                _evidence("apu_switch", kind="var", ref="RECENT_UI_TARGETS.apu_switch"),
+            ],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert "missing_target_evidence:apu_switch,battery_switch" in payload["metadata"]["overlay_rejected_reasons"]
