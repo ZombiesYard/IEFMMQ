@@ -495,10 +495,7 @@ def test_mapping_missing_target_evidence_reason_is_sorted_deterministically() ->
     help_obj = {
         "overlay": {
             "targets": ["battery_switch", "apu_switch"],
-            "evidence": [
-                _evidence("battery_switch", kind="var", ref="RECENT_UI_TARGETS.battery_switch"),
-                _evidence("apu_switch", kind="var", ref="RECENT_UI_TARGETS.apu_switch"),
-            ],
+            "evidence": [],
         },
         "explanations": ["x"],
     }
@@ -507,4 +504,6 @@ def test_mapping_missing_target_evidence_reason_is_sorted_deterministically() ->
 
     assert payload["actions"] == []
     assert payload["metadata"]["overlay_rejected"] is True
-    assert "missing_target_evidence:apu_switch,battery_switch" in payload["metadata"]["overlay_rejected_reasons"]
+    assert payload["metadata"]["overlay_rejected_reasons"] == [
+        "missing_target_evidence:apu_switch,battery_switch"
+    ]
