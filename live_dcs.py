@@ -24,6 +24,7 @@ from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, 
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
 from adapters.openai_compat_model import OpenAICompatModel
+from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config
 from adapters.prompting import build_help_prompt_result
 from adapters.recent_actions import (
     RecentDeltaRingBuffer,
@@ -328,6 +329,56 @@ def _dedupe_strings(items: Iterable[str]) -> list[str]:
     return out
 
 
+def _compact_gate_payload(raw: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "status": raw.get("status"),
+        "reason_code": raw.get("reason_code"),
+        "reason": raw.get("reason"),
+    }
+
+
+def _select_gates_for_context(
+    all_gates: Mapping[str, Mapping[str, Any]],
+    *,
+    inferred_step_id: str | None,
+    max_items: int = 8,
+) -> dict[str, dict[str, Any]]:
+    cap = max(0, int(max_items))
+    if cap == 0 or not all_gates:
+        return {}
+
+    ordered_ids: list[str] = []
+    if isinstance(inferred_step_id, str) and inferred_step_id:
+        for gate_type in ("precondition", "completion"):
+            gate_id = f"{inferred_step_id}.{gate_type}"
+            if gate_id in all_gates:
+                ordered_ids.append(gate_id)
+
+    blocked_ids = [
+        gate_id
+        for gate_id, gate in all_gates.items()
+        if isinstance(gate, Mapping) and gate.get("status") == "blocked"
+    ]
+    blocked_id_set = set(blocked_ids)
+    allowed_ids = [gate_id for gate_id in all_gates.keys() if gate_id not in blocked_id_set]
+    for gate_id in sorted(blocked_ids):
+        ordered_ids.append(gate_id)
+    for gate_id in sorted(allowed_ids):
+        ordered_ids.append(gate_id)
+
+    selected: dict[str, dict[str, Any]] = {}
+    for gate_id in ordered_ids:
+        if gate_id in selected:
+            continue
+        gate = all_gates.get(gate_id)
+        if not isinstance(gate, Mapping):
+            continue
+        selected[gate_id] = _compact_gate_payload(gate)
+        if len(selected) >= cap:
+            break
+    return selected
+
+
 @dataclass
 class HelpCacheEntry:
     state_key: str
@@ -623,6 +674,9 @@ class LiveDcsTutorLoop:
         if self.knowledge is None and self.rag_top_k > 0:
             self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
         self.pack_steps = load_pack_steps(self.pack_path)
+        gate_config = load_pack_gate_config(self.pack_path)
+        self.precondition_gates = dict(gate_config.get("precondition_gates", {}))
+        self.completion_gates = dict(gate_config.get("completion_gates", {}))
         self.candidate_steps = _load_step_ids(self.pack_path)
         self.overlay_allowlist = _load_overlay_allowlist(self.pack_path, self.ui_map_path)
         self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
@@ -842,15 +896,42 @@ class LiveDcsTutorLoop:
             if isinstance(item, str) and item
         ]
         inference = infer_step_id(self.pack_steps, vars_selected, recent_buttons)
+        all_gates = evaluate_pack_gates(
+            observations=[obs.to_dict()],
+            precondition_gates=self.precondition_gates,
+            completion_gates=self.completion_gates,
+        )
+        gates = _select_gates_for_context(
+            all_gates,
+            inferred_step_id=inference.inferred_step_id,
+            max_items=8,
+        )
+        inferred_gate_blockers: list[dict[str, str]] = []
+        if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
+            gate_id = f"{inference.inferred_step_id}.precondition"
+            gate_info = all_gates.get(gate_id)
+            if isinstance(gate_info, Mapping) and gate_info.get("status") == "blocked":
+                blocker: dict[str, str] = {"ref": f"GATES.{gate_id}"}
+                reason_code = gate_info.get("reason_code")
+                if isinstance(reason_code, str) and reason_code:
+                    blocker["reason_code"] = reason_code
+                reason = gate_info.get("reason")
+                if isinstance(reason, str) and reason:
+                    blocker["reason"] = reason
+                inferred_gate_blockers.append(blocker)
+
+        missing_conditions = list(inference.missing_conditions)
         deterministic_hint = {
             "inferred_step_id": inference.inferred_step_id,
-            "missing_conditions": list(inference.missing_conditions),
+            "missing_conditions": missing_conditions,
             "recent_ui_targets": recent_buttons,
+            "gate_blockers": inferred_gate_blockers,
         }
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
 
         context = {
             "vars": vars_selected,
+            "gates": gates,
             "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
             "candidate_steps": list(self.candidate_steps),
@@ -1092,6 +1173,34 @@ class LiveDcsTutorLoop:
             missing_conditions = hint.get("missing_conditions", []) if isinstance(hint, Mapping) else []
             if not isinstance(missing_conditions, list):
                 missing_conditions = []
+            gate_blockers = hint.get("gate_blockers", []) if isinstance(hint, Mapping) else []
+            if not isinstance(gate_blockers, list):
+                gate_blockers = []
+            gate_blocker_conditions: list[str] = []
+            for item in gate_blockers:
+                if isinstance(item, Mapping):
+                    reason = item.get("reason")
+                    if isinstance(reason, str) and reason:
+                        gate_blocker_conditions.append(reason)
+                        continue
+                    reason_code = item.get("reason_code")
+                    if isinstance(reason_code, str) and reason_code:
+                        gate_blocker_conditions.append(reason_code)
+                        continue
+                    ref = item.get("ref")
+                    if isinstance(ref, str) and ref:
+                        gate_blocker_conditions.append(ref)
+                        continue
+                elif isinstance(item, str) and item:
+                    # Backward compatibility for legacy string blockers.
+                    gate_blocker_conditions.append(item)
+            fallback_conditions = _dedupe_strings(
+                [
+                    item
+                    for item in [*missing_conditions, *gate_blocker_conditions]
+                    if isinstance(item, str) and item
+                ]
+            )
             self._stats.model_calls += 1
             try:
                 response = self.model.explain_error(obs, request)
@@ -1101,7 +1210,7 @@ class LiveDcsTutorLoop:
                     in_reply_to=request.request_id,
                     message=self._fallback_message(
                         inferred_step_id if isinstance(inferred_step_id, str) else None,
-                        [item for item in missing_conditions if isinstance(item, str)],
+                        fallback_conditions,
                     ),
                     actions=[],
                     metadata={

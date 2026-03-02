@@ -9,8 +9,9 @@ metadata:
     - Doc/Evaluation/fa18c_startup_master.md
     - Doc/Evaluation/Appendix - Training Task Syllabus.md
   notes: >
-    This MVP covers steps S01-S10 (phases P1-P4) sufficient for an initial cold
-    start. Remaining steps can be appended later using the same schema.
+    This MVP procedure list covers steps S01-S10 (phases P1-P4) sufficient for
+    an initial cold start. Deterministic gate maps additionally cover S11
+    readiness checks for future expansion.
 
 prerequisites:
   - "Aircraft cold and dark at ramp or carrier; parking brake set."
@@ -23,6 +24,139 @@ completion_conditions:
   - "Left engine crank sequence initiated and monitored per checklist."
   - "Both engines running and stabilized in green ranges."
   - "Safety-critical cautions resolved for current configuration (MVP S01-S10 scope)."
+
+precondition_gates:
+  S01: []
+  S02:
+    - op: flag_true
+      var: vars.power_available
+      reason_code: s02_requires_power_available
+      reason: "Power must be available before FIRE TEST."
+  S03:
+    - op: flag_true
+      var: vars.power_available
+      reason_code: s03_requires_power_available
+      reason: "Power must be available before turning APU ON."
+  S04:
+    - op: flag_true
+      var: vars.apu_ready
+      reason_code: s04_requires_apu_ready
+      reason: "APU READY light must be on before ENG CRANK RIGHT."
+  S05:
+    - op: flag_true
+      var: vars.engine_crank_right
+      reason_code: s05_requires_engine_crank_right
+      reason: "ENG CRANK must be in RIGHT before right throttle idle."
+  S06:
+    - op: flag_true
+      var: vars.rpm_r_gte_60
+      reason_code: s06_requires_rpm_r_gte_60
+      reason: "Right engine RPM must be above 60 before BLEED AIR cycle."
+  S07:
+    - op: flag_true
+      var: vars.rpm_r_gte_60
+      reason_code: s07_requires_right_engine_running
+      reason: "Right engine must be stabilized before lights test."
+  S08:
+    - op: flag_true
+      var: vars.rpm_r_gte_60
+      reason_code: s08_requires_right_engine_running
+      reason: "Right engine must be stabilized before display power-up."
+  S09:
+    - op: flag_true
+      var: vars.left_ddi_on
+      reason_code: s09_requires_left_ddi_on
+      reason: "Left DDI must be powered before COMM setup."
+    - op: flag_true
+      var: vars.right_ddi_on
+      reason_code: s09_requires_right_ddi_on
+      reason: "Right DDI must be powered before COMM setup."
+  S10:
+    - op: flag_true
+      var: vars.right_engine_nominal_start_params
+      reason_code: s10_requires_right_engine_nominal_start_params
+      reason: "Right engine start parameters must be in green range before ENG CRANK LEFT."
+  S11:
+    - op: flag_true
+      var: vars.engine_crank_left
+      reason_code: s11_requires_engine_crank_left
+      reason: "ENG CRANK must be in LEFT before left throttle idle."
+    - op: var_gte
+      var: vars.rpm_l
+      value: 25
+      reason_code: s11_requires_rpm_l_gte_25
+      reason: "Left engine RPM must reach at least 25 before left throttle idle."
+
+completion_gates:
+  S01:
+    - op: flag_true
+      var: vars.battery_on
+      reason_code: s01_requires_battery_on
+      reason: "BATTERY switch must be ON."
+    - op: flag_true
+      var: vars.l_gen_on
+      reason_code: s01_requires_l_gen_on
+      reason: "Left generator must be ON."
+    - op: flag_true
+      var: vars.r_gen_on
+      reason_code: s01_requires_r_gen_on
+      reason: "Right generator must be ON."
+  S02: []
+  S03:
+    - op: flag_true
+      var: vars.apu_on
+      reason_code: s03_requires_apu_on
+      reason: "APU switch must be ON."
+    - op: flag_true
+      var: vars.apu_ready
+      reason_code: s03_requires_apu_ready
+      reason: "APU READY light must be on."
+  S04:
+    - op: flag_true
+      var: vars.engine_crank_right
+      reason_code: s04_requires_engine_crank_right
+      reason: "ENG CRANK must be in RIGHT."
+  S05:
+    - op: var_gte
+      var: vars.rpm_r
+      value: 25
+      reason_code: s05_requires_rpm_r_gte_25
+      reason: "Right engine RPM must be at least 25."
+  S06:
+    - op: flag_true
+      var: vars.bleed_air_norm
+      reason_code: s06_requires_bleed_air_norm
+      reason: "BLEED AIR knob must return to NORM after full cycle."
+  S07: []
+  S08:
+    - op: flag_true
+      var: vars.left_ddi_on
+      reason_code: s08_requires_left_ddi_on
+      reason: "Left DDI must be powered."
+    - op: flag_true
+      var: vars.right_ddi_on
+      reason_code: s08_requires_right_ddi_on
+      reason: "Right DDI must be powered."
+    - op: flag_true
+      var: vars.mpcd_on
+      reason_code: s08_requires_mpcd_on
+      reason: "MPCD must be powered."
+    - op: flag_true
+      var: vars.hud_on
+      reason_code: s08_requires_hud_on
+      reason: "HUD must be powered."
+  S09: []
+  S10:
+    - op: flag_true
+      var: vars.engine_crank_left
+      reason_code: s10_requires_engine_crank_left
+      reason: "ENG CRANK must be moved to LEFT."
+  S11:
+    - op: var_gte
+      var: vars.rpm_l
+      value: 25
+      reason_code: s11_requires_rpm_l_gte_25
+      reason: "Left engine RPM must be at least 25."
 
 steps:
   - id: S01

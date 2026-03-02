@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 
 def _parse_time(value: str) -> datetime:
@@ -73,15 +73,29 @@ class GatingEngine:
         self.rules = rules
 
     def evaluate(self, observations: Iterable[Dict[str, Any]]) -> RuleResult:
+        result, _ = self.evaluate_with_failure_index(observations)
+        return result
+
+    def evaluate_with_failure_index(
+        self,
+        observations: Iterable[Dict[str, Any]],
+    ) -> Tuple[RuleResult, Optional[int]]:
         obs_list = list(observations)
-        if not obs_list:
-            return RuleResult(False, "no observations")
-        latest = obs_list[-1]
-        for rule in self.rules:
-            ok, why = self._eval_rule(rule, latest, obs_list)
+        return self.evaluate_with_failure_index_from_history(obs_list)
+
+    def evaluate_with_failure_index_from_history(
+        self,
+        observations_history: Sequence[Dict[str, Any]],
+    ) -> Tuple[RuleResult, Optional[int]]:
+        history = observations_history if isinstance(observations_history, list) else list(observations_history)
+        if not history:
+            return RuleResult(False, "no observations"), None
+        latest = history[-1]
+        for idx, rule in enumerate(self.rules):
+            ok, why = self._eval_rule(rule, latest, history)
             if not ok:
-                return RuleResult(False, why)
-        return RuleResult(True, None)
+                return RuleResult(False, why), idx
+        return RuleResult(True, None), None
 
     def _eval_rule(
         self, rule: Dict[str, Any], latest: Dict[str, Any], history: List[Dict[str, Any]]
