@@ -18,6 +18,7 @@ class OllamaModel(BaseHelpModel):
         base_url: str = "http://127.0.0.1:11434",
         timeout_s: float = 20.0,
         lang: str = "zh",
+        log_raw_llm_text: bool = False,
         client: object | None = None,
     ) -> None:
         super().__init__(
@@ -25,6 +26,7 @@ class OllamaModel(BaseHelpModel):
             base_url=base_url,
             timeout_s=timeout_s,
             lang=lang,
+            log_raw_llm_text=log_raw_llm_text,
             client=client,
         )
 

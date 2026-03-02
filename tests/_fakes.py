@@ -7,15 +7,30 @@ from core.types import TutorRequest
 
 
 class FakeResponse:
-    def __init__(self, payload: dict[str, Any], status_code: int = 200) -> None:
-        self._payload = payload
+    def __init__(
+        self,
+        payload: dict[str, Any] | None = None,
+        status_code: int = 200,
+        *,
+        text: str | None = None,
+        json_error: Exception | None = None,
+    ) -> None:
+        self._payload = payload or {}
         self._status_code = status_code
+        self.text = text if isinstance(text, str) else json.dumps(self._payload, ensure_ascii=False)
+        self._json_error = json_error
+
+    @property
+    def status_code(self) -> int:
+        return self._status_code
 
     def raise_for_status(self) -> None:
         if self._status_code >= 400:
             raise RuntimeError(f"http {self._status_code}")
 
     def json(self) -> dict[str, Any]:
+        if self._json_error is not None:
+            raise self._json_error
         return self._payload
 
 

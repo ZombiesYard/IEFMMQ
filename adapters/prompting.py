@@ -558,11 +558,6 @@ def build_help_prompt_result(
             if "trimmed_delta_summary" not in trim_reasons:
                 trim_reasons.append("trimmed_delta_summary")
             changed = True
-        elif rag_snippets:
-            rag_snippets = rag_snippets[:-1]
-            if "trimmed_rag_snippets" not in trim_reasons:
-                trim_reasons.append("trimmed_rag_snippets")
-            changed = True
         elif max_vars > 0:
             max_vars = max(0, max_vars - 5)
             selected_vars = _pick_vars(context.get("vars"), max_items=max_vars)
@@ -578,6 +573,11 @@ def build_help_prompt_result(
             overlay_targets = overlay_targets[:-1]
             if "trimmed_overlay_enum" not in trim_reasons:
                 trim_reasons.append("trimmed_overlay_enum")
+            changed = True
+        elif len(rag_snippets) > 0:
+            rag_snippets = rag_snippets[:-1]
+            if "trimmed_rag_snippets" not in trim_reasons:
+                trim_reasons.append("trimmed_rag_snippets")
             changed = True
         if not changed:
             break

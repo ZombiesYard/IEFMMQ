@@ -1,5 +1,7 @@
 vars:
   # Power
+  # BATTERY_SW is a 3-position selector exported as 0/1/2.
+  # In current FA-18C scripts/log captures, OFF is 1 and ON is 2.
   battery_on: "bios.BATTERY_SW == 2"
   ext_pwr_on: "bios.EXT_PWR_SW == 1"
   l_gen_on: "bios.L_GEN_SW == 1"
@@ -11,13 +13,18 @@ vars:
   apu_ready: "bios.APU_READY_LT == 1"
 
   # Engine start
-  engine_crank_right: "bios.ENGINE_CRANK_SW == 1"
-  engine_crank_left: "bios.ENGINE_CRANK_SW == 2"
+  # ENGINE_CRANK_SW is LEFT/OFF/RIGHT => 0/1/2 (DCS clickable: springloaded_3_pos_tumb2)
+  engine_crank_right: "bios.ENGINE_CRANK_SW == 2"
+  engine_crank_left: "bios.ENGINE_CRANK_SW == 0"
   bleed_air_norm: "bios.BLEED_AIR_KNOB == 2"
 
   # Engine instruments (IFEI + external nozzle position)
   rpm_r: "derived(num(bios.IFEI_RPM_R))"
   rpm_l: "derived(num(bios.IFEI_RPM_L))"
+  # Internal throttle axes (0 means OFF/cutoff-side in current captures).
+  # For S05 we only need to know whether right throttle left OFF detent.
+  throttle_r_not_off: "derived(num(bios.INT_THROTTLE_RIGHT) > 0)"
+  throttle_l_not_off: "derived(num(bios.INT_THROTTLE_LEFT) > 0)"
   temp_r: "derived(num(bios.IFEI_TEMP_R))"
   temp_l: "derived(num(bios.IFEI_TEMP_L))"
   ff_r: "derived(num(bios.IFEI_FF_R))"

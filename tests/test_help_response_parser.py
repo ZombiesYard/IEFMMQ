@@ -2,7 +2,12 @@ import json
 
 import pytest
 
-from adapters.help_response_parser import json_extract, parse_help_response, strip_code_fence
+from adapters.help_response_parser import (
+    json_extract,
+    parse_help_response,
+    parse_help_response_with_diagnostics,
+    strip_code_fence,
+)
 from tests._fakes import _help_obj_ok
 
 
@@ -47,3 +52,43 @@ def test_parse_help_response_parses_embedded_json_text() -> None:
 def test_json_extract_raises_on_missing_object() -> None:
     with pytest.raises(ValueError, match="does not contain JSON object/array"):
         json_extract("no json here")
+
+
+def test_parse_help_response_repairs_invalid_evidence_type_from_ref_prefix() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"][0]["type"] = "status"
+    help_obj["overlay"]["evidence"][0]["ref"] = "GATES.S03.completion"
+    raw = json.dumps(help_obj, ensure_ascii=False)
+
+    parsed, _extract, repair_meta = parse_help_response_with_diagnostics(raw)
+
+    assert parsed["overlay"]["evidence"][0]["type"] == "gate"
+    assert repair_meta["repair_applied"] is True
+    assert repair_meta["repaired_evidence_types"] == 1
+    assert repair_meta["dropped_unrepairable_evidence"] == 0
+
+
+def test_parse_help_response_drops_unrepairable_evidence_and_still_rejects_invalid_overlay() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"][0]["type"] = "status"
+    help_obj["overlay"]["evidence"][0]["ref"] = "UNKNOWN.foo"
+    raw = json.dumps(help_obj, ensure_ascii=False)
+
+    with pytest.raises(Exception, match="HelpResponse validation failed"):
+        parse_help_response_with_diagnostics(raw)
+
+
+def test_parse_help_response_drops_non_object_evidence_items_and_keeps_valid_items() -> None:
+    help_obj = _help_obj_ok()
+    valid_item = dict(help_obj["overlay"]["evidence"][0])
+    help_obj["overlay"]["evidence"] = ["noise", 123, valid_item]
+    raw = json.dumps(help_obj, ensure_ascii=False)
+
+    parsed, _extract, repair_meta = parse_help_response_with_diagnostics(raw)
+
+    assert parsed["overlay"]["evidence"] == [valid_item]
+    assert repair_meta["repair_applied"] is True
+    assert repair_meta["repaired_evidence_types"] == 0
+    assert repair_meta["dropped_unrepairable_evidence"] == 2
+    reasons = [item.get("reason") for item in repair_meta["details"] if isinstance(item, dict)]
+    assert reasons.count("non_object_evidence_item") == 2

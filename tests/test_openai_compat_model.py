@@ -46,11 +46,53 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert call["url"] == "http://127.0.0.1:8000/v1/chat/completions"
     assert call["json"]["model"] == "Qwen3-8B-Instruct"
     assert call["json"]["temperature"] == 0
+    assert call["json"]["response_format"]["type"] == "json_schema"
+    assert call["json"]["response_format"]["json_schema"]["name"] == "HelpResponse"
+    assert call["json"]["response_format"]["json_schema"]["strict"] is True
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0
     prompt_payload = _extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
     assert "deterministic_step_hint" in prompt_payload
     assert "inferred_step_id" in prompt_payload["deterministic_step_hint"]
+
+
+def test_openai_compat_schema_is_loaded_once_per_model_instance(monkeypatch) -> None:
+    schema_calls = {"count": 0}
+
+    def _fake_schema():
+        schema_calls["count"] += 1
+        return {"type": "object"}
+
+    monkeypatch.setattr("adapters.openai_compat_model.get_help_response_schema", _fake_schema)
+    fake = FakeClient(
+        responses=[
+            FakeResponse({"choices": [{"message": {"content": "{}"}}]}),
+            FakeResponse({"choices": [{"message": {"content": "{}"}}]}),
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+    assert schema_calls["count"] == 1
+
+    messages = [{"role": "user", "content": "ping"}]
+    assert model._chat(messages) == "{}"
+    assert model._chat(messages) == "{}"
+    assert schema_calls["count"] == 1
+
+
+def test_explain_error_records_raw_llm_text_when_enabled() -> None:
+    help_obj = _help_obj_ok()
+    payload = _openai_chat_payload_from_help_obj(help_obj)
+    fake = FakeClient(responses=[FakeResponse(payload, status_code=200)])
+    model = OpenAICompatModel(client=fake, log_raw_llm_text=True)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert isinstance(res.metadata.get("raw_llm_text"), str)
+    assert res.metadata["raw_llm_text"]
+    attempts = res.metadata.get("raw_llm_text_attempts")
+    assert isinstance(attempts, list) and len(attempts) == 1
+    assert attempts[0] == res.metadata["raw_llm_text"]
 
 
 def test_explain_error_http_429_fallback_no_overlay() -> None:
@@ -132,6 +174,109 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+
+
+def test_explain_error_retries_once_after_structured_output_failure_and_recovers() -> None:
+    invalid_payload = {
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "not-json"},
+            }
+        ]
+    }
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(invalid_payload), FakeResponse(valid_payload)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(res.actions) == 1
+    assert len(fake.calls) == 2
+    assert res.metadata["retry_count"] == 1
+    assert isinstance(res.metadata["retry_reason"], str) and res.metadata["retry_reason"]
+
+
+def test_explain_error_retries_once_and_returns_error_when_structured_output_still_invalid() -> None:
+    invalid_payload = {
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "not-json"},
+            }
+        ]
+    }
+    fake = FakeClient(responses=[FakeResponse(invalid_payload), FakeResponse(invalid_payload)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert len(fake.calls) == 2
+    assert res.metadata["retry_count"] == 1
+    assert isinstance(res.metadata["retry_reason"], str) and "ValueError" in res.metadata["retry_reason"]
+
+
+def test_openai_compat_downgrades_request_when_json_schema_format_is_rejected() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    rejected = {
+        "error": {
+            "message": "Unknown field response_format: json_schema is not supported by this server",
+        }
+    }
+    fake = FakeClient(responses=[FakeResponse(rejected, status_code=400), FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    first_payload = fake.calls[0]["json"]
+    second_payload = fake.calls[1]["json"]
+    assert "response_format" in first_payload
+    assert "response_format" not in second_payload
+
+
+def test_openai_compat_does_not_retry_on_unrelated_400_error() -> None:
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {"error": {"message": "Invalid model name Qwen/DoesNotExist"}},
+                status_code=400,
+            )
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert len(fake.calls) == 1
+
+
+def test_openai_compat_downgrades_when_400_text_indicates_response_format_unsupported() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                payload=None,
+                status_code=400,
+                text="Bad Request: response_format extra inputs are not permitted",
+                json_error=ValueError("not json"),
+            ),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    assert "response_format" in fake.calls[0]["json"]
+    assert "response_format" not in fake.calls[1]["json"]
 
 
 def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -> None:

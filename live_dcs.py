@@ -20,6 +20,7 @@ import yaml
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosReceiver
+from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
 from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
@@ -34,6 +35,7 @@ from adapters.recent_actions import (
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
+from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vars import VarResolver
@@ -318,6 +320,16 @@ def _normalize_help_report(raw: Any) -> dict[str, Any]:
     return report
 
 
+def _normalize_cached_response_metadata(metadata: dict[str, Any]) -> None:
+    metadata.setdefault("retry_count", 0)
+    metadata.setdefault("retry_reason", None)
+    metadata.setdefault("repair_applied", False)
+    metadata.setdefault("repair_details", {})
+    metadata.setdefault("fallback_overlay_used", False)
+    if metadata.get("fallback_overlay_reason") is None:
+        metadata["fallback_overlay_reason"] = "not_needed"
+
+
 def _dedupe_strings(items: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -377,6 +389,24 @@ def _select_gates_for_context(
         if len(selected) >= cap:
             break
     return selected
+
+
+_FALLBACK_STEP_TARGETS: dict[str, str] = {
+    "S01": "battery_switch",
+    "S03": "apu_switch",
+    "S04": "eng_crank_switch",
+    "S06": "bleed_air_knob",
+}
+
+_FALLBACK_STEP_VAR_REFS: dict[str, str] = {
+    "S01": "VARS.battery_on",
+    "S03": "VARS.apu_on",
+    "S04": "VARS.engine_crank_right",
+    "S06": "VARS.bleed_air_norm",
+}
+
+def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
+    return collect_evidence_refs_from_context(context)
 
 
 @dataclass
@@ -1075,6 +1105,142 @@ class LiveDcsTutorLoop:
             response.explanations = list(mapped.explanations)
         return list(mapped.actions), mapped_meta
 
+    def _build_safe_fallback_overlay_help_obj(
+        self,
+        request: TutorRequest,
+    ) -> tuple[dict[str, Any] | None, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return None, "missing_deterministic_hint"
+
+        inferred_step_id = hint.get("inferred_step_id")
+        if not isinstance(inferred_step_id, str) or not inferred_step_id:
+            return None, "missing_inferred_step_id"
+
+        fallback_target = _FALLBACK_STEP_TARGETS.get(inferred_step_id)
+        if fallback_target is None:
+            return None, f"unsupported_step:{inferred_step_id}"
+
+        request_allowlist = context.get("overlay_target_allowlist")
+        if isinstance(request_allowlist, list):
+            allowset = {item for item in request_allowlist if isinstance(item, str) and item}
+            if allowset and fallback_target not in allowset:
+                return None, f"target_not_in_request_allowlist:{fallback_target}"
+        if fallback_target not in set(self.overlay_allowlist):
+            return None, f"target_not_in_runtime_allowlist:{fallback_target}"
+
+        candidate_refs: list[str] = []
+        gate_blockers = hint.get("gate_blockers")
+        if isinstance(gate_blockers, list):
+            for blocker in gate_blockers:
+                if not isinstance(blocker, Mapping):
+                    continue
+                ref = blocker.get("ref")
+                if isinstance(ref, str) and ref:
+                    candidate_refs.append(ref)
+        candidate_refs.append(f"GATES.{inferred_step_id}.completion")
+        candidate_refs.append(f"GATES.{inferred_step_id}.precondition")
+        var_ref = _FALLBACK_STEP_VAR_REFS.get(inferred_step_id)
+        if isinstance(var_ref, str):
+            candidate_refs.append(var_ref)
+
+        allowed_refs = _collect_request_evidence_refs(context)
+        selected_ref: str | None = None
+        for ref in candidate_refs:
+            if ref in allowed_refs:
+                selected_ref = ref
+                break
+        if selected_ref is None:
+            return None, "no_verifiable_evidence_ref"
+
+        evidence_type = infer_evidence_type_from_ref(selected_ref)
+        if evidence_type is None:
+            return None, f"unsupported_evidence_ref:{selected_ref}"
+
+        reason_text = None
+        if isinstance(gate_blockers, list):
+            for blocker in gate_blockers:
+                if not isinstance(blocker, Mapping):
+                    continue
+                if blocker.get("ref") == selected_ref:
+                    reason = blocker.get("reason")
+                    if isinstance(reason, str) and reason:
+                        reason_text = reason
+                        break
+                    reason_code = blocker.get("reason_code")
+                    if isinstance(reason_code, str) and reason_code:
+                        reason_text = reason_code
+                        break
+        if not reason_text:
+            reason_text = f"Deterministic blocker indicates target {fallback_target}."
+        quote = reason_text.strip()
+        if len(quote) > 120:
+            quote = quote[:117].rstrip() + "..."
+
+        fallback_help_obj = {
+            "diagnosis": {
+                "step_id": inferred_step_id,
+                "error_category": "OM",
+            },
+            "next": {
+                "step_id": inferred_step_id,
+            },
+            "overlay": {
+                "targets": [fallback_target],
+                "evidence": [
+                    {
+                        "target": fallback_target,
+                        "type": evidence_type,
+                        "ref": selected_ref,
+                        "quote": quote,
+                        "grounding_confidence": 0.51,
+                    }
+                ],
+            },
+            "explanations": [
+                (
+                    f"请先操作 {fallback_target}。"
+                    if self.lang == "zh"
+                    else f"Please operate {fallback_target} first."
+                )
+            ],
+            "confidence": 0.51,
+        }
+        return fallback_help_obj, f"deterministic_step:{inferred_step_id}"
+
+    def _apply_safe_fallback_overlay(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(request)
+        if not isinstance(fallback_help_obj, Mapping):
+            return False, fallback_reason
+
+        mapped = map_help_response_to_tutor_response(
+            fallback_help_obj,
+            request=request,
+            status=response.status,
+            max_overlay_targets=1,
+            ui_map_path=self.ui_map_path,
+        )
+        mapped_meta = dict(mapped.metadata)
+        if mapped_meta:
+            response.metadata["fallback_response_mapping"] = mapped_meta
+        if not mapped.actions:
+            mapping_errors = mapped_meta.get("mapping_errors")
+            if isinstance(mapping_errors, list) and mapping_errors:
+                return False, f"fallback_mapping_failed:{'|'.join(str(item) for item in mapping_errors[:3])}"
+            return False, "fallback_mapping_failed"
+
+        response.actions = list(mapped.actions)
+        if not response.message and mapped.message:
+            response.message = mapped.message
+        if not response.explanations and mapped.explanations:
+            response.explanations = list(mapped.explanations)
+        return True, fallback_reason
+
     def _new_response_from_cached(
         self,
         cached_response: TutorResponse,
@@ -1166,6 +1332,7 @@ class LiveDcsTutorLoop:
             response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
+            _normalize_cached_response_metadata(response.metadata)
             overlay_report = self._execute_or_dry_run_actions(response.actions)
         else:
             hint = request.context.get("deterministic_step_hint", {})
@@ -1244,6 +1411,18 @@ class LiveDcsTutorLoop:
             response.actions = mapped_actions
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
+
+            fallback_overlay_used = False
+            fallback_overlay_reason = "not_needed"
+            if response.status == "error" and not response.actions:
+                fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
+                    response,
+                    request,
+                )
+
+            response.metadata["fallback_overlay_used"] = fallback_overlay_used
+            response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
+            _normalize_cached_response_metadata(response.metadata)
 
             overlay_report = self._execute_or_dry_run_actions(response.actions)
             provider = response.metadata.get("provider")
@@ -1333,6 +1512,7 @@ def _new_default_log_path() -> Path:
 def _build_model_from_args(args: argparse.Namespace) -> Any:
     provider = args.model_provider
     lang = args.lang
+    log_raw_llm_text = bool(getattr(args, "log_raw_llm_text", False))
     if provider == "stub":
         return ModelStub(mode=args.stub_mode)
 
@@ -1345,6 +1525,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             base_url=args.model_base_url,
             timeout_s=timeout_s,
             lang=lang,
+            log_raw_llm_text=log_raw_llm_text,
             api_key=args.model_api_key,
         )
     if provider == "ollama":
@@ -1354,6 +1535,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             base_url=base_url,
             timeout_s=timeout_s,
             lang=lang,
+            log_raw_llm_text=log_raw_llm_text,
         )
     raise ValueError(f"Unsupported model provider: {provider}")
 
@@ -1439,6 +1621,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
+    log_raw_group = parser.add_mutually_exclusive_group()
+    log_raw_group.add_argument(
+        "--log-raw-llm-text",
+        dest="log_raw_llm_text",
+        action="store_true",
+        help="Log raw model text into tutor_response.metadata.raw_llm_text(_attempts)",
+    )
+    log_raw_group.add_argument(
+        "--no-log-raw-llm-text",
+        dest="log_raw_llm_text",
+        action="store_false",
+        help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
+    )
+    parser.set_defaults(log_raw_llm_text=log_raw_default)
     return parser
 
 

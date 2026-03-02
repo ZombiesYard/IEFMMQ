@@ -268,6 +268,66 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
     assert isinstance(result.metadata["allowed_evidence_refs"], list)
 
 
+def test_budget_trim_prioritizes_vars_before_rag_snippets() -> None:
+    ctx = _base_context()
+    ctx["vars"] = {f"v_{i:03d}": "w" * 120 for i in range(90)}
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S03",
+            "page_or_heading": "S03",
+            "snippet_id": f"manual_s03_{i}",
+            "snippet": "APU switch ON and wait for READY. " * 12,
+        }
+        for i in range(5)
+    ]
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=900, max_prompt_tokens_est=180)
+
+    reasons = result.metadata["trim_reasons"]
+    assert "trimmed_vars" in reasons
+    if "trimmed_rag_snippets" in reasons:
+        assert reasons.index("trimmed_vars") < reasons.index("trimmed_rag_snippets")
+
+
+def test_budget_trim_can_drop_last_rag_snippet_before_compact_template() -> None:
+    base_ctx = {
+        "candidate_steps": ["S01"],
+        "overlay_target_allowlist": ["battery_switch"],
+        "vars": {"battery_on": False},
+        "recent_deltas": [],
+    }
+    base_result = build_help_prompt_result(
+        base_ctx,
+        "en",
+        max_prompt_chars=20000,
+        max_prompt_tokens_est=5000,
+    )
+
+    ctx = dict(base_ctx)
+    ctx["rag_topk"] = [
+        {
+            "doc_id": "manual",
+            "section": "S01",
+            "page_or_heading": "S01",
+            "snippet_id": "manual_s01_1",
+            "snippet": "Battery ON and generators ON. " * 120,
+        }
+    ]
+
+    result = build_help_prompt_result(
+        ctx,
+        "en",
+        max_prompt_chars=len(base_result.prompt) + 40,
+        max_prompt_tokens_est=5000,
+    )
+
+    assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
+    assert "compact_template" not in result.metadata["trim_reasons"]
+    assert result.metadata["rag_snippet_count"] == 0
+    assert result.metadata["grounding_applied"] is False
+
+
 def test_budget_trim_logs_by_default_without_terminal_print(capsys, caplog) -> None:
     ctx = _base_context()
     ctx["vars"] = {f"v_{i:03d}": "y" * 120 for i in range(80)}

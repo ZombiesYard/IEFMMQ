@@ -18,8 +18,10 @@ from live_dcs import (
     ReplayBiosReceiver,
     StdinHelpTrigger,
     UdpHelpTrigger,
+    build_arg_parser,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
+    _normalize_cached_response_metadata,
 )
 from tools.index_docs import build_index
 
@@ -36,7 +38,7 @@ def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
             "R_GEN_SW": 1,
             "APU_CONTROL_SW": apu_switch,
             "APU_READY_LT": 0,
-            "ENGINE_CRANK_SW": 0,
+            "ENGINE_CRANK_SW": 1,
         },
         "delta": {"APU_CONTROL_SW": apu_switch},
     }
@@ -1268,7 +1270,43 @@ def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> Non
     assert stats["help_cycles"] == 1
     assert stats["model_calls"] == 1
     assert len(executor.calls) == 1
-    assert executor.calls[0] == []
+    assert len(executor.calls[0]) == 1
+    assert executor.calls[0][0]["type"] == "overlay"
+    assert executor.calls[0][0]["target"] == "apu_switch"
+
+
+def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_model_error_fallback_overlay.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = FailingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0]) == 1
+    action = executor.calls[0][0]
+    assert action["type"] == "overlay"
+    assert action["target"] == "apu_switch"
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    meta = tutor_response_payload["metadata"]
+    assert meta["fallback_overlay_used"] is True
+    assert isinstance(meta["fallback_overlay_reason"], str)
+    assert meta["fallback_overlay_reason"].startswith("deterministic_step:")
 
 
 def test_live_loop_cache_key_ignores_numeric_churn_when_discrete_state_unchanged(tmp_path: Path) -> None:
@@ -1335,7 +1373,7 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
     replay_path = tmp_path / "bios_gate_blockers_for_hint.jsonl"
     frame = _bios_frame(1, 18.0, apu_switch=1)
     frame["bios"]["APU_READY_LT"] = 1
-    frame["bios"]["ENGINE_CRANK_SW"] = 0
+    frame["bios"]["ENGINE_CRANK_SW"] = 1
     frame["bios"]["IFEI_RPM_R"] = 22
     frame["delta"]["IFEI_RPM_R"] = 22
     _write_replay(replay_path, [frame])
@@ -1369,3 +1407,61 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
         isinstance(item, dict) and item.get("ref") == "GATES.S05.precondition"
         for item in gate_blockers
     )
+
+
+def test_live_dcs_cli_log_raw_llm_text_can_disable_env_default(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "1")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--no-log-raw-llm-text"])
+    assert args.log_raw_llm_text is False
+
+
+def test_live_dcs_cli_log_raw_llm_text_can_enable_when_env_default_off(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--log-raw-llm-text"])
+    assert args.log_raw_llm_text is True
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected"),
+    [
+        ("true", True),
+        ("false", False),
+    ],
+)
+def test_live_dcs_cli_log_raw_llm_text_reads_common_boolean_env_values(
+    monkeypatch,
+    env_value: str,
+    expected: bool,
+) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", env_value)
+    parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.log_raw_llm_text is expected
+
+
+def test_live_dcs_cli_log_raw_llm_text_invalid_env_falls_back_false_with_warning(monkeypatch, caplog) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "abc")
+    with caplog.at_level("WARNING"):
+        parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.log_raw_llm_text is False
+    assert any(
+        "SIMTUTOR_LOG_RAW_LLM_TEXT" in record.message and "Invalid boolean environment value" in record.message
+        for record in caplog.records
+    )
+
+
+def test_normalize_cached_response_metadata_normalizes_fallback_reason() -> None:
+    missing_reason: dict[str, Any] = {}
+    _normalize_cached_response_metadata(missing_reason)
+    assert missing_reason["fallback_overlay_reason"] == "not_needed"
+
+    none_reason: dict[str, Any] = {"fallback_overlay_reason": None}
+    _normalize_cached_response_metadata(none_reason)
+    assert none_reason["fallback_overlay_reason"] == "not_needed"
+
+    explicit_reason: dict[str, Any] = {"fallback_overlay_reason": "deterministic_step:S01"}
+    _normalize_cached_response_metadata(explicit_reason)
+    assert explicit_reason["fallback_overlay_reason"] == "deterministic_step:S01"
