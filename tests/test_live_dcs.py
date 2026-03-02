@@ -21,6 +21,7 @@ from live_dcs import (
     build_arg_parser,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
+    _normalize_cached_response_metadata,
 )
 from tools.index_docs import build_index
 
@@ -1450,3 +1451,17 @@ def test_live_dcs_cli_log_raw_llm_text_invalid_env_falls_back_false_with_warning
         "SIMTUTOR_LOG_RAW_LLM_TEXT" in record.message and "Invalid boolean environment value" in record.message
         for record in caplog.records
     )
+
+
+def test_normalize_cached_response_metadata_normalizes_fallback_reason() -> None:
+    missing_reason: dict[str, Any] = {}
+    _normalize_cached_response_metadata(missing_reason)
+    assert missing_reason["fallback_overlay_reason"] == "not_needed"
+
+    none_reason: dict[str, Any] = {"fallback_overlay_reason": None}
+    _normalize_cached_response_metadata(none_reason)
+    assert none_reason["fallback_overlay_reason"] == "not_needed"
+
+    explicit_reason: dict[str, Any] = {"fallback_overlay_reason": "deterministic_step:S01"}
+    _normalize_cached_response_metadata(explicit_reason)
+    assert explicit_reason["fallback_overlay_reason"] == "deterministic_step:S01"

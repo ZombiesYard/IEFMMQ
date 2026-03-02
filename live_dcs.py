@@ -320,6 +320,16 @@ def _normalize_help_report(raw: Any) -> dict[str, Any]:
     return report
 
 
+def _normalize_cached_response_metadata(metadata: dict[str, Any]) -> None:
+    metadata.setdefault("retry_count", 0)
+    metadata.setdefault("retry_reason", None)
+    metadata.setdefault("repair_applied", False)
+    metadata.setdefault("repair_details", {})
+    metadata.setdefault("fallback_overlay_used", False)
+    if metadata.get("fallback_overlay_reason") is None:
+        metadata["fallback_overlay_reason"] = "not_needed"
+
+
 def _dedupe_strings(items: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -1322,12 +1332,7 @@ class LiveDcsTutorLoop:
             response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
-            response.metadata.setdefault("retry_count", 0)
-            response.metadata.setdefault("retry_reason", None)
-            response.metadata.setdefault("repair_applied", False)
-            response.metadata.setdefault("repair_details", {})
-            response.metadata.setdefault("fallback_overlay_used", False)
-            response.metadata.setdefault("fallback_overlay_reason", "not_needed")
+            _normalize_cached_response_metadata(response.metadata)
             overlay_report = self._execute_or_dry_run_actions(response.actions)
         else:
             hint = request.context.get("deterministic_step_hint", {})
