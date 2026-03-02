@@ -203,6 +203,9 @@ def _validate_overlay_evidence(
     if unknown_refs:
         reasons.append("unknown_evidence_ref:" + ",".join(sorted(unknown_refs)))
 
+    # Keep this invariant explicit for auditability: every requested target must
+    # end up with at least one validated evidence ref, even when other item-level
+    # reasons (invalid/mismatch/unknown) are also present.
     missing_targets = sorted(target for target, refs in refs_by_target.items() if not refs)
     if missing_targets:
         reasons.append("missing_target_evidence:" + ",".join(missing_targets))
@@ -255,13 +258,6 @@ def map_help_response_to_tutor_response(
                 raw_targets = [item for item in targets if isinstance(item, str) and item]
 
     deduped_targets = _dedupe_preserve_order(raw_targets)
-    evidence_ok, evidence_reasons, refs_by_target, allowed_ref_count = _validate_overlay_evidence(
-        help_obj=help_obj,
-        targets=deduped_targets,
-        request=request,
-    )
-    if deduped_targets:
-        metadata["allowed_evidence_ref_count"] = allowed_ref_count
 
     rejected_targets: list[str] = []
     actions: list[dict[str, Any]] = []
@@ -280,6 +276,14 @@ def map_help_response_to_tutor_response(
             explanations=explanations,
             metadata=metadata,
         )
+
+    evidence_ok, evidence_reasons, refs_by_target, allowed_ref_count = _validate_overlay_evidence(
+        help_obj=help_obj,
+        targets=deduped_targets,
+        request=request,
+    )
+    if deduped_targets:
+        metadata["allowed_evidence_ref_count"] = allowed_ref_count
 
     if not deduped_targets:
         effective_status = status

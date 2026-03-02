@@ -112,6 +112,29 @@ def test_mapping_dedupes_targets_and_limits_max_overlay_count() -> None:
     _validate_tutor_response(payload)
 
 
+def test_mapping_max_overlay_zero_drops_targets_without_evidence_metadata() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(
+        help_obj,
+        max_overlay_targets=0,
+        request=_request_with_evidence_context(),
+    )
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["dropped_targets"] == ["apu_switch"]
+    assert "allowed_evidence_ref_count" not in payload["metadata"]
+    assert "overlay_rejected" not in payload["metadata"]
+    assert "overlay_rejected_reasons" not in payload["metadata"]
+    _validate_tutor_response(payload)
+
+
 def test_mapping_rejects_unknown_target_into_metadata() -> None:
     help_obj = {
         "overlay": {
