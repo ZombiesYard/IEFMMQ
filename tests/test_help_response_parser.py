@@ -76,3 +76,19 @@ def test_parse_help_response_drops_unrepairable_evidence_and_still_rejects_inval
 
     with pytest.raises(Exception, match="HelpResponse validation failed"):
         parse_help_response_with_diagnostics(raw)
+
+
+def test_parse_help_response_drops_non_object_evidence_items_and_keeps_valid_items() -> None:
+    help_obj = _help_obj_ok()
+    valid_item = dict(help_obj["overlay"]["evidence"][0])
+    help_obj["overlay"]["evidence"] = ["noise", 123, valid_item]
+    raw = json.dumps(help_obj, ensure_ascii=False)
+
+    parsed, _extract, repair_meta = parse_help_response_with_diagnostics(raw)
+
+    assert parsed["overlay"]["evidence"] == [valid_item]
+    assert repair_meta["repair_applied"] is True
+    assert repair_meta["repaired_evidence_types"] == 0
+    assert repair_meta["dropped_unrepairable_evidence"] == 2
+    reasons = [item.get("reason") for item in repair_meta["details"] if isinstance(item, dict)]
+    assert reasons.count("non_object_evidence_item") == 2

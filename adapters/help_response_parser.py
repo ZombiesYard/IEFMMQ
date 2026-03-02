@@ -75,7 +75,8 @@ def _repair_help_response_overlay_evidence(help_obj: dict[str, Any]) -> dict[str
 
     for idx, item in enumerate(evidence_raw):
         if not isinstance(item, Mapping):
-            rewritten_evidence.append(item)
+            dropped_count += 1
+            details.append({"index": idx, "action": "dropped", "reason": "non_object_evidence_item"})
             continue
 
         evidence_type = item.get("type")
