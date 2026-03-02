@@ -90,3 +90,18 @@ def test_load_pack_gate_config_rejects_rule_without_op(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"precondition_gates\.S01\[0\]\.op"):
         load_pack_gate_config(bad_pack)
+
+
+def test_evaluate_pack_gates_accepts_generator_rules_iterable() -> None:
+    precondition_gates = {
+        "S99": ({"op": "flag_true", "var": "vars.apu_ready"} for _ in [0]),
+    }
+    completion_gates: dict[str, tuple[dict[str, object], ...]] = {}
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(apu_ready=False)],
+        precondition_gates=precondition_gates,
+        completion_gates=completion_gates,
+    )
+
+    assert gates["S99.precondition"]["status"] == "blocked"
+    assert gates["S99.precondition"]["allowed"] is False

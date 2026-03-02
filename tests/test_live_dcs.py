@@ -1329,3 +1329,40 @@ def test_live_loop_does_not_cache_error_response_and_retries_model_within_cooldo
     assert stats["help_cycles"] == 2
     assert stats["model_calls"] == 2
     assert stats["cache_hits"] == 0
+
+
+def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_query(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_gate_blockers_for_hint.jsonl"
+    frame = _bios_frame(1, 18.0, apu_switch=1)
+    frame["bios"]["APU_READY_LT"] = 1
+    frame["bios"]["ENGINE_CRANK_SW"] = 0
+    frame["bios"]["IFEI_RPM_R"] = 22
+    frame["delta"]["IFEI_RPM_R"] = 22
+    _write_replay(replay_path, [frame])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(model.calls) == 1
+    request = model.calls[0]["request"]
+    assert request is not None
+    hint = request.context["deterministic_step_hint"]
+    missing_conditions = hint["missing_conditions"]
+    gate_blockers = hint["gate_blockers"]
+
+    assert isinstance(missing_conditions, list)
+    assert isinstance(gate_blockers, list)
+    assert all(not item.startswith("GATES.") for item in missing_conditions if isinstance(item, str))
+    assert any(item.startswith("GATES.S05.precondition:") for item in gate_blockers if isinstance(item, str))

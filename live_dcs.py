@@ -918,9 +918,6 @@ class LiveDcsTutorLoop:
                     inferred_gate_blockers.append(f"GATES.{gate_id}:{reason}")
 
         missing_conditions = list(inference.missing_conditions)
-        if inferred_gate_blockers:
-            missing_conditions.extend(inferred_gate_blockers)
-            missing_conditions = _dedupe_strings(missing_conditions)
         deterministic_hint = {
             "inferred_step_id": inference.inferred_step_id,
             "missing_conditions": missing_conditions,
@@ -1173,6 +1170,16 @@ class LiveDcsTutorLoop:
             missing_conditions = hint.get("missing_conditions", []) if isinstance(hint, Mapping) else []
             if not isinstance(missing_conditions, list):
                 missing_conditions = []
+            gate_blockers = hint.get("gate_blockers", []) if isinstance(hint, Mapping) else []
+            if not isinstance(gate_blockers, list):
+                gate_blockers = []
+            fallback_conditions = _dedupe_strings(
+                [
+                    item
+                    for item in [*missing_conditions, *gate_blockers]
+                    if isinstance(item, str) and item
+                ]
+            )
             self._stats.model_calls += 1
             try:
                 response = self.model.explain_error(obs, request)
@@ -1182,7 +1189,7 @@ class LiveDcsTutorLoop:
                     in_reply_to=request.request_id,
                     message=self._fallback_message(
                         inferred_step_id if isinstance(inferred_step_id, str) else None,
-                        [item for item in missing_conditions if isinstance(item, str)],
+                        fallback_conditions,
                     ),
                     actions=[],
                     metadata={

@@ -122,6 +122,23 @@ def _evaluate_gate_rules(
     return True, "ok", None
 
 
+def _coerce_rules_iterable(raw: Any) -> tuple[Mapping[str, Any], ...]:
+    if raw is None:
+        return ()
+    if isinstance(raw, Mapping):
+        return ()
+    if isinstance(raw, (str, bytes)):
+        return ()
+    if not isinstance(raw, Iterable):
+        return ()
+
+    out: list[Mapping[str, Any]] = []
+    for item in raw:
+        if isinstance(item, Mapping):
+            out.append(item)
+    return tuple(out)
+
+
 def evaluate_pack_gates(
     *,
     observations: Iterable[Mapping[str, Any]],
@@ -148,7 +165,7 @@ def evaluate_pack_gates(
             allowed, reason_code, reason = _evaluate_gate_rules(
                 step_id=step_id,
                 gate_type=gate_type,
-                rules=rules if isinstance(rules, (list, tuple)) else (),
+                rules=_coerce_rules_iterable(rules),
                 observations=obs_list,
             )
             gate_id = f"{step_id}.{gate_type}"
