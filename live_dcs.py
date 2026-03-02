@@ -960,10 +960,11 @@ class LiveDcsTutorLoop:
                         if isinstance(evidence_raw, list):
                             filtered_evidence: list[Any] = []
                             for item in evidence_raw:
-                                if isinstance(item, Mapping):
-                                    evidence_target = item.get("target")
-                                    if isinstance(evidence_target, str) and evidence_target not in allowed_target_set:
-                                        continue
+                                if not isinstance(item, Mapping):
+                                    continue
+                                evidence_target = item.get("target")
+                                if not isinstance(evidence_target, str) or evidence_target not in allowed_target_set:
+                                    continue
                                 filtered_evidence.append(item)
                             filtered_overlay["evidence"] = filtered_evidence
                         filtered_help_obj = dict(help_obj)
