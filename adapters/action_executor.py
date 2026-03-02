@@ -160,6 +160,16 @@ class OverlayActionExecutor:
                 self._reject(report, reason="rejected_non_overlay_action", action_idx=idx, action=action)
                 continue
 
+            if action.get("evidence_required") is True:
+                raw_refs = action.get("evidence_refs")
+                if not isinstance(raw_refs, list):
+                    self._reject(report, reason="overlay_missing_evidence_refs", action_idx=idx, action=action)
+                    continue
+                evidence_refs = [ref for ref in raw_refs if isinstance(ref, str) and ref]
+                if not evidence_refs:
+                    self._reject(report, reason="overlay_missing_evidence_refs", action_idx=idx, action=action)
+                    continue
+
             target = action.get("target")
             if not isinstance(target, str) or not target:
                 self._reject(report, reason="invalid_overlay_target", action_idx=idx, action=action)

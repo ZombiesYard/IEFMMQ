@@ -62,7 +62,17 @@ class RecordingModel:
                 "help_response": {
                     "diagnosis": {"step_id": "S02", "error_category": "OM"},
                     "next": {"step_id": "S03"},
-                    "overlay": {"targets": ["apu_switch"]},
+                    "overlay": {
+                        "targets": ["apu_switch"],
+                        "evidence": [
+                            {
+                                "target": "apu_switch",
+                                "type": "delta",
+                                "ref": "RECENT_UI_TARGETS.apu_switch",
+                                "quote": "Recent delta shows APU switch activity.",
+                            }
+                        ],
+                    },
                     "explanations": ["Turn on APU."],
                     "confidence": 0.9,
                 },
@@ -239,8 +249,99 @@ class OutOfAllowlistTargetModel:
                 "help_response": {
                     "diagnosis": {"step_id": "S02", "error_category": "OM"},
                     "next": {"step_id": "S03"},
-                    "overlay": {"targets": ["battery_switch"]},
+                    "overlay": {
+                        "targets": ["battery_switch"],
+                        "evidence": [
+                            {
+                                "target": "battery_switch",
+                                "type": "var",
+                                "ref": "VARS.battery_on",
+                                "quote": "Battery power state indicates this control path.",
+                            }
+                        ],
+                    },
                     "explanations": ["Check switch."],
+                    "confidence": 0.9,
+                },
+            },
+        )
+
+
+class MixedAllowlistTargetsModel:
+    def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+        return self.explain_error(observation, request)
+
+    def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+        return TutorResponse(
+            status="ok",
+            in_reply_to=request.request_id if request else None,
+            message="Check allowed switch first.",
+            actions=[],
+            explanations=["Check allowed switch first."],
+            metadata={
+                "provider": "mock_qwen",
+                "help_response": {
+                    "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                    "next": {"step_id": "S03"},
+                    "overlay": {
+                        "targets": ["apu_switch", "battery_switch"],
+                        "evidence": [
+                            {
+                                "target": "apu_switch",
+                                "type": "delta",
+                                "ref": "RECENT_UI_TARGETS.apu_switch",
+                                "quote": "Recent delta points to APU switch.",
+                            },
+                            {
+                                "target": "battery_switch",
+                                "type": "var",
+                                "ref": "VARS.battery_on",
+                                "quote": "Battery var confirms control context.",
+                            },
+                        ],
+                    },
+                    "explanations": ["Check allowed switch first."],
+                    "confidence": 0.9,
+                },
+            },
+        )
+
+
+class MixedAllowlistTargetsWithInvalidEvidenceItemModel:
+    def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+        return self.explain_error(observation, request)
+
+    def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+        return TutorResponse(
+            status="ok",
+            in_reply_to=request.request_id if request else None,
+            message="Check allowed switch first.",
+            actions=[],
+            explanations=["Check allowed switch first."],
+            metadata={
+                "provider": "mock_qwen",
+                "help_response": {
+                    "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                    "next": {"step_id": "S03"},
+                    "overlay": {
+                        "targets": ["apu_switch", "battery_switch"],
+                        "evidence": [
+                            {
+                                "target": "apu_switch",
+                                "type": "delta",
+                                "ref": "RECENT_UI_TARGETS.apu_switch",
+                                "quote": "Recent delta points to APU switch.",
+                            },
+                            "invalid-evidence-item",
+                            {
+                                "target": "battery_switch",
+                                "type": "var",
+                                "ref": "VARS.battery_on",
+                                "quote": "Battery var confirms control context.",
+                            },
+                        ],
+                    },
+                    "explanations": ["Check allowed switch first."],
                     "confidence": 0.9,
                 },
             },
@@ -743,6 +844,99 @@ def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: P
     response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
+
+
+def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_allowlist_partial_filter.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    ui_targets:\n"
+        "      - apu_switch\n",
+        encoding="utf-8",
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    model = MixedAllowlistTargetsModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        pack_path=pack,
+        ui_map_path=Path(_default_pack_path()).parent / "ui_map.yaml",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0]) == 1
+    assert executor.calls[0][0]["target"] == "apu_switch"
+    assert executor.calls[0][0]["element_id"] == _apu_element_id_from_ui_map()
+    tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
+    assert len(tutor_response_payloads) == 1
+    response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
+    assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
+    assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
+    assert response_mapping.get("overlay_rejected") is not True
+    reasons = response_mapping.get("overlay_rejected_reasons", [])
+    assert "evidence_target_not_in_overlay_targets" not in reasons
+
+
+def test_live_loop_allowlist_filter_drops_non_mapping_evidence_items(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_allowlist_drop_invalid_evidence.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    ui_targets:\n"
+        "      - apu_switch\n",
+        encoding="utf-8",
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    model = MixedAllowlistTargetsWithInvalidEvidenceItemModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        pack_path=pack,
+        ui_map_path=Path(_default_pack_path()).parent / "ui_map.yaml",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert len(executor.calls[0]) == 1
+    assert executor.calls[0][0]["target"] == "apu_switch"
+    tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
+    assert len(tutor_response_payloads) == 1
+    response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
+    reasons = response_mapping.get("overlay_rejected_reasons", [])
+    assert "invalid_overlay_evidence_item" not in reasons
+    assert response_mapping.get("overlay_rejected") is not True
 
 
 def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys) -> None:
