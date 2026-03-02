@@ -380,9 +380,14 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert "recent_deltas" in request.context
     assert "recent_actions" in request.context
     assert "deterministic_step_hint" in request.context
+    assert "gates" in request.context
     hint = request.context["deterministic_step_hint"]
     assert isinstance(hint, dict)
     assert hint.get("inferred_step_id")
+    gates = request.context["gates"]
+    assert isinstance(gates, dict)
+    assert "S03.completion" in gates
+    assert gates["S03.completion"]["status"] in {"allowed", "blocked"}
     assert request.metadata["prompt_hash"]
 
     assert len(executor.calls) == 1

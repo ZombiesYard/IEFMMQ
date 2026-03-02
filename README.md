@@ -57,7 +57,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
 
 ## Packs (fa18c_startup)
-- `pack.yaml` steps S01CS10 mapped from `fa18c_startup_master.md` (phase, wording, preconditions placeholders).
+- `pack.yaml` procedure steps S01-S10 mapped from `fa18c_startup_master.md`; deterministic `precondition_gates` / `completion_gates` additionally cover S11 readiness checks.
 - `taxonomy.yaml` error categories OM/CO/OR/PA/SV, weights, critical multiplier.
 - `ui_map.yaml` abstract targets  DCS `pnt_*`.
 - `telemetry_map.yaml` stable var mappings for gating/LLM/overlay (vars.*).
@@ -267,6 +267,7 @@ Notes:
 Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - `grounding_snippet_ids`: snippet ids actually injected into prompt.
 - `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
+- `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`) and evidence refs source (`GATES.*`).
 
 ### Overlay action evidence protocol
 Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
