@@ -62,7 +62,17 @@ class RecordingModel:
                 "help_response": {
                     "diagnosis": {"step_id": "S02", "error_category": "OM"},
                     "next": {"step_id": "S03"},
-                    "overlay": {"targets": ["apu_switch"]},
+                    "overlay": {
+                        "targets": ["apu_switch"],
+                        "evidence": [
+                            {
+                                "target": "apu_switch",
+                                "type": "delta",
+                                "ref": "RECENT_UI_TARGETS.apu_switch",
+                                "quote": "Recent delta shows APU switch activity.",
+                            }
+                        ],
+                    },
                     "explanations": ["Turn on APU."],
                     "confidence": 0.9,
                 },
@@ -239,7 +249,17 @@ class OutOfAllowlistTargetModel:
                 "help_response": {
                     "diagnosis": {"step_id": "S02", "error_category": "OM"},
                     "next": {"step_id": "S03"},
-                    "overlay": {"targets": ["battery_switch"]},
+                    "overlay": {
+                        "targets": ["battery_switch"],
+                        "evidence": [
+                            {
+                                "target": "battery_switch",
+                                "type": "var",
+                                "ref": "VARS.battery_on",
+                                "quote": "Battery power state indicates this control path.",
+                            }
+                        ],
+                    },
                     "explanations": ["Check switch."],
                     "confidence": 0.9,
                 },

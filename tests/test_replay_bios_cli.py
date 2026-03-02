@@ -54,7 +54,17 @@ class OverlayModel:
                 "help_response": {
                     "diagnosis": {"step_id": "S02", "error_category": "OM"},
                     "next": {"step_id": "S03"},
-                    "overlay": {"targets": ["apu_switch"]},
+                    "overlay": {
+                        "targets": ["apu_switch"],
+                        "evidence": [
+                            {
+                                "target": "apu_switch",
+                                "type": "delta",
+                                "ref": "RECENT_UI_TARGETS.apu_switch",
+                                "quote": "Recent delta shows APU switch activity.",
+                            }
+                        ],
+                    },
                     "explanations": ["Turn on APU."],
                     "confidence": 0.9,
                 },

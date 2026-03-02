@@ -82,6 +82,43 @@ def test_executor_rejects_invalid_overlay_target(monkeypatch) -> None:
     assert report.rejected[0]["reason"] == "invalid_overlay_target"
 
 
+def test_executor_rejects_overlay_with_evidence_required_but_missing_refs(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender)
+
+    report = executor.execute_actions(
+        [{"type": "overlay", "target": "apu_switch", "evidence_required": True}]
+    )
+
+    assert dummy.sent == []
+    assert len(report.rejected) == 1
+    assert report.rejected[0]["reason"] == "overlay_missing_evidence_refs"
+
+
+def test_executor_accepts_overlay_with_evidence_required_and_refs(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender)
+
+    report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "apu_switch",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.apu_switch"],
+            }
+        ]
+    )
+
+    assert len(dummy.sent) == 1
+    assert len(report.executed) == 1
+    assert report.rejected == []
+
+
 def test_executor_rejects_overlay_target_not_in_allowlist(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)

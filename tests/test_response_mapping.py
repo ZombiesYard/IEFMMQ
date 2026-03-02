@@ -23,12 +23,38 @@ def _validate_tutor_response(payload: dict) -> None:
     Draft202012Validator(schema, format_checker=FormatChecker()).validate(payload)
 
 
+def _request_with_evidence_context() -> TutorRequest:
+    return TutorRequest(
+        intent="help",
+        context={
+            "vars": {"battery_on": True, "apu_on": False},
+            "gates": [{"gate_id": "power_available", "status": "pass"}],
+            "recent_deltas": [
+                {"ui_target": "apu_switch", "bios_key": "APU_CONTROL_SW"},
+                {"ui_target": "battery_switch", "bios_key": "BATTERY_SW"},
+            ],
+            "delta_summary": {
+                "changed_keys_sample": ["APU_CONTROL_SW", "BATTERY_SW"],
+                "recent_key_changes_topk": [{"key": "APU_CONTROL_SW"}, {"key": "BATTERY_SW"}],
+            },
+            "rag_topk": [{"snippet_id": "manual_s03_1", "snippet": "APU ON"}],
+        },
+    )
+
+
+def _evidence(target: str, *, kind: str, ref: str, quote: str = "evidence") -> dict[str, str]:
+    return {"target": target, "type": kind, "ref": ref, "quote": quote}
+
+
 def test_mapping_generates_overlay_action_aligned_with_overlay_intent() -> None:
     help_obj = {
-        "overlay": {"targets": ["apu_switch"]},
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
         "explanations": ["Turn on APU first."],
     }
-    req = TutorRequest(intent="help")
+    req = _request_with_evidence_context()
 
     res = map_help_response_to_tutor_response(help_obj, request=req)
     payload = res.to_dict()
@@ -42,6 +68,8 @@ def test_mapping_generates_overlay_action_aligned_with_overlay_intent() -> None:
             "target": "apu_switch",
             "element_id": "pnt_375",
             "style": {"style": "highlight", "color": "#00ffcc", "thickness": 2},
+            "evidence_required": True,
+            "evidence_refs": ["RECENT_UI_TARGETS.apu_switch"],
         }
     ]
     _validate_tutor_response(payload)
@@ -49,11 +77,21 @@ def test_mapping_generates_overlay_action_aligned_with_overlay_intent() -> None:
 
 def test_mapping_dedupes_targets_and_limits_max_overlay_count() -> None:
     help_obj = {
-        "overlay": {"targets": ["apu_switch", "apu_switch", "battery_switch"]},
+        "overlay": {
+            "targets": ["apu_switch", "apu_switch", "battery_switch"],
+            "evidence": [
+                _evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch"),
+                _evidence("battery_switch", kind="delta", ref="RECENT_UI_TARGETS.battery_switch"),
+            ],
+        },
         "explanations": ["Do step S03."],
     }
 
-    res = map_help_response_to_tutor_response(help_obj, max_overlay_targets=1)
+    res = map_help_response_to_tutor_response(
+        help_obj,
+        max_overlay_targets=1,
+        request=_request_with_evidence_context(),
+    )
     payload = res.to_dict()
 
     assert len(payload["actions"]) == 1
@@ -64,11 +102,21 @@ def test_mapping_dedupes_targets_and_limits_max_overlay_count() -> None:
 
 def test_mapping_rejects_unknown_target_into_metadata() -> None:
     help_obj = {
-        "overlay": {"targets": ["unknown_target", "apu_switch"]},
+        "overlay": {
+            "targets": ["unknown_target", "apu_switch"],
+            "evidence": [
+                _evidence("unknown_target", kind="var", ref="VARS.battery_on"),
+                _evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch"),
+            ],
+        },
         "explanations": ["Check highlighted controls."],
     }
 
-    res = map_help_response_to_tutor_response(help_obj, max_overlay_targets=2)
+    res = map_help_response_to_tutor_response(
+        help_obj,
+        max_overlay_targets=2,
+        request=_request_with_evidence_context(),
+    )
     payload = res.to_dict()
 
     assert [a["target"] for a in payload["actions"]] == ["apu_switch"]
@@ -82,11 +130,22 @@ def test_mapping_rejects_unknown_target_into_metadata() -> None:
 
 def test_mapping_unknown_target_does_not_consume_limit_slot() -> None:
     help_obj = {
-        "overlay": {"targets": ["unknown_target", "apu_switch", "battery_switch"]},
+        "overlay": {
+            "targets": ["unknown_target", "apu_switch", "battery_switch"],
+            "evidence": [
+                _evidence("unknown_target", kind="var", ref="VARS.battery_on"),
+                _evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch"),
+                _evidence("battery_switch", kind="delta", ref="RECENT_UI_TARGETS.battery_switch"),
+            ],
+        },
         "explanations": ["Check highlighted controls."],
     }
 
-    res = map_help_response_to_tutor_response(help_obj, max_overlay_targets=1)
+    res = map_help_response_to_tutor_response(
+        help_obj,
+        max_overlay_targets=1,
+        request=_request_with_evidence_context(),
+    )
     payload = res.to_dict()
 
     assert [a["target"] for a in payload["actions"]] == ["apu_switch"]
@@ -111,9 +170,19 @@ def test_mapping_with_missing_or_empty_fields_still_returns_usable_tutor_respons
 
 
 def test_mapping_invalid_overlay_intent_coerces_to_highlight_and_records_error() -> None:
-    help_obj = {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]}
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["x"],
+    }
 
-    res = map_help_response_to_tutor_response(help_obj, overlay_intent="execute")
+    res = map_help_response_to_tutor_response(
+        help_obj,
+        overlay_intent="execute",
+        request=_request_with_evidence_context(),
+    )
     payload = res.to_dict()
 
     assert payload["actions"][0]["intent"] == "highlight"
@@ -123,9 +192,20 @@ def test_mapping_invalid_overlay_intent_coerces_to_highlight_and_records_error()
 
 
 def test_mapping_accumulates_multiple_mapping_errors_without_overwriting_first() -> None:
-    help_obj = {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]}
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["x"],
+    }
 
-    res = map_help_response_to_tutor_response(help_obj, overlay_intent="execute", status="bad_status")
+    res = map_help_response_to_tutor_response(
+        help_obj,
+        overlay_intent="execute",
+        status="bad_status",
+        request=_request_with_evidence_context(),
+    )
     payload = res.to_dict()
 
     assert res.status == "error"
@@ -158,9 +238,16 @@ def test_mapping_reuses_overlay_planner_cache(monkeypatch, tmp_path: Path) -> No
 
     monkeypatch.setattr(response_mapping, "OverlayPlanner", CountingOverlayPlanner)
     try:
-        help_obj = {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]}
-        map_help_response_to_tutor_response(help_obj, ui_map_path=ui_map_path)
-        map_help_response_to_tutor_response(help_obj, ui_map_path=ui_map_path)
+        help_obj = {
+            "overlay": {
+                "targets": ["apu_switch"],
+                "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+            },
+            "explanations": ["x"],
+        }
+        req = _request_with_evidence_context()
+        map_help_response_to_tutor_response(help_obj, ui_map_path=ui_map_path, request=req)
+        map_help_response_to_tutor_response(help_obj, ui_map_path=ui_map_path, request=req)
     finally:
         response_mapping._get_overlay_planner.cache_clear()
         monkeypatch.setattr(response_mapping, "OverlayPlanner", original_cls)
@@ -191,8 +278,15 @@ def test_mapping_skips_planner_loading_when_no_selected_targets(monkeypatch) -> 
 def test_mapping_sanitizes_planner_initialization_error_metadata() -> None:
     bad_path = Path("this/path/does/not/exist/ui_map.yaml")
     res = map_help_response_to_tutor_response(
-        {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]},
+        {
+            "overlay": {
+                "targets": ["apu_switch"],
+                "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+            },
+            "explanations": ["x"],
+        },
         ui_map_path=bad_path,
+        request=_request_with_evidence_context(),
     )
     payload = res.to_dict()
 
@@ -207,8 +301,15 @@ def test_mapping_sanitizes_yaml_parse_error_as_ui_map_invalid(tmp_path: Path) ->
     bad_yaml.write_text("version: v1\ncockpit_elements: [unclosed\n", encoding="utf-8")
 
     res = map_help_response_to_tutor_response(
-        {"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]},
+        {
+            "overlay": {
+                "targets": ["apu_switch"],
+                "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+            },
+            "explanations": ["x"],
+        },
         ui_map_path=bad_yaml,
+        request=_request_with_evidence_context(),
     )
     payload = res.to_dict()
 
@@ -226,7 +327,16 @@ def test_mapping_reraises_unexpected_planner_init_exception(monkeypatch) -> None
     monkeypatch.setattr(response_mapping, "_get_overlay_planner", _raise_unexpected)
     try:
         with pytest.raises(RuntimeError, match="unexpected init failure"):
-            map_help_response_to_tutor_response({"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]})
+            map_help_response_to_tutor_response(
+                {
+                    "overlay": {
+                        "targets": ["apu_switch"],
+                        "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+                    },
+                    "explanations": ["x"],
+                },
+                request=_request_with_evidence_context(),
+            )
     finally:
         monkeypatch.setattr(response_mapping, "_get_overlay_planner", original_get)
 
@@ -240,6 +350,47 @@ def test_mapping_reraises_unexpected_plan_exception(monkeypatch) -> None:
     monkeypatch.setattr(response_mapping, "_get_overlay_planner", lambda _ui_map_path: _BadPlanner())
     try:
         with pytest.raises(RuntimeError, match="unexpected plan failure"):
-            map_help_response_to_tutor_response({"overlay": {"targets": ["apu_switch"]}, "explanations": ["x"]})
+            map_help_response_to_tutor_response(
+                {
+                    "overlay": {
+                        "targets": ["apu_switch"],
+                        "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+                    },
+                    "explanations": ["x"],
+                },
+                request=_request_with_evidence_context(),
+            )
     finally:
         monkeypatch.setattr(response_mapping, "_get_overlay_planner", original_get)
+
+
+def test_mapping_rejects_overlay_when_targets_without_evidence() -> None:
+    help_obj = {
+        "overlay": {"targets": ["apu_switch"]},
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert "missing_overlay_evidence" in payload["metadata"]["overlay_rejected_reasons"]
+
+
+def test_mapping_rejects_overlay_when_evidence_ref_unknown() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.unknown_target")],
+        },
+        "explanations": ["x"],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] == []
+    assert payload["metadata"]["overlay_rejected"] is True
+    assert any(
+        reason.startswith("unknown_evidence_ref:")
+        for reason in payload["metadata"]["overlay_rejected_reasons"]
+    )
