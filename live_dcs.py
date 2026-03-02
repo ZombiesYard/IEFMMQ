@@ -1583,6 +1583,7 @@ def _new_default_log_path() -> Path:
 def _build_model_from_args(args: argparse.Namespace) -> Any:
     provider = args.model_provider
     lang = args.lang
+    log_raw_llm_text = bool(getattr(args, "log_raw_llm_text", False))
     if provider == "stub":
         return ModelStub(mode=args.stub_mode)
 
@@ -1595,6 +1596,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             base_url=args.model_base_url,
             timeout_s=timeout_s,
             lang=lang,
+            log_raw_llm_text=log_raw_llm_text,
             api_key=args.model_api_key,
         )
     if provider == "ollama":
@@ -1604,6 +1606,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             base_url=base_url,
             timeout_s=timeout_s,
             lang=lang,
+            log_raw_llm_text=log_raw_llm_text,
         )
     raise ValueError(f"Unsupported model provider: {provider}")
 
@@ -1689,6 +1692,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    parser.add_argument(
+        "--log-raw-llm-text",
+        action="store_true",
+        default=bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0"))),
+        help="Log raw model text into tutor_response.metadata.raw_llm_text(_attempts)",
+    )
     return parser
 
 

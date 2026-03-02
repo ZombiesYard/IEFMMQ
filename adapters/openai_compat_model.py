@@ -19,6 +19,7 @@ class OpenAICompatModel(BaseHelpModel):
         base_url: str = "http://127.0.0.1:8000",
         timeout_s: float = 20.0,
         lang: str = "zh",
+        log_raw_llm_text: bool = False,
         api_key: str | None = None,
         client: object | None = None,
     ) -> None:
@@ -28,6 +29,7 @@ class OpenAICompatModel(BaseHelpModel):
             base_url=base_url,
             timeout_s=timeout_s,
             lang=lang,
+            log_raw_llm_text=log_raw_llm_text,
             client=client,
         )
 

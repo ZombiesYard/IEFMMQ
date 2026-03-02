@@ -56,6 +56,22 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert "inferred_step_id" in prompt_payload["deterministic_step_hint"]
 
 
+def test_explain_error_records_raw_llm_text_when_enabled() -> None:
+    help_obj = _help_obj_ok()
+    payload = _openai_chat_payload_from_help_obj(help_obj)
+    fake = FakeClient(responses=[FakeResponse(payload, status_code=200)])
+    model = OpenAICompatModel(client=fake, log_raw_llm_text=True)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert isinstance(res.metadata.get("raw_llm_text"), str)
+    assert res.metadata["raw_llm_text"]
+    attempts = res.metadata.get("raw_llm_text_attempts")
+    assert isinstance(attempts, list) and len(attempts) == 1
+    assert attempts[0] == res.metadata["raw_llm_text"]
+
+
 def test_explain_error_http_429_fallback_no_overlay() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake)

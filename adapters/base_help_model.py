@@ -31,12 +31,14 @@ class BaseHelpModel(ModelPort):
         base_url: str,
         timeout_s: float,
         lang: str,
+        log_raw_llm_text: bool = False,
         client: Any | None = None,
     ) -> None:
         self.model_name = model_name
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self.lang = lang
+        self.log_raw_llm_text = bool(log_raw_llm_text)
 
         if client is None:
             try:
@@ -81,6 +83,7 @@ class BaseHelpModel(ModelPort):
         retry_count = 0
         retry_reason: str | None = None
         repair_details = self._empty_repair_details()
+        raw_text_attempts: list[str] = []
         try:
             messages, prompt_meta = self._build_messages(
                 observation,
@@ -91,6 +94,8 @@ class BaseHelpModel(ModelPort):
             )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
             raw_text = self._chat(messages)
+            if self.log_raw_llm_text:
+                raw_text_attempts.append(raw_text)
             try:
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             except Exception as first_parse_exc:
@@ -98,6 +103,8 @@ class BaseHelpModel(ModelPort):
                 retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
                 retry_messages = self._build_retry_messages(messages, first_parse_exc)
                 raw_text = self._chat(retry_messages)
+                if self.log_raw_llm_text:
+                    raw_text_attempts.append(raw_text)
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
@@ -126,6 +133,9 @@ class BaseHelpModel(ModelPort):
                     "fallback_overlay_reason": None,
                 }
             )
+            if self.log_raw_llm_text:
+                metadata["raw_llm_text"] = raw_text_attempts[-1] if raw_text_attempts else ""
+                metadata["raw_llm_text_attempts"] = list(raw_text_attempts)
             return TutorResponse(
                 status=mapped.status,
                 in_reply_to=mapped.in_reply_to,
@@ -136,29 +146,33 @@ class BaseHelpModel(ModelPort):
             )
         except Exception as exc:
             fallback_message = self._build_deterministic_fallback_message(deterministic_inference)
+            error_metadata = {
+                "provider": self.provider,
+                "model": self.model_name,
+                "latency_ms": int((perf_counter() - start) * 1000),
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "prompt_budget_used": prompt_budget_used,
+                "delta_dropped_count": delta_dropped_count,
+                "prompt_build": prompt_meta,
+                "deterministic_step_hint": deterministic_hint,
+                "deterministic_inference_error": deterministic_inference_error,
+                "retry_count": retry_count,
+                "retry_reason": retry_reason,
+                "repair_applied": bool(repair_details.get("repair_applied")),
+                "repair_details": repair_details,
+                "fallback_overlay_used": False,
+                "fallback_overlay_reason": None,
+            }
+            if self.log_raw_llm_text:
+                error_metadata["raw_llm_text"] = raw_text_attempts[-1] if raw_text_attempts else ""
+                error_metadata["raw_llm_text_attempts"] = list(raw_text_attempts)
             return TutorResponse(
                 status="error",
                 in_reply_to=request.request_id if request else None,
                 message=fallback_message,
                 actions=[],
-                metadata={
-                    "provider": self.provider,
-                    "model": self.model_name,
-                    "latency_ms": int((perf_counter() - start) * 1000),
-                    "error_type": type(exc).__name__,
-                    "error": str(exc),
-                    "prompt_budget_used": prompt_budget_used,
-                    "delta_dropped_count": delta_dropped_count,
-                    "prompt_build": prompt_meta,
-                    "deterministic_step_hint": deterministic_hint,
-                    "deterministic_inference_error": deterministic_inference_error,
-                    "retry_count": retry_count,
-                    "retry_reason": retry_reason,
-                    "repair_applied": bool(repair_details.get("repair_applied")),
-                    "repair_details": repair_details,
-                    "fallback_overlay_used": False,
-                    "fallback_overlay_reason": None,
-                },
+                metadata=error_metadata,
             )
 
     def _build_messages(
