@@ -25,6 +25,7 @@ class OpenAICompatModel(BaseHelpModel):
         client: object | None = None,
     ) -> None:
         self.api_key = api_key
+        self._help_response_schema = get_help_response_schema()
         super().__init__(
             model_name=model_name,
             base_url=base_url,
@@ -35,7 +36,6 @@ class OpenAICompatModel(BaseHelpModel):
         )
 
     def _chat(self, messages: list[dict[str, str]]) -> str:
-        schema = get_help_response_schema()
         payload = {
             "model": self.model_name,
             "messages": messages,
@@ -45,7 +45,7 @@ class OpenAICompatModel(BaseHelpModel):
                 "json_schema": {
                     "name": "HelpResponse",
                     "strict": True,
-                    "schema": schema,
+                    "schema": self._help_response_schema,
                 },
             },
         }

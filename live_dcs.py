@@ -20,7 +20,7 @@ import yaml
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosReceiver
-from adapters.evidence_refs import infer_evidence_type_from_ref
+from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
 from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
@@ -396,66 +396,7 @@ _FALLBACK_STEP_VAR_REFS: dict[str, str] = {
 }
 
 def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
-    refs: set[str] = set()
-
-    vars_map = context.get("vars")
-    if isinstance(vars_map, Mapping):
-        for key in vars_map.keys():
-            if isinstance(key, str) and key:
-                refs.add(f"VARS.{key}")
-
-    gates = context.get("gates")
-    if isinstance(gates, Mapping):
-        for gate_id in gates.keys():
-            if isinstance(gate_id, str) and gate_id:
-                refs.add(f"GATES.{gate_id}")
-
-    recent_deltas = context.get("recent_deltas")
-    if isinstance(recent_deltas, list):
-        for item in recent_deltas:
-            if not isinstance(item, Mapping):
-                continue
-            target = item.get("ui_target")
-            if not isinstance(target, str) or not target:
-                target = item.get("mapped_ui_target")
-            if not isinstance(target, str) or not target:
-                target = item.get("target")
-            if isinstance(target, str) and target:
-                refs.add(f"RECENT_UI_TARGETS.{target}")
-            key = item.get("k")
-            if not isinstance(key, str) or not key:
-                key = item.get("bios_key")
-            if isinstance(key, str) and key:
-                refs.add(f"DELTA_KEYS.{key}")
-
-    delta_summary = context.get("delta_summary")
-    if isinstance(delta_summary, Mapping):
-        changed_keys = delta_summary.get("changed_keys_sample")
-        if isinstance(changed_keys, list):
-            for key in changed_keys:
-                if isinstance(key, str) and key:
-                    refs.add(f"DELTA_KEYS.{key}")
-        topk = delta_summary.get("recent_key_changes_topk")
-        if isinstance(topk, list):
-            for item in topk:
-                if not isinstance(item, Mapping):
-                    continue
-                key = item.get("key")
-                if isinstance(key, str) and key:
-                    refs.add(f"DELTA_KEYS.{key}")
-
-    rag_topk = context.get("rag_topk")
-    if isinstance(rag_topk, list):
-        for item in rag_topk:
-            if not isinstance(item, Mapping):
-                continue
-            snippet_id = item.get("snippet_id")
-            if not isinstance(snippet_id, str) or not snippet_id:
-                snippet_id = item.get("id")
-            if isinstance(snippet_id, str) and snippet_id:
-                refs.add(f"RAG_SNIPPETS.{snippet_id}")
-
-    return refs
+    return collect_evidence_refs_from_context(context)
 
 
 @dataclass

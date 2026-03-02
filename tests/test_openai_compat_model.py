@@ -56,6 +56,29 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert "inferred_step_id" in prompt_payload["deterministic_step_hint"]
 
 
+def test_openai_compat_schema_is_loaded_once_per_model_instance(monkeypatch) -> None:
+    schema_calls = {"count": 0}
+
+    def _fake_schema():
+        schema_calls["count"] += 1
+        return {"type": "object"}
+
+    monkeypatch.setattr("adapters.openai_compat_model.get_help_response_schema", _fake_schema)
+    fake = FakeClient(
+        responses=[
+            FakeResponse({"choices": [{"message": {"content": "{}"}}]}),
+            FakeResponse({"choices": [{"message": {"content": "{}"}}]}),
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+    assert schema_calls["count"] == 1
+
+    messages = [{"role": "user", "content": "ping"}]
+    assert model._chat(messages) == "{}"
+    assert model._chat(messages) == "{}"
+    assert schema_calls["count"] == 1
+
+
 def test_explain_error_records_raw_llm_text_when_enabled() -> None:
     help_obj = _help_obj_ok()
     payload = _openai_chat_payload_from_help_obj(help_obj)
