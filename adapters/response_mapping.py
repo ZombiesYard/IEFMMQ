@@ -10,16 +10,9 @@ from typing import Any, Mapping
 
 import yaml
 
+from adapters.evidence_refs import EVIDENCE_TYPE_PREFIXES
 from core.overlay import OverlayPlanner
 from core.types import TutorRequest, TutorResponse
-
-_EVIDENCE_TYPE_PREFIXES: dict[str, tuple[str, ...]] = {
-    "var": ("VARS.",),
-    "gate": ("GATES.",),
-    "delta": ("RECENT_UI_TARGETS.", "DELTA_KEYS."),
-    "rag": ("RAG_SNIPPETS.",),
-}
-
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
@@ -176,14 +169,14 @@ def _validate_overlay_evidence(
         if target not in targets_set:
             unexpected_targets.add(target)
             continue
-        if not isinstance(evidence_type, str) or evidence_type not in _EVIDENCE_TYPE_PREFIXES:
+        if not isinstance(evidence_type, str) or evidence_type not in EVIDENCE_TYPE_PREFIXES:
             invalid_items += 1
             continue
         if not isinstance(ref, str) or not ref:
             invalid_items += 1
             continue
 
-        prefixes = _EVIDENCE_TYPE_PREFIXES[evidence_type]
+        prefixes = EVIDENCE_TYPE_PREFIXES[evidence_type]
         if not any(ref.startswith(prefix) for prefix in prefixes):
             type_ref_mismatch_targets.add(target)
             continue

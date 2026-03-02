@@ -18,6 +18,7 @@ from live_dcs import (
     ReplayBiosReceiver,
     StdinHelpTrigger,
     UdpHelpTrigger,
+    build_arg_parser,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
 )
@@ -1405,3 +1406,17 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
         isinstance(item, dict) and item.get("ref") == "GATES.S05.precondition"
         for item in gate_blockers
     )
+
+
+def test_live_dcs_cli_log_raw_llm_text_can_disable_env_default(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "1")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--no-log-raw-llm-text"])
+    assert args.log_raw_llm_text is False
+
+
+def test_live_dcs_cli_log_raw_llm_text_can_enable_when_env_default_off(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--log-raw-llm-text"])
+    assert args.log_raw_llm_text is True

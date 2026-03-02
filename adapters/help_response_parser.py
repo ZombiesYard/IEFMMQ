@@ -9,17 +9,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from adapters.evidence_refs import EVIDENCE_TYPES, infer_evidence_type_from_ref
 from adapters.json_extract import JsonExtractionResult, extract_first_json, parse_first_json
 from core.llm_schema import validate_help_response
-
-_EVIDENCE_TYPES = {"var", "gate", "rag", "delta"}
-_EVIDENCE_PREFIX_TO_TYPE: tuple[tuple[str, str], ...] = (
-    ("VARS.", "var"),
-    ("GATES.", "gate"),
-    ("RAG_SNIPPETS.", "rag"),
-    ("RECENT_UI_TARGETS.", "delta"),
-    ("DELTA_KEYS.", "delta"),
-)
 
 
 def strip_code_fence(text: str) -> str:
@@ -57,13 +49,6 @@ def parse_help_response_with_diagnostics(
     return obj, extraction, repair_meta
 
 
-def _infer_evidence_type_from_ref(ref: str) -> str | None:
-    for prefix, evidence_type in _EVIDENCE_PREFIX_TO_TYPE:
-        if ref.startswith(prefix):
-            return evidence_type
-    return None
-
-
 def _repair_help_response_overlay_evidence(help_obj: dict[str, Any]) -> dict[str, Any]:
     overlay = help_obj.get("overlay")
     if not isinstance(overlay, Mapping):
@@ -94,7 +79,7 @@ def _repair_help_response_overlay_evidence(help_obj: dict[str, Any]) -> dict[str
             continue
 
         evidence_type = item.get("type")
-        if isinstance(evidence_type, str) and evidence_type in _EVIDENCE_TYPES:
+        if isinstance(evidence_type, str) and evidence_type in EVIDENCE_TYPES:
             rewritten_evidence.append(item)
             continue
 
@@ -104,7 +89,7 @@ def _repair_help_response_overlay_evidence(help_obj: dict[str, Any]) -> dict[str
             details.append({"index": idx, "action": "dropped", "reason": "missing_or_invalid_ref"})
             continue
 
-        mapped_type = _infer_evidence_type_from_ref(ref)
+        mapped_type = infer_evidence_type_from_ref(ref)
         if mapped_type is None:
             dropped_count += 1
             details.append({"index": idx, "action": "dropped", "reason": f"unmapped_ref:{ref}"})

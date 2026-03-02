@@ -20,6 +20,7 @@ import yaml
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosReceiver
+from adapters.evidence_refs import infer_evidence_type_from_ref
 from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
@@ -392,22 +393,6 @@ _FALLBACK_STEP_VAR_REFS: dict[str, str] = {
     "S04": "VARS.engine_crank_right",
     "S06": "VARS.bleed_air_norm",
 }
-
-_EVIDENCE_PREFIX_TO_TYPE: tuple[tuple[str, str], ...] = (
-    ("VARS.", "var"),
-    ("GATES.", "gate"),
-    ("RAG_SNIPPETS.", "rag"),
-    ("RECENT_UI_TARGETS.", "delta"),
-    ("DELTA_KEYS.", "delta"),
-)
-
-
-def _infer_evidence_type_from_ref(ref: str) -> str | None:
-    for prefix, evidence_type in _EVIDENCE_PREFIX_TO_TYPE:
-        if ref.startswith(prefix):
-            return evidence_type
-    return None
-
 
 def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
     refs: set[str] = set()
@@ -1217,7 +1202,7 @@ class LiveDcsTutorLoop:
         if selected_ref is None:
             return None, "no_verifiable_evidence_ref"
 
-        evidence_type = _infer_evidence_type_from_ref(selected_ref)
+        evidence_type = infer_evidence_type_from_ref(selected_ref)
         if evidence_type is None:
             return None, f"unsupported_evidence_ref:{selected_ref}"
 
@@ -1692,12 +1677,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
-    parser.add_argument(
+    log_raw_default = bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")))
+    log_raw_group = parser.add_mutually_exclusive_group()
+    log_raw_group.add_argument(
         "--log-raw-llm-text",
+        dest="log_raw_llm_text",
         action="store_true",
-        default=bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0"))),
         help="Log raw model text into tutor_response.metadata.raw_llm_text(_attempts)",
     )
+    log_raw_group.add_argument(
+        "--no-log-raw-llm-text",
+        dest="log_raw_llm_text",
+        action="store_false",
+        help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
+    )
+    parser.set_defaults(log_raw_llm_text=log_raw_default)
     return parser
 
 

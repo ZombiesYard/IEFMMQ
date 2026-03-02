@@ -180,3 +180,59 @@ def test_cli_replay_bios_closes_source_when_store_enter_fails(monkeypatch, tmp_p
     code = main()
     assert code == 1
     assert close_state["closed"] is True
+
+
+def test_cli_replay_bios_log_raw_llm_text_can_disable_env_default(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_log_raw_env_on.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, bool] = {}
+
+    def _fake_run_replay(args):
+        captured["log_raw_llm_text"] = bool(args.log_raw_llm_text)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "1")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--no-log-raw-llm-text",
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["log_raw_llm_text"] is False
+
+
+def test_cli_replay_bios_log_raw_llm_text_can_enable_when_env_default_off(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_log_raw_env_off.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, bool] = {}
+
+    def _fake_run_replay(args):
+        captured["log_raw_llm_text"] = bool(args.log_raw_llm_text)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--log-raw-llm-text",
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["log_raw_llm_text"] is True

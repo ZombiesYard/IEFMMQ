@@ -574,7 +574,7 @@ def build_help_prompt_result(
             if "trimmed_overlay_enum" not in trim_reasons:
                 trim_reasons.append("trimmed_overlay_enum")
             changed = True
-        elif len(rag_snippets) > 1:
+        elif len(rag_snippets) > 0:
             rag_snippets = rag_snippets[:-1]
             if "trimmed_rag_snippets" not in trim_reasons:
                 trim_reasons.append("trimmed_rag_snippets")

@@ -275,12 +275,21 @@ def main() -> int:
     rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
-    rep_bios.add_argument(
+    replay_log_raw_default = bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0")))
+    replay_log_raw_group = rep_bios.add_mutually_exclusive_group()
+    replay_log_raw_group.add_argument(
         "--log-raw-llm-text",
+        dest="log_raw_llm_text",
         action="store_true",
-        default=bool(int(os.getenv("SIMTUTOR_LOG_RAW_LLM_TEXT", "0"))),
         help="Log raw model text into tutor_response.metadata.raw_llm_text(_attempts)",
     )
+    replay_log_raw_group.add_argument(
+        "--no-log-raw-llm-text",
+        dest="log_raw_llm_text",
+        action="store_false",
+        help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
+    )
+    rep_bios.set_defaults(log_raw_llm_text=replay_log_raw_default)
 
     args = parser.parse_args()
     if args.command == "validate":
