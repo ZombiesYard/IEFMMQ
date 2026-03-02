@@ -231,3 +231,31 @@ def test_vars_prefix_prefers_payload_over_top_level():
     # Should use payload.vars.altitude (5000), not top-level vars.altitude (1000)
     assert res.allowed
 
+
+def test_evaluate_with_failure_index_reports_first_failing_rule_index() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"rpm": 0.3, "temp": 650})
+    rules = [
+        {"op": "var_gte", "var": "payload.rpm", "value": 0.2},
+        {"op": "arg_in_range", "var": "payload.temp", "min": 190, "max": 590},
+    ]
+    engine = GatingEngine(rules)
+
+    result, failed_idx = engine.evaluate_with_failure_index([obs])
+
+    assert result.allowed is False
+    assert failed_idx == 1
+    assert "payload.temp" in (result.reason or "")
+
+
+def test_evaluate_with_failure_index_from_history_reuses_materialized_list() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    history = [make_obs(now, payload={"apu_ready": False})]
+    engine = GatingEngine([{"op": "flag_true", "var": "payload.apu_ready"}])
+
+    result, failed_idx = engine.evaluate_with_failure_index_from_history(history)
+
+    assert result.allowed is False
+    assert failed_idx == 0
+    assert "apu_ready" in (result.reason or "")
+

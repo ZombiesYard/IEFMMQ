@@ -105,21 +105,22 @@ def _evaluate_gate_rules(
     if not normalized_rules:
         return True, "no_rules", None
 
-    for idx, rule in enumerate(normalized_rules):
-        result = GatingEngine([rule]).evaluate(observations)
-        if result.allowed:
-            continue
-        reason_code_raw = rule.get("reason_code")
-        reason_code = (
-            reason_code_raw.strip()
-            if isinstance(reason_code_raw, str) and reason_code_raw.strip()
-            else _default_reason_code(step_id, gate_type, rule, idx)
-        )
-        reason_raw = rule.get("reason")
-        reason = reason_raw.strip() if isinstance(reason_raw, str) and reason_raw.strip() else result.reason
-        return False, reason_code, reason
+    engine = GatingEngine(normalized_rules)
+    result, failed_rule_index = engine.evaluate_with_failure_index_from_history(observations)
+    if result.allowed:
+        return True, "ok", None
 
-    return True, "ok", None
+    failed_idx = failed_rule_index if isinstance(failed_rule_index, int) and failed_rule_index >= 0 else 0
+    rule = normalized_rules[failed_idx]
+    reason_code_raw = rule.get("reason_code")
+    reason_code = (
+        reason_code_raw.strip()
+        if isinstance(reason_code_raw, str) and reason_code_raw.strip()
+        else _default_reason_code(step_id, gate_type, rule, failed_idx)
+    )
+    reason_raw = rule.get("reason")
+    reason = reason_raw.strip() if isinstance(reason_raw, str) and reason_raw.strip() else result.reason
+    return False, reason_code, reason
 
 
 def _coerce_rules_iterable(raw: Any) -> tuple[Mapping[str, Any], ...]:
