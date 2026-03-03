@@ -34,3 +34,5 @@ __pycache__
 tests/.tmp_bios_ui_map
 tests/.tmp_delta_policy/bool_max_changes_case
 CockpitScripts
+ThesisProposal1128.pdf
+logs/thesisproposal1128_extract.txt
