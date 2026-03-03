@@ -266,8 +266,8 @@ def main() -> int:
         "--knowledge-source-policy",
         default=None,
         help=(
-            "knowledge_source_policy.yaml path. In cold-start production mode, defaults to "
-            "repo-root knowledge_source_policy.yaml when omitted."
+            "knowledge_source_policy.yaml path. In cold-start production mode, omitted path "
+            "falls back to repository-checkout knowledge_source_policy.yaml when available."
         ),
     )
 

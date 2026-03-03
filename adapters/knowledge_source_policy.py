@@ -17,14 +17,6 @@ class KnowledgeSourcePolicyError(ValueError):
     pass
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
-
-
-def _default_index_path() -> Path:
-    return _repo_root() / "Doc" / "Evaluation" / "index.json"
-
-
 def _resolve_path(path_like: str | Path, *, base_dir: Path) -> Path:
     path = Path(path_like)
     if path.is_absolute():
@@ -189,9 +181,11 @@ class KnowledgeSourcePolicy:
 
         index_path_raw = index_path if index_path is not None else yaml_index_path_raw
         if index_path_raw is None:
-            effective_index_path = _default_index_path()
-        else:
-            effective_index_path = _resolve_path(index_path_raw, base_dir=policy_path.parent)
+            raise KnowledgeSourcePolicyError(
+                "knowledge source policy requires index_path: provide from_yaml(..., index_path=...) "
+                "or set policy.index_path in YAML"
+            )
+        effective_index_path = _resolve_path(index_path_raw, base_dir=policy_path.parent)
         chunk_catalog = _load_index_chunk_catalog(effective_index_path)
 
         allow_entries = raw.get("allow")

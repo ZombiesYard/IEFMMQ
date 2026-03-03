@@ -203,6 +203,21 @@ def test_policy_public_startup_info_does_not_expose_absolute_paths(tmp_path: Pat
     assert str(index_path.parent) not in info
 
 
+def test_policy_requires_explicit_index_path_when_yaml_omits_it(tmp_path: Path) -> None:
+    policy_path = tmp_path / "policy_without_index.yaml"
+    policy_path.write_text(
+        "policy_id: test\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KnowledgeSourcePolicyError, match="requires index_path"):
+        KnowledgeSourcePolicy.from_yaml(policy_path)
+
+
 def test_repository_policy_is_valid_against_repository_index() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     policy_path = repo_root / "knowledge_source_policy.yaml"

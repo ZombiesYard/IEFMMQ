@@ -538,6 +538,36 @@ def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path
         source.close()
 
 
+def test_live_loop_rejects_missing_default_policy_in_cold_start_production_mode(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_policy_default_missing.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    monkeypatch.setattr("live_dcs._default_knowledge_source_policy_path", lambda: tmp_path / "missing_default.yaml")
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    try:
+        with pytest.raises(
+            ValueError,
+            match="default policy not found.*Provide --knowledge-source-policy explicitly",
+        ):
+            loop = LiveDcsTutorLoop(
+                source=source,
+                model=model,
+                action_executor=executor,
+                cooldown_s=5.0,
+                lang="en",
+                rag_top_k=0,
+                cold_start_production=True,
+            )
+            loop.close()
+    finally:
+        source.close()
+
+
 def test_live_loop_normalizes_relative_knowledge_index_path(monkeypatch, tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_relative_index.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

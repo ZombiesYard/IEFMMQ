@@ -758,6 +758,12 @@ class LiveDcsTutorLoop:
         policy_path = self.knowledge_source_policy_path
         if self.cold_start_production and policy_path is None:
             policy_path = _default_knowledge_source_policy_path()
+            if not policy_path.is_file():
+                raise ValueError(
+                    "cold-start production requires valid knowledge source policy: "
+                    f"default policy not found at {policy_path}. "
+                    "Provide --knowledge-source-policy explicitly."
+                )
         if policy_path is None:
             return
 
@@ -1665,8 +1671,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--knowledge-source-policy",
         default=None,
         help=(
-            "knowledge_source_policy.yaml path. In cold-start production mode, defaults to "
-            "repo-root knowledge_source_policy.yaml when omitted."
+            "knowledge_source_policy.yaml path. In cold-start production mode, omitted path "
+            "falls back to repository-checkout knowledge_source_policy.yaml when available."
         ),
     )
 
