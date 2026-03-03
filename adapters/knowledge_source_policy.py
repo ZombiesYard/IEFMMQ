@@ -11,6 +11,7 @@ from typing import Any
 from collections.abc import Mapping, Sequence
 
 import yaml
+from core.knowledge import load_index_data
 
 
 class KnowledgeSourcePolicyError(ValueError):
@@ -92,7 +93,7 @@ def _load_index_chunk_catalog(
     allowed_keys: set[tuple[str, str]],
 ) -> dict[tuple[str, str], _IndexChunkInfo]:
     try:
-        raw = json.loads(index_path.read_text(encoding="utf-8"))
+        raw = load_index_data(index_path)
     except OSError as exc:
         raise KnowledgeSourcePolicyError(f"knowledge index read failed: {index_path}") from exc
     except json.JSONDecodeError as exc:

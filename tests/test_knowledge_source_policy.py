@@ -270,6 +270,40 @@ def test_policy_requires_explicit_index_path_when_yaml_omits_it(tmp_path: Path) 
         KnowledgeSourcePolicy.from_yaml(policy_path)
 
 
+def test_policy_and_bm25_reuse_shared_index_parse_cache(monkeypatch, tmp_path: Path) -> None:
+    from core import knowledge as knowledge_core
+    from core.knowledge import BM25Retriever
+
+    index_path = tmp_path / "index.json"
+    _write_index(index_path)
+    policy_path = tmp_path / "policy_cache.yaml"
+    policy_path.write_text(
+        "policy_id: test_cache\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    knowledge_core._load_index_data_cached.cache_clear()
+    parse_calls = {"count": 0}
+    real_json_loads = knowledge_core.json.loads
+
+    def _counting_json_loads(*args, **kwargs):
+        parse_calls["count"] += 1
+        return real_json_loads(*args, **kwargs)
+
+    monkeypatch.setattr(knowledge_core.json, "loads", _counting_json_loads)
+
+    KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+    BM25Retriever(index_path)
+
+    assert parse_calls["count"] == 1
+
+    knowledge_core._load_index_data_cached.cache_clear()
+
+
 def test_repository_policy_is_valid_against_repository_index() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     policy_path = repo_root / "knowledge_source_policy.yaml"
