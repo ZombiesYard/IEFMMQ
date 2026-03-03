@@ -119,12 +119,28 @@ def _check_schema_v1_presence() -> list[GuardViolation]:
     return violations
 
 
+def _check_private_issue_contract_not_public() -> list[GuardViolation]:
+    """Enforce that private issue templates are not committed to the public repo."""
+    violations: list[GuardViolation] = []
+    forbidden = REPO_ROOT / ".github/ISSUE_TEMPLATE/llm-task.yml"
+    if forbidden.exists():
+        violations.append(
+            GuardViolation(
+                rule="private_contract_leak",
+                path=forbidden,
+                detail="Private LLM issue template must not be committed.",
+            )
+        )
+    return violations
+
+
 def run_guards() -> list[GuardViolation]:
     violations: list[GuardViolation] = []
     violations.extend(_check_forbidden_automation())
     violations.extend(_check_core_purity())
     violations.extend(_check_core_imports())
     violations.extend(_check_schema_v1_presence())
+    violations.extend(_check_private_issue_contract_not_public())
     return violations
 
 
