@@ -1,0 +1,35 @@
+name: ci-guard
+
+on:
+  pull_request:
+    branches: ["*"]
+  push:
+    branches: ["main", "master", "develop"]
+
+jobs:
+  guard-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest
+
+      - name: Run CI guardrails
+        run: |
+          python tools/ci_guard.py
+
+      - name: Run tests
+        run: |
+          pytest -q
+

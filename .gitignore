@@ -36,3 +36,6 @@ tests/.tmp_delta_policy/bool_max_changes_case
 CockpitScripts
 ThesisProposal1128.pdf
 logs/thesisproposal1128_extract.txt
+.github/ISSUE_TEMPLATE
+.github/pull_request_template.md
+Doc/Engineering
