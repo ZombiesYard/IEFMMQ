@@ -238,6 +238,8 @@ python live_dcs.py \
   --model-base-url http://127.0.0.1:8000 \
   --model-api-key "${SIMTUTOR_MODEL_API_KEY}" \
   --knowledge-index Doc/Evaluation/index.json \
+  --cold-start-production \
+  --knowledge-source-policy knowledge_source_policy.yaml \
   --rag-top-k 5 \
   --output logs/live_dcs_live.jsonl
 ```
@@ -258,6 +260,8 @@ python -m simtutor replay-bios \
   --speed 1.0 \
   --help-udp-port 7794 \
   --model-provider stub \
+  --cold-start-production \
+  --knowledge-source-policy knowledge_source_policy.yaml \
   --output logs/replay_bios.jsonl
 ```
 Notes:
@@ -268,6 +272,19 @@ Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - `grounding_snippet_ids`: snippet ids actually injected into prompt.
 - `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
 - `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`); valid gate evidence refs are exactly `GATES.<gate_id>` where `<gate_id>` is a key in `context.gates` (for example `GATES.S05.precondition`).
+
+### Knowledge Source Policy (CS-001)
+- Policy file: `knowledge_source_policy.yaml` (repo root).
+- Runtime flags:
+  - `--cold-start-production` / `--no-cold-start-production`
+  - `--knowledge-source-policy <path>` (optional override; omitted path falls back to repository-checkout `knowledge_source_policy.yaml` when available)
+  - env default: `SIMTUTOR_COLD_START_PRODUCTION=1|0`
+- Behavior:
+  - In cold-start production mode, a valid knowledge source policy is mandatory; if flag is omitted, repository-checkout `knowledge_source_policy.yaml` is used when available.
+  - Providing `--knowledge-source-policy` applies whitelist filtering in any mode; cold-start production mode only makes valid policy mandatory.
+  - Missing/invalid policy causes startup failure.
+  - Startup log prints: `当前仅使用 cold-start 白名单块 ...`
+  - `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.
 
 ### Overlay action evidence protocol
 Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
