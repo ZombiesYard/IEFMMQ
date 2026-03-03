@@ -203,6 +203,44 @@ def test_policy_public_startup_info_does_not_expose_absolute_paths(tmp_path: Pat
     assert str(index_path.parent) not in info
 
 
+def test_policy_from_yaml_expands_user_in_policy_path(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    index_path = tmp_path / "index.json"
+    _write_index(index_path)
+    policy_path = tmp_path / "policy_home.yaml"
+    policy_path.write_text(
+        "policy_id: test_home_policy\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    policy = KnowledgeSourcePolicy.from_yaml("~/policy_home.yaml", index_path=index_path)
+    assert policy.policy_id == "test_home_policy"
+
+
+def test_policy_from_yaml_expands_user_in_yaml_index_path(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    index_path = tmp_path / "index_home.json"
+    _write_index(index_path)
+    policy_path = tmp_path / "policy_index_home.yaml"
+    policy_path.write_text(
+        "policy_id: test_home_index\n"
+        "index_path: ~/index_home.json\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path)
+    assert policy.policy_id == "test_home_index"
+    assert policy.index_path == index_path.resolve()
+
+
 def test_policy_requires_explicit_index_path_when_yaml_omits_it(tmp_path: Path) -> None:
     policy_path = tmp_path / "policy_without_index.yaml"
     policy_path.write_text(

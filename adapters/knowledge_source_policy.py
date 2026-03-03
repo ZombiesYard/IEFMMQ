@@ -18,10 +18,10 @@ class KnowledgeSourcePolicyError(ValueError):
 
 
 def _resolve_path(path_like: str | Path, *, base_dir: Path) -> Path:
-    path = Path(path_like)
+    path = Path(path_like).expanduser()
     if path.is_absolute():
-        return path
-    return (base_dir / path).resolve()
+        return path.resolve()
+    return (base_dir.expanduser() / path).resolve()
 
 
 def _coerce_non_empty_str(value: Any, *, field_name: str) -> str:
@@ -154,7 +154,7 @@ class KnowledgeSourcePolicy:
         *,
         index_path: str | Path | None = None,
     ) -> "KnowledgeSourcePolicy":
-        policy_path = Path(path).resolve()
+        policy_path = Path(path).expanduser().resolve()
         try:
             raw_text = policy_path.read_text(encoding="utf-8")
         except OSError as exc:
