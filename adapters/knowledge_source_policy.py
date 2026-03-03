@@ -56,14 +56,13 @@ def _coerce_line_range(value: Any, *, field_name: str) -> tuple[int, int]:
     return start, end
 
 
-def _chunk_line_count(chunk: Mapping[str, Any]) -> int:
-    text = chunk.get("text")
-    if not isinstance(text, str):
-        text = str(text or "")
-    return max(1, len(text.splitlines()))
+@dataclass(frozen=True)
+class _IndexChunkInfo:
+    line_count: int
+    lines: tuple[str, ...]
 
 
-def _load_index_line_counts(index_path: Path) -> dict[tuple[str, str], int]:
+def _load_index_chunk_catalog(index_path: Path) -> dict[tuple[str, str], _IndexChunkInfo]:
     try:
         raw = json.loads(index_path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -76,7 +75,7 @@ def _load_index_line_counts(index_path: Path) -> dict[tuple[str, str], int]:
     if not isinstance(documents, list):
         raise KnowledgeSourcePolicyError(f"knowledge index missing documents list: {index_path}")
 
-    out: dict[tuple[str, str], int] = {}
+    out: dict[tuple[str, str], _IndexChunkInfo] = {}
     for doc_idx, doc in enumerate(documents):
         if not isinstance(doc, Mapping):
             continue
@@ -92,7 +91,16 @@ def _load_index_line_counts(index_path: Path) -> dict[tuple[str, str], int]:
             chunk_id = chunk.get("chunk_id")
             if not isinstance(chunk_id, str) or not chunk_id:
                 chunk_id = f"{doc_id}_{chunk_idx}"
-            out[(doc_id, chunk_id)] = _chunk_line_count(chunk)
+            text = chunk.get("text")
+            if not isinstance(text, str):
+                text = str(text or "")
+            lines = tuple(text.splitlines())
+            if not lines:
+                lines = ("",)
+            out[(doc_id, chunk_id)] = _IndexChunkInfo(
+                line_count=max(1, len(lines)),
+                lines=lines,
+            )
     return out
 
 
@@ -129,12 +137,15 @@ class KnowledgeSourcePolicy:
     index_path: Path
     rules: tuple[SourceChunkRule, ...]
     _rules_by_key: dict[tuple[str, str], SourceChunkRule] = field(init=False, repr=False)
+    _allowed_excerpt_by_key: dict[tuple[str, str], str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         by_key: dict[tuple[str, str], SourceChunkRule] = {}
         for rule in self.rules:
-            by_key[(rule.doc_id, rule.chunk_id)] = rule
+            key = (rule.doc_id, rule.chunk_id)
+            by_key[key] = rule
         object.__setattr__(self, "_rules_by_key", by_key)
+        object.__setattr__(self, "_allowed_excerpt_by_key", {})
 
     @property
     def doc_count(self) -> int:
@@ -171,13 +182,14 @@ class KnowledgeSourcePolicy:
             effective_index_path = _default_index_path()
         else:
             effective_index_path = _resolve_path(index_path_raw, base_dir=policy_path.parent)
-        index_line_counts = _load_index_line_counts(effective_index_path)
+        chunk_catalog = _load_index_chunk_catalog(effective_index_path)
 
         allow_entries = raw.get("allow")
         if not isinstance(allow_entries, list) or not allow_entries:
             raise KnowledgeSourcePolicyError("allow must be a non-empty list")
 
         rules: list[SourceChunkRule] = []
+        allowed_excerpt_by_key: dict[tuple[str, str], str] = {}
         seen: set[tuple[str, str]] = set()
         for idx, item in enumerate(allow_entries):
             if not isinstance(item, Mapping):
@@ -187,11 +199,12 @@ class KnowledgeSourcePolicy:
             line_start, line_end = _coerce_line_range(item.get("line_range"), field_name=f"allow[{idx}].line_range")
 
             key = (doc_id, chunk_id)
-            max_lines = index_line_counts.get(key)
-            if max_lines is None:
+            chunk_info = chunk_catalog.get(key)
+            if chunk_info is None:
                 raise KnowledgeSourcePolicyError(
                     f"allow[{idx}] references unknown chunk: doc_id={doc_id!r} chunk_id={chunk_id!r}"
                 )
+            max_lines = chunk_info.line_count
             if line_end > max_lines:
                 raise KnowledgeSourcePolicyError(
                     f"allow[{idx}].line_range exceeds chunk lines: {line_end} > {max_lines} "
@@ -210,13 +223,16 @@ class KnowledgeSourcePolicy:
                     line_end=line_end,
                 )
             )
+            allowed_excerpt_by_key[key] = "\n".join(chunk_info.lines[line_start - 1 : line_end])
 
-        return cls(
+        policy = cls(
             policy_id=policy_id,
             policy_path=policy_path,
             index_path=effective_index_path,
             rules=tuple(rules),
         )
+        object.__setattr__(policy, "_allowed_excerpt_by_key", allowed_excerpt_by_key)
+        return policy
 
     def filter_snippets(self, snippets: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
         filtered: list[dict[str, Any]] = []
@@ -243,7 +259,13 @@ class KnowledgeSourcePolicy:
                     end = max(span_start, span_end)
                     if end < rule.line_start or start > rule.line_end:
                         continue
-            filtered.append(dict(snippet))
+            normalized = dict(snippet)
+            allowed_excerpt = self._allowed_excerpt_by_key.get((doc_id, chunk_id))
+            if allowed_excerpt is not None:
+                normalized["snippet"] = allowed_excerpt
+                normalized["line_start"] = rule.line_start
+                normalized["line_end"] = rule.line_end
+            filtered.append(normalized)
         return filtered
 
     def public_startup_info(self) -> str:

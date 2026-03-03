@@ -71,6 +71,10 @@ def _default_knowledge_source_policy_path() -> Path:
     return _repo_root() / "knowledge_source_policy.yaml"
 
 
+def _normalize_fs_path(path_like: str | Path) -> Path:
+    return Path(path_like).expanduser().resolve()
+
+
 ENV_COLD_START_PRODUCTION = "SIMTUTOR_COLD_START_PRODUCTION"
 
 
@@ -698,9 +702,10 @@ class LiveDcsTutorLoop:
             Path(telemetry_map_path) if telemetry_map_path else _default_telemetry_map_path()
         )
         self.bios_to_ui_path = Path(bios_to_ui_path) if bios_to_ui_path else _default_bios_to_ui_path()
-        self.knowledge_index_path = (
+        raw_knowledge_index_path = (
             Path(knowledge_index_path) if knowledge_index_path else _default_knowledge_index_path()
         )
+        self.knowledge_index_path = _normalize_fs_path(raw_knowledge_index_path)
         self.rag_top_k = max(0, int(rag_top_k))
         self.cold_start_production = bool(cold_start_production)
         self.knowledge_source_policy_path = (

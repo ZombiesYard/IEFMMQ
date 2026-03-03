@@ -57,6 +57,54 @@ def test_policy_loads_and_filters_by_doc_chunk(tmp_path: Path) -> None:
     assert len(filtered) == 1
     assert filtered[0]["doc_id"] == "doc_a"
     assert filtered[0]["snippet_id"] == "doc_a_0"
+    assert filtered[0]["line_start"] == 1
+    assert filtered[0]["line_end"] == 3
+    assert filtered[0]["snippet"] == "line1\nline2\nline3"
+
+
+def test_policy_clips_snippet_to_allowed_line_range_when_span_metadata_missing(tmp_path: Path) -> None:
+    index_path = tmp_path / "index.json"
+    _write_index(index_path)
+    policy_path = tmp_path / "policy_clip.yaml"
+    policy_path.write_text(
+        "policy_id: test_clip\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [2, 2]\n",
+        encoding="utf-8",
+    )
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+
+    snippets = [
+        {"doc_id": "doc_a", "snippet_id": "doc_a_0", "snippet": "line1"},
+    ]
+    filtered = policy.filter_snippets(snippets)
+    assert len(filtered) == 1
+    assert filtered[0]["snippet"] == "line2"
+    assert filtered[0]["line_start"] == 2
+    assert filtered[0]["line_end"] == 2
+
+
+def test_policy_rejects_snippet_when_reported_span_has_no_overlap(tmp_path: Path) -> None:
+    index_path = tmp_path / "index.json"
+    _write_index(index_path)
+    policy_path = tmp_path / "policy_no_overlap.yaml"
+    policy_path.write_text(
+        "policy_id: test_overlap\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [2, 3]\n",
+        encoding="utf-8",
+    )
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+
+    snippets = [
+        {"doc_id": "doc_a", "snippet_id": "doc_a_0", "snippet": "line1", "line_start": 1, "line_end": 1},
+    ]
+    filtered = policy.filter_snippets(snippets)
+    assert filtered == []
 
 
 def test_policy_rejects_invalid_line_range_shape(tmp_path: Path) -> None:

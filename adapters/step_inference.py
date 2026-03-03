@@ -224,8 +224,9 @@ def infer_step_id(
         if engine_crank_right is not True:
             missing.insert(0, "vars.engine_crank_right==true")
         return _result(s05, missing)
-    # `throttle_r_not_off` is not always observable in every telemetry slice.
-    # Only block on S05 when the signal is explicitly present and not true.
+    # Keep S05 inference aligned with pack gate semantics: once the key exists,
+    # any non-true value (False/None/unparseable) means the gate is still unmet.
+    # Missing key is tolerated because not every telemetry slice carries this signal.
     if has_throttle_r_not_off and throttle_r_not_off is not True:
         return _result(s05, ["vars.throttle_r_not_off==true"])
 

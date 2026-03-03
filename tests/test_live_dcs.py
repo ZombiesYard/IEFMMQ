@@ -538,6 +538,30 @@ def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path
         source.close()
 
 
+def test_live_loop_normalizes_relative_knowledge_index_path(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_relative_index.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    (tmp_path / "index.json").write_text('{"documents":[]}', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        rag_top_k=0,
+        knowledge_index_path=Path("index.json"),
+    )
+    try:
+        assert loop.knowledge_index_path == (tmp_path / "index.json").resolve()
+    finally:
+        loop.close()
+
+
 def test_live_loop_cold_start_production_prints_policy_summary(tmp_path: Path, capsys) -> None:
     replay_path = tmp_path / "bios_policy_summary.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
