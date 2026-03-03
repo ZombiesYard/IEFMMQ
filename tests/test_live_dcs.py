@@ -522,7 +522,7 @@ def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path
     model = RecordingModel()
     executor = RecordingExecutor()
     try:
-        with pytest.raises(ValueError, match="cold-start production requires valid knowledge source policy"):
+        with pytest.raises(ValueError) as exc_info:
             loop = LiveDcsTutorLoop(
                 source=source,
                 model=model,
@@ -534,6 +534,11 @@ def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path
                 knowledge_source_policy_path=tmp_path / "missing_knowledge_source_policy.yaml",
             )
             loop.close()
+        message = str(exc_info.value)
+        assert "cold-start production requires valid knowledge source policy" in message
+        assert "knowledge source policy read failed" in message
+        assert "missing_knowledge_source_policy.yaml" in message
+        assert str(tmp_path / "missing_knowledge_source_policy.yaml") not in message
     finally:
         source.close()
 

@@ -7,12 +7,13 @@ import json
 import math
 import os
 import queue
+import re
 import socket
 import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 import yaml
@@ -76,6 +77,9 @@ def _normalize_fs_path(path_like: str | Path) -> Path:
     return Path(path_like).expanduser().resolve()
 
 
+_ABS_PATH_TOKEN_RE = re.compile(r"(?P<path>(?:[A-Za-z]:[\\/]|/)[^\s,;\)\]\}]+)")
+
+
 class ObservationSource(Protocol):
     def get_observation(self) -> Observation | None:
         ...
@@ -92,6 +96,24 @@ class ActionExecutorLike(Protocol):
 class HelpTriggerLike(Protocol):
     def poll(self) -> bool:
         ...
+
+
+def _basename_from_path_like(path_text: str) -> str:
+    if re.match(r"^[A-Za-z]:[\\/]", path_text):
+        name = PureWindowsPath(path_text).name
+    else:
+        name = Path(path_text).name
+    return name or "<path>"
+
+
+def _sanitize_policy_error_for_user(message: str) -> str:
+    if not isinstance(message, str) or not message.strip():
+        return "invalid policy configuration"
+
+    def _replace(match: re.Match[str]) -> str:
+        return _basename_from_path_like(match.group("path"))
+
+    return _ABS_PATH_TOKEN_RE.sub(_replace, message)
 
 
 def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
@@ -772,9 +794,10 @@ class LiveDcsTutorLoop:
             )
         except KnowledgeSourcePolicyError as exc:
             if self.cold_start_production:
+                sanitized = _sanitize_policy_error_for_user(str(exc))
                 raise ValueError(
                     "cold-start production requires valid knowledge source policy: "
-                    f"{exc}"
+                    f"{sanitized}"
                 ) from exc
             raise
 

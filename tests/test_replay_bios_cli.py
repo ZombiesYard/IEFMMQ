@@ -352,6 +352,8 @@ def test_cli_replay_bios_rejects_missing_policy_in_cold_start_production(
     out = capsys.readouterr().out
     assert code == 1
     assert "cold-start production requires valid knowledge source policy" in out
+    assert "missing_knowledge_source_policy.yaml" in out
+    assert str(tmp_path / "missing_knowledge_source_policy.yaml") not in out
 
 
 def test_cli_replay_bios_cold_start_production_prints_policy_summary(
