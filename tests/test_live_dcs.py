@@ -22,6 +22,7 @@ from live_dcs import (
     _is_help_trigger_payload,
     _load_overlay_allowlist,
     _normalize_cached_response_metadata,
+    _sanitize_policy_error_for_user,
 )
 from tools.index_docs import build_index
 
@@ -517,6 +518,7 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
 def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_policy_missing.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    missing_policy_path = tmp_path / "dir with spaces" / "missing_knowledge_source_policy.yaml"
 
     source = ReplayBiosReceiver(replay_path)
     model = RecordingModel()
@@ -531,14 +533,14 @@ def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path
                 lang="en",
                 rag_top_k=0,
                 cold_start_production=True,
-                knowledge_source_policy_path=tmp_path / "missing_knowledge_source_policy.yaml",
+                knowledge_source_policy_path=missing_policy_path,
             )
             loop.close()
         message = str(exc_info.value)
         assert "cold-start production requires valid knowledge source policy" in message
         assert "knowledge source policy read failed" in message
         assert "missing_knowledge_source_policy.yaml" in message
-        assert str(tmp_path / "missing_knowledge_source_policy.yaml") not in message
+        assert str(missing_policy_path) not in message
     finally:
         source.close()
 
@@ -657,6 +659,48 @@ def test_live_loop_applies_policy_filter_in_cold_start_production_mode(tmp_path:
     assert rag_topk[0]["snippet_id"] == "fa18c_startup_master_1"
     assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
     assert req_meta["grounding_policy_filtered_out_count"] == 1
+
+
+def test_live_loop_applies_policy_filter_when_policy_path_provided_without_cold_start(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_policy_filter_non_cold_start.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=PolicyMixedKnowledge(),
+        rag_top_k=2,
+        cold_start_production=False,
+        knowledge_source_policy_path=_default_policy_path(),
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    rag_topk = tutor_request_payload["context"]["rag_topk"]
+    assert len(rag_topk) == 1
+    assert rag_topk[0]["doc_id"] == "fa18c_startup_master"
+    assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
+    assert req_meta["grounding_policy_filtered_out_count"] == 1
+
+
+def test_sanitize_policy_error_handles_unc_paths_with_spaces() -> None:
+    unc_path = r"\\server\share\folder with spaces\missing_policy.yaml"
+    message = f"knowledge source policy read failed: {unc_path}"
+    sanitized = _sanitize_policy_error_for_user(message, path_hints=[unc_path])
+    assert "missing_policy.yaml" in sanitized
+    assert unc_path not in sanitized
 
 
 def test_live_loop_surfaces_index_load_error_type_in_grounding_metadata(tmp_path: Path) -> None:

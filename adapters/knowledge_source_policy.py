@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 from collections.abc import Mapping, Sequence
 
@@ -16,6 +16,17 @@ from core.knowledge import load_index_data
 
 class KnowledgeSourcePolicyError(ValueError):
     pass
+
+
+def _path_filename(path_like: str | Path) -> str:
+    text = str(path_like)
+    if len(text) >= 3 and text[1] == ":" and text[2] in ("\\", "/"):
+        name = PureWindowsPath(text).name
+    elif text.startswith("\\\\"):
+        name = PureWindowsPath(text).name
+    else:
+        name = Path(text).name
+    return name or "<path>"
 
 
 def _resolve_path(path_like: str | Path, *, base_dir: Path) -> Path:
@@ -95,14 +106,14 @@ def _load_index_chunk_catalog(
     try:
         raw = load_index_data(index_path)
     except OSError as exc:
-        raise KnowledgeSourcePolicyError(f"knowledge index read failed: {index_path}") from exc
+        raise KnowledgeSourcePolicyError(f"knowledge index read failed: {_path_filename(index_path)}") from exc
     except json.JSONDecodeError as exc:
-        raise KnowledgeSourcePolicyError(f"knowledge index contains invalid JSON: {index_path}") from exc
+        raise KnowledgeSourcePolicyError(f"knowledge index contains invalid JSON: {_path_filename(index_path)}") from exc
     if not isinstance(raw, Mapping):
-        raise KnowledgeSourcePolicyError(f"knowledge index must be a mapping: {index_path}")
+        raise KnowledgeSourcePolicyError(f"knowledge index must be a mapping: {_path_filename(index_path)}")
     documents = raw.get("documents")
     if not isinstance(documents, list):
-        raise KnowledgeSourcePolicyError(f"knowledge index missing documents list: {index_path}")
+        raise KnowledgeSourcePolicyError(f"knowledge index missing documents list: {_path_filename(index_path)}")
 
     if not allowed_keys:
         return {}
@@ -203,13 +214,19 @@ class KnowledgeSourcePolicy:
         try:
             raw_text = policy_path.read_text(encoding="utf-8")
         except OSError as exc:
-            raise KnowledgeSourcePolicyError(f"knowledge source policy read failed: {policy_path}") from exc
+            raise KnowledgeSourcePolicyError(
+                f"knowledge source policy read failed: {_path_filename(policy_path)}"
+            ) from exc
         try:
             raw = yaml.safe_load(raw_text) or {}
         except yaml.YAMLError as exc:
-            raise KnowledgeSourcePolicyError(f"knowledge source policy contains invalid YAML: {policy_path}") from exc
+            raise KnowledgeSourcePolicyError(
+                f"knowledge source policy contains invalid YAML: {_path_filename(policy_path)}"
+            ) from exc
         if not isinstance(raw, Mapping):
-            raise KnowledgeSourcePolicyError(f"knowledge source policy must be a mapping: {policy_path}")
+            raise KnowledgeSourcePolicyError(
+                f"knowledge source policy must be a mapping: {_path_filename(policy_path)}"
+            )
 
         policy_id = raw.get("policy_id", policy_path.stem)
         policy_id = _coerce_non_empty_str(policy_id, field_name="policy_id")
@@ -221,7 +238,8 @@ class KnowledgeSourcePolicy:
             if yaml_index_path != caller_index_path:
                 raise KnowledgeSourcePolicyError(
                     "knowledge source policy index_path mismatch: "
-                    f"policy declares {yaml_index_path}, caller supplied {caller_index_path}"
+                    f"policy declares {_path_filename(yaml_index_path)}, "
+                    f"caller supplied {_path_filename(caller_index_path)}"
                 )
 
         index_path_raw = index_path if index_path is not None else yaml_index_path_raw

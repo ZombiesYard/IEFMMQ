@@ -265,7 +265,8 @@ def main() -> int:
         default=None,
         help=(
             "knowledge_source_policy.yaml path. In cold-start production mode, omitted path "
-            "falls back to repository-checkout knowledge_source_policy.yaml when available."
+            "falls back to repository-checkout knowledge_source_policy.yaml when available. "
+            "Providing this flag enables policy filtering in any mode."
         ),
     )
 

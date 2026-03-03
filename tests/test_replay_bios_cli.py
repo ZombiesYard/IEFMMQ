@@ -328,6 +328,7 @@ def test_cli_replay_bios_rejects_missing_policy_in_cold_start_production(
     replay_path = tmp_path / "bios_cli_cold_start_missing_policy.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
     output_path = tmp_path / "replay_missing_policy.jsonl"
+    missing_policy_path = tmp_path / "dir with spaces" / "missing_knowledge_source_policy.yaml"
 
     monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: ModelStub(mode="A"))
     monkeypatch.setattr(
@@ -342,7 +343,7 @@ def test_cli_replay_bios_rejects_missing_policy_in_cold_start_production(
             str(output_path),
             "--cold-start-production",
             "--knowledge-source-policy",
-            str(tmp_path / "missing_knowledge_source_policy.yaml"),
+            str(missing_policy_path),
             "--max-frames",
             "1",
         ],
@@ -353,7 +354,7 @@ def test_cli_replay_bios_rejects_missing_policy_in_cold_start_production(
     assert code == 1
     assert "cold-start production requires valid knowledge source policy" in out
     assert "missing_knowledge_source_policy.yaml" in out
-    assert str(tmp_path / "missing_knowledge_source_policy.yaml") not in out
+    assert str(missing_policy_path) not in out
 
 
 def test_cli_replay_bios_cold_start_production_prints_policy_summary(

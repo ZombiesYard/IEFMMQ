@@ -7,7 +7,6 @@ import json
 import math
 import os
 import queue
-import re
 import socket
 import threading
 import time
@@ -77,9 +76,6 @@ def _normalize_fs_path(path_like: str | Path) -> Path:
     return Path(path_like).expanduser().resolve()
 
 
-_ABS_PATH_TOKEN_RE = re.compile(r"(?P<path>(?:[A-Za-z]:[\\/]|/)[^\s,;\)\]\}]+)")
-
-
 class ObservationSource(Protocol):
     def get_observation(self) -> Observation | None:
         ...
@@ -99,21 +95,47 @@ class HelpTriggerLike(Protocol):
 
 
 def _basename_from_path_like(path_text: str) -> str:
-    if re.match(r"^[A-Za-z]:[\\/]", path_text):
+    if len(path_text) >= 3 and path_text[1] == ":" and path_text[2] in ("\\", "/"):
+        name = PureWindowsPath(path_text).name
+    elif path_text.startswith("\\\\"):
         name = PureWindowsPath(path_text).name
     else:
         name = Path(path_text).name
     return name or "<path>"
 
 
-def _sanitize_policy_error_for_user(message: str) -> str:
+def _path_text_variants(path_like: str | Path) -> list[str]:
+    raw = str(path_like)
+    variants: set[str] = set()
+    if raw:
+        variants.add(raw)
+    try:
+        resolved = str(Path(path_like).expanduser().resolve())
+        if resolved:
+            variants.add(resolved)
+    except OSError:
+        pass
+
+    expanded: set[str] = set(variants)
+    for item in variants:
+        expanded.add(item.replace("\\", "/"))
+        expanded.add(item.replace("/", "\\"))
+    return [item for item in expanded if item]
+
+
+def _sanitize_policy_error_for_user(
+    message: str,
+    *,
+    path_hints: Sequence[str | Path] = (),
+) -> str:
     if not isinstance(message, str) or not message.strip():
         return "invalid policy configuration"
 
-    def _replace(match: re.Match[str]) -> str:
-        return _basename_from_path_like(match.group("path"))
-
-    return _ABS_PATH_TOKEN_RE.sub(_replace, message)
+    sanitized = message
+    for hint in path_hints:
+        for variant in _path_text_variants(hint):
+            sanitized = sanitized.replace(variant, _basename_from_path_like(variant))
+    return sanitized
 
 
 def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
@@ -794,7 +816,13 @@ class LiveDcsTutorLoop:
             )
         except KnowledgeSourcePolicyError as exc:
             if self.cold_start_production:
-                sanitized = _sanitize_policy_error_for_user(str(exc))
+                sanitized = _sanitize_policy_error_for_user(
+                    str(exc),
+                    path_hints=(
+                        policy_path,
+                        self.knowledge_index_path,
+                    ),
+                )
                 raise ValueError(
                     "cold-start production requires valid knowledge source policy: "
                     f"{sanitized}"
@@ -1693,7 +1721,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "knowledge_source_policy.yaml path. In cold-start production mode, omitted path "
-            "falls back to repository-checkout knowledge_source_policy.yaml when available."
+            "falls back to repository-checkout knowledge_source_policy.yaml when available. "
+            "Providing this flag enables policy filtering in any mode."
         ),
     )
 
