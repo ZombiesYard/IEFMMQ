@@ -26,6 +26,8 @@ SCHEMA_INDEX = {
     "dcs_caps": ("simtutor.schemas.v2", "dcs_caps.json"),
 }
 
+ENV_COLD_START_PRODUCTION = "SIMTUTOR_COLD_START_PRODUCTION"
+
 
 def _load_schema(name: str) -> Mapping:
     if name not in SCHEMA_INDEX:
@@ -129,6 +131,8 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     bios_to_ui_path=args.bios_to_ui,
                     knowledge_index_path=args.knowledge_index,
                     rag_top_k=args.rag_top_k,
+                    cold_start_production=bool(args.cold_start_production),
+                    knowledge_source_policy_path=args.knowledge_source_policy,
                     cooldown_s=args.cooldown_s,
                     session_id=args.session_id,
                     lang=args.lang,
@@ -243,6 +247,26 @@ def main() -> int:
     )
     rep_bios.add_argument("--knowledge-index", default="Doc/Evaluation/index.json", help="Grounding index.json path")
     rep_bios.add_argument("--rag-top-k", type=int, default=5, help="Grounding snippet top-k")
+    replay_cold_start_default = parse_env_bool(ENV_COLD_START_PRODUCTION, default=False)
+    replay_cold_start_group = rep_bios.add_mutually_exclusive_group()
+    replay_cold_start_group.add_argument(
+        "--cold-start-production",
+        dest="cold_start_production",
+        action="store_true",
+        help="Enable cold-start production mode (requires valid knowledge source policy).",
+    )
+    replay_cold_start_group.add_argument(
+        "--no-cold-start-production",
+        dest="cold_start_production",
+        action="store_false",
+        help="Disable cold-start production mode even if env default is enabled.",
+    )
+    rep_bios.set_defaults(cold_start_production=replay_cold_start_default)
+    rep_bios.add_argument(
+        "--knowledge-source-policy",
+        default=None,
+        help="knowledge_source_policy.yaml path (required in cold-start production mode).",
+    )
 
     rep_bios.add_argument("--output", help="Event log JSONL output path")
     rep_bios.add_argument("--session-id", default=None, help="Optional event session id")

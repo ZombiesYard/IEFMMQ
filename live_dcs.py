@@ -21,6 +21,7 @@ from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosReceiver
 from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
+from adapters.knowledge_source_policy import KnowledgeSourcePolicy, KnowledgeSourcePolicyError
 from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
@@ -64,6 +65,13 @@ def _default_bios_to_ui_path() -> Path:
 
 def _default_knowledge_index_path() -> Path:
     return _repo_root() / DEFAULT_INDEX_PATH
+
+
+def _default_knowledge_source_policy_path() -> Path:
+    return _repo_root() / "knowledge_source_policy.yaml"
+
+
+ENV_COLD_START_PRODUCTION = "SIMTUTOR_COLD_START_PRODUCTION"
 
 
 class ObservationSource(Protocol):
@@ -672,6 +680,8 @@ class LiveDcsTutorLoop:
         knowledge_adapter: KnowledgePort | None = None,
         knowledge_index_path: str | Path | None = None,
         rag_top_k: int = 5,
+        cold_start_production: bool = False,
+        knowledge_source_policy_path: str | Path | None = None,
     ) -> None:
         self.source = source
         self.model = model
@@ -692,7 +702,13 @@ class LiveDcsTutorLoop:
             Path(knowledge_index_path) if knowledge_index_path else _default_knowledge_index_path()
         )
         self.rag_top_k = max(0, int(rag_top_k))
+        self.cold_start_production = bool(cold_start_production)
+        self.knowledge_source_policy_path = (
+            Path(knowledge_source_policy_path) if knowledge_source_policy_path else None
+        )
+        self.knowledge_source_policy: KnowledgeSourcePolicy | None = None
         self.pack_title = _load_pack_title(self.pack_path)
+        self._load_knowledge_source_policy()
 
         self.resolver = resolver if resolver is not None else VarResolver.from_yaml(self.telemetry_map_path)
         self.mapper = (
@@ -732,6 +748,33 @@ class LiveDcsTutorLoop:
         if self.knowledge is None:
             self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
         return self.knowledge
+
+    def _load_knowledge_source_policy(self) -> None:
+        policy_path = self.knowledge_source_policy_path
+        if self.cold_start_production and policy_path is None:
+            policy_path = _default_knowledge_source_policy_path()
+        if policy_path is None:
+            return
+
+        try:
+            policy = KnowledgeSourcePolicy.from_yaml(
+                policy_path,
+                index_path=self.knowledge_index_path,
+            )
+        except KnowledgeSourcePolicyError as exc:
+            if self.cold_start_production:
+                raise ValueError(
+                    "cold-start production requires valid knowledge source policy: "
+                    f"{exc}"
+                ) from exc
+            raise
+
+        self.knowledge_source_policy = policy
+        if self.cold_start_production:
+            print(
+                "[KNOWLEDGE_POLICY] 当前仅使用 cold-start 白名单块 "
+                f"{policy.public_startup_info()}"
+            )
 
     def _knowledge_store_id(self) -> str | None:
         knowledge = self.knowledge
@@ -881,6 +924,22 @@ class LiveDcsTutorLoop:
                 }
             )
 
+        policy_filtered_out_count = 0
+        policy_id: str | None = None
+        if self.knowledge_source_policy is not None:
+            policy_id = self.knowledge_source_policy.policy_id
+            before_filter_count = len(snippets)
+            snippets = self.knowledge_source_policy.filter_snippets(snippets)
+            policy_filtered_out_count = max(0, before_filter_count - len(snippets))
+            if (
+                before_filter_count > 0
+                and not snippets
+                and not bool(retrieve_meta.get("grounding_missing"))
+            ):
+                retrieve_meta = dict(retrieve_meta)
+                retrieve_meta["grounding_missing"] = True
+                retrieve_meta["grounding_reason"] = "policy_filtered_all"
+
         snippet_ids = [
             item.get("snippet_id")
             for item in snippets
@@ -907,6 +966,8 @@ class LiveDcsTutorLoop:
             "grounding_cache_hit": bool(retrieve_meta.get("cache_hit")),
             "grounding_index_path": grounding_index_path,
             "grounding_top_k": self.rag_top_k,
+            "grounding_policy_id": policy_id,
+            "grounding_policy_filtered_out_count": policy_filtered_out_count,
         }
 
     def _build_request(self, obs: Observation) -> tuple[TutorRequest, dict[str, Any], str]:
@@ -998,6 +1059,10 @@ class LiveDcsTutorLoop:
                 "grounding_snippet_ids": list(prompt_result.metadata.get("rag_snippet_ids") or []),
                 "grounding_cache_hit": bool(grounding_meta.get("grounding_cache_hit")),
                 "grounding_index_path": grounding_meta.get("grounding_index_path"),
+                "grounding_policy_id": grounding_meta.get("grounding_policy_id"),
+                "grounding_policy_filtered_out_count": int(
+                    grounding_meta.get("grounding_policy_filtered_out_count") or 0
+                ),
             },
         )
 
@@ -1576,6 +1641,26 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=5,
         help="Grounding snippet top-k for prompt injection (default 5)",
     )
+    cold_start_default = parse_env_bool(ENV_COLD_START_PRODUCTION, default=False)
+    cold_start_group = parser.add_mutually_exclusive_group()
+    cold_start_group.add_argument(
+        "--cold-start-production",
+        dest="cold_start_production",
+        action="store_true",
+        help="Enable cold-start production mode (requires valid knowledge source policy).",
+    )
+    cold_start_group.add_argument(
+        "--no-cold-start-production",
+        dest="cold_start_production",
+        action="store_false",
+        help="Disable cold-start production mode even if env default is enabled.",
+    )
+    parser.set_defaults(cold_start_production=cold_start_default)
+    parser.add_argument(
+        "--knowledge-source-policy",
+        default=None,
+        help="knowledge_source_policy.yaml path (required in cold-start production mode).",
+    )
 
     parser.add_argument("--output", help="Event log JSONL output path")
     parser.add_argument("--session-id", default=None, help="Optional event session id")
@@ -1676,6 +1761,8 @@ def main() -> int:
             bios_to_ui_path=args.bios_to_ui,
             knowledge_index_path=args.knowledge_index,
             rag_top_k=args.rag_top_k,
+            cold_start_production=bool(args.cold_start_production),
+            knowledge_source_policy_path=args.knowledge_source_policy,
             cooldown_s=args.cooldown_s,
             session_id=args.session_id,
             lang=args.lang,

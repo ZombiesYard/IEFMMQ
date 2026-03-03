@@ -219,6 +219,28 @@ class NonSerializableMetaKnowledge:
         raise AssertionError("query() should not be called when retrieve_with_meta() is available")
 
 
+class PolicyMixedKnowledge:
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        return [
+            {
+                "doc_id": "fa18c_startup_master",
+                "section": "Master Step Table",
+                "page_or_heading": "Master Step Table",
+                "snippet": "S03 APU switch to ON and wait for green APU READY light.",
+                "snippet_id": "fa18c_startup_master_1",
+                "score": 1.0,
+            },
+            {
+                "doc_id": "fa18c_coldstart_quiz",
+                "section": "Quiz",
+                "page_or_heading": "Quiz",
+                "snippet": "This quiz item should be rejected by policy.",
+                "snippet_id": "fa18c_coldstart_quiz_0",
+                "score": 0.9,
+            },
+        ]
+
+
 def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
     text = "".join(json.dumps(frame, ensure_ascii=False) + "\n" for frame in frames)
     path.write_text(text, encoding="utf-8")
@@ -233,6 +255,10 @@ def _apu_element_id_from_ui_map() -> str:
 
 def _default_pack_path() -> Path:
     return Path(__file__).resolve().parents[1] / "packs" / "fa18c_startup" / "pack.yaml"
+
+
+def _default_policy_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "knowledge_source_policy.yaml"
 
 
 class OutOfAllowlistTargetModel:
@@ -486,6 +512,90 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
     prompt_build = tutor_response_payload["metadata"]["prompt_build"]
     assert prompt_build["grounding_missing"] is True
     assert prompt_build["rag_snippet_ids"] == []
+
+
+def test_live_loop_rejects_missing_policy_in_cold_start_production_mode(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_policy_missing.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    try:
+        with pytest.raises(ValueError, match="cold-start production requires valid knowledge source policy"):
+            loop = LiveDcsTutorLoop(
+                source=source,
+                model=model,
+                action_executor=executor,
+                cooldown_s=5.0,
+                lang="en",
+                rag_top_k=0,
+                cold_start_production=True,
+                knowledge_source_policy_path=tmp_path / "missing_knowledge_source_policy.yaml",
+            )
+            loop.close()
+    finally:
+        source.close()
+
+
+def test_live_loop_cold_start_production_prints_policy_summary(tmp_path: Path, capsys) -> None:
+    replay_path = tmp_path / "bios_policy_summary.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        rag_top_k=0,
+        cold_start_production=True,
+        knowledge_source_policy_path=_default_policy_path(),
+    )
+    try:
+        loop.run(max_frames=1)
+    finally:
+        loop.close()
+    out = capsys.readouterr().out
+    assert "当前仅使用 cold-start 白名单块" in out
+
+
+def test_live_loop_applies_policy_filter_in_cold_start_production_mode(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_policy_filter.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=PolicyMixedKnowledge(),
+        rag_top_k=2,
+        cold_start_production=True,
+        knowledge_source_policy_path=_default_policy_path(),
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    rag_topk = tutor_request_payload["context"]["rag_topk"]
+    assert len(rag_topk) == 1
+    assert rag_topk[0]["doc_id"] == "fa18c_startup_master"
+    assert rag_topk[0]["snippet_id"] == "fa18c_startup_master_1"
+    assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
+    assert req_meta["grounding_policy_filtered_out_count"] == 1
 
 
 def test_live_loop_surfaces_index_load_error_type_in_grounding_metadata(tmp_path: Path) -> None:
@@ -1451,6 +1561,23 @@ def test_live_dcs_cli_log_raw_llm_text_invalid_env_falls_back_false_with_warning
         "SIMTUTOR_LOG_RAW_LLM_TEXT" in record.message and "Invalid boolean environment value" in record.message
         for record in caplog.records
     )
+
+
+def test_live_dcs_cli_cold_start_production_reads_env_default(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_COLD_START_PRODUCTION", "true")
+    parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.cold_start_production is True
+
+
+def test_live_dcs_cli_cold_start_production_can_be_overridden(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_COLD_START_PRODUCTION", "true")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--no-cold-start-production"])
+    assert args.cold_start_production is False
+
+    args = parser.parse_args(["--cold-start-production"])
+    assert args.cold_start_production is True
 
 
 def test_normalize_cached_response_metadata_normalizes_fallback_reason() -> None:

@@ -169,6 +169,7 @@ def infer_step_id(
     rpm_r_gte_25 = _as_bool(vars_safe.get("rpm_r_gte_25"))
     rpm_r_gte_60 = _as_bool(vars_safe.get("rpm_r_gte_60"))
     throttle_r_not_off = _as_bool(vars_safe.get("throttle_r_not_off"))
+    has_throttle_r_not_off = "throttle_r_not_off" in vars_safe
     if rpm_r_gte_25 is None and rpm_r is not None:
         rpm_r_gte_25 = rpm_r >= 25.0
     if rpm_r_gte_60 is None and rpm_r is not None:
@@ -223,7 +224,9 @@ def infer_step_id(
         if engine_crank_right is not True:
             missing.insert(0, "vars.engine_crank_right==true")
         return _result(s05, missing)
-    if throttle_r_not_off is not True:
+    # `throttle_r_not_off` is not always observable in every telemetry slice.
+    # Only block on S05 when the signal is explicitly present and not true.
+    if has_throttle_r_not_off and throttle_r_not_off is not True:
         return _result(s05, ["vars.throttle_r_not_off==true"])
 
     if rpm_r_gte_60 is not True:
