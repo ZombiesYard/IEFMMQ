@@ -36,6 +36,7 @@ from adapters.recent_actions import (
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
+from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
 from core.types import Event, Observation, TutorRequest, TutorResponse
@@ -73,9 +74,6 @@ def _default_knowledge_source_policy_path() -> Path:
 
 def _normalize_fs_path(path_like: str | Path) -> Path:
     return Path(path_like).expanduser().resolve()
-
-
-ENV_COLD_START_PRODUCTION = "SIMTUTOR_COLD_START_PRODUCTION"
 
 
 class ObservationSource(Protocol):

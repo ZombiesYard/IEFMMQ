@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping, Tuple
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.runner import replay_log, run_simulation
 
@@ -25,9 +26,6 @@ SCHEMA_INDEX = {
     "dcs_hello": ("simtutor.schemas.v2", "dcs_hello.json"),
     "dcs_caps": ("simtutor.schemas.v2", "dcs_caps.json"),
 }
-
-ENV_COLD_START_PRODUCTION = "SIMTUTOR_COLD_START_PRODUCTION"
-
 
 def _load_schema(name: str) -> Mapping:
     if name not in SCHEMA_INDEX:
