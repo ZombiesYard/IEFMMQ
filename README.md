@@ -277,10 +277,10 @@ Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
 - Policy file: `knowledge_source_policy.yaml` (repo root).
 - Runtime flags:
   - `--cold-start-production` / `--no-cold-start-production`
-  - `--knowledge-source-policy <path>`
+  - `--knowledge-source-policy <path>` (optional override; default uses repo-root `knowledge_source_policy.yaml`)
   - env default: `SIMTUTOR_COLD_START_PRODUCTION=1|0`
 - Behavior:
-  - In cold-start production mode, a valid knowledge source policy is mandatory.
+  - In cold-start production mode, a valid knowledge source policy is mandatory; if flag is omitted, repo-root `knowledge_source_policy.yaml` is used.
   - Missing/invalid policy causes startup failure.
   - Startup log prints: `当前仅使用 cold-start 白名单块 ...`
   - `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.

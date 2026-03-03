@@ -158,6 +158,51 @@ def test_policy_rejects_unknown_chunk_reference(tmp_path: Path) -> None:
         KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
 
 
+def test_policy_rejects_mismatched_yaml_index_and_caller_index(tmp_path: Path) -> None:
+    index_a = tmp_path / "a" / "index.json"
+    index_b = tmp_path / "b" / "index.json"
+    index_a.parent.mkdir(parents=True, exist_ok=True)
+    index_b.parent.mkdir(parents=True, exist_ok=True)
+    _write_index(index_a)
+    _write_index(index_b)
+
+    policy_path = tmp_path / "policy_mismatch.yaml"
+    policy_path.write_text(
+        "policy_id: test\n"
+        "index_path: a/index.json\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KnowledgeSourcePolicyError, match="index_path mismatch"):
+        KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_b)
+
+
+def test_policy_public_startup_info_does_not_expose_absolute_paths(tmp_path: Path) -> None:
+    index_path = tmp_path / "nested" / "index.json"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_index(index_path)
+    policy_path = tmp_path / "nested" / "policy.yaml"
+    policy_path.write_text(
+        "policy_id: test\n"
+        "allow:\n"
+        "  - doc_id: doc_a\n"
+        "    chunk_id: doc_a_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+    info = policy.public_startup_info()
+    assert "policy_file=policy.yaml" in info
+    assert "index_file=index.json" in info
+    assert str(policy_path.parent) not in info
+    assert str(index_path.parent) not in info
+
+
 def test_repository_policy_is_valid_against_repository_index() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     policy_path = repo_root / "knowledge_source_policy.yaml"

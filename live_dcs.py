@@ -1664,7 +1664,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--knowledge-source-policy",
         default=None,
-        help="knowledge_source_policy.yaml path (required in cold-start production mode).",
+        help=(
+            "knowledge_source_policy.yaml path. In cold-start production mode, defaults to "
+            "repo-root knowledge_source_policy.yaml when omitted."
+        ),
     )
 
     parser.add_argument("--output", help="Event log JSONL output path")

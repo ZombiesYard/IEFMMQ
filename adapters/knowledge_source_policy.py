@@ -177,7 +177,17 @@ class KnowledgeSourcePolicy:
         policy_id = raw.get("policy_id", policy_path.stem)
         policy_id = _coerce_non_empty_str(policy_id, field_name="policy_id")
 
-        index_path_raw = index_path if index_path is not None else raw.get("index_path")
+        yaml_index_path_raw = raw.get("index_path")
+        if index_path is not None and yaml_index_path_raw is not None:
+            yaml_index_path = _resolve_path(yaml_index_path_raw, base_dir=policy_path.parent).resolve()
+            caller_index_path = _resolve_path(index_path, base_dir=policy_path.parent).resolve()
+            if yaml_index_path != caller_index_path:
+                raise KnowledgeSourcePolicyError(
+                    "knowledge source policy index_path mismatch: "
+                    f"policy declares {yaml_index_path}, caller supplied {caller_index_path}"
+                )
+
+        index_path_raw = index_path if index_path is not None else yaml_index_path_raw
         if index_path_raw is None:
             effective_index_path = _default_index_path()
         else:
@@ -271,7 +281,7 @@ class KnowledgeSourcePolicy:
     def public_startup_info(self) -> str:
         return (
             f"policy_id={self.policy_id} docs={self.doc_count} chunks={self.chunk_count} "
-            f"policy_path={self.policy_path} index_path={self.index_path}"
+            f"policy_file={self.policy_path.name} index_file={self.index_path.name}"
         )
 
 
