@@ -54,7 +54,43 @@ class _IndexChunkInfo:
     lines: tuple[str, ...]
 
 
-def _load_index_chunk_catalog(index_path: Path) -> dict[tuple[str, str], _IndexChunkInfo]:
+@dataclass(frozen=True)
+class _ParsedAllowEntry:
+    idx: int
+    doc_id: str
+    chunk_id: str
+    line_start: int
+    line_end: int
+
+
+def _parse_allow_entries(raw_allow: Any) -> list[_ParsedAllowEntry]:
+    if not isinstance(raw_allow, list) or not raw_allow:
+        raise KnowledgeSourcePolicyError("allow must be a non-empty list")
+
+    parsed: list[_ParsedAllowEntry] = []
+    for idx, item in enumerate(raw_allow):
+        if not isinstance(item, Mapping):
+            raise KnowledgeSourcePolicyError(f"allow[{idx}] must be a mapping")
+        doc_id = _coerce_non_empty_str(item.get("doc_id"), field_name=f"allow[{idx}].doc_id")
+        chunk_id = _coerce_non_empty_str(item.get("chunk_id"), field_name=f"allow[{idx}].chunk_id")
+        line_start, line_end = _coerce_line_range(item.get("line_range"), field_name=f"allow[{idx}].line_range")
+        parsed.append(
+            _ParsedAllowEntry(
+                idx=idx,
+                doc_id=doc_id,
+                chunk_id=chunk_id,
+                line_start=line_start,
+                line_end=line_end,
+            )
+        )
+    return parsed
+
+
+def _load_index_chunk_catalog(
+    index_path: Path,
+    *,
+    allowed_keys: set[tuple[str, str]],
+) -> dict[tuple[str, str], _IndexChunkInfo]:
     try:
         raw = json.loads(index_path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -66,6 +102,9 @@ def _load_index_chunk_catalog(index_path: Path) -> dict[tuple[str, str], _IndexC
     documents = raw.get("documents")
     if not isinstance(documents, list):
         raise KnowledgeSourcePolicyError(f"knowledge index missing documents list: {index_path}")
+
+    if not allowed_keys:
+        return {}
 
     out: dict[tuple[str, str], _IndexChunkInfo] = {}
     for doc_idx, doc in enumerate(documents):
@@ -83,16 +122,21 @@ def _load_index_chunk_catalog(index_path: Path) -> dict[tuple[str, str], _IndexC
             chunk_id = chunk.get("chunk_id")
             if not isinstance(chunk_id, str) or not chunk_id:
                 chunk_id = f"{doc_id}_{chunk_idx}"
+            key = (doc_id, chunk_id)
+            if key not in allowed_keys:
+                continue
             text = chunk.get("text")
             if not isinstance(text, str):
                 text = str(text or "")
             lines = tuple(text.splitlines())
             if not lines:
                 lines = ("",)
-            out[(doc_id, chunk_id)] = _IndexChunkInfo(
+            out[key] = _IndexChunkInfo(
                 line_count=max(1, len(lines)),
                 lines=lines,
             )
+            if len(out) >= len(allowed_keys):
+                return out
     return out
 
 
@@ -186,48 +230,44 @@ class KnowledgeSourcePolicy:
                 "or set policy.index_path in YAML"
             )
         effective_index_path = _resolve_path(index_path_raw, base_dir=policy_path.parent)
-        chunk_catalog = _load_index_chunk_catalog(effective_index_path)
-
-        allow_entries = raw.get("allow")
-        if not isinstance(allow_entries, list) or not allow_entries:
-            raise KnowledgeSourcePolicyError("allow must be a non-empty list")
+        parsed_allow_entries = _parse_allow_entries(raw.get("allow"))
+        allowed_keys = {(entry.doc_id, entry.chunk_id) for entry in parsed_allow_entries}
+        chunk_catalog = _load_index_chunk_catalog(
+            effective_index_path,
+            allowed_keys=allowed_keys,
+        )
 
         rules: list[SourceChunkRule] = []
         allowed_excerpt_by_key: dict[tuple[str, str], str] = {}
         seen: set[tuple[str, str]] = set()
-        for idx, item in enumerate(allow_entries):
-            if not isinstance(item, Mapping):
-                raise KnowledgeSourcePolicyError(f"allow[{idx}] must be a mapping")
-            doc_id = _coerce_non_empty_str(item.get("doc_id"), field_name=f"allow[{idx}].doc_id")
-            chunk_id = _coerce_non_empty_str(item.get("chunk_id"), field_name=f"allow[{idx}].chunk_id")
-            line_start, line_end = _coerce_line_range(item.get("line_range"), field_name=f"allow[{idx}].line_range")
-
-            key = (doc_id, chunk_id)
+        for entry in parsed_allow_entries:
+            idx = entry.idx
+            key = (entry.doc_id, entry.chunk_id)
             chunk_info = chunk_catalog.get(key)
             if chunk_info is None:
                 raise KnowledgeSourcePolicyError(
-                    f"allow[{idx}] references unknown chunk: doc_id={doc_id!r} chunk_id={chunk_id!r}"
+                    f"allow[{idx}] references unknown chunk: doc_id={entry.doc_id!r} chunk_id={entry.chunk_id!r}"
                 )
             max_lines = chunk_info.line_count
-            if line_end > max_lines:
+            if entry.line_end > max_lines:
                 raise KnowledgeSourcePolicyError(
-                    f"allow[{idx}].line_range exceeds chunk lines: {line_end} > {max_lines} "
-                    f"for doc_id={doc_id!r} chunk_id={chunk_id!r}"
+                    f"allow[{idx}].line_range exceeds chunk lines: {entry.line_end} > {max_lines} "
+                    f"for doc_id={entry.doc_id!r} chunk_id={entry.chunk_id!r}"
                 )
             if key in seen:
                 raise KnowledgeSourcePolicyError(
-                    f"duplicate whitelist chunk entry: doc_id={doc_id!r} chunk_id={chunk_id!r}"
+                    f"duplicate whitelist chunk entry: doc_id={entry.doc_id!r} chunk_id={entry.chunk_id!r}"
                 )
             seen.add(key)
             rules.append(
                 SourceChunkRule(
-                    doc_id=doc_id,
-                    chunk_id=chunk_id,
-                    line_start=line_start,
-                    line_end=line_end,
+                    doc_id=entry.doc_id,
+                    chunk_id=entry.chunk_id,
+                    line_start=entry.line_start,
+                    line_end=entry.line_end,
                 )
             )
-            allowed_excerpt_by_key[key] = "\n".join(chunk_info.lines[line_start - 1 : line_end])
+            allowed_excerpt_by_key[key] = "\n".join(chunk_info.lines[entry.line_start - 1 : entry.line_end])
 
         policy = cls(
             policy_id=policy_id,

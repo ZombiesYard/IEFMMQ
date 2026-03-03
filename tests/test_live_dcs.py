@@ -550,10 +550,7 @@ def test_live_loop_rejects_missing_default_policy_in_cold_start_production_mode(
     model = RecordingModel()
     executor = RecordingExecutor()
     try:
-        with pytest.raises(
-            ValueError,
-            match="default policy not found.*Provide --knowledge-source-policy explicitly",
-        ):
+        with pytest.raises(ValueError) as exc_info:
             loop = LiveDcsTutorLoop(
                 source=source,
                 model=model,
@@ -564,6 +561,11 @@ def test_live_loop_rejects_missing_default_policy_in_cold_start_production_mode(
                 cold_start_production=True,
             )
             loop.close()
+        message = str(exc_info.value)
+        assert "default policy file" in message
+        assert "not found" in message
+        assert "Provide --knowledge-source-policy explicitly" in message
+        assert str(tmp_path / "missing_default.yaml") not in message
     finally:
         source.close()
 

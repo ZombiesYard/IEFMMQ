@@ -759,7 +759,7 @@ class LiveDcsTutorLoop:
             if not policy_path.is_file():
                 raise ValueError(
                     "cold-start production requires valid knowledge source policy: "
-                    f"default policy not found at {policy_path}. "
+                    f"default policy file {policy_path.name!r} not found in repository checkout. "
                     "Provide --knowledge-source-policy explicitly."
                 )
         if policy_path is None:

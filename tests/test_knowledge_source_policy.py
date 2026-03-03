@@ -29,6 +29,20 @@ def _write_index(path: Path) -> None:
     path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _set_home_env(monkeypatch: pytest.MonkeyPatch, home: Path) -> None:
+    home_str = str(home)
+    monkeypatch.setenv("HOME", home_str)
+    monkeypatch.setenv("USERPROFILE", home_str)
+
+    drive = home.drive
+    if drive:
+        monkeypatch.setenv("HOMEDRIVE", drive)
+        home_path = home_str[len(drive) :]
+        if not home_path.startswith(("\\", "/")):
+            home_path = f"\\{home_path}"
+        monkeypatch.setenv("HOMEPATH", home_path)
+
+
 def test_policy_loads_and_filters_by_doc_chunk(tmp_path: Path) -> None:
     index_path = tmp_path / "index.json"
     _write_index(index_path)
@@ -204,7 +218,7 @@ def test_policy_public_startup_info_does_not_expose_absolute_paths(tmp_path: Pat
 
 
 def test_policy_from_yaml_expands_user_in_policy_path(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("HOME", str(tmp_path))
+    _set_home_env(monkeypatch, tmp_path)
     index_path = tmp_path / "index.json"
     _write_index(index_path)
     policy_path = tmp_path / "policy_home.yaml"
@@ -222,7 +236,7 @@ def test_policy_from_yaml_expands_user_in_policy_path(monkeypatch, tmp_path: Pat
 
 
 def test_policy_from_yaml_expands_user_in_yaml_index_path(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("HOME", str(tmp_path))
+    _set_home_env(monkeypatch, tmp_path)
     index_path = tmp_path / "index_home.json"
     _write_index(index_path)
     policy_path = tmp_path / "policy_index_home.yaml"
