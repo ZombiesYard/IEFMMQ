@@ -12,6 +12,7 @@ source_chunks:
 
 # F/A-18C Cold Start – Master Step List
 
+
 This file defines the canonical F/A-18C cold-start sequence used in the study.
 It is derived from the DCS F/A-18C manual / training mission description and
 is organized into phases for analysis and training.
@@ -30,6 +31,7 @@ Columns:
 ---
 
 ## Master Step Table
+
 
 | StepID | Phase | OfficialStep (DCS-style wording) | ShortExplanation (for learners/tutor) | CockpitArea |
 |--------|-------|-----------------------------------|----------------------------------------|-------------|

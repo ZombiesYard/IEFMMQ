@@ -18,6 +18,7 @@ source_chunks:
 
 # Task: F/A-18C Cold Start in DCS World (VR)
 
+
 Please answer the following questions about **the cold start procedure you just performed**
 in DCS World (F/A-18C, VR). There are no right or wrong answers – we are interested in
 your **personal experience**.
@@ -34,6 +35,7 @@ You can also use numbers in between (e.g., 7, 13, …).
 
 ## 1. Mental Demand
 
+
 **How mentally demanding was the task?**
 
 Consider how much thinking, remembering, deciding, and concentrating was required
@@ -48,6 +50,7 @@ to complete the cold start procedure in VR.
 ---
 
 ## 2. Physical Demand
+
 
 **How physically demanding was the task?**
 
@@ -64,6 +67,7 @@ controller usage, body posture in VR, etc.
 
 ## 3. Temporal Demand
 
+
 **How hurried or rushed was the pace of the task?**
 
 Consider whether you felt under time pressure during the cold start, for example
@@ -78,6 +82,7 @@ because you tried to complete the checklist quickly or keep up with the tutor.
 ---
 
 ## 4. Performance
+
 
 **How successful do you think you were in accomplishing the task?**
 
@@ -94,6 +99,7 @@ to a taxi-ready state.
 
 ## 5. Effort
 
+
 **How hard did you have to work (mentally and physically) to accomplish your level of performance?**
 
 Consider the total amount of effort you had to invest in this cold start attempt.
@@ -108,6 +114,7 @@ Consider the total amount of effort you had to invest in this cold start attempt
 
 ## 6. Frustration Level
 
+
 **How insecure, discouraged, irritated, stressed, and annoyed versus secure, content, relaxed, and satisfied did you feel during the task?**
 
 - 0 = Very low frustration (very relaxed, content, satisfied)  
@@ -119,6 +126,7 @@ Consider the total amount of effort you had to invest in this cold start attempt
 ---
 
 ## 7. Overall Comments (optional)
+
 
 If you want, you can briefly describe **what made the task easy or difficult** for you
 (e.g., VR controls, remembering the sequence, reading the displays, using the tutor).

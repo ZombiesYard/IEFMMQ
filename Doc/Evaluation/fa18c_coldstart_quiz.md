@@ -23,6 +23,7 @@ source_chunks:
 
 # F/A-18C Cold Start – Knowledge Quiz
 
+
 Please answer the following questions about the F/A-18C cold start procedure
 (from cold and dark to taxi-ready). Choose the **single best answer** unless
 the question explicitly says “select all that apply”.
@@ -30,6 +31,7 @@ the question explicitly says “select all that apply”.
 ---
 
 ## Q1. Overall Goal
+
 
 What is the main goal of the cold start procedure in this study?
 
@@ -44,6 +46,7 @@ D. To practice landing pattern and arrestor hook operations
 
 ## Q2. Right Engine Throttle Timing
 
+
 When should you move the **right throttle** from OFF to IDLE during engine start?
 
 A. As soon as the APU READY light appears  
@@ -56,6 +59,7 @@ D. Only after both engines are already running
 ---
 
 ## Q3. Left Engine Preconditions
+
 
 Before moving the **ENG CRANK** switch to LEFT (to start the left engine), which
 of the following should be true for the right engine?
@@ -71,6 +75,7 @@ D. Only the nozzle position needs to be between 90–100%
 
 ## Q4. INS Mode
 
+
 When should you set the **INS knob** to GND (ground) or CV (carrier)?
 
 A. Immediately after turning on the battery  
@@ -83,6 +88,7 @@ D. Only after takeoff
 ---
 
 ## Q5. Purpose of the Fire Test
+
 
 What is the purpose of running **FIRE TEST A and B** during the cold start?
 
@@ -97,6 +103,7 @@ D. To test the launch bar and arrestor hook mechanisms
 
 ## Q6. OBOGS
 
+
 What is the role of **OBOGS** in the F/A-18C?
 
 A. It controls fuel flow to both engines  
@@ -109,6 +116,7 @@ D. It manages hydraulic pressure for the flight controls
 ---
 
 ## Q7. Order of Early Power-Up Steps
+
 
 Which of the following **best describes the correct order** at the very beginning
 of the cold start procedure?
@@ -126,6 +134,7 @@ D. Battery ON → APU ON → Fire tests (while APU starts)
 
 ## Q8. Displays and Pages
 
+
 After bringing up the DDIs, MPCD and HUD, which pages are typically selected
 for the F/A-18C cold start in this study?
 
@@ -139,6 +148,7 @@ D. ENG page on the left DDI and HUD repeater on the right DDI
 ---
 
 ## Q9. FCS Preparation
+
 
 Which of the following actions are part of **preparing the flight control system (FCS)** 
 for takeoff? (Select *all* that apply.)
@@ -155,6 +165,7 @@ D. Setting the INS knob to CV
 
 ## Q10. Final Instrument Settings Before Taxi
 
+
 Which of the following should normally be set or checked before releasing
 the parking brake for taxi? (Select *all* that apply.)
 
@@ -169,6 +180,7 @@ D. Attitude source set to AUTO and standby attitude indicator uncaged
 ---
 
 ## Q11. Sequence Mini-Task 1
+
 
 Consider the following four steps:
 
@@ -189,6 +201,7 @@ D. 2 → 4 → 3 → 1
 ---
 
 ## Q12. Sequence Mini-Task 2
+
 
 Consider the following actions related to FCS and flaps:
 

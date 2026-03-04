@@ -13,6 +13,7 @@ source_chunks:
 
 # F/A-18C Scoring Sheet Template
 
+
 This template defines two levels of scoring data:
 
 - **Trial-level summary**: one row per participant × condition × trial.
@@ -21,6 +22,7 @@ This template defines two levels of scoring data:
 ---
 
 ## 1. Trial-Level Summary
+
 
 | ParticipantID | Condition            | TrialID | Completed | DeadEnd_DE | HelpRequest_HR | TaskTime_sec | TotalErrorScore | CriticalErrorScore | NonCriticalErrorScore | Count_OM | Count_CO | Count_OR | Count_PA | Count_SV | Comments |
 |---------------|----------------------|---------|-----------|------------|----------------|--------------|-----------------|--------------------|-----------------------|----------|----------|----------|----------|----------|----------|
@@ -46,6 +48,7 @@ This template defines two levels of scoring data:
 ---
 
 ## 2. Step-Level Coding
+
 
 | ParticipantID | Condition        | TrialID | StepID | Phase | Critical | Performed | Error_OM | Error_CO | Error_OR | Error_PA | Error_SV | StepErrorScore | Notes                    |
 |---------------|------------------|---------|--------|-------|----------|-----------|----------|----------|----------|----------|----------|----------------|--------------------------|

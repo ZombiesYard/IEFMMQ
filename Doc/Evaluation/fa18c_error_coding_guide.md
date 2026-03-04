@@ -26,6 +26,7 @@ source_chunks:
 
 # F/A-18C Cold Start – Error Coding Guide
 
+
 This document defines the error taxonomy and scoring rules for the F/A-18C
 cold-start task used in the study. It is meant to be used by human raters
 when watching recordings or inspecting logs of participants’ runs.
@@ -35,6 +36,7 @@ The canonical step sequence is defined in `fa18c_startup_master.md`.
 ---
 
 ## 1. Goals
+
 
 The coding scheme focuses on **procedural** performance:
 
@@ -50,6 +52,7 @@ skills, only the cockpit procedure from cold-and-dark to taxi-ready.
 
 ## 2. Error Taxonomy
 
+
 Each observed deviation from the canonical procedure is coded into one or
 more of the following categories. Errors are always coded with respect to
 a **target step** (StepID) and the corresponding **phase**.
@@ -58,6 +61,7 @@ For each category we give a short definition and one or more examples
 from the F/A-18C cold-start task.
 
 ## 2.1 Omission (OM)
+
 
 **Definition:** A required step in the canonical procedure is not performed
 at all by the end of the trial.
@@ -77,6 +81,7 @@ at all by the end of the trial.
 ---
 
 ## 2.2 Commission (CO)
+
 
 **Definition:** The learner performs a **non-required** or clearly
 unnecessary step that is not part of the canonical checklist and is not
@@ -98,6 +103,7 @@ implicitly required by the simulator.
 ---
 
 ## 2.3 Order Error (OR)
+
 
 **Definition:** A step that belongs to the canonical procedure is executed
 in the wrong **relative order** compared to other steps.
@@ -121,6 +127,7 @@ in the wrong **relative order** compared to other steps.
 
 ## 2.4 Parameter / Setting Error (PA)
 
+
 **Definition:** The correct step is executed, but with wrong parameter
 values, positions, or magnitude.
 
@@ -143,6 +150,7 @@ values, positions, or magnitude.
 ---
 
 ## 2.5 State Violation (SV)
+
 
 **Definition:** The learner executes a step while required **preconditions**
 about the aircraft state are not satisfied.
@@ -168,6 +176,7 @@ about the aircraft state are not satisfied.
 
 ## 2.6 Dead-End / Stuck (DE)
 
+
 **Definition:** The learner reaches a state from which they **cannot
 complete** the procedure without external help, or they repeatedly loop
 without making progress.
@@ -190,6 +199,7 @@ without making progress.
 
 ## 2.7 Help Request / External Intervention (HR)
 
+
 **Definition:** The learner explicitly asks for help outside the assigned
 condition (e.g., looking up external guides or asking the experimenter),
 or the experimenter intervenes to correct a mistake.
@@ -210,6 +220,7 @@ or the experimenter intervenes to correct a mistake.
 ---
 
 ## 3. Step Criticality
+
 
 Each canonical step in `fa18c_startup_master.md` is assigned a **criticality**
 flag, indicating whether an error on that step is considered **critical** for
@@ -249,6 +260,7 @@ The exact criticality labels should be finalized with the domain expert
 
 ## 4.1 Per-Step Error Scoring
 
+
 Each step can have zero or multiple error codes attached. We assign
 **weights** to error categories:
 
@@ -282,6 +294,7 @@ For simplicity, we recommend:
 
 ## 4.2 Trial-Level Scores
 
+
 For each trial, compute:
 
 1. **Total Error Score**  
@@ -310,6 +323,7 @@ completion rate, and time).
 
 ## 5. Coding Procedure
 
+
 1. **Data Source:**
    - Use VR video recordings and/or DCS track/log files.
    - Ensure raters have access to the canonical sequence (`fa18c_startup_master.md`)
@@ -337,6 +351,7 @@ completion rate, and time).
 ---
 
 ## 6. Relation to Study Conditions
+
 
 The same error taxonomy and scoring rules are applied across all three
 conditions:

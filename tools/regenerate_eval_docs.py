@@ -273,7 +273,6 @@ def _render_doc_content(
     doc: _MarkdownDoc,
     rules: list[_PolicyRule],
     *,
-    index_path: Path,
     policy_id: str,
     policy_version: str,
     version_stamp: str,
@@ -292,20 +291,20 @@ def _render_doc_content(
                 f"policy line range exceeds chunk lines: {doc.doc_id}/{rule.chunk_id} "
                 f"{rule.line_end} > {max_line}"
             )
-        selected = "\n".join(chunk.lines[rule.line_start - 1 : rule.line_end]).strip()
+        # Preserve exact selected lines from the indexed chunk (no strip), so
+        # line_range semantics match runtime whitelist clipping.
+        selected = "\n".join(chunk.lines[rule.line_start - 1 : rule.line_end])
         heading_text = chunk.heading
         heading_prefix: str | None = None
         if heading_text:
             heading_prefix = "# " if pos == 0 else "## "
-        section_lines: list[str] = []
         if heading_prefix is not None:
-            section_lines.append(f"{heading_prefix}{heading_text}")
-        if selected:
-            if section_lines:
-                section_lines.append("")
-            section_lines.append(selected)
-        section_text = "\n".join(section_lines).strip()
-        if section_text:
+            section_text = f"{heading_prefix}{heading_text}"
+            if selected:
+                section_text = f"{section_text}\n\n{selected}"
+        else:
+            section_text = selected
+        if section_text != "":
             body_sections.append(section_text)
         chunk_refs.append(f"- {rule.doc_id}/{rule.chunk_id}:{rule.line_start}-{rule.line_end}")
 
@@ -380,7 +379,6 @@ def build_regenerated_docs(
         content = _render_doc_content(
             doc,
             doc_rules,
-            index_path=index_path_resolved,
             policy_id=policy_id,
             policy_version=policy_version,
             version_stamp=version_stamp,

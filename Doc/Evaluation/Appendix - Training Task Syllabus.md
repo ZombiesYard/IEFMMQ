@@ -21,6 +21,7 @@ source_chunks:
 
 # Task Syllabus: F/A-18C Cold Start to Taxi-Ready
 
+
 This syllabus specifies the procedural training task used in the study:
 a cold start of the F/A-18C from a “cold and dark” parking position to a
 taxi-ready configuration in DCS World (VR).
@@ -32,6 +33,7 @@ and success criteria for experimental evaluation.
 ---
 
 ## 1. Scenario Definition
+
 
 - **Platform:** DCS World, F/A-18C Lot 20, VR mode (Meta Quest 3).
 - **Starting condition:** Aircraft parked at an airfield ramp or carrier deck in a
@@ -52,11 +54,13 @@ measurement across participants.
 
 ## 2. Phase Structure
 
+
 For analysis and guidance, the 25 steps in `fa18c_startup_master.md` are grouped
 into six phases. Each phase has a clear functional goal and observable completion
 conditions (DCS state + cockpit configuration).
 
 ## Phase P1 – Power-Up & Safety (S01–S03)
+
 
 **Goal:** Bring the aircraft from cold and dark to a safe, powered state with
 basic safety systems verified.
@@ -81,6 +85,7 @@ basic safety systems verified.
 ---
 
 ## Phase P2 – Right Engine Start & Basic Checks (S04–S07)
+
 
 **Goal:** Start and stabilize the right engine and verify basic bleed air and
 warning systems.
@@ -108,6 +113,7 @@ warning systems.
 
 ## Phase P3 – Displays & Communications (S08–S09)
 
+
 **Goal:** Bring up the primary displays and configure basic communications.
 
 - **Content:**
@@ -129,6 +135,7 @@ warning systems.
 ---
 
 ## Phase P4 – Left Engine Start & Core Systems (S10–S14)
+
 
 **Goal:** Start the left engine and bring core navigation and life-support
 systems online.
@@ -157,6 +164,7 @@ systems online.
 
 ## Phase P5 – FCS & Flight Controls (S15–S19)
 
+
 **Goal:** Verify the flight control system and complete major control-surface
 and systems checks before taxi.
 
@@ -183,6 +191,7 @@ and systems checks before taxi.
 ---
 
 ## Phase P6 – Pre-Taxi Instruments & Final Checks (S20–S25)
+
 
 **Goal:** Configure key instruments and final references; release the aircraft
 for taxi when cleared.
@@ -213,6 +222,7 @@ for taxi when cleared.
 
 ## 3. Success and Failure Criteria
 
+
 For the experiment, a trial is considered **successful** if:
 
 1. The learner reaches the “taxi-ready” end condition:
@@ -235,6 +245,7 @@ A trial is treated as **failed** if:
 ---
 
 ## 4. Use in the Study
+
 
 - The **video+notes** group will receive a static version of this syllabus plus
   a conventional checklist.

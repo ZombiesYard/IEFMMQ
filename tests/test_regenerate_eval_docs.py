@@ -220,3 +220,43 @@ def test_build_regenerated_docs_parses_inputs_once_for_version_stamp(
     assert len(rendered) == 1
     assert call_count["json_loads"] == 1
     assert call_count["yaml_safe_load"] == 1
+
+
+def test_render_preserves_selected_leading_blank_lines(tmp_path: Path) -> None:
+    index_path = tmp_path / "Doc" / "Evaluation" / "index.json"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index = {
+        "documents": [
+            {
+                "doc_id": "sample_doc",
+                "source_path": "Doc\\Evaluation\\sample_doc.md",
+                "chunks": [
+                    {
+                        "chunk_id": "sample_doc_0",
+                        "heading": "Sample Title",
+                        "text": "\nAlpha",
+                    }
+                ],
+            }
+        ]
+    }
+    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    policy_path = tmp_path / "knowledge_source_policy.yaml"
+    policy_path.write_text(
+        "policy_id: sample_policy\n"
+        "version: v1\n"
+        "index_path: Doc/Evaluation/index.json\n"
+        "allow:\n"
+        "  - doc_id: sample_doc\n"
+        "    chunk_id: sample_doc_0\n"
+        "    line_range: [1, 2]\n",
+        encoding="utf-8",
+    )
+    rendered = build_regenerated_docs(
+        index_path=index_path,
+        policy_path=policy_path,
+        repo_root=tmp_path,
+        version_stamp_override="snapshot-v1",
+    )
+    assert len(rendered) == 1
+    assert "# Sample Title\n\n\nAlpha" in rendered[0].content
