@@ -207,10 +207,37 @@ def _load_markdown_docs(index_path: Path, *, repo_root: Path) -> tuple[list[_Mar
 
 
 def _compute_version_stamp(index_path: Path, policy_path: Path) -> str:
+    try:
+        index_obj = json.loads(index_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise EvalDocRegenerationError(f"failed to read index for version stamp: {index_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise EvalDocRegenerationError(f"invalid index JSON for version stamp: {index_path}") from exc
+    try:
+        policy_obj = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise EvalDocRegenerationError(f"failed to read policy for version stamp: {policy_path}") from exc
+    except yaml.YAMLError as exc:
+        raise EvalDocRegenerationError(f"invalid policy YAML for version stamp: {policy_path}") from exc
+
     hasher = hashlib.sha256()
-    hasher.update(index_path.read_bytes())
+    hasher.update(
+        json.dumps(
+            index_obj,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
     hasher.update(b"\n--\n")
-    hasher.update(policy_path.read_bytes())
+    hasher.update(
+        json.dumps(
+            policy_obj,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
     return hasher.hexdigest()[:16]
 
 

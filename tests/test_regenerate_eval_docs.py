@@ -7,6 +7,7 @@ import pytest
 
 from tools.regenerate_eval_docs import (
     EvalDocDriftError,
+    _compute_version_stamp,
     build_regenerated_docs,
     regenerate_eval_docs,
 )
@@ -90,3 +91,22 @@ def test_regenerate_eval_docs_check_mode_detects_drift(tmp_path: Path) -> None:
             check=True,
         )
     assert exc_info.value.drift_paths == [generated_path]
+
+
+def test_compute_version_stamp_is_stable_across_line_endings(tmp_path: Path) -> None:
+    index_lf = tmp_path / "index_lf.json"
+    index_crlf = tmp_path / "index_crlf.json"
+    policy_lf = tmp_path / "policy_lf.yaml"
+    policy_crlf = tmp_path / "policy_crlf.yaml"
+
+    index_payload = '{\n  "documents": []\n}\n'
+    policy_payload = "policy_id: p\nversion: v1\nindex_path: Doc/Evaluation/index.json\nallow: []\n"
+
+    index_lf.write_text(index_payload, encoding="utf-8")
+    index_crlf.write_text(index_payload.replace("\n", "\r\n"), encoding="utf-8")
+    policy_lf.write_text(policy_payload, encoding="utf-8")
+    policy_crlf.write_text(policy_payload.replace("\n", "\r\n"), encoding="utf-8")
+
+    stamp_lf = _compute_version_stamp(index_lf, policy_lf)
+    stamp_crlf = _compute_version_stamp(index_crlf, policy_crlf)
+    assert stamp_lf == stamp_crlf
