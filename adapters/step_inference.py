@@ -11,6 +11,8 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
+from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
 _MAX_MISSING_CONDITIONS = 8
@@ -25,13 +27,28 @@ class StepInferenceResult:
 
 def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]:
     """
-    Load procedure steps from pack.yaml.
+    Load procedure steps from canonical step registry when available.
+    Falls back to pack.yaml for compatibility.
 
     Returns an empty list when file/content is invalid so fallback remains safe.
     """
     path = Path(pack_path) if pack_path else _DEFAULT_PACK_PATH
+    registry_path = default_step_registry_path(path)
+    cached_registry_steps = _load_registry_steps_cached(str(registry_path.resolve()))
+    if cached_registry_steps:
+        return [dict(step) for step in cached_registry_steps]
+
     cached_steps = _load_pack_steps_cached(str(path.resolve()))
     return [dict(step) for step in cached_steps]
+
+
+@lru_cache(maxsize=8)
+def _load_registry_steps_cached(resolved_registry_path: str) -> tuple[dict[str, Any], ...]:
+    try:
+        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=25)
+    except (StepRegistryError, OSError, ValueError):
+        return ()
+    return tuple(dict(step) for step in entries)
 
 
 @lru_cache(maxsize=8)

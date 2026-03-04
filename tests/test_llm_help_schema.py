@@ -41,6 +41,7 @@ def test_help_response_schema_injects_step_and_target_enums() -> None:
 
     assert "S01" in diagnosis_step_enum
     assert "S10" in diagnosis_step_enum
+    assert "S25" in diagnosis_step_enum
     assert diagnosis_step_enum == next_step_enum
     assert "battery_switch" in overlay_target_enum
     assert "apu_switch" in overlay_target_enum

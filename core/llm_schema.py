@@ -19,6 +19,8 @@ import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from core.step_registry import StepRegistryError, default_step_registry_path, load_step_ids
+
 _REQUIRED_PROPERTY_RE = re.compile(r"'([^']+)' is a required property")
 _HELP_RESPONSE_SCHEMA_ID = "https://simtutor.dev/schemas/v2/help_response.generated.json"
 
@@ -46,7 +48,7 @@ def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
     return data
 
 
-def _load_step_ids(pack_path: Path) -> list[str]:
+def _load_step_ids_from_pack(pack_path: Path) -> list[str]:
     data = _load_yaml_mapping(pack_path, "pack.yaml")
     steps = data.get("steps")
     if not isinstance(steps, list) or not steps:
@@ -60,6 +62,16 @@ def _load_step_ids(pack_path: Path) -> list[str]:
             raise ValueError(f"pack.yaml step missing string id: {pack_path}")
         step_ids.append(step_id)
     return sorted(set(step_ids))
+
+
+def _load_step_ids(pack_path: Path, step_registry_path: Path | None) -> list[str]:
+    registry_path = step_registry_path or default_step_registry_path(pack_path)
+    if registry_path.is_file():
+        try:
+            return load_step_ids(registry_path)
+        except StepRegistryError as exc:
+            raise ValueError(f"invalid step registry: {registry_path}: {exc}") from exc
+    return _load_step_ids_from_pack(pack_path)
 
 
 def _load_overlay_targets(pack_path: Path, ui_map_path: Path) -> list[str]:
@@ -163,7 +175,8 @@ def build_help_response_schema(
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": _HELP_RESPONSE_SCHEMA_ID,
         "$comment": (
-            "Runtime-generated schema: enums come from pack.yaml/ui_map.yaml/taxonomy.yaml "
+            "Runtime-generated schema: step enums come from step_registry.yaml (fallback pack.yaml), "
+            "and other enums come from ui_map.yaml/taxonomy.yaml "
             "and are therefore not persisted as a static schema artifact."
         ),
         "title": "HelpResponse",
@@ -223,11 +236,13 @@ def _cached_help_schema(
     pack_path: str,
     ui_map_path: str,
     taxonomy_path: str | None,
+    step_registry_path: str | None,
 ) -> dict[str, Any]:
     pack = Path(pack_path)
     ui_map = Path(ui_map_path)
     taxonomy = Path(taxonomy_path) if taxonomy_path else None
-    step_ids = _load_step_ids(pack)
+    step_registry = Path(step_registry_path) if step_registry_path else None
+    step_ids = _load_step_ids(pack, step_registry)
     overlay_targets = _load_overlay_targets(pack, ui_map)
     error_categories = _load_error_categories(taxonomy)
     return build_help_response_schema(step_ids, overlay_targets, error_categories)
@@ -237,11 +252,17 @@ def get_help_response_schema(
     pack_path: str | Path | None = None,
     ui_map_path: str | Path | None = None,
     taxonomy_path: str | Path | None = None,
+    step_registry_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    pack = str((Path(pack_path) if pack_path else _default_pack_path()).resolve())
+    pack_path_obj = Path(pack_path) if pack_path else _default_pack_path()
+    pack = str(pack_path_obj.resolve())
     ui_map = str((Path(ui_map_path) if ui_map_path else _default_ui_map_path()).resolve())
     taxonomy = str((Path(taxonomy_path) if taxonomy_path else _default_taxonomy_path()).resolve())
-    return copy.deepcopy(_cached_help_schema(pack, ui_map, taxonomy))
+    if step_registry_path is not None:
+        step_registry = str(Path(step_registry_path).resolve())
+    else:
+        step_registry = str(default_step_registry_path(pack_path_obj).resolve())
+    return copy.deepcopy(_cached_help_schema(pack, ui_map, taxonomy, step_registry))
 
 
 def _format_path_segment(segment: Any) -> str:
