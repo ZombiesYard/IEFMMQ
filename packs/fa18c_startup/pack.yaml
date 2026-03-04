@@ -239,8 +239,8 @@ completion_gates:
       reason: "Left engine RPM must be at least 25."
     - op: flag_true
       var: vars.throttle_l_not_off
-      reason_code: s11_requires_throttle_left_idle
-      reason: "Left throttle must be moved from OFF toward IDLE."
+      reason_code: s11_requires_throttle_l_not_off
+      reason: "Left throttle must be moved out of OFF detent."
   S12:
     - op: var_gte
       var: vars.ins_mode
