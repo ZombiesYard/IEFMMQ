@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import yaml
+from core.step_signal_metadata import STEP_EVIDENCE_REQUIREMENT_VALUES, STEP_OBSERVABILITY_VALUES
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,8 +21,6 @@ REQUIRED_NON_EMPTY_UI_TARGET_STEPS = (
     "S15",
     "S18",
 )
-ALLOWED_OBSERVABILITY = {"observable", "partially", "unknown"}
-ALLOWED_EVIDENCE_REQUIREMENTS = {"var", "gate", "delta", "rag", "visual"}
 
 
 def _load_yaml(path: Path) -> dict:
@@ -90,7 +89,7 @@ def test_step_signal_metadata_values_are_valid() -> None:
 
         observability = step.get("observability")
         assert isinstance(observability, str), f"step {step_id} observability must be string"
-        assert observability in ALLOWED_OBSERVABILITY, f"step {step_id} observability invalid: {observability!r}"
+        assert observability in STEP_OBSERVABILITY_VALUES, f"step {step_id} observability invalid: {observability!r}"
 
         evidence_requirements = step.get("evidence_requirements")
         assert isinstance(evidence_requirements, list), f"step {step_id} evidence_requirements must be list"
@@ -98,7 +97,7 @@ def test_step_signal_metadata_values_are_valid() -> None:
             assert isinstance(req, str) and req, (
                 f"step {step_id} evidence_requirements[{req_idx}] must be non-empty string"
             )
-            assert req in ALLOWED_EVIDENCE_REQUIREMENTS, (
+            assert req in STEP_EVIDENCE_REQUIREMENT_VALUES, (
                 f"step {step_id} evidence_requirements[{req_idx}] invalid: {req!r}"
             )
 

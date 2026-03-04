@@ -39,6 +39,11 @@ from adapters.telemetry_pipeline import enrich_bios_observation
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
+from core.step_signal_metadata import (
+    STEP_EVIDENCE_REQUIREMENT_VALUES,
+    STEP_OBSERVABILITY_VALUES,
+    compute_requires_visual_confirmation,
+)
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vars import VarResolver
 from ports.knowledge_port import KnowledgePort, KnowledgeRetrieveWithMetaPort
@@ -160,10 +165,6 @@ def _load_step_ids(pack_path: Path) -> list[str]:
     return out
 
 
-_ALLOWED_STEP_OBSERVABILITY = frozenset({"observable", "partially", "unknown"})
-_ALLOWED_STEP_EVIDENCE_REQUIREMENTS = frozenset({"var", "gate", "delta", "rag", "visual"})
-
-
 def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
     pack = _load_yaml_mapping(pack_path, "pack.yaml")
     steps = pack.get("steps")
@@ -182,8 +183,8 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
 
         observability = step.get("observability")
         if observability is not None:
-            if not isinstance(observability, str) or observability not in _ALLOWED_STEP_OBSERVABILITY:
-                allowed = ", ".join(sorted(_ALLOWED_STEP_OBSERVABILITY))
+            if not isinstance(observability, str) or observability not in STEP_OBSERVABILITY_VALUES:
+                allowed = ", ".join(sorted(STEP_OBSERVABILITY_VALUES))
                 raise ValueError(
                     f"pack.steps[{step_idx}].observability must be one of {{{allowed}}}: {pack_path}"
                 )
@@ -201,8 +202,8 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
                         f"pack.steps[{step_idx}].evidence_requirements[{req_idx}] must be non-empty string: "
                         f"{pack_path}"
                     )
-                if req not in _ALLOWED_STEP_EVIDENCE_REQUIREMENTS:
-                    allowed = ", ".join(sorted(_ALLOWED_STEP_EVIDENCE_REQUIREMENTS))
+                if req not in STEP_EVIDENCE_REQUIREMENT_VALUES:
+                    allowed = ", ".join(sorted(STEP_EVIDENCE_REQUIREMENT_VALUES))
                     raise ValueError(
                         f"pack.steps[{step_idx}].evidence_requirements[{req_idx}] must be one of "
                         f"{{{allowed}}}: {pack_path}"
@@ -216,9 +217,9 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
         if profile:
             observability_value = profile.get("observability")
             evidence_requirements_value = profile.get("evidence_requirements", [])
-            requires_visual_confirmation = (
-                observability_value in {"partially", "unknown"}
-                or "visual" in evidence_requirements_value
+            requires_visual_confirmation = compute_requires_visual_confirmation(
+                observability_value if isinstance(observability_value, str) else None,
+                evidence_requirements_value if isinstance(evidence_requirements_value, list) else [],
             )
             profile["requires_visual_confirmation"] = bool(requires_visual_confirmation)
             profiles[step_id] = profile
@@ -1156,7 +1157,7 @@ class LiveDcsTutorLoop:
                     deterministic_hint["observability"] = observability
                 evidence_requirements = step_signal_profile.get("evidence_requirements")
                 if isinstance(evidence_requirements, list):
-                    deterministic_hint["evidence_requirements"] = [
+                    deterministic_hint["step_evidence_requirements"] = [
                         item for item in evidence_requirements if isinstance(item, str) and item
                     ]
                 requires_visual_confirmation = step_signal_profile.get("requires_visual_confirmation")

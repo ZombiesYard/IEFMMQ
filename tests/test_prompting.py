@@ -42,6 +42,7 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
 
     assert payload["allowed_step_ids"] == ["S02", "S03"]
     assert payload["allowed_overlay_targets"] == ["apu_switch", "battery_switch"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
     assert payload["allowed_error_categories"]
     assert payload["output_example_json"]["diagnosis"]["error_category"] in payload["allowed_error_categories"]
     summary = payload["recent_deltas_summary"]
@@ -445,12 +446,13 @@ def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
         "missing_conditions": ["check_fcs_page"],
         "recent_ui_targets": ["left_mdi_pb5"],
         "observability": "partially",
-        "evidence_requirements": ["visual", "gate", "visual", "invalid_type"],
+        "step_evidence_requirements": ["visual", "gate", "visual", "invalid_type"],
     }
 
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     hint = payload["deterministic_step_hint"]
     assert hint["inferred_step_id"] == "S15"
     assert hint["observability"] == "partially"
-    assert hint["evidence_requirements"] == ["visual", "gate"]
+    assert hint["step_evidence_requirements"] == ["visual", "gate"]
     assert hint["requires_visual_confirmation"] is True
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
