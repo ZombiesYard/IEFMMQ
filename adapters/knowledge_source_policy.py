@@ -181,6 +181,7 @@ class SourceChunkRule:
 @dataclass(frozen=True)
 class KnowledgeSourcePolicy:
     policy_id: str
+    policy_version: str
     policy_path: Path
     index_path: Path
     rules: tuple[SourceChunkRule, ...]
@@ -230,6 +231,7 @@ class KnowledgeSourcePolicy:
 
         policy_id = raw.get("policy_id", policy_path.stem)
         policy_id = _coerce_non_empty_str(policy_id, field_name="policy_id")
+        policy_version = _coerce_non_empty_str(raw.get("version", "unknown"), field_name="version")
 
         yaml_index_path_raw = raw.get("index_path")
         if index_path is not None and yaml_index_path_raw is not None:
@@ -290,6 +292,7 @@ class KnowledgeSourcePolicy:
 
         policy = cls(
             policy_id=policy_id,
+            policy_version=policy_version,
             policy_path=policy_path,
             index_path=effective_index_path,
             rules=tuple(rules),
@@ -333,7 +336,8 @@ class KnowledgeSourcePolicy:
 
     def public_startup_info(self) -> str:
         return (
-            f"policy_id={self.policy_id} docs={self.doc_count} chunks={self.chunk_count} "
+            f"policy_id={self.policy_id} policy_version={self.policy_version} "
+            f"docs={self.doc_count} chunks={self.chunk_count} "
             f"policy_file={self.policy_path.name} index_file={self.index_path.name}"
         )
 

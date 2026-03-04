@@ -1,4 +1,17 @@
+<!--
+AUTO-GENERATED FILE. DO NOT EDIT.
+generator: tools/regenerate_eval_docs.py
+source_index: Doc/Evaluation/index.json
+policy_id: fa18c_cold_start_whitelist_v1
+policy_version: v2
+version_stamp: 6bbd506dfd81e311
+source_chunks:
+- fa18c_startup_master/fa18c_startup_master_0:1-17
+- fa18c_startup_master/fa18c_startup_master_1:1-28
+-->
+
 # F/A-18C Cold Start – Master Step List
+
 
 This file defines the canonical F/A-18C cold-start sequence used in the study.
 It is derived from the DCS F/A-18C manual / training mission description and
@@ -18,6 +31,7 @@ Columns:
 ---
 
 ## Master Step Table
+
 
 | StepID | Phase | OfficialStep (DCS-style wording) | ShortExplanation (for learners/tutor) | CockpitArea |
 |--------|-------|-----------------------------------|----------------------------------------|-------------|

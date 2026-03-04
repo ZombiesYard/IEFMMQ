@@ -286,6 +286,17 @@ Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
   - Startup log prints: `当前仅使用 cold-start 白名单块 ...`
   - `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.
 
+### Evaluation Doc Regeneration (CS-002)
+- Regenerate all `Doc/Evaluation/*.md` (except `index.json`) from `index.json + knowledge_source_policy.yaml`:
+  ```sh
+  python -m tools.regenerate_eval_docs
+  ```
+- CI drift check (no writes):
+  ```sh
+  python -m tools.regenerate_eval_docs --check
+  ```
+- The CI guard also enforces this check; manual edits to generated evaluation docs will fail CI.
+
 ### Overlay action evidence protocol
 Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
 

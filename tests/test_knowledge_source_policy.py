@@ -58,6 +58,7 @@ def test_policy_loads_and_filters_by_doc_chunk(tmp_path: Path) -> None:
 
     policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
     assert policy.policy_id == "test_policy"
+    assert policy.policy_version == "unknown"
     assert policy.doc_count == 1
     assert policy.chunk_count == 1
     assert "docs=1" in policy.public_startup_info()
@@ -311,5 +312,6 @@ def test_repository_policy_is_valid_against_repository_index() -> None:
 
     policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
     assert policy.policy_id == "fa18c_cold_start_whitelist_v1"
-    assert policy.doc_count == 2
-    assert policy.chunk_count > 0
+    assert policy.policy_version == "v2"
+    assert policy.doc_count == 6
+    assert policy.chunk_count == 53

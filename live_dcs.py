@@ -986,8 +986,10 @@ class LiveDcsTutorLoop:
 
         policy_filtered_out_count = 0
         policy_id: str | None = None
+        policy_version: str | None = None
         if self.knowledge_source_policy is not None:
             policy_id = self.knowledge_source_policy.policy_id
+            policy_version = self.knowledge_source_policy.policy_version
             before_filter_count = len(snippets)
             snippets = self.knowledge_source_policy.filter_snippets(snippets)
             policy_filtered_out_count = max(0, before_filter_count - len(snippets))
@@ -1027,6 +1029,7 @@ class LiveDcsTutorLoop:
             "grounding_index_path": grounding_index_path,
             "grounding_top_k": self.rag_top_k,
             "grounding_policy_id": policy_id,
+            "grounding_policy_version": policy_version,
             "grounding_policy_filtered_out_count": policy_filtered_out_count,
         }
 
@@ -1120,6 +1123,7 @@ class LiveDcsTutorLoop:
                 "grounding_cache_hit": bool(grounding_meta.get("grounding_cache_hit")),
                 "grounding_index_path": grounding_meta.get("grounding_index_path"),
                 "grounding_policy_id": grounding_meta.get("grounding_policy_id"),
+                "grounding_policy_version": grounding_meta.get("grounding_policy_version"),
                 "grounding_policy_filtered_out_count": int(
                     grounding_meta.get("grounding_policy_filtered_out_count") or 0
                 ),
