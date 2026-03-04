@@ -249,3 +249,19 @@ def test_load_pack_steps_cache_invalidates_when_pack_fallback_changes(tmp_path: 
 
     second = load_pack_steps(pack_path)
     assert second[0]["marker"] == "updated"
+
+
+def test_load_pack_steps_falls_back_when_pack_metadata_registry_path_is_invalid(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "metadata": {"step_registry_path": 123},
+            "steps": [{"id": "S01", "marker": "from_pack"}],
+        },
+    )
+
+    loaded = load_pack_steps(pack_path)
+    assert loaded[0]["id"] == "S01"
+    assert loaded[0]["marker"] == "from_pack"

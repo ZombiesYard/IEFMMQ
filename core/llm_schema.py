@@ -73,7 +73,13 @@ def _load_step_ids_from_pack(pack_path: Path) -> list[str]:
 
 
 def _load_step_ids(pack_path: Path, step_registry_path: Path | None) -> list[str]:
-    registry_path = step_registry_path or default_step_registry_path(pack_path)
+    if step_registry_path is not None:
+        registry_path = step_registry_path
+    else:
+        try:
+            registry_path = default_step_registry_path(pack_path)
+        except StepRegistryError:
+            return _load_step_ids_from_pack(pack_path)
     if registry_path.is_file():
         try:
             return load_step_ids(registry_path)
@@ -285,14 +291,22 @@ def get_help_response_schema(
     ui_map_resolved = (Path(ui_map_path) if ui_map_path else _default_ui_map_path()).resolve()
     taxonomy_resolved = (Path(taxonomy_path) if taxonomy_path else _default_taxonomy_path()).resolve()
     if step_registry_path is not None:
-        step_registry_resolved = Path(step_registry_path).resolve()
+        step_registry_resolved: Path | None = Path(step_registry_path).resolve()
     else:
-        step_registry_resolved = default_step_registry_path(pack_path_obj).resolve()
+        try:
+            step_registry_resolved = default_step_registry_path(pack_path_obj).resolve()
+        except StepRegistryError:
+            step_registry_resolved = None
 
     pack_mtime_ns, pack_size_bytes = _path_signature(pack_resolved)
     ui_map_mtime_ns, ui_map_size_bytes = _path_signature(ui_map_resolved)
     taxonomy_mtime_ns, taxonomy_size_bytes = _path_signature(taxonomy_resolved)
-    step_registry_mtime_ns, step_registry_size_bytes = _path_signature(step_registry_resolved)
+    if step_registry_resolved is None:
+        step_registry_mtime_ns, step_registry_size_bytes = (-1, -1)
+        step_registry_cache_key: str | None = None
+    else:
+        step_registry_mtime_ns, step_registry_size_bytes = _path_signature(step_registry_resolved)
+        step_registry_cache_key = str(step_registry_resolved)
 
     return copy.deepcopy(
         _cached_help_schema(
@@ -305,7 +319,7 @@ def get_help_response_schema(
             str(taxonomy_resolved),
             taxonomy_mtime_ns,
             taxonomy_size_bytes,
-            str(step_registry_resolved),
+            step_registry_cache_key,
             step_registry_mtime_ns,
             step_registry_size_bytes,
         )

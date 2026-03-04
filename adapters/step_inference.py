@@ -41,17 +41,21 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
     Returns an empty list when file/content is invalid so fallback remains safe.
     """
     path = Path(pack_path) if pack_path else _DEFAULT_PACK_PATH
-    registry_path = default_step_registry_path(path)
-    registry_path_resolved = registry_path.resolve()
-    registry_signature = _path_signature(registry_path_resolved)
-    if registry_signature is not None:
-        cached_registry_steps = _load_registry_steps_cached(
-            str(registry_path_resolved),
-            registry_signature[0],
-            registry_signature[1],
-        )
-        if cached_registry_steps:
-            return [dict(step) for step in cached_registry_steps]
+    try:
+        registry_path = default_step_registry_path(path)
+    except StepRegistryError:
+        registry_path = None
+    if registry_path is not None:
+        registry_path_resolved = registry_path.resolve()
+        registry_signature = _path_signature(registry_path_resolved)
+        if registry_signature is not None:
+            cached_registry_steps = _load_registry_steps_cached(
+                str(registry_path_resolved),
+                registry_signature[0],
+                registry_signature[1],
+            )
+            if cached_registry_steps:
+                return [dict(step) for step in cached_registry_steps]
 
     pack_path_resolved = path.resolve()
     pack_signature = _path_signature(pack_path_resolved)

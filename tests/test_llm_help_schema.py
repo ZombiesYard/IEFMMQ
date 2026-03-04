@@ -368,3 +368,34 @@ def test_help_schema_cache_invalidates_when_ui_map_and_taxonomy_change(tmp_path:
     categories_after = schema_after["properties"]["diagnosis"]["properties"]["error_category"]["enum"]
     assert overlay_after == ["target_a", "target_b"]
     assert set(categories_after) == {"OM", "CO"}
+
+
+def test_help_schema_falls_back_to_pack_steps_when_pack_registry_metadata_is_invalid(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    ui_map_path = tmp_path / "ui_map.yaml"
+    taxonomy_path = tmp_path / "taxonomy.yaml"
+
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "metadata": {"step_registry_path": 123},
+            "steps": [{"id": "S01"}, {"id": "S02"}],
+        },
+    )
+    _write_yaml(
+        ui_map_path,
+        {"cockpit_elements": {"target_a": {"description": "A"}}},
+    )
+    _write_yaml(
+        taxonomy_path,
+        {"taxonomy": {"categories": [{"code": "OM"}], "trial_flags": []}},
+    )
+
+    schema = get_help_response_schema(
+        pack_path=pack_path,
+        ui_map_path=ui_map_path,
+        taxonomy_path=taxonomy_path,
+    )
+    step_ids = schema["properties"]["next"]["properties"]["step_id"]["enum"]
+    assert step_ids == ["S01", "S02"]
