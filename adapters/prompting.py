@@ -13,6 +13,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from core.llm_schema import get_help_response_schema
+from core.step_signal_metadata import (
+    STEP_EVIDENCE_REQUIREMENT_VALUES,
+    STEP_OBSERVABILITY_VALUES,
+    compute_requires_visual_confirmation,
+)
 
 _ABS_WIN_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 _ABS_POSIX_PATH_RE = re.compile(r"^/")
@@ -276,6 +281,9 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             "inferred_step_id": None,
             "missing_conditions": [],
             "recent_ui_targets": [],
+            "observability": None,
+            "step_evidence_requirements": [],
+            "requires_visual_confirmation": False,
         }
 
     inferred_raw = raw.get("inferred_step_id")
@@ -313,10 +321,45 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
     else:
         recent_ui_targets = []
 
+    observability_raw = raw.get("observability")
+    observability = (
+        observability_raw
+        if isinstance(observability_raw, str) and observability_raw in STEP_OBSERVABILITY_VALUES
+        else None
+    )
+
+    step_evidence_requirements_raw = raw.get("step_evidence_requirements")
+    if step_evidence_requirements_raw is None:
+        # Backward compatibility with older hint payloads.
+        step_evidence_requirements_raw = raw.get("evidence_requirements")
+
+    step_evidence_requirements: list[str] = []
+    if isinstance(step_evidence_requirements_raw, (list, tuple)):
+        seen_requirements: set[str] = set()
+        for item in step_evidence_requirements_raw:
+            if not isinstance(item, str) or item not in STEP_EVIDENCE_REQUIREMENT_VALUES:
+                continue
+            if item in seen_requirements:
+                continue
+            seen_requirements.add(item)
+            step_evidence_requirements.append(item)
+
+    requires_visual_confirmation_raw = raw.get("requires_visual_confirmation")
+    if isinstance(requires_visual_confirmation_raw, bool):
+        requires_visual_confirmation = requires_visual_confirmation_raw
+    else:
+        requires_visual_confirmation = compute_requires_visual_confirmation(
+            observability,
+            step_evidence_requirements,
+        )
+
     return {
         "inferred_step_id": inferred_step_id,
         "missing_conditions": missing_conditions,
         "recent_ui_targets": recent_ui_targets,
+        "observability": observability,
+        "step_evidence_requirements": step_evidence_requirements,
+        "requires_visual_confirmation": requires_visual_confirmation,
     }
 
 
@@ -446,6 +489,9 @@ def build_help_prompt_result(
     schema = get_help_response_schema()
     step_enum = list(schema["properties"]["next"]["properties"]["step_id"]["enum"])
     target_enum = list(schema["properties"]["overlay"]["properties"]["targets"]["items"]["enum"])
+    overlay_evidence_type_enum = list(
+        schema["properties"]["overlay"]["properties"]["evidence"]["items"]["properties"]["type"]["enum"]
+    )
     schema_category_enum = list(schema["properties"]["diagnosis"]["properties"]["error_category"]["enum"])
     category_enum = _normalize_enum_list(context.get("error_category_enum"), schema_category_enum)
 
@@ -471,8 +517,10 @@ def build_help_prompt_result(
             "必须从 allowed_step_ids 中选择 diagnosis.step_id 与 next.step_id。",
             "必须从 allowed_overlay_targets 中选择 overlay.targets。",
             "必须从 allowed_error_categories 中选择 diagnosis.error_category。",
+            "overlay.evidence.type 必须从 allowed_overlay_evidence_types 中选择（不得使用 visual）。",
             "只允许引用 EVIDENCE_SOURCES 中出现的 ref。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
+            "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
             "若不确定，也必须返回合法 JSON，不得输出自然语言段落。",
@@ -487,8 +535,10 @@ def build_help_prompt_result(
             "diagnosis.step_id and next.step_id must be chosen from allowed_step_ids.",
             "overlay.targets must be chosen from allowed_overlay_targets.",
             "diagnosis.error_category must be chosen from allowed_error_categories.",
+            "overlay.evidence.type must be chosen from allowed_overlay_evidence_types (never use \"visual\").",
             "Only refs that appear in EVIDENCE_SOURCES are allowed.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
+            "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
             "If uncertain, still return valid JSON only.",
@@ -533,6 +583,7 @@ def build_help_prompt_result(
         payload = {
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
+            "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
             "current_vars_selected": selected_vars,
             "recent_deltas_summary": recent_deltas_summary,
@@ -594,6 +645,7 @@ def build_help_prompt_result(
         compact_payload = {
             "allowed_step_ids": candidate_steps,
             "allowed_overlay_targets": overlay_targets,
+            "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
             "grounding": _build_grounding_payload(
                 context,
@@ -601,7 +653,6 @@ def build_help_prompt_result(
                 rag_input_count=rag_input_count,
             ),
             "allowed_evidence_refs": final_allowed_refs,
-            "output_example_json": payload.get("output_example_json", {}),
         }
         prompt = (
             f"{compact_header}\n"

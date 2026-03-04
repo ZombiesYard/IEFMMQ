@@ -20,16 +20,76 @@ def _obs_with_vars(**vars_map):
     }
 
 
-def test_pack_gate_config_contains_s01_to_s11_for_precondition_and_completion() -> None:
+def test_pack_gate_config_contains_s01_to_s25_for_precondition_and_completion() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     pre = cfg["precondition_gates"]
     comp = cfg["completion_gates"]
 
-    for step_id in [f"S{i:02d}" for i in range(1, 12)]:
+    for step_id in [f"S{i:02d}" for i in range(1, 26)]:
         assert step_id in pre, f"missing precondition gate config for {step_id}"
         assert step_id in comp, f"missing completion gate config for {step_id}"
         assert isinstance(pre[step_id], tuple)
         assert isinstance(comp[step_id], tuple)
+
+
+def test_evaluate_pack_gates_reports_blocked_reason_code_for_s12_precondition() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(rpm_l_gte_60=False, throttle_l_not_off=False)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    s12_pre = gates["S12.precondition"]
+
+    assert s12_pre["status"] == "blocked"
+    assert s12_pre["allowed"] is False
+    assert s12_pre["reason_code"] == "s12_requires_rpm_l_gte_60"
+    assert isinstance(s12_pre["reason"], str) and s12_pre["reason"]
+
+
+def test_evaluate_pack_gates_allows_s12_precondition_when_left_engine_ready() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(rpm_l_gte_60=True, throttle_l_not_off=True)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    s12_pre = gates["S12.precondition"]
+
+    assert s12_pre["status"] == "allowed"
+    assert s12_pre["allowed"] is True
+    assert s12_pre["reason_code"] == "ok"
+    assert s12_pre["reason"] is None
+
+
+def test_evaluate_pack_gates_reports_blocked_reason_code_for_s13_completion() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(radar_on=False)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    s13_comp = gates["S13.completion"]
+
+    assert s13_comp["status"] == "blocked"
+    assert s13_comp["allowed"] is False
+    assert s13_comp["reason_code"] == "s13_requires_radar_on"
+    assert isinstance(s13_comp["reason"], str) and s13_comp["reason"]
+
+
+def test_evaluate_pack_gates_allows_s13_completion_when_radar_on() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(radar_on=True)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    s13_comp = gates["S13.completion"]
+
+    assert s13_comp["status"] == "allowed"
+    assert s13_comp["allowed"] is True
+    assert s13_comp["reason_code"] == "ok"
+    assert s13_comp["reason"] is None
 
 
 def test_evaluate_pack_gates_reports_blocked_reason_code_for_s04_precondition() -> None:
