@@ -1,62 +1,205 @@
 version: v1
+metadata:
+  source: "external:DCS World FA-18C clickabledata.lua"
+  source_reference:
+    dcs_install_hint: "L:/DCS World/Mods/aircraft/FA-18C/Cockpit/Scripts/clickabledata.lua"
+    ci_fixture: "tests/fixtures/fa18c_clickable_ids.txt"
+  notes: >
+    Full cold-start overlay targets for S01-S25. dcs_id values align to
+    clickable element ids (pnt_*). aliases/panel_area provide stable semantic
+    labels for prompt/debug/UI consumption.
+
 cockpit_elements:
   battery_switch:
     description: "Battery switch ON/OFF/ORIDE"
     dcs_id: "pnt_404"
+    aliases: ["Battery Switch", "BATTERY_SW"]
+    panel_area: "right_console_electrical"
   generator_left_switch:
     description: "Left generator switch NORM/OFF"
     dcs_id: "pnt_402"
+    aliases: ["Left Generator Control Switch", "L_GEN_SW"]
+    panel_area: "right_console_electrical"
   generator_right_switch:
     description: "Right generator switch NORM/OFF"
     dcs_id: "pnt_403"
+    aliases: ["Right Generator Control Switch", "R_GEN_SW"]
+    panel_area: "right_console_electrical"
   fire_test_switch:
     description: "Fire and Bleed Air Test Switch"
     dcs_id: "pnt_331"
+    aliases: ["Fire and Bleed Air Test Switch", "FIRE_TEST_SW"]
+    panel_area: "left_console_engine_start"
   apu_switch:
     description: "APU control switch"
     dcs_id: "pnt_375"
+    aliases: ["APU Control Switch", "APU_CONTROL_SW"]
+    panel_area: "left_console_engine_start"
   eng_crank_switch:
     description: "Engine crank switch (LEFT/RIGHT/NORM)"
     dcs_id: "pnt_377"
+    aliases: ["Engine Crank Switch", "ENGINE_CRANK_SW"]
+    panel_area: "left_console_engine_start"
+  throttle_quadrant_reference:
+    description: "Throttle quadrant reference (nearest clickable anchor)"
+    dcs_id: "pnt_504"
+    aliases: ["Throttles Friction Adjusting Lever"]
+    panel_area: "throttle_quadrant"
   bleed_air_knob:
     description: "BLEED AIR knob"
     dcs_id: "pnt_411"
+    aliases: ["Bleed Air Knob", "BLEED_AIR_KNOB"]
+    panel_area: "right_console_environmental"
   lights_test_button:
     description: "Lights Test Switch TEST/OFF"
     dcs_id: "pnt_416"
+    aliases: ["Lights Test Switch"]
+    panel_area: "right_console_lighting"
   left_mdi_brightness_selector:
     description: "Left MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_51"
+    aliases: ["Left MDI Brightness Selector", "LEFT_DDI_BRT_CTL"]
+    panel_area: "left_instrument_panel"
   right_mdi_brightness_selector:
     description: "Right MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_76"
+    aliases: ["Right MDI Brightness Selector", "RIGHT_DDI_BRT_CTL"]
+    panel_area: "right_instrument_panel"
   ampcd_off_brightness_knob:
     description: "AMPCD Off/Brightness Control Knob"
     dcs_id: "pnt_203"
+    aliases: ["AMPCD Off/Brightness Control Knob", "AMPCD_BRT_CTL"]
+    panel_area: "center_instrument_panel"
   hud_symbology_brightness_knob:
     description: "HUD Symbology Brightness Control Knob"
     dcs_id: "pnt_141"
+    aliases: ["HUD Symbology Brightness Control Knob", "HUD_SYM_BRT"]
+    panel_area: "hud_control_panel"
   left_mdi_pb5:
     description: "Left MDI PB 5"
     dcs_id: "pnt_58"
+    aliases: ["Left MDI PB 5"]
+    panel_area: "left_instrument_panel"
   right_mdi_pb5:
     description: "Right MDI PB 5"
     dcs_id: "pnt_83"
+    aliases: ["Right MDI PB 5"]
+    panel_area: "right_instrument_panel"
+  fcs_reset_button:
+    description: "FCS RESET button"
+    dcs_id: "pnt_349"
+    aliases: ["FCS RESET Button"]
+    panel_area: "left_console_flight_controls"
   fcs_bit_switch:
-    description: "FCS BIT Switch on right wall"
+    description: "FCS BIT switch on right wall"
     dcs_id: "pnt_470"
+    aliases: ["FCS BIT Switch"]
+    panel_area: "right_console_flight_controls"
   ufc_comm1_channel_selector_rotate:
-    description: "UFC COMM 1 Channel Selector Knob rotate"
+    description: "UFC COMM 1 channel selector rotate"
     dcs_id: "pnt_124"
+    aliases: ["UFC COMM 1 Channel Selector Knob Rotate", "COMM1_CHAN"]
+    panel_area: "ufc"
   ufc_comm1_channel_selector_pull:
-    description: "UFC COMM 1 Channel Selector Knob push/pull function"
-    dcs_id: "pnt_125"
+    description: "UFC COMM 1 channel selector pull"
+    dcs_id: "pnt_124"
+    aliases: ["UFC COMM 1 Channel Selector Knob Pull", "COMM1_CHAN"]
+    panel_area: "ufc"
   ufc_comm2_channel_selector_rotate:
-    description: "UFC COMM 2 Channel Selector Knob rotate"
+    description: "UFC COMM 2 channel selector rotate"
     dcs_id: "pnt_126"
+    aliases: ["UFC COMM 2 Channel Selector Knob Rotate", "COMM2_CHAN"]
+    panel_area: "ufc"
   ufc_comm2_channel_selector_pull:
-    description: "UFC COMM 2 Channel Selector Knob push/pull function"
-    dcs_id: "pnt_127"
+    description: "UFC COMM 2 channel selector pull"
+    dcs_id: "pnt_126"
+    aliases: ["UFC COMM 2 Channel Selector Knob Pull", "COMM2_CHAN"]
+    panel_area: "ufc"
+  ins_mode_knob:
+    description: "INS mode switch"
+    dcs_id: "pnt_443"
+    aliases: ["INS Switch", "INS_SW"]
+    panel_area: "sensor_panel_right_console"
+  radar_mode_knob:
+    description: "Radar mode switch"
+    dcs_id: "pnt_440"
+    aliases: ["RADAR Switch", "RADAR_SW"]
+    panel_area: "sensor_panel_right_console"
+  obogs_control_switch:
+    description: "OBOGS control switch"
+    dcs_id: "pnt_365"
+    aliases: ["OBOGS Control Switch"]
+    panel_area: "left_console_oxygen"
+  obogs_flow_knob:
+    description: "OBOGS flow knob"
+    dcs_id: "pnt_366"
+    aliases: ["OXY Flow Knob"]
+    panel_area: "left_console_oxygen"
+  flap_switch:
+    description: "Flap switch AUTO/HALF/FULL"
+    dcs_id: "pnt_234"
+    aliases: ["FLAP Switch"]
+    panel_area: "left_quarter_panel"
+  takeoff_trim_button:
+    description: "T/O trim button"
+    dcs_id: "pnt_346"
+    aliases: ["T/O TRIM Button"]
+    panel_area: "left_console_flight_controls"
+  refuel_probe_switch:
+    description: "Probe control switch EXTEND/RETRACT/EMERG EXTD"
+    dcs_id: "pnt_341"
+    aliases: ["Probe Control Switch"]
+    panel_area: "left_console_fuel"
+  launch_bar_switch:
+    description: "Launch bar control switch EXTEND/RETRACT"
+    dcs_id: "pnt_233"
+    aliases: ["Launch Bar Control Switch"]
+    panel_area: "left_quarter_panel"
+  arresting_hook_handle:
+    description: "Arresting hook handle UP/DOWN"
+    dcs_id: "pnt_293"
+    aliases: ["Arresting Hook Handle"]
+    panel_area: "left_quarter_panel"
+  pitot_heater_switch:
+    description: "Pitot heater switch ON/AUTO"
+    dcs_id: "pnt_409"
+    aliases: ["Pitot Heater Switch"]
+    panel_area: "right_console_anti_ice"
+  parking_brake_handle:
+    description: "Emergency/parking brake handle"
+    dcs_id: "pnt_240"
+    aliases: ["Emergency/Parking Brake Handle"]
+    panel_area: "left_console_gear"
+  ifei_up_button:
+    description: "IFEI up arrow button"
+    dcs_id: "pnt_170"
+    aliases: ["IFEI Up Arrow Button"]
+    panel_area: "ifei"
+  ifei_down_button:
+    description: "IFEI down arrow button"
+    dcs_id: "pnt_171"
+    aliases: ["IFEI Down Arrow Button"]
+    panel_area: "ifei"
+  standby_altimeter_pressure_knob:
+    description: "Standby pressure altimeter setting knob"
+    dcs_id: "pnt_224"
+    aliases: ["AAU-52 Altimeter Pressure Setting Knob"]
+    panel_area: "right_instrument_panel"
+  radar_altimeter_bug_knob:
+    description: "Radar altimeter low-altitude bug / power knob"
+    dcs_id: "pnt_291"
+    aliases: ["Radar Altimeter Push to Test/Set Min Alt"]
+    panel_area: "right_instrument_panel"
+  standby_attitude_cage_knob:
+    description: "Standby attitude indicator cage knob"
+    dcs_id: "pnt_213"
+    aliases: ["SAI Cage Knob"]
+    panel_area: "right_instrument_panel"
+  attitude_source_selector:
+    description: "HUD attitude source selector INS/AUTO/STBY"
+    dcs_id: "pnt_148"
+    aliases: ["Attitude Selector Switch"]
+    panel_area: "center_instrument_panel"
 
 default_overlay:
   style: "highlight"

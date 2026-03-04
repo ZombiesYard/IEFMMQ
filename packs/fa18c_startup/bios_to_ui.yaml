@@ -14,6 +14,10 @@ mappings:
     - fire_test_switch
   BLEED_AIR_KNOB:
     - bleed_air_knob
+  INS_SW:
+    - ins_mode_knob
+  RADAR_SW:
+    - radar_mode_knob
 
   LEFT_DDI_BRT_CTL:
     - left_mdi_brightness_selector

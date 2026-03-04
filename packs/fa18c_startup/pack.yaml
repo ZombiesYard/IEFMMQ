@@ -26,6 +26,46 @@ completion_conditions:
   - "Taxi-ready checks configured for current scenario profile (airfield/carrier)."
   - "Safety-critical cautions reviewed for full cold-start flow S01-S25."
 
+ui_targets:
+  - battery_switch
+  - generator_left_switch
+  - generator_right_switch
+  - fire_test_switch
+  - apu_switch
+  - eng_crank_switch
+  - throttle_quadrant_reference
+  - bleed_air_knob
+  - lights_test_button
+  - left_mdi_brightness_selector
+  - right_mdi_brightness_selector
+  - ampcd_off_brightness_knob
+  - hud_symbology_brightness_knob
+  - left_mdi_pb5
+  - right_mdi_pb5
+  - ufc_comm1_channel_selector_pull
+  - ufc_comm1_channel_selector_rotate
+  - ufc_comm2_channel_selector_pull
+  - ufc_comm2_channel_selector_rotate
+  - ins_mode_knob
+  - radar_mode_knob
+  - obogs_control_switch
+  - obogs_flow_knob
+  - fcs_reset_button
+  - flap_switch
+  - takeoff_trim_button
+  - fcs_bit_switch
+  - refuel_probe_switch
+  - launch_bar_switch
+  - arresting_hook_handle
+  - pitot_heater_switch
+  - parking_brake_handle
+  - ifei_up_button
+  - ifei_down_button
+  - standby_altimeter_pressure_knob
+  - radar_altimeter_bug_knob
+  - standby_attitude_cage_knob
+  - attitude_source_selector
+
 precondition_gates:
   S01: []
   S02:
@@ -351,7 +391,8 @@ steps:
     completion_conditions:
       - "Right throttle at IDLE."
       - "Throttle moved when RPM >=25%."
-    ui_targets: []
+    ui_targets:
+      - throttle_quadrant_reference
     tutor_prompts:
       - "Monitor IFEI; when right RPM passes 25%, lift and move right throttle to IDLE, then visually confirm detent release."
 
@@ -462,7 +503,8 @@ steps:
       - "Left RPM reaches at least 25%."
     completion_conditions:
       - "Left throttle moved from OFF to IDLE when RPM >=25%."
-    ui_targets: []
+    ui_targets:
+      - throttle_quadrant_reference
     tutor_prompts:
       - "Monitor left RPM; once >=25%, advance left throttle OFF to IDLE and visually confirm detent release."
 
@@ -478,7 +520,8 @@ steps:
       - "Left engine RPM >60% and left throttle not in OFF."
     completion_conditions:
       - "INS knob set to GND (airfield) or CV (carrier)."
-    ui_targets: []
+    ui_targets:
+      - ins_mode_knob
     tutor_prompts:
       - "When left engine RPM exceeds 60%, set INS knob to GND or CV for alignment; verify mode selection."
 
@@ -494,7 +537,8 @@ steps:
       - "INS mode configured for alignment."
     completion_conditions:
       - "Radar knob in OPR and radar power online."
-    ui_targets: []
+    ui_targets:
+      - radar_mode_knob
     tutor_prompts:
       - "After INS mode is set, rotate radar knob to OPR and verify radar comes online."
 
@@ -510,7 +554,9 @@ steps:
       - "Radar and core avionics are online."
     completion_conditions:
       - "OBOGS control and FLOW switches confirmed ON."
-    ui_targets: []
+    ui_targets:
+      - obogs_control_switch
+      - obogs_flow_knob
     tutor_prompts:
       - "Set OBOGS and FLOW to ON; this step currently needs visual confirmation or checklist cross-check."
 
@@ -528,6 +574,7 @@ steps:
       - "FCS RESET manually pressed."
       - "FCS page brought up and reviewed for faults."
     ui_targets:
+      - fcs_reset_button
       - left_mdi_pb5
     tutor_prompts:
       - "Manually press FCS RESET, then use left DDI PB5 to bring up/review the FCS page; PB5 highlight is for monitoring only and final status needs visual confirmation."
@@ -544,7 +591,8 @@ steps:
       - "FCS checks reviewed and displays stable."
     completion_conditions:
       - "Flap switch confirmed in AUTO."
-    ui_targets: []
+    ui_targets:
+      - flap_switch
     tutor_prompts:
       - "Set flap switch to AUTO and visually verify switch position."
 
@@ -560,7 +608,8 @@ steps:
       - "Flap mode set and left display powered."
     completion_conditions:
       - "TAKEOFF TRIM button pressed and trim set."
-    ui_targets: []
+    ui_targets:
+      - takeoff_trim_button
     tutor_prompts:
       - "Press TAKEOFF TRIM and visually confirm trim indication."
 
@@ -594,7 +643,13 @@ steps:
       - "Core avionics and FCS BIT checks complete."
     completion_conditions:
       - "Four-down checklist completed and all items cross-checked."
-    ui_targets: []
+    ui_targets:
+      - refuel_probe_switch
+      - throttle_quadrant_reference
+      - launch_bar_switch
+      - arresting_hook_handle
+      - pitot_heater_switch
+      - flap_switch
     tutor_prompts:
       - "Execute the full four-down checklist and visually verify each item because telemetry coverage is limited."
 
@@ -610,7 +665,8 @@ steps:
       - "Four-down checks completed and taxi prep ongoing."
     completion_conditions:
       - "Parking brake released and aircraft ready to roll."
-    ui_targets: []
+    ui_targets:
+      - parking_brake_handle
     tutor_prompts:
       - "Release parking brake when taxi checklist is complete; verify brake state visually."
 
@@ -626,7 +682,9 @@ steps:
       - "Pre-taxi instrument configuration in progress."
     completion_conditions:
       - "BINGO fuel value set to mission requirement."
-    ui_targets: []
+    ui_targets:
+      - ifei_up_button
+      - ifei_down_button
     tutor_prompts:
       - "Set BINGO fuel on IFEI and visually confirm the target value."
 
@@ -642,7 +700,8 @@ steps:
       - "BINGO setup complete and instrument checks underway."
     completion_conditions:
       - "Standby barometric altimeter matches local elevation/QNH."
-    ui_targets: []
+    ui_targets:
+      - standby_altimeter_pressure_knob
     tutor_prompts:
       - "Adjust standby barometric altimeter to field elevation/QNH and verify visually."
 
@@ -658,7 +717,8 @@ steps:
       - "Standby barometric altimeter configured."
     completion_conditions:
       - "Radar altimeter bug set to scenario-appropriate value."
-    ui_targets: []
+    ui_targets:
+      - radar_altimeter_bug_knob
     tutor_prompts:
       - "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier); visual confirmation is required."
 
@@ -674,7 +734,8 @@ steps:
       - "Altimeter checks complete and standby instruments powered."
     completion_conditions:
       - "Standby attitude indicator uncaged and free-moving."
-    ui_targets: []
+    ui_targets:
+      - standby_attitude_cage_knob
     tutor_prompts:
       - "Uncage the standby attitude indicator and visually confirm normal movement."
 
@@ -690,6 +751,7 @@ steps:
       - "Standby attitude indicator uncaged."
     completion_conditions:
       - "Attitude source selector set to AUTO."
-    ui_targets: []
+    ui_targets:
+      - attitude_source_selector
     tutor_prompts:
       - "Set attitude source selector to AUTO and visually verify final pre-taxi configuration."
