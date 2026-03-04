@@ -1,6 +1,8 @@
+import os
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 from core.step_signal_metadata import STEP_EVIDENCE_REQUIREMENT_VALUES, STEP_OBSERVABILITY_VALUES
@@ -9,7 +11,9 @@ from core.step_signal_metadata import STEP_EVIDENCE_REQUIREMENT_VALUES, STEP_OBS
 BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
 UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
-CLICKABLEDATA_PATH = BASE_DIR / "CockpitScripts" / "clickabledata.lua"
+DEFAULT_CLICKABLEDATA_PATH = BASE_DIR / "CockpitScripts" / "clickabledata.lua"
+CLICKABLE_IDS_FIXTURE_PATH = BASE_DIR / "tests" / "fixtures" / "fa18c_clickable_ids.txt"
+CLICKABLEDATA_ENV_VAR = "SIMTUTOR_FA18C_CLICKABLEDATA_PATH"
 REQUIRED_STEP_IDS = tuple(f"S{i:02d}" for i in range(1, 26))
 REQUIRED_OPERABLE_STEP_IDS = REQUIRED_STEP_IDS
 _PNT_ID_PATTERN = re.compile(r"^pnt_[0-9]+(?:_[0-9]+)?$")
@@ -34,9 +38,35 @@ def _dedupe_keep_order(items: list[str]) -> list[str]:
     return out
 
 
-def _load_clickable_ids() -> set[str]:
-    text = CLICKABLEDATA_PATH.read_text(encoding="utf-8")
-    return {match.group("id") for match in _CLICKABLE_ID_PATTERN.finditer(text)}
+def _extract_clickable_ids(text: str) -> set[str]:
+    ids = {match.group("id") for match in _CLICKABLE_ID_PATTERN.finditer(text)}
+    if ids:
+        return ids
+    return {line.strip() for line in text.splitlines() if _PNT_ID_PATTERN.fullmatch(line.strip())}
+
+
+def _load_clickable_ids() -> tuple[set[str], Path]:
+    candidate_paths: list[Path] = []
+
+    env_path = os.getenv(CLICKABLEDATA_ENV_VAR)
+    if env_path:
+        candidate_paths.append(Path(env_path))
+
+    candidate_paths.append(DEFAULT_CLICKABLEDATA_PATH)
+    candidate_paths.append(CLICKABLE_IDS_FIXTURE_PATH)
+
+    for path in candidate_paths:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        ids = _extract_clickable_ids(text)
+        if ids:
+            return ids, path
+
+    pytest.skip(
+        "clickabledata source not found; set "
+        f"{CLICKABLEDATA_ENV_VAR} or provide {DEFAULT_CLICKABLEDATA_PATH} / {CLICKABLE_IDS_FIXTURE_PATH}"
+    )
 
 
 def test_step_ui_targets_must_exist_and_reference_ui_map_keys() -> None:
@@ -132,15 +162,15 @@ def test_ui_map_dcs_ids_align_with_cockpit_clickabledata() -> None:
     cockpit_elements = ui_map.get("cockpit_elements")
     assert isinstance(cockpit_elements, dict) and cockpit_elements, "ui_map.yaml must define cockpit_elements"
 
-    clickable_ids = _load_clickable_ids()
-    assert clickable_ids, "clickabledata.lua must expose at least one elements[pnt_*] id"
+    clickable_ids, source_path = _load_clickable_ids()
+    assert clickable_ids, f"{source_path} must expose at least one pnt_* id"
 
     for target, entry in cockpit_elements.items():
         assert isinstance(entry, dict), f"ui_map target {target!r} must map to a mapping"
         dcs_id = entry.get("dcs_id")
         assert isinstance(dcs_id, str) and dcs_id
         assert dcs_id in clickable_ids, (
-            f"ui_map target {target!r} uses dcs_id {dcs_id!r} not found in CockpitScripts/clickabledata.lua"
+            f"ui_map target {target!r} uses dcs_id {dcs_id!r} not found in clickable reference source: {source_path}"
         )
 
 
