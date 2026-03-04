@@ -8,7 +8,6 @@ from typing import Any, Iterable, Mapping, Tuple
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.runner import replay_log, run_simulation
 
@@ -26,6 +25,7 @@ SCHEMA_INDEX = {
     "dcs_hello": ("simtutor.schemas.v2", "dcs_hello.json"),
     "dcs_caps": ("simtutor.schemas.v2", "dcs_caps.json"),
 }
+
 
 def _load_schema(name: str) -> Mapping:
     if name not in SCHEMA_INDEX:
@@ -129,8 +129,6 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     bios_to_ui_path=args.bios_to_ui,
                     knowledge_index_path=args.knowledge_index,
                     rag_top_k=args.rag_top_k,
-                    cold_start_production=bool(args.cold_start_production),
-                    knowledge_source_policy_path=args.knowledge_source_policy,
                     cooldown_s=args.cooldown_s,
                     session_id=args.session_id,
                     lang=args.lang,
@@ -245,30 +243,6 @@ def main() -> int:
     )
     rep_bios.add_argument("--knowledge-index", default="Doc/Evaluation/index.json", help="Grounding index.json path")
     rep_bios.add_argument("--rag-top-k", type=int, default=5, help="Grounding snippet top-k")
-    replay_cold_start_default = parse_env_bool(ENV_COLD_START_PRODUCTION, default=False)
-    replay_cold_start_group = rep_bios.add_mutually_exclusive_group()
-    replay_cold_start_group.add_argument(
-        "--cold-start-production",
-        dest="cold_start_production",
-        action="store_true",
-        help="Enable cold-start production mode (requires valid knowledge source policy).",
-    )
-    replay_cold_start_group.add_argument(
-        "--no-cold-start-production",
-        dest="cold_start_production",
-        action="store_false",
-        help="Disable cold-start production mode even if env default is enabled.",
-    )
-    rep_bios.set_defaults(cold_start_production=replay_cold_start_default)
-    rep_bios.add_argument(
-        "--knowledge-source-policy",
-        default=None,
-        help=(
-            "knowledge_source_policy.yaml path. In cold-start production mode, omitted path "
-            "falls back to repository-checkout knowledge_source_policy.yaml when available. "
-            "Providing this flag enables policy filtering in any mode."
-        ),
-    )
 
     rep_bios.add_argument("--output", help="Event log JSONL output path")
     rep_bios.add_argument("--session-id", default=None, help="Optional event session id")

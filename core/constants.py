@@ -1,5 +1,0 @@
-"""Shared project-wide constants."""
-
-ENV_COLD_START_PRODUCTION = "SIMTUTOR_COLD_START_PRODUCTION"
-
-__all__ = ["ENV_COLD_START_PRODUCTION"]

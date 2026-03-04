@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 import math
 import re
-from functools import lru_cache
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from pathlib import Path
@@ -37,22 +36,10 @@ def _normalize_text(value: Any) -> str:
     return str(value)
 
 
-@lru_cache(maxsize=16)
-def _load_index_data_cached(resolved_path: str, mtime_ns: int, size_bytes: int) -> Any:
-    del mtime_ns, size_bytes  # cache-key components only
-    return json.loads(Path(resolved_path).read_text(encoding="utf-8"))
-
-
-def load_index_data(index_path: str | Path) -> Any:
-    path = Path(index_path).expanduser().resolve()
-    stat = path.stat()
-    return _load_index_data_cached(str(path), int(stat.st_mtime_ns), int(stat.st_size))
-
-
 class BM25Retriever(KnowledgePort):
     def __init__(self, index_path: str | Path):
         self.index_path = Path(index_path)
-        self.data = load_index_data(self.index_path)
+        self.data = json.loads(self.index_path.read_text(encoding="utf-8"))
         self.chunks: list[dict[str, Any]] = []
         for doc_idx, doc in enumerate(self.data.get("documents", [])):
             if not isinstance(doc, Mapping):

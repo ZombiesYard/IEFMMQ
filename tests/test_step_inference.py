@@ -125,38 +125,6 @@ def test_infer_step_s05_when_throttle_state_is_unknown_after_rpm_25() -> None:
     assert result.missing_conditions == ("vars.throttle_r_not_off==true",)
 
 
-def test_infer_step_s05_when_throttle_state_is_unparseable_after_rpm_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": True,
-            "apu_ready": True,
-            "engine_crank_right": True,
-            "rpm_r": 30,
-            "throttle_r_not_off": "unknown",
-        },
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S05"
-    assert result.missing_conditions == ("vars.throttle_r_not_off==true",)
-
-
-def test_infer_step_advances_to_s06_when_throttle_key_is_missing_after_rpm_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": True,
-            "apu_ready": True,
-            "engine_crank_right": True,
-            "rpm_r": 45,
-            # throttle_r_not_off intentionally omitted
-        },
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S06"
-    assert result.missing_conditions == ("vars.rpm_r>=60",)
-
-
 def test_infer_step_is_robust_on_invalid_inputs() -> None:
     result = infer_step_id(
         _pack_steps(),

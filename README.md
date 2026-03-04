@@ -273,6 +273,28 @@ python3 -m pytest -q
 - `model_access.md`
 - `help_flow.md`
 - `help_flow_en.md`
+Replay BIOS via `simtutor` CLI (default safe mode with dry-run overlay):
+```sh
+python -m simtutor replay-bios \
+  --input logs/dcs_bios_raw.jsonl \
+  --speed 1.0 \
+  --help-udp-port 7794 \
+  --model-provider stub \
+  --output logs/replay_bios.jsonl
+```
+Notes:
+- `--speed 1.0`: realtime pacing by frame `t_wall`; `--speed 0`: max speed.
+- `replay-bios` defaults to `--dry-run-overlay`; use `--no-dry-run-overlay` only when you really want to send overlay commands.
+
+Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
+- `grounding_snippet_ids`: snippet ids actually injected into prompt.
+- `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
+- `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`); valid gate evidence refs are exactly `GATES.<gate_id>` where `<gate_id>` is a key in `context.gates` (for example `GATES.S05.precondition`).
+
+### Overlay action evidence protocol
+Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
+
+## Source Documents (authoritative)
 - `Doc/Evaluation/fa18c_startup_master.md`
 - `Doc/Evaluation/Appendix - Training Task Syllabus.md`
 - `Doc/Evaluation/fa18c_error_coding_guide.md`
