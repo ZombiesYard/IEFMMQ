@@ -27,6 +27,15 @@ def _base_context() -> dict:
     }
 
 
+def test_prompt_defaults_to_registry_backed_step_ids() -> None:
+    result = build_help_prompt_result({}, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert payload["allowed_step_ids"][0] == "S01"
+    assert payload["allowed_step_ids"][-1] == "S25"
+    assert len(payload["allowed_step_ids"]) == 25
+
+
 def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -> None:
     prompt = build_help_prompt(_base_context(), "en")
     payload = _extract_prompt_constraints_json(prompt)
