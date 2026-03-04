@@ -57,9 +57,9 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
   - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
 
 ## Packs (fa18c_startup)
-- `pack.yaml` procedure steps S01-S10 mapped from `fa18c_startup_master.md`; deterministic `precondition_gates` / `completion_gates` additionally cover S11 readiness checks.
+- `pack.yaml` procedure steps S01-S25 mapped from `fa18c_startup_master.md`; deterministic `precondition_gates` / `completion_gates` keep full cold-start progression checkable.
 - `taxonomy.yaml` error categories OM/CO/OR/PA/SV, weights, critical multiplier.
-- `ui_map.yaml` abstract targets  DCS `pnt_*`.
+- `ui_map.yaml` abstract targets to DCS `pnt_*`, with `aliases` and `panel_area` metadata for stable allowlist/debug/UX.
 - `telemetry_map.yaml` stable var mappings for gating/LLM/overlay (vars.*).
 - Instruments: NASATLX, quiz stored under `Doc/Evaluation`.
 
