@@ -284,7 +284,7 @@ Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
   - Providing `--knowledge-source-policy` applies whitelist filtering in any mode; cold-start production mode only makes valid policy mandatory.
   - Missing/invalid policy causes startup failure.
   - Startup log prints: `当前仅使用 cold-start 白名单块 ...`
-- `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.
+  - `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.
 
 ### Evaluation Doc Regeneration (CS-002)
 - Regenerate all `Doc/Evaluation/*.md` (except `index.json`) from `index.json + knowledge_source_policy.yaml`:

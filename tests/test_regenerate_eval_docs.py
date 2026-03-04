@@ -7,6 +7,7 @@ import pytest
 
 from tools.regenerate_eval_docs import (
     EvalDocDriftError,
+    EvalDocRegenerationError,
     _compute_version_stamp,
     build_regenerated_docs,
     regenerate_eval_docs,
@@ -110,3 +111,81 @@ def test_compute_version_stamp_is_stable_across_line_endings(tmp_path: Path) -> 
     stamp_lf = _compute_version_stamp(index_lf, policy_lf)
     stamp_crlf = _compute_version_stamp(index_crlf, policy_crlf)
     assert stamp_lf == stamp_crlf
+
+
+def test_build_regenerated_docs_rejects_absolute_source_path(tmp_path: Path) -> None:
+    index_path = tmp_path / "Doc" / "Evaluation" / "index.json"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index = {
+        "documents": [
+            {
+                "doc_id": "sample_doc",
+                "source_path": "/tmp/evil.md",
+                "chunks": [{"chunk_id": "sample_doc_0", "heading": "H", "text": "L1"}],
+            }
+        ]
+    }
+    index_path.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+    policy_path = tmp_path / "knowledge_source_policy.yaml"
+    policy_path.write_text(
+        "policy_id: p\n"
+        "version: v1\n"
+        "index_path: Doc/Evaluation/index.json\n"
+        "allow:\n"
+        "  - doc_id: sample_doc\n"
+        "    chunk_id: sample_doc_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(EvalDocRegenerationError, match="must be relative to repo root"):
+        build_regenerated_docs(index_path=index_path, policy_path=policy_path, repo_root=tmp_path)
+
+
+def test_build_regenerated_docs_rejects_path_traversal(tmp_path: Path) -> None:
+    index_path = tmp_path / "Doc" / "Evaluation" / "index.json"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index = {
+        "documents": [
+            {
+                "doc_id": "sample_doc",
+                "source_path": "../outside.md",
+                "chunks": [{"chunk_id": "sample_doc_0", "heading": "H", "text": "L1"}],
+            }
+        ]
+    }
+    index_path.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+    policy_path = tmp_path / "knowledge_source_policy.yaml"
+    policy_path.write_text(
+        "policy_id: p\n"
+        "version: v1\n"
+        "index_path: Doc/Evaluation/index.json\n"
+        "allow:\n"
+        "  - doc_id: sample_doc\n"
+        "    chunk_id: sample_doc_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(EvalDocRegenerationError, match="escapes repo root"):
+        build_regenerated_docs(index_path=index_path, policy_path=policy_path, repo_root=tmp_path)
+
+
+def test_regenerate_eval_docs_reports_non_utf8_existing_file(tmp_path: Path) -> None:
+    index_path, policy_path = _write_sample_index_and_policy(tmp_path)
+    changed = regenerate_eval_docs(
+        index_path=index_path,
+        policy_path=policy_path,
+        repo_root=tmp_path,
+        check=False,
+    )
+    generated_path = changed[0]
+    generated_path.write_bytes(b"\xff\xfe\xfd")
+
+    with pytest.raises(EvalDocRegenerationError, match="not valid UTF-8"):
+        regenerate_eval_docs(
+            index_path=index_path,
+            policy_path=policy_path,
+            repo_root=tmp_path,
+            check=True,
+        )

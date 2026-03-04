@@ -4,7 +4,7 @@ generator: tools/regenerate_eval_docs.py
 source_index: Doc/Evaluation/index.json
 policy_id: fa18c_cold_start_whitelist_v1
 policy_version: v2
-version_stamp: 5c73b4cb34066c5d
+version_stamp: 6bbd506dfd81e311
 source_chunks:
 - fa18c_scoring_sheet_template/fa18c_scoring_sheet_template_0:1-7
 - fa18c_scoring_sheet_template/fa18c_scoring_sheet_template_1:1-23
@@ -64,7 +64,6 @@ This template defines two levels of scoring data:
 - `Performed`: `yes` / `no` (did the participant attempt this step at all?).
 - `Error_OM`, `Error_CO`, `Error_OR`, `Error_PA`, `Error_SV`: `0` or `1` for each category.
 - `StepErrorScore`: numeric value computed from error codes and criticality, e.g.:  
-  `StepErrorScore = (2*OM + 1*CO + 2*OR + 1*PA + 2*SV) * (Critical ? 1.5 : 1)`
+  `StepErrorScore = ceil((2*OM + 1*CO + 2*OR + 1*PA + 2*SV) * (1.5 if Critical == "yes" else 1.0))`
+  (round up to nearest integer after applying critical multiplier).
 - `Notes`: short comments, e.g. “INS mode set before engine stable”.
-
----

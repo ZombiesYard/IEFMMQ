@@ -66,9 +66,21 @@ def _to_repo_relative_path(raw_path: str, *, repo_root: Path) -> Path:
     win_path = PureWindowsPath(text)
     normalized = str(win_path).replace("\\", "/")
     candidate = Path(normalized)
-    if candidate.is_absolute():
-        return candidate.resolve()
-    return (repo_root / candidate).resolve()
+    if candidate.is_absolute() or win_path.is_absolute():
+        raise EvalDocRegenerationError(
+            f"index document source_path must be relative to repo root: {text}"
+        )
+    resolved = (repo_root / candidate).resolve()
+    eval_root = (repo_root / "Doc" / "Evaluation").resolve()
+    if not resolved.is_relative_to(repo_root):
+        raise EvalDocRegenerationError(
+            f"index document source_path escapes repo root: {text}"
+        )
+    if not resolved.is_relative_to(eval_root):
+        raise EvalDocRegenerationError(
+            f"index document source_path must stay under Doc/Evaluation: {text}"
+        )
+    return resolved
 
 
 def _as_non_empty_str(value: Any, *, field_name: str) -> str:
@@ -382,7 +394,12 @@ def regenerate_eval_docs(
     changed: list[Path] = []
     drift: list[Path] = []
     for render in renders:
-        current = render.output_path.read_text(encoding="utf-8") if render.output_path.exists() else ""
+        try:
+            current = render.output_path.read_text(encoding="utf-8") if render.output_path.exists() else ""
+        except UnicodeDecodeError as exc:
+            raise EvalDocRegenerationError(
+                f"evaluation markdown is not valid UTF-8: {render.output_path}"
+            ) from exc
         if current == render.content:
             continue
         if check:
