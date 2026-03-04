@@ -1,4 +1,5 @@
 ﻿from jsonschema.exceptions import ValidationError
+import os
 from pathlib import Path
 import time
 
@@ -250,6 +251,13 @@ def _write_yaml(path: Path, payload: dict) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
 
+def _bump_mtime(path: Path) -> None:
+    now = time.time()
+    current = path.stat().st_mtime
+    bumped = max(current + 2.0, now + 2.0)
+    os.utime(path, (bumped, bumped))
+
+
 def _registry_payload(first_short_explanation: str) -> dict:
     steps = []
     for i in range(1, 26):
@@ -301,8 +309,6 @@ def test_help_schema_cache_invalidates_when_registry_file_removed(tmp_path: Path
     assert step_ids_with_registry[0] == "S01"
     assert step_ids_with_registry[-1] == "S25"
 
-    # Ensure timestamp granularity is crossed for cache invalidation on some filesystems.
-    time.sleep(0.01)
     registry_path.unlink()
 
     schema_without_registry = get_help_response_schema(
@@ -348,15 +354,16 @@ def test_help_schema_cache_invalidates_when_ui_map_and_taxonomy_change(tmp_path:
     assert overlay_before == ["target_a"]
     assert categories_before == ["OM"]
 
-    time.sleep(0.01)
     _write_yaml(
         ui_map_path,
         {"cockpit_elements": {"target_a": {"description": "A"}, "target_b": {"description": "B"}}},
     )
+    _bump_mtime(ui_map_path)
     _write_yaml(
         taxonomy_path,
         {"taxonomy": {"categories": [{"code": "OM"}, {"code": "CO"}], "trial_flags": []}},
     )
+    _bump_mtime(taxonomy_path)
 
     schema_after = get_help_response_schema(
         pack_path=pack_path,

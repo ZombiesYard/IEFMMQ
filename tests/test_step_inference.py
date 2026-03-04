@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 import time
 
-from adapters.step_inference import StepInferenceResult, extract_recent_ui_targets, infer_step_id, load_pack_steps
 import yaml
+from adapters.step_inference import StepInferenceResult, extract_recent_ui_targets, infer_step_id, load_pack_steps
 
 
 def _pack_steps() -> list[dict]:
@@ -184,6 +185,13 @@ def _write_yaml(path: Path, payload: dict) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
 
+def _bump_mtime(path: Path) -> None:
+    now = time.time()
+    current = path.stat().st_mtime
+    bumped = max(current + 2.0, now + 2.0)
+    os.utime(path, (bumped, bumped))
+
+
 def _registry_payload(first_short_explanation: str) -> dict:
     steps = []
     for i in range(1, 26):
@@ -218,8 +226,8 @@ def test_load_pack_steps_cache_invalidates_when_registry_changes(tmp_path: Path)
     first = load_pack_steps(pack_path)
     assert first[0]["short_explanation"] == "first"
 
-    time.sleep(0.01)
     _write_yaml(registry_path, _registry_payload("updated"))
+    _bump_mtime(registry_path)
 
     second = load_pack_steps(pack_path)
     assert second[0]["short_explanation"] == "updated"
@@ -238,7 +246,6 @@ def test_load_pack_steps_cache_invalidates_when_pack_fallback_changes(tmp_path: 
     first = load_pack_steps(pack_path)
     assert first[0]["marker"] == "first"
 
-    time.sleep(0.01)
     _write_yaml(
         pack_path,
         {
@@ -246,6 +253,7 @@ def test_load_pack_steps_cache_invalidates_when_pack_fallback_changes(tmp_path: 
             "steps": [{"id": "S01", "marker": "updated"}],
         },
     )
+    _bump_mtime(pack_path)
 
     second = load_pack_steps(pack_path)
     assert second[0]["marker"] == "updated"
