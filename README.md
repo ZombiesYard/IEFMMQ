@@ -1,303 +1,281 @@
-# SimTutor Core v0.1 F/A-18C Cold Start (Mock-first)
+# SimTutor Core (IEFMMQ)
 
-Simulator-agnostic tutoring backend with clean architecture (domain core + ports/adapters), mock environment, scoring, replayable event logs, and batch harness. Packs are derived from `Doc/Evaluation` sources.
+SimTutor Core is a tutoring backend for the DCS F/A-18C cold-start training scenario.
+The project uses a clean "core + ports + adapters" architecture and supports:
+- mock scenario simulation and scoring
+- live/replay DCS-BIOS tutoring loop
+- overlay-only (highlight) execution safety boundary
+- local BM25 retrieval with cold-start knowledge source policy
 
-## Repo Layout
-- `core/` domain engines: procedure state machine, gating DSL, scoring, overlay planner, knowledge BM25, data types.
-- `ports/` contracts for environment/model/knowledge/event store, etc.
-- `adapters/` mock env, DCS UDP stub, model stub, local knowledge adapter.
-- `packs/fa18c_startup/` procedure/taxonomy/ui_map + instruments.
-- `simtutor/schemas/v1/` JSON Schemas for Observation/TutorRequest/TutorResponse/Event.
-- `mock_scenarios/` scripted observation sequences.
-- `tools/index_docs.py` offline indexer for `Doc/Evaluation` md/pdf.
-- `logs/`, `artifacts/` run outputs.
+## What Works Now
 
-## Quickstart
-1) Python 3.10. Install deps:
-   ```sh
-   python -m pip install -e .
-   ```
-2) Build document index (defaults to `Doc/Evaluation`):
-   ```sh
-   python -m tools.index_docs --output Doc/Evaluation/index.json
-   ```
-3) Run a single mock scenario  log:
-   ```sh
-   python -m simtutor run --pack packs/fa18c_startup/pack.yaml \
-       --scenario mock_scenarios/correct_process.json \
-       --output logs/run_demo.jsonl
-   ```
-4) Replay trajectory check:
-   ```sh
-   python -m simtutor replay logs/run_demo.jsonl --pack packs/fa18c_startup/pack.yaml
-   ```
-5) Score a log:
-   ```sh
-   python -m simtutor score logs/run_demo.jsonl \
-       --pack packs/fa18c_startup/pack.yaml \
-       --taxonomy packs/fa18c_startup/taxonomy.yaml
-   ```
-6) Batch all scenarios, export CSV (requested example):
-   ```sh
-   python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts
-   ```
-   Creates `artifacts/results.csv` plus per-scenario logs.
-7) Schema validation for logs:
-   ```sh
-   python -m simtutor validate logs/run_demo.jsonl --schema event
-   ```
-8) Run all automated tests:
-   ```sh
-   pytest
-   ```
+- `simtutor` CLI: `run / replay / score / batch / validate / replay-bios / model-config`
+- `live_dcs.py`: end-to-end runtime (`bios -> enrich -> help -> response mapping -> overlay`)
+- model providers: `stub`, `openai_compat`, `ollama`
+- JSONL event logs for replay, scoring, and schema validation
+- DCS utilities for indexing, hook installation, telemetry/BIOS listening, and recording
 
-## Data Contracts (v1)
-- JSON Schemas in `simtutor/schemas/v1/*.schema.json`
-- Python dataclasses in `core/types.py`
-  - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
+## Repository Layout
 
-## Packs (fa18c_startup)
-- `pack.yaml` procedure steps S01-S10 mapped from `fa18c_startup_master.md`; deterministic `precondition_gates` / `completion_gates` additionally cover S11 readiness checks.
-- `taxonomy.yaml` error categories OM/CO/OR/PA/SV, weights, critical multiplier.
-- `ui_map.yaml` abstract targets  DCS `pnt_*`.
-- `telemetry_map.yaml` stable var mappings for gating/LLM/overlay (vars.*).
-- Instruments: NASATLX, quiz stored under `Doc/Evaluation`.
+- `core/`: domain engines (`procedure`, `gating`, `scoring`, `overlay`, `knowledge`, `types`)
+- `ports/`: model/knowledge/telemetry interfaces
+- `adapters/`: model adapters, DCS adapters, event writers, response mapping
+- `simtutor/`: CLI entrypoint and schemas
+- `packs/fa18c_startup/`: pack config (`pack`, `taxonomy`, `ui_map`, `telemetry_map`)
+- `mock_scenarios/`: offline scenario inputs
+- `tools/`: indexing, hook install, listener/recorder tools
+- `Doc/Evaluation/`: source training and evaluation documents
 
-## Engines
-- Procedure engine (`core/procedure.py`): pending/active/done/blocked, rewind, timeout, prompt counts; emits `step_activated|completed|blocked`.
-- Gating (`core/gating.py`): DSL ops `var_gte`, `arg_in_range`, `flag_true`, `time_since`.
-- Scoring (`core/scoring.py`): counts/errors per category + TotalErrorScore from event logs; uses pack/taxonomy.
-- Overlay planner (`core/overlay.py`): maps abstract target to overlay action (highlight/clear/pulse).
-- Knowledge BM25 (`core/knowledge.py` + `adapters/knowledge_local.py`): queries `Doc/Evaluation/index.json` (default).
+## Requirements
 
-## Adapters
-- MockEnv (`adapters/mock_env.py`): replays `mock_scenarios/*.json` via `get_observation()`.
-- DCS UDP stub (`adapters/dcs_adapter.py`): sends `HILITE pnt_XXX` / `CLEAR` to `127.0.0.1:7778`, compatible with `Scripts/Hooks/VRHilite.lua`; designed to map ui_map entries for future expansion.
-- Model stub (`adapters/model_stub.py`): deterministic modes A/B/C; writes card info in `TutorResponse.metadata`.
+- Python `3.10+`
+- Run commands from repo root
+- Commands below use `python3` (many environments do not provide a `python` alias)
 
-## Experiment Harness
-- Single run: `python -m simtutor run ...`
-- Replay: `python -m simtutor replay ...`
-- Replay telemetry: `python -m simtutor replay --telemetry logs/telemetry_*.jsonl`
-- Replay BIOS help loop: `python -m simtutor replay-bios --input logs/dcs_bios_raw.jsonl --auto-help-once`
-- Score: `python -m simtutor score ...`
-- Batch: `python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts`
-  - Optional: `--taxonomy packs/fa18c_startup/taxonomy.yaml`
-  - Optional: `--scenarios mock_scenarios/*.json`
+## Installation
 
-## Knowledge Retrieval
-- Build index: `python -m tools.index_docs --output Doc/Evaluation/index.json`
-- Query example (Python):
-  ```python
-  from adapters.knowledge_local import LocalKnowledgeAdapter, build_grounding_query
-  kg = LocalKnowledgeAdapter()  # defaults Doc/Evaluation/index.json
-  query = build_grounding_query(
-      pack_title="F/A-18C Cold Start (MVP subset)",
-      inferred_step="S03",
-      missing_conditions=["vars.apu_ready==true"],
-      recent_ui_targets=["apu_switch"],
-  )
-  print(kg.retrieve(query, top_k=3, step_id="S03"))
-  ```
-- `retrieve()` result fields: `doc_id/section/page_or_heading/snippet/snippet_id/score`.
-- Same `step_id` uses 60s retrieval cache by default.
-
-## DCS Overlay Quick Test
-- With `VRHilite.lua` running in DCS (listening 127.0.0.1:7778):
-  ```python
-  from adapters.dcs_adapter import DcsAdapter
-  dcs = DcsAdapter()
-  dcs.highlight("pnt_331")  # fire test switch
-  dcs.clear()
-  dcs.close()
-  ```
-  Mirrors `DCS/Scripts/HilteTest.py` / `HiliteClearTest.py`.
-
-## DCS Overlay (SimTutorHighlight)
-- Install hook: copy `DCS/Scripts/Hooks/SimTutorHighlight.lua` to
-  `Saved Games\\DCS\\Scripts\\Hooks\\SimTutorHighlight.lua`.
-- PC sender/ack example:
-  ```python
-  from adapters.dcs.overlay.ack_receiver import DcsOverlayAckReceiver
-  from adapters.dcs.overlay.sender import DcsOverlaySender
-  from core.overlay import OverlayIntent
-
-  with DcsOverlayAckReceiver() as ack_rx, DcsOverlaySender(ack_receiver=ack_rx) as sender:
-      intent = OverlayIntent(intent="highlight", target="battery", element_id="pnt_331")
-      sender.send_intent(intent, expect_ack=True)
-      sender.send_intent(OverlayIntent(intent="clear", target="battery", element_id="pnt_331"))
-  ```
-
-## DCS Export Injection (SimTutor.lua)
-- Install SimTutor DCS scripts into Saved Games and patch `Export.lua`:
-  ```sh
-  python -m tools.install_dcs_hook --dcs-variant DCS
-  ```
-  This copies from `DCS/Scripts` in the repo to `Saved Games\DCS\Scripts`.
-
-## DCS Capabilities Handshake
-- DCS listens for HELLO on UDP `127.0.0.1:7793` and replies with caps.
-- PC example:
-  ```python
-  from adapters.dcs.caps.handshake import negotiate, apply_caps_to_overlay_sender
-  from adapters.dcs.overlay.sender import DcsOverlaySender
-
-  caps = negotiate()
-  sender = DcsOverlaySender()
-  if caps:
-      apply_caps_to_overlay_sender(sender, caps)
-  ```
-
-## DCS Telemetry (UDP -> Observation)
-- SimTutor.lua sends JSON telemetry over UDP (default 127.0.0.1:7780, 20 Hz).
-- PC receiver example:
-  ```python
-  from adapters.dcs.telemetry.receiver import DcsTelemetryReceiver
-  with DcsTelemetryReceiver() as rx:
-      obs = rx.get_observation()
-      if obs:
-          print(obs.payload)
-  ```
-- Record to JSONL event log:
-  ```sh
-  python -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30 --print
-  ```
-
-## DCS-BIOS Bridge (Hub Script -> SimTutor)
-1) Generate catalog + Lua control list:
-   ```sh
-   python -m adapters.dcs_bios.catalog_loader \
-       --aircraft FA-18C_hornet \
-       --input DCS/Scripts/DCS-BIOS/doc/json/FA-18C_hornet.json \
-       --output artifacts/dcs_bios_catalog_FA-18C_hornet.json \
-       --controls-lua artifacts/dcs_bios_controls_FA-18C_hornet.lua
-   ```
-2) Load `DCS/Scripts/SimTutor/SimTutorDcsBiosHub.lua` into DCS-BIOS Hub.
-   - Set `CONTROL_LIST_PATH` or `CONTROL_LIST_DIR` to the generated `artifacts/dcs_bios_controls_*.lua`.
-   - Default UDP target: `127.0.0.1:7790`.
-   - Set `SEND_DELTA_ONLY = true` to reduce bandwidth (receiver merges cache).
-3) Receive on PC:
-   ```python
-   from adapters.dcs_bios.receiver import DcsBiosReceiver
-   with DcsBiosReceiver() as rx:
-       obs = rx.get_observation()
-       if obs:
-           print(obs.payload["bios"])
-   ```
-4) Raw DCS-BIOS export decode (if you see hex bytes):
-   ```python
-   from adapters.dcs_bios.receiver import DcsBiosRawReceiver
-   with DcsBiosRawReceiver(
-       aircraft="FA-18C_hornet",
-       control_reference_dir="DCS/Scripts/DCS-BIOS/doc/json",
-   ) as rx:
-       obs = rx.get_observation()
-       if obs:
-           print(obs.payload["bios"])
-   ```
-   Or CLI:
-   ```sh
-   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet
-   ```
-   Record for a fixed duration (seconds):
-   ```sh
-   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet \
-       --duration 15 --output logs/dcs_bios_raw_15s.jsonl
-   ```
-   Note: the raw export stream is incremental; the first frame may be partial
-   (e.g., `_ACFT_NAME` truncated). For a single fuller snapshot, wait for enough
-   keys before exiting:
-   ```sh
-   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet \
-       --once --wait 15 --min-keys 500 \
-       --output artifacts/dcs_bios_frame_once.json
-   ```
-
-## Live DCS Tutor Loop (ST-015)
-- End-to-end runtime for `bios frame -> enrich -> help request -> model -> TutorResponse mapping -> overlay execution`.
-- Supports live UDP and offline replay.
-- Supports `--dry-run-overlay` for prompt/logic iteration without sending UDP commands.
-
-Run with replay (single-sample/offline validation; supports JSONL and single-line JSON):
-```sh
-python live_dcs.py \
-  --replay-bios artifacts/dcs_bios_frame_once.jsonl \
-  --auto-help-once \
-  --dry-run-overlay \
-  --model-provider stub \
-  --output logs/live_dcs_replay.jsonl
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -U pip
+python3 -m pip install -e .
 ```
 
-Run with live DCS-BIOS UDP receiver:
-```sh
-python live_dcs.py \
-  --host 0.0.0.0 --port 7790 \
-  --auto-help-every-n-frames 20 \
+## Quickstart (Offline Mock)
+
+1. Build knowledge index (default input is `Doc/Evaluation`):
+
+```bash
+python3 -m tools.index_docs --output Doc/Evaluation/index.json
+```
+
+2. Run one mock scenario:
+
+```bash
+python3 -m simtutor run \
+  --pack packs/fa18c_startup/pack.yaml \
+  --scenario mock_scenarios/correct_process.json \
+  --output logs/run_demo.jsonl
+```
+
+3. Replay trajectory:
+
+```bash
+python3 -m simtutor replay logs/run_demo.jsonl --pack packs/fa18c_startup/pack.yaml
+```
+
+4. Score the run:
+
+```bash
+python3 -m simtutor score \
+  logs/run_demo.jsonl \
+  --pack packs/fa18c_startup/pack.yaml \
+  --taxonomy packs/fa18c_startup/taxonomy.yaml
+```
+
+5. Batch scenarios and export CSV:
+
+```bash
+python3 -m simtutor batch \
+  --pack packs/fa18c_startup/pack.yaml \
+  --taxonomy packs/fa18c_startup/taxonomy.yaml \
+  --output-dir artifacts
+```
+
+Output: `artifacts/results.csv`
+
+## CLI Overview
+
+```bash
+python3 -m simtutor -h
+```
+
+Subcommands:
+- `validate`: validate JSONL logs against schema
+- `run`: run one mock scenario
+- `replay`: replay event logs or telemetry logs
+- `score`: score a run with taxonomy
+- `batch`: run multiple scenarios and export results
+- `model-config`: validate model env configuration (non-sensitive output)
+- `replay-bios`: replay DCS-BIOS JSONL through the live tutor pipeline
+
+## Model Providers
+
+Supported providers:
+- `openai_compat` (vLLM / llama.cpp / TGI via OpenAI-compatible APIs)
+- `ollama`
+- `stub` (deterministic local fallback for testing)
+
+Main env vars:
+- `SIMTUTOR_MODEL_PROVIDER=ollama|openai_compat|stub`
+- `SIMTUTOR_MODEL_NAME`
+- `SIMTUTOR_MODEL_BASE_URL`
+- `SIMTUTOR_MODEL_TIMEOUT_S`
+- `SIMTUTOR_LANG=zh|en`
+- `SIMTUTOR_MODEL_API_KEY` (`openai_compat` required)
+
+Minimal local stub setup:
+
+```bash
+export SIMTUTOR_MODEL_PROVIDER=stub
+export SIMTUTOR_MODEL_TIMEOUT_S=20
+export SIMTUTOR_LANG=zh
+```
+
+Check current model config:
+
+```bash
+python3 -m simtutor model-config
+```
+
+## Live DCS Tutor Loop
+
+### Replay BIOS First (recommended)
+
+`replay-bios` runs in safe mode by default (`--dry-run-overlay` enabled).
+
+```bash
+python3 -m simtutor replay-bios \
+  --input logs/dcs_bios_raw.jsonl \
+  --model-provider stub \
+  --auto-help-once \
+  --output logs/replay_bios_demo.jsonl
+```
+
+Common options:
+- `--speed 1.0`: realtime pacing, `--speed 0`: max speed
+- `--no-dry-run-overlay`: actually send overlay commands
+- `--stdin-help`: press Enter to trigger help
+- `--help-udp-port <port>`: enable UDP help trigger
+
+### Live DCS-BIOS UDP
+
+```bash
+export SIMTUTOR_MODEL_API_KEY="<your_key>"
+
+python3 live_dcs.py \
+  --host 0.0.0.0 \
+  --port 7790 \
   --model-provider openai_compat \
   --model-name Qwen3-8B-Instruct \
   --model-base-url http://127.0.0.1:8000 \
   --model-api-key "${SIMTUTOR_MODEL_API_KEY}" \
   --knowledge-index Doc/Evaluation/index.json \
+  --rag-top-k 5 \
   --cold-start-production \
   --knowledge-source-policy knowledge_source_policy.yaml \
-  --rag-top-k 5 \
+  --auto-help-every-n-frames 20 \
   --output logs/live_dcs_live.jsonl
 ```
-Note:
-- If you run inside WSL2 Ubuntu/bash, use `${SIMTUTOR_MODEL_API_KEY}`.
-- If you run from Windows PowerShell, use `$env:SIMTUTOR_MODEL_API_KEY`.
 
-Optional stdin help trigger:
-```sh
-python live_dcs.py --stdin-help --dry-run-overlay --model-provider stub
-```
-Then press `Enter` (or type `help`) to trigger a help cycle on current state.
-
-Replay BIOS via `simtutor` CLI (default safe mode with dry-run overlay):
-```sh
-python -m simtutor replay-bios \
-  --input logs/dcs_bios_raw.jsonl \
-  --speed 1.0 \
-  --help-udp-port 7794 \
-  --model-provider stub \
-  --cold-start-production \
-  --knowledge-source-policy knowledge_source_policy.yaml \
-  --output logs/replay_bios.jsonl
-```
 Notes:
-- `--speed 1.0`: realtime pacing by frame `t_wall`; `--speed 0`: max speed.
-- `replay-bios` defaults to `--dry-run-overlay`; use `--no-dry-run-overlay` only when you really want to send overlay commands.
+- `live_dcs.py` does not enable `--dry-run-overlay` by default.
+- In cold-start production mode, a valid knowledge source policy is mandatory.
+- In PowerShell, use `$env:SIMTUTOR_MODEL_API_KEY="..."`.
 
-Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
-- `grounding_snippet_ids`: snippet ids actually injected into prompt.
-- `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
-- `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`); valid gate evidence refs are exactly `GATES.<gate_id>` where `<gate_id>` is a key in `context.gates` (for example `GATES.S05.precondition`).
+## Knowledge Index and Source Policy
 
-### Knowledge Source Policy (CS-001)
-- Policy file: `knowledge_source_policy.yaml` (repo root).
-- Runtime flags:
-  - `--cold-start-production` / `--no-cold-start-production`
-  - `--knowledge-source-policy <path>` (optional override; omitted path falls back to repository-checkout `knowledge_source_policy.yaml` when available)
-  - env default: `SIMTUTOR_COLD_START_PRODUCTION=1|0`
-- Behavior:
-  - In cold-start production mode, a valid knowledge source policy is mandatory; if flag is omitted, repository-checkout `knowledge_source_policy.yaml` is used when available.
-  - Providing `--knowledge-source-policy` applies whitelist filtering in any mode; cold-start production mode only makes valid policy mandatory.
-  - Missing/invalid policy causes startup failure.
-  - Startup log prints: `当前仅使用 cold-start 白名单块 ...`
-  - `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.
+### Index
 
-### Overlay action evidence protocol
-Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
+- Default index path: `Doc/Evaluation/index.json`
+- Rebuild with `tools.index_docs`
 
-## Source Documents (authoritative)
+### Knowledge Source Policy (`knowledge_source_policy.yaml`)
+
+- Flags: `--cold-start-production / --no-cold-start-production`
+- Env default: `SIMTUTOR_COLD_START_PRODUCTION=1|0`
+- `--knowledge-source-policy <path>` enables whitelist filtering in any mode
+- In cold-start production mode:
+  - if no path is provided, runtime falls back to repo `knowledge_source_policy.yaml`
+  - invalid/missing policy fails fast at startup
+- `allow[].line_range` is enforced at runtime by clipping snippet lines
+
+## DCS Tools
+
+### Install DCS Hook
+
+```bash
+python3 -m tools.install_dcs_hook --dcs-variant DCS
+```
+
+Optional:
+- `--saved-games <path>`
+- `--no-export` (skip `Export.lua` patch)
+
+### Telemetry Listen/Record
+
+```bash
+python3 -m tools.listen_dcs_telemetry --host 0.0.0.0 --port 7780
+python3 -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30 --print
+```
+
+### Send Fake Telemetry
+
+```bash
+python3 -m tools.send_fake_dcs_telemetry --host 127.0.0.1 --port 7780 --count 20 --hz 20
+```
+
+### Decode Raw DCS-BIOS Stream
+
+```bash
+python3 -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet
+```
+
+One-shot fuller snapshot:
+
+```bash
+python3 -m tools.listen_dcs_bios_raw \
+  --aircraft FA-18C_hornet \
+  --once --wait 15 --min-keys 500 \
+  --output artifacts/dcs_bios_frame_once.json
+```
+
+## Schema Validation
+
+```bash
+python3 -m simtutor validate logs/run_demo.jsonl --schema event
+```
+
+Available schema names:
+- `event`
+- `observation`
+- `tutor_request`
+- `tutor_response`
+- `dcs_observation`
+- `dcs_bios_frame`
+- `telemetry_frame`
+- `dcs_overlay_command`
+- `dcs_overlay_ack`
+- `dcs_hello`
+- `dcs_caps`
+
+## Tests
+
+```bash
+python3 -m pytest -q
+```
+
+## Troubleshooting
+
+- `python: command not found`
+  - Use `python3`.
+
+- `model-config` shows `Missing required env: SIMTUTOR_MODEL_PROVIDER`
+  - Export required model env vars first.
+
+- cold-start policy startup errors in live/replay modes
+  - Verify `knowledge_source_policy.yaml` matches `Doc/Evaluation/index.json`
+    (`doc_id/chunk_id/line_range`).
+
+## References
+
+- `READMEZH.md` (Chinese README)
+- `model_access.md`
+- `help_flow.md`
+- `help_flow_en.md`
 - `Doc/Evaluation/fa18c_startup_master.md`
 - `Doc/Evaluation/Appendix - Training Task Syllabus.md`
 - `Doc/Evaluation/fa18c_error_coding_guide.md`
 - `Doc/Evaluation/fa18c_scoring_sheet_template.md`
 - `Doc/Evaluation/fa18c_coldstart_quiz.md`
 - `Doc/Evaluation/fa18c_nasatlx_vr.md`
-
-## Notes
-- Default doc root for indexing/retrieval: `Doc/Evaluation`.
-- Event logs are JSONL; replayable and scorable.
-- PyPDF2 deprecation warning is expected; no functional impact for now.
