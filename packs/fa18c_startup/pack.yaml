@@ -91,7 +91,7 @@ precondition_gates:
     - op: flag_true
       var: vars.rpm_l_gte_60
       reason_code: s12_requires_rpm_l_gte_60
-      reason: "Left engine RPM must exceed 60 before INS alignment setup."
+      reason: "Left engine RPM must be at least 60 before INS alignment setup."
     - op: flag_true
       var: vars.throttle_l_not_off
       reason_code: s12_requires_throttle_l_not_off
@@ -559,7 +559,7 @@ steps:
   - id: S15
     phase: P5
     official_step: "Press the FCS RESET button and monitor the FCS DDI page."
-    short_explanation: "Press FCS RESET and check FCS page status."
+    short_explanation: "Manually press FCS RESET, then use DDI to monitor FCS page status."
     cockpit_area: "Left console / left DDI"
     critical: true
     observability: partially
@@ -570,11 +570,12 @@ steps:
     preconditions:
       - "Left DDI is powered and FCS page available."
     completion_conditions:
-      - "FCS RESET pressed; FCS page reviewed for faults."
+      - "FCS RESET manually pressed."
+      - "FCS page brought up and reviewed for faults."
     ui_targets:
       - left_mdi_pb5
     tutor_prompts:
-      - "Press FCS RESET and review the FCS page; visual confirmation of status is required."
+      - "Manually press FCS RESET, then use left DDI PB5 to bring up/review the FCS page; PB5 highlight is for monitoring only and final status needs visual confirmation."
 
   - id: S16
     phase: P5
