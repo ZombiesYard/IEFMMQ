@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import tools.regenerate_eval_docs as regen
 from tools.regenerate_eval_docs import (
     EvalDocDriftError,
     EvalDocRegenerationError,
@@ -189,3 +190,33 @@ def test_regenerate_eval_docs_reports_non_utf8_existing_file(tmp_path: Path) -> 
             repo_root=tmp_path,
             check=True,
         )
+
+
+def test_build_regenerated_docs_parses_inputs_once_for_version_stamp(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    index_path, policy_path = _write_sample_index_and_policy(tmp_path)
+    call_count = {"json_loads": 0, "yaml_safe_load": 0}
+    real_json_loads = regen.json.loads
+    real_yaml_safe_load = regen.yaml.safe_load
+
+    def _counting_json_loads(*args, **kwargs):
+        call_count["json_loads"] += 1
+        return real_json_loads(*args, **kwargs)
+
+    def _counting_yaml_safe_load(*args, **kwargs):
+        call_count["yaml_safe_load"] += 1
+        return real_yaml_safe_load(*args, **kwargs)
+
+    monkeypatch.setattr(regen.json, "loads", _counting_json_loads)
+    monkeypatch.setattr(regen.yaml, "safe_load", _counting_yaml_safe_load)
+
+    rendered = build_regenerated_docs(
+        index_path=index_path,
+        policy_path=policy_path,
+        repo_root=tmp_path,
+    )
+    assert len(rendered) == 1
+    assert call_count["json_loads"] == 1
+    assert call_count["yaml_safe_load"] == 1

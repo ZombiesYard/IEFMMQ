@@ -658,6 +658,7 @@ def test_live_loop_applies_policy_filter_in_cold_start_production_mode(tmp_path:
     assert rag_topk[0]["doc_id"] == "fa18c_startup_master"
     assert rag_topk[0]["snippet_id"] == "fa18c_startup_master_1"
     assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
+    assert req_meta["grounding_policy_version"] == "v2"
     assert req_meta["grounding_policy_filtered_out_count"] == 1
 
 
@@ -692,6 +693,7 @@ def test_live_loop_applies_policy_filter_when_policy_path_provided_without_cold_
     assert len(rag_topk) == 1
     assert rag_topk[0]["doc_id"] == "fa18c_startup_master"
     assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
+    assert req_meta["grounding_policy_version"] == "v2"
     assert req_meta["grounding_policy_filtered_out_count"] == 1
 
 

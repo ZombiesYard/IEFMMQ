@@ -95,7 +95,7 @@ def _as_positive_int(value: Any, *, field_name: str) -> int:
     return value
 
 
-def _load_policy(policy_path: Path) -> tuple[str, str, Path | None, list[_PolicyRule]]:
+def _load_policy(policy_path: Path) -> tuple[str, str, Path | None, list[_PolicyRule], dict[str, Any]]:
     try:
         raw_text = policy_path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -154,10 +154,14 @@ def _load_policy(policy_path: Path) -> tuple[str, str, Path | None, list[_Policy
                 line_end=line_end,
             )
         )
-    return policy_id, policy_version, index_path_from_policy, out_rules
+    return policy_id, policy_version, index_path_from_policy, out_rules, raw
 
 
-def _load_markdown_docs(index_path: Path, *, repo_root: Path) -> tuple[list[_MarkdownDoc], dict[str, _MarkdownDoc]]:
+def _load_markdown_docs(
+    index_path: Path,
+    *,
+    repo_root: Path,
+) -> tuple[list[_MarkdownDoc], dict[str, _MarkdownDoc], dict[str, Any]]:
     try:
         raw = json.loads(index_path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -215,22 +219,34 @@ def _load_markdown_docs(index_path: Path, *, repo_root: Path) -> tuple[list[_Mar
         docs_by_id[doc_id] = doc_meta
     if not ordered_docs:
         raise EvalDocRegenerationError("no markdown documents found in index")
-    return ordered_docs, docs_by_id
+    return ordered_docs, docs_by_id, raw
 
 
-def _compute_version_stamp(index_path: Path, policy_path: Path) -> str:
-    try:
-        index_obj = json.loads(index_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise EvalDocRegenerationError(f"failed to read index for version stamp: {index_path}") from exc
-    except json.JSONDecodeError as exc:
-        raise EvalDocRegenerationError(f"invalid index JSON for version stamp: {index_path}") from exc
-    try:
-        policy_obj = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise EvalDocRegenerationError(f"failed to read policy for version stamp: {policy_path}") from exc
-    except yaml.YAMLError as exc:
-        raise EvalDocRegenerationError(f"invalid policy YAML for version stamp: {policy_path}") from exc
+def _compute_version_stamp(
+    index_path: Path | None = None,
+    policy_path: Path | None = None,
+    *,
+    index_obj: Any | None = None,
+    policy_obj: Any | None = None,
+) -> str:
+    if index_obj is None:
+        if index_path is None:
+            raise EvalDocRegenerationError("index_path is required when index_obj is not provided")
+        try:
+            index_obj = json.loads(index_path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise EvalDocRegenerationError(f"failed to read index for version stamp: {index_path}") from exc
+        except json.JSONDecodeError as exc:
+            raise EvalDocRegenerationError(f"invalid index JSON for version stamp: {index_path}") from exc
+    if policy_obj is None:
+        if policy_path is None:
+            raise EvalDocRegenerationError("policy_path is required when policy_obj is not provided")
+        try:
+            policy_obj = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise EvalDocRegenerationError(f"failed to read policy for version stamp: {policy_path}") from exc
+        except yaml.YAMLError as exc:
+            raise EvalDocRegenerationError(f"invalid policy YAML for version stamp: {policy_path}") from exc
 
     hasher = hashlib.sha256()
     hasher.update(
@@ -324,13 +340,13 @@ def build_regenerated_docs(
     policy_path_resolved = Path(policy_path).expanduser().resolve()
     repo_root_resolved = Path(repo_root).expanduser().resolve() if repo_root is not None else Path.cwd().resolve()
 
-    policy_id, policy_version, policy_index_path, rules = _load_policy(policy_path_resolved)
+    policy_id, policy_version, policy_index_path, rules, raw_policy = _load_policy(policy_path_resolved)
     if policy_index_path is not None and policy_index_path != index_path_resolved:
         raise EvalDocRegenerationError(
             "policy index_path mismatch: "
             f"policy={policy_index_path} caller={index_path_resolved}"
         )
-    ordered_docs, docs_by_id = _load_markdown_docs(index_path_resolved, repo_root=repo_root_resolved)
+    ordered_docs, docs_by_id, raw_index = _load_markdown_docs(index_path_resolved, repo_root=repo_root_resolved)
     rules_by_doc: dict[str, list[_PolicyRule]] = {}
     for rule in rules:
         rules_by_doc.setdefault(rule.doc_id, []).append(rule)
@@ -346,7 +362,10 @@ def build_regenerated_docs(
         joined = ", ".join(missing_in_policy)
         raise EvalDocRegenerationError(f"markdown docs missing in policy allow list: {joined}")
 
-    version_stamp = version_stamp_override or _compute_version_stamp(index_path_resolved, policy_path_resolved)
+    version_stamp = version_stamp_override or _compute_version_stamp(
+        index_obj=raw_index,
+        policy_obj=raw_policy,
+    )
     try:
         index_display_path = str(index_path_resolved.relative_to(repo_root_resolved)).replace("\\", "/")
     except ValueError:
