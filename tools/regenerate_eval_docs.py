@@ -59,7 +59,7 @@ class RegeneratedDoc:
     content: str
 
 
-def _to_repo_relative_path(raw_path: str, *, repo_root: Path) -> Path:
+def _resolve_and_validate_output_path(raw_path: str, *, repo_root: Path) -> Path:
     text = str(raw_path).strip()
     if not text:
         raise EvalDocRegenerationError("index document source_path must be non-empty")
@@ -213,7 +213,7 @@ def _load_markdown_docs(
             )
         if not chunks_by_id:
             raise EvalDocRegenerationError(f"markdown document has no valid chunks: {doc_id}")
-        output_path = _to_repo_relative_path(source_path, repo_root=repo_root)
+        output_path = _resolve_and_validate_output_path(source_path, repo_root=repo_root)
         doc_meta = _MarkdownDoc(doc_id=doc_id, output_path=output_path, chunks_by_id=chunks_by_id)
         ordered_docs.append(doc_meta)
         docs_by_id[doc_id] = doc_meta
@@ -323,7 +323,7 @@ def _render_doc_content(
         *chunk_refs,
         "-->",
     ]
-    body = "\n\n".join(body_sections).strip()
+    body = "\n\n".join(body_sections)
     return "\n".join(header) + "\n\n" + body + "\n"
 
 

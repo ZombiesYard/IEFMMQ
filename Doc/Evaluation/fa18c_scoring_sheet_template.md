@@ -70,3 +70,4 @@ This template defines two levels of scoring data:
   `StepErrorScore = ceil((2*OM + 1*CO + 2*OR + 1*PA + 2*SV) * (1.5 if Critical == "yes" else 1.0))`
   (round up to nearest integer after applying critical multiplier).
 - `Notes`: short comments, e.g. “INS mode set before engine stable”.
+
