@@ -119,12 +119,66 @@ def _check_schema_v1_presence() -> list[GuardViolation]:
     return violations
 
 
+def _check_eval_doc_drift() -> list[GuardViolation]:
+    violations: list[GuardViolation] = []
+    try:
+        try:
+            from tools.regenerate_eval_docs import (
+                EvalDocDriftError,
+                EvalDocRegenerationError,
+                regenerate_eval_docs,
+            )
+        except ModuleNotFoundError:
+            from regenerate_eval_docs import (  # type: ignore
+                EvalDocDriftError,
+                EvalDocRegenerationError,
+                regenerate_eval_docs,
+            )
+    except Exception as exc:
+        violations.append(
+            GuardViolation(
+                rule="eval_docs_regeneration_error",
+                path=REPO_ROOT / "tools" / "regenerate_eval_docs.py",
+                detail=f"Doc regeneration import failed: {exc}",
+            )
+        )
+        return violations
+
+    try:
+        regenerate_eval_docs(
+            index_path=REPO_ROOT / "Doc" / "Evaluation" / "index.json",
+            policy_path=REPO_ROOT / "knowledge_source_policy.yaml",
+            repo_root=REPO_ROOT,
+            check=True,
+            strict_policy=True,
+        )
+    except EvalDocDriftError as exc:
+        for path in exc.drift_paths:
+            violations.append(
+                GuardViolation(
+                    rule="eval_docs_drift",
+                    path=path,
+                    detail="Generated Doc/Evaluation markdown is out of date. Run: python -m tools.regenerate_eval_docs",
+                )
+            )
+    except EvalDocRegenerationError as exc:
+        violations.append(
+            GuardViolation(
+                rule="eval_docs_regeneration_error",
+                path=REPO_ROOT / "knowledge_source_policy.yaml",
+                detail=f"Doc regeneration pipeline error: {exc}",
+            )
+        )
+    return violations
+
+
 def run_guards() -> list[GuardViolation]:
     violations: list[GuardViolation] = []
     violations.extend(_check_forbidden_automation())
     violations.extend(_check_core_purity())
     violations.extend(_check_core_imports())
     violations.extend(_check_schema_v1_presence())
+    violations.extend(_check_eval_doc_drift())
     return violations
 
 

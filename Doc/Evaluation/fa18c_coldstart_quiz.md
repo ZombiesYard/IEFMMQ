@@ -1,3 +1,26 @@
+<!--
+AUTO-GENERATED FILE. DO NOT EDIT.
+generator: tools/regenerate_eval_docs.py
+source_index: Doc/Evaluation/index.json
+policy_id: fa18c_cold_start_whitelist_v1
+policy_version: v2
+version_stamp: b6c83e15460e9229
+source_chunks:
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_0:1-6
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_1:1-11
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_2:1-11
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_3:1-12
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_4:1-11
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_5:1-11
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_6:1-11
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_7:1-14
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_8:1-12
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_9:1-13
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_10:1-13
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_11:1-18
+- fa18c_coldstart_quiz/fa18c_coldstart_quiz_12:1-19
+-->
+
 # F/A-18C Cold Start – Knowledge Quiz
 
 Please answer the following questions about the F/A-18C cold start procedure
@@ -6,7 +29,7 @@ the question explicitly says “select all that apply”.
 
 ---
 
-### Q1. Overall Goal
+## Q1. Overall Goal
 
 What is the main goal of the cold start procedure in this study?
 
@@ -19,7 +42,7 @@ D. To practice landing pattern and arrestor hook operations
 
 ---
 
-### Q2. Right Engine Throttle Timing
+## Q2. Right Engine Throttle Timing
 
 When should you move the **right throttle** from OFF to IDLE during engine start?
 
@@ -32,7 +55,7 @@ D. Only after both engines are already running
 
 ---
 
-### Q3. Left Engine Preconditions
+## Q3. Left Engine Preconditions
 
 Before moving the **ENG CRANK** switch to LEFT (to start the left engine), which
 of the following should be true for the right engine?
@@ -46,7 +69,7 @@ D. Only the nozzle position needs to be between 90–100%
 
 ---
 
-### Q4. INS Mode
+## Q4. INS Mode
 
 When should you set the **INS knob** to GND (ground) or CV (carrier)?
 
@@ -59,7 +82,7 @@ D. Only after takeoff
 
 ---
 
-### Q5. Purpose of the Fire Test
+## Q5. Purpose of the Fire Test
 
 What is the purpose of running **FIRE TEST A and B** during the cold start?
 
@@ -72,7 +95,7 @@ D. To test the launch bar and arrestor hook mechanisms
 
 ---
 
-### Q6. OBOGS
+## Q6. OBOGS
 
 What is the role of **OBOGS** in the F/A-18C?
 
@@ -85,7 +108,7 @@ D. It manages hydraulic pressure for the flight controls
 
 ---
 
-### Q7. Order of Early Power-Up Steps
+## Q7. Order of Early Power-Up Steps
 
 Which of the following **best describes the correct order** at the very beginning
 of the cold start procedure?
@@ -101,7 +124,7 @@ D. Battery ON → APU ON → Fire tests (while APU starts)
 
 ---
 
-### Q8. Displays and Pages
+## Q8. Displays and Pages
 
 After bringing up the DDIs, MPCD and HUD, which pages are typically selected
 for the F/A-18C cold start in this study?
@@ -115,7 +138,7 @@ D. ENG page on the left DDI and HUD repeater on the right DDI
 
 ---
 
-### Q9. FCS Preparation
+## Q9. FCS Preparation
 
 Which of the following actions are part of **preparing the flight control system (FCS)** 
 for takeoff? (Select *all* that apply.)
@@ -130,7 +153,7 @@ D. Setting the INS knob to CV
 
 ---
 
-### Q10. Final Instrument Settings Before Taxi
+## Q10. Final Instrument Settings Before Taxi
 
 Which of the following should normally be set or checked before releasing
 the parking brake for taxi? (Select *all* that apply.)
@@ -145,7 +168,7 @@ D. Attitude source set to AUTO and standby attitude indicator uncaged
 
 ---
 
-### Q11. Sequence Mini-Task 1
+## Q11. Sequence Mini-Task 1
 
 Consider the following four steps:
 
@@ -165,7 +188,7 @@ D. 2 → 4 → 3 → 1
 
 ---
 
-### Q12. Sequence Mini-Task 2
+## Q12. Sequence Mini-Task 2
 
 Consider the following actions related to FCS and flaps:
 

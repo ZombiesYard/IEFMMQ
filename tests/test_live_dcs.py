@@ -232,11 +232,11 @@ class PolicyMixedKnowledge:
                 "score": 1.0,
             },
             {
-                "doc_id": "fa18c_coldstart_quiz",
-                "section": "Quiz",
-                "page_or_heading": "Quiz",
-                "snippet": "This quiz item should be rejected by policy.",
-                "snippet_id": "fa18c_coldstart_quiz_0",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "section": "INTRODUCTION",
+                "page_or_heading": 2,
+                "snippet": "This PDF snippet should be rejected by policy.",
+                "snippet_id": "DCS FA-18C Early Access Guide EN_1",
                 "score": 0.9,
             },
         ]

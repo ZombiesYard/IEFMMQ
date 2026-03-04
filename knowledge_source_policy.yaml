@@ -1,43 +1,269 @@
 policy_id: fa18c_cold_start_whitelist_v1
-version: v1
+version: v2
 index_path: Doc/Evaluation/index.json
 allow:
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_0"
-    line_range: [1, 10]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_1"
-    line_range: [1, 17]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_2"
-    line_range: [1, 4]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_3"
-    line_range: [1, 22]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_4"
-    line_range: [1, 24]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_5"
-    line_range: [1, 20]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_6"
-    line_range: [1, 25]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_7"
-    line_range: [1, 25]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_8"
-    line_range: [1, 27]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_9"
-    line_range: [1, 21]
-  - doc_id: "Appendix - Training Task Syllabus"
-    chunk_id: "Appendix - Training Task Syllabus_10"
-    line_range: [1, 12]
-  - doc_id: "fa18c_startup_master"
-    chunk_id: "fa18c_startup_master_0"
-    line_range: [1, 17]
-  - doc_id: "fa18c_startup_master"
-    chunk_id: "fa18c_startup_master_1"
-    line_range: [1, 28]
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_0
+  line_range:
+  - 1
+  - 10
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_1
+  line_range:
+  - 1
+  - 17
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_2
+  line_range:
+  - 1
+  - 4
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_3
+  line_range:
+  - 1
+  - 22
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_4
+  line_range:
+  - 1
+  - 24
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_5
+  line_range:
+  - 1
+  - 20
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_6
+  line_range:
+  - 1
+  - 25
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_7
+  line_range:
+  - 1
+  - 25
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_8
+  line_range:
+  - 1
+  - 27
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_9
+  line_range:
+  - 1
+  - 21
+- doc_id: Appendix - Training Task Syllabus
+  chunk_id: Appendix - Training Task Syllabus_10
+  line_range:
+  - 1
+  - 12
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_0
+  line_range:
+  - 1
+  - 6
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_1
+  line_range:
+  - 1
+  - 11
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_2
+  line_range:
+  - 1
+  - 11
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_3
+  line_range:
+  - 1
+  - 12
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_4
+  line_range:
+  - 1
+  - 11
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_5
+  line_range:
+  - 1
+  - 11
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_6
+  line_range:
+  - 1
+  - 11
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_7
+  line_range:
+  - 1
+  - 14
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_8
+  line_range:
+  - 1
+  - 12
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_9
+  line_range:
+  - 1
+  - 13
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_10
+  line_range:
+  - 1
+  - 13
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_11
+  line_range:
+  - 1
+  - 18
+- doc_id: fa18c_coldstart_quiz
+  chunk_id: fa18c_coldstart_quiz_12
+  line_range:
+  - 1
+  - 19
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_0
+  line_range:
+  - 1
+  - 8
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_1
+  line_range:
+  - 1
+  - 12
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_2
+  line_range:
+  - 1
+  - 7
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_3
+  line_range:
+  - 1
+  - 17
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_4
+  line_range:
+  - 1
+  - 19
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_5
+  line_range:
+  - 1
+  - 20
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_6
+  line_range:
+  - 1
+  - 21
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_7
+  line_range:
+  - 1
+  - 22
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_8
+  line_range:
+  - 1
+  - 20
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_9
+  line_range:
+  - 1
+  - 19
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_10
+  line_range:
+  - 1
+  - 34
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_11
+  line_range:
+  - 1
+  - 1
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_12
+  line_range:
+  - 1
+  - 31
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_13
+  line_range:
+  - 1
+  - 26
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_14
+  line_range:
+  - 1
+  - 26
+- doc_id: fa18c_error_coding_guide
+  chunk_id: fa18c_error_coding_guide_15
+  line_range:
+  - 1
+  - 14
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_0
+  line_range:
+  - 1
+  - 14
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_1
+  line_range:
+  - 1
+  - 13
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_2
+  line_range:
+  - 1
+  - 13
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_3
+  line_range:
+  - 1
+  - 13
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_4
+  line_range:
+  - 1
+  - 13
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_5
+  line_range:
+  - 1
+  - 12
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_6
+  line_range:
+  - 1
+  - 10
+- doc_id: fa18c_nasatlx_vr
+  chunk_id: fa18c_nasatlx_vr_7
+  line_range:
+  - 1
+  - 11
+- doc_id: fa18c_scoring_sheet_template
+  chunk_id: fa18c_scoring_sheet_template_0
+  line_range:
+  - 1
+  - 7
+- doc_id: fa18c_scoring_sheet_template
+  chunk_id: fa18c_scoring_sheet_template_1
+  line_range:
+  - 1
+  - 23
+- doc_id: fa18c_scoring_sheet_template
+  chunk_id: fa18c_scoring_sheet_template_2
+  line_range:
+  - 1
+  - 22
+- doc_id: fa18c_startup_master
+  chunk_id: fa18c_startup_master_0
+  line_range:
+  - 1
+  - 17
+- doc_id: fa18c_startup_master
+  chunk_id: fa18c_startup_master_1
+  line_range:
+  - 1
+  - 28

@@ -1,3 +1,15 @@
+<!--
+AUTO-GENERATED FILE. DO NOT EDIT.
+generator: tools/regenerate_eval_docs.py
+source_index: Doc/Evaluation/index.json
+policy_id: fa18c_cold_start_whitelist_v1
+policy_version: v2
+version_stamp: b6c83e15460e9229
+source_chunks:
+- fa18c_startup_master/fa18c_startup_master_0:1-17
+- fa18c_startup_master/fa18c_startup_master_1:1-28
+-->
+
 # F/A-18C Cold Start – Master Step List
 
 This file defines the canonical F/A-18C cold-start sequence used in the study.

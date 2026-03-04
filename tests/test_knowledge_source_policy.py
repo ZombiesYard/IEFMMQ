@@ -311,5 +311,5 @@ def test_repository_policy_is_valid_against_repository_index() -> None:
 
     policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
     assert policy.policy_id == "fa18c_cold_start_whitelist_v1"
-    assert policy.doc_count == 2
-    assert policy.chunk_count > 0
+    assert policy.doc_count == 6
+    assert policy.chunk_count == 53
