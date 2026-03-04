@@ -28,6 +28,8 @@ MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
+ALLOWED_STEP_OBSERVABILITY = frozenset({"observable", "partially", "unknown"})
+ALLOWED_STEP_EVIDENCE_REQUIREMENTS = frozenset({"var", "gate", "delta", "rag", "visual"})
 
 
 @dataclass(frozen=True)
@@ -276,6 +278,9 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             "inferred_step_id": None,
             "missing_conditions": [],
             "recent_ui_targets": [],
+            "observability": None,
+            "evidence_requirements": [],
+            "requires_visual_confirmation": False,
         }
 
     inferred_raw = raw.get("inferred_step_id")
@@ -313,10 +318,40 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
     else:
         recent_ui_targets = []
 
+    observability_raw = raw.get("observability")
+    observability = (
+        observability_raw
+        if isinstance(observability_raw, str) and observability_raw in ALLOWED_STEP_OBSERVABILITY
+        else None
+    )
+
+    evidence_requirements_raw = raw.get("evidence_requirements")
+    evidence_requirements: list[str] = []
+    if isinstance(evidence_requirements_raw, (list, tuple)):
+        seen_requirements: set[str] = set()
+        for item in evidence_requirements_raw:
+            if not isinstance(item, str) or item not in ALLOWED_STEP_EVIDENCE_REQUIREMENTS:
+                continue
+            if item in seen_requirements:
+                continue
+            seen_requirements.add(item)
+            evidence_requirements.append(item)
+
+    requires_visual_confirmation_raw = raw.get("requires_visual_confirmation")
+    if isinstance(requires_visual_confirmation_raw, bool):
+        requires_visual_confirmation = requires_visual_confirmation_raw
+    else:
+        requires_visual_confirmation = (
+            observability in {"partially", "unknown"} or "visual" in evidence_requirements
+        )
+
     return {
         "inferred_step_id": inferred_step_id,
         "missing_conditions": missing_conditions,
         "recent_ui_targets": recent_ui_targets,
+        "observability": observability,
+        "evidence_requirements": evidence_requirements,
+        "requires_visual_confirmation": requires_visual_confirmation,
     }
 
 

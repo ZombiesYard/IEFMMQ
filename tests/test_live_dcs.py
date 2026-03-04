@@ -21,6 +21,7 @@ from live_dcs import (
     build_arg_parser,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
+    _load_step_signal_profiles,
     _normalize_cached_response_metadata,
     _sanitize_policy_error_for_user,
 )
@@ -414,6 +415,7 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     hint = request.context["deterministic_step_hint"]
     assert isinstance(hint, dict)
     assert hint.get("inferred_step_id")
+    assert isinstance(hint.get("requires_visual_confirmation"), bool)
     gates = request.context["gates"]
     assert isinstance(gates, dict)
     assert "S03.completion" in gates
@@ -430,6 +432,8 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert "observation" in kinds
     assert "tutor_request" in kinds
     assert "tutor_response" in kinds
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    assert isinstance(tutor_response_payload["metadata"].get("requires_visual_confirmation"), bool)
 
 
 def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: Path) -> None:
@@ -1464,6 +1468,61 @@ def test_load_overlay_allowlist_uses_step_ui_targets_union_when_top_level_missin
 
     allowlist = _load_overlay_allowlist(pack, ui_map)
     assert allowlist == ["apu_switch", "battery_switch"]
+
+
+def test_load_step_signal_profiles_parses_valid_step_metadata(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: observable\n"
+        "    evidence_requirements: [var, gate]\n"
+        "  - id: S02\n"
+        "    observability: unknown\n"
+        "    evidence_requirements: [visual, rag]\n",
+        encoding="utf-8",
+    )
+
+    profiles = _load_step_signal_profiles(pack)
+    assert profiles["S01"]["observability"] == "observable"
+    assert profiles["S01"]["evidence_requirements"] == ["var", "gate"]
+    assert profiles["S01"]["requires_visual_confirmation"] is False
+    assert profiles["S02"]["observability"] == "unknown"
+    assert profiles["S02"]["evidence_requirements"] == ["visual", "rag"]
+    assert profiles["S02"]["requires_visual_confirmation"] is True
+
+
+def test_load_step_signal_profiles_rejects_invalid_observability(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: maybe\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.observability must be one of"):
+        _load_step_signal_profiles(pack)
+
+
+def test_load_step_signal_profiles_rejects_invalid_evidence_requirement(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: observable\n"
+        "    evidence_requirements: [var, visual, unsupported]\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.evidence_requirements\[2\] must be one of"):
+        _load_step_signal_profiles(pack)
 
 
 def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> None:

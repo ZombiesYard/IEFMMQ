@@ -268,9 +268,6 @@ completion_gates:
 steps:
   - id: S01
     phase: P1
-    official_step: "Set the BATTERY switch to ON and confirm both Left and Right Generators are ON."
-    short_explanation: "Power the jet: battery ON, generators confirmed ON."
-    cockpit_area: "Right console"
     critical: true
     observability: observable
     evidence_requirements:
@@ -290,9 +287,6 @@ steps:
 
   - id: S02
     phase: P1
-    official_step: "Move and hold the fire detection switch to FIRE TEST A and wait for all the audio caution messages to play. Once complete, wait 10 seconds and then do the same for FIRE TEST B."
-    short_explanation: "Run fire detection tests A and B; listen for caution tones."
-    cockpit_area: "Left console"
     critical: true
     observability: partially
     evidence_requirements:
@@ -311,9 +305,6 @@ steps:
 
   - id: S03
     phase: P1
-    official_step: "APU switch to ON and wait for green APU READY light."
-    short_explanation: "Start APU; wait for APU READY."
-    cockpit_area: "Left console"
     critical: true
     observability: observable
     evidence_requirements:
@@ -332,9 +323,6 @@ steps:
 
   - id: S04
     phase: P2
-    official_step: "Move the ENG CRANK switch to the right to start the right engine."
-    short_explanation: "ENG CRANK to RIGHT to start right engine."
-    cockpit_area: "Left console"
     critical: true
     observability: observable
     evidence_requirements:
@@ -352,9 +340,6 @@ steps:
 
   - id: S05
     phase: P2
-    official_step: "Move the right throttle from OFF to IDLE when the right engine is above 25% rpm."
-    short_explanation: "Advance right throttle to IDLE at >=25% RPM."
-    cockpit_area: "Throttles / IFEI"
     critical: true
     observability: partially
     evidence_requirements:
@@ -372,9 +357,6 @@ steps:
 
   - id: S06
     phase: P2
-    official_step: "Once right engine RPM is over 60%, rotate the BLEED AIR knob 360 deg clockwise, from NORM to NORM."
-    short_explanation: "Cycle BLEED AIR knob 360 deg after right RPM >60%."
-    cockpit_area: "Right console"
     critical: false
     observability: observable
     evidence_requirements:
@@ -392,9 +374,6 @@ steps:
 
   - id: S07
     phase: P2
-    official_step: "Test the CAUTION, WARNING and ADVISORY lights."
-    short_explanation: "Run caution/warning/advisory lights test."
-    cockpit_area: "Right console"
     critical: false
     observability: partially
     evidence_requirements:
@@ -412,9 +391,6 @@ steps:
 
   - id: S08
     phase: P3
-    official_step: "Turn on power to both DDIs, MPCD and HUD; select FCS (left DDI) and BIT (right DDI)."
-    short_explanation: "Power DDIs/MPCD/HUD; set FCS left, BIT right."
-    cockpit_area: "Center instrument panel"
     critical: false
     observability: observable
     evidence_requirements:
@@ -438,9 +414,6 @@ steps:
 
   - id: S09
     phase: P3
-    official_step: "Set COMM 1 and COMM 2 radios as required for the mission."
-    short_explanation: "Configure COMM1/COMM2 to mission presets."
-    cockpit_area: "UFC / comm panels"
     critical: false
     observability: partially
     evidence_requirements:
@@ -461,9 +434,6 @@ steps:
 
   - id: S10
     phase: P4
-    official_step: "Move the ENG CRANK switch to the left after confirming normal right engine parameters."
-    short_explanation: "Verify right engine parameters, then ENG CRANK to LEFT."
-    cockpit_area: "Left console / IFEI"
     critical: true
     observability: observable
     evidence_requirements:
@@ -481,9 +451,6 @@ steps:
 
   - id: S11
     phase: P4
-    official_step: "Move the left throttle from OFF to IDLE when left engine has reached at least 25% rpm."
-    short_explanation: "Advance left throttle to IDLE once left engine passes 25% RPM."
-    cockpit_area: "Throttles / IFEI"
     critical: true
     observability: partially
     evidence_requirements:
@@ -501,9 +468,6 @@ steps:
 
   - id: S12
     phase: P4
-    official_step: "Once left engine RPM is greater than 60%, rotate INS knob to GND or CV depending on parking location."
-    short_explanation: "After left engine stabilizes >60%, set INS to GND/CV."
-    cockpit_area: "Right console"
     critical: true
     observability: observable
     evidence_requirements:
@@ -520,9 +484,6 @@ steps:
 
   - id: S13
     phase: P4
-    official_step: "Set the Radar knob to OPR (operate)."
-    short_explanation: "Turn radar power knob to OPR."
-    cockpit_area: "Right console"
     critical: true
     observability: observable
     evidence_requirements:
@@ -539,9 +500,6 @@ steps:
 
   - id: S14
     phase: P4
-    official_step: "Set OBOGS control and FLOW switches to ON."
-    short_explanation: "Enable OBOGS and OBOGS FLOW."
-    cockpit_area: "Left console"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -558,9 +516,6 @@ steps:
 
   - id: S15
     phase: P5
-    official_step: "Press the FCS RESET button and monitor the FCS DDI page."
-    short_explanation: "Manually press FCS RESET, then use DDI to monitor FCS page status."
-    cockpit_area: "Left console / left DDI"
     critical: true
     observability: partially
     evidence_requirements:
@@ -579,9 +534,6 @@ steps:
 
   - id: S16
     phase: P5
-    official_step: "Set the Flap switch to AUTO."
-    short_explanation: "Set flap switch to AUTO."
-    cockpit_area: "Left quarter panel"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -598,9 +550,6 @@ steps:
 
   - id: S17
     phase: P5
-    official_step: "Press TAKEOFF TRIM button."
-    short_explanation: "Apply takeoff trim setting."
-    cockpit_area: "Left console"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -617,9 +566,6 @@ steps:
 
   - id: S18
     phase: P5
-    official_step: "Hold FCS BIT switch up and press the FCS OSB on BIT/FCS page simultaneously."
-    short_explanation: "Run FCS BIT using switch+OSB combo."
-    cockpit_area: "Right console / right DDI"
     critical: true
     observability: partially
     evidence_requirements:
@@ -638,9 +584,6 @@ steps:
 
   - id: S19
     phase: P5
-    official_step: "Perform four-down checks: refueling probe, speed brake, launch bar, arrestor hook, pitot heat, and flaps HALF."
-    short_explanation: "Run full four-down control configuration checks."
-    cockpit_area: "Multiple cockpit areas"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -657,9 +600,6 @@ steps:
 
   - id: S20
     phase: P6
-    official_step: "Release the hand/parking brake when ready to taxi."
-    short_explanation: "Release parking brake."
-    cockpit_area: "Left console"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -676,9 +616,6 @@ steps:
 
   - id: S21
     phase: P6
-    official_step: "Set BINGO fuel using IFEI up/down controls."
-    short_explanation: "Configure BINGO fuel level."
-    cockpit_area: "IFEI"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -695,9 +632,6 @@ steps:
 
   - id: S22
     phase: P6
-    official_step: "Set standby barometric altimeter to airfield elevation/QNH."
-    short_explanation: "Adjust standby barometric altimeter."
-    cockpit_area: "Right instrument panel"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -714,9 +648,6 @@ steps:
 
   - id: S23
     phase: P6
-    official_step: "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier)."
-    short_explanation: "Configure radar altimeter low-altitude bug."
-    cockpit_area: "Right quarter panel"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -733,9 +664,6 @@ steps:
 
   - id: S24
     phase: P6
-    official_step: "Uncage standby attitude indicator."
-    short_explanation: "Uncage standby attitude indicator."
-    cockpit_area: "Right instrument panel"
     critical: true
     observability: unknown
     evidence_requirements:
@@ -752,9 +680,6 @@ steps:
 
   - id: S25
     phase: P6
-    official_step: "Set attitude source selector to AUTO."
-    short_explanation: "Set attitude source to AUTO."
-    cockpit_area: "Center instrument panel"
     critical: true
     observability: unknown
     evidence_requirements:

@@ -436,3 +436,21 @@ def test_prompt_deterministic_step_hint_accepts_tuple_inputs() -> None:
     assert hint["inferred_step_id"] == "S03"
     assert hint["missing_conditions"] == ["vars.apu_ready==true"]
     assert hint["recent_ui_targets"] == ["apu_switch"]
+
+
+def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
+    ctx = _base_context()
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S15",
+        "missing_conditions": ["check_fcs_page"],
+        "recent_ui_targets": ["left_mdi_pb5"],
+        "observability": "partially",
+        "evidence_requirements": ["visual", "gate", "visual", "invalid_type"],
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+    hint = payload["deterministic_step_hint"]
+    assert hint["inferred_step_id"] == "S15"
+    assert hint["observability"] == "partially"
+    assert hint["evidence_requirements"] == ["visual", "gate"]
+    assert hint["requires_visual_confirmation"] is True

@@ -20,6 +20,8 @@ REQUIRED_NON_EMPTY_UI_TARGET_STEPS = (
     "S15",
     "S18",
 )
+ALLOWED_OBSERVABILITY = {"observable", "partially", "unknown"}
+ALLOWED_EVIDENCE_REQUIREMENTS = {"var", "gate", "delta", "rag", "visual"}
 
 
 def _load_yaml(path: Path) -> dict:
@@ -74,3 +76,40 @@ def test_clickable_subset_steps_have_non_empty_ui_targets() -> None:
         ui_targets = by_id[step_id].get("ui_targets")
         assert isinstance(ui_targets, list), f"step {step_id} ui_targets must be list"
         assert ui_targets, f"step {step_id} ui_targets must not be empty for clickable coverage"
+
+
+def test_step_signal_metadata_values_are_valid() -> None:
+    pack = _load_yaml(PACK_PATH)
+    steps = pack.get("steps")
+    assert isinstance(steps, list)
+
+    for idx, step in enumerate(steps):
+        assert isinstance(step, dict), f"pack.steps[{idx}] must be mapping"
+        step_id = step.get("id")
+        assert isinstance(step_id, str) and step_id, f"pack.steps[{idx}].id must be non-empty string"
+
+        observability = step.get("observability")
+        assert isinstance(observability, str), f"step {step_id} observability must be string"
+        assert observability in ALLOWED_OBSERVABILITY, f"step {step_id} observability invalid: {observability!r}"
+
+        evidence_requirements = step.get("evidence_requirements")
+        assert isinstance(evidence_requirements, list), f"step {step_id} evidence_requirements must be list"
+        for req_idx, req in enumerate(evidence_requirements):
+            assert isinstance(req, str) and req, (
+                f"step {step_id} evidence_requirements[{req_idx}] must be non-empty string"
+            )
+            assert req in ALLOWED_EVIDENCE_REQUIREMENTS, (
+                f"step {step_id} evidence_requirements[{req_idx}] invalid: {req!r}"
+            )
+
+
+def test_pack_steps_do_not_duplicate_registry_text_fields() -> None:
+    pack = _load_yaml(PACK_PATH)
+    steps = pack.get("steps")
+    assert isinstance(steps, list)
+
+    for idx, step in enumerate(steps):
+        assert isinstance(step, dict), f"pack.steps[{idx}] must be mapping"
+        assert "official_step" not in step, f"pack.steps[{idx}] must not define official_step"
+        assert "short_explanation" not in step, f"pack.steps[{idx}] must not define short_explanation"
+        assert "cockpit_area" not in step, f"pack.steps[{idx}] must not define cockpit_area"

@@ -160,6 +160,72 @@ def _load_step_ids(pack_path: Path) -> list[str]:
     return out
 
 
+_ALLOWED_STEP_OBSERVABILITY = frozenset({"observable", "partially", "unknown"})
+_ALLOWED_STEP_EVIDENCE_REQUIREMENTS = frozenset({"var", "gate", "delta", "rag", "visual"})
+
+
+def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
+    pack = _load_yaml_mapping(pack_path, "pack.yaml")
+    steps = pack.get("steps")
+    if not isinstance(steps, list):
+        return {}
+
+    profiles: dict[str, dict[str, Any]] = {}
+    for step_idx, step in enumerate(steps):
+        if not isinstance(step, Mapping):
+            raise ValueError(f"pack.steps[{step_idx}] must be a mapping: {pack_path}")
+        step_id = step.get("id")
+        if not isinstance(step_id, str) or not step_id:
+            raise ValueError(f"pack.steps[{step_idx}].id must be non-empty string: {pack_path}")
+
+        profile: dict[str, Any] = {}
+
+        observability = step.get("observability")
+        if observability is not None:
+            if not isinstance(observability, str) or observability not in _ALLOWED_STEP_OBSERVABILITY:
+                allowed = ", ".join(sorted(_ALLOWED_STEP_OBSERVABILITY))
+                raise ValueError(
+                    f"pack.steps[{step_idx}].observability must be one of {{{allowed}}}: {pack_path}"
+                )
+            profile["observability"] = observability
+
+        evidence_requirements_raw = step.get("evidence_requirements")
+        if evidence_requirements_raw is not None:
+            if not isinstance(evidence_requirements_raw, list):
+                raise ValueError(f"pack.steps[{step_idx}].evidence_requirements must be a list: {pack_path}")
+            evidence_requirements: list[str] = []
+            seen: set[str] = set()
+            for req_idx, req in enumerate(evidence_requirements_raw):
+                if not isinstance(req, str) or not req:
+                    raise ValueError(
+                        f"pack.steps[{step_idx}].evidence_requirements[{req_idx}] must be non-empty string: "
+                        f"{pack_path}"
+                    )
+                if req not in _ALLOWED_STEP_EVIDENCE_REQUIREMENTS:
+                    allowed = ", ".join(sorted(_ALLOWED_STEP_EVIDENCE_REQUIREMENTS))
+                    raise ValueError(
+                        f"pack.steps[{step_idx}].evidence_requirements[{req_idx}] must be one of "
+                        f"{{{allowed}}}: {pack_path}"
+                    )
+                if req in seen:
+                    continue
+                seen.add(req)
+                evidence_requirements.append(req)
+            profile["evidence_requirements"] = evidence_requirements
+
+        if profile:
+            observability_value = profile.get("observability")
+            evidence_requirements_value = profile.get("evidence_requirements", [])
+            requires_visual_confirmation = (
+                observability_value in {"partially", "unknown"}
+                or "visual" in evidence_requirements_value
+            )
+            profile["requires_visual_confirmation"] = bool(requires_visual_confirmation)
+            profiles[step_id] = profile
+
+    return profiles
+
+
 def _load_overlay_allowlist(pack_path: Path, ui_map_path: Path) -> list[str]:
     ui_map = _load_yaml_mapping(ui_map_path, "ui_map.yaml")
     cockpit_elements = ui_map.get("cockpit_elements")
@@ -767,6 +833,7 @@ class LiveDcsTutorLoop:
         if self.knowledge is None and self.rag_top_k > 0:
             self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
         self.pack_steps = load_pack_steps(self.pack_path)
+        self.step_signal_profiles = _load_step_signal_profiles(self.pack_path)
         gate_config = load_pack_gate_config(self.pack_path)
         self.precondition_gates = dict(gate_config.get("precondition_gates", {}))
         self.completion_gates = dict(gate_config.get("completion_gates", {}))
@@ -1081,6 +1148,20 @@ class LiveDcsTutorLoop:
             "recent_ui_targets": recent_buttons,
             "gate_blockers": inferred_gate_blockers,
         }
+        if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
+            step_signal_profile = self.step_signal_profiles.get(inference.inferred_step_id)
+            if isinstance(step_signal_profile, Mapping):
+                observability = step_signal_profile.get("observability")
+                if isinstance(observability, str) and observability:
+                    deterministic_hint["observability"] = observability
+                evidence_requirements = step_signal_profile.get("evidence_requirements")
+                if isinstance(evidence_requirements, list):
+                    deterministic_hint["evidence_requirements"] = [
+                        item for item in evidence_requirements if isinstance(item, str) and item
+                    ]
+                requires_visual_confirmation = step_signal_profile.get("requires_visual_confirmation")
+                if isinstance(requires_visual_confirmation, bool):
+                    deterministic_hint["requires_visual_confirmation"] = requires_visual_confirmation
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
 
         context = {
@@ -1564,6 +1645,12 @@ class LiveDcsTutorLoop:
                 )
             else:
                 self._help_cache = None
+
+        hint = request.context.get("deterministic_step_hint")
+        if isinstance(hint, Mapping):
+            requires_visual_confirmation = hint.get("requires_visual_confirmation")
+            if isinstance(requires_visual_confirmation, bool):
+                response.metadata["requires_visual_confirmation"] = requires_visual_confirmation
 
         if self.dry_run_overlay and overlay_report.get("dry_run"):
             print(
