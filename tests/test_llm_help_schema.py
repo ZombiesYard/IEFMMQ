@@ -1,5 +1,9 @@
 ﻿from jsonschema.exceptions import ValidationError
+from pathlib import Path
+import time
+
 import pytest
+import yaml
 
 from core.llm_schema import get_help_response_schema, validate_help_response
 
@@ -239,3 +243,128 @@ def test_validate_help_response_rejects_additional_properties(
 
     with pytest.raises(ValidationError, match=expected_path):
         validate_help_response(payload)
+
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def _registry_payload(first_short_explanation: str) -> dict:
+    steps = []
+    for i in range(1, 26):
+        sid = f"S{i:02d}"
+        short = first_short_explanation if i == 1 else f"step-{sid}"
+        steps.append(
+            {
+                "step_id": sid,
+                "phase": "P1",
+                "official_description": f"Official {sid}",
+                "short_explanation": short,
+                "source_chunk_refs": [f"doc/chunk:{i}-{i}"],
+            }
+        )
+    return {"schema_version": "v1", "steps": steps}
+
+
+def test_help_schema_cache_invalidates_when_registry_file_removed(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    ui_map_path = tmp_path / "ui_map.yaml"
+    taxonomy_path = tmp_path / "taxonomy.yaml"
+    registry_path = tmp_path / "step_registry.yaml"
+
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "steps": [{"id": "S01"}, {"id": "S02"}],
+        },
+    )
+    _write_yaml(
+        ui_map_path,
+        {"cockpit_elements": {"target_a": {"description": "A"}}},
+    )
+    _write_yaml(
+        taxonomy_path,
+        {"taxonomy": {"categories": [{"code": "OM"}], "trial_flags": []}},
+    )
+    _write_yaml(registry_path, _registry_payload("first"))
+
+    schema_with_registry = get_help_response_schema(
+        pack_path=pack_path,
+        ui_map_path=ui_map_path,
+        taxonomy_path=taxonomy_path,
+        step_registry_path=registry_path,
+    )
+    step_ids_with_registry = schema_with_registry["properties"]["next"]["properties"]["step_id"]["enum"]
+    assert len(step_ids_with_registry) == 25
+    assert step_ids_with_registry[0] == "S01"
+    assert step_ids_with_registry[-1] == "S25"
+
+    # Ensure timestamp granularity is crossed for cache invalidation on some filesystems.
+    time.sleep(0.01)
+    registry_path.unlink()
+
+    schema_without_registry = get_help_response_schema(
+        pack_path=pack_path,
+        ui_map_path=ui_map_path,
+        taxonomy_path=taxonomy_path,
+        step_registry_path=registry_path,
+    )
+    step_ids_without_registry = schema_without_registry["properties"]["next"]["properties"]["step_id"]["enum"]
+    assert step_ids_without_registry == ["S01", "S02"]
+
+
+def test_help_schema_cache_invalidates_when_ui_map_and_taxonomy_change(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    ui_map_path = tmp_path / "ui_map.yaml"
+    taxonomy_path = tmp_path / "taxonomy.yaml"
+    registry_path = tmp_path / "missing_registry.yaml"
+
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "steps": [{"id": "S01"}],
+        },
+    )
+    _write_yaml(
+        ui_map_path,
+        {"cockpit_elements": {"target_a": {"description": "A"}}},
+    )
+    _write_yaml(
+        taxonomy_path,
+        {"taxonomy": {"categories": [{"code": "OM"}], "trial_flags": []}},
+    )
+
+    schema_before = get_help_response_schema(
+        pack_path=pack_path,
+        ui_map_path=ui_map_path,
+        taxonomy_path=taxonomy_path,
+        step_registry_path=registry_path,
+    )
+    overlay_before = schema_before["properties"]["overlay"]["properties"]["targets"]["items"]["enum"]
+    categories_before = schema_before["properties"]["diagnosis"]["properties"]["error_category"]["enum"]
+    assert overlay_before == ["target_a"]
+    assert categories_before == ["OM"]
+
+    time.sleep(0.01)
+    _write_yaml(
+        ui_map_path,
+        {"cockpit_elements": {"target_a": {"description": "A"}, "target_b": {"description": "B"}}},
+    )
+    _write_yaml(
+        taxonomy_path,
+        {"taxonomy": {"categories": [{"code": "OM"}, {"code": "CO"}], "trial_flags": []}},
+    )
+
+    schema_after = get_help_response_schema(
+        pack_path=pack_path,
+        ui_map_path=ui_map_path,
+        taxonomy_path=taxonomy_path,
+        step_registry_path=registry_path,
+    )
+    overlay_after = schema_after["properties"]["overlay"]["properties"]["targets"]["items"]["enum"]
+    categories_after = schema_after["properties"]["diagnosis"]["properties"]["error_category"]["enum"]
+    assert overlay_after == ["target_a", "target_b"]
+    assert set(categories_after) == {"OM", "CO"}

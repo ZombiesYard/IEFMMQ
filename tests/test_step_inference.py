@@ -1,4 +1,8 @@
-from adapters.step_inference import StepInferenceResult, extract_recent_ui_targets, infer_step_id
+from pathlib import Path
+import time
+
+from adapters.step_inference import StepInferenceResult, extract_recent_ui_targets, infer_step_id, load_pack_steps
+import yaml
 
 
 def _pack_steps() -> list[dict]:
@@ -173,3 +177,75 @@ def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
         "recent_actions": {"recent_buttons": ["fire_test_switch"]},
     }
     assert extract_recent_ui_targets(context) == ["eng_crank_switch", "apu_switch"]
+
+
+def _write_yaml(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def _registry_payload(first_short_explanation: str) -> dict:
+    steps = []
+    for i in range(1, 26):
+        sid = f"S{i:02d}"
+        short = first_short_explanation if i == 1 else f"step-{sid}"
+        steps.append(
+            {
+                "step_id": sid,
+                "phase": "P1",
+                "official_description": f"Official {sid}",
+                "short_explanation": short,
+                "source_chunk_refs": [f"doc/chunk:{i}-{i}"],
+            }
+        )
+    return {"schema_version": "v1", "steps": steps}
+
+
+def test_load_pack_steps_cache_invalidates_when_registry_changes(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    registry_path = tmp_path / "step_registry.yaml"
+
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "metadata": {"step_registry_path": "step_registry.yaml"},
+            "steps": [{"id": "S01", "marker": "fallback"}],
+        },
+    )
+    _write_yaml(registry_path, _registry_payload("first"))
+
+    first = load_pack_steps(pack_path)
+    assert first[0]["short_explanation"] == "first"
+
+    time.sleep(0.01)
+    _write_yaml(registry_path, _registry_payload("updated"))
+
+    second = load_pack_steps(pack_path)
+    assert second[0]["short_explanation"] == "updated"
+
+
+def test_load_pack_steps_cache_invalidates_when_pack_fallback_changes(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "steps": [{"id": "S01", "marker": "first"}],
+        },
+    )
+
+    first = load_pack_steps(pack_path)
+    assert first[0]["marker"] == "first"
+
+    time.sleep(0.01)
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "steps": [{"id": "S01", "marker": "updated"}],
+        },
+    )
+
+    second = load_pack_steps(pack_path)
+    assert second[0]["marker"] == "updated"

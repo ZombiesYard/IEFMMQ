@@ -25,6 +25,14 @@ class StepInferenceResult:
     missing_conditions: tuple[str, ...]
 
 
+def _path_signature(path: Path) -> tuple[int, int] | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
 def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]:
     """
     Load procedure steps from canonical step registry when available.
@@ -34,16 +42,36 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
     """
     path = Path(pack_path) if pack_path else _DEFAULT_PACK_PATH
     registry_path = default_step_registry_path(path)
-    cached_registry_steps = _load_registry_steps_cached(str(registry_path.resolve()))
-    if cached_registry_steps:
-        return [dict(step) for step in cached_registry_steps]
+    registry_path_resolved = registry_path.resolve()
+    registry_signature = _path_signature(registry_path_resolved)
+    if registry_signature is not None:
+        cached_registry_steps = _load_registry_steps_cached(
+            str(registry_path_resolved),
+            registry_signature[0],
+            registry_signature[1],
+        )
+        if cached_registry_steps:
+            return [dict(step) for step in cached_registry_steps]
 
-    cached_steps = _load_pack_steps_cached(str(path.resolve()))
+    pack_path_resolved = path.resolve()
+    pack_signature = _path_signature(pack_path_resolved)
+    if pack_signature is None:
+        return []
+    cached_steps = _load_pack_steps_cached(
+        str(pack_path_resolved),
+        pack_signature[0],
+        pack_signature[1],
+    )
     return [dict(step) for step in cached_steps]
 
 
 @lru_cache(maxsize=8)
-def _load_registry_steps_cached(resolved_registry_path: str) -> tuple[dict[str, Any], ...]:
+def _load_registry_steps_cached(
+    resolved_registry_path: str,
+    registry_mtime_ns: int,
+    registry_size_bytes: int,
+) -> tuple[dict[str, Any], ...]:
+    del registry_mtime_ns, registry_size_bytes  # cache-key components only
     try:
         entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=25)
     except (StepRegistryError, OSError, ValueError):
@@ -52,7 +80,12 @@ def _load_registry_steps_cached(resolved_registry_path: str) -> tuple[dict[str, 
 
 
 @lru_cache(maxsize=8)
-def _load_pack_steps_cached(resolved_pack_path: str) -> tuple[dict[str, Any], ...]:
+def _load_pack_steps_cached(
+    resolved_pack_path: str,
+    pack_mtime_ns: int,
+    pack_size_bytes: int,
+) -> tuple[dict[str, Any], ...]:
+    del pack_mtime_ns, pack_size_bytes  # cache-key components only
     path = Path(resolved_pack_path)
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))

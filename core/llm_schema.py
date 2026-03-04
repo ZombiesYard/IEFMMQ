@@ -48,6 +48,14 @@ def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
     return data
 
 
+def _path_signature(path: Path) -> tuple[int, int]:
+    try:
+        stat = path.stat()
+    except OSError:
+        return (-1, -1)
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
 def _load_step_ids_from_pack(pack_path: Path) -> list[str]:
     data = _load_yaml_mapping(pack_path, "pack.yaml")
     steps = data.get("steps")
@@ -234,10 +242,28 @@ def build_help_response_schema(
 @lru_cache(maxsize=16)
 def _cached_help_schema(
     pack_path: str,
+    pack_mtime_ns: int,
+    pack_size_bytes: int,
     ui_map_path: str,
+    ui_map_mtime_ns: int,
+    ui_map_size_bytes: int,
     taxonomy_path: str | None,
+    taxonomy_mtime_ns: int,
+    taxonomy_size_bytes: int,
     step_registry_path: str | None,
+    step_registry_mtime_ns: int,
+    step_registry_size_bytes: int,
 ) -> dict[str, Any]:
+    del (
+        pack_mtime_ns,
+        pack_size_bytes,
+        ui_map_mtime_ns,
+        ui_map_size_bytes,
+        taxonomy_mtime_ns,
+        taxonomy_size_bytes,
+        step_registry_mtime_ns,
+        step_registry_size_bytes,
+    )  # cache-key components only
     pack = Path(pack_path)
     ui_map = Path(ui_map_path)
     taxonomy = Path(taxonomy_path) if taxonomy_path else None
@@ -255,14 +281,35 @@ def get_help_response_schema(
     step_registry_path: str | Path | None = None,
 ) -> dict[str, Any]:
     pack_path_obj = Path(pack_path) if pack_path else _default_pack_path()
-    pack = str(pack_path_obj.resolve())
-    ui_map = str((Path(ui_map_path) if ui_map_path else _default_ui_map_path()).resolve())
-    taxonomy = str((Path(taxonomy_path) if taxonomy_path else _default_taxonomy_path()).resolve())
+    pack_resolved = pack_path_obj.resolve()
+    ui_map_resolved = (Path(ui_map_path) if ui_map_path else _default_ui_map_path()).resolve()
+    taxonomy_resolved = (Path(taxonomy_path) if taxonomy_path else _default_taxonomy_path()).resolve()
     if step_registry_path is not None:
-        step_registry = str(Path(step_registry_path).resolve())
+        step_registry_resolved = Path(step_registry_path).resolve()
     else:
-        step_registry = str(default_step_registry_path(pack_path_obj).resolve())
-    return copy.deepcopy(_cached_help_schema(pack, ui_map, taxonomy, step_registry))
+        step_registry_resolved = default_step_registry_path(pack_path_obj).resolve()
+
+    pack_mtime_ns, pack_size_bytes = _path_signature(pack_resolved)
+    ui_map_mtime_ns, ui_map_size_bytes = _path_signature(ui_map_resolved)
+    taxonomy_mtime_ns, taxonomy_size_bytes = _path_signature(taxonomy_resolved)
+    step_registry_mtime_ns, step_registry_size_bytes = _path_signature(step_registry_resolved)
+
+    return copy.deepcopy(
+        _cached_help_schema(
+            str(pack_resolved),
+            pack_mtime_ns,
+            pack_size_bytes,
+            str(ui_map_resolved),
+            ui_map_mtime_ns,
+            ui_map_size_bytes,
+            str(taxonomy_resolved),
+            taxonomy_mtime_ns,
+            taxonomy_size_bytes,
+            str(step_registry_resolved),
+            step_registry_mtime_ns,
+            step_registry_size_bytes,
+        )
+    )
 
 
 def _format_path_segment(segment: Any) -> str:
