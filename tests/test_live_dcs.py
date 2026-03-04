@@ -406,6 +406,7 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert request is not None
     assert request.intent == "help"
     assert "candidate_steps" in request.context
+    assert request.context["candidate_steps"] == [f"S{i:02d}" for i in range(1, 26)]
     assert "recent_deltas" in request.context
     assert "recent_actions" in request.context
     assert "deterministic_step_hint" in request.context

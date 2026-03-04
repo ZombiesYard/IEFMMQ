@@ -6,7 +6,20 @@ import yaml
 BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
 UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
-REQUIRED_NON_EMPTY_STEPS = ("S01", "S02", "S03", "S04", "S06", "S07", "S08", "S09", "S10")
+REQUIRED_STEP_IDS = tuple(f"S{i:02d}" for i in range(1, 26))
+REQUIRED_NON_EMPTY_UI_TARGET_STEPS = (
+    "S01",
+    "S02",
+    "S03",
+    "S04",
+    "S06",
+    "S07",
+    "S08",
+    "S09",
+    "S10",
+    "S15",
+    "S18",
+)
 
 
 def _load_yaml(path: Path) -> dict:
@@ -40,14 +53,24 @@ def test_step_ui_targets_must_exist_and_reference_ui_map_keys() -> None:
             assert target in allowed_targets, f"step {step_id} ui_targets[{idx}]={target!r} not found in ui_map.yaml"
 
 
-def test_required_steps_have_non_empty_ui_targets() -> None:
+def test_required_steps_exist_for_full_cold_start() -> None:
     pack = _load_yaml(PACK_PATH)
     steps = pack.get("steps")
     assert isinstance(steps, list)
 
     by_id = {step.get("id"): step for step in steps if isinstance(step, dict)}
-    for step_id in REQUIRED_NON_EMPTY_STEPS:
+    for step_id in REQUIRED_STEP_IDS:
+        assert step_id in by_id, f"required step {step_id} missing in pack"
+
+
+def test_clickable_subset_steps_have_non_empty_ui_targets() -> None:
+    pack = _load_yaml(PACK_PATH)
+    steps = pack.get("steps")
+    assert isinstance(steps, list)
+
+    by_id = {step.get("id"): step for step in steps if isinstance(step, dict)}
+    for step_id in REQUIRED_NON_EMPTY_UI_TARGET_STEPS:
         assert step_id in by_id, f"required step {step_id} missing in pack"
         ui_targets = by_id[step_id].get("ui_targets")
         assert isinstance(ui_targets, list), f"step {step_id} ui_targets must be list"
-        assert ui_targets, f"step {step_id} ui_targets must not be empty for MVP coverage"
+        assert ui_targets, f"step {step_id} ui_targets must not be empty for clickable coverage"
