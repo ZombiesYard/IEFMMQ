@@ -16,6 +16,7 @@ from typing import Any
 import yaml
 
 _STEP_ID_RE = re.compile(r"^S(\d{2})$")
+_SUPPORTED_SCHEMA_VERSIONS = {"v1"}
 
 
 class StepRegistryError(ValueError):
@@ -55,7 +56,67 @@ def _repo_root() -> Path:
 def default_step_registry_path(pack_path: str | Path | None = None) -> Path:
     if pack_path is None:
         return _repo_root() / "packs" / "fa18c_startup" / "step_registry.yaml"
-    return Path(pack_path).resolve().parent / "step_registry.yaml"
+    resolved_pack_path = Path(pack_path).resolve()
+    configured = _load_registry_path_from_pack_metadata(resolved_pack_path)
+    if configured is not None:
+        return configured
+    return resolved_pack_path.parent / "step_registry.yaml"
+
+
+def _safe_stat(path: Path, *, label: str) -> tuple[int, int]:
+    try:
+        stat = path.stat()
+    except FileNotFoundError as exc:
+        raise StepRegistryError(f"{label} not found: {path}") from exc
+    except OSError as exc:
+        raise StepRegistryError(f"failed to stat {label}: {path}") from exc
+    return int(stat.st_mtime_ns), int(stat.st_size)
+
+
+@lru_cache(maxsize=32)
+def _load_registry_path_from_pack_metadata_cached(
+    resolved_pack_path: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> str | None:
+    del mtime_ns, size_bytes  # cache-key components only
+    pack_path = Path(resolved_pack_path)
+    try:
+        raw_pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise StepRegistryError(f"pack contains invalid YAML: {pack_path}") from exc
+    except OSError as exc:
+        raise StepRegistryError(f"failed to read pack metadata: {pack_path}") from exc
+    if not isinstance(raw_pack, dict):
+        raise StepRegistryError(f"pack root must be a mapping: {pack_path}")
+
+    metadata = raw_pack.get("metadata")
+    if metadata is None:
+        return None
+    if not isinstance(metadata, dict):
+        raise StepRegistryError(f"pack metadata must be a mapping: {pack_path}")
+
+    step_registry_path_raw = metadata.get("step_registry_path")
+    if step_registry_path_raw is None:
+        return None
+    if not isinstance(step_registry_path_raw, str) or not step_registry_path_raw.strip():
+        raise StepRegistryError(f"metadata.step_registry_path must be a non-empty string: {pack_path}")
+
+    candidate = Path(step_registry_path_raw.strip()).expanduser()
+    resolved = candidate.resolve() if candidate.is_absolute() else (pack_path.parent / candidate).resolve()
+    return str(resolved)
+
+
+def _load_registry_path_from_pack_metadata(resolved_pack_path: Path) -> Path | None:
+    if not resolved_pack_path.is_file():
+        return None
+    mtime_ns, size_bytes = _safe_stat(resolved_pack_path, label="pack file")
+    configured = _load_registry_path_from_pack_metadata_cached(
+        str(resolved_pack_path),
+        mtime_ns,
+        size_bytes,
+    )
+    return Path(configured) if configured is not None else None
 
 
 def _require_non_empty_str(value: Any, *, field_name: str) -> str:
@@ -152,7 +213,13 @@ def _parse_step(raw_step: Any, *, index: int) -> CanonicalStep:
 
 
 @lru_cache(maxsize=8)
-def _load_registry_cached(resolved_path: str, expected_count: int | None) -> tuple[CanonicalStep, ...]:
+def _load_registry_cached(
+    resolved_path: str,
+    mtime_ns: int,
+    size_bytes: int,
+    expected_count: int | None,
+) -> tuple[CanonicalStep, ...]:
+    del mtime_ns, size_bytes  # cache-key components only
     path = Path(resolved_path)
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -166,7 +233,12 @@ def _load_registry_cached(resolved_path: str, expected_count: int | None) -> tup
     if not isinstance(raw, dict):
         raise StepRegistryError(f"step registry root must be a mapping: {path}")
 
-    _require_non_empty_str(raw.get("schema_version"), field_name="schema_version")
+    schema_version = _require_non_empty_str(raw.get("schema_version"), field_name="schema_version")
+    if schema_version not in _SUPPORTED_SCHEMA_VERSIONS:
+        supported = ", ".join(sorted(_SUPPORTED_SCHEMA_VERSIONS))
+        raise StepRegistryError(
+            f"unsupported schema_version {schema_version!r}; supported versions: {supported}"
+        )
     steps_raw = raw.get("steps")
     if not isinstance(steps_raw, list) or not steps_raw:
         raise StepRegistryError("steps must be a non-empty list")
@@ -182,7 +254,8 @@ def load_step_registry(
     expected_count: int | None = 25,
 ) -> list[CanonicalStep]:
     registry_path = Path(path).resolve() if path is not None else default_step_registry_path().resolve()
-    return list(_load_registry_cached(str(registry_path), expected_count))
+    mtime_ns, size_bytes = _safe_stat(registry_path, label="step registry")
+    return list(_load_registry_cached(str(registry_path), mtime_ns, size_bytes, expected_count))
 
 
 def load_step_registry_dicts(
