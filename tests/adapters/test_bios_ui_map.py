@@ -29,6 +29,73 @@ def test_pack_bios_to_ui_covers_critical_switches() -> None:
         assert mapper.targets_for_key(bios_key) == [ui_target]
 
 
+def test_pack_bios_to_ui_covers_cold_start_step_keys() -> None:
+    mapper = BiosUiMapper.from_yaml(BIOS_TO_UI_PATH, UI_MAP_PATH)
+
+    expected: dict[str, list[str]] = {
+        "LIGHTS_TEST_SW": ["lights_test_button"],
+        "LEFT_DDI_PB_05": ["left_mdi_pb5"],
+        "RIGHT_DDI_PB_05": ["right_mdi_pb5"],
+        "COMM1_CHANNEL_NUMERIC": [
+            "ufc_comm1_channel_selector_rotate",
+            "ufc_comm1_channel_selector_pull",
+        ],
+        "COMM2_CHANNEL_NUMERIC": [
+            "ufc_comm2_channel_selector_rotate",
+            "ufc_comm2_channel_selector_pull",
+        ],
+        "UFC_COMM1_PULL": ["ufc_comm1_channel_selector_pull"],
+        "UFC_COMM2_PULL": ["ufc_comm2_channel_selector_pull"],
+        "OBOGS_SW": ["obogs_control_switch"],
+        "OXY_FLOW": ["obogs_flow_knob"],
+        "FCS_RESET_BTN": ["fcs_reset_button"],
+        "TO_TRIM_BTN": ["takeoff_trim_button"],
+        "FLAP_SW": ["flap_switch"],
+        "PROBE_SW": ["refuel_probe_switch"],
+        "LAUNCH_BAR_SW": ["launch_bar_switch"],
+        "HOOK_LEVER": ["arresting_hook_handle"],
+        "PITOT_HEAT_SW": ["pitot_heater_switch"],
+        "EMERGENCY_PARKING_BRAKE_PULL": ["parking_brake_handle"],
+        "EMERGENCY_PARKING_BRAKE_ROTATE": ["parking_brake_handle"],
+        "IFEI_UP_BTN": ["ifei_up_button"],
+        "IFEI_DWN_BTN": ["ifei_down_button"],
+        "STBY_PRESS_SET_0": ["standby_altimeter_pressure_knob"],
+        "STBY_PRESS_SET_1": ["standby_altimeter_pressure_knob"],
+        "STBY_PRESS_SET_2": ["standby_altimeter_pressure_knob"],
+        "RADALT_MIN_HEIGHT_PTR": ["radar_altimeter_bug_knob"],
+        "SAI_CAGE": ["standby_attitude_cage_knob"],
+        "HUD_ATT_SW": ["attitude_source_selector"],
+    }
+
+    for bios_key, ui_targets in expected.items():
+        assert mapper.targets_for_key(bios_key) == ui_targets
+
+
+def test_pack_bios_to_ui_maps_replay_style_keys_without_regression() -> None:
+    mapper = BiosUiMapper.from_yaml(BIOS_TO_UI_PATH, UI_MAP_PATH)
+    delta = {
+        "LEFT_MDI_PB_5": 1,  # legacy key spelling
+        "LEFT_DDI_PB_05": 1,  # current replay key spelling
+        "FCS_RESET_BTN": 1,
+        "COMM1_CHANNEL_NUMERIC": 3,
+        "COMM2_CHAN": 11,
+        "TO_TRIM_BTN": 1,
+        "EMERGENCY_PARKING_BRAKE_PULL": 0,
+        "NOT_MAPPED": 1,
+    }
+
+    assert mapper.map_delta(delta) == [
+        "left_mdi_pb5",
+        "fcs_reset_button",
+        "ufc_comm1_channel_selector_rotate",
+        "ufc_comm1_channel_selector_pull",
+        "ufc_comm2_channel_selector_rotate",
+        "ufc_comm2_channel_selector_pull",
+        "takeoff_trim_button",
+        "parking_brake_handle",
+    ]
+
+
 def test_map_delta_supports_one_to_many_and_stable_order() -> None:
     ui_map = FIXTURE_DIR / "ui_map_minimal.yaml"
     bios_map = FIXTURE_DIR / "bios_to_ui_one_to_many.yaml"
