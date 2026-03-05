@@ -136,7 +136,7 @@ def _clone_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_clone_value(item) for item in value]
     if isinstance(value, tuple):
-        return [_clone_value(item) for item in value]
+        return tuple(_clone_value(item) for item in value)
     return value
 
 

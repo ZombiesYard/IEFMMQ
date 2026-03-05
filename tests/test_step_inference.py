@@ -7,14 +7,17 @@ import pytest
 import yaml
 
 from adapters.pack_gates import load_pack_gate_config
-from adapters.step_inference import StepInferenceResult, extract_recent_ui_targets, infer_step_id, load_pack_steps
+from adapters.step_inference import (
+    StepInferenceResult,
+    _rule_to_condition_text,
+    extract_recent_ui_targets,
+    infer_step_id,
+    load_pack_steps,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
-STEP_IDS = [f"S{i:02d}" for i in range(1, 26)]
-PACK_STEPS = load_pack_steps(PACK_PATH)
-PACK_GATES = load_pack_gate_config(PACK_PATH)
 
 
 def _step_ids(pack_steps: list[dict[str, Any]]) -> list[str]:
@@ -52,38 +55,6 @@ def _extract_var_key(rule: Mapping[str, Any]) -> str | None:
     if "." in raw:
         return None
     return raw
-
-
-def _rule_condition_text(rule: Mapping[str, Any]) -> str | None:
-    op = rule.get("op")
-    key = _extract_var_key(rule)
-    if not isinstance(op, str) or not key:
-        return None
-    if op == "flag_true":
-        return f"vars.{key}==true"
-    if op == "var_gte":
-        value = rule.get("value")
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            return None
-        if isinstance(value, float) and value.is_integer():
-            value = int(value)
-        return f"vars.{key}>={value}"
-    if op == "arg_in_range":
-        min_value = rule.get("min")
-        max_value = rule.get("max")
-        if (
-            isinstance(min_value, bool)
-            or isinstance(max_value, bool)
-            or not isinstance(min_value, (int, float))
-            or not isinstance(max_value, (int, float))
-        ):
-            return None
-        if isinstance(min_value, float) and min_value.is_integer():
-            min_value = int(min_value)
-        if isinstance(max_value, float) and max_value.is_integer():
-            max_value = int(max_value)
-        return f"vars.{key} in [{min_value},{max_value}]"
-    return None
 
 
 def _rule_pass_value(rule: Mapping[str, Any]) -> Any:
@@ -129,10 +100,10 @@ def _rule_fail_value(rule: Mapping[str, Any]) -> Any:
     return False
 
 
-def _build_baseline_vars() -> dict[str, Any]:
+def _build_baseline_vars(pack_gates: Mapping[str, Any]) -> dict[str, Any]:
     vars_map: dict[str, Any] = {}
     for gate_type in ("precondition_gates", "completion_gates"):
-        gate_map = PACK_GATES[gate_type]
+        gate_map = pack_gates[gate_type]
         for rules in gate_map.values():
             for rule in rules:
                 key = _extract_var_key(rule)
@@ -142,19 +113,14 @@ def _build_baseline_vars() -> dict[str, Any]:
     return vars_map
 
 
-BASELINE_VARS = _build_baseline_vars()
-STEP_INDEX = _step_index(PACK_STEPS)
-STEP_META = _step_by_id(PACK_STEPS)
-
-
-def _step_observability(step_id: str) -> str | None:
-    step = STEP_META.get(step_id, {})
+def _step_observability(step_id: str, step_meta: Mapping[str, Mapping[str, Any]]) -> str | None:
+    step = step_meta.get(step_id, {})
     value = step.get("observability")
     return value if isinstance(value, str) else None
 
 
-def _first_ui_target(step_id: str) -> str | None:
-    step = STEP_META.get(step_id, {})
+def _first_ui_target(step_id: str, step_meta: Mapping[str, Mapping[str, Any]]) -> str | None:
+    step = step_meta.get(step_id, {})
     targets = step.get("ui_targets")
     if not isinstance(targets, list):
         return None
@@ -164,79 +130,122 @@ def _first_ui_target(step_id: str) -> str | None:
     return None
 
 
-def _is_observability_hold_step(step_id: str) -> bool:
-    obs = _step_observability(step_id)
-    comp_rules = PACK_GATES["completion_gates"].get(step_id, ())
+def _is_observability_hold_step(
+    step_id: str,
+    *,
+    pack_gates: Mapping[str, Any],
+    step_meta: Mapping[str, Mapping[str, Any]],
+) -> bool:
+    obs = _step_observability(step_id, step_meta)
+    comp_rules = pack_gates["completion_gates"].get(step_id, ())
     return obs in {"partially", "unknown"} and len(comp_rules) == 0
 
 
-def _completion_var_keys_after(step_id: str) -> set[str]:
-    idx = STEP_INDEX[step_id]
+def _completion_var_keys_after(
+    step_id: str,
+    *,
+    step_ids: list[str],
+    step_index: Mapping[str, int],
+    pack_gates: Mapping[str, Any],
+) -> set[str]:
+    idx = step_index[step_id]
     out: set[str] = set()
-    for later_id in STEP_IDS[idx + 1 :]:
-        for rule in PACK_GATES["completion_gates"].get(later_id, ()):
+    for later_id in step_ids[idx + 1 :]:
+        for rule in pack_gates["completion_gates"].get(later_id, ()):
             key = _extract_var_key(rule)
             if key:
                 out.add(key)
     return out
 
 
-def _build_step_blocking_scenario(step_id: str) -> tuple[dict[str, Any], list[str], str | None]:
-    vars_map = dict(BASELINE_VARS)
+@pytest.fixture(scope="session")
+def pack_ctx() -> dict[str, Any]:
+    pack_steps = load_pack_steps(PACK_PATH)
+    pack_gates = load_pack_gate_config(PACK_PATH)
+    step_ids = _step_ids(pack_steps)
+    return {
+        "pack_steps": pack_steps,
+        "pack_gates": pack_gates,
+        "step_ids": step_ids,
+        "step_index": _step_index(pack_steps),
+        "step_meta": _step_by_id(pack_steps),
+        "baseline_vars": _build_baseline_vars(pack_gates),
+    }
+
+
+def _build_step_blocking_scenario(step_id: str, ctx: Mapping[str, Any]) -> tuple[dict[str, Any], list[str], str | None]:
+    step_ids: list[str] = ctx["step_ids"]
+    step_index: Mapping[str, int] = ctx["step_index"]
+    step_meta: Mapping[str, Mapping[str, Any]] = ctx["step_meta"]
+    pack_gates: Mapping[str, Any] = ctx["pack_gates"]
+    vars_map = dict(ctx["baseline_vars"])
     recent_ui_targets: list[str] = []
 
-    for prev_step_id in STEP_IDS[: STEP_INDEX[step_id]]:
-        if not _is_observability_hold_step(prev_step_id):
+    for prev_step_id in step_ids[: step_index[step_id]]:
+        if not _is_observability_hold_step(prev_step_id, pack_gates=pack_gates, step_meta=step_meta):
             continue
-        target = _first_ui_target(prev_step_id)
+        target = _first_ui_target(prev_step_id, step_meta)
         if target:
             recent_ui_targets.append(target)
 
-    completion_rules = PACK_GATES["completion_gates"].get(step_id, ())
+    completion_rules = pack_gates["completion_gates"].get(step_id, ())
     if completion_rules:
         failing_rule = completion_rules[0]
         key = _extract_var_key(failing_rule)
         if key:
             vars_map[key] = _rule_fail_value(failing_rule)
-        return vars_map, recent_ui_targets, _rule_condition_text(failing_rule)
+        return vars_map, recent_ui_targets, _rule_to_condition_text(failing_rule)
 
-    if _is_observability_hold_step(step_id):
-        hidden_keys = sorted(_completion_var_keys_after(step_id))
+    if _is_observability_hold_step(step_id, pack_gates=pack_gates, step_meta=step_meta):
+        hidden_keys = sorted(
+            _completion_var_keys_after(
+                step_id,
+                step_ids=step_ids,
+                step_index=step_index,
+                pack_gates=pack_gates,
+            )
+        )
         if hidden_keys:
             vars_map["vars_source_missing"] = hidden_keys
-    target = _first_ui_target(step_id)
+    target = _first_ui_target(step_id, step_meta)
     if target:
         recent_ui_targets = [item for item in recent_ui_targets if item != target]
     return vars_map, recent_ui_targets, None
 
 
-@pytest.mark.parametrize("step_id", STEP_IDS)
-def test_infer_step_pack_gate_driven_blocking_scenarios_cover_s01_to_s25(step_id: str) -> None:
-    vars_map, recent_ui_targets, expected_condition = _build_step_blocking_scenario(step_id)
+def test_infer_step_pack_gate_driven_blocking_scenarios_cover_s01_to_s25(pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
+    step_ids: list[str] = pack_ctx["step_ids"]
 
+    for step_id in step_ids:
+        vars_map, recent_ui_targets, expected_condition = _build_step_blocking_scenario(step_id, pack_ctx)
+
+        result = infer_step_id(
+            pack_steps,
+            vars_map,
+            recent_ui_targets,
+            precondition_gates=pack_gates["precondition_gates"],
+            completion_gates=pack_gates["completion_gates"],
+            pack_path=PACK_PATH,
+        )
+
+        assert result.inferred_step_id == step_id
+        if expected_condition is None:
+            assert result.missing_conditions == ()
+        else:
+            assert expected_condition in result.missing_conditions
+
+
+def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready(pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
     result = infer_step_id(
-        PACK_STEPS,
-        vars_map,
-        recent_ui_targets,
-        precondition_gates=PACK_GATES["precondition_gates"],
-        completion_gates=PACK_GATES["completion_gates"],
-        pack_path=PACK_PATH,
-    )
-
-    assert result.inferred_step_id == step_id
-    if expected_condition is None:
-        assert result.missing_conditions == ()
-    else:
-        assert expected_condition in result.missing_conditions
-
-
-def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready() -> None:
-    result = infer_step_id(
-        PACK_STEPS,
+        pack_steps,
         {"power_available": True, "apu_on": True, "apu_ready": False},
         ["apu_switch"],
-        precondition_gates=PACK_GATES["precondition_gates"],
-        completion_gates=PACK_GATES["completion_gates"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
         pack_path=PACK_PATH,
     )
 
@@ -244,9 +253,11 @@ def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready() -> None:
     assert "vars.apu_ready==true" in result.missing_conditions
 
 
-def test_infer_step_mvp_progresses_to_s07_without_missing_conditions() -> None:
+def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
     result = infer_step_id(
-        PACK_STEPS,
+        pack_steps,
         {
             "power_available": True,
             "apu_ready": True,
@@ -255,8 +266,8 @@ def test_infer_step_mvp_progresses_to_s07_without_missing_conditions() -> None:
             "bleed_air_norm": True,
         },
         ["bleed_air_knob", "eng_crank_switch"],
-        precondition_gates=PACK_GATES["precondition_gates"],
-        completion_gates=PACK_GATES["completion_gates"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
         pack_path=PACK_PATH,
     )
 
@@ -264,17 +275,20 @@ def test_infer_step_mvp_progresses_to_s07_without_missing_conditions() -> None:
     assert result.missing_conditions == ()
 
 
-def test_infer_step_is_robust_on_invalid_inputs() -> None:
+def test_infer_step_is_robust_on_invalid_inputs(pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
+    step_ids: list[str] = pack_ctx["step_ids"]
     result = infer_step_id(
-        PACK_STEPS,
+        pack_steps,
         vars_map={"power_available": "unknown"},
         recent_ui_targets=["apu_switch", "", 1],  # type: ignore[list-item]
-        precondition_gates=PACK_GATES["precondition_gates"],
-        completion_gates=PACK_GATES["completion_gates"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
         pack_path=PACK_PATH,
     )
     assert isinstance(result, StepInferenceResult)
-    assert result.inferred_step_id in STEP_IDS
+    assert result.inferred_step_id in step_ids
 
 
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
