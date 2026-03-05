@@ -19,7 +19,7 @@ from adapters.step_inference import (
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
+REAL_PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
 _SYNTHETIC_SUPPORTED_OPS = frozenset({"flag_true", "var_gte", "arg_in_range"})
 
 
@@ -203,13 +203,56 @@ def _completion_var_keys_after(
     return out
 
 
-@pytest.fixture(scope="session")
-def pack_ctx() -> dict[str, Any]:
-    pack_steps = load_pack_steps(PACK_PATH)
-    pack_gates = load_pack_gate_config(PACK_PATH)
+def _write_synthetic_inference_pack(pack_path: Path) -> None:
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "synthetic_inference_pack",
+            "steps": [
+                {
+                    "id": "S01",
+                    "observability": "observable",
+                    "ui_targets": ["battery_switch"],
+                },
+                {
+                    "id": "S02",
+                    "observability": "observable",
+                    "ui_targets": ["apu_switch"],
+                },
+                {
+                    "id": "S03",
+                    "observability": "partially",
+                    "ui_targets": ["eng_crank_switch"],
+                },
+                {
+                    "id": "S04",
+                    "observability": "observable",
+                    "ui_targets": ["throttle_right"],
+                },
+            ],
+            "precondition_gates": {
+                "S01": [{"op": "flag_true", "var": "vars.power_available"}],
+                "S02": [{"op": "flag_true", "var": "vars.apu_on"}],
+                "S03": [{"op": "flag_true", "var": "vars.engine_crank_right"}],
+                "S04": [{"op": "flag_true", "var": "vars.bleed_air_norm"}],
+            },
+            "completion_gates": {
+                "S01": [{"op": "flag_true", "var": "vars.battery_on"}],
+                "S02": [{"op": "var_gte", "var": "vars.apu_ready_pct", "value": 90}],
+                "S03": [],
+                "S04": [{"op": "arg_in_range", "var": "vars.rpm_r", "min": 60, "max": 70}],
+            },
+        },
+    )
+
+
+def _build_pack_ctx(pack_path: Path) -> dict[str, Any]:
+    pack_steps = load_pack_steps(pack_path)
+    pack_gates = load_pack_gate_config(pack_path)
     synthetic_pack_gates = _filter_supported_gate_map(pack_gates)
     step_ids = _step_ids(pack_steps)
     return {
+        "pack_path": pack_path,
         "pack_steps": pack_steps,
         "pack_gates": synthetic_pack_gates,
         "step_ids": step_ids,
@@ -217,6 +260,18 @@ def pack_ctx() -> dict[str, Any]:
         "step_meta": _step_by_id(pack_steps),
         "baseline_vars": _build_baseline_vars(synthetic_pack_gates),
     }
+
+
+@pytest.fixture()
+def synthetic_pack_ctx(tmp_path: Path) -> dict[str, Any]:
+    pack_path = tmp_path / "synthetic_inference_pack.yaml"
+    _write_synthetic_inference_pack(pack_path)
+    return _build_pack_ctx(pack_path)
+
+
+@pytest.fixture(scope="session")
+def real_pack_ctx() -> dict[str, Any]:
+    return _build_pack_ctx(REAL_PACK_PATH)
 
 
 def _build_step_blocking_scenario(step_id: str, ctx: Mapping[str, Any]) -> tuple[dict[str, Any], list[str], str | None]:
@@ -260,13 +315,16 @@ def _build_step_blocking_scenario(step_id: str, ctx: Mapping[str, Any]) -> tuple
     return vars_map, recent_ui_targets, None
 
 
-def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(pack_ctx: Mapping[str, Any]) -> None:
-    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
-    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
-    step_ids: list[str] = pack_ctx["step_ids"]
+def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(
+    synthetic_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]
+    step_ids: list[str] = synthetic_pack_ctx["step_ids"]
+    pack_path: Path = synthetic_pack_ctx["pack_path"]
 
     for step_id in step_ids:
-        vars_map, recent_ui_targets, expected_condition = _build_step_blocking_scenario(step_id, pack_ctx)
+        vars_map, recent_ui_targets, expected_condition = _build_step_blocking_scenario(step_id, synthetic_pack_ctx)
 
         result = infer_step_id(
             pack_steps,
@@ -274,7 +332,7 @@ def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(pac
             recent_ui_targets,
             precondition_gates=pack_gates["precondition_gates"],
             completion_gates=pack_gates["completion_gates"],
-            pack_path=PACK_PATH,
+            pack_path=pack_path,
         )
 
         assert result.inferred_step_id == step_id
@@ -284,41 +342,50 @@ def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(pac
             assert expected_condition in result.missing_conditions
 
 
-def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready(pack_ctx: Mapping[str, Any]) -> None:
-    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
-    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
+def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready(real_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     result = infer_step_id(
         pack_steps,
         {"power_available": True, "apu_on": True, "apu_ready": False},
         ["apu_switch"],
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
-        pack_path=PACK_PATH,
+        pack_path=REAL_PACK_PATH,
     )
 
     assert result.inferred_step_id == "S03"
     assert "vars.apu_ready==true" in result.missing_conditions
 
 
-def test_infer_step_accepts_iterable_recent_ui_targets(pack_ctx: Mapping[str, Any]) -> None:
-    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
-    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
+def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]
+    pack_path: Path = synthetic_pack_ctx["pack_path"]
     result = infer_step_id(
         pack_steps,
-        {"power_available": True, "apu_on": True, "apu_ready": False},
-        deque(["apu_switch"]),
+        {
+            "power_available": True,
+            "battery_on": False,
+            "apu_on": True,
+            "apu_ready_pct": 100,
+            "engine_crank_right": True,
+            "bleed_air_norm": True,
+            "rpm_r": 65,
+        },
+        deque(["battery_switch"]),
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
-        pack_path=PACK_PATH,
+        pack_path=pack_path,
     )
 
-    assert result.inferred_step_id == "S03"
-    assert "vars.apu_ready==true" in result.missing_conditions
+    assert result.inferred_step_id == "S01"
+    assert "vars.battery_on==true" in result.missing_conditions
 
 
-def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(pack_ctx: Mapping[str, Any]) -> None:
-    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
-    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
+def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(real_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     result = infer_step_id(
         pack_steps,
         {
@@ -331,27 +398,70 @@ def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(pack_ctx: M
         ["bleed_air_knob", "eng_crank_switch"],
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
-        pack_path=PACK_PATH,
+        pack_path=REAL_PACK_PATH,
     )
 
     assert result.inferred_step_id == "S07"
     assert result.missing_conditions == ()
 
 
-def test_infer_step_is_robust_on_invalid_inputs(pack_ctx: Mapping[str, Any]) -> None:
-    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
-    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
-    step_ids: list[str] = pack_ctx["step_ids"]
+def test_infer_step_is_robust_on_invalid_inputs(synthetic_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]
+    step_ids: list[str] = synthetic_pack_ctx["step_ids"]
+    pack_path: Path = synthetic_pack_ctx["pack_path"]
     result = infer_step_id(
         pack_steps,
         vars_map={"power_available": "unknown"},
         recent_ui_targets=["apu_switch", "", 1],  # type: ignore[list-item]
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
-        pack_path=PACK_PATH,
+        pack_path=pack_path,
     )
     assert isinstance(result, StepInferenceResult)
     assert result.inferred_step_id in step_ids
+
+
+def test_infer_step_reads_nested_payload_vars_before_marking_soft_block() -> None:
+    pack_steps = [
+        {"id": "S01", "observability": "partially", "ui_targets": ["s01_btn"]},
+        {"id": "S02", "observability": "observable", "ui_targets": ["s02_btn"]},
+    ]
+    precondition_gates = {
+        "S01": (
+            {
+                "op": "flag_true",
+                "var": "payload.vars.power_available",
+                "reason_code": "s01_requires_power",
+            },
+        ),
+        "S02": (),
+    }
+    completion_gates = {
+        "S01": (),
+        "S02": (
+            {
+                "op": "var_gte",
+                "var": "vars.after_step_metric",
+                "value": 1,
+                "reason_code": "s02_requires_progress_metric",
+            },
+        ),
+    }
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map={
+            "payload": {"vars": {"power_available": False}},
+            "after_step_metric": 0,
+        },
+        recent_ui_targets=["s01_btn"],
+        precondition_gates=precondition_gates,
+        completion_gates=completion_gates,
+    )
+
+    assert result.inferred_step_id == "S01"
+    assert "vars.power_available==true" in result.missing_conditions
 
 
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
@@ -477,7 +587,19 @@ def test_load_pack_steps_does_not_inject_none_when_pack_step_field_absent(tmp_pa
     assert "observability" not in first
 
 
-def test_infer_step_preserves_caller_precondition_map_when_completion_is_missing() -> None:
+def test_infer_step_preserves_caller_precondition_map_when_completion_is_missing(tmp_path: Path) -> None:
+    pack_path = tmp_path / "fallback_pack.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "fallback_pack",
+            "steps": [{"id": "S01"}, {"id": "S02"}],
+            "completion_gates": {
+                "S01": [{"op": "flag_true", "var": "vars.battery_on"}],
+                "S02": [{"op": "flag_true", "var": "vars.r_gen_on"}],
+            },
+        },
+    )
     pack_steps = [{"id": "S01"}, {"id": "S02"}]
     precondition_gates = {
         "S01": (
@@ -502,7 +624,7 @@ def test_infer_step_preserves_caller_precondition_map_when_completion_is_missing
         [],
         precondition_gates=precondition_gates,
         completion_gates=None,
-        pack_path=PACK_PATH,
+        pack_path=pack_path,
     )
 
     assert result.inferred_step_id == "S01"

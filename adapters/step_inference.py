@@ -721,9 +721,25 @@ def _read_rule_var(
     if key is not None and key in vars_map:
         return vars_map.get(key), False
     if key is not None:
+        for candidate in _iter_var_path_candidates(var_raw, key):
+            value = _read_by_path(vars_map, candidate)
+            if value is not None:
+                return value, False
         return None, True
     value = _read_by_path(vars_map, var_raw)
     return value, value is None
+
+
+def _iter_var_path_candidates(var_raw: str, key: str) -> tuple[str, ...]:
+    candidates = (var_raw, key, f"vars.{key}", f"payload.vars.{key}")
+    ordered_unique: list[str] = []
+    seen: set[str] = set()
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        ordered_unique.append(path)
+    return tuple(ordered_unique)
 
 
 def _extract_var_key_from_path(path: str) -> str | None:
