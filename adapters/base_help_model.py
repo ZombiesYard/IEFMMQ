@@ -255,7 +255,17 @@ class BaseHelpModel(ModelPort):
             recent_ui_targets = normalize_recent_ui_targets(payload.get("recent_ui_targets"))
 
         pack_steps = load_pack_steps()
-        inference = infer_step_id(pack_steps, inference_vars, recent_ui_targets)
+        raw_gates = context.get("gates")
+        gates = raw_gates if isinstance(raw_gates, Mapping) else None
+        raw_scenario_profile = context.get("scenario_profile")
+        scenario_profile = raw_scenario_profile if isinstance(raw_scenario_profile, str) and raw_scenario_profile else None
+        inference = infer_step_id(
+            pack_steps,
+            inference_vars,
+            recent_ui_targets,
+            gates=gates,
+            scenario_profile=scenario_profile,
+        )
         if inference.inferred_step_id is None and isinstance(observation.procedure_hint, str) and observation.procedure_hint:
             inference = StepInferenceResult(
                 inferred_step_id=observation.procedure_hint,

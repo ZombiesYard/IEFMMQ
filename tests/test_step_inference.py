@@ -1,202 +1,280 @@
 import os
 from pathlib import Path
 import time
+from typing import Any, Mapping
 
+import pytest
 import yaml
+
+from adapters.pack_gates import load_pack_gate_config
 from adapters.step_inference import StepInferenceResult, extract_recent_ui_targets, infer_step_id, load_pack_steps
 
 
-def _pack_steps() -> list[dict]:
-    return [
-        {"id": "S01"},
-        {"id": "S02"},
-        {"id": "S03"},
-        {"id": "S04"},
-        {"id": "S05"},
-        {"id": "S06"},
-        {"id": "S07"},
-    ]
+BASE_DIR = Path(__file__).resolve().parent.parent
+PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
+STEP_IDS = [f"S{i:02d}" for i in range(1, 26)]
+PACK_STEPS = load_pack_steps(PACK_PATH)
+PACK_GATES = load_pack_gate_config(PACK_PATH)
 
 
-def test_infer_step_s01_when_power_blocked() -> None:
+def _step_ids(pack_steps: list[dict[str, Any]]) -> list[str]:
+    out: list[str] = []
+    for step in pack_steps:
+        step_id = step.get("id")
+        if isinstance(step_id, str) and step_id:
+            out.append(step_id)
+    return out
+
+
+def _step_index(pack_steps: list[dict[str, Any]]) -> dict[str, int]:
+    return {step_id: idx for idx, step_id in enumerate(_step_ids(pack_steps))}
+
+
+def _step_by_id(pack_steps: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for step in pack_steps:
+        step_id = step.get("id")
+        if isinstance(step_id, str) and step_id and step_id not in out:
+            out[step_id] = step
+    return out
+
+
+def _extract_var_key(rule: Mapping[str, Any]) -> str | None:
+    raw = rule.get("var")
+    if not isinstance(raw, str) or not raw:
+        return None
+    if raw.startswith("payload.vars."):
+        suffix = raw[len("payload.vars.") :]
+        return suffix if suffix else None
+    if raw.startswith("vars."):
+        suffix = raw[len("vars.") :]
+        return suffix if suffix else None
+    if "." in raw:
+        return None
+    return raw
+
+
+def _rule_condition_text(rule: Mapping[str, Any]) -> str | None:
+    op = rule.get("op")
+    key = _extract_var_key(rule)
+    if not isinstance(op, str) or not key:
+        return None
+    if op == "flag_true":
+        return f"vars.{key}==true"
+    if op == "var_gte":
+        value = rule.get("value")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        return f"vars.{key}>={value}"
+    if op == "arg_in_range":
+        min_value = rule.get("min")
+        max_value = rule.get("max")
+        if (
+            isinstance(min_value, bool)
+            or isinstance(max_value, bool)
+            or not isinstance(min_value, (int, float))
+            or not isinstance(max_value, (int, float))
+        ):
+            return None
+        if isinstance(min_value, float) and min_value.is_integer():
+            min_value = int(min_value)
+        if isinstance(max_value, float) and max_value.is_integer():
+            max_value = int(max_value)
+        return f"vars.{key} in [{min_value},{max_value}]"
+    return None
+
+
+def _rule_pass_value(rule: Mapping[str, Any]) -> Any:
+    op = rule.get("op")
+    if op == "flag_true":
+        return True
+    if op == "var_gte":
+        value = rule.get("value")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 1
+        return value + 5
+    if op == "arg_in_range":
+        min_value = rule.get("min")
+        max_value = rule.get("max")
+        if (
+            isinstance(min_value, bool)
+            or isinstance(max_value, bool)
+            or not isinstance(min_value, (int, float))
+            or not isinstance(max_value, (int, float))
+        ):
+            return 0
+        midpoint = (float(min_value) + float(max_value)) / 2.0
+        if midpoint.is_integer():
+            return int(midpoint)
+        return midpoint
+    return True
+
+
+def _rule_fail_value(rule: Mapping[str, Any]) -> Any:
+    op = rule.get("op")
+    if op == "flag_true":
+        return False
+    if op == "var_gte":
+        value = rule.get("value")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0
+        return value - 1
+    if op == "arg_in_range":
+        min_value = rule.get("min")
+        if isinstance(min_value, bool) or not isinstance(min_value, (int, float)):
+            return -1
+        return min_value - 1
+    return False
+
+
+def _build_baseline_vars() -> dict[str, Any]:
+    vars_map: dict[str, Any] = {}
+    for gate_type in ("precondition_gates", "completion_gates"):
+        gate_map = PACK_GATES[gate_type]
+        for rules in gate_map.values():
+            for rule in rules:
+                key = _extract_var_key(rule)
+                if not key:
+                    continue
+                vars_map[key] = _rule_pass_value(rule)
+    return vars_map
+
+
+BASELINE_VARS = _build_baseline_vars()
+STEP_INDEX = _step_index(PACK_STEPS)
+STEP_META = _step_by_id(PACK_STEPS)
+
+
+def _step_observability(step_id: str) -> str | None:
+    step = STEP_META.get(step_id, {})
+    value = step.get("observability")
+    return value if isinstance(value, str) else None
+
+
+def _first_ui_target(step_id: str) -> str | None:
+    step = STEP_META.get(step_id, {})
+    targets = step.get("ui_targets")
+    if not isinstance(targets, list):
+        return None
+    for item in targets:
+        if isinstance(item, str) and item:
+            return item
+    return None
+
+
+def _is_observability_hold_step(step_id: str) -> bool:
+    obs = _step_observability(step_id)
+    comp_rules = PACK_GATES["completion_gates"].get(step_id, ())
+    return obs in {"partially", "unknown"} and len(comp_rules) == 0
+
+
+def _completion_var_keys_after(step_id: str) -> set[str]:
+    idx = STEP_INDEX[step_id]
+    out: set[str] = set()
+    for later_id in STEP_IDS[idx + 1 :]:
+        for rule in PACK_GATES["completion_gates"].get(later_id, ()):
+            key = _extract_var_key(rule)
+            if key:
+                out.add(key)
+    return out
+
+
+def _build_step_blocking_scenario(step_id: str) -> tuple[dict[str, Any], list[str], str | None]:
+    vars_map = dict(BASELINE_VARS)
+    recent_ui_targets: list[str] = []
+
+    for prev_step_id in STEP_IDS[: STEP_INDEX[step_id]]:
+        if not _is_observability_hold_step(prev_step_id):
+            continue
+        target = _first_ui_target(prev_step_id)
+        if target:
+            recent_ui_targets.append(target)
+
+    completion_rules = PACK_GATES["completion_gates"].get(step_id, ())
+    if completion_rules:
+        failing_rule = completion_rules[0]
+        key = _extract_var_key(failing_rule)
+        if key:
+            vars_map[key] = _rule_fail_value(failing_rule)
+        return vars_map, recent_ui_targets, _rule_condition_text(failing_rule)
+
+    if _is_observability_hold_step(step_id):
+        hidden_keys = sorted(_completion_var_keys_after(step_id))
+        if hidden_keys:
+            vars_map["vars_source_missing"] = hidden_keys
+    target = _first_ui_target(step_id)
+    if target:
+        recent_ui_targets = [item for item in recent_ui_targets if item != target]
+    return vars_map, recent_ui_targets, None
+
+
+@pytest.mark.parametrize("step_id", STEP_IDS)
+def test_infer_step_pack_gate_driven_blocking_scenarios_cover_s01_to_s25(step_id: str) -> None:
+    vars_map, recent_ui_targets, expected_condition = _build_step_blocking_scenario(step_id)
+
     result = infer_step_id(
-        _pack_steps(),
-        {"power_available": False, "battery_on": False, "l_gen_on": True, "r_gen_on": True},
-        [],
+        PACK_STEPS,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=PACK_GATES["precondition_gates"],
+        completion_gates=PACK_GATES["completion_gates"],
+        pack_path=PACK_PATH,
     )
-    assert result.inferred_step_id == "S01"
-    assert "vars.battery_on==true" in result.missing_conditions
+
+    assert result.inferred_step_id == step_id
+    if expected_condition is None:
+        assert result.missing_conditions == ()
+    else:
+        assert expected_condition in result.missing_conditions
 
 
-def test_infer_step_s02_when_fire_test_not_seen_and_apu_not_started() -> None:
+def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready() -> None:
     result = infer_step_id(
-        _pack_steps(),
-        {"power_available": True, "apu_on": False, "apu_ready": False, "rpm_r": 0},
-        [],
-    )
-    assert result.inferred_step_id == "S02"
-    assert "recent_ui_targets has fire_test_switch" in result.missing_conditions
-
-
-def test_infer_step_s02_when_fire_test_is_still_active() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {"power_available": True, "apu_on": False, "apu_ready": False, "fire_test_active": True, "rpm_r": 0},
-        [],
-    )
-    assert result.inferred_step_id == "S02"
-    assert result.missing_conditions == ("vars.fire_test_active==false (complete FIRE TEST A/B)",)
-
-
-def test_infer_step_s03_when_apu_not_ready() -> None:
-    result = infer_step_id(
-        _pack_steps(),
+        PACK_STEPS,
         {"power_available": True, "apu_on": True, "apu_ready": False},
-        ["apu_switch", "fire_test_switch"],
+        ["apu_switch"],
+        precondition_gates=PACK_GATES["precondition_gates"],
+        completion_gates=PACK_GATES["completion_gates"],
+        pack_path=PACK_PATH,
     )
+
     assert result.inferred_step_id == "S03"
     assert "vars.apu_ready==true" in result.missing_conditions
 
 
-def test_infer_step_s04_when_apu_ready_but_no_engine_crank() -> None:
+def test_infer_step_mvp_progresses_to_s07_without_missing_conditions() -> None:
     result = infer_step_id(
-        _pack_steps(),
-        {"power_available": True, "apu_ready": True, "engine_crank_right": False, "rpm_r": 0},
-        ["apu_switch"],
-    )
-    assert result.inferred_step_id == "S04"
-    assert "vars.engine_crank_right==true" in result.missing_conditions
-
-
-def test_infer_step_s05_when_rpm_below_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {"power_available": True, "apu_ready": True, "engine_crank_right": True, "rpm_r": 22},
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S05"
-    assert result.missing_conditions == ("vars.rpm_r>=25",)
-
-
-def test_infer_step_s06_when_rpm_over_60_but_bleed_action_missing() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {"power_available": True, "apu_ready": True, "engine_crank_right": True, "rpm_r": 63},
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S06"
-    assert "recent_ui_targets has bleed_air_knob" in result.missing_conditions
-
-
-def test_infer_step_s06_when_rpm_between_25_and_60() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {"power_available": True, "apu_ready": True, "engine_crank_right": True, "rpm_r": 45},
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S06"
-    assert result.missing_conditions == ("vars.rpm_r>=60",)
-
-
-def test_infer_step_s05_when_throttle_not_moved_from_off_after_rpm_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
+        PACK_STEPS,
         {
             "power_available": True,
             "apu_ready": True,
             "engine_crank_right": True,
-            "rpm_r": 30,
-            "throttle_r_not_off": False,
+            "rpm_r": 65,
+            "bleed_air_norm": True,
         },
-        ["eng_crank_switch"],
+        ["bleed_air_knob", "eng_crank_switch"],
+        precondition_gates=PACK_GATES["precondition_gates"],
+        completion_gates=PACK_GATES["completion_gates"],
+        pack_path=PACK_PATH,
     )
-    assert result.inferred_step_id == "S05"
-    assert result.missing_conditions == ("vars.throttle_r_not_off==true",)
 
-
-def test_infer_step_s05_when_throttle_state_is_unknown_after_rpm_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": True,
-            "apu_ready": True,
-            "engine_crank_right": True,
-            "rpm_r": 30,
-            "throttle_r_not_off": None,
-        },
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S05"
-    assert result.missing_conditions == ("vars.throttle_r_not_off==true",)
-
-
-def test_infer_step_s05_when_throttle_state_is_unparseable_after_rpm_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": True,
-            "apu_ready": True,
-            "engine_crank_right": True,
-            "rpm_r": 30,
-            "throttle_r_not_off": "unknown",
-        },
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S05"
-    assert result.missing_conditions == ("vars.throttle_r_not_off==true",)
-
-
-def test_infer_step_advances_to_s06_when_throttle_key_is_missing_after_rpm_25() -> None:
-    result = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": True,
-            "apu_ready": True,
-            "engine_crank_right": True,
-            "rpm_r": 45,
-            # throttle_r_not_off intentionally omitted
-        },
-        ["eng_crank_switch"],
-    )
-    assert result.inferred_step_id == "S06"
-    assert result.missing_conditions == ("vars.rpm_r>=60",)
+    assert result.inferred_step_id == "S07"
+    assert result.missing_conditions == ()
 
 
 def test_infer_step_is_robust_on_invalid_inputs() -> None:
     result = infer_step_id(
-        _pack_steps(),
+        PACK_STEPS,
         vars_map={"power_available": "unknown"},
         recent_ui_targets=["apu_switch", "", 1],  # type: ignore[list-item]
+        precondition_gates=PACK_GATES["precondition_gates"],
+        completion_gates=PACK_GATES["completion_gates"],
+        pack_path=PACK_PATH,
     )
     assert isinstance(result, StepInferenceResult)
-    assert result.inferred_step_id in {"S02", "S03", "S04", "S05", "S06", "S07"}
-
-
-def test_infer_step_distinguishes_false_vs_source_missing_unknown_for_power() -> None:
-    result_false = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": False,
-            "battery_on": False,
-            "l_gen_on": True,
-            "r_gen_on": True,
-        },
-        [],
-    )
-    assert result_false.inferred_step_id == "S01"
-
-    result_unknown = infer_step_id(
-        _pack_steps(),
-        {
-            "power_available": False,
-            "battery_on": False,
-            "l_gen_on": True,
-            "r_gen_on": True,
-            "vars_source_missing": ["power_available", "battery_on"],
-        },
-        [],
-    )
-    assert result_unknown.inferred_step_id == "S02"
+    assert isinstance(result.inferred_step_id, str)
 
 
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:

@@ -1128,11 +1128,20 @@ class LiveDcsTutorLoop:
             for item in recent_actions.get("recent_buttons", [])
             if isinstance(item, str) and item
         ]
-        inference = infer_step_id(self.pack_steps, vars_selected, recent_buttons)
         all_gates = evaluate_pack_gates(
             observations=[obs.to_dict()],
             precondition_gates=self.precondition_gates,
             completion_gates=self.completion_gates,
+        )
+        inference = infer_step_id(
+            self.pack_steps,
+            vars_selected,
+            recent_buttons,
+            gates=all_gates,
+            precondition_gates=self.precondition_gates,
+            completion_gates=self.completion_gates,
+            scenario_profile=self.scenario_profile,
+            pack_path=self.pack_path,
         )
         gates = _select_gates_for_context(
             all_gates,
