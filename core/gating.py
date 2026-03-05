@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+_UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
+
 
 def _parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -56,6 +58,69 @@ def _get_var(data: Dict[str, Any], path: str) -> Optional[Any]:
 
 def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _is_unknown_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in _UNKNOWN_TEXT_VALUES
+    return False
+
+
+def _coerce_flag_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if _is_number(value):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _iter_vars_source_missing(data: Dict[str, Any]) -> List[str]:
+    candidates: list[Any] = []
+    payload_vars = _get_by_path(data, "payload.vars")
+    if isinstance(payload_vars, dict):
+        candidates.append(payload_vars.get("vars_source_missing"))
+    top_level_vars = data.get("vars")
+    if isinstance(top_level_vars, dict):
+        candidates.append(top_level_vars.get("vars_source_missing"))
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in candidates:
+        if not isinstance(raw, list):
+            continue
+        for item in raw:
+            if not isinstance(item, str) or not item:
+                continue
+            if item in seen:
+                continue
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def _var_key_from_path(path: str) -> Optional[str]:
+    if path.startswith("payload.vars."):
+        suffix = path[len("payload.vars.") :]
+        return suffix if suffix and "." not in suffix else None
+    if path.startswith("vars."):
+        suffix = path[len("vars.") :]
+        return suffix if suffix and "." not in suffix else None
+    if "." not in path:
+        return path
+    return None
+
+
+def _is_var_source_missing(data: Dict[str, Any], path: str) -> bool:
+    var_key = _var_key_from_path(path)
+    if var_key is None:
+        return False
+    return var_key in _iter_vars_source_missing(data)
 
 
 def _missing_keys(rule: Dict[str, Any], keys: Iterable[str]) -> List[str]:
@@ -106,6 +171,8 @@ class GatingEngine:
             if missing:
                 return False, f"rule var_gte missing keys: {missing}"
             val = _get_var(latest, rule["var"])
+            if _is_var_source_missing(latest, rule["var"]) or _is_unknown_value(val):
+                return False, f"{rule['var']} unknown"
             if val is None:
                 return False, f"{rule['var']} missing"
             if not _is_number(val) or not _is_number(rule["value"]):
@@ -118,6 +185,8 @@ class GatingEngine:
             if missing:
                 return False, f"rule arg_in_range missing keys: {missing}"
             val = _get_var(latest, rule["var"])
+            if _is_var_source_missing(latest, rule["var"]) or _is_unknown_value(val):
+                return False, f"{rule['var']} unknown"
             if val is None:
                 return False, f"{rule['var']} missing"
             if not _is_number(val) or not _is_number(rule["min"]) or not _is_number(rule["max"]):
@@ -130,9 +199,14 @@ class GatingEngine:
             if missing:
                 return False, f"rule flag_true missing keys: {missing}"
             val = _get_var(latest, rule["var"])
+            if _is_var_source_missing(latest, rule["var"]) or _is_unknown_value(val):
+                return False, f"{rule['var']} unknown"
             if val is None:
                 return False, f"{rule['var']} missing"
-            if not bool(val):
+            bool_val = _coerce_flag_bool(val)
+            if bool_val is None:
+                return False, f"{rule['var']} not boolean"
+            if not bool_val:
                 return False, f"{rule['var']} not true"
             return True, None
         if op == "time_since":

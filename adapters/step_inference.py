@@ -206,24 +206,25 @@ def infer_step_id(
     s07 = _pick_step_id(step_ids, "S07", 6)
 
     vars_safe = vars_map if isinstance(vars_map, Mapping) else {}
+    vars_source_missing = _extract_source_missing_vars(vars_safe)
     recent = normalize_recent_ui_targets(list(recent_ui_targets or []))
     recent_set = set(recent)
 
-    power_available = _as_bool(vars_safe.get("power_available"))
-    battery_on = _as_bool(vars_safe.get("battery_on"))
-    l_gen_on = _as_bool(vars_safe.get("l_gen_on"))
-    r_gen_on = _as_bool(vars_safe.get("r_gen_on"))
-    fire_test_active = _as_bool(vars_safe.get("fire_test_active"))
-    apu_on = _as_bool(vars_safe.get("apu_on"))
-    apu_ready = _as_bool(vars_safe.get("apu_ready"))
-    engine_crank_right = _as_bool(vars_safe.get("engine_crank_right"))
-    bleed_air_norm = _as_bool(vars_safe.get("bleed_air_norm"))
+    power_available = _as_bool(_read_var(vars_safe, vars_source_missing, "power_available"))
+    battery_on = _as_bool(_read_var(vars_safe, vars_source_missing, "battery_on"))
+    l_gen_on = _as_bool(_read_var(vars_safe, vars_source_missing, "l_gen_on"))
+    r_gen_on = _as_bool(_read_var(vars_safe, vars_source_missing, "r_gen_on"))
+    fire_test_active = _as_bool(_read_var(vars_safe, vars_source_missing, "fire_test_active"))
+    apu_on = _as_bool(_read_var(vars_safe, vars_source_missing, "apu_on"))
+    apu_ready = _as_bool(_read_var(vars_safe, vars_source_missing, "apu_ready"))
+    engine_crank_right = _as_bool(_read_var(vars_safe, vars_source_missing, "engine_crank_right"))
+    bleed_air_norm = _as_bool(_read_var(vars_safe, vars_source_missing, "bleed_air_norm"))
 
-    rpm_r = _as_float(vars_safe.get("rpm_r"))
-    rpm_r_gte_25 = _as_bool(vars_safe.get("rpm_r_gte_25"))
-    rpm_r_gte_60 = _as_bool(vars_safe.get("rpm_r_gte_60"))
-    throttle_r_not_off = _as_bool(vars_safe.get("throttle_r_not_off"))
-    has_throttle_r_not_off = "throttle_r_not_off" in vars_safe
+    rpm_r = _as_float(_read_var(vars_safe, vars_source_missing, "rpm_r"))
+    rpm_r_gte_25 = _as_bool(_read_var(vars_safe, vars_source_missing, "rpm_r_gte_25"))
+    rpm_r_gte_60 = _as_bool(_read_var(vars_safe, vars_source_missing, "rpm_r_gte_60"))
+    throttle_r_not_off = _as_bool(_read_var(vars_safe, vars_source_missing, "throttle_r_not_off"))
+    has_throttle_r_not_off = "throttle_r_not_off" in vars_safe and "throttle_r_not_off" not in vars_source_missing
     if rpm_r_gte_25 is None and rpm_r is not None:
         rpm_r_gte_25 = rpm_r >= 25.0
     if rpm_r_gte_60 is None and rpm_r is not None:
@@ -341,6 +342,23 @@ def _result(
         if len(filtered) >= _MAX_MISSING_CONDITIONS:
             break
     return StepInferenceResult(inferred_step_id=inferred_step_id, missing_conditions=tuple(filtered))
+
+
+def _extract_source_missing_vars(vars_map: Mapping[str, Any]) -> set[str]:
+    raw = vars_map.get("vars_source_missing")
+    if not isinstance(raw, list):
+        return set()
+    out: set[str] = set()
+    for item in raw:
+        if isinstance(item, str) and item:
+            out.add(item)
+    return out
+
+
+def _read_var(vars_map: Mapping[str, Any], source_missing: set[str], key: str) -> Any:
+    if key in source_missing:
+        return None
+    return vars_map.get(key)
 
 
 def _as_bool(value: Any) -> bool | None:

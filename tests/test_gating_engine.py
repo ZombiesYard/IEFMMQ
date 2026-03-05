@@ -259,3 +259,32 @@ def test_evaluate_with_failure_index_from_history_reuses_materialized_list() -> 
     assert failed_idx == 0
     assert "apu_ready" in (result.reason or "")
 
+
+def test_flag_true_blocks_unknown_string_value() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"apu_ready": "unknown"})
+    engine = GatingEngine([{"op": "flag_true", "var": "payload.apu_ready"}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown" in (res.reason or "")
+
+
+def test_flag_true_distinguishes_false_vs_source_missing_unknown() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    engine = GatingEngine([{"op": "flag_true", "var": "vars.battery_on"}])
+
+    obs_false = make_obs(now, payload={"vars": {"battery_on": False}})
+    res_false = engine.evaluate([obs_false])
+    assert res_false.allowed is False
+    assert "not true" in (res_false.reason or "")
+
+    obs_unknown = make_obs(
+        now,
+        payload={"vars": {"battery_on": False, "vars_source_missing": ["battery_on"]}},
+    )
+    res_unknown = engine.evaluate([obs_unknown])
+    assert res_unknown.allowed is False
+    assert "unknown" in (res_unknown.reason or "")
+

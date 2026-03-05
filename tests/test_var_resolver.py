@@ -13,6 +13,68 @@ PACK_TELEMETRY_MAP_PATH = REPO_ROOT / "packs" / "fa18c_startup" / "telemetry_map
 SAMPLE_FRAME_ONCE_PATH = REPO_ROOT / "artifacts" / "dcs_bios_frame_once.json"
 SAMPLE_RAW_JSONL_PATH = REPO_ROOT / "logs" / "dcs_bios_raw_15s.jsonl"
 
+EXPECTED_S11_S25_VAR_KEYS = {
+    "rpm_l_gte_25",
+    "rpm_l_in_range",
+    "temp_l_in_range",
+    "ff_l_in_range",
+    "oil_l_in_range",
+    "noz_l_in_range",
+    "left_engine_nominal_start_params",
+    "left_engine_idle_ready",
+    "ins_mode_set",
+    "ins_mode_cv_or_gnd",
+    "radar_mode_value",
+    "radar_mode_opr",
+    "obogs_switch_on",
+    "obogs_flow_on",
+    "obogs_ready",
+    "fcs_reset_pressed",
+    "fcs_page_reviewed",
+    "flap_mode_value",
+    "flap_auto",
+    "flap_half",
+    "flap_full",
+    "flap_configured",
+    "takeoff_trim_pressed",
+    "takeoff_trim_set",
+    "fcs_bit_switch_up",
+    "fcs_bit_complete",
+    "probe_switch_value",
+    "launch_bar_switch_value",
+    "hook_handle_value",
+    "pitot_heat_on",
+    "four_down_complete",
+    "parking_brake_pull_value",
+    "parking_brake_rotate_value",
+    "parking_brake_released",
+    "ifei_up_pressed",
+    "ifei_down_pressed",
+    "bingo_fuel_set",
+    "standby_pressure_set_0",
+    "standby_pressure_set_1",
+    "standby_pressure_set_2",
+    "standby_altimeter_set",
+    "radar_altimeter_bug_value",
+    "radar_altimeter_bug_set",
+    "sai_cage_value",
+    "standby_attitude_uncaged",
+    "hud_att_source_value",
+    "attitude_source_auto",
+}
+
+EXPECTED_UNKNOWN_VALUE_KEYS = {
+    "fcs_page_reviewed",
+    "takeoff_trim_set",
+    "fcs_bit_complete",
+    "four_down_complete",
+    "bingo_fuel_set",
+    "standby_altimeter_set",
+    "radar_altimeter_bug_set",
+    "standby_attitude_uncaged",
+    "attitude_source_auto",
+}
+
 
 def _tmp_dir() -> Path:
     base = Path("tests/.tmp_telemetry")
@@ -309,3 +371,82 @@ def test_var_resolver_none_rule_counts_as_source_missing() -> None:
     assert vars_out["manual_ready"] is False
     assert "manual_placeholder" in vars_out["vars_source_missing"]
     assert "manual_ready" in vars_out["vars_source_missing"]
+
+
+def test_var_resolver_pack_s11_s25_vars_are_present_and_unknown_is_explicit() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+    frame = TelemetryFrame(
+        seq=700,
+        t_wall=700.0,
+        source="dcs_bios",
+        bios={
+            "IFEI_RPM_L": " 66",
+            "IFEI_TEMP_L": "300",
+            "IFEI_FF_L": "500",
+            "IFEI_OIL_PRESS_L": "70",
+            "EXT_NOZZLE_POS_L": 50000,
+            "INT_THROTTLE_LEFT": 1,
+            "INS_SW": 4,
+            "RADAR_SW": 2,
+            "OBOGS_SW": 1,
+            "OXY_FLOW": 65535,
+            "FLAP_SW": 0,
+            "EMERGENCY_PARKING_BRAKE_PULL": 0,
+            "EMERGENCY_PARKING_BRAKE_ROTATE": 2,
+            "RADALT_MIN_HEIGHT_PTR": 37431,
+            "HUD_ATT_SW": 1,
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert EXPECTED_S11_S25_VAR_KEYS.issubset(vars_out.keys())
+    for key in EXPECTED_UNKNOWN_VALUE_KEYS:
+        assert vars_out[key] == "unknown"
+
+
+def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame_auto = TelemetryFrame(seq=801, t_wall=801.0, source="dcs_bios", bios={"FLAP_SW": 0})
+    vars_auto = resolver.resolve(frame_auto)
+    assert vars_auto["flap_mode_value"] == 0
+    assert vars_auto["flap_auto"] is True
+    assert vars_auto["flap_half"] is False
+    assert vars_auto["flap_full"] is False
+
+    frame_half = TelemetryFrame(seq=802, t_wall=802.0, source="dcs_bios", bios={"FLAP_SW": 1})
+    vars_half = resolver.resolve(frame_half)
+    assert vars_half["flap_mode_value"] == 1
+    assert vars_half["flap_auto"] is False
+    assert vars_half["flap_half"] is True
+    assert vars_half["flap_full"] is False
+
+    frame_full = TelemetryFrame(seq=803, t_wall=803.0, source="dcs_bios", bios={"FLAP_SW": 2})
+    vars_full = resolver.resolve(frame_full)
+    assert vars_full["flap_mode_value"] == 2
+    assert vars_full["flap_auto"] is False
+    assert vars_full["flap_half"] is False
+    assert vars_full["flap_full"] is True
+
+    frame_none = TelemetryFrame(seq=804, t_wall=804.0, source="dcs_bios", bios={"FLAP_SW": None})
+    vars_none = resolver.resolve(frame_none)
+    assert vars_none["flap_mode_value"] is None
+    assert vars_none["flap_auto"] is False
+    assert vars_none["flap_half"] is False
+    assert vars_none["flap_full"] is False
+    assert "flap_mode_value" in vars_none["vars_source_missing"]
+    assert "flap_auto" in vars_none["vars_source_missing"]
+    assert "flap_half" in vars_none["vars_source_missing"]
+    assert "flap_full" in vars_none["vars_source_missing"]
+
+    frame_missing = TelemetryFrame(seq=805, t_wall=805.0, source="dcs_bios", bios={})
+    vars_missing = resolver.resolve(frame_missing)
+    assert vars_missing["flap_mode_value"] is None
+    assert vars_missing["flap_auto"] is False
+    assert vars_missing["flap_half"] is False
+    assert vars_missing["flap_full"] is False
+    assert "flap_mode_value" in vars_missing["vars_source_missing"]
+    assert "flap_auto" in vars_missing["vars_source_missing"]
+    assert "flap_half" in vars_missing["vars_source_missing"]
+    assert "flap_full" in vars_missing["vars_source_missing"]

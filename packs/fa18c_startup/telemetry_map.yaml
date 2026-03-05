@@ -37,21 +37,84 @@ vars:
   # Startup thresholds and right-engine nominal checks (S05/S06/S10)
   rpm_r_gte_25: "derived(vars.rpm_r >= 25)"
   rpm_r_gte_60: "derived(vars.rpm_r >= 60)"
+  rpm_l_gte_25: "derived(vars.rpm_l >= 25)"
   rpm_l_gte_60: "derived(vars.rpm_l >= 60)"
   rpm_r_in_range: "derived(vars.rpm_r >= 63 and vars.rpm_r <= 70)"
+  rpm_l_in_range: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70)"
   temp_r_in_range: "derived(vars.temp_r >= 190 and vars.temp_r <= 590)"
+  temp_l_in_range: "derived(vars.temp_l >= 190 and vars.temp_l <= 590)"
   ff_r_in_range: "derived(vars.ff_r >= 420 and vars.ff_r <= 900)"
+  ff_l_in_range: "derived(vars.ff_l >= 420 and vars.ff_l <= 900)"
   oil_r_in_range: "derived(vars.oil_r >= 45 and vars.oil_r <= 110)"
+  oil_l_in_range: "derived(vars.oil_l >= 45 and vars.oil_l <= 110)"
   noz_r_in_range: "derived(vars.noz_r >= 73 and vars.noz_r <= 84)"
+  noz_l_in_range: "derived(vars.noz_l >= 73 and vars.noz_l <= 84)"
   right_engine_nominal_start_params: "derived(vars.rpm_r_in_range and vars.temp_r_in_range and vars.ff_r_in_range and vars.oil_r_in_range and vars.noz_r_in_range)"
+  left_engine_nominal_start_params: "derived(vars.rpm_l_in_range and vars.temp_l_in_range and vars.ff_l_in_range and vars.oil_l_in_range and vars.noz_l_in_range)"
+  left_engine_idle_ready: "derived(vars.rpm_l_gte_25 and vars.throttle_l_not_off)"
 
   # Displays / avionics
   left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
   right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"
   mpcd_on: "bios.AMPCD_BRT_CTL > 0"
   hud_on: "bios.HUD_SYM_BRT > 0"
+  core_avionics_online: "derived(vars.left_ddi_on and vars.right_ddi_on and vars.mpcd_on and vars.hud_on)"
 
-  # Key switches
+  # Key switches / sensor panel
   fire_test_active: "bios.FIRE_TEST_SW == 1"
   ins_mode: "bios.INS_SW"
+  ins_mode_set: "derived(vars.ins_mode >= 1)"
+  ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 4)"
+  radar_mode_value: "derived(num(bios.RADAR_SW))"
+  radar_mode_opr: "derived(vars.radar_mode_value >= 2)"
   radar_on: "bios.RADAR_SW > 0"
+
+  # S14-S25 extension vars.
+  # If a checklist item is currently not observable from trusted telemetry, expose it
+  # as explicit "unknown" (instead of false) so gating/inference can degrade safely.
+  obogs_switch_on: "bios.OBOGS_SW == 1"
+  obogs_flow_on: "bios.OXY_FLOW > 0"
+  obogs_ready: "derived(vars.obogs_switch_on and vars.obogs_flow_on)"
+
+  fcs_reset_pressed: "bios.FCS_RESET_BTN == 1"
+  fcs_page_reviewed: "'unknown'"
+
+  flap_mode_value: "derived(num(bios.FLAP_SW))"
+  flap_auto: "derived(vars.flap_mode_value == 0)"
+  flap_half: "derived(vars.flap_mode_value == 1)"
+  flap_full: "derived(vars.flap_mode_value == 2)"
+  flap_configured: "derived(vars.flap_auto or vars.flap_half)"
+
+  takeoff_trim_pressed: "bios.TO_TRIM_BTN == 1"
+  takeoff_trim_set: "'unknown'"
+
+  fcs_bit_switch_up: "bios.FCS_BIT_SW == 1"
+  fcs_bit_complete: "'unknown'"
+
+  probe_switch_value: "derived(num(bios.PROBE_SW))"
+  launch_bar_switch_value: "derived(num(bios.LAUNCH_BAR_SW))"
+  hook_handle_value: "derived(num(bios.HOOK_LEVER))"
+  pitot_heat_on: "bios.PITOT_HEAT_SW > 0"
+  four_down_complete: "'unknown'"
+
+  parking_brake_pull_value: "derived(num(bios.EMERGENCY_PARKING_BRAKE_PULL))"
+  parking_brake_rotate_value: "derived(num(bios.EMERGENCY_PARKING_BRAKE_ROTATE))"
+  parking_brake_released: "derived(vars.parking_brake_pull_value == 0)"
+
+  ifei_up_pressed: "bios.IFEI_UP_BTN == 1"
+  ifei_down_pressed: "bios.IFEI_DWN_BTN == 1"
+  bingo_fuel_set: "'unknown'"
+
+  standby_pressure_set_0: "derived(num(bios.STBY_PRESS_SET_0))"
+  standby_pressure_set_1: "derived(num(bios.STBY_PRESS_SET_1))"
+  standby_pressure_set_2: "derived(num(bios.STBY_PRESS_SET_2))"
+  standby_altimeter_set: "'unknown'"
+
+  radar_altimeter_bug_value: "derived(num(bios.RADALT_MIN_HEIGHT_PTR))"
+  radar_altimeter_bug_set: "'unknown'"
+
+  sai_cage_value: "derived(num(bios.SAI_CAGE))"
+  standby_attitude_uncaged: "'unknown'"
+
+  hud_att_source_value: "derived(num(bios.HUD_ATT_SW))"
+  attitude_source_auto: "'unknown'"
