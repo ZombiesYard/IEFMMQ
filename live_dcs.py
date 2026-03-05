@@ -1150,9 +1150,11 @@ class LiveDcsTutorLoop:
         )
         inferred_gate_blockers: list[dict[str, str]] = []
         if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
-            gate_id = f"{inference.inferred_step_id}.precondition"
-            gate_info = all_gates.get(gate_id)
-            if isinstance(gate_info, Mapping) and gate_info.get("status") == "blocked":
+            for gate_type in ("precondition", "completion"):
+                gate_id = f"{inference.inferred_step_id}.{gate_type}"
+                gate_info = all_gates.get(gate_id)
+                if not (isinstance(gate_info, Mapping) and gate_info.get("status") == "blocked"):
+                    continue
                 blocker: dict[str, str] = {"ref": f"GATES.{gate_id}"}
                 reason_code = gate_info.get("reason_code")
                 if isinstance(reason_code, str) and reason_code:

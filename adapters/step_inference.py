@@ -424,17 +424,27 @@ def _resolve_gate_statuses(
     precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]],
     completion_gates: Mapping[str, Iterable[Mapping[str, Any]]],
 ) -> dict[str, dict[str, Any]]:
+    provided: dict[str, dict[str, Any]] = {}
     if isinstance(gates, Mapping):
-        out: dict[str, dict[str, Any]] = {}
         for gate_id, gate_info in gates.items():
             if not isinstance(gate_id, str) or not isinstance(gate_info, Mapping):
                 continue
             parts = gate_id.split(".")
             if len(parts) != 2 or parts[1] not in {"precondition", "completion"}:
                 continue
-            out[gate_id] = _clone_mapping(gate_info)
-        if out:
-            return out
+            provided[gate_id] = _clone_mapping(gate_info)
+
+        expected_ids = {
+            f"{step_id}.precondition"
+            for step_id in precondition_gates.keys()
+            if isinstance(step_id, str) and step_id
+        } | {
+            f"{step_id}.completion"
+            for step_id in completion_gates.keys()
+            if isinstance(step_id, str) and step_id
+        }
+        if provided and expected_ids and expected_ids.issubset(provided.keys()):
+            return provided
 
     obs = {
         "observation_id": "deterministic-step-inference",
@@ -444,11 +454,14 @@ def _resolve_gate_statuses(
         "vars": dict(vars_map),
         "version": "v1",
     }
-    return evaluate_pack_gates(
+    evaluated = evaluate_pack_gates(
         observations=[obs],
         precondition_gates=precondition_gates,
         completion_gates=completion_gates,
     )
+    if provided:
+        evaluated.update(provided)
+    return evaluated
 
 
 def _is_gate_blocked(gate_info: Mapping[str, Any] | None) -> bool:

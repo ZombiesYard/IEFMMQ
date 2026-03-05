@@ -274,7 +274,7 @@ def test_infer_step_is_robust_on_invalid_inputs() -> None:
         pack_path=PACK_PATH,
     )
     assert isinstance(result, StepInferenceResult)
-    assert isinstance(result.inferred_step_id, str)
+    assert result.inferred_step_id in STEP_IDS
 
 
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
