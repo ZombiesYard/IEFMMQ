@@ -1,4 +1,6 @@
 import os
+from collections import deque
+from collections.abc import Iterable as IterableABC
 from pathlib import Path
 import time
 from typing import Any, Mapping
@@ -9,8 +11,8 @@ import yaml
 from adapters.pack_gates import load_pack_gate_config
 from adapters.step_inference import (
     StepInferenceResult,
-    _rule_to_condition_text,
     extract_recent_ui_targets,
+    format_gate_rule_condition,
     infer_step_id,
     load_pack_steps,
 )
@@ -112,14 +114,25 @@ def _filter_supported_gate_map(pack_gates: Mapping[str, Any]) -> dict[str, dict[
         "completion_gates": {},
     }
     for gate_type in ("precondition_gates", "completion_gates"):
-        gate_map = pack_gates[gate_type]
+        gate_map = pack_gates.get(gate_type, {})
+        if not isinstance(gate_map, Mapping):
+            out[gate_type] = {}
+            continue
         filtered_map: dict[str, tuple[dict[str, Any], ...]] = {}
         for step_id, rules in gate_map.items():
-            if not isinstance(step_id, str) or not step_id or not isinstance(rules, tuple):
+            if not isinstance(step_id, str) or not step_id:
+                continue
+            if isinstance(rules, Mapping):
+                rules_iter = [rules]
+            elif isinstance(rules, (list, tuple)):
+                rules_iter = list(rules)
+            elif isinstance(rules, IterableABC) and not isinstance(rules, (str, bytes)):
+                rules_iter = list(rules)
+            else:
                 continue
             filtered_map[step_id] = tuple(
                 dict(rule)
-                for rule in rules
+                for rule in rules_iter
                 if isinstance(rule, Mapping) and _is_supported_rule_for_synthetic_case(rule)
             )
         out[gate_type] = filtered_map
@@ -129,7 +142,9 @@ def _filter_supported_gate_map(pack_gates: Mapping[str, Any]) -> dict[str, dict[
 def _build_baseline_vars(pack_gates: Mapping[str, Any]) -> dict[str, Any]:
     vars_map: dict[str, Any] = {}
     for gate_type in ("precondition_gates", "completion_gates"):
-        gate_map = pack_gates[gate_type]
+        gate_map = pack_gates.get(gate_type, {})
+        if not isinstance(gate_map, Mapping):
+            continue
         for rules in gate_map.values():
             for rule in rules:
                 key = _extract_var_key(rule)
@@ -163,7 +178,8 @@ def _is_observability_hold_step(
     step_meta: Mapping[str, Mapping[str, Any]],
 ) -> bool:
     obs = _step_observability(step_id, step_meta)
-    comp_rules = pack_gates["completion_gates"].get(step_id, ())
+    completion_map = pack_gates.get("completion_gates", {})
+    comp_rules = completion_map.get(step_id, ()) if isinstance(completion_map, Mapping) else ()
     return obs in {"partially", "unknown"} and len(comp_rules) == 0
 
 
@@ -176,8 +192,11 @@ def _completion_var_keys_after(
 ) -> set[str]:
     idx = step_index[step_id]
     out: set[str] = set()
+    completion_map = pack_gates.get("completion_gates", {})
+    if not isinstance(completion_map, Mapping):
+        return out
     for later_id in step_ids[idx + 1 :]:
-        for rule in pack_gates["completion_gates"].get(later_id, ()):
+        for rule in completion_map.get(later_id, ()):
             key = _extract_var_key(rule)
             if key:
                 out.add(key)
@@ -215,13 +234,14 @@ def _build_step_blocking_scenario(step_id: str, ctx: Mapping[str, Any]) -> tuple
         if target:
             recent_ui_targets.append(target)
 
-    completion_rules = pack_gates["completion_gates"].get(step_id, ())
+    completion_map = pack_gates.get("completion_gates", {})
+    completion_rules = completion_map.get(step_id, ()) if isinstance(completion_map, Mapping) else ()
     if completion_rules:
         failing_rule = completion_rules[0]
         key = _extract_var_key(failing_rule)
         if key:
             vars_map[key] = _rule_fail_value(failing_rule)
-        return vars_map, recent_ui_targets, _rule_to_condition_text(failing_rule)
+        return vars_map, recent_ui_targets, format_gate_rule_condition(failing_rule)
 
     if _is_observability_hold_step(step_id, pack_gates=pack_gates, step_meta=step_meta):
         hidden_keys = sorted(
@@ -271,6 +291,22 @@ def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready(pack_ctx: Mapping[s
         pack_steps,
         {"power_available": True, "apu_on": True, "apu_ready": False},
         ["apu_switch"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=PACK_PATH,
+    )
+
+    assert result.inferred_step_id == "S03"
+    assert "vars.apu_ready==true" in result.missing_conditions
+
+
+def test_infer_step_accepts_iterable_recent_ui_targets(pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
+    result = infer_step_id(
+        pack_steps,
+        {"power_available": True, "apu_on": True, "apu_ready": False},
+        deque(["apu_switch"]),
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
         pack_path=PACK_PATH,

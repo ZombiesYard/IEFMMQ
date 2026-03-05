@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from collections.abc import Iterable as IterableABC
 from typing import Any, Iterable, Mapping, Sequence
 
 import yaml
@@ -171,6 +172,8 @@ def normalize_recent_ui_targets(raw: Any, *, max_items: int = _MAX_RECENT_UI_TAR
         candidates = list(raw)
     elif isinstance(raw, tuple):
         candidates = list(raw)
+    elif isinstance(raw, IterableABC) and not isinstance(raw, (str, bytes, Mapping)):
+        candidates = list(raw)
     elif isinstance(raw, Mapping):
         value = raw.get("recent_buttons")
         if isinstance(value, (list, tuple)):
@@ -263,7 +266,7 @@ def infer_step_id(
         return StepInferenceResult(inferred_step_id=None, missing_conditions=())
 
     vars_safe = vars_map if isinstance(vars_map, Mapping) else {}
-    recent = normalize_recent_ui_targets(recent_ui_targets or ())
+    recent = normalize_recent_ui_targets(list(recent_ui_targets or ()))
     recent_set = set(recent)
 
     effective_pack_path = Path(pack_path).expanduser().resolve() if pack_path else _DEFAULT_PACK_PATH
@@ -594,6 +597,13 @@ def _rule_to_condition_text(rule: Mapping[str, Any]) -> str | None:
     return None
 
 
+def format_gate_rule_condition(rule: Mapping[str, Any]) -> str | None:
+    """
+    Stable formatter for gate-rule condition hints used in tests and diagnostics.
+    """
+    return _rule_to_condition_text(rule)
+
+
 def _normalize_var_path(raw: Any) -> str | None:
     if not isinstance(raw, str) or not raw:
         return None
@@ -787,6 +797,7 @@ def _coerce_number(value: Any) -> float | None:
 __all__ = [
     "StepInferenceResult",
     "extract_recent_ui_targets",
+    "format_gate_rule_condition",
     "infer_step_id",
     "load_pack_steps",
     "normalize_recent_ui_targets",
