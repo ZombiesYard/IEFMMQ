@@ -595,6 +595,53 @@ def test_infer_step_uses_scenario_profile_specific_gate_overrides(tmp_path: Path
     assert carrier.inferred_step_id == "S02"
 
 
+def test_infer_step_falls_back_to_default_profile_when_scenario_profile_invalid(tmp_path: Path) -> None:
+    pack_path = tmp_path / "profile_invalid_fallback_pack.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "profile_invalid_fallback_pack",
+            "steps": [{"id": "S01"}, {"id": "S02"}],
+            "precondition_gates": {
+                "S01": [{"op": "flag_true", "var": "vars.airfield_ready"}],
+                "S02": [{"op": "flag_true", "var": "vars.s2_ready"}],
+            },
+            "completion_gates": {"S01": [], "S02": []},
+            "profile_overrides": {
+                "carrier": {
+                    "precondition_gates": {
+                        "S01": [{"op": "flag_true", "var": "vars.carrier_ready"}],
+                    }
+                }
+            },
+        },
+    )
+    pack_steps = load_pack_steps(pack_path)
+    vars_map = {
+        "airfield_ready": False,
+        "carrier_ready": True,
+        "s2_ready": False,
+    }
+
+    invalid = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets=[],
+        scenario_profile="invalid-profile",
+        pack_path=pack_path,
+    )
+    airfield = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets=[],
+        scenario_profile="airfield",
+        pack_path=pack_path,
+    )
+
+    assert invalid.inferred_step_id == "S01"
+    assert invalid == airfield
+
+
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
     context = {
         "recent_ui_targets": ["eng_crank_switch", "eng_crank_switch", "apu_switch"],
@@ -656,6 +703,29 @@ def test_infer_step_normalizes_default_scenario_profile_for_gate_map_cache(tmp_p
 
     assert info.currsize == 1
     assert info.hits >= 1
+
+
+def test_infer_step_keeps_top_level_vars_when_payload_vars_present() -> None:
+    pack_steps = [{"id": "S01"}, {"id": "S02"}]
+    precondition_gates = {
+        "S01": ({"op": "flag_true", "var": "payload.vars.power_available"},),
+        "S02": ({"op": "var_gte", "var": "vars.after_step_metric", "value": 1},),
+    }
+    completion_gates = {"S01": (), "S02": ()}
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map={
+            "payload": {"vars": {"power_available": True}},
+            "after_step_metric": 2,
+        },
+        recent_ui_targets=[],
+        precondition_gates=precondition_gates,
+        completion_gates=completion_gates,
+    )
+
+    assert result.inferred_step_id == "S02"
+    assert result.missing_conditions == ()
 
 
 def _write_yaml(path: Path, payload: dict) -> None:

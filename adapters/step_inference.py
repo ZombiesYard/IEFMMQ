@@ -14,7 +14,12 @@ from typing import Any, Mapping, Sequence, TypeAlias
 
 import yaml
 
-from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config, normalize_scenario_profile
+from adapters.pack_gates import (
+    DEFAULT_SCENARIO_PROFILE,
+    evaluate_pack_gates,
+    load_pack_gate_config,
+    normalize_scenario_profile,
+)
 from core.step_signal_metadata import STEP_OBSERVABILITY_VALUES
 from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
 
@@ -437,17 +442,24 @@ def _resolve_gate_maps(
     pack_path: Path,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
     if precondition_gates is None and completion_gates is None:
-        normalized_profile = normalize_scenario_profile(scenario_profile)
+        normalized_profile = _normalize_scenario_profile_for_inference(scenario_profile)
         return _load_coerced_pack_gate_maps_cached(str(pack_path), normalized_profile)
 
     if precondition_gates is None or completion_gates is None:
-        normalized_profile = normalize_scenario_profile(scenario_profile)
+        normalized_profile = _normalize_scenario_profile_for_inference(scenario_profile)
         loaded_pre, loaded_comp = _load_coerced_pack_gate_maps_cached(str(pack_path), normalized_profile)
         if precondition_gates is None:
             precondition_gates = loaded_pre
         if completion_gates is None:
             completion_gates = loaded_comp
     return _coerce_gate_rules_map(precondition_gates), _coerce_gate_rules_map(completion_gates)
+
+
+def _normalize_scenario_profile_for_inference(profile: str | None) -> str:
+    try:
+        return normalize_scenario_profile(profile)
+    except ValueError:
+        return DEFAULT_SCENARIO_PROFILE
 
 
 @lru_cache(maxsize=8)
@@ -519,10 +531,17 @@ def _build_inference_observation(vars_map: Mapping[str, Any]) -> dict[str, Any]:
     else:
         payload_vars = _clone_mapping(vars_map)
 
-    if not isinstance(top_level_vars_raw, Mapping):
-        top_level_vars = _clone_mapping(payload_vars)
-    else:
-        top_level_vars = _clone_mapping(top_level_vars_raw)
+    top_level_vars = _clone_mapping(payload_vars)
+    if isinstance(top_level_vars_raw, Mapping):
+        for key, value in top_level_vars_raw.items():
+            if isinstance(key, str) and key:
+                top_level_vars[key] = _clone_value(value)
+    for key, value in vars_map.items():
+        if not isinstance(key, str) or not key or key in {"payload", "vars"}:
+            continue
+        if key in top_level_vars or isinstance(value, Mapping):
+            continue
+        top_level_vars[key] = _clone_value(value)
 
     payload["vars"] = payload_vars
     return {
