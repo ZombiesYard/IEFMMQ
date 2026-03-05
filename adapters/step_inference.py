@@ -4,14 +4,22 @@ Deterministic startup step inference for model fallback and prompt hints.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import islice
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from collections.abc import Iterable as IterableABC
+from typing import Any, Mapping, Sequence, TypeAlias
 
 import yaml
 
-from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config
+from adapters.pack_gates import (
+    DEFAULT_SCENARIO_PROFILE,
+    evaluate_pack_gates,
+    load_pack_gate_config,
+    normalize_scenario_profile,
+)
 from core.step_signal_metadata import STEP_OBSERVABILITY_VALUES
 from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
 
@@ -20,6 +28,8 @@ _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
 _MAX_MISSING_CONDITIONS = 8
 _MAX_RECENT_UI_TARGETS = 24
 _UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
+_PACK_METADATA_MERGE_FIELDS = ("observability", "evidence_requirements", "ui_targets", "requires_visual_confirmation")
+RecentUiTargetsInput: TypeAlias = Sequence[str] | Mapping[str, Any] | IterableABC[str] | None
 
 
 @dataclass(frozen=True)
@@ -55,15 +65,6 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
         registry_path = default_step_registry_path(path)
     except StepRegistryError:
         registry_path = None
-    pack_steps_for_merge: tuple[dict[str, Any], ...] = ()
-    pack_path_resolved = path.resolve()
-    pack_signature = _path_signature(pack_path_resolved)
-    if pack_signature is not None:
-        pack_steps_for_merge = _load_pack_steps_cached(
-            str(pack_path_resolved),
-            pack_signature[0],
-            pack_signature[1],
-        )
 
     if registry_path is not None:
         registry_path_resolved = registry_path.resolve()
@@ -76,13 +77,35 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
             )
             if cached_registry_steps:
                 registry_steps = [_clone_mapping(step) for step in cached_registry_steps]
-                if pack_steps_for_merge:
+                if _registry_steps_need_pack_metadata(registry_steps):
+                    pack_steps_for_merge = _load_pack_steps_for_path(path)
                     _merge_pack_step_metadata(registry_steps, pack_steps_for_merge)
                 return registry_steps
 
+    pack_steps = _load_pack_steps_for_path(path)
+    return [_clone_mapping(step) for step in pack_steps]
+
+
+def _registry_steps_need_pack_metadata(registry_steps: Sequence[Mapping[str, Any]]) -> bool:
+    for step in registry_steps:
+        if not isinstance(step, Mapping):
+            continue
+        for field in _PACK_METADATA_MERGE_FIELDS:
+            if field not in step:
+                return True
+    return False
+
+
+def _load_pack_steps_for_path(path: Path) -> tuple[dict[str, Any], ...]:
+    pack_path_resolved = path.resolve()
+    pack_signature = _path_signature(pack_path_resolved)
     if pack_signature is None:
-        return []
-    return [_clone_mapping(step) for step in pack_steps_for_merge]
+        return ()
+    return _load_pack_steps_cached(
+        str(pack_path_resolved),
+        pack_signature[0],
+        pack_signature[1],
+    )
 
 
 @lru_cache(maxsize=8)
@@ -136,7 +159,7 @@ def _clone_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_clone_value(item) for item in value]
     if isinstance(value, tuple):
-        return [_clone_value(item) for item in value]
+        return tuple(_clone_value(item) for item in value)
     return value
 
 
@@ -156,29 +179,44 @@ def _merge_pack_step_metadata(
         pack_step = pack_by_id.get(step_id)
         if not isinstance(pack_step, Mapping):
             continue
-        for field in ("observability", "evidence_requirements", "ui_targets", "requires_visual_confirmation"):
+        for field in _PACK_METADATA_MERGE_FIELDS:
             if field in step:
                 continue
+            if field not in pack_step:
+                continue
             value = pack_step.get(field)
+            if value is None:
+                continue
             step[field] = _clone_value(value)
 
 
 def normalize_recent_ui_targets(raw: Any, *, max_items: int = _MAX_RECENT_UI_TARGETS) -> list[str]:
-    candidates: list[Any] = []
-    if isinstance(raw, list):
-        candidates = list(raw)
-    elif isinstance(raw, tuple):
-        candidates = list(raw)
+    cap = max(0, int(max_items))
+    if cap <= 0:
+        return []
+
+    candidates: IterableABC[Any]
+    if isinstance(raw, str):
+        candidates = (raw,)
+    elif isinstance(raw, (list, tuple)):
+        candidates = raw
+    elif isinstance(raw, IterableABC) and not isinstance(raw, (str, bytes, Mapping)):
+        candidates = islice(raw, cap)
     elif isinstance(raw, Mapping):
         value = raw.get("recent_buttons")
-        if isinstance(value, (list, tuple)):
-            candidates = list(value)
-        elif isinstance(value, str):
-            candidates = [value]
+        if isinstance(value, str):
+            candidates = (value,)
+        elif isinstance(value, (list, tuple)):
+            candidates = value
+        elif isinstance(value, IterableABC) and not isinstance(value, (str, bytes, Mapping)):
+            candidates = islice(value, cap)
+        else:
+            candidates = ()
+    else:
+        candidates = ()
 
     out: list[str] = []
     seen: set[str] = set()
-    cap = max(0, int(max_items))
     for item in candidates:
         if not isinstance(item, str) or not item:
             continue
@@ -241,11 +279,11 @@ def extract_recent_ui_targets(
 def infer_step_id(
     pack_steps: Sequence[Mapping[str, Any]],
     vars_map: Mapping[str, Any] | None,
-    recent_ui_targets: Sequence[str] | None,
+    recent_ui_targets: RecentUiTargetsInput,
     *,
     gates: Mapping[str, Any] | None = None,
-    precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
-    completion_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+    precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
+    completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
     scenario_profile: str | None = None,
     pack_path: str | Path | None = None,
 ) -> StepInferenceResult:
@@ -398,33 +436,60 @@ def _extract_step_id(step: Mapping[str, Any]) -> str | None:
 
 def _resolve_gate_maps(
     *,
-    precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None,
-    completion_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None,
+    precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None,
+    completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None,
     scenario_profile: str | None,
     pack_path: Path,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
+    if precondition_gates is None and completion_gates is None:
+        normalized_profile = _normalize_scenario_profile_for_inference(scenario_profile)
+        return _load_coerced_pack_gate_maps_cached(str(pack_path), normalized_profile)
+
     if precondition_gates is None or completion_gates is None:
-        loaded = load_pack_gate_config(pack_path, scenario_profile=scenario_profile)
+        normalized_profile = _normalize_scenario_profile_for_inference(scenario_profile)
+        loaded_pre, loaded_comp = _load_coerced_pack_gate_maps_cached(str(pack_path), normalized_profile)
         if precondition_gates is None:
-            precondition_gates = loaded.get("precondition_gates", {})
+            precondition_gates = loaded_pre
         if completion_gates is None:
-            completion_gates = loaded.get("completion_gates", {})
+            completion_gates = loaded_comp
     return _coerce_gate_rules_map(precondition_gates), _coerce_gate_rules_map(completion_gates)
 
 
+def _normalize_scenario_profile_for_inference(profile: str | None) -> str:
+    try:
+        return normalize_scenario_profile(profile)
+    except ValueError:
+        return DEFAULT_SCENARIO_PROFILE
+
+
+@lru_cache(maxsize=8)
+def _load_coerced_pack_gate_maps_cached(
+    resolved_pack_path: str,
+    scenario_profile: str,
+) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
+    loaded = load_pack_gate_config(Path(resolved_pack_path), scenario_profile=scenario_profile)
+    return (
+        _coerce_gate_rules_map(loaded.get("precondition_gates", {})),
+        _coerce_gate_rules_map(loaded.get("completion_gates", {})),
+    )
+
+
 def _coerce_gate_rules_map(
-    raw: Mapping[str, Iterable[Mapping[str, Any]]] | None,
+    raw: Mapping[str, IterableABC[Mapping[str, Any]]] | None,
 ) -> dict[str, tuple[dict[str, Any], ...]]:
     out: dict[str, tuple[dict[str, Any], ...]] = {}
     if not isinstance(raw, Mapping):
         return out
+    fast_path = _as_precoerced_gate_rules_map(raw)
+    if fast_path is not None:
+        return fast_path
     for step_id, rules_raw in raw.items():
         if not isinstance(step_id, str) or not step_id:
             continue
         normalized_rules: list[dict[str, Any]] = []
         if isinstance(rules_raw, Mapping):
             normalized_rules.append(_clone_mapping(rules_raw))
-        elif isinstance(rules_raw, Iterable) and not isinstance(rules_raw, (str, bytes)):
+        elif isinstance(rules_raw, IterableABC) and not isinstance(rules_raw, (str, bytes)):
             for item in rules_raw:
                 if isinstance(item, Mapping):
                     normalized_rules.append(_clone_mapping(item))
@@ -432,12 +497,69 @@ def _coerce_gate_rules_map(
     return out
 
 
+def _as_precoerced_gate_rules_map(
+    raw: Mapping[str, IterableABC[Mapping[str, Any]]],
+) -> dict[str, tuple[dict[str, Any], ...]] | None:
+    out: dict[str, tuple[dict[str, Any], ...]] = {}
+    for step_id, rules_raw in raw.items():
+        if not isinstance(step_id, str) or not step_id:
+            return None
+        if isinstance(rules_raw, tuple):
+            if not all(isinstance(item, dict) for item in rules_raw):
+                return None
+            out[step_id] = tuple(_clone_mapping(item) for item in rules_raw)
+            continue
+        if isinstance(rules_raw, list):
+            if not all(isinstance(item, dict) for item in rules_raw):
+                return None
+            out[step_id] = tuple(_clone_mapping(item) for item in rules_raw)
+            continue
+        return None
+    return out
+
+
+def _build_inference_observation(vars_map: Mapping[str, Any]) -> dict[str, Any]:
+    payload_raw = vars_map.get("payload")
+    payload = _clone_mapping(payload_raw) if isinstance(payload_raw, Mapping) else {}
+
+    nested_payload_vars = payload.get("vars")
+    top_level_vars_raw = vars_map.get("vars")
+    if isinstance(nested_payload_vars, Mapping):
+        payload_vars = _clone_mapping(nested_payload_vars)
+    elif isinstance(top_level_vars_raw, Mapping):
+        payload_vars = _clone_mapping(top_level_vars_raw)
+    else:
+        payload_vars = _clone_mapping(vars_map)
+
+    top_level_vars = _clone_mapping(payload_vars)
+    if isinstance(top_level_vars_raw, Mapping):
+        for key, value in top_level_vars_raw.items():
+            if isinstance(key, str) and key:
+                top_level_vars[key] = _clone_value(value)
+    for key, value in vars_map.items():
+        if not isinstance(key, str) or not key or key in {"payload", "vars"}:
+            continue
+        if key in top_level_vars or isinstance(value, Mapping):
+            continue
+        top_level_vars[key] = _clone_value(value)
+
+    payload["vars"] = payload_vars
+    return {
+        "observation_id": "deterministic-step-inference",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": "inference",
+        "payload": payload,
+        "vars": top_level_vars,
+        "version": "v1",
+    }
+
+
 def _resolve_gate_statuses(
     *,
     vars_map: Mapping[str, Any],
     gates: Mapping[str, Any] | None,
-    precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]],
-    completion_gates: Mapping[str, Iterable[Mapping[str, Any]]],
+    precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]],
+    completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]],
 ) -> dict[str, dict[str, Any]]:
     provided: dict[str, dict[str, Any]] = {}
     if isinstance(gates, Mapping):
@@ -461,14 +583,7 @@ def _resolve_gate_statuses(
         if provided and expected_ids and expected_ids.issubset(provided.keys()):
             return provided
 
-    obs = {
-        "observation_id": "deterministic-step-inference",
-        "timestamp": "1970-01-01T00:00:00+00:00",
-        "source": "inference",
-        "payload": {"vars": dict(vars_map)},
-        "vars": dict(vars_map),
-        "version": "v1",
-    }
+    obs = _build_inference_observation(vars_map)
     evaluated = evaluate_pack_gates(
         observations=[obs],
         precondition_gates=precondition_gates,
@@ -551,6 +666,13 @@ def _rule_to_condition_text(rule: Mapping[str, Any]) -> str | None:
             return None
         return f"time_since({tag})>={at_least}"
     return None
+
+
+def format_gate_rule_condition(rule: Mapping[str, Any]) -> str | None:
+    """
+    Stable formatter for gate-rule condition hints used in tests and diagnostics.
+    """
+    return _rule_to_condition_text(rule)
 
 
 def _normalize_var_path(raw: Any) -> str | None:
@@ -666,12 +788,37 @@ def _read_rule_var(
     key = _extract_var_key_from_path(var_raw)
     if key is not None and key in vars_source_missing:
         return None, True
-    if key is not None and key in vars_map:
-        return vars_map.get(key), False
     if key is not None:
+        for candidate in _iter_var_path_candidates(var_raw, key):
+            if candidate == key:
+                if key in vars_map:
+                    return vars_map.get(key), False
+                continue
+            value = _read_by_path(vars_map, candidate)
+            if value is not None:
+                return value, False
         return None, True
     value = _read_by_path(vars_map, var_raw)
     return value, value is None
+
+
+def _is_qualified_var_path(path: str) -> bool:
+    return path.startswith("payload.vars.") or path.startswith("vars.")
+
+
+def _iter_var_path_candidates(var_raw: str, key: str) -> tuple[str, ...]:
+    if _is_qualified_var_path(var_raw):
+        candidates = (var_raw, f"vars.{key}", f"payload.vars.{key}", key)
+    else:
+        candidates = (var_raw, f"vars.{key}", f"payload.vars.{key}")
+    ordered_unique: list[str] = []
+    seen: set[str] = set()
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        ordered_unique.append(path)
+    return tuple(ordered_unique)
 
 
 def _extract_var_key_from_path(path: str) -> str | None:
@@ -746,6 +893,7 @@ def _coerce_number(value: Any) -> float | None:
 __all__ = [
     "StepInferenceResult",
     "extract_recent_ui_targets",
+    "format_gate_rule_condition",
     "infer_step_id",
     "load_pack_steps",
     "normalize_recent_ui_targets",
