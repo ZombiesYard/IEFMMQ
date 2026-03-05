@@ -15,6 +15,7 @@ from adapters.step_inference import (
     format_gate_rule_condition,
     infer_step_id,
     load_pack_steps,
+    normalize_recent_ui_targets,
 )
 
 
@@ -566,6 +567,17 @@ def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
         "recent_actions": {"recent_buttons": ["fire_test_switch"]},
     }
     assert extract_recent_ui_targets(context) == ["eng_crank_switch", "apu_switch"]
+
+
+def test_normalize_recent_ui_targets_does_not_overconsume_iterables() -> None:
+    def _guarded_targets():
+        for idx in range(10):
+            if idx >= 3:
+                raise AssertionError("iterator consumed beyond cap")
+            yield f"btn_{idx}"
+
+    result = normalize_recent_ui_targets(_guarded_targets(), max_items=3)
+    assert result == ["btn_0", "btn_1", "btn_2"]
 
 
 def _write_yaml(path: Path, payload: dict) -> None:

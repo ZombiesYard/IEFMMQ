@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import islice
 from pathlib import Path
 from collections.abc import Iterable as IterableABC
 from typing import Any, Mapping, Sequence, TypeAlias
@@ -185,23 +186,30 @@ def _merge_pack_step_metadata(
 
 
 def normalize_recent_ui_targets(raw: Any, *, max_items: int = _MAX_RECENT_UI_TARGETS) -> list[str]:
-    candidates: list[Any] = []
-    if isinstance(raw, list):
-        candidates = list(raw)
-    elif isinstance(raw, tuple):
-        candidates = list(raw)
+    cap = max(0, int(max_items))
+    if cap <= 0:
+        return []
+
+    candidates: IterableABC[Any]
+    if isinstance(raw, (list, tuple)):
+        candidates = raw
     elif isinstance(raw, IterableABC) and not isinstance(raw, (str, bytes, Mapping)):
-        candidates = list(raw)
+        candidates = islice(raw, cap)
     elif isinstance(raw, Mapping):
         value = raw.get("recent_buttons")
-        if isinstance(value, (list, tuple)):
-            candidates = list(value)
-        elif isinstance(value, str):
-            candidates = [value]
+        if isinstance(value, str):
+            candidates = (value,)
+        elif isinstance(value, (list, tuple)):
+            candidates = value
+        elif isinstance(value, IterableABC) and not isinstance(value, (str, bytes, Mapping)):
+            candidates = islice(value, cap)
+        else:
+            candidates = ()
+    else:
+        candidates = ()
 
     out: list[str] = []
     seen: set[str] = set()
-    cap = max(0, int(max_items))
     for item in candidates:
         if not isinstance(item, str) or not item:
             continue
