@@ -22,6 +22,7 @@ _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
 _MAX_MISSING_CONDITIONS = 8
 _MAX_RECENT_UI_TARGETS = 24
 _UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
+_PACK_METADATA_MERGE_FIELDS = ("observability", "evidence_requirements", "ui_targets", "requires_visual_confirmation")
 RecentUiTargetsInput: TypeAlias = Sequence[str] | Mapping[str, Any] | IterableABC[str] | None
 
 
@@ -58,15 +59,6 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
         registry_path = default_step_registry_path(path)
     except StepRegistryError:
         registry_path = None
-    pack_steps_for_merge: tuple[dict[str, Any], ...] = ()
-    pack_path_resolved = path.resolve()
-    pack_signature = _path_signature(pack_path_resolved)
-    if pack_signature is not None:
-        pack_steps_for_merge = _load_pack_steps_cached(
-            str(pack_path_resolved),
-            pack_signature[0],
-            pack_signature[1],
-        )
 
     if registry_path is not None:
         registry_path_resolved = registry_path.resolve()
@@ -79,13 +71,35 @@ def load_pack_steps(pack_path: str | Path | None = None) -> list[dict[str, Any]]
             )
             if cached_registry_steps:
                 registry_steps = [_clone_mapping(step) for step in cached_registry_steps]
-                if pack_steps_for_merge:
+                if _registry_steps_need_pack_metadata(registry_steps):
+                    pack_steps_for_merge = _load_pack_steps_for_path(path)
                     _merge_pack_step_metadata(registry_steps, pack_steps_for_merge)
                 return registry_steps
 
+    pack_steps = _load_pack_steps_for_path(path)
+    return [_clone_mapping(step) for step in pack_steps]
+
+
+def _registry_steps_need_pack_metadata(registry_steps: Sequence[Mapping[str, Any]]) -> bool:
+    for step in registry_steps:
+        if not isinstance(step, Mapping):
+            continue
+        for field in _PACK_METADATA_MERGE_FIELDS:
+            if field not in step:
+                return True
+    return False
+
+
+def _load_pack_steps_for_path(path: Path) -> tuple[dict[str, Any], ...]:
+    pack_path_resolved = path.resolve()
+    pack_signature = _path_signature(pack_path_resolved)
     if pack_signature is None:
-        return []
-    return [_clone_mapping(step) for step in pack_steps_for_merge]
+        return ()
+    return _load_pack_steps_cached(
+        str(pack_path_resolved),
+        pack_signature[0],
+        pack_signature[1],
+    )
 
 
 @lru_cache(maxsize=8)
@@ -159,7 +173,7 @@ def _merge_pack_step_metadata(
         pack_step = pack_by_id.get(step_id)
         if not isinstance(pack_step, Mapping):
             continue
-        for field in ("observability", "evidence_requirements", "ui_targets", "requires_visual_confirmation"):
+        for field in _PACK_METADATA_MERGE_FIELDS:
             if field in step:
                 continue
             if field not in pack_step:
@@ -480,6 +494,35 @@ def _as_precoerced_gate_rules_map(
     return out
 
 
+def _build_inference_observation(vars_map: Mapping[str, Any]) -> dict[str, Any]:
+    payload_raw = vars_map.get("payload")
+    payload = _clone_mapping(payload_raw) if isinstance(payload_raw, Mapping) else {}
+
+    nested_payload_vars = payload.get("vars")
+    top_level_vars_raw = vars_map.get("vars")
+    if isinstance(nested_payload_vars, Mapping):
+        payload_vars = _clone_mapping(nested_payload_vars)
+    elif isinstance(top_level_vars_raw, Mapping):
+        payload_vars = _clone_mapping(top_level_vars_raw)
+    else:
+        payload_vars = _clone_mapping(vars_map)
+
+    if not isinstance(top_level_vars_raw, Mapping):
+        top_level_vars = _clone_mapping(payload_vars)
+    else:
+        top_level_vars = _clone_mapping(top_level_vars_raw)
+
+    payload["vars"] = payload_vars
+    return {
+        "observation_id": "deterministic-step-inference",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "source": "inference",
+        "payload": payload,
+        "vars": top_level_vars,
+        "version": "v1",
+    }
+
+
 def _resolve_gate_statuses(
     *,
     vars_map: Mapping[str, Any],
@@ -509,14 +552,7 @@ def _resolve_gate_statuses(
         if provided and expected_ids and expected_ids.issubset(provided.keys()):
             return provided
 
-    obs = {
-        "observation_id": "deterministic-step-inference",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": "inference",
-        "payload": {"vars": dict(vars_map)},
-        "vars": dict(vars_map),
-        "version": "v1",
-    }
+    obs = _build_inference_observation(vars_map)
     evaluated = evaluate_pack_gates(
         observations=[obs],
         precondition_gates=precondition_gates,
