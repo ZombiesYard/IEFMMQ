@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping, Tuple
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from adapters.pack_gates import DEFAULT_SCENARIO_PROFILE, SUPPORTED_SCENARIO_PROFILES
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.runner import replay_log, run_simulation
@@ -134,6 +135,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     cooldown_s=args.cooldown_s,
                     session_id=args.session_id,
                     lang=args.lang,
+                    scenario_profile=args.scenario_profile,
                     event_sink=store.append,
                     dry_run_overlay=bool(args.dry_run_overlay),
                 )
@@ -302,6 +304,12 @@ def main() -> int:
     rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    rep_bios.add_argument(
+        "--scenario-profile",
+        choices=sorted(SUPPORTED_SCENARIO_PROFILES),
+        default=DEFAULT_SCENARIO_PROFILE,
+        help="Scenario profile to parameterize pack gate branches (default: airfield).",
+    )
     replay_log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
     replay_log_raw_group = rep_bios.add_mutually_exclusive_group()
     replay_log_raw_group.add_argument(

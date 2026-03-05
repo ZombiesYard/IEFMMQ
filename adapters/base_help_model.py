@@ -201,16 +201,22 @@ class BaseHelpModel(ModelPort):
         allowlist = context.get("overlay_target_allowlist")
         if not isinstance(allowlist, list) or not allowlist:
             allowlist = list(schema_targets)
+        scenario_profile = context.get("scenario_profile")
+        if not isinstance(scenario_profile, str) or not scenario_profile:
+            scenario_profile = None
         normalized_recent_ui_targets = list(recent_ui_targets or [])
         hint_payload = (
             dict(deterministic_hint)
             if isinstance(deterministic_hint, Mapping)
             else self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
         )
+        if scenario_profile is not None and "scenario_profile" not in hint_payload:
+            hint_payload["scenario_profile"] = scenario_profile
 
         prompt_context = {
             "intent": request.intent if request else "help",
             "message": request.message if request else None,
+            "scenario_profile": scenario_profile,
             "candidate_steps": candidate_steps,
             "overlay_target_allowlist": allowlist,
             "vars": context.get("vars"),

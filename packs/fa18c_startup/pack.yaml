@@ -282,11 +282,12 @@ completion_gates:
       reason_code: s11_requires_throttle_l_not_off
       reason: "Left throttle must be moved out of OFF detent."
   S12:
-    - op: var_gte
+    - op: arg_in_range
       var: vars.ins_mode
-      value: 1
-      reason_code: s12_requires_ins_mode_set
-      reason: "INS mode must be set to GND/CV."
+      min: 1
+      max: 1
+      reason_code: s12_requires_ins_mode_gnd
+      reason: "INS mode must be set to GND for airfield startup."
   S13:
     - op: flag_true
       var: vars.radar_on
@@ -301,9 +302,33 @@ completion_gates:
   S20: []
   S21: []
   S22: []
-  S23: []
+  S23:
+    - op: arg_in_range
+      var: vars.radar_altimeter_bug_value
+      min: 180
+      max: 220
+      reason_code: s23_requires_radalt_bug_airfield_200
+      reason: "Radar altimeter bug should be near 200 ft for airfield startup."
   S24: []
   S25: []
+
+profile_overrides:
+  carrier:
+    completion_gates:
+      S12:
+        - op: arg_in_range
+          var: vars.ins_mode
+          min: 4
+          max: 4
+          reason_code: s12_requires_ins_mode_cv
+          reason: "INS mode must be set to CV for carrier startup."
+      S23:
+        - op: arg_in_range
+          var: vars.radar_altimeter_bug_value
+          min: 30
+          max: 60
+          reason_code: s23_requires_radalt_bug_carrier_40
+          reason: "Radar altimeter bug should be near 40 ft for carrier operations."
 
 steps:
   - id: S01
