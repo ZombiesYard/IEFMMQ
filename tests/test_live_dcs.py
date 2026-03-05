@@ -11,7 +11,7 @@ import time
 import pytest
 import yaml
 
-from core.types import Observation, TutorResponse
+from core.types import Observation, TutorRequest, TutorResponse
 from live_dcs import (
     CompositeHelpTrigger,
     LiveDcsTutorLoop,
@@ -1584,6 +1584,166 @@ def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_p
     assert meta["fallback_overlay_used"] is True
     assert isinstance(meta["fallback_overlay_reason"], str)
     assert meta["fallback_overlay_reason"].startswith("deterministic_step:")
+
+
+def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_pack_driven_fallback.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        step_meta: dict[str, dict[str, Any]] = {}
+        for step in loop.pack_steps:
+            if not isinstance(step, dict):
+                continue
+            step_id = step.get("id")
+            if not isinstance(step_id, str) or not step_id:
+                continue
+            raw_targets = step.get("ui_targets")
+            targets: list[str] = []
+            if isinstance(raw_targets, list):
+                targets = [item for item in raw_targets if isinstance(item, str) and item]
+            step_meta[step_id] = {"targets": targets}
+
+        vars_map: dict[str, Any] = {}
+        for gate_map in (loop.precondition_gates, loop.completion_gates):
+            for rules in gate_map.values():
+                if not isinstance(rules, (list, tuple)):
+                    continue
+                for rule in rules:
+                    if not isinstance(rule, dict):
+                        continue
+                    raw_var = rule.get("var")
+                    if not isinstance(raw_var, str) or not raw_var:
+                        continue
+                    var_name = raw_var
+                    if var_name.startswith("payload.vars."):
+                        var_name = var_name[len("payload.vars.") :]
+                    elif var_name.startswith("vars."):
+                        var_name = var_name[len("vars.") :]
+                    elif var_name.startswith("payload.") and "." in var_name:
+                        var_name = var_name[len("payload.") :]
+                    vars_map[var_name] = 0
+
+        verifiable_types = {"var", "gate", "delta"}
+        for step_id in [f"S{i:02d}" for i in range(1, 26)]:
+            raw_targets = step_meta.get(step_id, {}).get("targets", [])
+            step_targets = [
+                target for target in raw_targets if isinstance(target, str) and target in set(loop.overlay_allowlist)
+            ]
+            recent_deltas = [{"ui_target": target, "k": f"DUMMY_{idx}"} for idx, target in enumerate(step_targets)]
+            hint: dict[str, Any] = {
+                "inferred_step_id": step_id,
+                "missing_conditions": [],
+                "gate_blockers": [{"ref": f"GATES.{step_id}.precondition", "reason": "blocked"}],
+                "recent_ui_targets": list(step_targets),
+            }
+            profile = loop.step_signal_profiles.get(step_id, {})
+            requirements = profile.get("evidence_requirements")
+            if isinstance(requirements, list):
+                hint["step_evidence_requirements"] = [
+                    item for item in requirements if isinstance(item, str) and item
+                ]
+            request = TutorRequest(
+                actor="learner",
+                intent="help",
+                message="help",
+                context={
+                    "vars": dict(vars_map),
+                    "gates": {
+                        f"{step_id}.precondition": {
+                            "status": "blocked",
+                            "reason_code": "test_blocked",
+                            "reason": "blocked in test",
+                        },
+                        f"{step_id}.completion": {
+                            "status": "blocked",
+                            "reason_code": "test_blocked",
+                            "reason": "blocked in test",
+                        },
+                    },
+                    "recent_deltas": recent_deltas,
+                    "overlay_target_allowlist": list(loop.overlay_allowlist),
+                    "deterministic_step_hint": hint,
+                },
+            )
+            fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+            can_verify = True
+            if isinstance(requirements, list) and requirements:
+                can_verify = any(item in verifiable_types for item in requirements if isinstance(item, str))
+            expected_overlay = bool(step_targets) and can_verify
+            if expected_overlay:
+                assert isinstance(fallback_help_obj, dict), step_id
+                assert fallback_reason == f"deterministic_step:{step_id}"
+                overlay = fallback_help_obj["overlay"]
+                assert isinstance(overlay, dict)
+                assert len(overlay["targets"]) == 1
+                assert overlay["targets"][0] in step_targets
+            else:
+                assert fallback_help_obj is None, step_id
+    finally:
+        loop.close()
+
+
+def test_live_loop_pack_step_without_ui_targets_degrades_to_safe_text(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack_no_step_targets.yaml"
+    pack_path.write_text(
+        "pack_id: test_fallback_pack\n"
+        "version: v1\n"
+        "title: Test Fallback Pack\n"
+        "precondition_gates:\n"
+        "  S01: []\n"
+        "completion_gates:\n"
+        "  S01: []\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    phase: P1\n"
+        "    observability: unknown\n"
+        "    evidence_requirements: [visual, rag]\n"
+        "    completion_conditions:\n"
+        "      - \"visual check only\"\n",
+        encoding="utf-8",
+    )
+
+    replay_path = tmp_path / "bios_model_error_no_step_target.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 21.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = FailingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        pack_path=pack_path,
+        cooldown_s=5.0,
+        lang="en",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert executor.calls[0] == []
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    assert tutor_response_payload["actions"] == []
+    assert isinstance(tutor_response_payload.get("message"), str)
+    assert tutor_response_payload["message"].startswith("Fallback:")
+    meta = tutor_response_payload["metadata"]
+    assert meta["fallback_overlay_used"] is False
+    assert isinstance(meta["fallback_overlay_reason"], str)
+    assert meta["fallback_overlay_reason"].startswith("unsupported_step:S01")
 
 
 def test_live_loop_cache_key_ignores_numeric_churn_when_discrete_state_unchanged(tmp_path: Path) -> None:

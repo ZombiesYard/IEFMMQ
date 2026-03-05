@@ -518,19 +518,100 @@ def _select_gates_for_context(
     return selected
 
 
-_FALLBACK_STEP_TARGETS: dict[str, str] = {
-    "S01": "battery_switch",
-    "S03": "apu_switch",
-    "S04": "eng_crank_switch",
-    "S06": "bleed_air_knob",
-}
+def _extract_step_id(step: Mapping[str, Any]) -> str | None:
+    raw_id = step.get("id")
+    if isinstance(raw_id, str) and raw_id:
+        return raw_id
+    raw_step_id = step.get("step_id")
+    if isinstance(raw_step_id, str) and raw_step_id:
+        return raw_step_id
+    return None
 
-_FALLBACK_STEP_VAR_REFS: dict[str, str] = {
-    "S01": "VARS.battery_on",
-    "S03": "VARS.apu_on",
-    "S04": "VARS.engine_crank_right",
-    "S06": "VARS.bleed_air_norm",
-}
+
+def _normalize_step_ui_targets(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str) or not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def _normalize_rule_var_ref(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip()
+    if not value:
+        return None
+    if value.startswith("payload.vars."):
+        value = value[len("payload.vars.") :]
+    elif value.startswith("vars."):
+        value = value[len("vars.") :]
+    elif "." in value:
+        return None
+    if not value:
+        return None
+    return f"VARS.{value}"
+
+
+def _collect_step_gate_var_refs(
+    step_id: str,
+    *,
+    precondition_gates: Mapping[str, Any],
+    completion_gates: Mapping[str, Any],
+) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for gate_map in (precondition_gates, completion_gates):
+        rules_raw = gate_map.get(step_id)
+        rules: Iterable[Any]
+        if isinstance(rules_raw, Mapping):
+            rules = (rules_raw,)
+        elif isinstance(rules_raw, Iterable) and not isinstance(rules_raw, (str, bytes)):
+            rules = rules_raw
+        else:
+            continue
+        for rule in rules:
+            if not isinstance(rule, Mapping):
+                continue
+            ref = _normalize_rule_var_ref(rule.get("var"))
+            if ref is None or ref in seen:
+                continue
+            seen.add(ref)
+            out.append(ref)
+    return out
+
+
+def _build_step_fallback_profiles(
+    pack_steps: Sequence[Mapping[str, Any]],
+    *,
+    precondition_gates: Mapping[str, Any],
+    completion_gates: Mapping[str, Any],
+) -> dict[str, dict[str, list[str]]]:
+    profiles: dict[str, dict[str, list[str]]] = {}
+    for step in pack_steps:
+        if not isinstance(step, Mapping):
+            continue
+        step_id = _extract_step_id(step)
+        if not isinstance(step_id, str) or not step_id or step_id in profiles:
+            continue
+        ui_targets = _normalize_step_ui_targets(step.get("ui_targets"))
+        gate_var_refs = _collect_step_gate_var_refs(
+            step_id,
+            precondition_gates=precondition_gates,
+            completion_gates=completion_gates,
+        )
+        profiles[step_id] = {
+            "ui_targets": ui_targets,
+            "gate_var_refs": gate_var_refs,
+        }
+    return profiles
 
 def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
     return collect_evidence_refs_from_context(context)
@@ -851,6 +932,12 @@ class LiveDcsTutorLoop:
         self.completion_gates = dict(gate_config.get("completion_gates", {}))
         self.candidate_steps = _load_step_ids(self.pack_path)
         self.overlay_allowlist = _load_overlay_allowlist(self.pack_path, self.ui_map_path)
+        self.overlay_allowset = set(self.overlay_allowlist)
+        self.step_fallback_profiles = _build_step_fallback_profiles(
+            self.pack_steps,
+            precondition_gates=self.precondition_gates,
+            completion_gates=self.completion_gates,
+        )
         self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
 
         self._latest_raw_obs: Observation | None = None
@@ -1355,17 +1442,27 @@ class LiveDcsTutorLoop:
         if not isinstance(inferred_step_id, str) or not inferred_step_id:
             return None, "missing_inferred_step_id"
 
-        fallback_target = _FALLBACK_STEP_TARGETS.get(inferred_step_id)
-        if fallback_target is None:
+        step_fallback_profile = self.step_fallback_profiles.get(inferred_step_id)
+        if not isinstance(step_fallback_profile, Mapping):
             return None, f"unsupported_step:{inferred_step_id}"
+        fallback_targets_raw = step_fallback_profile.get("ui_targets")
+        fallback_targets = _normalize_step_ui_targets(fallback_targets_raw)
+        if not fallback_targets:
+            return None, f"unsupported_step:{inferred_step_id}"
+        declared_fallback_target = fallback_targets[0]
 
         request_allowlist = context.get("overlay_target_allowlist")
+        candidate_targets = list(fallback_targets)
         if isinstance(request_allowlist, list):
             allowset = {item for item in request_allowlist if isinstance(item, str) and item}
-            if allowset and fallback_target not in allowset:
-                return None, f"target_not_in_request_allowlist:{fallback_target}"
-        if fallback_target not in set(self.overlay_allowlist):
-            return None, f"target_not_in_runtime_allowlist:{fallback_target}"
+            if allowset:
+                candidate_targets = [target for target in candidate_targets if target in allowset]
+                if not candidate_targets:
+                    return None, f"target_not_in_request_allowlist:{declared_fallback_target}"
+        candidate_targets = [target for target in candidate_targets if target in self.overlay_allowset]
+        if not candidate_targets:
+            return None, f"target_not_in_runtime_allowlist:{declared_fallback_target}"
+        fallback_target = candidate_targets[0]
 
         candidate_refs: list[str] = []
         gate_blockers = hint.get("gate_blockers")
@@ -1378,22 +1475,49 @@ class LiveDcsTutorLoop:
                     candidate_refs.append(ref)
         candidate_refs.append(f"GATES.{inferred_step_id}.completion")
         candidate_refs.append(f"GATES.{inferred_step_id}.precondition")
-        var_ref = _FALLBACK_STEP_VAR_REFS.get(inferred_step_id)
-        if isinstance(var_ref, str):
-            candidate_refs.append(var_ref)
+        gate_var_refs = step_fallback_profile.get("gate_var_refs")
+        if isinstance(gate_var_refs, list):
+            for ref in gate_var_refs:
+                if isinstance(ref, str) and ref:
+                    candidate_refs.append(ref)
+        candidate_refs.append(f"RECENT_UI_TARGETS.{fallback_target}")
+        rag_topk = context.get("rag_topk")
+        if isinstance(rag_topk, list):
+            for snippet in rag_topk:
+                if not isinstance(snippet, Mapping):
+                    continue
+                snippet_id = snippet.get("snippet_id")
+                if isinstance(snippet_id, str) and snippet_id:
+                    candidate_refs.append(f"RAG_SNIPPETS.{snippet_id}")
 
         allowed_refs = _collect_request_evidence_refs(context)
+        step_evidence_requirements = hint.get("step_evidence_requirements")
+        allowed_evidence_types: set[str] | None = None
+        if isinstance(step_evidence_requirements, list):
+            allowed_evidence_types = set()
+            for req in step_evidence_requirements:
+                if not isinstance(req, str) or not req:
+                    continue
+                if req in {"var", "gate", "delta", "rag"}:
+                    allowed_evidence_types.add(req)
         selected_ref: str | None = None
-        for ref in candidate_refs:
+        selected_evidence_type: str | None = None
+        for ref in _dedupe_strings(candidate_refs):
             if ref in allowed_refs:
+                evidence_type = infer_evidence_type_from_ref(ref)
+                if evidence_type is None:
+                    continue
+                if allowed_evidence_types is not None and evidence_type not in allowed_evidence_types:
+                    continue
                 selected_ref = ref
+                selected_evidence_type = evidence_type
                 break
         if selected_ref is None:
             return None, "no_verifiable_evidence_ref"
 
-        evidence_type = infer_evidence_type_from_ref(selected_ref)
-        if evidence_type is None:
+        if selected_evidence_type is None:
             return None, f"unsupported_evidence_ref:{selected_ref}"
+        evidence_type = selected_evidence_type
 
         reason_text = None
         if isinstance(gate_blockers, list):
