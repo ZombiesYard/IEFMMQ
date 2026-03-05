@@ -159,6 +159,8 @@ def _merge_pack_step_metadata(
         for field in ("observability", "evidence_requirements", "ui_targets", "requires_visual_confirmation"):
             if field in step:
                 continue
+            if field not in pack_step:
+                continue
             value = pack_step.get(field)
             step[field] = _clone_value(value)
 
@@ -403,13 +405,28 @@ def _resolve_gate_maps(
     scenario_profile: str | None,
     pack_path: Path,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
+    if precondition_gates is None and completion_gates is None:
+        return _load_coerced_pack_gate_maps_cached(str(pack_path), scenario_profile)
+
     if precondition_gates is None or completion_gates is None:
-        loaded = load_pack_gate_config(pack_path, scenario_profile=scenario_profile)
+        loaded_pre, loaded_comp = _load_coerced_pack_gate_maps_cached(str(pack_path), scenario_profile)
         if precondition_gates is None:
-            precondition_gates = loaded.get("precondition_gates", {})
+            precondition_gates = loaded_pre
         if completion_gates is None:
-            completion_gates = loaded.get("completion_gates", {})
+            completion_gates = loaded_comp
     return _coerce_gate_rules_map(precondition_gates), _coerce_gate_rules_map(completion_gates)
+
+
+@lru_cache(maxsize=8)
+def _load_coerced_pack_gate_maps_cached(
+    resolved_pack_path: str,
+    scenario_profile: str | None,
+) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
+    loaded = load_pack_gate_config(Path(resolved_pack_path), scenario_profile=scenario_profile)
+    return (
+        _coerce_gate_rules_map(loaded.get("precondition_gates", {})),
+        _coerce_gate_rules_map(loaded.get("completion_gates", {})),
+    )
 
 
 def _coerce_gate_rules_map(
@@ -418,6 +435,9 @@ def _coerce_gate_rules_map(
     out: dict[str, tuple[dict[str, Any], ...]] = {}
     if not isinstance(raw, Mapping):
         return out
+    fast_path = _as_precoerced_gate_rules_map(raw)
+    if fast_path is not None:
+        return fast_path
     for step_id, rules_raw in raw.items():
         if not isinstance(step_id, str) or not step_id:
             continue
@@ -429,6 +449,27 @@ def _coerce_gate_rules_map(
                 if isinstance(item, Mapping):
                     normalized_rules.append(_clone_mapping(item))
         out[step_id] = tuple(normalized_rules)
+    return out
+
+
+def _as_precoerced_gate_rules_map(
+    raw: Mapping[str, Iterable[Mapping[str, Any]]],
+) -> dict[str, tuple[dict[str, Any], ...]] | None:
+    out: dict[str, tuple[dict[str, Any], ...]] = {}
+    for step_id, rules_raw in raw.items():
+        if not isinstance(step_id, str) or not step_id:
+            return None
+        if isinstance(rules_raw, tuple):
+            if not all(isinstance(item, dict) for item in rules_raw):
+                return None
+            out[step_id] = rules_raw
+            continue
+        if isinstance(rules_raw, list):
+            if not all(isinstance(item, dict) for item in rules_raw):
+                return None
+            out[step_id] = tuple(rules_raw)
+            continue
+        return None
     return out
 
 

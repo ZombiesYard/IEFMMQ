@@ -213,7 +213,7 @@ def _build_step_blocking_scenario(step_id: str, ctx: Mapping[str, Any]) -> tuple
     return vars_map, recent_ui_targets, None
 
 
-def test_infer_step_pack_gate_driven_blocking_scenarios_cover_s01_to_s25(pack_ctx: Mapping[str, Any]) -> None:
+def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = pack_ctx["pack_gates"]
     step_ids: list[str] = pack_ctx["step_ids"]
@@ -392,3 +392,55 @@ def test_load_pack_steps_falls_back_when_pack_metadata_registry_path_is_invalid(
     loaded = load_pack_steps(pack_path)
     assert loaded[0]["id"] == "S01"
     assert loaded[0]["marker"] == "from_pack"
+
+
+def test_load_pack_steps_does_not_inject_none_when_pack_step_field_absent(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    registry_path = tmp_path / "step_registry.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "metadata": {"step_registry_path": "step_registry.yaml"},
+            "steps": [{"id": "S01"}],
+        },
+    )
+    _write_yaml(registry_path, _registry_payload("first"))
+
+    loaded = load_pack_steps(pack_path)
+    first = loaded[0]
+    assert first["id"] == "S01"
+    assert "ui_targets" not in first
+    assert "observability" not in first
+
+
+def test_infer_step_preserves_caller_precondition_map_when_completion_is_missing() -> None:
+    pack_steps = [{"id": "S01"}, {"id": "S02"}]
+    precondition_gates = {
+        "S01": (
+            {
+                "op": "flag_true",
+                "var": "vars.custom_ready",
+                "reason_code": "s01_requires_custom_ready",
+            },
+        ),
+        "S02": (),
+    }
+    vars_map = {
+        "custom_ready": False,
+        "battery_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
+    }
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        [],
+        precondition_gates=precondition_gates,
+        completion_gates=None,
+        pack_path=PACK_PATH,
+    )
+
+    assert result.inferred_step_id == "S01"
+    assert "vars.custom_ready==true" in result.missing_conditions

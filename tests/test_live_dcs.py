@@ -1681,8 +1681,14 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
     assert isinstance(gate_blockers, list)
     assert all(not item.startswith("GATES.") for item in missing_conditions if isinstance(item, str))
     assert gate_blockers, "expected at least one inferred gate blocker"
+    inferred_step_id = hint.get("inferred_step_id")
+    assert isinstance(inferred_step_id, str) and inferred_step_id
     assert all(
         isinstance(item, dict) and isinstance(item.get("ref"), str) and item.get("ref", "").startswith("GATES.")
+        for item in gate_blockers
+    )
+    assert any(
+        isinstance(item, dict) and item.get("ref") == f"GATES.{inferred_step_id}.completion"
         for item in gate_blockers
     )
 
