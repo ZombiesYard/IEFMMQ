@@ -1,7 +1,9 @@
+from pathlib import Path
 import pytest
 
 from adapters.delta_aggregator import DeltaSummary
 from adapters.delta_sanitizer import SanitizedDelta
+from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.recent_actions import (
     RecentDeltaRingBuffer,
     build_prompt_recent_deltas,
@@ -9,6 +11,11 @@ from adapters.recent_actions import (
     build_recent_button_signal,
     project_recent_ui_targets,
 )
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+BIOS_TO_UI_PATH = BASE_DIR / "packs" / "fa18c_startup" / "bios_to_ui.yaml"
+UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
 
 
 def _bios_to_ui_mapping() -> dict:
@@ -142,3 +149,44 @@ def test_mapping_targets_string_is_not_split_into_characters() -> None:
 
     rows = build_prompt_recent_deltas(recent, bios_to_ui, max_items=8)
     assert rows[0]["mapped_ui_target"] == "battery_switch"
+
+
+def test_project_recent_ui_targets_replay_keys_enriched_and_backward_compatible() -> None:
+    mapper = BiosUiMapper.from_yaml(BIOS_TO_UI_PATH, UI_MAP_PATH)
+    recent = [
+        {"t_wall": 10.0, "seq": 1, "delta": {"BATTERY_SW": 2, "L_GEN_SW": 1}},
+        {
+            "t_wall": 11.0,
+            "seq": 2,
+            "delta": {
+                "LEFT_MDI_PB_5": 1,
+                "LEFT_DDI_PB_05": 1,
+                "FCS_RESET_BTN": 1,
+                "TO_TRIM_BTN": 1,
+                "FLAP_SW": 1,
+            },
+        },
+        {
+            "t_wall": 12.0,
+            "seq": 3,
+            "delta": {
+                "COMM1_CHANNEL_NUMERIC": 3,
+                "IFEI_UP_BTN": 1,
+                "EMERGENCY_PARKING_BRAKE_PULL": 0,
+            },
+        },
+    ]
+
+    targets = project_recent_ui_targets(recent, mapper, max_items=20)
+    assert targets == [
+        "ufc_comm1_channel_selector_rotate",
+        "ufc_comm1_channel_selector_pull",
+        "ifei_up_button",
+        "parking_brake_handle",
+        "left_mdi_pb5",
+        "fcs_reset_button",
+        "takeoff_trim_button",
+        "flap_switch",
+        "battery_switch",
+        "generator_left_switch",
+    ]

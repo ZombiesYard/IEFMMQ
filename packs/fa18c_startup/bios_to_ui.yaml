@@ -1,5 +1,6 @@
 version: v1
 mappings:
+  # S01-S04 / S06
   BATTERY_SW:
     - battery_switch
   L_GEN_SW:
@@ -12,13 +13,24 @@ mappings:
     - eng_crank_switch
   FIRE_TEST_SW:
     - fire_test_switch
+  LIGHTS_TEST_SW:
+    - lights_test_button
   BLEED_AIR_KNOB:
     - bleed_air_knob
+  INT_THROTTLE_LEFT:
+    - throttle_quadrant_reference
+  INT_THROTTLE_RIGHT:
+    - throttle_quadrant_reference
+
+  # S08
+  LEFT_DDI_PB_05:
+    - left_mdi_pb5
+  RIGHT_DDI_PB_05:
+    - right_mdi_pb5
   INS_SW:
     - ins_mode_knob
   RADAR_SW:
     - radar_mode_knob
-
   LEFT_DDI_BRT_CTL:
     - left_mdi_brightness_selector
   RIGHT_DDI_BRT_CTL:
@@ -31,14 +43,75 @@ mappings:
     - right_mdi_pb5
   LEFT_MDI_PB_5:
     - left_mdi_pb5
-  FCS_BIT_SW:
-    - fcs_bit_switch
 
+  # S09
   COMM1_CHAN:
     targets:
       - ufc_comm1_channel_selector_rotate
       - ufc_comm1_channel_selector_pull
+  COMM1_CHANNEL_NUMERIC:
+    targets:
+      - ufc_comm1_channel_selector_rotate
+      - ufc_comm1_channel_selector_pull
+  COMM1_FREQ:
+    targets:
+      - ufc_comm1_channel_selector_rotate
+      - ufc_comm1_channel_selector_pull
+  UFC_COMM1_PULL:
+    - ufc_comm1_channel_selector_pull
   COMM2_CHAN:
     targets:
       - ufc_comm2_channel_selector_rotate
       - ufc_comm2_channel_selector_pull
+  COMM2_CHANNEL_NUMERIC:
+    targets:
+      - ufc_comm2_channel_selector_rotate
+      - ufc_comm2_channel_selector_pull
+  COMM2_FREQ:
+    targets:
+      - ufc_comm2_channel_selector_rotate
+      - ufc_comm2_channel_selector_pull
+  UFC_COMM2_PULL:
+    - ufc_comm2_channel_selector_pull
+
+  # S14-S25
+  OBOGS_SW:
+    - obogs_control_switch
+  OXY_FLOW:
+    - obogs_flow_knob
+  FCS_RESET_BTN:
+    - fcs_reset_button
+  TO_TRIM_BTN:
+    - takeoff_trim_button
+  FCS_BIT_SW:
+    - fcs_bit_switch
+  FLAP_SW:
+    - flap_switch
+  PROBE_SW:
+    - refuel_probe_switch
+  LAUNCH_BAR_SW:
+    - launch_bar_switch
+  HOOK_LEVER:
+    - arresting_hook_handle
+  PITOT_HEAT_SW:
+    - pitot_heater_switch
+  EMERGENCY_PARKING_BRAKE_PULL:
+    - parking_brake_handle
+  EMERGENCY_PARKING_BRAKE_ROTATE:
+    - parking_brake_handle
+  IFEI_UP_BTN:
+    - ifei_up_button
+  IFEI_DWN_BTN:
+    - ifei_down_button
+  STBY_PRESS_SET_0:
+    - standby_altimeter_pressure_knob
+  STBY_PRESS_SET_1:
+    - standby_altimeter_pressure_knob
+  STBY_PRESS_SET_2:
+    - standby_altimeter_pressure_knob
+  RADALT_MIN_HEIGHT_PTR:
+    - radar_altimeter_bug_knob
+  SAI_CAGE:
+    - standby_attitude_cage_knob
+  HUD_ATT_SW:
+    - attitude_source_selector
