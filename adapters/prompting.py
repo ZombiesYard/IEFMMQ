@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from adapters.pack_gates import SUPPORTED_SCENARIO_PROFILES
 from core.llm_schema import get_help_response_schema
 from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
@@ -33,7 +34,6 @@ MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
-SUPPORTED_SCENARIO_PROFILES = frozenset({"airfield", "carrier"})
 
 
 @dataclass(frozen=True)
