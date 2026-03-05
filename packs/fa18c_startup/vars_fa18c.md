@@ -1,6 +1,6 @@
-# FA-18C Stable Vars (S01-S10 Focus)
+# FA-18C Stable Vars (S01-S25)
 
-This document records the S01-S10 startup vars resolved from `telemetry_map.yaml`,
+This document records the startup vars resolved from `telemetry_map.yaml`,
 their DCS-BIOS source keys, and operating-range assumptions used by SimTutor.
 
 ## Numeric Vars
@@ -38,3 +38,12 @@ their DCS-BIOS source keys, and operating-range assumptions used by SimTutor.
   whose resolved value is `None` in current frame.
 - Intended use: prompt `missing_conditions` and deterministic fallback when data is
   unavailable (avoid LLM guessing from raw/incomplete telemetry).
+
+## Tri-state unknown convention (S14-S25)
+
+- For checklist items that are not yet reliably observable from trusted telemetry,
+  resolver emits string `"unknown"` instead of coercing to `false`.
+- Consumers must treat these vars as tri-state (`true` / `false` / `unknown`) and
+  should not rely on generic truthiness.
+- Gate/inference paths interpret `"unknown"` as unmet/unknown evidence, enabling
+  explicit degrade behavior instead of false-positive pass/fail.

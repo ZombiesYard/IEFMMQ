@@ -35,6 +35,28 @@ def test_var_gte_blocks_when_low():
     assert "payload.rpm" in res.reason
 
 
+def test_var_gte_blocks_as_unknown_when_source_missing_marked() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"rpm": 0.25, "vars_source_missing": ["rpm"]}})
+    engine = GatingEngine([{"op": "var_gte", "var": "vars.rpm", "value": 0.2}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown(source_missing)" in (res.reason or "")
+
+
+def test_var_gte_blocks_as_unknown_when_value_is_unknown_text() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"rpm": "unknown"}})
+    engine = GatingEngine([{"op": "var_gte", "var": "vars.rpm", "value": 0.2}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown(value=unknown)" in (res.reason or "")
+
+
 def test_arg_in_range_blocks_out_of_bounds():
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     obs = make_obs(now, payload={"temp": 650})
@@ -42,6 +64,28 @@ def test_arg_in_range_blocks_out_of_bounds():
     res = engine.evaluate([obs])
     assert not res.allowed
     assert "payload.temp" in res.reason
+
+
+def test_arg_in_range_blocks_as_unknown_when_source_missing_marked() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"temp": 400, "vars_source_missing": ["temp"]}})
+    engine = GatingEngine([{"op": "arg_in_range", "var": "vars.temp", "min": 190, "max": 590}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown(source_missing)" in (res.reason or "")
+
+
+def test_arg_in_range_blocks_as_unknown_when_value_is_unknown_text() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"temp": "unknown"}})
+    engine = GatingEngine([{"op": "arg_in_range", "var": "vars.temp", "min": 190, "max": 590}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown(value=unknown)" in (res.reason or "")
 
 
 def test_arg_in_range_allows_when_in_bounds():
@@ -71,6 +115,18 @@ def test_flag_true_blocks_for_false_none_or_missing():
 
     res_missing = engine.evaluate([make_obs(now, payload={})])
     assert not res_missing.allowed
+
+
+def test_flag_true_not_boolean_reason_includes_type_and_value() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"apu_ready": {"raw": 2}})
+    engine = GatingEngine([{"op": "flag_true", "var": "payload.apu_ready"}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "not boolean(type=dict" in (res.reason or "")
+    assert "{'raw': 2}" in (res.reason or "")
 
 
 def test_time_since_requires_elapsed_seconds():
@@ -258,4 +314,33 @@ def test_evaluate_with_failure_index_from_history_reuses_materialized_list() -> 
     assert result.allowed is False
     assert failed_idx == 0
     assert "apu_ready" in (result.reason or "")
+
+
+def test_flag_true_blocks_unknown_string_value() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"apu_ready": "unknown"})
+    engine = GatingEngine([{"op": "flag_true", "var": "payload.apu_ready"}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown(value=unknown)" in (res.reason or "")
+
+
+def test_flag_true_distinguishes_false_vs_source_missing_unknown() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    engine = GatingEngine([{"op": "flag_true", "var": "vars.battery_on"}])
+
+    obs_false = make_obs(now, payload={"vars": {"battery_on": False}})
+    res_false = engine.evaluate([obs_false])
+    assert res_false.allowed is False
+    assert "not true" in (res_false.reason or "")
+
+    obs_unknown = make_obs(
+        now,
+        payload={"vars": {"battery_on": False, "vars_source_missing": ["battery_on"]}},
+    )
+    res_unknown = engine.evaluate([obs_unknown])
+    assert res_unknown.allowed is False
+    assert "unknown(source_missing)" in (res_unknown.reason or "")
 

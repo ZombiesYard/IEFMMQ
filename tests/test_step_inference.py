@@ -172,6 +172,33 @@ def test_infer_step_is_robust_on_invalid_inputs() -> None:
     assert result.inferred_step_id in {"S02", "S03", "S04", "S05", "S06", "S07"}
 
 
+def test_infer_step_distinguishes_false_vs_source_missing_unknown_for_power() -> None:
+    result_false = infer_step_id(
+        _pack_steps(),
+        {
+            "power_available": False,
+            "battery_on": False,
+            "l_gen_on": True,
+            "r_gen_on": True,
+        },
+        [],
+    )
+    assert result_false.inferred_step_id == "S01"
+
+    result_unknown = infer_step_id(
+        _pack_steps(),
+        {
+            "power_available": False,
+            "battery_on": False,
+            "l_gen_on": True,
+            "r_gen_on": True,
+            "vars_source_missing": ["power_available", "battery_on"],
+        },
+        [],
+    )
+    assert result_unknown.inferred_step_id == "S02"
+
+
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:
     context = {
         "recent_ui_targets": ["eng_crank_switch", "eng_crank_switch", "apu_switch"],
