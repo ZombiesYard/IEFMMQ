@@ -164,6 +164,8 @@ def _merge_pack_step_metadata(
             if field not in pack_step:
                 continue
             value = pack_step.get(field)
+            if value is None:
+                continue
             step[field] = _clone_value(value)
 
 
@@ -247,7 +249,7 @@ def extract_recent_ui_targets(
 def infer_step_id(
     pack_steps: Sequence[Mapping[str, Any]],
     vars_map: Mapping[str, Any] | None,
-    recent_ui_targets: Sequence[str] | None,
+    recent_ui_targets: Any,
     *,
     gates: Mapping[str, Any] | None = None,
     precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
@@ -267,7 +269,7 @@ def infer_step_id(
         return StepInferenceResult(inferred_step_id=None, missing_conditions=())
 
     vars_safe = vars_map if isinstance(vars_map, Mapping) else {}
-    recent = normalize_recent_ui_targets(list(recent_ui_targets or ()))
+    recent = normalize_recent_ui_targets(recent_ui_targets or ())
     recent_set = set(recent)
 
     effective_pack_path = Path(pack_path).expanduser().resolve() if pack_path else _DEFAULT_PACK_PATH

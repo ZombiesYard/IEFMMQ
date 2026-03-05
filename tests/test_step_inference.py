@@ -383,6 +383,31 @@ def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mappi
     assert "vars.battery_on==true" in result.missing_conditions
 
 
+def test_infer_step_accepts_mapping_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]
+    pack_path: Path = synthetic_pack_ctx["pack_path"]
+    result = infer_step_id(
+        pack_steps,
+        {
+            "power_available": True,
+            "battery_on": False,
+            "apu_on": True,
+            "apu_ready_pct": 100,
+            "engine_crank_right": True,
+            "bleed_air_norm": True,
+            "rpm_r": 65,
+        },
+        {"recent_buttons": ["battery_switch"]},
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=pack_path,
+    )
+
+    assert result.inferred_step_id == "S01"
+    assert "vars.battery_on==true" in result.missing_conditions
+
+
 def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(real_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
@@ -576,6 +601,32 @@ def test_load_pack_steps_does_not_inject_none_when_pack_step_field_absent(tmp_pa
             "pack_id": "tmp_pack",
             "metadata": {"step_registry_path": "step_registry.yaml"},
             "steps": [{"id": "S01"}],
+        },
+    )
+    _write_yaml(registry_path, _registry_payload("first"))
+
+    loaded = load_pack_steps(pack_path)
+    first = loaded[0]
+    assert first["id"] == "S01"
+    assert "ui_targets" not in first
+    assert "observability" not in first
+
+
+def test_load_pack_steps_does_not_inject_none_when_pack_step_field_is_null(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    registry_path = tmp_path / "step_registry.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "tmp_pack",
+            "metadata": {"step_registry_path": "step_registry.yaml"},
+            "steps": [
+                {
+                    "id": "S01",
+                    "ui_targets": None,
+                    "observability": None,
+                }
+            ],
         },
     )
     _write_yaml(registry_path, _registry_payload("first"))
