@@ -462,12 +462,12 @@ def _as_precoerced_gate_rules_map(
         if isinstance(rules_raw, tuple):
             if not all(isinstance(item, dict) for item in rules_raw):
                 return None
-            out[step_id] = rules_raw
+            out[step_id] = tuple(_clone_mapping(item) for item in rules_raw)
             continue
         if isinstance(rules_raw, list):
             if not all(isinstance(item, dict) for item in rules_raw):
                 return None
-            out[step_id] = tuple(rules_raw)
+            out[step_id] = tuple(_clone_mapping(item) for item in rules_raw)
             continue
         return None
     return out

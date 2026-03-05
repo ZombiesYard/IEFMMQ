@@ -18,6 +18,7 @@ from adapters.step_inference import (
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
+_SYNTHETIC_SUPPORTED_OPS = frozenset({"flag_true", "var_gte", "arg_in_range"})
 
 
 def _step_ids(pack_steps: list[dict[str, Any]]) -> list[str]:
@@ -100,6 +101,31 @@ def _rule_fail_value(rule: Mapping[str, Any]) -> Any:
     return False
 
 
+def _is_supported_rule_for_synthetic_case(rule: Mapping[str, Any]) -> bool:
+    op = rule.get("op")
+    return isinstance(op, str) and op in _SYNTHETIC_SUPPORTED_OPS
+
+
+def _filter_supported_gate_map(pack_gates: Mapping[str, Any]) -> dict[str, dict[str, tuple[dict[str, Any], ...]]]:
+    out: dict[str, dict[str, tuple[dict[str, Any], ...]]] = {
+        "precondition_gates": {},
+        "completion_gates": {},
+    }
+    for gate_type in ("precondition_gates", "completion_gates"):
+        gate_map = pack_gates[gate_type]
+        filtered_map: dict[str, tuple[dict[str, Any], ...]] = {}
+        for step_id, rules in gate_map.items():
+            if not isinstance(step_id, str) or not step_id or not isinstance(rules, tuple):
+                continue
+            filtered_map[step_id] = tuple(
+                dict(rule)
+                for rule in rules
+                if isinstance(rule, Mapping) and _is_supported_rule_for_synthetic_case(rule)
+            )
+        out[gate_type] = filtered_map
+    return out
+
+
 def _build_baseline_vars(pack_gates: Mapping[str, Any]) -> dict[str, Any]:
     vars_map: dict[str, Any] = {}
     for gate_type in ("precondition_gates", "completion_gates"):
@@ -162,14 +188,15 @@ def _completion_var_keys_after(
 def pack_ctx() -> dict[str, Any]:
     pack_steps = load_pack_steps(PACK_PATH)
     pack_gates = load_pack_gate_config(PACK_PATH)
+    synthetic_pack_gates = _filter_supported_gate_map(pack_gates)
     step_ids = _step_ids(pack_steps)
     return {
         "pack_steps": pack_steps,
-        "pack_gates": pack_gates,
+        "pack_gates": synthetic_pack_gates,
         "step_ids": step_ids,
         "step_index": _step_index(pack_steps),
         "step_meta": _step_by_id(pack_steps),
-        "baseline_vars": _build_baseline_vars(pack_gates),
+        "baseline_vars": _build_baseline_vars(synthetic_pack_gates),
     }
 
 

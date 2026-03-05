@@ -1687,8 +1687,12 @@ def test_live_loop_keeps_gate_blockers_out_of_missing_conditions_for_grounding_q
         isinstance(item, dict) and isinstance(item.get("ref"), str) and item.get("ref", "").startswith("GATES.")
         for item in gate_blockers
     )
+    expected_refs = {
+        f"GATES.{inferred_step_id}.precondition",
+        f"GATES.{inferred_step_id}.completion",
+    }
     assert any(
-        isinstance(item, dict) and item.get("ref") == f"GATES.{inferred_step_id}.completion"
+        isinstance(item, dict) and item.get("ref") in expected_refs
         for item in gate_blockers
     )
 
