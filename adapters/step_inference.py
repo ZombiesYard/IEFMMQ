@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from collections.abc import Iterable as IterableABC
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, TypeAlias
 
 import yaml
 
@@ -22,6 +22,7 @@ _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
 _MAX_MISSING_CONDITIONS = 8
 _MAX_RECENT_UI_TARGETS = 24
 _UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
+RecentUiTargetsInput: TypeAlias = Sequence[str] | Mapping[str, Any] | IterableABC[str] | None
 
 
 @dataclass(frozen=True)
@@ -249,7 +250,7 @@ def extract_recent_ui_targets(
 def infer_step_id(
     pack_steps: Sequence[Mapping[str, Any]],
     vars_map: Mapping[str, Any] | None,
-    recent_ui_targets: Any,
+    recent_ui_targets: RecentUiTargetsInput,
     *,
     gates: Mapping[str, Any] | None = None,
     precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
