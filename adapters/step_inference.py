@@ -126,17 +126,18 @@ def _load_pack_steps_cached(
 def _clone_mapping(raw: Mapping[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in raw.items():
-        if isinstance(value, Mapping):
-            out[key] = _clone_mapping(value)
-            continue
-        if isinstance(value, list):
-            out[key] = [item for item in value]
-            continue
-        if isinstance(value, tuple):
-            out[key] = [item for item in value]
-            continue
-        out[key] = value
+        out[key] = _clone_value(value)
     return out
+
+
+def _clone_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return _clone_mapping(value)
+    if isinstance(value, list):
+        return [_clone_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_clone_value(item) for item in value]
+    return value
 
 
 def _merge_pack_step_metadata(
@@ -159,12 +160,7 @@ def _merge_pack_step_metadata(
             if field in step:
                 continue
             value = pack_step.get(field)
-            if isinstance(value, tuple):
-                step[field] = [item for item in value]
-            elif isinstance(value, list):
-                step[field] = [item for item in value]
-            else:
-                step[field] = value
+            step[field] = _clone_value(value)
 
 
 def normalize_recent_ui_targets(raw: Any, *, max_items: int = _MAX_RECENT_UI_TARGETS) -> list[str]:
@@ -268,7 +264,8 @@ def infer_step_id(
     recent = normalize_recent_ui_targets(recent_ui_targets or ())
     recent_set = set(recent)
 
-    effective_pack_path = Path(pack_path).resolve() if pack_path else _DEFAULT_PACK_PATH
+    effective_pack_path = Path(pack_path).expanduser().resolve() if pack_path else _DEFAULT_PACK_PATH
+    vars_source_missing = _extract_source_missing_vars(vars_safe)
     pre_map, comp_map = _resolve_gate_maps(
         precondition_gates=precondition_gates,
         completion_gates=completion_gates,
@@ -300,11 +297,19 @@ def infer_step_id(
             failed_rule=pre_failed_rule,
         )
         if _is_gate_blocked(pre_gate):
-            if _is_soft_block_from_rule(pre_failed_rule, vars_safe):
+            if _is_soft_block_from_rule(pre_failed_rule, vars_safe, vars_source_missing):
                 if soft_candidate is None:
                     soft_candidate = (step_id, pre_missing)
                 if _should_hold_by_observability(profile, completion_rules):
-                    if _has_progression_evidence(step_profiles, idx, gate_statuses, comp_map, recent_set, vars_safe):
+                    if _has_progression_evidence(
+                        step_profiles,
+                        idx,
+                        gate_statuses,
+                        comp_map,
+                        recent_set,
+                        vars_safe,
+                        vars_source_missing,
+                    ):
                         continue
                     return _result(step_id, ())
             else:
@@ -318,7 +323,7 @@ def infer_step_id(
             failed_rule=comp_failed_rule,
         )
         if _is_gate_blocked(comp_gate):
-            if _is_soft_block_from_rule(comp_failed_rule, vars_safe):
+            if _is_soft_block_from_rule(comp_failed_rule, vars_safe, vars_source_missing):
                 if soft_candidate is None:
                     soft_candidate = (step_id, comp_missing)
             else:
@@ -326,7 +331,15 @@ def infer_step_id(
             continue
 
         if _should_hold_by_observability(profile, completion_rules):
-            if _has_progression_evidence(step_profiles, idx, gate_statuses, comp_map, recent_set, vars_safe):
+            if _has_progression_evidence(
+                step_profiles,
+                idx,
+                gate_statuses,
+                comp_map,
+                recent_set,
+                vars_safe,
+                vars_source_missing,
+            ):
                 continue
             return _result(step_id, ())
 
@@ -392,8 +405,10 @@ def _resolve_gate_maps(
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
     if precondition_gates is None or completion_gates is None:
         loaded = load_pack_gate_config(pack_path, scenario_profile=scenario_profile)
-        precondition_gates = loaded.get("precondition_gates", {})
-        completion_gates = loaded.get("completion_gates", {})
+        if precondition_gates is None:
+            precondition_gates = loaded.get("precondition_gates", {})
+        if completion_gates is None:
+            completion_gates = loaded.get("completion_gates", {})
     return _coerce_gate_rules_map(precondition_gates), _coerce_gate_rules_map(completion_gates)
 
 
@@ -578,6 +593,7 @@ def _has_progression_evidence(
     completion_gates: Mapping[str, Sequence[Mapping[str, Any]]],
     recent_set: set[str],
     vars_map: Mapping[str, Any],
+    vars_source_missing: set[str],
 ) -> bool:
     current = step_profiles[idx]
     if current.ui_targets:
@@ -589,7 +605,12 @@ def _has_progression_evidence(
         completion_gate = gate_statuses.get(f"{later.step_id}.completion")
         reason_code = completion_gate.get("reason_code") if isinstance(completion_gate, Mapping) else None
         failed_rule = _pick_failed_rule(completion_gates.get(later.step_id, ()), reason_code)
-        if _is_strong_gate_signal(completion_gate, failed_rule=failed_rule, vars_map=vars_map):
+        if _is_strong_gate_signal(
+            completion_gate,
+            failed_rule=failed_rule,
+            vars_map=vars_map,
+            vars_source_missing=vars_source_missing,
+        ):
             return True
     return False
 
@@ -599,6 +620,7 @@ def _is_strong_gate_signal(
     *,
     failed_rule: Mapping[str, Any] | None,
     vars_map: Mapping[str, Any],
+    vars_source_missing: set[str],
 ) -> bool:
     if not isinstance(gate_info, Mapping):
         return False
@@ -610,18 +632,19 @@ def _is_strong_gate_signal(
         return False
     if isinstance(reason_code, str) and reason_code == "no_rules":
         return False
-    return not _is_soft_block_from_rule(failed_rule, vars_map)
+    return not _is_soft_block_from_rule(failed_rule, vars_map, vars_source_missing)
 
 
 def _is_soft_block_from_rule(
     failed_rule: Mapping[str, Any] | None,
     vars_map: Mapping[str, Any],
+    vars_source_missing: set[str],
 ) -> bool:
     if not isinstance(failed_rule, Mapping):
         return False
     op = failed_rule.get("op")
     var_raw = failed_rule.get("var")
-    value, missing = _read_rule_var(vars_map, var_raw)
+    value, missing = _read_rule_var(vars_map, var_raw, vars_source_missing)
     if missing:
         return True
     if _is_unknown_text(value):
@@ -636,12 +659,12 @@ def _is_soft_block_from_rule(
 def _read_rule_var(
     vars_map: Mapping[str, Any],
     var_raw: Any,
+    vars_source_missing: set[str],
 ) -> tuple[Any, bool]:
     if not isinstance(var_raw, str) or not var_raw:
         return None, True
     key = _extract_var_key_from_path(var_raw)
-    source_missing = _extract_source_missing_vars(vars_map)
-    if key is not None and key in source_missing:
+    if key is not None and key in vars_source_missing:
         return None, True
     if key is not None and key in vars_map:
         return vars_map.get(key), False
