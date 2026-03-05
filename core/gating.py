@@ -125,7 +125,20 @@ def _format_unknown_reason(var_path: str, *, source_missing: bool, value: Any) -
     if isinstance(value, str):
         normalized = value.strip().lower()
         return f"{var_path} unknown(value={normalized})"
-    return f"{var_path} unknown(value)"
+    return f"{var_path} unknown(value_type={type(value).__name__}, value={value!r})"
+
+
+def _read_var_with_unknown_check(
+    latest: dict[str, Any],
+    *,
+    var_path: str,
+    vars_source_missing: set[str],
+) -> tuple[Any, Optional[str]]:
+    val = _get_var(latest, var_path)
+    source_missing = _is_var_source_missing(var_path, vars_source_missing)
+    if source_missing or _is_unknown_value(val):
+        return val, _format_unknown_reason(var_path, source_missing=source_missing, value=val)
+    return val, None
 
 
 def _missing_keys(rule: dict[str, Any], keys: Iterable[str]) -> list[str]:
@@ -180,10 +193,13 @@ class GatingEngine:
             missing = _missing_keys(rule, ("var", "value"))
             if missing:
                 return False, f"rule var_gte missing keys: {missing}"
-            val = _get_var(latest, rule["var"])
-            source_missing = _is_var_source_missing(rule["var"], vars_source_missing)
-            if source_missing or _is_unknown_value(val):
-                return False, _format_unknown_reason(rule["var"], source_missing=source_missing, value=val)
+            val, unknown_reason = _read_var_with_unknown_check(
+                latest,
+                var_path=rule["var"],
+                vars_source_missing=vars_source_missing,
+            )
+            if unknown_reason is not None:
+                return False, unknown_reason
             if val is None:
                 return False, f"{rule['var']} missing"
             if not _is_number(val) or not _is_number(rule["value"]):
@@ -195,10 +211,13 @@ class GatingEngine:
             missing = _missing_keys(rule, ("var", "min", "max"))
             if missing:
                 return False, f"rule arg_in_range missing keys: {missing}"
-            val = _get_var(latest, rule["var"])
-            source_missing = _is_var_source_missing(rule["var"], vars_source_missing)
-            if source_missing or _is_unknown_value(val):
-                return False, _format_unknown_reason(rule["var"], source_missing=source_missing, value=val)
+            val, unknown_reason = _read_var_with_unknown_check(
+                latest,
+                var_path=rule["var"],
+                vars_source_missing=vars_source_missing,
+            )
+            if unknown_reason is not None:
+                return False, unknown_reason
             if val is None:
                 return False, f"{rule['var']} missing"
             if not _is_number(val) or not _is_number(rule["min"]) or not _is_number(rule["max"]):
@@ -210,15 +229,18 @@ class GatingEngine:
             missing = _missing_keys(rule, ("var",))
             if missing:
                 return False, f"rule flag_true missing keys: {missing}"
-            val = _get_var(latest, rule["var"])
-            source_missing = _is_var_source_missing(rule["var"], vars_source_missing)
-            if source_missing or _is_unknown_value(val):
-                return False, _format_unknown_reason(rule["var"], source_missing=source_missing, value=val)
+            val, unknown_reason = _read_var_with_unknown_check(
+                latest,
+                var_path=rule["var"],
+                vars_source_missing=vars_source_missing,
+            )
+            if unknown_reason is not None:
+                return False, unknown_reason
             if val is None:
                 return False, f"{rule['var']} missing"
             bool_val = _coerce_flag_bool(val)
             if bool_val is None:
-                return False, f"{rule['var']} not boolean"
+                return False, f"{rule['var']} not boolean(type={type(val).__name__}, value={val!r})"
             if not bool_val:
                 return False, f"{rule['var']} not true"
             return True, None

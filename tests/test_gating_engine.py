@@ -117,6 +117,18 @@ def test_flag_true_blocks_for_false_none_or_missing():
     assert not res_missing.allowed
 
 
+def test_flag_true_not_boolean_reason_includes_type_and_value() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"apu_ready": {"raw": 2}})
+    engine = GatingEngine([{"op": "flag_true", "var": "payload.apu_ready"}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "not boolean(type=dict" in (res.reason or "")
+    assert "{'raw': 2}" in (res.reason or "")
+
+
 def test_time_since_requires_elapsed_seconds():
     t0 = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     t1 = t0 + timedelta(seconds=6)
