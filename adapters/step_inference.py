@@ -4,11 +4,12 @@ Deterministic startup step inference for model fallback and prompt hints.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from collections.abc import Iterable as IterableABC
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 import yaml
 
@@ -249,8 +250,8 @@ def infer_step_id(
     recent_ui_targets: Sequence[str] | None,
     *,
     gates: Mapping[str, Any] | None = None,
-    precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
-    completion_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+    precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
+    completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
     scenario_profile: str | None = None,
     pack_path: str | Path | None = None,
 ) -> StepInferenceResult:
@@ -403,8 +404,8 @@ def _extract_step_id(step: Mapping[str, Any]) -> str | None:
 
 def _resolve_gate_maps(
     *,
-    precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None,
-    completion_gates: Mapping[str, Iterable[Mapping[str, Any]]] | None,
+    precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None,
+    completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None,
     scenario_profile: str | None,
     pack_path: Path,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
@@ -433,7 +434,7 @@ def _load_coerced_pack_gate_maps_cached(
 
 
 def _coerce_gate_rules_map(
-    raw: Mapping[str, Iterable[Mapping[str, Any]]] | None,
+    raw: Mapping[str, IterableABC[Mapping[str, Any]]] | None,
 ) -> dict[str, tuple[dict[str, Any], ...]]:
     out: dict[str, tuple[dict[str, Any], ...]] = {}
     if not isinstance(raw, Mapping):
@@ -447,7 +448,7 @@ def _coerce_gate_rules_map(
         normalized_rules: list[dict[str, Any]] = []
         if isinstance(rules_raw, Mapping):
             normalized_rules.append(_clone_mapping(rules_raw))
-        elif isinstance(rules_raw, Iterable) and not isinstance(rules_raw, (str, bytes)):
+        elif isinstance(rules_raw, IterableABC) and not isinstance(rules_raw, (str, bytes)):
             for item in rules_raw:
                 if isinstance(item, Mapping):
                     normalized_rules.append(_clone_mapping(item))
@@ -456,7 +457,7 @@ def _coerce_gate_rules_map(
 
 
 def _as_precoerced_gate_rules_map(
-    raw: Mapping[str, Iterable[Mapping[str, Any]]],
+    raw: Mapping[str, IterableABC[Mapping[str, Any]]],
 ) -> dict[str, tuple[dict[str, Any], ...]] | None:
     out: dict[str, tuple[dict[str, Any], ...]] = {}
     for step_id, rules_raw in raw.items():
@@ -480,8 +481,8 @@ def _resolve_gate_statuses(
     *,
     vars_map: Mapping[str, Any],
     gates: Mapping[str, Any] | None,
-    precondition_gates: Mapping[str, Iterable[Mapping[str, Any]]],
-    completion_gates: Mapping[str, Iterable[Mapping[str, Any]]],
+    precondition_gates: Mapping[str, IterableABC[Mapping[str, Any]]],
+    completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]],
 ) -> dict[str, dict[str, Any]]:
     provided: dict[str, dict[str, Any]] = {}
     if isinstance(gates, Mapping):
@@ -507,7 +508,7 @@ def _resolve_gate_statuses(
 
     obs = {
         "observation_id": "deterministic-step-inference",
-        "timestamp": "1970-01-01T00:00:00+00:00",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "source": "inference",
         "payload": {"vars": dict(vars_map)},
         "vars": dict(vars_map),
