@@ -50,15 +50,15 @@ vars:
   noz_r_in_range: "derived(vars.noz_r >= 73 and vars.noz_r <= 84)"
   noz_l_in_range: "derived(vars.noz_l >= 73 and vars.noz_l <= 84)"
   right_engine_nominal_start_params: "derived(vars.rpm_r_in_range and vars.temp_r_in_range and vars.ff_r_in_range and vars.oil_r_in_range and vars.noz_r_in_range)"
-  left_engine_nominal_start_params: "derived(vars.rpm_l_in_range and vars.temp_l_in_range and vars.ff_l_in_range and vars.oil_l_in_range and vars.noz_l_in_range)"
-  left_engine_idle_ready: "derived(vars.rpm_l_gte_25 and vars.throttle_l_not_off)"
+  left_engine_nominal_start_params: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70 and vars.temp_l >= 190 and vars.temp_l <= 590 and vars.ff_l >= 420 and vars.ff_l <= 900 and vars.oil_l >= 45 and vars.oil_l <= 110 and vars.noz_l >= 73 and vars.noz_l <= 84)"
+  left_engine_idle_ready: "derived(vars.rpm_l >= 25 and num(bios.INT_THROTTLE_LEFT) > 0)"
 
   # Displays / avionics
   left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
   right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"
   mpcd_on: "bios.AMPCD_BRT_CTL > 0"
   hud_on: "bios.HUD_SYM_BRT > 0"
-  core_avionics_online: "derived(vars.left_ddi_on and vars.right_ddi_on and vars.mpcd_on and vars.hud_on)"
+  core_avionics_online: "derived(bios.LEFT_DDI_BRT_CTL > 0 and bios.RIGHT_DDI_BRT_CTL > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
 
   # Key switches / sensor panel
   fire_test_active: "bios.FIRE_TEST_SW == 1"
@@ -74,7 +74,7 @@ vars:
   # as explicit "unknown" (instead of false) so gating/inference can degrade safely.
   obogs_switch_on: "bios.OBOGS_SW == 1"
   obogs_flow_on: "bios.OXY_FLOW > 0"
-  obogs_ready: "derived(vars.obogs_switch_on and vars.obogs_flow_on)"
+  obogs_ready: "derived(bios.OBOGS_SW == 1 and bios.OXY_FLOW > 0)"
 
   fcs_reset_pressed: "bios.FCS_RESET_BTN == 1"
   fcs_page_reviewed: "'unknown'"
@@ -83,7 +83,7 @@ vars:
   flap_auto: "derived(vars.flap_mode_value == 0)"
   flap_half: "derived(vars.flap_mode_value == 1)"
   flap_full: "derived(vars.flap_mode_value == 2)"
-  flap_configured: "derived(vars.flap_auto or vars.flap_half)"
+  flap_configured: "derived(vars.flap_mode_value == 0 or vars.flap_mode_value == 1)"
 
   takeoff_trim_pressed: "bios.TO_TRIM_BTN == 1"
   takeoff_trim_set: "'unknown'"

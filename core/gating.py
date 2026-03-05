@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
+from typing import Any, Iterable, Optional, Sequence, Tuple
 
 _UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
 
@@ -25,7 +25,7 @@ def _parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def _get_by_path(data: Dict[str, Any], path: str) -> Optional[Any]:
+def _get_by_path(data: dict[str, Any], path: str) -> Optional[Any]:
     parts = path.split(".")
     current: Any = data
     for part in parts:
@@ -36,7 +36,7 @@ def _get_by_path(data: Dict[str, Any], path: str) -> Optional[Any]:
     return current
 
 
-def _get_var(data: Dict[str, Any], path: str) -> Optional[Any]:
+def _get_var(data: dict[str, Any], path: str) -> Optional[Any]:
     # Prefer stable vars when a bare key is used.
     if "." not in path:
         val = _get_by_path(data, f"payload.vars.{path}")
@@ -80,7 +80,7 @@ def _coerce_flag_bool(value: Any) -> Optional[bool]:
     return None
 
 
-def _collect_vars_source_missing(data: Dict[str, Any]) -> set[str]:
+def _collect_vars_source_missing(data: dict[str, Any]) -> set[str]:
     candidates: list[Any] = []
     payload_vars = _get_by_path(data, "payload.vars")
     if isinstance(payload_vars, dict):
@@ -119,7 +119,7 @@ def _is_var_source_missing(path: str, vars_source_missing: set[str]) -> bool:
     return var_key in vars_source_missing
 
 
-def _missing_keys(rule: Dict[str, Any], keys: Iterable[str]) -> List[str]:
+def _missing_keys(rule: dict[str, Any], keys: Iterable[str]) -> list[str]:
     return [key for key in keys if key not in rule]
 
 
@@ -130,23 +130,23 @@ class RuleResult:
 
 
 class GatingEngine:
-    def __init__(self, rules: List[Dict[str, Any]]):
+    def __init__(self, rules: list[dict[str, Any]]):
         self.rules = rules
 
-    def evaluate(self, observations: Iterable[Dict[str, Any]]) -> RuleResult:
+    def evaluate(self, observations: Iterable[dict[str, Any]]) -> RuleResult:
         result, _ = self.evaluate_with_failure_index(observations)
         return result
 
     def evaluate_with_failure_index(
         self,
-        observations: Iterable[Dict[str, Any]],
+        observations: Iterable[dict[str, Any]],
     ) -> Tuple[RuleResult, Optional[int]]:
         obs_list = list(observations)
         return self.evaluate_with_failure_index_from_history(obs_list)
 
     def evaluate_with_failure_index_from_history(
         self,
-        observations_history: Sequence[Dict[str, Any]],
+        observations_history: Sequence[dict[str, Any]],
     ) -> Tuple[RuleResult, Optional[int]]:
         history = observations_history if isinstance(observations_history, list) else list(observations_history)
         if not history:
@@ -161,9 +161,9 @@ class GatingEngine:
 
     def _eval_rule(
         self,
-        rule: Dict[str, Any],
-        latest: Dict[str, Any],
-        history: list[Dict[str, Any]],
+        rule: dict[str, Any],
+        latest: dict[str, Any],
+        history: list[dict[str, Any]],
         vars_source_missing: set[str],
     ) -> Tuple[bool, Optional[str]]:
         op = rule.get("op")

@@ -414,6 +414,7 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert vars_auto["flap_auto"] is True
     assert vars_auto["flap_half"] is False
     assert vars_auto["flap_full"] is False
+    assert vars_auto["flap_configured"] is True
 
     frame_half = TelemetryFrame(seq=802, t_wall=802.0, source="dcs_bios", bios={"FLAP_SW": 1})
     vars_half = resolver.resolve(frame_half)
@@ -421,6 +422,7 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert vars_half["flap_auto"] is False
     assert vars_half["flap_half"] is True
     assert vars_half["flap_full"] is False
+    assert vars_half["flap_configured"] is True
 
     frame_full = TelemetryFrame(seq=803, t_wall=803.0, source="dcs_bios", bios={"FLAP_SW": 2})
     vars_full = resolver.resolve(frame_full)
@@ -428,6 +430,7 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert vars_full["flap_auto"] is False
     assert vars_full["flap_half"] is False
     assert vars_full["flap_full"] is True
+    assert vars_full["flap_configured"] is False
 
     frame_none = TelemetryFrame(seq=804, t_wall=804.0, source="dcs_bios", bios={"FLAP_SW": None})
     vars_none = resolver.resolve(frame_none)
@@ -435,10 +438,12 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert vars_none["flap_auto"] is False
     assert vars_none["flap_half"] is False
     assert vars_none["flap_full"] is False
+    assert vars_none["flap_configured"] is False
     assert "flap_mode_value" in vars_none["vars_source_missing"]
     assert "flap_auto" in vars_none["vars_source_missing"]
     assert "flap_half" in vars_none["vars_source_missing"]
     assert "flap_full" in vars_none["vars_source_missing"]
+    assert "flap_configured" in vars_none["vars_source_missing"]
 
     frame_missing = TelemetryFrame(seq=805, t_wall=805.0, source="dcs_bios", bios={})
     vars_missing = resolver.resolve(frame_missing)
@@ -446,7 +451,29 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert vars_missing["flap_auto"] is False
     assert vars_missing["flap_half"] is False
     assert vars_missing["flap_full"] is False
+    assert vars_missing["flap_configured"] is False
     assert "flap_mode_value" in vars_missing["vars_source_missing"]
     assert "flap_auto" in vars_missing["vars_source_missing"]
     assert "flap_half" in vars_missing["vars_source_missing"]
     assert "flap_full" in vars_missing["vars_source_missing"]
+    assert "flap_configured" in vars_missing["vars_source_missing"]
+
+
+def test_var_resolver_pack_composite_vars_propagate_source_missing() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+    frame = TelemetryFrame(
+        seq=900,
+        t_wall=900.0,
+        source="dcs_bios",
+        bios={},
+    )
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["left_engine_nominal_start_params"] is False
+    assert vars_out["left_engine_idle_ready"] is False
+    assert vars_out["core_avionics_online"] is False
+    assert vars_out["obogs_ready"] is False
+    assert "left_engine_nominal_start_params" in vars_out["vars_source_missing"]
+    assert "left_engine_idle_ready" in vars_out["vars_source_missing"]
+    assert "core_avionics_online" in vars_out["vars_source_missing"]
+    assert "obogs_ready" in vars_out["vars_source_missing"]
