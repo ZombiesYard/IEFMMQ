@@ -33,6 +33,7 @@ MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
+SUPPORTED_SCENARIO_PROFILES = frozenset({"airfield", "carrier"})
 
 
 @dataclass(frozen=True)
@@ -284,6 +285,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             "observability": None,
             "step_evidence_requirements": [],
             "requires_visual_confirmation": False,
+            "scenario_profile": None,
         }
 
     inferred_raw = raw.get("inferred_step_id")
@@ -352,6 +354,12 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             observability,
             step_evidence_requirements,
         )
+    scenario_profile_raw = raw.get("scenario_profile")
+    scenario_profile = (
+        scenario_profile_raw
+        if isinstance(scenario_profile_raw, str) and scenario_profile_raw in SUPPORTED_SCENARIO_PROFILES
+        else None
+    )
 
     return {
         "inferred_step_id": inferred_step_id,
@@ -360,6 +368,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
         "observability": observability,
         "step_evidence_requirements": step_evidence_requirements,
         "requires_visual_confirmation": requires_visual_confirmation,
+        "scenario_profile": scenario_profile,
     }
 
 
@@ -505,6 +514,12 @@ def build_help_prompt_result(
     rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
+    scenario_profile_raw = context.get("scenario_profile")
+    scenario_profile = (
+        scenario_profile_raw
+        if isinstance(scenario_profile_raw, str) and scenario_profile_raw in SUPPORTED_SCENARIO_PROFILES
+        else None
+    )
 
     payload: dict[str, Any] = {}
 
@@ -585,6 +600,7 @@ def build_help_prompt_result(
             "allowed_overlay_targets": overlay_targets,
             "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
+            "scenario_profile": scenario_profile,
             "current_vars_selected": selected_vars,
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,

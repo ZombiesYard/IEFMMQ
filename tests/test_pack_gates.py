@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config
+from adapters.prompting import build_help_prompt_result
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -180,3 +181,104 @@ def test_evaluate_pack_gates_treats_single_mapping_rule_as_one_rule() -> None:
 
     assert gates["S98.precondition"]["status"] == "blocked"
     assert gates["S98.precondition"]["allowed"] is False
+
+
+def test_load_pack_gate_config_applies_carrier_profile_overrides() -> None:
+    airfield = load_pack_gate_config(PACK_PATH, scenario_profile="airfield")
+    carrier = load_pack_gate_config(PACK_PATH, scenario_profile="carrier")
+
+    assert airfield["completion_gates"]["S12"][0]["reason_code"] == "s12_requires_ins_mode_gnd"
+    assert carrier["completion_gates"]["S12"][0]["reason_code"] == "s12_requires_ins_mode_cv"
+    assert airfield["completion_gates"]["S23"][0]["reason_code"] == "s23_requires_radalt_bug_airfield_200"
+    assert carrier["completion_gates"]["S23"][0]["reason_code"] == "s23_requires_radalt_bug_carrier_40"
+
+
+def test_load_pack_gate_config_rejects_unknown_scenario_profile() -> None:
+    with pytest.raises(ValueError, match="unsupported scenario_profile"):
+        load_pack_gate_config(PACK_PATH, scenario_profile="invalid_profile")
+
+
+def test_evaluate_pack_gates_profile_changes_s12_and_s23_gate_results() -> None:
+    airfield_cfg = load_pack_gate_config(PACK_PATH, scenario_profile="airfield")
+    carrier_cfg = load_pack_gate_config(PACK_PATH, scenario_profile="carrier")
+    obs = _obs_with_vars(
+        rpm_l_gte_60=True,
+        throttle_l_not_off=True,
+        ins_mode=1,
+        radar_altimeter_bug_value=200,
+    )
+
+    airfield_gates = evaluate_pack_gates(
+        observations=[obs],
+        precondition_gates=airfield_cfg["precondition_gates"],
+        completion_gates=airfield_cfg["completion_gates"],
+    )
+    carrier_gates = evaluate_pack_gates(
+        observations=[obs],
+        precondition_gates=carrier_cfg["precondition_gates"],
+        completion_gates=carrier_cfg["completion_gates"],
+    )
+
+    assert airfield_gates["S12.completion"]["status"] == "allowed"
+    assert airfield_gates["S23.completion"]["status"] == "allowed"
+    assert carrier_gates["S12.completion"]["status"] == "blocked"
+    assert carrier_gates["S12.completion"]["reason_code"] == "s12_requires_ins_mode_cv"
+    assert carrier_gates["S23.completion"]["status"] == "blocked"
+    assert carrier_gates["S23.completion"]["reason_code"] == "s23_requires_radalt_bug_carrier_40"
+
+
+def test_scenario_profile_changes_prompt_gate_hints() -> None:
+    obs = _obs_with_vars(
+        rpm_l_gte_60=True,
+        throttle_l_not_off=True,
+        ins_mode=0,
+        radar_altimeter_bug_value=0,
+    )
+    airfield_cfg = load_pack_gate_config(PACK_PATH, scenario_profile="airfield")
+    carrier_cfg = load_pack_gate_config(PACK_PATH, scenario_profile="carrier")
+    airfield_gates = evaluate_pack_gates(
+        observations=[obs],
+        precondition_gates=airfield_cfg["precondition_gates"],
+        completion_gates=airfield_cfg["completion_gates"],
+    )
+    carrier_gates = evaluate_pack_gates(
+        observations=[obs],
+        precondition_gates=carrier_cfg["precondition_gates"],
+        completion_gates=carrier_cfg["completion_gates"],
+    )
+
+    base_context = {
+        "candidate_steps": ["S12", "S23"],
+        "overlay_target_allowlist": ["ins_mode_knob", "radar_altimeter_bug_knob"],
+        "vars": {},
+        "recent_deltas": [],
+        "recent_actions": [],
+        "rag_topk": [],
+    }
+    airfield_prompt = build_help_prompt_result(
+        {
+            **base_context,
+            "scenario_profile": "airfield",
+            "gates": {
+                "S12.completion": airfield_gates["S12.completion"],
+                "S23.completion": airfield_gates["S23.completion"],
+            },
+        },
+        "en",
+    ).prompt
+    carrier_prompt = build_help_prompt_result(
+        {
+            **base_context,
+            "scenario_profile": "carrier",
+            "gates": {
+                "S12.completion": carrier_gates["S12.completion"],
+                "S23.completion": carrier_gates["S23.completion"],
+            },
+        },
+        "en",
+    ).prompt
+
+    assert '"scenario_profile":"airfield"' in airfield_prompt
+    assert '"scenario_profile":"carrier"' in carrier_prompt
+    assert "GND for airfield startup" in airfield_prompt
+    assert "CV for carrier startup" in carrier_prompt

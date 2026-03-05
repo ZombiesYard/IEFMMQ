@@ -80,6 +80,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - Replay: `python -m simtutor replay ...`
 - Replay telemetry: `python -m simtutor replay --telemetry logs/telemetry_*.jsonl`
 - Replay BIOS help loop: `python -m simtutor replay-bios --input logs/dcs_bios_raw.jsonl --auto-help-once`
+  - Optional: `--scenario-profile airfield|carrier` (default `airfield`)
 - Score: `python -m simtutor score ...`
 - Batch: `python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts`
   - Optional: `--taxonomy packs/fa18c_startup/taxonomy.yaml`
@@ -223,6 +224,7 @@ Run with replay (single-sample/offline validation; supports JSONL and single-lin
 python live_dcs.py \
   --replay-bios artifacts/dcs_bios_frame_once.jsonl \
   --auto-help-once \
+  --scenario-profile airfield \
   --dry-run-overlay \
   --model-provider stub \
   --output logs/live_dcs_replay.jsonl
@@ -258,6 +260,7 @@ Replay BIOS via `simtutor` CLI (default safe mode with dry-run overlay):
 python -m simtutor replay-bios \
   --input logs/dcs_bios_raw.jsonl \
   --speed 1.0 \
+  --scenario-profile carrier \
   --help-udp-port 7794 \
   --model-provider stub \
   --cold-start-production \

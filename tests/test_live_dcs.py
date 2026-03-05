@@ -1747,6 +1747,42 @@ def test_live_dcs_cli_cold_start_production_can_be_overridden(monkeypatch) -> No
     assert args.cold_start_production is True
 
 
+def test_live_dcs_cli_scenario_profile_defaults_airfield_and_accepts_carrier() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.scenario_profile == "airfield"
+
+    args = parser.parse_args(["--scenario-profile", "carrier"])
+    assert args.scenario_profile == "carrier"
+
+
+def test_live_loop_request_context_and_metadata_include_scenario_profile(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_scenario_profile.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        scenario_profile="carrier",
+        lang="en",
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(model.calls) == 1
+    request = model.calls[0]["request"]
+    assert request is not None
+    assert request.context["scenario_profile"] == "carrier"
+    assert request.metadata["scenario_profile"] == "carrier"
+    assert request.context["deterministic_step_hint"]["scenario_profile"] == "carrier"
+
+
 def test_normalize_cached_response_metadata_normalizes_fallback_reason() -> None:
     missing_reason: dict[str, Any] = {}
     _normalize_cached_response_metadata(missing_reason)

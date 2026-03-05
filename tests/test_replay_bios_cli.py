@@ -416,3 +416,57 @@ def test_cli_replay_bios_cold_start_production_reads_env_default(monkeypatch, tm
     code = main()
     assert code == 0
     assert captured["cold_start_production"] is True
+
+
+def test_cli_replay_bios_scenario_profile_defaults_airfield(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_scenario_profile_default.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, str] = {}
+
+    def _fake_run_replay(args):
+        captured["scenario_profile"] = str(args.scenario_profile)
+        return 0
+
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["scenario_profile"] == "airfield"
+
+
+def test_cli_replay_bios_scenario_profile_accepts_carrier(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_scenario_profile_carrier.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, str] = {}
+
+    def _fake_run_replay(args):
+        captured["scenario_profile"] = str(args.scenario_profile)
+        return 0
+
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--scenario-profile",
+            "carrier",
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["scenario_profile"] == "carrier"

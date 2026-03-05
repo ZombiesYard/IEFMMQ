@@ -26,7 +26,13 @@ from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, 
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
 from adapters.openai_compat_model import OpenAICompatModel
-from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config
+from adapters.pack_gates import (
+    DEFAULT_SCENARIO_PROFILE,
+    SUPPORTED_SCENARIO_PROFILES,
+    evaluate_pack_gates,
+    load_pack_gate_config,
+    normalize_scenario_profile,
+)
 from adapters.prompting import build_help_prompt_result
 from adapters.recent_actions import (
     RecentDeltaRingBuffer,
@@ -788,6 +794,7 @@ class LiveDcsTutorLoop:
         cooldown_s: float = 4.0,
         session_id: str | None = None,
         lang: str = "zh",
+        scenario_profile: str = DEFAULT_SCENARIO_PROFILE,
         event_sink: Callable[[Event], None] | None = None,
         dry_run_overlay: bool = False,
         knowledge_adapter: KnowledgePort | None = None,
@@ -802,6 +809,7 @@ class LiveDcsTutorLoop:
         self.cooldown_s = max(0.0, float(cooldown_s))
         self.session_id = session_id
         self.lang = "zh" if lang not in {"zh", "en"} else lang
+        self.scenario_profile = normalize_scenario_profile(scenario_profile)
         self.event_sink = event_sink
         self.dry_run_overlay = dry_run_overlay
 
@@ -835,7 +843,10 @@ class LiveDcsTutorLoop:
             self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
         self.pack_steps = load_pack_steps(self.pack_path)
         self.step_signal_profiles = _load_step_signal_profiles(self.pack_path)
-        gate_config = load_pack_gate_config(self.pack_path)
+        gate_config = load_pack_gate_config(
+            self.pack_path,
+            scenario_profile=self.scenario_profile,
+        )
         self.precondition_gates = dict(gate_config.get("precondition_gates", {}))
         self.completion_gates = dict(gate_config.get("completion_gates", {}))
         self.candidate_steps = _load_step_ids(self.pack_path)
@@ -1148,6 +1159,7 @@ class LiveDcsTutorLoop:
             "missing_conditions": missing_conditions,
             "recent_ui_targets": recent_buttons,
             "gate_blockers": inferred_gate_blockers,
+            "scenario_profile": self.scenario_profile,
         }
         if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
             step_signal_profile = self.step_signal_profiles.get(inference.inferred_step_id)
@@ -1173,6 +1185,7 @@ class LiveDcsTutorLoop:
             "candidate_steps": list(self.candidate_steps),
             "overlay_target_allowlist": list(self.overlay_allowlist),
             "deterministic_step_hint": deterministic_hint,
+            "scenario_profile": self.scenario_profile,
             "rag_topk": rag_topk,
             "grounding_missing": bool(grounding_meta.get("grounding_missing")),
             "grounding_reason": grounding_meta.get("grounding_reason"),
@@ -1209,6 +1222,7 @@ class LiveDcsTutorLoop:
                 "grounding_policy_filtered_out_count": int(
                     grounding_meta.get("grounding_policy_filtered_out_count") or 0
                 ),
+                "scenario_profile": self.scenario_profile,
             },
         )
 
@@ -1222,6 +1236,7 @@ class LiveDcsTutorLoop:
             "candidate_steps": self.candidate_steps,
             "overlay_target_allowlist": self.overlay_allowlist,
             "deterministic_step_hint": deterministic_hint,
+            "scenario_profile": self.scenario_profile,
         }
         state_key = _stable_hash_json(state_signature)
         return req, prompt_result.metadata, state_key
@@ -1652,6 +1667,7 @@ class LiveDcsTutorLoop:
             requires_visual_confirmation = hint.get("requires_visual_confirmation")
             if isinstance(requires_visual_confirmation, bool):
                 response.metadata["requires_visual_confirmation"] = requires_visual_confirmation
+        response.metadata["scenario_profile"] = self.scenario_profile
 
         if self.dry_run_overlay and overlay_report.get("dry_run"):
             print(
@@ -1862,6 +1878,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    parser.add_argument(
+        "--scenario-profile",
+        choices=sorted(SUPPORTED_SCENARIO_PROFILES),
+        default=DEFAULT_SCENARIO_PROFILE,
+        help="Scenario profile to parameterize pack gate branches (default: airfield).",
+    )
     log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
     log_raw_group = parser.add_mutually_exclusive_group()
     log_raw_group.add_argument(
@@ -1922,6 +1944,7 @@ def main() -> int:
             cooldown_s=args.cooldown_s,
             session_id=args.session_id,
             lang=args.lang,
+            scenario_profile=args.scenario_profile,
             event_sink=store.append,
             dry_run_overlay=bool(args.dry_run_overlay),
         )

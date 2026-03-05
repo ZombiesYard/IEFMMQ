@@ -13,6 +13,8 @@ import yaml
 from core.gating import GatingEngine
 
 _GATE_FIELD_NAMES = ("precondition_gates", "completion_gates")
+DEFAULT_SCENARIO_PROFILE = "airfield"
+SUPPORTED_SCENARIO_PROFILES = ("airfield", "carrier")
 
 
 def _repo_root() -> Path:
@@ -58,30 +60,88 @@ def _normalize_rules_map(raw: Any, *, field_name: str, pack_path: Path) -> dict[
     return out
 
 
+def normalize_scenario_profile(profile: str | None) -> str:
+    if profile is None:
+        return DEFAULT_SCENARIO_PROFILE
+    normalized = profile.strip().lower()
+    if not normalized:
+        return DEFAULT_SCENARIO_PROFILE
+    if normalized not in SUPPORTED_SCENARIO_PROFILES:
+        allowed = ", ".join(SUPPORTED_SCENARIO_PROFILES)
+        raise ValueError(f"unsupported scenario_profile {profile!r}, expected one of: {allowed}")
+    return normalized
+
+
+def _normalize_profile_overrides(
+    raw: Any,
+    *,
+    pack_path: Path,
+) -> dict[str, dict[str, dict[str, tuple[dict[str, Any], ...]]]]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"profile_overrides must be a mapping in pack: {pack_path}")
+
+    out: dict[str, dict[str, dict[str, tuple[dict[str, Any], ...]]]] = {}
+    for profile_raw, cfg_raw in raw.items():
+        if not isinstance(profile_raw, str) or not profile_raw.strip():
+            raise ValueError(f"profile_overrides profile name must be non-empty string in pack: {pack_path}")
+        profile = normalize_scenario_profile(profile_raw)
+        if not isinstance(cfg_raw, Mapping):
+            raise ValueError(f"profile_overrides.{profile} must be a mapping in pack: {pack_path}")
+        profile_cfg: dict[str, dict[str, tuple[dict[str, Any], ...]]] = {}
+        for field_name in _GATE_FIELD_NAMES:
+            profile_cfg[field_name] = _normalize_rules_map(
+                cfg_raw.get(field_name),
+                field_name=f"profile_overrides.{profile}.{field_name}",
+                pack_path=pack_path,
+            )
+        out[profile] = profile_cfg
+    return out
+
+
 @lru_cache(maxsize=8)
-def _load_pack_gate_config_cached(resolved_pack_path: str) -> dict[str, dict[str, tuple[dict[str, Any], ...]]]:
+def _load_pack_gate_config_cached(
+    resolved_pack_path: str,
+) -> dict[str, Any]:
     pack_path = Path(resolved_pack_path)
     data = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
     if not isinstance(data, Mapping):
         raise ValueError(f"pack must be a YAML mapping: {pack_path}")
 
-    out: dict[str, dict[str, tuple[dict[str, Any], ...]]] = {}
+    base: dict[str, dict[str, tuple[dict[str, Any], ...]]] = {}
     for field_name in _GATE_FIELD_NAMES:
-        out[field_name] = _normalize_rules_map(data.get(field_name), field_name=field_name, pack_path=pack_path)
-    return out
+        base[field_name] = _normalize_rules_map(data.get(field_name), field_name=field_name, pack_path=pack_path)
+    profile_overrides = _normalize_profile_overrides(data.get("profile_overrides"), pack_path=pack_path)
+    return {
+        "base": base,
+        "profile_overrides": profile_overrides,
+    }
 
 
-def load_pack_gate_config(pack_path: str | Path | None = None) -> dict[str, dict[str, tuple[dict[str, Any], ...]]]:
+def load_pack_gate_config(
+    pack_path: str | Path | None = None,
+    *,
+    scenario_profile: str | None = None,
+) -> dict[str, dict[str, tuple[dict[str, Any], ...]]]:
     path = Path(pack_path) if pack_path else _default_pack_path()
     resolved = path.resolve()
     loaded = _load_pack_gate_config_cached(str(resolved))
-    return {
-        field_name: {
+    profile = normalize_scenario_profile(scenario_profile)
+    base = loaded["base"]
+    profile_overrides = loaded["profile_overrides"].get(profile, {})
+
+    merged: dict[str, dict[str, tuple[dict[str, Any], ...]]] = {}
+    for field_name in _GATE_FIELD_NAMES:
+        field_rules: dict[str, tuple[dict[str, Any], ...]] = {
             step_id: tuple(dict(rule) for rule in rules)
-            for step_id, rules in loaded[field_name].items()
+            for step_id, rules in base[field_name].items()
         }
-        for field_name in _GATE_FIELD_NAMES
-    }
+        for step_id, rules in profile_overrides.get(field_name, {}).items():
+            field_rules[step_id] = tuple(dict(rule) for rule in rules)
+        merged[field_name] = field_rules
+
+    return merged
 
 
 def _default_reason_code(step_id: str, gate_type: str, rule: Mapping[str, Any], index: int) -> str:
@@ -181,4 +241,10 @@ def evaluate_pack_gates(
     return out
 
 
-__all__ = ["evaluate_pack_gates", "load_pack_gate_config"]
+__all__ = [
+    "DEFAULT_SCENARIO_PROFILE",
+    "SUPPORTED_SCENARIO_PROFILES",
+    "evaluate_pack_gates",
+    "load_pack_gate_config",
+    "normalize_scenario_profile",
+]
