@@ -35,6 +35,28 @@ def test_var_gte_blocks_when_low():
     assert "payload.rpm" in res.reason
 
 
+def test_var_gte_blocks_as_unknown_when_source_missing_marked() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"rpm": 0.25, "vars_source_missing": ["rpm"]}})
+    engine = GatingEngine([{"op": "var_gte", "var": "vars.rpm", "value": 0.2}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown" in (res.reason or "")
+
+
+def test_var_gte_blocks_as_unknown_when_value_is_unknown_text() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"rpm": "unknown"}})
+    engine = GatingEngine([{"op": "var_gte", "var": "vars.rpm", "value": 0.2}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown" in (res.reason or "")
+
+
 def test_arg_in_range_blocks_out_of_bounds():
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
     obs = make_obs(now, payload={"temp": 650})
@@ -42,6 +64,28 @@ def test_arg_in_range_blocks_out_of_bounds():
     res = engine.evaluate([obs])
     assert not res.allowed
     assert "payload.temp" in res.reason
+
+
+def test_arg_in_range_blocks_as_unknown_when_source_missing_marked() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"temp": 400, "vars_source_missing": ["temp"]}})
+    engine = GatingEngine([{"op": "arg_in_range", "var": "vars.temp", "min": 190, "max": 590}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown" in (res.reason or "")
+
+
+def test_arg_in_range_blocks_as_unknown_when_value_is_unknown_text() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    obs = make_obs(now, payload={"vars": {"temp": "unknown"}})
+    engine = GatingEngine([{"op": "arg_in_range", "var": "vars.temp", "min": 190, "max": 590}])
+
+    res = engine.evaluate([obs])
+
+    assert res.allowed is False
+    assert "unknown" in (res.reason or "")
 
 
 def test_arg_in_range_allows_when_in_bounds():

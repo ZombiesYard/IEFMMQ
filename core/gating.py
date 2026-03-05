@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 _UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
 
@@ -80,7 +80,7 @@ def _coerce_flag_bool(value: Any) -> Optional[bool]:
     return None
 
 
-def _iter_vars_source_missing(data: Dict[str, Any]) -> List[str]:
+def _collect_vars_source_missing(data: Dict[str, Any]) -> set[str]:
     candidates: list[Any] = []
     payload_vars = _get_by_path(data, "payload.vars")
     if isinstance(payload_vars, dict):
@@ -89,18 +89,14 @@ def _iter_vars_source_missing(data: Dict[str, Any]) -> List[str]:
     if isinstance(top_level_vars, dict):
         candidates.append(top_level_vars.get("vars_source_missing"))
 
-    out: list[str] = []
-    seen: set[str] = set()
+    out: set[str] = set()
     for raw in candidates:
         if not isinstance(raw, list):
             continue
         for item in raw:
             if not isinstance(item, str) or not item:
                 continue
-            if item in seen:
-                continue
-            seen.add(item)
-            out.append(item)
+            out.add(item)
     return out
 
 
@@ -116,11 +112,11 @@ def _var_key_from_path(path: str) -> Optional[str]:
     return None
 
 
-def _is_var_source_missing(data: Dict[str, Any], path: str) -> bool:
+def _is_var_source_missing(path: str, vars_source_missing: set[str]) -> bool:
     var_key = _var_key_from_path(path)
     if var_key is None:
         return False
-    return var_key in _iter_vars_source_missing(data)
+    return var_key in vars_source_missing
 
 
 def _missing_keys(rule: Dict[str, Any], keys: Iterable[str]) -> List[str]:
@@ -156,14 +152,19 @@ class GatingEngine:
         if not history:
             return RuleResult(False, "no observations"), None
         latest = history[-1]
+        vars_source_missing = _collect_vars_source_missing(latest)
         for idx, rule in enumerate(self.rules):
-            ok, why = self._eval_rule(rule, latest, history)
+            ok, why = self._eval_rule(rule, latest, history, vars_source_missing)
             if not ok:
                 return RuleResult(False, why), idx
         return RuleResult(True, None), None
 
     def _eval_rule(
-        self, rule: Dict[str, Any], latest: Dict[str, Any], history: List[Dict[str, Any]]
+        self,
+        rule: Dict[str, Any],
+        latest: Dict[str, Any],
+        history: list[Dict[str, Any]],
+        vars_source_missing: set[str],
     ) -> Tuple[bool, Optional[str]]:
         op = rule.get("op")
         if op == "var_gte":
@@ -171,7 +172,7 @@ class GatingEngine:
             if missing:
                 return False, f"rule var_gte missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if _is_var_source_missing(latest, rule["var"]) or _is_unknown_value(val):
+            if _is_var_source_missing(rule["var"], vars_source_missing) or _is_unknown_value(val):
                 return False, f"{rule['var']} unknown"
             if val is None:
                 return False, f"{rule['var']} missing"
@@ -185,7 +186,7 @@ class GatingEngine:
             if missing:
                 return False, f"rule arg_in_range missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if _is_var_source_missing(latest, rule["var"]) or _is_unknown_value(val):
+            if _is_var_source_missing(rule["var"], vars_source_missing) or _is_unknown_value(val):
                 return False, f"{rule['var']} unknown"
             if val is None:
                 return False, f"{rule['var']} missing"
@@ -199,7 +200,7 @@ class GatingEngine:
             if missing:
                 return False, f"rule flag_true missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if _is_var_source_missing(latest, rule["var"]) or _is_unknown_value(val):
+            if _is_var_source_missing(rule["var"], vars_source_missing) or _is_unknown_value(val):
                 return False, f"{rule['var']} unknown"
             if val is None:
                 return False, f"{rule['var']} missing"
