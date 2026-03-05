@@ -514,6 +514,39 @@ def test_infer_step_prefers_nested_payload_vars_shape_when_present() -> None:
     assert "vars.s2_ready==true" in result.missing_conditions
 
 
+def test_infer_step_qualified_var_path_prioritizes_nested_value_over_conflicting_top_level_key() -> None:
+    pack_steps = [
+        {"id": "S01", "observability": "partially", "ui_targets": ["s01_btn"]},
+        {"id": "S02", "observability": "observable", "ui_targets": ["s02_btn"]},
+    ]
+    precondition_gates = {
+        "S01": (
+            {
+                "op": "flag_true",
+                "var": "payload.vars.power_available",
+                "reason_code": "s01_requires_payload_power",
+            },
+        ),
+        "S02": (),
+    }
+    completion_gates = {"S01": (), "S02": ()}
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map={
+            "payload": {"vars": {"power_available": "unknown"}},
+            "power_available": False,
+            "s2_ready": False,
+        },
+        recent_ui_targets=[],
+        precondition_gates=precondition_gates,
+        completion_gates=completion_gates,
+    )
+
+    assert result.inferred_step_id == "S01"
+    assert result.missing_conditions == ()
+
+
 def test_infer_step_uses_scenario_profile_specific_gate_overrides(tmp_path: Path) -> None:
     pack_path = tmp_path / "profile_override_pack.yaml"
     _write_yaml(

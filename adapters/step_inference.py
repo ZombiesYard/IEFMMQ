@@ -765,10 +765,12 @@ def _read_rule_var(
     key = _extract_var_key_from_path(var_raw)
     if key is not None and key in vars_source_missing:
         return None, True
-    if key is not None and key in vars_map:
-        return vars_map.get(key), False
     if key is not None:
         for candidate in _iter_var_path_candidates(var_raw, key):
+            if candidate == key:
+                if key in vars_map:
+                    return vars_map.get(key), False
+                continue
             value = _read_by_path(vars_map, candidate)
             if value is not None:
                 return value, False
@@ -777,8 +779,15 @@ def _read_rule_var(
     return value, value is None
 
 
+def _is_qualified_var_path(path: str) -> bool:
+    return path.startswith("payload.vars.") or path.startswith("vars.")
+
+
 def _iter_var_path_candidates(var_raw: str, key: str) -> tuple[str, ...]:
-    candidates = (var_raw, key, f"vars.{key}", f"payload.vars.{key}")
+    if _is_qualified_var_path(var_raw):
+        candidates = (var_raw, f"vars.{key}", f"payload.vars.{key}", key)
+    else:
+        candidates = (var_raw, f"vars.{key}", f"payload.vars.{key}")
     ordered_unique: list[str] = []
     seen: set[str] = set()
     for path in candidates:
