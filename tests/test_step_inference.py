@@ -8,6 +8,7 @@ from typing import Any, Mapping
 import pytest
 import yaml
 
+import adapters.step_inference as step_inference_module
 from adapters.pack_gates import load_pack_gate_config
 from adapters.step_inference import (
     StepInferenceResult,
@@ -611,6 +612,50 @@ def test_normalize_recent_ui_targets_does_not_overconsume_iterables() -> None:
 
     result = normalize_recent_ui_targets(_guarded_targets(), max_items=3)
     assert result == ["btn_0", "btn_1", "btn_2"]
+
+
+def test_normalize_recent_ui_targets_accepts_single_string() -> None:
+    assert normalize_recent_ui_targets("battery_switch") == ["battery_switch"]
+
+
+def test_infer_step_normalizes_default_scenario_profile_for_gate_map_cache(tmp_path: Path) -> None:
+    pack_path = tmp_path / "cache_profile_pack.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "cache_profile_pack",
+            "steps": [{"id": "S01"}, {"id": "S02"}],
+            "precondition_gates": {
+                "S01": [{"op": "flag_true", "var": "vars.s01_ready"}],
+                "S02": [{"op": "flag_true", "var": "vars.s02_ready"}],
+            },
+            "completion_gates": {"S01": [], "S02": []},
+        },
+    )
+    pack_steps = load_pack_steps(pack_path)
+
+    step_inference_module._load_coerced_pack_gate_maps_cached.cache_clear()
+    try:
+        infer_step_id(
+            pack_steps,
+            {"s01_ready": False, "s02_ready": False},
+            recent_ui_targets=[],
+            scenario_profile=None,
+            pack_path=pack_path,
+        )
+        infer_step_id(
+            pack_steps,
+            {"s01_ready": False, "s02_ready": False},
+            recent_ui_targets=[],
+            scenario_profile="airfield",
+            pack_path=pack_path,
+        )
+        info = step_inference_module._load_coerced_pack_gate_maps_cached.cache_info()
+    finally:
+        step_inference_module._load_coerced_pack_gate_maps_cached.cache_clear()
+
+    assert info.currsize == 1
+    assert info.hits >= 1
 
 
 def _write_yaml(path: Path, payload: dict) -> None:

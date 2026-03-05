@@ -14,7 +14,7 @@ from typing import Any, Mapping, Sequence, TypeAlias
 
 import yaml
 
-from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config
+from adapters.pack_gates import evaluate_pack_gates, load_pack_gate_config, normalize_scenario_profile
 from core.step_signal_metadata import STEP_OBSERVABILITY_VALUES
 from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
 
@@ -191,7 +191,9 @@ def normalize_recent_ui_targets(raw: Any, *, max_items: int = _MAX_RECENT_UI_TAR
         return []
 
     candidates: IterableABC[Any]
-    if isinstance(raw, (list, tuple)):
+    if isinstance(raw, str):
+        candidates = (raw,)
+    elif isinstance(raw, (list, tuple)):
         candidates = raw
     elif isinstance(raw, IterableABC) and not isinstance(raw, (str, bytes, Mapping)):
         candidates = islice(raw, cap)
@@ -435,10 +437,12 @@ def _resolve_gate_maps(
     pack_path: Path,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
     if precondition_gates is None and completion_gates is None:
-        return _load_coerced_pack_gate_maps_cached(str(pack_path), scenario_profile)
+        normalized_profile = normalize_scenario_profile(scenario_profile)
+        return _load_coerced_pack_gate_maps_cached(str(pack_path), normalized_profile)
 
     if precondition_gates is None or completion_gates is None:
-        loaded_pre, loaded_comp = _load_coerced_pack_gate_maps_cached(str(pack_path), scenario_profile)
+        normalized_profile = normalize_scenario_profile(scenario_profile)
+        loaded_pre, loaded_comp = _load_coerced_pack_gate_maps_cached(str(pack_path), normalized_profile)
         if precondition_gates is None:
             precondition_gates = loaded_pre
         if completion_gates is None:
@@ -449,7 +453,7 @@ def _resolve_gate_maps(
 @lru_cache(maxsize=8)
 def _load_coerced_pack_gate_maps_cached(
     resolved_pack_path: str,
-    scenario_profile: str | None,
+    scenario_profile: str,
 ) -> tuple[dict[str, tuple[dict[str, Any], ...]], dict[str, tuple[dict[str, Any], ...]]]:
     loaded = load_pack_gate_config(Path(resolved_pack_path), scenario_profile=scenario_profile)
     return (
