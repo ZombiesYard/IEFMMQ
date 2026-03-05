@@ -43,7 +43,7 @@ def test_var_gte_blocks_as_unknown_when_source_missing_marked() -> None:
     res = engine.evaluate([obs])
 
     assert res.allowed is False
-    assert "unknown" in (res.reason or "")
+    assert "unknown(source_missing)" in (res.reason or "")
 
 
 def test_var_gte_blocks_as_unknown_when_value_is_unknown_text() -> None:
@@ -54,7 +54,7 @@ def test_var_gte_blocks_as_unknown_when_value_is_unknown_text() -> None:
     res = engine.evaluate([obs])
 
     assert res.allowed is False
-    assert "unknown" in (res.reason or "")
+    assert "unknown(value=unknown)" in (res.reason or "")
 
 
 def test_arg_in_range_blocks_out_of_bounds():
@@ -74,7 +74,7 @@ def test_arg_in_range_blocks_as_unknown_when_source_missing_marked() -> None:
     res = engine.evaluate([obs])
 
     assert res.allowed is False
-    assert "unknown" in (res.reason or "")
+    assert "unknown(source_missing)" in (res.reason or "")
 
 
 def test_arg_in_range_blocks_as_unknown_when_value_is_unknown_text() -> None:
@@ -85,7 +85,7 @@ def test_arg_in_range_blocks_as_unknown_when_value_is_unknown_text() -> None:
     res = engine.evaluate([obs])
 
     assert res.allowed is False
-    assert "unknown" in (res.reason or "")
+    assert "unknown(value=unknown)" in (res.reason or "")
 
 
 def test_arg_in_range_allows_when_in_bounds():
@@ -312,7 +312,7 @@ def test_flag_true_blocks_unknown_string_value() -> None:
     res = engine.evaluate([obs])
 
     assert res.allowed is False
-    assert "unknown" in (res.reason or "")
+    assert "unknown(value=unknown)" in (res.reason or "")
 
 
 def test_flag_true_distinguishes_false_vs_source_missing_unknown() -> None:
@@ -330,5 +330,5 @@ def test_flag_true_distinguishes_false_vs_source_missing_unknown() -> None:
     )
     res_unknown = engine.evaluate([obs_unknown])
     assert res_unknown.allowed is False
-    assert "unknown" in (res_unknown.reason or "")
+    assert "unknown(source_missing)" in (res_unknown.reason or "")
 

@@ -119,6 +119,15 @@ def _is_var_source_missing(path: str, vars_source_missing: set[str]) -> bool:
     return var_key in vars_source_missing
 
 
+def _format_unknown_reason(var_path: str, *, source_missing: bool, value: Any) -> str:
+    if source_missing:
+        return f"{var_path} unknown(source_missing)"
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        return f"{var_path} unknown(value={normalized})"
+    return f"{var_path} unknown(value)"
+
+
 def _missing_keys(rule: dict[str, Any], keys: Iterable[str]) -> list[str]:
     return [key for key in keys if key not in rule]
 
@@ -172,8 +181,9 @@ class GatingEngine:
             if missing:
                 return False, f"rule var_gte missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if _is_var_source_missing(rule["var"], vars_source_missing) or _is_unknown_value(val):
-                return False, f"{rule['var']} unknown"
+            source_missing = _is_var_source_missing(rule["var"], vars_source_missing)
+            if source_missing or _is_unknown_value(val):
+                return False, _format_unknown_reason(rule["var"], source_missing=source_missing, value=val)
             if val is None:
                 return False, f"{rule['var']} missing"
             if not _is_number(val) or not _is_number(rule["value"]):
@@ -186,8 +196,9 @@ class GatingEngine:
             if missing:
                 return False, f"rule arg_in_range missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if _is_var_source_missing(rule["var"], vars_source_missing) or _is_unknown_value(val):
-                return False, f"{rule['var']} unknown"
+            source_missing = _is_var_source_missing(rule["var"], vars_source_missing)
+            if source_missing or _is_unknown_value(val):
+                return False, _format_unknown_reason(rule["var"], source_missing=source_missing, value=val)
             if val is None:
                 return False, f"{rule['var']} missing"
             if not _is_number(val) or not _is_number(rule["min"]) or not _is_number(rule["max"]):
@@ -200,8 +211,9 @@ class GatingEngine:
             if missing:
                 return False, f"rule flag_true missing keys: {missing}"
             val = _get_var(latest, rule["var"])
-            if _is_var_source_missing(rule["var"], vars_source_missing) or _is_unknown_value(val):
-                return False, f"{rule['var']} unknown"
+            source_missing = _is_var_source_missing(rule["var"], vars_source_missing)
+            if source_missing or _is_unknown_value(val):
+                return False, _format_unknown_reason(rule["var"], source_missing=source_missing, value=val)
             if val is None:
                 return False, f"{rule['var']} missing"
             bool_val = _coerce_flag_bool(val)
