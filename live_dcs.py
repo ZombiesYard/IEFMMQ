@@ -613,6 +613,7 @@ def _build_step_fallback_profiles(
         }
     return profiles
 
+
 def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
     return collect_evidence_refs_from_context(context)
 
@@ -1500,8 +1501,7 @@ class LiveDcsTutorLoop:
                     continue
                 if req in {"var", "gate", "delta", "rag"}:
                     allowed_evidence_types.add(req)
-        selected_ref: str | None = None
-        selected_evidence_type: str | None = None
+        selected: tuple[str, str] | None = None
         for ref in _dedupe_strings(candidate_refs):
             if ref in allowed_refs:
                 evidence_type = infer_evidence_type_from_ref(ref)
@@ -1509,15 +1509,11 @@ class LiveDcsTutorLoop:
                     continue
                 if allowed_evidence_types is not None and evidence_type not in allowed_evidence_types:
                     continue
-                selected_ref = ref
-                selected_evidence_type = evidence_type
+                selected = (ref, evidence_type)
                 break
-        if selected_ref is None:
+        if selected is None:
             return None, "no_verifiable_evidence_ref"
-
-        if selected_evidence_type is None:
-            return None, f"unsupported_evidence_ref:{selected_ref}"
-        evidence_type = selected_evidence_type
+        selected_ref, evidence_type = selected
 
         reason_text = None
         if isinstance(gate_blockers, list):
