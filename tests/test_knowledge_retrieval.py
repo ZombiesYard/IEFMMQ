@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+
 
 from adapters.knowledge_local import (
     RETRIEVER_POOL_MAX_SIZE,
@@ -6,6 +8,7 @@ from adapters.knowledge_local import (
     LocalKnowledgeAdapter,
     build_grounding_query,
 )
+from adapters.knowledge_source_policy import KnowledgeSourcePolicy
 from tools.index_docs import build_index
 
 
@@ -114,6 +117,236 @@ def test_retrieve_with_invalid_index_marks_load_error(tmp_path: Path) -> None:
     assert meta["grounding_missing"] is True
     assert meta["grounding_reason"] == "index_load_error"
     assert meta["index_error_type"] is not None
+
+
+def test_retrieve_with_source_policy_filters_non_whitelist_chunks_and_returns_chunk_refs(
+    tmp_path: Path,
+) -> None:
+    doc = tmp_path / "trusted.md"
+    doc.write_text(
+        "# S03\nAPU switch ON and wait for READY.\n# S04\nEngine crank to RIGHT.\n",
+        encoding="utf-8",
+    )
+    index_path = tmp_path / "index_policy.json"
+    build_index([str(doc)], str(index_path))
+
+    policy_path = tmp_path / "policy.yaml"
+    policy_path.write_text(
+        "policy_id: retrieval_policy\n"
+        "version: v-test\n"
+        "allow:\n"
+        "  - doc_id: trusted\n"
+        "    chunk_id: trusted_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+
+    adapter = LocalKnowledgeAdapter(index_path, source_policy=policy)
+    snippets, meta = adapter.retrieve_with_meta("apu engine crank", top_k=5, step_id="S03")
+
+    assert [item["snippet_id"] for item in snippets] == ["trusted_0"]
+    assert snippets[0]["snippet"] == "APU switch ON and wait for READY."
+    assert meta["source_policy_applied"] is True
+    assert meta["source_policy_id"] == "retrieval_policy"
+    assert meta["source_policy_version"] == "v-test"
+    assert meta["source_policy_filtered_out_count"] == 1
+    assert meta["grounding_missing"] is False
+    assert meta["source_chunk_refs"] == ["trusted/trusted_0:1-1"]
+
+
+def test_retrieve_with_source_policy_marks_grounding_missing_when_all_results_filtered(
+    tmp_path: Path,
+) -> None:
+    index_path = tmp_path / "index_filtered_all.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "doc_id": "allowed_doc",
+                        "chunks": [
+                            {
+                                "chunk_id": "allowed_doc_0",
+                                "snippet_id": "allowed_doc_0",
+                                "section": "Safe",
+                                "page_or_heading": "Safe",
+                                "text": "hydraulic accumulator servicing guidance",
+                            }
+                        ],
+                    },
+                    {
+                        "doc_id": "forbidden",
+                        "chunks": [
+                            {
+                                "chunk_id": "forbidden_0",
+                                "snippet_id": "forbidden_0",
+                                "section": "Intro",
+                                "page_or_heading": "Intro",
+                                "text": "battery switch and apu switch are mentioned here",
+                            }
+                        ],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    policy_path = tmp_path / "policy_filtered_all.yaml"
+    policy_path.write_text(
+        "policy_id: retrieval_policy\n"
+        "allow:\n"
+        "  - doc_id: allowed_doc\n"
+        "    chunk_id: allowed_doc_0\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+    adapter = LocalKnowledgeAdapter(index_path, source_policy=policy)
+    snippets, meta = adapter.retrieve_with_meta("battery apu switch", top_k=3, step_id="S03")
+
+    assert snippets == []
+    assert meta["grounding_missing"] is True
+    assert meta["grounding_reason"] == "policy_filtered_all"
+    assert meta["snippet_ids"] == []
+    assert meta["source_chunk_refs"] == []
+    assert meta["source_policy_filtered_out_count"] == 1
+
+
+def test_source_policy_cache_does_not_mark_filtered_small_topk_as_exhaustive(tmp_path: Path) -> None:
+    index_path = tmp_path / "index_cache_policy.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "doc_id": "manual",
+                        "chunks": [
+                            {
+                                "chunk_id": "manual_0",
+                                "snippet_id": "manual_0",
+                                "section": "Forbidden",
+                                "page_or_heading": "Forbidden",
+                                "text": "battery battery battery battery",
+                            },
+                            {
+                                "chunk_id": "manual_1",
+                                "snippet_id": "manual_1",
+                                "section": "Allowed",
+                                "page_or_heading": "Allowed",
+                                "text": "battery",
+                            },
+                        ],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    policy_path = tmp_path / "policy_cache_policy.yaml"
+    policy_path.write_text(
+        "policy_id: retrieval_policy\n"
+        "allow:\n"
+        "  - doc_id: manual\n"
+        "    chunk_id: manual_1\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+
+    now = [100.0]
+    adapter = LocalKnowledgeAdapter(index_path, source_policy=policy, time_fn=lambda: now[0], step_cache_ttl_s=60.0)
+    assert adapter.retriever is not None
+
+    calls = {"count": 0}
+    raw_query = adapter.retriever.query
+
+    def _counted_query(text: str, k: int = 5):
+        calls["count"] += 1
+        return raw_query(text, k)
+
+    adapter.retriever.query = _counted_query  # type: ignore[assignment]
+
+    first, first_meta = adapter.retrieve_with_meta("battery", top_k=1, step_id="S03")
+    second, second_meta = adapter.retrieve_with_meta("battery", top_k=2, step_id="S03")
+
+    assert first == []
+    assert first_meta["grounding_reason"] == "policy_filtered_all"
+    assert calls["count"] == 2
+    assert [item["snippet_id"] for item in second] == ["manual_1"]
+    assert second_meta["cache_hit"] is False
+
+
+def test_source_policy_cache_reapplies_policy_for_smaller_topk_requests(tmp_path: Path) -> None:
+    index_path = tmp_path / "index_cache_policy_smaller_topk.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "doc_id": "manual",
+                        "chunks": [
+                            {
+                                "chunk_id": "manual_0",
+                                "snippet_id": "manual_0",
+                                "section": "Forbidden",
+                                "page_or_heading": "Forbidden",
+                                "text": "battery battery battery battery",
+                            },
+                            {
+                                "chunk_id": "manual_1",
+                                "snippet_id": "manual_1",
+                                "section": "Allowed",
+                                "page_or_heading": "Allowed",
+                                "text": "battery",
+                            },
+                        ],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    policy_path = tmp_path / "policy_cache_policy_smaller_topk.yaml"
+    policy_path.write_text(
+        "policy_id: retrieval_policy\n"
+        "allow:\n"
+        "  - doc_id: manual\n"
+        "    chunk_id: manual_1\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+
+    now = [100.0]
+    adapter = LocalKnowledgeAdapter(index_path, source_policy=policy, time_fn=lambda: now[0], step_cache_ttl_s=60.0)
+    assert adapter.retriever is not None
+
+    calls = {"count": 0}
+    raw_query = adapter.retriever.query
+
+    def _counted_query(text: str, k: int = 5):
+        calls["count"] += 1
+        return raw_query(text, k)
+
+    adapter.retriever.query = _counted_query  # type: ignore[assignment]
+
+    first, first_meta = adapter.retrieve_with_meta("battery", top_k=2, step_id="S03")
+    second, second_meta = adapter.retrieve_with_meta("battery", top_k=1, step_id="S03")
+
+    assert [item["snippet_id"] for item in first] == ["manual_1"]
+    assert first_meta["cache_hit"] is False
+    assert second == []
+    assert second_meta["cache_hit"] is True
+    assert second_meta["grounding_reason"] == "policy_filtered_all"
+    assert calls["count"] == 1
 
 
 def test_retriever_pool_is_bounded(tmp_path: Path) -> None:

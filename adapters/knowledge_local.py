@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Callable
 from collections.abc import Mapping
 
+from adapters.knowledge_source_policy import KnowledgeSourcePolicy
+from adapters.source_chunk_refs import collect_source_chunk_refs
 from core.knowledge import BM25Retriever
 from ports.knowledge_port import KnowledgePort
 
@@ -60,9 +62,41 @@ class _StepCacheEntry:
     step_id: str
     query: str
     t_mono: float
-    snippets: list[dict[str, Any]]
-    requested_k: int
+    raw_snippets: list[dict[str, Any]]
     is_exhaustive: bool
+
+
+def _extract_non_empty_str(value: Any) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            return text
+    return None
+
+
+def _snippet_ids(snippets: list[Mapping[str, Any]]) -> list[str]:
+    out: list[str] = []
+    for item in snippets:
+        snippet_id = _extract_non_empty_str(item.get("snippet_id"))
+        if snippet_id is not None:
+            out.append(snippet_id)
+    return out
+
+
+def _apply_source_policy(
+    snippets: list[dict[str, Any]],
+    *,
+    policy: KnowledgeSourcePolicy | None,
+) -> tuple[list[dict[str, Any]], int, bool, bool, str | None]:
+    if policy is None:
+        return [dict(item) for item in snippets], 0, False, False, None
+
+    before_filter_count = len(snippets)
+    filtered = policy.filter_snippets(snippets)
+    policy_filtered_out_count = max(0, before_filter_count - len(filtered))
+    grounding_missing = before_filter_count > 0 and not filtered
+    grounding_reason = "policy_filtered_all" if grounding_missing else None
+    return filtered, policy_filtered_out_count, True, grounding_missing, grounding_reason
 
 
 class LocalKnowledgeAdapter(KnowledgePort):
@@ -73,11 +107,13 @@ class LocalKnowledgeAdapter(KnowledgePort):
         self,
         index_path: str | Path | None = None,
         *,
+        source_policy: KnowledgeSourcePolicy | None = None,
         step_cache_ttl_s: float = DEFAULT_STEP_CACHE_TTL_S,
         time_fn: Callable[[], float] | None = None,
     ):
         path = DEFAULT_INDEX_PATH if index_path is None else index_path
         self.index_path = Path(path)
+        self.source_policy = source_policy
         self.step_cache_ttl_s = max(0.0, float(step_cache_ttl_s))
         self._time_fn = time_fn or time.monotonic
         self._step_cache: "OrderedDict[str, _StepCacheEntry]" = OrderedDict()
@@ -150,10 +186,21 @@ class LocalKnowledgeAdapter(KnowledgePort):
             "page_or_heading": page_or_heading,
             "snippet": snippet,
             "snippet_id": snippet_id,
+            "chunk_id": (
+                raw.get("chunk_id")
+                if isinstance(raw.get("chunk_id"), str) and raw.get("chunk_id")
+                else snippet_id
+            ),
         }
         score = raw.get("score")
         if isinstance(score, (int, float)) and not isinstance(score, bool):
             normalized["score"] = float(score)
+        line_start = raw.get("line_start")
+        if isinstance(line_start, int) and not isinstance(line_start, bool) and line_start >= 1:
+            normalized["line_start"] = line_start
+        line_end = raw.get("line_end")
+        if isinstance(line_end, int) and not isinstance(line_end, bool) and line_end >= 1:
+            normalized["line_end"] = line_end
         return normalized
 
     def _prune_step_cache(self, now: float) -> None:
@@ -175,6 +222,9 @@ class LocalKnowledgeAdapter(KnowledgePort):
         step_id: str | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         k = max(0, int(top_k))
+        policy = self.source_policy
+        policy_id = policy.policy_id if policy is not None else None
+        policy_version = policy.policy_version if policy is not None else None
         if self.retriever is None:
             if self._index_state == "load_error":
                 grounding_reason = "index_load_error"
@@ -188,7 +238,12 @@ class LocalKnowledgeAdapter(KnowledgePort):
                 "grounding_reason": grounding_reason,
                 "index_error_type": self._index_error_type,
                 "snippet_ids": [],
+                "source_chunk_refs": [],
                 "index_path": str(self.index_path),
+                "source_policy_applied": False,
+                "source_policy_id": policy_id,
+                "source_policy_version": policy_version,
+                "source_policy_filtered_out_count": 0,
             }
             self._last_retrieve_metadata = dict(meta)
             return [], meta
@@ -200,7 +255,12 @@ class LocalKnowledgeAdapter(KnowledgePort):
                 "grounding_missing": False,
                 "grounding_reason": None,
                 "snippet_ids": [],
+                "source_chunk_refs": [],
                 "index_path": str(self.index_path),
+                "source_policy_applied": False,
+                "source_policy_id": policy_id,
+                "source_policy_version": policy_version,
+                "source_policy_filtered_out_count": 0,
             }
             self._last_retrieve_metadata = dict(meta)
             return [], meta
@@ -215,36 +275,56 @@ class LocalKnowledgeAdapter(KnowledgePort):
                     cached is not None
                     and (now - cached.t_mono) <= self.step_cache_ttl_s
                     and cached.query == query
-                    and (len(cached.snippets) >= k or cached.is_exhaustive)
+                    and (len(cached.raw_snippets) >= k or cached.is_exhaustive)
                 ):
                     self._step_cache.move_to_end(cache_key)
-                    snippets = [dict(item) for item in cached.snippets[:k]]
+                    ranked_snippets = cached.raw_snippets[:k]
+                    (
+                        snippets,
+                        policy_filtered_out_count,
+                        source_policy_applied,
+                        grounding_missing,
+                        grounding_reason,
+                    ) = _apply_source_policy(ranked_snippets, policy=policy)
                     meta = {
                         "query": query,
                         "top_k": k,
                         "cache_hit": True,
                         "cache_step_id": cache_key,
-                        "grounding_missing": False,
-                        "grounding_reason": None,
-                        "snippet_ids": [
-                            item["snippet_id"] for item in snippets if isinstance(item.get("snippet_id"), str)
-                        ],
+                        "grounding_missing": grounding_missing,
+                        "grounding_reason": grounding_reason,
+                        "snippet_ids": _snippet_ids(snippets),
+                        "source_chunk_refs": collect_source_chunk_refs(snippets),
                         "index_path": str(self.index_path),
+                        "source_policy_applied": source_policy_applied,
+                        "source_policy_id": policy_id,
+                        "source_policy_version": policy_version,
+                        "source_policy_filtered_out_count": policy_filtered_out_count,
                     }
                     self._last_retrieve_metadata = dict(meta)
                     return snippets, meta
 
         raw_results = self.retriever.query(query, k=k)
-        snippets = [self._normalize_result(item, idx) for idx, item in enumerate(raw_results)]
+        ranked_snippets = [self._normalize_result(item, idx) for idx, item in enumerate(raw_results)]
+        raw_result_count = len(raw_results)
+        (
+            snippets,
+            policy_filtered_out_count,
+            source_policy_applied,
+            grounding_missing,
+            grounding_reason,
+        ) = _apply_source_policy(ranked_snippets, policy=policy)
         if cache_key is not None:
             with self._step_cache_lock:
                 self._step_cache[cache_key] = _StepCacheEntry(
                     step_id=cache_key,
                     query=query,
                     t_mono=now,
-                    snippets=[dict(item) for item in snippets],
-                    requested_k=k,
-                    is_exhaustive=len(snippets) < k,
+                    raw_snippets=[dict(item) for item in ranked_snippets],
+                    # Exhaustiveness must reflect the raw retriever ranking, not the
+                    # post-policy filtered snippet count, otherwise a small `top_k`
+                    # request can incorrectly cache an empty result as exhaustive.
+                    is_exhaustive=raw_result_count < k,
                 )
                 self._step_cache.move_to_end(cache_key)
                 self._prune_step_cache(now)
@@ -253,10 +333,15 @@ class LocalKnowledgeAdapter(KnowledgePort):
             "top_k": k,
             "cache_hit": False,
             "cache_step_id": cache_key,
-            "grounding_missing": False,
-            "grounding_reason": None,
-            "snippet_ids": [item["snippet_id"] for item in snippets if isinstance(item.get("snippet_id"), str)],
+            "grounding_missing": grounding_missing,
+            "grounding_reason": grounding_reason,
+            "snippet_ids": _snippet_ids(snippets),
+            "source_chunk_refs": collect_source_chunk_refs(snippets),
             "index_path": str(self.index_path),
+            "source_policy_applied": source_policy_applied,
+            "source_policy_id": policy_id,
+            "source_policy_version": policy_version,
+            "source_policy_filtered_out_count": policy_filtered_out_count,
         }
         self._last_retrieve_metadata = dict(meta)
         return snippets, meta

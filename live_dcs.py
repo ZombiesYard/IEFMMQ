@@ -40,6 +40,7 @@ from adapters.recent_actions import (
     build_recent_button_signal,
 )
 from adapters.response_mapping import map_help_response_to_tutor_response
+from adapters.source_chunk_refs import build_source_chunk_ref
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
 from core.constants import ENV_COLD_START_PRODUCTION
@@ -381,9 +382,19 @@ def _normalize_knowledge_snippet(raw: Mapping[str, Any], fallback_idx: int) -> d
         "snippet": snippet,
         "snippet_id": snippet_id,
     }
+    chunk_id_raw = raw.get("chunk_id")
+    chunk_id_scalar = _json_safe_scalar(chunk_id_raw)
+    if isinstance(chunk_id_scalar, str) and chunk_id_scalar:
+        normalized["chunk_id"] = chunk_id_scalar
     score = raw.get("score")
     if isinstance(score, (int, float)) and not isinstance(score, bool):
         normalized["score"] = float(score) if math.isfinite(float(score)) else str(score)
+    line_start = _coerce_int(raw.get("line_start"))
+    if line_start is not None and line_start >= 1:
+        normalized["line_start"] = line_start
+    line_end = _coerce_int(raw.get("line_end"))
+    if line_end is not None and line_end >= 1:
+        normalized["line_end"] = line_end
     return normalized
 
 
@@ -394,9 +405,14 @@ def _normalize_retrieve_meta(raw: Any) -> dict[str, Any]:
             "grounding_missing": False,
             "grounding_reason": None,
             "snippet_ids": [],
+            "source_chunk_refs": [],
             "index_path": None,
             "grounding_error_type": None,
             "index_error_type": None,
+            "source_policy_applied": False,
+            "source_policy_id": None,
+            "source_policy_version": None,
+            "source_policy_filtered_out_count": 0,
         }
 
     def _normalize_error_type(value: Any) -> str | None:
@@ -425,14 +441,27 @@ def _normalize_retrieve_meta(raw: Any) -> dict[str, Any]:
             if isinstance(scalar, str) and scalar:
                 snippet_ids.append(scalar)
 
+    source_chunk_refs_raw = raw.get("source_chunk_refs")
+    source_chunk_refs: list[str] = []
+    if isinstance(source_chunk_refs_raw, (list, tuple)):
+        for item in source_chunk_refs_raw:
+            scalar = _json_safe_scalar(item)
+            if isinstance(scalar, str) and scalar:
+                source_chunk_refs.append(scalar)
+
     return {
         "cache_hit": bool(raw.get("cache_hit")),
         "grounding_missing": bool(raw.get("grounding_missing")),
         "grounding_reason": grounding_reason,
         "snippet_ids": snippet_ids,
+        "source_chunk_refs": source_chunk_refs,
         "index_path": index_path,
         "grounding_error_type": _normalize_error_type(raw.get("grounding_error_type")),
         "index_error_type": _normalize_error_type(raw.get("index_error_type")),
+        "source_policy_applied": bool(raw.get("source_policy_applied")),
+        "source_policy_id": _normalize_error_type(raw.get("source_policy_id")),
+        "source_policy_version": _normalize_error_type(raw.get("source_policy_version")),
+        "source_policy_filtered_out_count": _coerce_int(raw.get("source_policy_filtered_out_count")) or 0,
     }
 
 
@@ -925,7 +954,10 @@ class LiveDcsTutorLoop:
         )
         self.knowledge: KnowledgePort | None = knowledge_adapter
         if self.knowledge is None and self.rag_top_k > 0:
-            self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
+            self.knowledge = LocalKnowledgeAdapter(
+                index_path=self.knowledge_index_path,
+                source_policy=self.knowledge_source_policy,
+            )
         self.pack_steps = load_pack_steps(self.pack_path)
         self.step_signal_profiles = _load_step_signal_profiles(self.pack_path)
         gate_config = load_pack_gate_config(
@@ -963,7 +995,10 @@ class LiveDcsTutorLoop:
 
     def _ensure_knowledge(self) -> KnowledgePort:
         if self.knowledge is None:
-            self.knowledge = LocalKnowledgeAdapter(index_path=self.knowledge_index_path)
+            self.knowledge = LocalKnowledgeAdapter(
+                index_path=self.knowledge_index_path,
+                source_policy=self.knowledge_source_policy,
+            )
         return self.knowledge
 
     def _load_knowledge_source_policy(self) -> None:
@@ -1157,7 +1192,8 @@ class LiveDcsTutorLoop:
         policy_filtered_out_count = 0
         policy_id: str | None = None
         policy_version: str | None = None
-        if self.knowledge_source_policy is not None:
+        source_chunk_refs = list(retrieve_meta.get("source_chunk_refs") or [])
+        if self.knowledge_source_policy is not None and not bool(retrieve_meta.get("source_policy_applied")):
             policy_id = self.knowledge_source_policy.policy_id
             policy_version = self.knowledge_source_policy.policy_version
             before_filter_count = len(snippets)
@@ -1171,6 +1207,21 @@ class LiveDcsTutorLoop:
                 retrieve_meta = dict(retrieve_meta)
                 retrieve_meta["grounding_missing"] = True
                 retrieve_meta["grounding_reason"] = "policy_filtered_all"
+            source_chunk_refs = []
+            for item in snippets:
+                ref = build_source_chunk_ref(item)
+                if ref is not None:
+                    source_chunk_refs.append(ref)
+        elif bool(retrieve_meta.get("source_policy_applied")):
+            policy_id_raw = retrieve_meta.get("source_policy_id")
+            policy_version_raw = retrieve_meta.get("source_policy_version")
+            policy_id = policy_id_raw if isinstance(policy_id_raw, str) and policy_id_raw else None
+            policy_version = (
+                policy_version_raw
+                if isinstance(policy_version_raw, str) and policy_version_raw
+                else None
+            )
+            policy_filtered_out_count = int(retrieve_meta.get("source_policy_filtered_out_count") or 0)
 
         snippet_ids = [
             item.get("snippet_id")
@@ -1195,6 +1246,7 @@ class LiveDcsTutorLoop:
             "grounding_error_type": retrieve_meta.get("grounding_error_type")
             or retrieve_meta.get("index_error_type"),
             "grounding_snippet_ids": snippet_ids,
+            "source_chunk_refs": source_chunk_refs,
             "grounding_cache_hit": bool(retrieve_meta.get("cache_hit")),
             "grounding_index_path": grounding_index_path,
             "grounding_top_k": self.rag_top_k,
@@ -1318,6 +1370,7 @@ class LiveDcsTutorLoop:
                 "grounding_reason_requested": grounding_meta.get("grounding_reason"),
                 "grounding_error_type": grounding_meta.get("grounding_error_type"),
                 "grounding_snippet_ids": list(prompt_result.metadata.get("rag_snippet_ids") or []),
+                "source_chunk_refs": list(grounding_meta.get("source_chunk_refs") or []),
                 "grounding_cache_hit": bool(grounding_meta.get("grounding_cache_hit")),
                 "grounding_index_path": grounding_meta.get("grounding_index_path"),
                 "grounding_policy_id": grounding_meta.get("grounding_policy_id"),
