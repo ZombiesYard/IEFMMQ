@@ -10,6 +10,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - `simtutor/schemas/v1/` JSON Schemas for Observation/TutorRequest/TutorResponse/Event.
 - `mock_scenarios/` scripted observation sequences.
 - `tools/index_docs.py` offline indexer for `Doc/Evaluation` md/pdf.
+- `tools/build_coldstart_state_matrix.py` from pack/gates generate the cold-start status matrix and `replay-bios` input.
 - `logs/`, `artifacts/` run outputs.
 
 ## Quickstart
@@ -81,6 +82,8 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - Replay telemetry: `python -m simtutor replay --telemetry logs/telemetry_*.jsonl`
 - Replay BIOS help loop: `python -m simtutor replay-bios --input logs/dcs_bios_raw.jsonl --auto-help-once`
   - Optional: `--scenario-profile airfield|carrier` (default `airfield`)
+- Build cold-start replay baseline: `python tools/build_coldstart_state_matrix.py --output-dir artifacts/regression/coldstart_state_matrix`
+  - Optional: `--scenario-profile airfield|carrier|all`
 - Score: `python -m simtutor score ...`
 - Batch: `python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts`
   - Optional: `--taxonomy packs/fa18c_startup/taxonomy.yaml`
