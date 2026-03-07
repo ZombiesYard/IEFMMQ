@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/vision_observation.json",
+  "title": "Vision Observation v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "frame_id", "timestamp", "source"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "frame_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "source": { "type": "string" },
+    "session_id": { "type": ["string", "null"] },
+    "observation_ref": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "Optional Observation.observation_id linked to the visual frame."
+    },
+    "channel": {
+      "type": ["string", "null"],
+      "description": "Stable logical camera or display channel, e.g. center_mfd."
+    },
+    "image_uri": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "Optional URI to the stored image/frame artifact."
+    },
+    "mime_type": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "description": "Free-form adapter metadata." }
+  }
+}

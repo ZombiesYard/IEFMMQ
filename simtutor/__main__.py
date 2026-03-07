@@ -2,44 +2,16 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
-from importlib import resources
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Tuple
+from typing import Any, Iterable, Tuple
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from adapters.pack_gates import DEFAULT_SCENARIO_PROFILE, SUPPORTED_SCENARIO_PROFILES
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
+from simtutor.schemas import SCHEMA_INDEX, load_schema
 from simtutor.runner import replay_log, run_simulation
-
-
-SCHEMA_INDEX = {
-    "event": ("simtutor.schemas.v1", "event.schema.json"),
-    "observation": ("simtutor.schemas.v1", "observation.schema.json"),
-    "tutor_request": ("simtutor.schemas.v1", "tutor_request.schema.json"),
-    "tutor_response": ("simtutor.schemas.v1", "tutor_response.schema.json"),
-    "dcs_observation": ("simtutor.schemas.v2", "dcs_observation.json"),
-    "dcs_bios_frame": ("simtutor.schemas.v2", "dcs_bios_frame.json"),
-    "telemetry_frame": ("simtutor.schemas.v2", "telemetry_frame.json"),
-    "dcs_overlay_command": ("simtutor.schemas.v2", "dcs_overlay_command.json"),
-    "dcs_overlay_ack": ("simtutor.schemas.v2", "dcs_overlay_ack.json"),
-    "dcs_hello": ("simtutor.schemas.v2", "dcs_hello.json"),
-    "dcs_caps": ("simtutor.schemas.v2", "dcs_caps.json"),
-}
-
-def _load_schema(name: str) -> Mapping:
-    if name not in SCHEMA_INDEX:
-        raise FileNotFoundError(f"Unknown schema: {name}")
-    schema_pkg, schema_file = SCHEMA_INDEX[name]
-    try:
-        schema_path = resources.files(schema_pkg) / schema_file
-    except ModuleNotFoundError as exc:
-        raise FileNotFoundError(f"Schema package not found: {schema_pkg}") from exc
-    if not schema_path.is_file():
-        raise FileNotFoundError(f"Schema not found: {schema_path}")
-    with schema_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def _iter_jsonl(path: Path) -> Iterable[Tuple[int, Any]]:
@@ -55,7 +27,7 @@ def _iter_jsonl(path: Path) -> Iterable[Tuple[int, Any]]:
 
 
 def validate(files: list[str], schema_name: str) -> int:
-    schema = _load_schema(schema_name)
+    schema = load_schema(schema_name)
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     had_error = False
 

@@ -42,6 +42,11 @@
       "format": "uuid",
       "description": "Links to Observation/TutorRequest/TutorResponse for tracing"
     },
+    "vision_refs": {
+      "type": "array",
+      "items": { "type": "string", "format": "uuid" },
+      "description": "Optional linked VisionObservation.frame_id values."
+    },
     "payload": { "type": "object", "description": "Envelope contents; validated separately if desired" },
     "tags": { "type": "array", "items": { "type": "string" } },
     "metadata": { "type": "object", "description": "Transport or routing metadata" }

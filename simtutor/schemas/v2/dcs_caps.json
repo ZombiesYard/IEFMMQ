@@ -11,7 +11,11 @@
     "overlay": { "type": "boolean" },
     "overlay_ack": { "type": "boolean" },
     "clickable_actions": { "type": "boolean" },
-    "vlm_frame": { "type": "boolean" }
+    "vlm_frame": { "type": "boolean" },
+    "vision_available": {
+      "type": "boolean",
+      "description": "Reserved capability bit for future VisionPort/VLM adapters."
+    }
   }
 }
 
