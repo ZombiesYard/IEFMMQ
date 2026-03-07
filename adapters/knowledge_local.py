@@ -13,6 +13,7 @@ from typing import Any, Callable
 from collections.abc import Mapping
 
 from adapters.knowledge_source_policy import KnowledgeSourcePolicy
+from adapters.source_chunk_refs import collect_source_chunk_refs
 from core.knowledge import BM25Retriever
 from ports.knowledge_port import KnowledgePort
 
@@ -73,14 +74,6 @@ def _extract_non_empty_str(value: Any) -> str | None:
     return None
 
 
-def _extract_positive_int(value: Any) -> int | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int) and value >= 1:
-        return value
-    return None
-
-
 def _snippet_ids(snippets: list[Mapping[str, Any]]) -> list[str]:
     out: list[str] = []
     for item in snippets:
@@ -90,45 +83,16 @@ def _snippet_ids(snippets: list[Mapping[str, Any]]) -> list[str]:
     return out
 
 
-def _source_chunk_ref(snippet: Mapping[str, Any]) -> str | None:
-    doc_id = _extract_non_empty_str(snippet.get("doc_id"))
-    chunk_id = _extract_non_empty_str(snippet.get("chunk_id")) or _extract_non_empty_str(snippet.get("snippet_id"))
-    if doc_id is None or chunk_id is None:
-        return None
-
-    line_start = _extract_positive_int(snippet.get("line_start"))
-    line_end = _extract_positive_int(snippet.get("line_end"))
-    if line_start is None or line_end is None:
-        return f"{doc_id}/{chunk_id}"
-
-    start = min(line_start, line_end)
-    end = max(line_start, line_end)
-    return f"{doc_id}/{chunk_id}:{start}-{end}"
-
-
-def _source_chunk_refs(snippets: list[Mapping[str, Any]]) -> list[str]:
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in snippets:
-        ref = _source_chunk_ref(item)
-        if ref is None or ref in seen:
-            continue
-        seen.add(ref)
-        out.append(ref)
-    return out
-
-
 def _apply_source_policy(
     snippets: list[dict[str, Any]],
     *,
     policy: KnowledgeSourcePolicy | None,
 ) -> tuple[list[dict[str, Any]], int, bool, bool, str | None]:
-    filtered = [dict(item) for item in snippets]
     if policy is None:
-        return filtered, 0, False, False, None
+        return [dict(item) for item in snippets], 0, False, False, None
 
-    before_filter_count = len(filtered)
-    filtered = policy.filter_snippets(filtered)
+    before_filter_count = len(snippets)
+    filtered = policy.filter_snippets(snippets)
     policy_filtered_out_count = max(0, before_filter_count - len(filtered))
     grounding_missing = before_filter_count > 0 and not filtered
     grounding_reason = "policy_filtered_all" if grounding_missing else None
@@ -314,7 +278,7 @@ class LocalKnowledgeAdapter(KnowledgePort):
                     and (len(cached.raw_snippets) >= k or cached.is_exhaustive)
                 ):
                     self._step_cache.move_to_end(cache_key)
-                    ranked_snippets = [dict(item) for item in cached.raw_snippets[:k]]
+                    ranked_snippets = cached.raw_snippets[:k]
                     (
                         snippets,
                         policy_filtered_out_count,
@@ -330,7 +294,7 @@ class LocalKnowledgeAdapter(KnowledgePort):
                         "grounding_missing": grounding_missing,
                         "grounding_reason": grounding_reason,
                         "snippet_ids": _snippet_ids(snippets),
-                        "source_chunk_refs": _source_chunk_refs(snippets),
+                        "source_chunk_refs": collect_source_chunk_refs(snippets),
                         "index_path": str(self.index_path),
                         "source_policy_applied": source_policy_applied,
                         "source_policy_id": policy_id,
@@ -372,7 +336,7 @@ class LocalKnowledgeAdapter(KnowledgePort):
             "grounding_missing": grounding_missing,
             "grounding_reason": grounding_reason,
             "snippet_ids": _snippet_ids(snippets),
-            "source_chunk_refs": _source_chunk_refs(snippets),
+            "source_chunk_refs": collect_source_chunk_refs(snippets),
             "index_path": str(self.index_path),
             "source_policy_applied": source_policy_applied,
             "source_policy_id": policy_id,

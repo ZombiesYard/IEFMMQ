@@ -11,6 +11,7 @@ import time
 import pytest
 import yaml
 
+from adapters.source_chunk_refs import build_source_chunk_ref
 from core.types import Observation, TutorRequest, TutorResponse
 from live_dcs import (
     CompositeHelpTrigger,
@@ -20,7 +21,6 @@ from live_dcs import (
     UdpHelpTrigger,
     build_arg_parser,
     _is_help_trigger_payload,
-    _build_source_chunk_ref,
     _load_overlay_allowlist,
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
@@ -801,7 +801,7 @@ def test_live_loop_prefers_chunk_id_when_building_source_chunk_refs_for_policy_f
 
 
 def test_build_source_chunk_ref_falls_back_to_chunk_without_line_range() -> None:
-    assert _build_source_chunk_ref(
+    assert build_source_chunk_ref(
         {
             "doc_id": "fa18c_startup_master",
             "snippet_id": "custom_alias",

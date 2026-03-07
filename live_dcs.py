@@ -40,6 +40,7 @@ from adapters.recent_actions import (
     build_recent_button_signal,
 )
 from adapters.response_mapping import map_help_response_to_tutor_response
+from adapters.source_chunk_refs import build_source_chunk_ref
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
 from core.constants import ENV_COLD_START_PRODUCTION
@@ -330,29 +331,6 @@ def _coerce_int(value: Any) -> int | None:
     if isinstance(value, int):
         return value
     return None
-
-
-def _build_source_chunk_ref(raw: Mapping[str, Any]) -> str | None:
-    doc_id_raw = raw.get("doc_id")
-    doc_id = doc_id_raw.strip() if isinstance(doc_id_raw, str) else None
-    if not doc_id:
-        return None
-
-    chunk_id_raw = raw.get("chunk_id")
-    if not isinstance(chunk_id_raw, str) or not chunk_id_raw.strip():
-        chunk_id_raw = raw.get("snippet_id")
-    chunk_id = chunk_id_raw.strip() if isinstance(chunk_id_raw, str) else None
-    if not chunk_id:
-        return None
-
-    line_start = _coerce_int(raw.get("line_start"))
-    line_end = _coerce_int(raw.get("line_end"))
-    if line_start is None or line_end is None or line_start < 1 or line_end < 1:
-        return f"{doc_id}/{chunk_id}"
-
-    start = min(line_start, line_end)
-    end = max(line_start, line_end)
-    return f"{doc_id}/{chunk_id}:{start}-{end}"
 
 
 def _json_safe_scalar(value: Any) -> str | int | float | bool | None:
@@ -1231,7 +1209,7 @@ class LiveDcsTutorLoop:
                 retrieve_meta["grounding_reason"] = "policy_filtered_all"
             source_chunk_refs = []
             for item in snippets:
-                ref = _build_source_chunk_ref(item)
+                ref = build_source_chunk_ref(item)
                 if ref is not None:
                     source_chunk_refs.append(ref)
         elif bool(retrieve_meta.get("source_policy_applied")):
