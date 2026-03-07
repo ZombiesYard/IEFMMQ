@@ -89,7 +89,7 @@ def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
     ctx = _base_context()
     ctx["deterministic_step_hint"] = {
         "inferred_step_id": "S15",
-        "observability": "partially",
+        "observability_status": "partial",
         "step_evidence_requirements": ["visual", "gate"],
         "recent_ui_targets": ["left_mdi_pb5"],
     }
@@ -101,8 +101,12 @@ def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
     assert uncertainty["partial"]["requires_confirmation_phrase"] is True
     assert uncertainty["partial"]["allow_diagnosis_from_hint"] is True
     assert uncertainty["partial"]["allow_single_target_only"] is True
+    assert uncertainty["partial"]["applies_when"] == "current_observability_status=partial or requires_visual_confirmation=true"
     assert uncertainty["unknown"]["force_empty_overlay"] is True
     assert uncertainty["unknown"]["requires_confirmation_phrase"] is True
+    assert uncertainty["unknown"]["applies_when"] == (
+        "current_inferred_step_id is null, evidence conflicts, or no verifiable evidence exists"
+    )
     assert payload["deterministic_step_hint"]["requires_visual_confirmation"] is True
     assert "Return at most one overlay target." in result.prompt
     assert "If uncertainty_policy.partial applies" in result.prompt
@@ -520,7 +524,7 @@ def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
         "inferred_step_id": "S15",
         "missing_conditions": ["check_fcs_page"],
         "recent_ui_targets": ["left_mdi_pb5"],
-        "observability": "partially",
+        "observability_status": "partial",
         "step_evidence_requirements": ["visual", "gate", "visual", "invalid_type"],
     }
 

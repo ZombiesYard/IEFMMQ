@@ -35,6 +35,8 @@ MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
+# Keep only the highest-signal overlay candidates so policy hints stay useful
+# without bloating the prompt when recent UI/delta lists are noisy.
 MAX_PRIORITY_OVERLAY_TARGETS = 8
 
 
@@ -319,11 +321,20 @@ def _build_overlay_target_policy(priority_targets: list[str]) -> dict[str, Any]:
 
 def _build_overlay_evidence_contract(allowed_refs: list[str] | None = None) -> dict[str, Any]:
     allowed_ref_values = [ref for ref in (allowed_refs or []) if isinstance(ref, str) and ref]
+    known_prefixes = {
+        prefix
+        for prefixes in EVIDENCE_TYPE_PREFIXES.values()
+        for prefix in prefixes
+    }
+    present_prefixes = {
+        prefix
+        for ref in allowed_ref_values
+        for prefix in known_prefixes
+        if ref.startswith(prefix)
+    }
     type_ref_prefixes: dict[str, list[str]] = {}
     for evidence_type, prefixes in sorted(EVIDENCE_TYPE_PREFIXES.items(), key=lambda item: item[0]):
-        matched_prefixes = [
-            prefix for prefix in prefixes if any(ref.startswith(prefix) for ref in allowed_ref_values)
-        ]
+        matched_prefixes = [prefix for prefix in prefixes if prefix in present_prefixes]
         type_ref_prefixes[evidence_type] = matched_prefixes if matched_prefixes else list(prefixes[:1])
     return {
         "field_order": ["target", "type", "ref", "quote", "grounding_confidence"],
@@ -346,14 +357,14 @@ def _build_uncertainty_policy(deterministic_step_hint: Mapping[str, Any]) -> dic
         "current_inferred_step_id": inferred_step_id,
         "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
         "partial": {
-            "applies_when": "observability_status=partial or requires_visual_confirmation=true",
+            "applies_when": "current_observability_status=partial or requires_visual_confirmation=true",
             "allow_diagnosis_from_hint": True,
             "allow_single_target_only": True,
             "prefer_empty_overlay_without_verifiable_evidence": True,
             "requires_confirmation_phrase": True,
         },
         "unknown": {
-            "applies_when": "inferred_step_id is null, evidence conflicts, or no verifiable evidence exists",
+            "applies_when": "current_inferred_step_id is null, evidence conflicts, or no verifiable evidence exists",
             "force_empty_overlay": True,
             "requires_confirmation_phrase": True,
         },
