@@ -12,6 +12,7 @@ import yaml
 
 from adapters.evidence_refs import EVIDENCE_TYPE_PREFIXES, collect_evidence_refs_from_context
 from core.overlay import OverlayPlanner
+from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import TutorRequest, TutorResponse
 
 def _repo_root() -> Path:
@@ -57,6 +58,99 @@ def _collect_allowed_evidence_refs(request: TutorRequest | None) -> set[str]:
     if request is None or not isinstance(request.context, Mapping):
         return set()
     return collect_evidence_refs_from_context(request.context)
+
+
+def _coerce_confidence(raw: Any) -> float | None:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    return float(raw)
+
+
+def _extract_observability_metadata(
+    request: TutorRequest | None,
+) -> tuple[str | None, bool, list[str]]:
+    if request is None or not isinstance(request.context, Mapping):
+        return None, False, []
+    hint = request.context.get("deterministic_step_hint")
+    if not isinstance(hint, Mapping):
+        return None, False, []
+
+    observability = normalize_observability_status(
+        hint.get("observability_status") if "observability_status" in hint else hint.get("observability")
+    )
+    requirements_raw = hint.get("step_evidence_requirements")
+    if requirements_raw is None:
+        requirements_raw = hint.get("evidence_requirements")
+    requirements = [item for item in requirements_raw if isinstance(item, str) and item] if isinstance(requirements_raw, list) else []
+
+    requires_visual_confirmation_raw = hint.get("requires_visual_confirmation")
+    if isinstance(requires_visual_confirmation_raw, bool):
+        requires_visual_confirmation = requires_visual_confirmation_raw
+    else:
+        requires_visual_confirmation = compute_requires_visual_confirmation(observability, requirements)
+    return observability, requires_visual_confirmation, requirements
+
+
+def _downgrade_confidence(confidence: float, observability_status: str | None) -> float:
+    if observability_status == "partial":
+        return min(confidence, 0.74)
+    if observability_status == "unobservable":
+        return min(confidence, 0.49)
+    return confidence
+
+
+def _visual_confirmation_note(observability_status: str | None) -> str:
+    if observability_status == "partial":
+        return "待视觉确认：当前步骤只有部分可观测证据，请按高亮执行后进行目视确认。"
+    return "待视觉确认：当前步骤缺少直接遥测证据，请按高亮执行后进行目视确认。"
+
+
+def _append_unique_explanation(explanations: list[str], note: str) -> list[str]:
+    if note in explanations:
+        return explanations
+    return [*explanations, note]
+
+
+def _annotate_response_metadata(
+    *,
+    help_obj: Mapping[str, Any] | None,
+    request: TutorRequest | None,
+    explanations: list[str],
+    metadata: dict[str, Any],
+) -> list[str]:
+    if isinstance(help_obj, Mapping):
+        diagnosis = help_obj.get("diagnosis")
+        next_step = help_obj.get("next")
+        if isinstance(diagnosis, Mapping):
+            metadata["diagnosis"] = dict(diagnosis)
+        if isinstance(next_step, Mapping):
+            metadata["next"] = dict(next_step)
+
+    raw_confidence = _coerce_confidence(help_obj.get("confidence") if isinstance(help_obj, Mapping) else None)
+    observability_status, requires_visual_confirmation, _requirements = _extract_observability_metadata(request)
+
+    if raw_confidence is not None:
+        metadata["model_confidence"] = raw_confidence
+
+    if observability_status is not None:
+        metadata["observability_status"] = observability_status
+    metadata["requires_visual_confirmation"] = bool(requires_visual_confirmation)
+
+    effective_confidence = raw_confidence
+    if raw_confidence is not None and requires_visual_confirmation:
+        effective_confidence = _downgrade_confidence(raw_confidence, observability_status)
+        metadata["confidence_adjustment_reason"] = f"observability:{observability_status or 'unknown'}"
+        metadata["confidence_adjusted"] = effective_confidence != raw_confidence
+        metadata["evidence_strength"] = "limited"
+    elif raw_confidence is not None:
+        metadata["confidence_adjusted"] = False
+
+    if effective_confidence is not None:
+        metadata["effective_confidence"] = effective_confidence
+
+    if requires_visual_confirmation:
+        explanations = _append_unique_explanation(explanations, _visual_confirmation_note(observability_status))
+    return explanations
 
 
 def _validate_overlay_evidence(
@@ -173,6 +267,12 @@ def map_help_response_to_tutor_response(
 
     explanations_raw = help_obj.get("explanations") if isinstance(help_obj, Mapping) else None
     explanations = [item for item in explanations_raw if isinstance(item, str) and item] if isinstance(explanations_raw, list) else []
+    explanations = _annotate_response_metadata(
+        help_obj=help_obj,
+        request=request,
+        explanations=explanations,
+        metadata=metadata,
+    )
     message = explanations[0] if explanations else None
 
     raw_targets: list[str] = []

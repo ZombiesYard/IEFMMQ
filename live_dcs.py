@@ -49,6 +49,7 @@ from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
     STEP_OBSERVABILITY_VALUES,
     compute_requires_visual_confirmation,
+    normalize_observability_status,
 )
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vars import VarResolver
@@ -187,14 +188,16 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
 
         profile: dict[str, Any] = {}
 
-        observability = step.get("observability")
-        if observability is not None:
-            if not isinstance(observability, str) or observability not in STEP_OBSERVABILITY_VALUES:
+        observability_raw = step.get("observability")
+        if observability_raw is not None:
+            observability = normalize_observability_status(observability_raw)
+            if observability is None:
                 allowed = ", ".join(sorted(STEP_OBSERVABILITY_VALUES))
                 raise ValueError(
                     f"pack.steps[{step_idx}].observability must be one of {{{allowed}}}: {pack_path}"
                 )
             profile["observability"] = observability
+            profile["observability_status"] = observability
 
         evidence_requirements_raw = step.get("evidence_requirements")
         if evidence_requirements_raw is not None:
@@ -1266,6 +1269,7 @@ class LiveDcsTutorLoop:
                 observability = step_signal_profile.get("observability")
                 if isinstance(observability, str) and observability:
                     deterministic_hint["observability"] = observability
+                    deterministic_hint["observability_status"] = observability
                 evidence_requirements = step_signal_profile.get("evidence_requirements")
                 if isinstance(evidence_requirements, list):
                     deterministic_hint["step_evidence_requirements"] = [
@@ -1795,6 +1799,9 @@ class LiveDcsTutorLoop:
 
         hint = request.context.get("deterministic_step_hint")
         if isinstance(hint, Mapping):
+            observability_status = hint.get("observability_status")
+            if isinstance(observability_status, str) and observability_status:
+                response.metadata["observability_status"] = observability_status
             requires_visual_confirmation = hint.get("requires_visual_confirmation")
             if isinstance(requires_visual_confirmation, bool):
                 response.metadata["requires_visual_confirmation"] = requires_visual_confirmation

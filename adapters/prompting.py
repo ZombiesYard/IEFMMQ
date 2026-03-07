@@ -16,8 +16,8 @@ from adapters.pack_gates import SUPPORTED_SCENARIO_PROFILES
 from core.llm_schema import get_help_response_schema
 from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
-    STEP_OBSERVABILITY_VALUES,
     compute_requires_visual_confirmation,
+    normalize_observability_status,
 )
 
 _ABS_WIN_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
@@ -283,6 +283,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             "missing_conditions": [],
             "recent_ui_targets": [],
             "observability": None,
+            "observability_status": None,
             "step_evidence_requirements": [],
             "requires_visual_confirmation": False,
             "scenario_profile": None,
@@ -323,11 +324,8 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
     else:
         recent_ui_targets = []
 
-    observability_raw = raw.get("observability")
-    observability = (
-        observability_raw
-        if isinstance(observability_raw, str) and observability_raw in STEP_OBSERVABILITY_VALUES
-        else None
+    observability = normalize_observability_status(
+        raw.get("observability_status") if "observability_status" in raw else raw.get("observability")
     )
 
     step_evidence_requirements_raw = raw.get("step_evidence_requirements")
@@ -366,6 +364,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
         "missing_conditions": missing_conditions,
         "recent_ui_targets": recent_ui_targets,
         "observability": observability,
+        "observability_status": observability,
         "step_evidence_requirements": step_evidence_requirements,
         "requires_visual_confirmation": requires_visual_confirmation,
         "scenario_profile": scenario_profile,
