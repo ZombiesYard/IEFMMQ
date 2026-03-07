@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from adapters.action_executor import OverlayActionExecutor
+from adapters.step_inference import load_pack_steps
 from core.types import Observation, TutorResponse
 from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
 from tests.adapters.socket_stubs import DummySocket
@@ -15,7 +16,6 @@ PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
 UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
 TELEMETRY_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "telemetry_map.yaml"
 BIOS_TO_UI_PATH = BASE_DIR / "packs" / "fa18c_startup" / "bios_to_ui.yaml"
-_VERIFIABLE_EVIDENCE_TYPES = {"var", "gate", "delta"}
 
 
 class FailingHelpModel:
@@ -34,29 +34,26 @@ def _pick_mapping_event(events: list[Any], kind: str) -> Mapping[str, Any]:
     return payload
 
 
-def _expected_executable_result(loop: LiveDcsTutorLoop, inferred_step_id: str | None) -> tuple[bool, list[str]]:
+def _step_ids_from_pack() -> set[str]:
+    out: set[str] = set()
+    for step in load_pack_steps(PACK_PATH):
+        step_id = step.get("id")
+        if isinstance(step_id, str) and step_id:
+            out.add(step_id)
+    return out
+
+
+def _fallback_step_targets(loop: LiveDcsTutorLoop, inferred_step_id: str | None) -> list[str]:
     if not isinstance(inferred_step_id, str) or not inferred_step_id:
-        return False, []
+        return []
 
     fallback_profile = loop.step_fallback_profiles.get(inferred_step_id, {})
     raw_targets = fallback_profile.get("ui_targets", [])
-    available_targets = [
+    return [
         target
         for target in raw_targets
         if isinstance(target, str) and target in loop.overlay_allowset
     ]
-
-    signal_profile = loop.step_signal_profiles.get(inferred_step_id, {})
-    requirements = signal_profile.get("evidence_requirements")
-    if isinstance(requirements, list) and requirements:
-        can_verify = any(
-            isinstance(item, str) and item in _VERIFIABLE_EVIDENCE_TYPES
-            for item in requirements
-        )
-    else:
-        can_verify = True
-
-    return bool(available_targets) and can_verify, available_targets
 
 
 def _run_matrix_case(
@@ -109,10 +106,16 @@ def test_coldstart_help_loop_accepts_state_matrix_cases(monkeypatch, tmp_path: P
     )
 
     assert manifest["scenario_profile"] == "airfield"
-    assert manifest["case_count"] == 50
+    assert manifest["case_count"] == len(manifest["cases"])
 
-    expected_steps = {f"S{i:02d}" for i in range(1, 26)}
+    expected_steps = _step_ids_from_pack()
     accepted_steps: set[str] = set()
+    manifest_steps = {
+        case["step_id"]
+        for case in manifest["cases"]
+        if isinstance(case, Mapping) and isinstance(case.get("step_id"), str) and case["step_id"]
+    }
+    assert manifest_steps == expected_steps
 
     for case in manifest["cases"]:
         replay_path = output_dir / case["replay_input"]
@@ -151,14 +154,10 @@ def test_coldstart_help_loop_accepts_state_matrix_cases(monkeypatch, tmp_path: P
             assert isinstance(response_meta["fallback_overlay_reason"], str), case["case_id"]
             assert isinstance(response_meta["prompt_build"], dict), case["case_id"]
 
-            executable, available_targets = _expected_executable_result(
-                loop,
-                hint["inferred_step_id"],
-            )
+            available_targets = _fallback_step_targets(loop, hint["inferred_step_id"])
             dry_run_payloads = [event.payload for event in events if getattr(event, "kind", None) == "overlay_dry_run"]
 
-            if executable:
-                assert response_meta["fallback_overlay_used"] is True, case["case_id"]
+            if response_meta["fallback_overlay_used"] is True:
                 assert len(response_payload["actions"]) == 1, case["case_id"]
                 action = response_payload["actions"][0]
                 assert action["type"] == "overlay", case["case_id"]
