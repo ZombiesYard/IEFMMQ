@@ -20,6 +20,15 @@ def test_vision_observation_schema_accepts_defaults() -> None:
     validate_instance(obs, "vision_observation")
 
 
+def test_vision_observation_schema_accepts_layout_id() -> None:
+    obs = VisionObservation(
+        source="vision_stub",
+        channel="composite_panel",
+        layout_id="fa18c_composite_panel_v1",
+    ).to_dict()
+    validate_instance(obs, "vision_observation")
+
+
 def test_vision_port_protocol_shape() -> None:
     class DummyVisionAdapter:
         def start(self, session_id: str) -> None:

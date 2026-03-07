@@ -1,0 +1,97 @@
+layout_id: fa18c_composite_panel_v1
+title: "F/A-18C Composite Panel Layout v1"
+description: >
+  Fixed composite panel layout for v0.4 visual grounding. The goal is stable OCR
+  and annunciator recognition, not photoreal cockpit recreation.
+canvas:
+  width: 2560
+  height: 1440
+background:
+  style: matte_neutral_dark
+  fill: "#101416"
+  description: "Dark neutral matte background with no cockpit scenery or decorative texture."
+regions:
+  - region_id: left_ddi
+    display_name_zh: 左 DDI
+    display_name_en: Left DDI
+    x: 32
+    y: 32
+    width: 768
+    height: 768
+    intended_contents:
+      - "Left DDI pages such as FCS/HSI/ENG."
+      - "Display text and page-level annunciation."
+    background_style: display_cutout_dark
+    ocr_priority: high
+  - region_id: ampcd
+    display_name_zh: AMPCD
+    display_name_en: AMPCD
+    x: 896
+    y: 32
+    width: 768
+    height: 768
+    intended_contents:
+      - "AMPCD page state and center display text."
+      - "Page labels and display symbology."
+    background_style: display_cutout_dark
+    ocr_priority: high
+  - region_id: right_ddi
+    display_name_zh: 右 DDI
+    display_name_en: Right DDI
+    x: 1760
+    y: 32
+    width: 768
+    height: 768
+    intended_contents:
+      - "Right DDI pages such as BIT/FCS."
+      - "Display text and BIT result review."
+    background_style: display_cutout_dark
+    ocr_priority: high
+  - region_id: warning_panel
+    display_name_zh: 告警灯区
+    display_name_en: Warning Panel
+    x: 32
+    y: 832
+    width: 848
+    height: 248
+    intended_contents:
+      - "MASTER CAUTION and caution/warning/advisory lamps."
+      - "Engine fire and extinguisher related annunciators."
+    background_style: annunciator_panel_dark
+    ocr_priority: high
+  - region_id: ufc
+    display_name_zh: UFC
+    display_name_en: UFC
+    x: 912
+    y: 832
+    width: 736
+    height: 248
+    intended_contents:
+      - "UFC readouts, COMM channel state, and keypad area."
+      - "Mission radio frequency or preset confirmation."
+    background_style: keypad_panel_dark
+    ocr_priority: high
+  - region_id: ifei
+    display_name_zh: IFEI
+    display_name_en: IFEI
+    x: 1680
+    y: 832
+    width: 848
+    height: 248
+    intended_contents:
+      - "Integrated Fuel/Engine Indicator text and numeric values."
+      - "BINGO fuel confirmation and engine status references."
+    background_style: engine_indicator_dark
+    ocr_priority: high
+  - region_id: standby_hud
+    display_name_zh: 备用仪表/HUD
+    display_name_en: Standby / HUD
+    x: 912
+    y: 1112
+    width: 736
+    height: 296
+    intended_contents:
+      - "Standby attitude/altimeter area and any small HUD crop needed by the pack."
+      - "Visual-only standby instrument confirmation."
+    background_style: standby_cluster_dark
+    ocr_priority: medium
