@@ -317,16 +317,20 @@ def _build_overlay_target_policy(priority_targets: list[str]) -> dict[str, Any]:
     }
 
 
-def _build_overlay_evidence_contract() -> dict[str, Any]:
+def _build_overlay_evidence_contract(allowed_refs: list[str] | None = None) -> dict[str, Any]:
+    allowed_ref_values = [ref for ref in (allowed_refs or []) if isinstance(ref, str) and ref]
+    type_ref_prefixes: dict[str, list[str]] = {}
+    for evidence_type, prefixes in sorted(EVIDENCE_TYPE_PREFIXES.items(), key=lambda item: item[0]):
+        matched_prefixes = [
+            prefix for prefix in prefixes if any(ref.startswith(prefix) for ref in allowed_ref_values)
+        ]
+        type_ref_prefixes[evidence_type] = matched_prefixes if matched_prefixes else list(prefixes[:1])
     return {
         "field_order": ["target", "type", "ref", "quote", "grounding_confidence"],
         "quote_max_chars": 120,
         "same_target_required": True,
         "ref_must_exist_in_allowed_evidence_refs": True,
-        "type_ref_prefixes": {
-            evidence_type: list(prefixes)
-            for evidence_type, prefixes in sorted(EVIDENCE_TYPE_PREFIXES.items(), key=lambda item: item[0])
-        },
+        "type_ref_prefixes": type_ref_prefixes,
     }
 
 
@@ -625,14 +629,6 @@ def build_help_prompt_result(
     rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
-    overlay_target_priority = _build_overlay_target_priority(
-        overlay_targets,
-        recent_actions_signal,
-        deterministic_step_hint,
-        recent_deltas_summary,
-    )
-    overlay_target_policy = _build_overlay_target_policy(overlay_target_priority)
-    overlay_evidence_contract = _build_overlay_evidence_contract()
     uncertainty_policy = _build_uncertainty_policy(deterministic_step_hint)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
@@ -690,9 +686,11 @@ def build_help_prompt_result(
     trim_reasons: list[str] = []
 
     allowed_refs: list[str] = []
+    current_overlay_target_policy = _build_overlay_target_policy([])
+    current_overlay_evidence_contract = _build_overlay_evidence_contract([])
 
     def _render_and_measure() -> tuple[str, int, int]:
-        nonlocal payload, allowed_refs
+        nonlocal payload, allowed_refs, current_overlay_target_policy, current_overlay_evidence_contract
         evidence_sources, refs = _build_evidence_sources(
             selected_vars=selected_vars,
             gates_summary=gates_summary,
@@ -700,9 +698,17 @@ def build_help_prompt_result(
             rag_snippets=rag_snippets,
         )
         allowed_refs = refs
+        overlay_target_priority = _build_overlay_target_priority(
+            overlay_targets,
+            recent_actions_signal,
+            deterministic_step_hint,
+            recent_deltas_summary,
+        )
+        current_overlay_target_policy = _build_overlay_target_policy(overlay_target_priority)
+        current_overlay_evidence_contract = _build_overlay_evidence_contract(allowed_refs)
         next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
         example_refs = [allowed_refs[0]] if allowed_refs else []
-        example_target = overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
+        example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
         example_targets = [example_target] if example_refs and example_target else []
         example_ref = example_refs[0] if example_refs else None
         example_evidence_type = (
@@ -748,8 +754,8 @@ def build_help_prompt_result(
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
-            "overlay_target_policy": overlay_target_policy,
-            "overlay_evidence_contract": overlay_evidence_contract,
+            "overlay_target_policy": current_overlay_target_policy,
+            "overlay_evidence_contract": current_overlay_evidence_contract,
             "uncertainty_policy": uncertainty_policy,
             "grounding": _build_grounding_payload(
                 context,
@@ -823,8 +829,8 @@ def build_help_prompt_result(
             "gates_summary": gates_summary,
             "deterministic_step_hint": compact_hint,
             "overlay_target_policy": {
-                "mode": "single_target_preferred",
-                "preferred_target": overlay_target_policy.get("preferred_target"),
+                "mode": current_overlay_target_policy["mode"],
+                "preferred_target": current_overlay_target_policy.get("preferred_target"),
             },
             "grounding": {
                 "applied": bool(compact_grounding_payload["applied"]),
@@ -874,7 +880,7 @@ def build_help_prompt_result(
         "delta_summary_items": len(recent_deltas_summary["items"]),
         "evidence_refs_count": len(final_allowed_refs),
         "allowed_evidence_refs": list(final_allowed_refs),
-        "preferred_overlay_target": overlay_target_policy["preferred_target"],
+        "preferred_overlay_target": current_overlay_target_policy["preferred_target"],
         "rag_snippet_count": len(final_rag_snippets),
         "rag_snippet_ids": [
             str(item.get("id"))

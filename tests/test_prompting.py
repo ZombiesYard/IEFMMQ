@@ -81,7 +81,8 @@ def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:
     assert contract["ref_must_exist_in_allowed_evidence_refs"] is True
     assert contract["type_ref_prefixes"]["var"] == ["VARS."]
     assert contract["type_ref_prefixes"]["gate"] == ["GATES."]
-    assert "RECENT_UI_TARGETS." in contract["type_ref_prefixes"]["delta"]
+    assert contract["type_ref_prefixes"]["delta"] == ["RECENT_UI_TARGETS."]
+    assert "DELTA_KEYS." not in contract["type_ref_prefixes"]["delta"]
 
 
 def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
@@ -200,6 +201,31 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     assert "deterministic_step_hint" in payload
     assert payload["overlay_target_policy"]["mode"] == "single_target_preferred"
     assert payload["decision_priority"][:2] == ["deterministic_step_hint", "gates_summary"]
+
+
+def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
+    ctx = {
+        "candidate_steps": ["S01"],
+        "overlay_target_allowlist": ["battery_switch", "apu_switch"],
+        "vars": {},
+        "recent_deltas": [],
+        "recent_actions": {
+            "current_button": "apu_switch",
+            "recent_buttons": ["apu_switch", "battery_switch"],
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+
+    assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
+
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert payload["allowed_overlay_targets"] == ["battery_switch"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "battery_switch"
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
