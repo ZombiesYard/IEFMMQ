@@ -13,18 +13,21 @@ from core.llm_schema import get_help_response_schema
 
 class OpenAICompatModel(BaseHelpModel):
     provider = "openai_compat"
+    _DEFAULT_QWEN35_MAX_TOKENS = 384
 
     def __init__(
         self,
         model_name: str = "Qwen3-8B-Instruct",
         base_url: str = "http://127.0.0.1:8000",
         timeout_s: float = 20.0,
+        max_tokens: int | None = None,
         lang: str = "zh",
         log_raw_llm_text: bool = False,
         api_key: str | None = None,
         client: object | None = None,
     ) -> None:
         self.api_key = api_key
+        self.max_tokens = int(max_tokens) if isinstance(max_tokens, int) and max_tokens > 0 else None
         self._help_response_schema = get_help_response_schema()
         super().__init__(
             model_name=model_name,
@@ -36,10 +39,11 @@ class OpenAICompatModel(BaseHelpModel):
         )
 
     def _chat(self, messages: list[dict[str, str]]) -> str:
+        generation_payload = self._build_generation_payload()
         payload = {
             "model": self.model_name,
             "messages": messages,
-            "temperature": 0,
+            **generation_payload,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -65,7 +69,7 @@ class OpenAICompatModel(BaseHelpModel):
             fallback_payload = {
                 "model": self.model_name,
                 "messages": messages,
-                "temperature": 0,
+                **generation_payload,
             }
             response = self._client.post(
                 f"{self.base_url}/v1/chat/completions",
@@ -94,6 +98,32 @@ class OpenAICompatModel(BaseHelpModel):
         if isinstance(message, Mapping) and isinstance(message.get("content"), str):
             return message["content"]
         raise ValueError("OpenAI-compatible response missing choices[0].message.content")
+
+    def _build_generation_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {"temperature": 0}
+        effective_max_tokens = self._effective_max_tokens()
+        if effective_max_tokens is not None:
+            payload["max_tokens"] = effective_max_tokens
+        payload.update(self._build_request_overrides())
+        return payload
+
+    def _build_request_overrides(self) -> dict[str, object]:
+        if self._should_disable_thinking():
+            return {"chat_template_kwargs": {"enable_thinking": False}}
+        return {}
+
+    def _effective_max_tokens(self) -> int | None:
+        if self.max_tokens is not None:
+            return self.max_tokens
+        if self._is_qwen35_model():
+            return self._DEFAULT_QWEN35_MAX_TOKENS
+        return None
+
+    def _should_disable_thinking(self) -> bool:
+        return self._is_qwen35_model()
+
+    def _is_qwen35_model(self) -> bool:
+        return "qwen3.5" in self.model_name.lower()
 
     def _is_json_schema_unsupported_400(self, response: Any) -> bool:
         status_code = getattr(response, "status_code", None)

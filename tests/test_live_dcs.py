@@ -2215,6 +2215,19 @@ def test_live_dcs_cli_cold_start_production_can_be_overridden(monkeypatch) -> No
     assert args.cold_start_production is True
 
 
+def test_live_dcs_cli_model_max_tokens_reads_env_default(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_MODEL_MAX_TOKENS", "256")
+    parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.model_max_tokens == 256
+
+
+def test_live_dcs_cli_model_max_tokens_can_be_overridden() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(["--model-max-tokens", "128"])
+    assert args.model_max_tokens == 128
+
+
 def test_live_dcs_cli_scenario_profile_defaults_airfield_and_accepts_carrier() -> None:
     parser = build_arg_parser()
     args = parser.parse_args([])

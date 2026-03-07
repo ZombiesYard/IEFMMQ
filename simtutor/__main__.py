@@ -273,6 +273,12 @@ def main() -> int:
     rep_bios.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
     rep_bios.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
     rep_bios.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
+    rep_bios.add_argument(
+        "--model-max-tokens",
+        type=int,
+        default=int(os.getenv("SIMTUTOR_MODEL_MAX_TOKENS", "0")),
+        help="Max completion tokens for model providers that support it (0 uses provider default).",
+    )
     rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))

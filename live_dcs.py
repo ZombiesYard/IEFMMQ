@@ -2023,6 +2023,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
         return ModelStub(mode=args.stub_mode)
 
     timeout_s = float(args.model_timeout_s)
+    model_max_tokens = int(args.model_max_tokens) if int(args.model_max_tokens) > 0 else None
     if provider == "openai_compat":
         if not args.model_base_url:
             raise ValueError("--model-base-url is required for openai_compat")
@@ -2030,6 +2031,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             model_name=args.model_name,
             base_url=args.model_base_url,
             timeout_s=timeout_s,
+            max_tokens=model_max_tokens,
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
             api_key=args.model_api_key,
@@ -2148,6 +2150,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
     parser.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
     parser.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
+    parser.add_argument(
+        "--model-max-tokens",
+        type=int,
+        default=int(os.getenv("SIMTUTOR_MODEL_MAX_TOKENS", "0")),
+        help="Max completion tokens for model providers that support it (0 uses provider default).",
+    )
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
