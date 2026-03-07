@@ -1,5 +1,6 @@
 import json
 
+from adapters.evidence_refs import infer_evidence_type_from_ref
 from adapters.prompting import (
     MAX_DELTA_SUMMARY_ITEMS,
     MAX_RECENT_ACTIONS_SIGNAL_ITEMS,
@@ -61,6 +62,55 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert sample_evidence["type"] in {"var", "gate", "rag", "delta"}
     assert sample_evidence["ref"] in payload["allowed_evidence_refs"]
     assert len(sample_evidence["quote"]) <= 120
+    assert sample_evidence["type"] == infer_evidence_type_from_ref(sample_evidence["ref"])
+
+
+def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:
+    payload = _extract_prompt_constraints_json(build_help_prompt(_base_context(), "en"))
+
+    policy = payload["overlay_target_policy"]
+    assert policy["mode"] == "single_target_preferred"
+    assert policy["max_targets"] == 1
+    assert policy["empty_overlay_if_uncertain"] is True
+    assert policy["candidate_targets_in_priority_order"][0] == "apu_switch"
+
+    contract = payload["overlay_evidence_contract"]
+    assert contract["field_order"] == ["target", "type", "ref", "quote", "grounding_confidence"]
+    assert contract["quote_max_chars"] == 120
+    assert contract["same_target_required"] is True
+    assert contract["ref_must_exist_in_allowed_evidence_refs"] is True
+    assert contract["type_ref_prefixes"]["var"] == ["VARS."]
+    assert contract["type_ref_prefixes"]["gate"] == ["GATES."]
+    assert contract["type_ref_prefixes"]["delta"] == ["RECENT_UI_TARGETS."]
+    assert "DELTA_KEYS." not in contract["type_ref_prefixes"]["delta"]
+
+
+def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
+    ctx = _base_context()
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S15",
+        "observability_status": "partial",
+        "step_evidence_requirements": ["visual", "gate"],
+        "recent_ui_targets": ["left_mdi_pb5"],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    uncertainty = payload["uncertainty_policy"]
+    assert uncertainty["partial"]["requires_confirmation_phrase"] is True
+    assert uncertainty["partial"]["allow_diagnosis_from_hint"] is True
+    assert uncertainty["partial"]["allow_single_target_only"] is True
+    assert uncertainty["partial"]["applies_when"] == "current_observability_status=partial or requires_visual_confirmation=true"
+    assert uncertainty["unknown"]["force_empty_overlay"] is True
+    assert uncertainty["unknown"]["requires_confirmation_phrase"] is True
+    assert uncertainty["unknown"]["applies_when"] == (
+        "current_inferred_step_id is null, evidence conflicts, or no verifiable evidence exists"
+    )
+    assert payload["deterministic_step_hint"]["requires_visual_confirmation"] is True
+    assert "Return at most one overlay target." in result.prompt
+    assert "If uncertainty_policy.partial applies" in result.prompt
+    assert "If uncertainty_policy.unknown applies" in result.prompt
 
 
 def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
@@ -151,6 +201,35 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     assert result.metadata["evidence_refs_count"] == 0
     assert result.metadata["grounding_applied"] is False
     assert result.metadata["grounding_missing"] is True
+    assert "gates_summary" in payload
+    assert "deterministic_step_hint" in payload
+    assert payload["overlay_target_policy"]["mode"] == "single_target_preferred"
+    assert payload["decision_priority"][:2] == ["deterministic_step_hint", "gates_summary"]
+
+
+def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
+    ctx = {
+        "candidate_steps": ["S01"],
+        "overlay_target_allowlist": ["battery_switch", "apu_switch"],
+        "vars": {},
+        "recent_deltas": [],
+        "recent_actions": {
+            "current_button": "apu_switch",
+            "recent_buttons": ["apu_switch", "battery_switch"],
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+
+    assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
+
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert payload["allowed_overlay_targets"] == ["battery_switch"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "battery_switch"
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
@@ -445,7 +524,7 @@ def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
         "inferred_step_id": "S15",
         "missing_conditions": ["check_fcs_page"],
         "recent_ui_targets": ["left_mdi_pb5"],
-        "observability": "partially",
+        "observability_status": "partial",
         "step_evidence_requirements": ["visual", "gate", "visual", "invalid_type"],
     }
 

@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from adapters.evidence_refs import EVIDENCE_TYPE_PREFIXES, infer_evidence_type_from_ref
 from adapters.pack_gates import SUPPORTED_SCENARIO_PROFILES
 from core.llm_schema import get_help_response_schema
 from core.step_signal_metadata import (
@@ -34,6 +35,9 @@ MAX_RECENT_UI_TARGETS_SIGNAL_ITEMS = 8
 DEFAULT_MAX_VARS_ITEMS = 20
 MAX_RAG_SNIPPETS = 5
 MAX_RAG_SNIPPET_CHARS = 220
+# Keep only the highest-signal overlay candidates so policy hints stay useful
+# without bloating the prompt when recent UI/delta lists are noisy.
+MAX_PRIORITY_OVERLAY_TARGETS = 8
 
 
 @dataclass(frozen=True)
@@ -260,6 +264,129 @@ def _build_recent_actions_signal(context: Mapping[str, Any]) -> dict[str, Any]:
         "current_button": current_button,
         "recent_buttons": recent_buttons,
     }
+
+
+def _build_overlay_target_priority(
+    overlay_targets: list[str],
+    recent_actions_signal: Mapping[str, Any],
+    deterministic_step_hint: Mapping[str, Any],
+    recent_deltas_summary: Mapping[str, Any],
+) -> list[str]:
+    if not overlay_targets:
+        return []
+
+    allowed_targets = set(overlay_targets)
+    ranked: list[str] = []
+    seen: set[str] = set()
+
+    def _append_if_allowed(value: Any) -> None:
+        if not isinstance(value, str) or not value or value not in allowed_targets or value in seen:
+            return
+        seen.add(value)
+        ranked.append(value)
+
+    hint_targets = deterministic_step_hint.get("recent_ui_targets")
+    if isinstance(hint_targets, list):
+        for item in hint_targets:
+            _append_if_allowed(item)
+
+    _append_if_allowed(recent_actions_signal.get("current_button"))
+
+    recent_buttons = recent_actions_signal.get("recent_buttons")
+    if isinstance(recent_buttons, list):
+        for item in recent_buttons:
+            _append_if_allowed(item)
+
+    delta_items = recent_deltas_summary.get("items")
+    if isinstance(delta_items, list):
+        for item in delta_items:
+            if isinstance(item, Mapping):
+                _append_if_allowed(item.get("ui_target"))
+
+    for target in overlay_targets:
+        _append_if_allowed(target)
+
+    return ranked[:MAX_PRIORITY_OVERLAY_TARGETS]
+
+
+def _build_overlay_target_policy(priority_targets: list[str]) -> dict[str, Any]:
+    return {
+        "mode": "single_target_preferred",
+        "max_targets": 1,
+        "empty_overlay_if_uncertain": True,
+        "preferred_target": priority_targets[0] if priority_targets else None,
+        "candidate_targets_in_priority_order": list(priority_targets),
+    }
+
+
+def _build_overlay_evidence_contract(allowed_refs: list[str] | None = None) -> dict[str, Any]:
+    allowed_ref_values = [ref for ref in (allowed_refs or []) if isinstance(ref, str) and ref]
+    known_prefixes = {
+        prefix
+        for prefixes in EVIDENCE_TYPE_PREFIXES.values()
+        for prefix in prefixes
+    }
+    present_prefixes = {
+        prefix
+        for ref in allowed_ref_values
+        for prefix in known_prefixes
+        if ref.startswith(prefix)
+    }
+    type_ref_prefixes: dict[str, list[str]] = {}
+    for evidence_type, prefixes in sorted(EVIDENCE_TYPE_PREFIXES.items(), key=lambda item: item[0]):
+        matched_prefixes = [prefix for prefix in prefixes if prefix in present_prefixes]
+        type_ref_prefixes[evidence_type] = matched_prefixes if matched_prefixes else list(prefixes[:1])
+    return {
+        "field_order": ["target", "type", "ref", "quote", "grounding_confidence"],
+        "quote_max_chars": 120,
+        "same_target_required": True,
+        "ref_must_exist_in_allowed_evidence_refs": True,
+        "type_ref_prefixes": type_ref_prefixes,
+    }
+
+
+def _build_uncertainty_policy(deterministic_step_hint: Mapping[str, Any]) -> dict[str, Any]:
+    observability_status = deterministic_step_hint.get("observability_status")
+    if not isinstance(observability_status, str) or not observability_status:
+        observability_status = None
+    inferred_step_id = deterministic_step_hint.get("inferred_step_id")
+    if not isinstance(inferred_step_id, str) or not inferred_step_id:
+        inferred_step_id = None
+    return {
+        "current_observability_status": observability_status,
+        "current_inferred_step_id": inferred_step_id,
+        "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
+        "partial": {
+            "applies_when": "current_observability_status=partial or requires_visual_confirmation=true",
+            "allow_diagnosis_from_hint": True,
+            "allow_single_target_only": True,
+            "prefer_empty_overlay_without_verifiable_evidence": True,
+            "requires_confirmation_phrase": True,
+        },
+        "unknown": {
+            "applies_when": "current_inferred_step_id is null, evidence conflicts, or no verifiable evidence exists",
+            "force_empty_overlay": True,
+            "requires_confirmation_phrase": True,
+        },
+    }
+
+
+def _example_quote_for_evidence_type(evidence_type: str, lang: str) -> str:
+    if lang == "zh":
+        quotes = {
+            "var": "当前变量状态支持这个高亮目标。",
+            "gate": "当前 gate 状态支持这个高亮目标。",
+            "rag": "检索片段支持这个高亮目标。",
+            "delta": "最近变化支持这个高亮目标。",
+        }
+        return quotes.get(evidence_type, "当前证据支持这个高亮目标。")
+    quotes = {
+        "var": "Current variable state supports this target.",
+        "gate": "Current gate state supports this target.",
+        "rag": "Retrieved snippet supports this target.",
+        "delta": "Recent delta supports this target.",
+    }
+    return quotes.get(evidence_type, "Current evidence supports this target.")
 
 
 def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
@@ -513,6 +640,7 @@ def build_help_prompt_result(
     rag_input_count = len(rag_snippets)
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
+    uncertainty_policy = _build_uncertainty_policy(deterministic_step_hint)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
         scenario_profile_raw
@@ -532,11 +660,15 @@ def build_help_prompt_result(
             "必须从 allowed_overlay_targets 中选择 overlay.targets。",
             "必须从 allowed_error_categories 中选择 diagnosis.error_category。",
             "overlay.evidence.type 必须从 allowed_overlay_evidence_types 中选择（不得使用 visual）。",
+            "最多只返回 1 个 overlay target；必须优先选择 overlay_target_policy.candidate_targets_in_priority_order 中最靠前且证据最强的 target。",
             "只允许引用 EVIDENCE_SOURCES 中出现的 ref。",
+            "overlay.evidence 字段顺序必须固定为 target,type,ref,quote,grounding_confidence，且 type 必须与 ref 前缀匹配。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
             "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
+            "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认，且 overlay 仍只能返回单目标。",
+            "若 uncertainty_policy.unknown 生效：必须返回空 targets 和空 evidence，并要求确认，不得猜测高亮。",
             "若不确定，也必须返回合法 JSON，不得输出自然语言段落。",
         ]
     else:
@@ -550,20 +682,26 @@ def build_help_prompt_result(
             "overlay.targets must be chosen from allowed_overlay_targets.",
             "diagnosis.error_category must be chosen from allowed_error_categories.",
             "overlay.evidence.type must be chosen from allowed_overlay_evidence_types (never use \"visual\").",
+            "Return at most one overlay target. Pick the highest-confidence target from overlay_target_policy.candidate_targets_in_priority_order.",
             "Only refs that appear in EVIDENCE_SOURCES are allowed.",
+            "Emit overlay.evidence fields in this exact order: target, type, ref, quote, grounding_confidence, and type must match the ref prefix.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
             "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
+            "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation and overlay stays single-target only.",
+            "If uncertainty_policy.unknown applies, keep overlay.targets=[] and overlay.evidence=[], then ask for confirmation instead of guessing.",
             "If uncertain, still return valid JSON only.",
         ]
 
     trim_reasons: list[str] = []
 
     allowed_refs: list[str] = []
+    current_overlay_target_policy = _build_overlay_target_policy([])
+    current_overlay_evidence_contract = _build_overlay_evidence_contract([])
 
     def _render_and_measure() -> tuple[str, int, int]:
-        nonlocal payload, allowed_refs
+        nonlocal payload, allowed_refs, current_overlay_target_policy, current_overlay_evidence_contract
         evidence_sources, refs = _build_evidence_sources(
             selected_vars=selected_vars,
             gates_summary=gates_summary,
@@ -571,20 +709,33 @@ def build_help_prompt_result(
             rag_snippets=rag_snippets,
         )
         allowed_refs = refs
+        overlay_target_priority = _build_overlay_target_priority(
+            overlay_targets,
+            recent_actions_signal,
+            deterministic_step_hint,
+            recent_deltas_summary,
+        )
+        current_overlay_target_policy = _build_overlay_target_policy(overlay_target_priority)
+        current_overlay_evidence_contract = _build_overlay_evidence_contract(allowed_refs)
         next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
         example_refs = [allowed_refs[0]] if allowed_refs else []
-        example_targets = [overlay_targets[0]] if example_refs else []
+        example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
+        example_targets = [example_target] if example_refs and example_target else []
+        example_ref = example_refs[0] if example_refs else None
+        example_evidence_type = (
+            infer_evidence_type_from_ref(example_ref) if isinstance(example_ref, str) else None
+        ) or overlay_evidence_type_enum[0]
         example_overlay_evidence = (
             [
                 {
-                    "target": overlay_targets[0],
-                    "type": "delta",
-                    "ref": example_refs[0],
-                    "quote": "Recent delta supports this target.",
+                    "target": example_targets[0],
+                    "type": example_evidence_type,
+                    "ref": example_ref,
+                    "quote": _example_quote_for_evidence_type(example_evidence_type, lang),
                     "grounding_confidence": 0.9,
                 }
             ]
-            if example_refs
+            if example_refs and example_targets
             else []
         )
         example_obj = {
@@ -599,11 +750,24 @@ def build_help_prompt_result(
             "allowed_overlay_targets": overlay_targets,
             "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
+            "decision_priority": [
+                "deterministic_step_hint",
+                "gates_summary",
+                "overlay_target_policy",
+                "recent_actions_signal",
+                "recent_deltas_summary",
+                "current_vars_selected",
+                "EVIDENCE_SOURCES.RAG_SNIPPETS",
+            ],
             "scenario_profile": scenario_profile,
             "current_vars_selected": selected_vars,
+            "gates_summary": gates_summary,
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
+            "overlay_target_policy": current_overlay_target_policy,
+            "overlay_evidence_contract": current_overlay_evidence_contract,
+            "uncertainty_policy": uncertainty_policy,
             "grounding": _build_grounding_payload(
                 context,
                 rag_snippets,
@@ -657,16 +821,33 @@ def build_help_prompt_result(
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
         final_rag_snippets = []
         final_allowed_refs = []
+        compact_hint = {
+            "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),
+            "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
+        }
+        compact_grounding_payload = _build_grounding_payload(
+            context,
+            final_rag_snippets,
+            rag_input_count=rag_input_count,
+        )
         compact_payload = {
-            "allowed_step_ids": candidate_steps,
+            "allowed_step_ids": candidate_steps[:3],
             "allowed_overlay_targets": overlay_targets,
-            "allowed_overlay_evidence_types": overlay_evidence_type_enum,
-            "allowed_error_categories": category_enum,
-            "grounding": _build_grounding_payload(
-                context,
-                final_rag_snippets,
-                rag_input_count=rag_input_count,
-            ),
+            "decision_priority": [
+                "deterministic_step_hint",
+                "gates_summary",
+            ],
+            "gates_summary": gates_summary,
+            "deterministic_step_hint": compact_hint,
+            "overlay_target_policy": {
+                "mode": current_overlay_target_policy["mode"],
+                "preferred_target": current_overlay_target_policy.get("preferred_target"),
+            },
+            "grounding": {
+                "applied": bool(compact_grounding_payload["applied"]),
+                "missing": bool(compact_grounding_payload["missing"]),
+                "reason": compact_grounding_payload["reason"],
+            },
             "allowed_evidence_refs": final_allowed_refs,
         }
         prompt = (
@@ -710,6 +891,7 @@ def build_help_prompt_result(
         "delta_summary_items": len(recent_deltas_summary["items"]),
         "evidence_refs_count": len(final_allowed_refs),
         "allowed_evidence_refs": list(final_allowed_refs),
+        "preferred_overlay_target": current_overlay_target_policy["preferred_target"],
         "rag_snippet_count": len(final_rag_snippets),
         "rag_snippet_ids": [
             str(item.get("id"))
