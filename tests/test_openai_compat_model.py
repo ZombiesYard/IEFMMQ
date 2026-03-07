@@ -54,6 +54,10 @@ def test_explain_error_success_200_valid_help_response() -> None:
     prompt_payload = _extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
     assert "deterministic_step_hint" in prompt_payload
     assert "inferred_step_id" in prompt_payload["deterministic_step_hint"]
+    assert prompt_payload["overlay_target_policy"]["mode"] == "single_target_preferred"
+    assert prompt_payload["overlay_target_policy"]["max_targets"] == 1
+    assert "uncertainty_policy" in prompt_payload
+    assert prompt_payload["decision_priority"][:2] == ["deterministic_step_hint", "gates_summary"]
 
 
 def test_openai_compat_schema_is_loaded_once_per_model_instance(monkeypatch) -> None:
