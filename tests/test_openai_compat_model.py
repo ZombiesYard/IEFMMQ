@@ -378,6 +378,69 @@ def test_openai_compat_respects_explicit_max_tokens_for_qwen35_fallback_retry() 
     assert "response_format" not in fake.calls[1]["json"]
 
 
+def test_openai_compat_retries_without_chat_template_kwargs_when_server_rejects_it() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {
+                    "error": {
+                        "message": "Unknown field: chat_template_kwargs",
+                    }
+                },
+                status_code=400,
+            ),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-9B")
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    assert fake.calls[0]["json"]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "chat_template_kwargs" not in fake.calls[1]["json"]
+    assert "response_format" in fake.calls[1]["json"]
+    assert fake.calls[1]["json"]["max_tokens"] == 384
+
+
+def test_openai_compat_retries_without_chat_template_kwargs_then_without_json_schema() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {
+                    "error": {
+                        "message": "Unknown field: chat_template_kwargs",
+                    }
+                },
+                status_code=400,
+            ),
+            FakeResponse(
+                {
+                    "error": {
+                        "message": 'Grammar error: Unimplemented keys: ["uniqueItems"]',
+                    }
+                },
+                status_code=400,
+            ),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-9B")
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 3
+    assert fake.calls[0]["json"]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "chat_template_kwargs" not in fake.calls[1]["json"]
+    assert "response_format" in fake.calls[1]["json"]
+    assert "chat_template_kwargs" not in fake.calls[2]["json"]
+    assert "response_format" not in fake.calls[2]["json"]
+
+
 def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake, lang="zh")
