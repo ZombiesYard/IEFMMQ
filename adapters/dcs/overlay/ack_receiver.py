@@ -18,10 +18,12 @@ class DcsOverlayAckReceiver:
         timeout: float = 0.2,
         session_id: str | None = None,
         completed_cache_size: int = 2048,
+        pending_cache_size: int = 2048,
     ) -> None:
         self.server = (host, port)
         self.session_id = session_id
-        self._pending: dict[str, dict] = {}
+        self._pending_cache_size = max(1, int(pending_cache_size))
+        self._pending: OrderedDict[str, dict] = OrderedDict()
         self._completed_cache_size = max(1, int(completed_cache_size))
         self._completed: OrderedDict[str, None] = OrderedDict()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -36,6 +38,12 @@ class DcsOverlayAckReceiver:
         self._completed[cmd_id] = None
         while len(self._completed) > self._completed_cache_size:
             self._completed.popitem(last=False)
+
+    def _remember_pending(self, cmd_id: str, ack: dict) -> None:
+        self._pending.pop(cmd_id, None)
+        self._pending[cmd_id] = ack
+        while len(self._pending) > self._pending_cache_size:
+            self._pending.popitem(last=False)
 
     def recv(self) -> Optional[dict]:
         try:
@@ -74,7 +82,7 @@ class DcsOverlayAckReceiver:
             if ack_cmd_id == cmd_id:
                 self._remember_completed(cmd_id)
                 return ack
-            self._pending.setdefault(ack_cmd_id, ack)
+            self._remember_pending(ack_cmd_id, ack)
         return None
 
     def to_event(self, ack: dict, *, intent: str | None = None, target: str | None = None) -> Event:

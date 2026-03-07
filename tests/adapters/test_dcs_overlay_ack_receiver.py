@@ -119,3 +119,16 @@ def test_completed_cache_is_bounded(monkeypatch) -> None:
         assert list(receiver._completed.keys()) == ["cmd-2", "cmd-3"]
     finally:
         receiver.close()
+
+
+def test_pending_cache_is_bounded(monkeypatch) -> None:
+    dummy = DummySocket([])
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    receiver = DcsOverlayAckReceiver(host="127.0.0.1", port=0, pending_cache_size=2)
+    try:
+        receiver._remember_pending("cmd-1", {"cmd_id": "cmd-1", "status": "ok"})
+        receiver._remember_pending("cmd-2", {"cmd_id": "cmd-2", "status": "ok"})
+        receiver._remember_pending("cmd-3", {"cmd_id": "cmd-3", "status": "ok"})
+        assert list(receiver._pending.keys()) == ["cmd-2", "cmd-3"]
+    finally:
+        receiver.close()

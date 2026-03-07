@@ -174,6 +174,15 @@ class DcsOverlaySender:
         )
         self._emit_event(event)
 
+    def _should_track_last_target_after_ack(self, intent: OverlayIntent, ack: Mapping[str, Any]) -> bool:
+        status = ack.get("status")
+        if status == "ok":
+            return True
+        failure_class = ack.get("failure_class")
+        if failure_class == "ack_timeout" and intent.intent == "highlight":
+            return True
+        return False
+
     def send_intent(self, intent: OverlayIntent, expect_ack: bool = True) -> Optional[dict]:
         if not self.enabled:
             evt = Event(
@@ -258,7 +267,7 @@ class DcsOverlaySender:
                 self._last_target = None
             return None
 
-        if ack and ack.get("status") == "ok":
+        if ack and self._should_track_last_target_after_ack(intent, ack):
             if intent.intent == "highlight":
                 self._last_target = target
             elif intent.intent == "clear":

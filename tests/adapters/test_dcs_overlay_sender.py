@@ -244,6 +244,40 @@ def test_sender_accepts_late_ack_during_retry_window(monkeypatch) -> None:
     assert applied[0].payload["attempt_count"] == 2
 
 
+def test_sender_tracks_timed_out_highlight_for_next_auto_clear(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    ack_receiver = SequencedAckReceiver([None, None])
+    sender = DcsOverlaySender(
+        host="127.0.0.1",
+        port=7781,
+        ack_receiver=ack_receiver,
+        ack_retry_count=0,
+    )
+
+    first_ack = sender.send_intent(
+        OverlayIntent(intent="highlight", target="first", element_id="pnt_100"),
+        expect_ack=True,
+    )
+    second_ack = sender.send_intent(
+        OverlayIntent(intent="highlight", target="second", element_id="pnt_200"),
+        expect_ack=True,
+    )
+
+    assert first_ack is not None
+    assert first_ack["failure_class"] == "ack_timeout"
+    assert second_ack is not None
+    assert second_ack["failure_class"] == "ack_timeout"
+    assert len(dummy.sent) == 3
+    cmds = [decode_overlay_command(item[0]) for item in dummy.sent]
+    assert cmds[0]["action"] == "highlight"
+    assert cmds[0]["target"] == "pnt_100"
+    assert cmds[1]["action"] == "clear"
+    assert cmds[1]["target"] == "pnt_100"
+    assert cmds[2]["action"] == "highlight"
+    assert cmds[2]["target"] == "pnt_200"
+
+
 def test_sender_uses_sender_session_id_for_remote_and_local_ack_results(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
