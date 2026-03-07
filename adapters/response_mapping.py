@@ -99,7 +99,11 @@ def _downgrade_confidence(confidence: float, observability_status: str | None) -
     return confidence
 
 
-def _visual_confirmation_note(observability_status: str | None) -> str:
+def _visual_confirmation_note(observability_status: str | None, *, lang: str) -> str:
+    if lang == "en":
+        if observability_status == "partial":
+            return "Visual confirmation required: only partial observable evidence is available for this step."
+        return "Visual confirmation required: no direct telemetry evidence is available for this step."
     if observability_status == "partial":
         return "待视觉确认：当前步骤只有部分可观测证据，请按高亮执行后进行目视确认。"
     return "待视觉确认：当前步骤缺少直接遥测证据，请按高亮执行后进行目视确认。"
@@ -117,6 +121,7 @@ def _annotate_response_metadata(
     request: TutorRequest | None,
     explanations: list[str],
     metadata: dict[str, Any],
+    lang: str,
 ) -> list[str]:
     if isinstance(help_obj, Mapping):
         diagnosis = help_obj.get("diagnosis")
@@ -139,7 +144,7 @@ def _annotate_response_metadata(
     effective_confidence = raw_confidence
     if raw_confidence is not None and requires_visual_confirmation:
         effective_confidence = _downgrade_confidence(raw_confidence, observability_status)
-        metadata["confidence_adjustment_reason"] = f"observability:{observability_status or 'unknown'}"
+        metadata["confidence_adjustment_reason"] = f"observability:{observability_status or 'unspecified'}"
         metadata["confidence_adjusted"] = effective_confidence != raw_confidence
         metadata["evidence_strength"] = "limited"
     elif raw_confidence is not None:
@@ -149,7 +154,10 @@ def _annotate_response_metadata(
         metadata["effective_confidence"] = effective_confidence
 
     if requires_visual_confirmation:
-        explanations = _append_unique_explanation(explanations, _visual_confirmation_note(observability_status))
+        explanations = _append_unique_explanation(
+            explanations,
+            _visual_confirmation_note(observability_status, lang=lang),
+        )
     return explanations
 
 
@@ -253,6 +261,7 @@ def map_help_response_to_tutor_response(
     max_overlay_targets: int = 1,
     ui_map_path: str | Path | None = None,
     overlay_intent: str = "highlight",
+    lang: str = "zh",
 ) -> TutorResponse:
     metadata: dict[str, Any] = {}
 
@@ -272,6 +281,7 @@ def map_help_response_to_tutor_response(
         request=request,
         explanations=explanations,
         metadata=metadata,
+        lang=lang,
     )
     message = explanations[0] if explanations else None
 

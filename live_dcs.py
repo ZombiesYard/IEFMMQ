@@ -1416,6 +1416,7 @@ class LiveDcsTutorLoop:
             status=response.status,
             max_overlay_targets=1,
             ui_map_path=self.ui_map_path,
+            lang=self.lang,
         )
         mapped_meta = dict(mapped.metadata)
         if rejected_by_request_allowlist:
@@ -1585,6 +1586,7 @@ class LiveDcsTutorLoop:
             status=response.status,
             max_overlay_targets=1,
             ui_map_path=self.ui_map_path,
+            lang=self.lang,
         )
         mapped_meta = dict(mapped.metadata)
         if mapped_meta:

@@ -109,7 +109,12 @@ class BaseHelpModel(ModelPort):
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
-            mapped = map_help_response_to_tutor_response(help_obj, request=request, status="ok")
+            mapped = map_help_response_to_tutor_response(
+                help_obj,
+                request=request,
+                status="ok",
+                lang=self.lang,
+            )
             metadata = dict(mapped.metadata)
             metadata.update(
                 {

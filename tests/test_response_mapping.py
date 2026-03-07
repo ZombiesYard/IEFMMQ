@@ -311,6 +311,54 @@ def test_mapping_normalizes_unobservable_status_from_request_hint() -> None:
     _validate_tutor_response(payload)
 
 
+def test_mapping_emits_english_visual_confirmation_note_when_lang_is_en() -> None:
+    help_obj = {
+        "diagnosis": {"step_id": "S20", "error_category": "OM"},
+        "next": {"step_id": "S21"},
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["Use the highlighted control as the next single action."],
+        "confidence": 0.88,
+    }
+    req = _request_with_evidence_context()
+    req.context["deterministic_step_hint"] = {
+        "inferred_step_id": "S20",
+        "observability_status": "unobservable",
+        "requires_visual_confirmation": True,
+    }
+
+    res = map_help_response_to_tutor_response(help_obj, request=req, lang="en")
+
+    assert any("Visual confirmation required" in item for item in res.explanations)
+    assert not any("待视觉确认" in item for item in res.explanations)
+
+
+def test_mapping_uses_unspecified_adjustment_reason_when_visual_confirmation_lacks_observability() -> None:
+    help_obj = {
+        "diagnosis": {"step_id": "S14", "error_category": "OM"},
+        "next": {"step_id": "S15"},
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
+        },
+        "explanations": ["Check the highlighted control and continue the sequence."],
+        "confidence": 0.91,
+    }
+    req = _request_with_evidence_context()
+    req.context["deterministic_step_hint"] = {
+        "inferred_step_id": "S15",
+        "step_evidence_requirements": ["visual", "gate"],
+    }
+
+    res = map_help_response_to_tutor_response(help_obj, request=req)
+
+    assert res.metadata["requires_visual_confirmation"] is True
+    assert "observability_status" not in res.metadata
+    assert res.metadata["confidence_adjustment_reason"] == "observability:unspecified"
+
+
 def test_mapping_reuses_overlay_planner_cache(monkeypatch, tmp_path: Path) -> None:
     ui_map_path = tmp_path / "ui_map.yaml"
     ui_map_path.write_text(
