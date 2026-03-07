@@ -543,7 +543,8 @@ class BaseHelpModel(ModelPort):
         try:
             return self._chat(messages)
         except Exception as exc:
-            raise annotate_exception(exc, code=MODEL_HTTP_FAIL, stage="model_http")
+            annotate_exception(exc, code=MODEL_HTTP_FAIL, stage="model_http")
+            raise
 
     def _empty_repair_details(self) -> dict[str, Any]:
         return {

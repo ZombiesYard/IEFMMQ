@@ -45,7 +45,8 @@ def parse_help_response_with_diagnostics(
     try:
         obj, extraction = parse_first_json(raw_text)
     except Exception as exc:
-        raise annotate_exception(exc, code=JSON_EXTRACT_FAIL, stage="json_extract")
+        annotate_exception(exc, code=JSON_EXTRACT_FAIL, stage="json_extract")
+        raise
     if not isinstance(obj, dict):
         raise annotate_exception(ValueError("HelpResponse must be a JSON object"), code=SCHEMA_FAIL, stage="schema")
 
@@ -53,7 +54,8 @@ def parse_help_response_with_diagnostics(
     try:
         validate_help_response(obj)
     except ValidationError as exc:
-        raise annotate_exception(exc, code=SCHEMA_FAIL, stage="schema")
+        annotate_exception(exc, code=SCHEMA_FAIL, stage="schema")
+        raise
     return obj, extraction, repair_meta
 
 

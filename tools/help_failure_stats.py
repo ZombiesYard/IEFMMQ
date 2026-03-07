@@ -8,13 +8,16 @@ import argparse
 import json
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 
-def load_jsonl(path: str | Path) -> list[dict[str, Any]]:
+def load_jsonl(path: str | Path) -> Iterator[dict[str, Any]]:
     source = Path(path)
     with source.open("r", encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+        for line in handle:
+            if not line.strip():
+                continue
+            yield json.loads(line)
 
 
 def summarize_help_failures(events: Iterable[Mapping[str, Any]]) -> dict[str, Any]:

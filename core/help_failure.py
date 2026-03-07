@@ -4,7 +4,7 @@ Help-cycle failure classification helpers.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 
 JSON_EXTRACT_FAIL = "json_extract_fail"
