@@ -317,6 +317,7 @@ class LocalKnowledgeAdapter(KnowledgePort):
 
         raw_results = self.retriever.query(query, k=k)
         snippets = [self._normalize_result(item, idx) for idx, item in enumerate(raw_results)]
+        raw_result_count = len(raw_results)
         policy_filtered_out_count = 0
         source_policy_applied = False
         grounding_missing = False
@@ -352,7 +353,10 @@ class LocalKnowledgeAdapter(KnowledgePort):
                     t_mono=now,
                     snippets=[dict(item) for item in snippets],
                     requested_k=k,
-                    is_exhaustive=len(snippets) < k,
+                    # Exhaustiveness must reflect the raw retriever ranking, not the
+                    # post-policy filtered snippet count, otherwise a small `top_k`
+                    # request can incorrectly cache an empty result as exhaustive.
+                    is_exhaustive=raw_result_count < k,
                     metadata=cache_meta,
                 )
                 self._step_cache.move_to_end(cache_key)
