@@ -1,326 +1,563 @@
-# SimTutor Core v0.1 F/A-18C Cold Start (Mock-first)
+# SimTutor Core
 
-Simulator-agnostic tutoring backend with clean architecture (domain core + ports/adapters), mock environment, scoring, replayable event logs, and batch harness. Packs are derived from `Doc/Evaluation` sources.
+SimTutor Core is a simulator-agnostic tutoring backend for F/A-18C cold-start tutoring. The repository keeps domain logic separate from simulator integration, supports deterministic mock runs, DCS-BIOS replay, and live DCS operation, and writes JSONL event logs that can be replayed, validated, and scored offline.
 
-## Repo Layout
-- `core/` domain engines: procedure state machine, gating DSL, scoring, overlay planner, knowledge BM25, data types.
-- `ports/` contracts for environment/model/knowledge/event store, etc.
-- `adapters/` mock env, DCS UDP stub, model stub, local knowledge adapter.
-- `packs/fa18c_startup/` procedure/taxonomy/ui_map + instruments.
-- `simtutor/schemas/v1/` + `simtutor/schemas/v2/` JSON Schemas for stable contracts and DCS transports.
-- `mock_scenarios/` scripted observation sequences.
-- `tools/index_docs.py` offline indexer for `Doc/Evaluation` md/pdf.
-- `tools/build_coldstart_state_matrix.py` generates the cold-start status matrix and `replay-bios` input from pack/gates.
-- `logs/`, `artifacts/` run outputs.
+The current repository state covers:
 
-## Quickstart
-1) Python 3.10. Install deps:
-   ```sh
-   python -m pip install -e .
-   ```
-2) Build document index (defaults to `Doc/Evaluation`):
-   ```sh
-   python -m tools.index_docs --output Doc/Evaluation/index.json
-   ```
-3) Run a single mock scenario  log:
-   ```sh
-   python -m simtutor run --pack packs/fa18c_startup/pack.yaml \
-       --scenario mock_scenarios/correct_process.json \
-       --output logs/run_demo.jsonl
-   ```
-4) Replay trajectory check:
-   ```sh
-   python -m simtutor replay logs/run_demo.jsonl --pack packs/fa18c_startup/pack.yaml
-   ```
-5) Score a log:
-   ```sh
-   python -m simtutor score logs/run_demo.jsonl \
-       --pack packs/fa18c_startup/pack.yaml \
-       --taxonomy packs/fa18c_startup/taxonomy.yaml
-   ```
-6) Batch all scenarios, export CSV (requested example):
-   ```sh
-   python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts
-   ```
-   Creates `artifacts/results.csv` plus per-scenario logs.
-7) Schema validation for logs:
-   ```sh
-   python -m simtutor validate logs/run_demo.jsonl --schema event
-   ```
-8) Run all automated tests:
-   ```sh
-   pytest
-   ```
+- Clean Architecture / Hexagonal boundaries across `core/`, `ports/`, and `adapters/`
+- Pack-driven FA-18C startup procedure coverage in `packs/fa18c_startup/`
+- Mock, replay, and live DCS help flows
+- JSON Schemas under `simtutor/schemas/v1/` and `simtutor/schemas/v2/`
+- Reserved vision contracts without forcing a VLM pipeline into the core
 
-## Data Contracts (v1)
-- JSON Schemas in `simtutor/schemas/v1/*.schema.json`
-- Python dataclasses in `core/types.py`
-  - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
+## TL;DR
 
-## Vision Reserve (CS-019)
-- `ports/vision_port.py`: reserved `VisionPort` for future VLM adapters, frame-oriented and currently unused by core flows.
-- `core/types_v2.py` + `simtutor/schemas/v2/vision_observation.json`: `VisionObservation` contract for linking future screen/frame inputs without changing current tutor semantics.
-- `simtutor/schemas/__init__.py`: unified schema registry covering v1 + v2, including `vision_observation`.
-- `dcs_caps` may now include optional `vision_available`; absence keeps current behavior unchanged.
+All examples below assume bash/WSL and the project virtualenv:
 
-## Packs (fa18c_startup)
-- `pack.yaml` procedure steps S01-S25 mapped from `fa18c_startup_master.md`; deterministic `precondition_gates` / `completion_gates` keep full cold-start progression checkable.
-- `taxonomy.yaml` error categories OM/CO/OR/PA/SV, weights, critical multiplier.
-- `ui_map.yaml` abstract targets to DCS `pnt_*`, with `aliases` and `panel_area` metadata for stable allowlist/debug/UX.
-- `telemetry_map.yaml` stable var mappings for gating/LLM/overlay (vars.*).
-- Instruments: NASATLX, quiz stored under `Doc/Evaluation`.
-
-## Engines
-- Procedure engine (`core/procedure.py`): pending/active/done/blocked, rewind, timeout, prompt counts; emits `step_activated|completed|blocked`.
-- Gating (`core/gating.py`): DSL ops `var_gte`, `arg_in_range`, `flag_true`, `time_since`.
-- Scoring (`core/scoring.py`): counts/errors per category + TotalErrorScore from event logs; uses pack/taxonomy.
-- Overlay planner (`core/overlay.py`): maps abstract target to overlay action (highlight/clear/pulse).
-- Knowledge BM25 (`core/knowledge.py` + `adapters/knowledge_local.py`): queries `Doc/Evaluation/index.json` (default).
-
-## Adapters
-- MockEnv (`adapters/mock_env.py`): replays `mock_scenarios/*.json` via `get_observation()`.
-- DCS UDP stub (`adapters/dcs_adapter.py`): sends `HILITE pnt_XXX` / `CLEAR` to `127.0.0.1:7778`, compatible with `Scripts/Hooks/VRHilite.lua`; designed to map ui_map entries for future expansion.
-- Model stub (`adapters/model_stub.py`): deterministic modes A/B/C; writes card info in `TutorResponse.metadata`.
-
-## Experiment Harness
-- Single run: `python -m simtutor run ...`
-- Replay: `python -m simtutor replay ...`
-- Replay telemetry: `python -m simtutor replay --telemetry logs/telemetry_*.jsonl`
-- Replay BIOS help loop: `python -m simtutor replay-bios --input logs/dcs_bios_raw.jsonl --auto-help-once`
-  - Optional: `--scenario-profile airfield|carrier` (default `airfield`)
-- Build cold-start replay baseline: `python tools/build_coldstart_state_matrix.py --output-dir artifacts/regression/coldstart_state_matrix`
-  - Optional: `--scenario-profile airfield|carrier|all`
-- Score: `python -m simtutor score ...`
-- Batch: `python -m simtutor batch --pack packs/fa18c_startup/pack.yaml --output-dir artifacts`
-  - Optional: `--taxonomy packs/fa18c_startup/taxonomy.yaml`
-  - Optional: `--scenarios mock_scenarios/*.json`
-
-## Knowledge Retrieval
-- Build index: `python -m tools.index_docs --output Doc/Evaluation/index.json`
-- Query example (Python):
-  ```python
-  from adapters.knowledge_local import LocalKnowledgeAdapter, build_grounding_query
-  kg = LocalKnowledgeAdapter()  # defaults Doc/Evaluation/index.json
-  query = build_grounding_query(
-      pack_title="F/A-18C Cold Start (MVP subset)",
-      inferred_step="S03",
-      missing_conditions=["vars.apu_ready==true"],
-      recent_ui_targets=["apu_switch"],
-  )
-  print(kg.retrieve(query, top_k=3, step_id="S03"))
-  ```
-- `retrieve()` result fields: `doc_id/section/page_or_heading/snippet/snippet_id/score`.
-- Same `step_id` uses 60s retrieval cache by default.
-
-## DCS Overlay Quick Test
-- With `VRHilite.lua` running in DCS (listening 127.0.0.1:7778):
-  ```python
-  from adapters.dcs_adapter import DcsAdapter
-  dcs = DcsAdapter()
-  dcs.highlight("pnt_331")  # fire test switch
-  dcs.clear()
-  dcs.close()
-  ```
-  Mirrors `DCS/Scripts/HilteTest.py` / `HiliteClearTest.py`.
-
-## DCS Overlay (SimTutorHighlight)
-- Install hook: copy `DCS/Scripts/Hooks/SimTutorHighlight.lua` to
-  `Saved Games\\DCS\\Scripts\\Hooks\\SimTutorHighlight.lua`.
-- PC sender/ack example:
-  ```python
-  from adapters.dcs.overlay.ack_receiver import DcsOverlayAckReceiver
-  from adapters.dcs.overlay.sender import DcsOverlaySender
-  from core.overlay import OverlayIntent
-
-  with DcsOverlayAckReceiver() as ack_rx, DcsOverlaySender(ack_receiver=ack_rx) as sender:
-      intent = OverlayIntent(intent="highlight", target="battery", element_id="pnt_331")
-      sender.send_intent(intent, expect_ack=True)
-      sender.send_intent(OverlayIntent(intent="clear", target="battery", element_id="pnt_331"))
-  ```
-
-## DCS Export Injection (SimTutor.lua)
-- Install SimTutor DCS scripts into Saved Games and patch `Export.lua`:
-  ```sh
-  python -m tools.install_dcs_hook --dcs-variant DCS
-  ```
-  This copies from `DCS/Scripts` in the repo to `Saved Games\DCS\Scripts`.
-
-## DCS Capabilities Handshake
-- DCS listens for HELLO on UDP `127.0.0.1:7793` and replies with caps.
-- PC example:
-  ```python
-  from adapters.dcs.caps.handshake import negotiate, apply_caps_to_overlay_sender
-  from adapters.dcs.overlay.sender import DcsOverlaySender
-
-  caps = negotiate()
-  sender = DcsOverlaySender()
-  if caps:
-      apply_caps_to_overlay_sender(sender, caps)
-  ```
-
-## DCS Telemetry (UDP -> Observation)
-- SimTutor.lua sends JSON telemetry over UDP (default 127.0.0.1:7780, 20 Hz).
-- PC receiver example:
-  ```python
-  from adapters.dcs.telemetry.receiver import DcsTelemetryReceiver
-  with DcsTelemetryReceiver() as rx:
-      obs = rx.get_observation()
-      if obs:
-          print(obs.payload)
-  ```
-- Record to JSONL event log:
-  ```sh
-  python -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30 --print
-  ```
-
-## DCS-BIOS Bridge (Hub Script -> SimTutor)
-1) Generate catalog + Lua control list:
-   ```sh
-   python -m adapters.dcs_bios.catalog_loader \
-       --aircraft FA-18C_hornet \
-       --input DCS/Scripts/DCS-BIOS/doc/json/FA-18C_hornet.json \
-       --output artifacts/dcs_bios_catalog_FA-18C_hornet.json \
-       --controls-lua artifacts/dcs_bios_controls_FA-18C_hornet.lua
-   ```
-2) Load `DCS/Scripts/SimTutor/SimTutorDcsBiosHub.lua` into DCS-BIOS Hub.
-   - Set `CONTROL_LIST_PATH` or `CONTROL_LIST_DIR` to the generated `artifacts/dcs_bios_controls_*.lua`.
-   - Default UDP target: `127.0.0.1:7790`.
-   - Set `SEND_DELTA_ONLY = true` to reduce bandwidth (receiver merges cache).
-3) Receive on PC:
-   ```python
-   from adapters.dcs_bios.receiver import DcsBiosReceiver
-   with DcsBiosReceiver() as rx:
-       obs = rx.get_observation()
-       if obs:
-           print(obs.payload["bios"])
-   ```
-4) Raw DCS-BIOS export decode (if you see hex bytes):
-   ```python
-   from adapters.dcs_bios.receiver import DcsBiosRawReceiver
-   with DcsBiosRawReceiver(
-       aircraft="FA-18C_hornet",
-       control_reference_dir="DCS/Scripts/DCS-BIOS/doc/json",
-   ) as rx:
-       obs = rx.get_observation()
-       if obs:
-           print(obs.payload["bios"])
-   ```
-   Or CLI:
-   ```sh
-   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet
-   ```
-   Record for a fixed duration (seconds):
-   ```sh
-   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet \
-       --duration 15 --output logs/dcs_bios_raw_15s.jsonl
-   ```
-   Note: the raw export stream is incremental; the first frame may be partial
-   (e.g., `_ACFT_NAME` truncated). For a single fuller snapshot, wait for enough
-   keys before exiting:
-   ```sh
-   python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet \
-       --once --wait 15 --min-keys 500 \
-       --output artifacts/dcs_bios_frame_once.json
-   ```
-
-## Live DCS Tutor Loop (ST-015)
-- End-to-end runtime for `bios frame -> enrich -> help request -> model -> TutorResponse mapping -> overlay execution`.
-- Supports live UDP and offline replay.
-- Supports `--dry-run-overlay` for prompt/logic iteration without sending UDP commands.
-
-Run with replay (single-sample/offline validation; supports JSONL and single-line JSON):
-```sh
-python live_dcs.py \
-  --replay-bios artifacts/dcs_bios_frame_once.jsonl \
-  --auto-help-once \
-  --scenario-profile airfield \
-  --dry-run-overlay \
-  --model-provider stub \
-  --output logs/live_dcs_replay.jsonl
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate
+python -m pip install -e .
 ```
 
-Run with live DCS-BIOS UDP receiver:
-```sh
-python live_dcs.py \
-  --host 0.0.0.0 --port 7790 \
-  --auto-help-every-n-frames 20 \
-  --model-provider openai_compat \
-  --model-name Qwen3-8B-Instruct \
-  --model-base-url http://127.0.0.1:8000 \
-  --model-api-key "${SIMTUTOR_MODEL_API_KEY}" \
-  --knowledge-index Doc/Evaluation/index.json \
-  --cold-start-production \
-  --knowledge-source-policy knowledge_source_policy.yaml \
-  --rag-top-k 5 \
-  --output logs/live_dcs_live.jsonl
-```
-Note:
-- If you run inside WSL2 Ubuntu/bash, use `${SIMTUTOR_MODEL_API_KEY}`.
-- If you run from Windows PowerShell, use `$env:SIMTUTOR_MODEL_API_KEY`.
+Build the grounding index:
 
-Optional stdin help trigger:
-```sh
-python live_dcs.py --stdin-help --dry-run-overlay --model-provider stub
+```bash
+python -m tools.index_docs --output Doc/Evaluation/index.json
 ```
-Then press `Enter` (or type `help`) to trigger a help cycle on current state.
 
-Replay BIOS via `simtutor` CLI (default safe mode with dry-run overlay):
-```sh
+Run one deterministic mock scenario:
+
+```bash
+python -m simtutor run \
+  --pack packs/fa18c_startup/pack.yaml \
+  --scenario mock_scenarios/correct_process.json \
+  --output logs/run_demo.jsonl
+```
+
+Replay and validate the generated log:
+
+```bash
+python -m simtutor replay logs/run_demo.jsonl --pack packs/fa18c_startup/pack.yaml
+python -m simtutor score logs/run_demo.jsonl \
+  --pack packs/fa18c_startup/pack.yaml \
+  --taxonomy packs/fa18c_startup/taxonomy.yaml
+```
+
+Replay DCS-BIOS frames through the tutor loop without sending overlay commands:
+
+```bash
 python -m simtutor replay-bios \
   --input logs/dcs_bios_raw.jsonl \
-  --speed 1.0 \
-  --scenario-profile carrier \
-  --help-udp-port 7794 \
-  --model-provider stub \
-  --cold-start-production \
-  --knowledge-source-policy knowledge_source_policy.yaml \
-  --output logs/replay_bios.jsonl
+  --auto-help-once \
+  --stdin-help \
+  --dry-run-overlay
 ```
-Notes:
-- `--speed 1.0`: realtime pacing by frame `t_wall`; `--speed 0`: max speed.
-- `replay-bios` defaults to `--dry-run-overlay`; use `--no-dry-run-overlay` only when you really want to send overlay commands.
 
-Grounding metadata (in `tutor_request` / `tutor_response.payload.metadata`):
-- `grounding_snippet_ids`: snippet ids actually injected into prompt.
-- `grounding_missing`: `true` when no retrieval grounding is applied (e.g., index unavailable, RAG disabled via `rag_top_k<=0`, or retrieval error); flow degrades safely without crash.
-- `context.gates`: deterministic gate results (`allowed|blocked`, `reason_code`, `reason`); valid gate evidence refs are exactly `GATES.<gate_id>` where `<gate_id>` is a key in `context.gates` (for example `GATES.S05.precondition`).
+Replay with a local vLLM OpenAI-compatible endpoint:
 
-### Knowledge Source Policy (CS-001)
-- Policy file: `knowledge_source_policy.yaml` (repo root).
-- Runtime flags:
-  - `--cold-start-production` / `--no-cold-start-production`
-  - `--knowledge-source-policy <path>` (optional override; omitted path falls back to repository-checkout `knowledge_source_policy.yaml` when available)
-  - env default: `SIMTUTOR_COLD_START_PRODUCTION=1|0`
-- Behavior:
-  - In cold-start production mode, a valid knowledge source policy is mandatory; if flag is omitted, repository-checkout `knowledge_source_policy.yaml` is used when available.
-  - Providing `--knowledge-source-policy` applies whitelist filtering in any mode; cold-start production mode only makes valid policy mandatory.
-  - Missing/invalid policy causes startup failure.
-  - Startup log prints: `当前仅使用 cold-start 白名单块 ...`
-  - `allow[].line_range` is enforced at runtime by clipping emitted snippets to the whitelisted in-chunk lines.
+```bash
+export SIMTUTOR_MODEL_PROVIDER=openai_compat
+export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000/v1
+export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
+export SIMTUTOR_MODEL_TIMEOUT_S=20
+export SIMTUTOR_MODEL_API_KEY=dummy
+export SIMTUTOR_LANG=zh
 
-### Evaluation Doc Regeneration (CS-002)
-- Regenerate all `Doc/Evaluation/*.md` (except `index.json`) from `index.json + knowledge_source_policy.yaml`:
-  ```sh
-  python -m tools.regenerate_eval_docs
-  ```
-- CI drift check (no writes):
-  ```sh
-  python -m tools.regenerate_eval_docs --check
-  ```
-- The CI guard also enforces this check; manual edits to generated evaluation docs will fail CI.
+python -m simtutor replay-bios \
+  --input logs/dcs_bios_raw.jsonl \
+  --model-provider openai_compat \
+  --auto-help-once \
+  --stdin-help
+```
 
-### Overlay action evidence protocol
-Evidence protocol hard gate: overlay actions are rejected and logged in response metadata if any target lacks verifiable `overlay.evidence` refs, or any evidence item is malformed, type/ref mismatched, or cites unknown refs (allowed prefixes: `VARS.*` / `GATES.*` / `RECENT_UI_TARGETS.*` / `DELTA_KEYS.*` / `RAG_SNIPPETS.*`).
+Run the live DCS loop:
 
-## Source Documents (authoritative)
-- `Doc/Evaluation/fa18c_startup_master.md`
-- `Doc/Evaluation/Appendix - Training Task Syllabus.md`
-- `Doc/Evaluation/fa18c_error_coding_guide.md`
-- `Doc/Evaluation/fa18c_scoring_sheet_template.md`
-- `Doc/Evaluation/fa18c_coldstart_quiz.md`
-- `Doc/Evaluation/fa18c_nasatlx_vr.md`
+```bash
+python live_dcs.py \
+  --stdin-help \
+  --help-udp-port 7792 \
+  --output logs/live_dcs.jsonl
+```
 
-## Notes
-- Default doc root for indexing/retrieval: `Doc/Evaluation`.
-- Event logs are JSONL; replayable and scorable.
-- PyPDF2 deprecation warning is expected; no functional impact for now.
+Install the DCS hook files into Saved Games:
+
+```bash
+python -m tools.install_dcs_hook --dcs-variant DCS
+```
+
+## Repository Layout
+
+- `core/`: pure domain logic, procedure engine, gating, scoring, overlay planning
+- `ports/`: stable interfaces for environment, model, knowledge, event store, vision
+- `adapters/`: mock adapters, DCS adapters, DCS-BIOS adapters, event-store adapters
+- `simtutor/`: CLI entrypoints, runtime config, schema registry
+- `simtutor/schemas/v1/`: stable v1 contracts
+- `simtutor/schemas/v2/`: transport and forward-compatible v2 contracts
+- `packs/fa18c_startup/`: pack, taxonomy, UI mapping, telemetry mapping, BIOS mapping
+- `tools/`: indexing, install, diagnostics, telemetry capture, replay-input generation
+- `DCS/Scripts/`: DCS-side Lua scripts for telemetry/export/highlight integration
+- `Doc/Evaluation/`: authoritative knowledge source material and generated `index.json`
+- `mock_scenarios/`: deterministic mock observations for tests and demos
+- `tests/`: unit and integration coverage
+
+## Setup
+
+### Requirements
+
+- Python 3.10+
+- A virtual environment
+- Optional: DCS + DCS-BIOS for live integration
+- Optional: local vLLM OpenAI-compatible endpoint for LLM-backed help
+
+### Install
+
+Using the repository virtualenv convention:
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate
+python -m pip install -e .
+```
+
+Alternative with Poetry:
+
+```bash
+poetry install
+poetry run python -m simtutor --help
+```
+
+## Runtime Configuration
+
+There is no installed console script at the moment. Use module/script entrypoints directly:
+
+- `python -m simtutor`
+- `python live_dcs.py`
+- `python -m tools.<tool_name>`
+
+### Environment Variables
+
+| Variable | Purpose | Typical value / behavior |
+| --- | --- | --- |
+| `SIMTUTOR_MODEL_PROVIDER` | Model provider used by `model-config` and CLI defaults | `stub`, `openai_compat`, or `ollama` |
+| `SIMTUTOR_MODEL_NAME` | Model identifier | Defaults by provider; for OpenAI-compatible mode the CLI default is `Qwen3-8B-Instruct` |
+| `SIMTUTOR_MODEL_BASE_URL` | Base URL for the model API | Required for `openai_compat`; default for `ollama` is `http://127.0.0.1:11434` |
+| `SIMTUTOR_MODEL_TIMEOUT_S` | Model timeout in seconds | Positive float; CLI default is `20` |
+| `SIMTUTOR_MODEL_API_KEY` | API key for provider access | Required for `openai_compat`; can be a dummy token for a local vLLM endpoint if that endpoint ignores auth |
+| `SIMTUTOR_LANG` | Tutor language | `zh` or `en`; CLI default is `zh` |
+| `SIMTUTOR_COLD_START_PRODUCTION` | Default switch for cold-start production mode | Boolean-like string such as `1`, `0`, `true`, `false` |
+| `SIMTUTOR_LOG_RAW_LLM_TEXT` | Default switch for raw LLM text logging | Off by default; enable only for debugging |
+| `SIMTUTOR_FA18C_CLICKABLEDATA_PATH` | Optional path for clickable-data validation tests | Used by `tests/test_pack_ui_targets_valid.py` |
+| `SIMTUTOR_PROMPT_TRIM_PRINT` | Debug print switch for prompt trimming | Developer-only diagnostic toggle |
+
+### Recommended OpenAI-Compatible Configuration
+
+```bash
+export SIMTUTOR_MODEL_PROVIDER=openai_compat
+export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000/v1
+export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
+export SIMTUTOR_MODEL_TIMEOUT_S=20
+export SIMTUTOR_MODEL_API_KEY=dummy
+export SIMTUTOR_LANG=zh
+```
+
+To validate the environment without printing secrets:
+
+```bash
+python -m simtutor model-config
+```
+
+## Main Workflows
+
+### 1. Mock / Deterministic Flow
+
+1. Build the grounding index if it does not exist yet.
+2. Run `python -m simtutor run`.
+3. Replay the resulting log.
+4. Score the run.
+
+Example:
+
+```bash
+python -m tools.index_docs --output Doc/Evaluation/index.json
+python -m simtutor run \
+  --pack packs/fa18c_startup/pack.yaml \
+  --scenario mock_scenarios/correct_process.json \
+  --output logs/run_demo.jsonl
+python -m simtutor replay logs/run_demo.jsonl --pack packs/fa18c_startup/pack.yaml
+python -m simtutor score logs/run_demo.jsonl \
+  --pack packs/fa18c_startup/pack.yaml \
+  --taxonomy packs/fa18c_startup/taxonomy.yaml
+```
+
+### 2. Replay DCS-BIOS Offline
+
+This is the safest way to iterate on the help loop because overlay is dry-run by default.
+
+```bash
+python -m simtutor replay-bios \
+  --input logs/dcs_bios_raw.jsonl \
+  --auto-help-once \
+  --stdin-help \
+  --dry-run-overlay
+```
+
+### 3. Live DCS
+
+The live loop listens for DCS-BIOS UDP frames, performs help cycles, and can emit overlay commands through the action executor.
+
+```bash
+python live_dcs.py \
+  --host 0.0.0.0 \
+  --port 7790 \
+  --stdin-help \
+  --help-udp-port 7792 \
+  --output logs/live_dcs.jsonl
+```
+
+## CLI Reference
+
+### `python -m simtutor`
+
+Top-level subcommands:
+
+- `validate`
+- `run`
+- `replay`
+- `score`
+- `batch`
+- `model-config`
+- `replay-bios`
+
+#### `simtutor validate`
+
+Syntax:
+
+```bash
+python -m simtutor validate [--schema SCHEMA_NAME] FILE [FILE ...]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `files` | Yes | One or more JSONL files |
+| `--schema` | No | One of `dcs_bios_frame`, `dcs_caps`, `dcs_hello`, `dcs_observation`, `dcs_overlay_ack`, `dcs_overlay_command`, `event`, `observation`, `telemetry_frame`, `tutor_request`, `tutor_response`, `vision_observation`; default `event` |
+
+#### `simtutor run`
+
+Syntax:
+
+```bash
+python -m simtutor run --pack PACK --scenario SCENARIO [--output OUTPUT]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--pack` | Yes | Path to `pack.yaml` |
+| `--scenario` | Yes | Path to a mock scenario JSON file |
+| `--output` | No | Output log path; defaults to `logs/run_<timestamp>.jsonl` |
+
+#### `simtutor replay`
+
+Syntax:
+
+```bash
+python -m simtutor replay [FILE] [--pack PACK] [--telemetry TELEMETRY ...]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `file` | Conditionally | Event log JSONL for replay validation; required unless `--telemetry` is used |
+| `--pack` | Conditionally | Pack path required for event-log replay |
+| `--telemetry` | No | One or more telemetry JSONL logs for sequence / wall-clock validation |
+
+#### `simtutor score`
+
+Syntax:
+
+```bash
+python -m simtutor score FILE --pack PACK --taxonomy TAXONOMY
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `file` | Yes | Event log JSONL |
+| `--pack` | Yes | Pack path |
+| `--taxonomy` | Yes | Taxonomy path |
+
+#### `simtutor batch`
+
+Syntax:
+
+```bash
+python -m simtutor batch --pack PACK [--taxonomy TAXONOMY] [--scenarios SCENARIOS ...] [--output-dir OUTPUT_DIR]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--pack` | Yes | Pack path |
+| `--taxonomy` | No | Taxonomy path; defaults to `packs/fa18c_startup/taxonomy.yaml` |
+| `--scenarios` | No | Scenario JSON files; defaults to `mock_scenarios/*.json` |
+| `--output-dir` | No | Output directory for logs and `results.csv`; default `logs` |
+
+#### `simtutor model-config`
+
+Syntax:
+
+```bash
+python -m simtutor model-config
+```
+
+This validates environment-based provider configuration and prints non-sensitive startup info.
+
+#### `simtutor replay-bios`
+
+Syntax:
+
+```bash
+python -m simtutor replay-bios --input INPUT [options]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--input` | Yes | Path to `dcs_bios_raw.jsonl` |
+| `--speed` | No | Replay speed, `1.0` realtime and `0` max speed; default `1.0` |
+| `--pack` | No | Pack path; default `packs/fa18c_startup/pack.yaml` |
+| `--ui-map` | No | UI map path; default `packs/fa18c_startup/ui_map.yaml` |
+| `--telemetry-map` | No | Telemetry map path; default `packs/fa18c_startup/telemetry_map.yaml` |
+| `--bios-to-ui` | No | BIOS-to-UI path; default `packs/fa18c_startup/bios_to_ui.yaml` |
+| `--knowledge-index` | No | Grounding index path; default `Doc/Evaluation/index.json` |
+| `--rag-top-k` | No | Number of grounding snippets injected; default `5` |
+| `--cold-start-production` | No | Force-enable cold-start production mode |
+| `--no-cold-start-production` | No | Force-disable cold-start production mode even if the env default is enabled |
+| `--knowledge-source-policy` | No | Path to `knowledge_source_policy.yaml`; also enables policy filtering outside production mode |
+| `--output` | No | Output JSONL path; default `logs/replay_bios_<timestamp>.jsonl` |
+| `--session-id` | No | Optional session id for emitted events |
+| `--cooldown-s` | No | Help cache cooldown in seconds; default `4.0` |
+| `--max-frames` | No | Maximum frames to process; `0` means unlimited |
+| `--duration` | No | Run duration in seconds; `0` means unlimited |
+| `--auto-help-once` | No | Trigger one help cycle after the first frame |
+| `--auto-help-every-n-frames` | No | Trigger help every N frames |
+| `--stdin-help` | No | Enable stdin help trigger |
+| `--help-udp-host` | No | UDP host for the help trigger listener; default `127.0.0.1` |
+| `--help-udp-port` | No | UDP port for help trigger; `0` disables it |
+| `--help-udp-timeout` | No | UDP trigger timeout in seconds; default `0.2` |
+| `--dry-run-overlay` | No | Keep overlay in dry-run mode; default enabled for replay safety |
+| `--no-dry-run-overlay` | No | Send overlay commands instead of dry-run planning |
+| `--model-provider` | No | `stub`, `openai_compat`, or `ollama`; default `stub` |
+| `--model-name` | No | Model name; default from env or `Qwen3-8B-Instruct` |
+| `--model-base-url` | No | Provider base URL |
+| `--model-timeout-s` | No | Model timeout in seconds; default env or `20` |
+| `--model-api-key` | No | Provider API key |
+| `--stub-mode` | No | Stub model mode; default `A` |
+| `--lang` | No | `zh` or `en`; default env or `zh` |
+| `--scenario-profile` | No | `airfield` or `carrier`; default `airfield` |
+| `--log-raw-llm-text` | No | Log raw model text into `tutor_response.metadata` |
+| `--no-log-raw-llm-text` | No | Force-disable raw LLM text logging even if the env flag is on |
+
+### `python live_dcs.py`
+
+Syntax:
+
+```bash
+python live_dcs.py [options]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--host` | No | DCS-BIOS UDP bind host; default `0.0.0.0` |
+| `--port` | No | DCS-BIOS UDP bind port; default `7790` |
+| `--timeout` | No | Receiver socket timeout in seconds; default `0.2` |
+| `--merge-full-state` | No | Merge BIOS deltas into a full-state cache; enabled by default |
+| `--no-merge-full-state` | No | Disable full-state merging and use delta-only BIOS payloads |
+| `--pack` | No | Pack path; default `packs/fa18c_startup/pack.yaml` |
+| `--ui-map` | No | UI map path; default `packs/fa18c_startup/ui_map.yaml` |
+| `--telemetry-map` | No | Telemetry map path; default `packs/fa18c_startup/telemetry_map.yaml` |
+| `--bios-to-ui` | No | BIOS-to-UI path; default `packs/fa18c_startup/bios_to_ui.yaml` |
+| `--knowledge-index` | No | Grounding index path; default `Doc/Evaluation/index.json` |
+| `--rag-top-k` | No | Number of grounding snippets injected; default `5` |
+| `--cold-start-production` | No | Force-enable cold-start production mode |
+| `--no-cold-start-production` | No | Force-disable cold-start production mode even if env default is enabled |
+| `--knowledge-source-policy` | No | Path to `knowledge_source_policy.yaml`; also enables policy filtering outside production mode |
+| `--output` | No | Event log JSONL output path; default `logs/live_dcs_<timestamp>.jsonl` |
+| `--session-id` | No | Optional event session id |
+| `--cooldown-s` | No | Same-state help reuse cooldown; default `4.0` |
+| `--max-frames` | No | Maximum frames to process; `0` means unlimited |
+| `--duration` | No | Run duration in seconds; `0` means unlimited |
+| `--auto-help-once` | No | Trigger one help cycle after the first frame |
+| `--auto-help-every-n-frames` | No | Trigger help every N frames |
+| `--stdin-help` | No | Enable stdin help trigger |
+| `--help-udp-host` | No | UDP host for help trigger listener; default `127.0.0.1` |
+| `--help-udp-port` | No | UDP port for the help trigger listener; `0` disables it |
+| `--help-udp-timeout` | No | UDP trigger timeout in seconds; default `0.2` |
+| `--dry-run-overlay` | No | Do not send UDP overlay commands; print planned actions only |
+| `--replay-bios` | No | Replay BIOS JSONL instead of listening on UDP |
+| `--speed` | No | Replay speed multiplier for `--replay-bios`; default `1.0` |
+| `--model-provider` | No | `stub`, `openai_compat`, or `ollama`; default `stub` |
+| `--model-name` | No | Model name; default env or `Qwen3-8B-Instruct` |
+| `--model-base-url` | No | Provider base URL |
+| `--model-timeout-s` | No | Model timeout in seconds; default env or `20` |
+| `--model-api-key` | No | Provider API key |
+| `--stub-mode` | No | Stub model mode; default `A` |
+| `--lang` | No | `zh` or `en`; default env or `zh` |
+| `--scenario-profile` | No | `airfield` or `carrier`; default `airfield` |
+| `--log-raw-llm-text` | No | Log raw model text into `tutor_response.metadata` |
+| `--no-log-raw-llm-text` | No | Force-disable raw LLM text logging even if the env flag is on |
+
+## Supporting Utilities
+
+### `python -m tools.index_docs`
+
+Builds the grounding index from Markdown/PDF sources.
+
+```bash
+python -m tools.index_docs --output Doc/Evaluation/index.json
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--input` | No | Files or directories to index; default `Doc/Evaluation` |
+| `--output` | Yes | Output index JSON path |
+
+### `python -m tools.install_dcs_hook`
+
+Copies DCS-side scripts into Saved Games and optionally patches `Export.lua`.
+
+```bash
+python -m tools.install_dcs_hook --dcs-variant DCS
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--source-root` | No | Repository root containing `DCS/` and `adapters/` |
+| `--saved-games` | No | Explicit Saved Games path; otherwise `<home>/Saved Games/<variant>` |
+| `--dcs-variant` | No | DCS variant folder, for example `DCS` or `DCS.openbeta`; default `DCS` |
+| `--no-export` | No | Copy files only and do not patch `Export.lua` |
+
+### `python -m tools.record_dcs_telemetry`
+
+Records DCS telemetry frames into JSONL.
+
+```bash
+python -m tools.record_dcs_telemetry --output logs/dcs_telemetry.jsonl --duration 30
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--output` | Yes | Output JSONL path |
+| `--host` | No | UDP bind host; default `0.0.0.0` |
+| `--port` | No | UDP bind port; default `7780` |
+| `--session-id` | No | Optional session id |
+| `--no-handshake` | No | Disable DCS capabilities handshake on start |
+| `--caps-host` | No | Handshake host; default `127.0.0.1` |
+| `--caps-port` | No | Handshake port; default `7793` |
+| `--caps-timeout` | No | Handshake timeout seconds; default `1.0` |
+| `--duration` | No | Seconds to record; `0` requires `--max-frames` |
+| `--max-frames` | No | Maximum frames to record; `0` requires `--duration` |
+| `--print` | No | Print each frame payload to stdout |
+
+### `python -m tools.listen_dcs_bios_raw`
+
+Decodes raw DCS-BIOS export frames.
+
+```bash
+python -m tools.listen_dcs_bios_raw --aircraft FA-18C_hornet --once
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--host` | No | DCS-BIOS export host; default `239.255.50.10` |
+| `--port` | No | DCS-BIOS export port; default `5010` |
+| `--aircraft` | Yes | Aircraft name, for example `FA-18C_hornet` |
+| `--control-dir` | No | Control-reference directory; default `DCS/Scripts/DCS-BIOS/doc/json` |
+| `--once` | No | Read one frame and exit |
+| `--wait` | No | Wait time for `--once`; default `5.0` seconds |
+| `--min-keys` | No | Minimum BIOS keys before exiting `--once`; default `200` |
+| `--stable-frames` | No | Exit after N frames with no key growth; default `5` |
+| `--duration` | No | Continuous-mode duration; default `0` means until Ctrl+C |
+| `--output` | No | Write decoded frame(s) to JSON or JSONL |
+
+### `python tools/build_coldstart_state_matrix.py`
+
+Builds replayable state-matrix inputs for offline help regression.
+
+```bash
+python tools/build_coldstart_state_matrix.py --output-dir artifacts/regression/coldstart_state_matrix
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--output-dir` | No | Output directory for `matrix.json` and replay inputs |
+| `--pack` | No | Pack path |
+| `--telemetry-map` | No | Telemetry map path |
+| `--bios-to-ui` | No | BIOS-to-UI path |
+| `--scenario-profile` | No | `airfield`, `carrier`, or `all` |
+
+## DCS Integration Notes
+
+### Overlay Boundary
+
+The repository is intentionally limited to overlay actions:
+
+- `highlight`
+- `clear`
+- `pulse`
+
+It does not auto-click cockpit controls and does not execute unsafe cockpit actions on behalf of the user.
+
+### DCS-Side Files
+
+Relevant DCS-side scripts live under:
+
+- `DCS/Scripts/Hooks/SimTutorHighlight.lua`
+- `DCS/Scripts/SimTutor/SimTutor.lua`
+- `DCS/Scripts/SimTutor/SimTutor Function.lua`
+- `DCS/Scripts/SimTutor/SimTutorDcsBiosHub.lua`
+
+### Typical Live Bring-Up
+
+1. Install the hook files with `python -m tools.install_dcs_hook`.
+2. Ensure DCS or DCS.openbeta loads the copied Lua files.
+3. Start `python live_dcs.py`.
+4. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
+
+## Output Artifacts
+
+Typical generated outputs:
+
+- `logs/run_<timestamp>.jsonl`
+- `logs/replay_bios_<timestamp>.jsonl`
+- `logs/live_dcs_<timestamp>.jsonl`
+- `logs/dcs_telemetry.jsonl`
+- `logs/results.csv`
+- `Doc/Evaluation/index.json`
+- `artifacts/regression/coldstart_state_matrix/`
+
+Event logs are designed to be replayed and validated with:
+
+```bash
+python -m simtutor validate logs/example.jsonl --schema event
+python -m simtutor replay logs/example.jsonl --pack packs/fa18c_startup/pack.yaml
+```
+
+## Development Notes
+
+- The authoritative machine-executable procedure data lives in `packs/fa18c_startup/`.
+- Grounding source material is indexed from `Doc/Evaluation/`.
+- Replay and live flows intentionally summarize and budget DCS-BIOS deltas before prompting.
+- `vision_observation` exists as a reserved forward-compatible contract, but there is no production VLM pipeline in this repository yet.
+
+## License
+
+This repository is licensed under the Apache License 2.0. See [`LICENSE`](LICENSE) for the full text.
