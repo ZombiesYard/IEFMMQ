@@ -312,6 +312,31 @@ def test_openai_compat_downgrades_when_400_text_indicates_response_format_unsupp
     assert "response_format" not in fake.calls[1]["json"]
 
 
+def test_openai_compat_downgrades_when_vllm_reports_unimplemented_schema_keys() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {
+                    "error": {
+                        "message": 'Grammar error: Unimplemented keys: ["uniqueItems"]',
+                    }
+                },
+                status_code=400,
+            ),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    assert "response_format" in fake.calls[0]["json"]
+    assert "response_format" not in fake.calls[1]["json"]
+
+
 def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake, lang="zh")

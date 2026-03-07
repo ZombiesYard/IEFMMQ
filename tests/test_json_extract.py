@@ -8,6 +8,7 @@ from adapters.json_extract import (
     REPAIR_DROP_PREFIX,
     REPAIR_DROP_SUFFIX,
     REPAIR_REMOVE_CODE_FENCE,
+    REPAIR_REMOVE_THINK_TAGS,
     extract_first_json,
     parse_first_json,
 )
@@ -39,6 +40,13 @@ def test_extract_first_json_inline_code_fence_records_repair_reason() -> None:
     assert result.json_text == '{"k":1}'
     assert result.json_repaired is True
     assert result.repair_reasons == (REPAIR_REMOVE_CODE_FENCE,)
+
+
+def test_extract_first_json_strips_leading_think_block() -> None:
+    result = extract_first_json('<think>\nAllowed: ["CO", "DE"]\n</think>\n{"k":1}')
+    assert result.json_text == '{"k":1}'
+    assert result.json_repaired is True
+    assert result.repair_reasons == (REPAIR_REMOVE_THINK_TAGS,)
 
 
 def test_extract_first_json_prefix_suffix_records_repair_reasons() -> None:
@@ -81,6 +89,15 @@ def test_parse_help_response_with_meta_accepts_fenced_payload_and_marks_repaired
     assert parsed == payload
     assert meta.json_repaired is True
     assert REPAIR_REMOVE_CODE_FENCE in meta.repair_reasons
+
+
+def test_parse_help_response_with_meta_accepts_think_then_json_payload() -> None:
+    payload = _help_obj_ok()
+    raw = "<think>\nI should return JSON only.\n</think>\n" + json.dumps(payload, ensure_ascii=False)
+    parsed, meta = parse_help_response_with_meta(raw)
+    assert parsed == payload
+    assert meta.json_repaired is True
+    assert REPAIR_REMOVE_THINK_TAGS in meta.repair_reasons
 
 
 def test_parse_help_response_with_meta_rejects_typo_field_name() -> None:

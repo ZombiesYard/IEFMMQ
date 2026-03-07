@@ -39,6 +39,18 @@ MAX_RAG_SNIPPET_CHARS = 220
 # without bloating the prompt when recent UI/delta lists are noisy.
 MAX_PRIORITY_OVERLAY_TARGETS = 8
 
+_MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
+    "vars.apu_on": ("apu_switch",),
+    "vars.apu_ready": ("apu_switch",),
+    "vars.battery_on": ("battery_switch",),
+    "vars.bleed_air_norm": ("bleed_air_knob",),
+    "vars.engine_crank_left": ("eng_crank_switch",),
+    "vars.engine_crank_right": ("eng_crank_switch",),
+    "vars.fcs_reset_pressed": ("fcs_reset_button",),
+    "vars.l_gen_on": ("generator_left_switch",),
+    "vars.r_gen_on": ("generator_right_switch",),
+}
+
 
 @dataclass(frozen=True)
 class PromptBuildResult:
@@ -285,6 +297,17 @@ def _build_overlay_target_priority(
         seen.add(value)
         ranked.append(value)
 
+    missing_conditions = deterministic_step_hint.get("missing_conditions")
+    if isinstance(missing_conditions, list):
+        for item in missing_conditions:
+            if not isinstance(item, str) or not item:
+                continue
+            matched = re.match(r"^(vars\.[A-Za-z0-9_]+)\s*(?:==|!=|>=|<=|>|<)", item.strip())
+            if matched is None:
+                continue
+            for target in _MISSING_CONDITION_TARGET_HINTS.get(matched.group(1), ()):
+                _append_if_allowed(target)
+
     hint_targets = deterministic_step_hint.get("recent_ui_targets")
     if isinstance(hint_targets, list):
         for item in hint_targets:
@@ -317,6 +340,25 @@ def _build_overlay_target_policy(priority_targets: list[str]) -> dict[str, Any]:
         "preferred_target": priority_targets[0] if priority_targets else None,
         "candidate_targets_in_priority_order": list(priority_targets),
     }
+
+
+def _reprioritize_overlay_targets(
+    overlay_targets: list[str],
+    priority_targets: list[str],
+) -> list[str]:
+    if not overlay_targets:
+        return []
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for target in priority_targets:
+        if target in overlay_targets and target not in seen:
+            seen.add(target)
+            ordered.append(target)
+    for target in overlay_targets:
+        if target not in seen:
+            seen.add(target)
+            ordered.append(target)
+    return ordered
 
 
 def _build_overlay_evidence_contract(allowed_refs: list[str] | None = None) -> dict[str, Any]:
@@ -699,6 +741,15 @@ def build_help_prompt_result(
     allowed_refs: list[str] = []
     current_overlay_target_policy = _build_overlay_target_policy([])
     current_overlay_evidence_contract = _build_overlay_evidence_contract([])
+    overlay_targets = list(overlay_targets)
+
+    initial_overlay_target_priority = _build_overlay_target_priority(
+        overlay_targets,
+        recent_actions_signal,
+        deterministic_step_hint,
+        recent_deltas_summary,
+    )
+    overlay_targets = _reprioritize_overlay_targets(overlay_targets, initial_overlay_target_priority)
 
     def _render_and_measure() -> tuple[str, int, int]:
         nonlocal payload, allowed_refs, current_overlay_target_policy, current_overlay_evidence_contract

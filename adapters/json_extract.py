@@ -3,8 +3,9 @@ Minimal and safe JSON extraction/repair helpers for model outputs.
 
 Allowed repair set is intentionally small:
 1) Remove balanced markdown code fence wrappers (```json ... ```).
-2) Drop non-JSON prefix text before the first JSON object/array.
-3) Drop non-JSON suffix text after the first JSON object/array.
+2) Remove leading balanced <think>...</think> blocks.
+3) Drop non-JSON prefix text before the first JSON object/array.
+4) Drop non-JSON suffix text after the first JSON object/array.
 
 Any transformation outside this set is rejected.
 """
@@ -13,18 +14,23 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from typing import Any
 
 
 REPAIR_REMOVE_CODE_FENCE = "removed_code_fence"
+REPAIR_REMOVE_THINK_TAGS = "removed_think_tags"
 REPAIR_DROP_PREFIX = "dropped_prefix_text"
 REPAIR_DROP_SUFFIX = "dropped_suffix_text"
 
 ALLOWED_REPAIRS = (
     REPAIR_REMOVE_CODE_FENCE,
+    REPAIR_REMOVE_THINK_TAGS,
     REPAIR_DROP_PREFIX,
     REPAIR_DROP_SUFFIX,
 )
+
+_THINK_BLOCK_RE = re.compile(r"(?is)^\s*<think(?:\s[^>]*)?>.*?</think>\s*")
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,17 @@ def _strip_balanced_code_fence(raw: str) -> tuple[str, bool]:
         if not rest or rest[0].isspace() or rest[0] in "{[":
             inner = rest.strip()
     return inner, True
+
+
+def _strip_leading_think_blocks(raw: str) -> tuple[str, bool]:
+    text = raw.strip()
+    repaired = False
+    while True:
+        match = _THINK_BLOCK_RE.match(text)
+        if match is None:
+            return text, repaired
+        text = text[match.end() :].strip()
+        repaired = True
 
 
 def _find_first_json_segment(text: str) -> tuple[int, int]:
@@ -103,11 +120,14 @@ def extract_first_json(raw_text: str) -> JsonExtractionResult:
         raise TypeError("raw_text must be a string")
 
     text, fence_removed = _strip_balanced_code_fence(raw_text)
+    text, think_removed = _strip_leading_think_blocks(text)
     start, end = _find_first_json_segment(text)
     extracted = text[start:end]
     reasons: list[str] = []
     if fence_removed:
         reasons.append(REPAIR_REMOVE_CODE_FENCE)
+    if think_removed:
+        reasons.append(REPAIR_REMOVE_THINK_TAGS)
     if text[:start].strip():
         reasons.append(REPAIR_DROP_PREFIX)
     if text[end:].strip():
@@ -134,6 +154,7 @@ __all__ = [
     "REPAIR_DROP_PREFIX",
     "REPAIR_DROP_SUFFIX",
     "REPAIR_REMOVE_CODE_FENCE",
+    "REPAIR_REMOVE_THINK_TAGS",
     "extract_first_json",
     "parse_first_json",
 ]

@@ -103,6 +103,12 @@ class OpenAICompatModel(BaseHelpModel):
         if not error_text:
             return False
         normalized = error_text.lower()
+        grammar_error_patterns = (
+            r"\bgrammar error\b",
+            r"\bunimplemented keys?\b",
+        )
+        if any(re.search(pattern, normalized) for pattern in grammar_error_patterns):
+            return True
         schema_tokens = ("response_format", "json_schema")
         if not any(token in normalized for token in schema_tokens):
             return False
