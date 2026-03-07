@@ -43,3 +43,11 @@ def test_event_schema_links_payloads():
     evt = Event(kind="observation", payload=obs, related_id=obs["observation_id"]).to_dict()
     validate(evt, "event")
 
+
+def test_event_schema_accepts_overlay_rejected_event():
+    evt = Event(
+        kind="overlay_rejected",
+        payload={"failure_code": "evidence_fail", "reasons": ["missing_overlay_evidence"]},
+    ).to_dict()
+    validate(evt, "event")
+

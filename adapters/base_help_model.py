@@ -17,6 +17,16 @@ from adapters.step_inference import (
     load_pack_steps,
     normalize_recent_ui_targets,
 )
+from core.help_failure import (
+    ALLOWLIST_FAIL,
+    EVIDENCE_FAIL,
+    MODEL_HTTP_FAIL,
+    SCHEMA_FAIL,
+    annotate_exception,
+    exception_failure_code,
+    exception_failure_stage,
+    merge_failure_metadata,
+)
 from core.llm_schema import get_help_response_schema
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
@@ -94,7 +104,7 @@ class BaseHelpModel(ModelPort):
                 deterministic_hint=deterministic_hint,
             )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
-            raw_text = self._chat(messages)
+            raw_text = self._chat_with_failure_classification(messages)
             if self.log_raw_llm_text:
                 raw_text_attempts.append(raw_text)
             try:
@@ -103,7 +113,7 @@ class BaseHelpModel(ModelPort):
                 retry_count = 1
                 retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
                 retry_messages = self._build_retry_messages(messages, first_parse_exc)
-                raw_text = self._chat(retry_messages)
+                raw_text = self._chat_with_failure_classification(retry_messages)
                 if self.log_raw_llm_text:
                     raw_text_attempts.append(raw_text)
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
@@ -139,6 +149,12 @@ class BaseHelpModel(ModelPort):
                     "fallback_overlay_reason": None,
                 }
             )
+            if evidence_guardrail_reasons:
+                metadata = merge_failure_metadata(
+                    metadata,
+                    EVIDENCE_FAIL,
+                    stage="evidence_guardrail",
+                )
             if self.log_raw_llm_text:
                 metadata["raw_llm_text"] = raw_text_attempts[-1] if raw_text_attempts else ""
                 metadata["raw_llm_text_attempts"] = list(raw_text_attempts)
@@ -170,6 +186,14 @@ class BaseHelpModel(ModelPort):
                 "fallback_overlay_used": False,
                 "fallback_overlay_reason": None,
             }
+            failure_code = exception_failure_code(exc)
+            failure_stage = exception_failure_stage(exc)
+            if failure_code is not None:
+                error_metadata = merge_failure_metadata(
+                    error_metadata,
+                    failure_code,
+                    stage=failure_stage,
+                )
             if self.log_raw_llm_text:
                 error_metadata["raw_llm_text"] = raw_text_attempts[-1] if raw_text_attempts else ""
                 error_metadata["raw_llm_text_attempts"] = list(raw_text_attempts)
@@ -369,14 +393,22 @@ class BaseHelpModel(ModelPort):
                 section, key = path.split(".")
                 sid = help_obj[section][key]
                 if sid not in allowed_steps:
-                    raise ValueError(f"{path}={sid!r} not in candidate_steps")
+                    raise annotate_exception(
+                        ValueError(f"{path}={sid!r} not in candidate_steps"),
+                        code=SCHEMA_FAIL,
+                        stage="context_bounds",
+                    )
 
         allowlist = context.get("overlay_target_allowlist")
         if isinstance(allowlist, list) and allowlist:
             allowed_targets = {target for target in allowlist if isinstance(target, str)}
             for idx, target in enumerate(help_obj["overlay"]["targets"]):
                 if target not in allowed_targets:
-                    raise ValueError(f"overlay.targets[{idx}]={target!r} not in overlay_target_allowlist")
+                    raise annotate_exception(
+                        ValueError(f"overlay.targets[{idx}]={target!r} not in overlay_target_allowlist"),
+                        code=ALLOWLIST_FAIL,
+                        stage="context_bounds",
+                    )
 
     def _enforce_evidence_guardrail(
         self,
@@ -506,6 +538,12 @@ class BaseHelpModel(ModelPort):
         retry_messages = [dict(msg) for msg in messages]
         retry_messages.append({"role": "user", "content": retry_hint})
         return retry_messages
+
+    def _chat_with_failure_classification(self, messages: list[dict[str, str]]) -> str:
+        try:
+            return self._chat(messages)
+        except Exception as exc:
+            raise annotate_exception(exc, code=MODEL_HTTP_FAIL, stage="model_http")
 
     def _empty_repair_details(self) -> dict[str, Any]:
         return {

@@ -8,6 +8,7 @@ from adapters.help_response_parser import (
     parse_help_response_with_diagnostics,
     strip_code_fence,
 )
+from core.help_failure import JSON_EXTRACT_FAIL, SCHEMA_FAIL, exception_failure_code
 from tests._fakes import _help_obj_ok
 
 
@@ -50,8 +51,9 @@ def test_parse_help_response_parses_embedded_json_text() -> None:
 
 
 def test_json_extract_raises_on_missing_object() -> None:
-    with pytest.raises(ValueError, match="does not contain JSON object/array"):
+    with pytest.raises(ValueError, match="does not contain JSON object/array") as excinfo:
         json_extract("no json here")
+    assert exception_failure_code(excinfo.value) is None
 
 
 def test_parse_help_response_repairs_invalid_evidence_type_from_ref_prefix() -> None:
@@ -74,8 +76,9 @@ def test_parse_help_response_drops_unrepairable_evidence_and_still_rejects_inval
     help_obj["overlay"]["evidence"][0]["ref"] = "UNKNOWN.foo"
     raw = json.dumps(help_obj, ensure_ascii=False)
 
-    with pytest.raises(Exception, match="HelpResponse validation failed"):
+    with pytest.raises(Exception, match="HelpResponse validation failed") as excinfo:
         parse_help_response_with_diagnostics(raw)
+    assert exception_failure_code(excinfo.value) == SCHEMA_FAIL
 
 
 def test_parse_help_response_drops_non_object_evidence_items_and_keeps_valid_items() -> None:
@@ -92,3 +95,15 @@ def test_parse_help_response_drops_non_object_evidence_items_and_keeps_valid_ite
     assert repair_meta["dropped_unrepairable_evidence"] == 2
     reasons = [item.get("reason") for item in repair_meta["details"] if isinstance(item, dict)]
     assert reasons.count("non_object_evidence_item") == 2
+
+
+def test_parse_help_response_marks_json_extract_fail_when_no_json_found() -> None:
+    with pytest.raises(ValueError, match="does not contain JSON object/array") as excinfo:
+        parse_help_response_with_diagnostics("plain text only")
+    assert exception_failure_code(excinfo.value) == JSON_EXTRACT_FAIL
+
+
+def test_parse_help_response_marks_schema_fail_when_payload_is_not_object() -> None:
+    with pytest.raises(ValueError, match="HelpResponse must be a JSON object") as excinfo:
+        parse_help_response_with_diagnostics('["not", "an", "object"]')
+    assert exception_failure_code(excinfo.value) == SCHEMA_FAIL

@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from adapters.source_chunk_refs import build_source_chunk_ref
+from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL
 from core.types import Observation, TutorRequest, TutorResponse
 from live_dcs import (
     CompositeHelpTrigger,
@@ -1178,9 +1179,13 @@ def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: P
     assert executor.calls[0] == []
     tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
     assert len(tutor_response_payloads) == 1
+    assert tutor_response_payloads[0]["metadata"]["failure_code"] == ALLOWLIST_FAIL
     response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
+    rejected_payloads = [event.payload for event in events if event.kind == "overlay_rejected"]
+    assert len(rejected_payloads) == 1
+    assert rejected_payloads[0]["failure_code"] == ALLOWLIST_FAIL
 
 
 def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:
@@ -1223,12 +1228,66 @@ def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evi
     assert executor.calls[0][0]["element_id"] == _apu_element_id_from_ui_map()
     tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
     assert len(tutor_response_payloads) == 1
+    assert tutor_response_payloads[0]["metadata"]["failure_code"] == ALLOWLIST_FAIL
     response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
     assert response_mapping.get("overlay_rejected") is not True
     reasons = response_mapping.get("overlay_rejected_reasons", [])
     assert "evidence_target_not_in_overlay_targets" not in reasons
+    rejected_payloads = [event.payload for event in events if event.kind == "overlay_rejected"]
+    assert len(rejected_payloads) == 1
+    assert rejected_payloads[0]["failure_code"] == ALLOWLIST_FAIL
+
+
+def test_live_loop_emits_overlay_rejected_event_for_evidence_failure(tmp_path: Path) -> None:
+    class EvidenceFailModel:
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Need more evidence.",
+                actions=[],
+                explanations=["Need more evidence."],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                        "next": {"step_id": "S03"},
+                        "overlay": {"targets": ["apu_switch"], "evidence": []},
+                        "explanations": ["Need more evidence."],
+                        "confidence": 0.4,
+                    },
+                },
+            )
+
+    replay_path = tmp_path / "bios_evidence_rejected.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=EvidenceFailModel(),
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    assert tutor_response_payload["metadata"]["failure_code"] == EVIDENCE_FAIL
+    rejected_payload = next(event.payload for event in events if event.kind == "overlay_rejected")
+    assert rejected_payload["failure_code"] == EVIDENCE_FAIL
+    assert rejected_payload["overlay_rejected"] is True
 
 
 def test_live_loop_allowlist_filter_drops_non_mapping_evidence_items(tmp_path: Path) -> None:

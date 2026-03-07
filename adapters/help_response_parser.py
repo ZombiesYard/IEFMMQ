@@ -11,7 +11,9 @@ from typing import Any, Mapping
 
 from adapters.evidence_refs import EVIDENCE_TYPES, infer_evidence_type_from_ref
 from adapters.json_extract import JsonExtractionResult, extract_first_json, parse_first_json
+from core.help_failure import JSON_EXTRACT_FAIL, SCHEMA_FAIL, annotate_exception
 from core.llm_schema import validate_help_response
+from jsonschema.exceptions import ValidationError
 
 
 def strip_code_fence(text: str) -> str:
@@ -40,12 +42,18 @@ def parse_help_response_with_meta(raw_text: str) -> tuple[dict[str, Any], JsonEx
 def parse_help_response_with_diagnostics(
     raw_text: str,
 ) -> tuple[dict[str, Any], JsonExtractionResult, dict[str, Any]]:
-    obj, extraction = parse_first_json(raw_text)
+    try:
+        obj, extraction = parse_first_json(raw_text)
+    except Exception as exc:
+        raise annotate_exception(exc, code=JSON_EXTRACT_FAIL, stage="json_extract")
     if not isinstance(obj, dict):
-        raise ValueError("HelpResponse must be a JSON object")
+        raise annotate_exception(ValueError("HelpResponse must be a JSON object"), code=SCHEMA_FAIL, stage="schema")
 
     repair_meta = _repair_help_response_overlay_evidence(obj)
-    validate_help_response(obj)
+    try:
+        validate_help_response(obj)
+    except ValidationError as exc:
+        raise annotate_exception(exc, code=SCHEMA_FAIL, stage="schema")
     return obj, extraction, repair_meta
 
 
