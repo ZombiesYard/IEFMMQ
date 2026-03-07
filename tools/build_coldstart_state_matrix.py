@@ -235,9 +235,9 @@ def _clone_mapping(raw: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in raw.items()}
 
 
-def _load_step_profiles(pack_path: Path) -> list[_StepProfile]:
+def _step_profiles_from_pack_steps(pack_steps: Sequence[Mapping[str, Any]]) -> list[_StepProfile]:
     out: list[_StepProfile] = []
-    for step in load_pack_steps(pack_path):
+    for step in pack_steps:
         if not isinstance(step, Mapping):
             continue
         step_id_raw = step.get("id") or step.get("step_id")
@@ -335,8 +335,9 @@ def _build_profile_cases(
     scenario_profile: str,
     output_dir: Path,
 ) -> list[_CaseSpec]:
-    pack_steps = _load_step_profiles(pack_path)
-    if not pack_steps:
+    raw_pack_steps = load_pack_steps(pack_path)
+    pack_steps = _step_profiles_from_pack_steps(raw_pack_steps)
+    if not pack_steps or not raw_pack_steps:
         raise StateMatrixBuildError(f"no pack steps loaded from {pack_path}")
 
     step_ids = [item.step_id for item in pack_steps]
@@ -428,7 +429,7 @@ def _build_profile_cases(
             recent_targets_for_inference = _recent_targets_from_frames(frames, mapper)
             final_vars = resolver.resolve(frames[-1])
             result = infer_step_id(
-                load_pack_steps(pack_path),
+                raw_pack_steps,
                 final_vars,
                 recent_targets_for_inference,
                 precondition_gates=precondition_gates,
@@ -478,26 +479,28 @@ def _write_replay_case(
                     break
         if delta_key is None:
             raise StateMatrixBuildError(f"missing delta key for recent ui target {target!r}")
+        bios_payload = _clone_mapping(bios_state)
         frames.append(
             {
                 "schema_version": "v2",
                 "seq": seq,
                 "t_wall": t_wall,
                 "aircraft": _AIRCRAFT,
-                "bios": _clone_mapping(bios_state),
-                "delta": {delta_key: _clone_mapping(bios_state).get(delta_key, 1)},
+                "bios": bios_payload,
+                "delta": {delta_key: bios_payload.get(delta_key, 1)},
             }
         )
         seq += 1
         t_wall += 0.1
 
+    final_bios_payload = _clone_mapping(bios_state)
     frames.append(
         {
             "schema_version": "v2",
             "seq": seq,
             "t_wall": t_wall,
             "aircraft": _AIRCRAFT,
-            "bios": _clone_mapping(bios_state),
+            "bios": final_bios_payload,
             "delta": {},
         }
     )

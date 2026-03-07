@@ -10,7 +10,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - `simtutor/schemas/v1/` JSON Schemas for Observation/TutorRequest/TutorResponse/Event.
 - `mock_scenarios/` scripted observation sequences.
 - `tools/index_docs.py` offline indexer for `Doc/Evaluation` md/pdf.
-- `tools/build_coldstart_state_matrix.py` from pack/gates generate the cold-start status matrix and `replay-bios` input.
+- `tools/build_coldstart_state_matrix.py` generates the cold-start status matrix and `replay-bios` input from pack/gates.
 - `logs/`, `artifacts/` run outputs.
 
 ## Quickstart
