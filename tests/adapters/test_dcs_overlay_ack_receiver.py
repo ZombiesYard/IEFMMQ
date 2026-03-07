@@ -92,3 +92,17 @@ def test_to_event_status_mapping(monkeypatch) -> None:
     failed_event = receiver.to_event(failed_ack, intent="highlight", target="pnt_001")
     assert ok_event.kind == "overlay_applied"
     assert failed_event.kind == "overlay_failed"
+
+
+def test_wait_for_ignores_duplicate_ack_after_match(monkeypatch) -> None:
+    ack = {
+        "schema_version": "v2",
+        "cmd_id": "ffffffff-ffff-4fff-ffff-ffffffffffff",
+        "status": "ok",
+    }
+    receiver = _make_receiver(monkeypatch, [encode_ack(ack), encode_ack(ack)])
+    received = receiver.wait_for(ack["cmd_id"], timeout=0.01)
+    assert received is not None
+    assert received["cmd_id"] == ack["cmd_id"]
+    duplicate = receiver.wait_for(ack["cmd_id"], timeout=0.01)
+    assert duplicate is None

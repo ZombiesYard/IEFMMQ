@@ -305,6 +305,36 @@ def test_execute_overlay_actions_without_sender_owns_sender_lifecycle(monkeypatc
     assert owned_sender.send_calls[0][1] is False
 
 
+def test_executor_emits_unified_overlay_failed_payload_for_ack_timeout(monkeypatch) -> None:
+    class NeverAckReceiver:
+        def wait_for(self, cmd_id: str, timeout: float = 1.0):
+            return None
+
+        def to_event(self, ack: dict, *, intent: str | None = None, target: str | None = None) -> Event:
+            raise AssertionError("unexpected direct event mapping")
+
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
+    sender = DcsOverlaySender(
+        auto_clear=False,
+        ack_enabled=True,
+        ack_receiver=NeverAckReceiver(),
+        ack_retry_count=1,
+        event_sink=None,
+    )
+    executor = OverlayActionExecutor(sender=sender, event_sink=events.append, expect_ack=True)
+
+    report = executor.execute_actions([{"type": "overlay", "target": "apu_switch"}])
+
+    assert len(report.executed) == 1
+    assert len(dummy.sent) == 2
+    failed = next(evt for evt in events if evt.kind == "overlay_failed")
+    assert failed.payload["failure_class"] == "ack_timeout"
+    assert failed.payload["attempt_count"] == 2
+    assert failed.payload["status"] == "failed"
+
+
 def test_executor_pack_path_rejects_non_mapping_yaml(tmp_path: Path) -> None:
     class NoopSender:
         def __init__(self):
