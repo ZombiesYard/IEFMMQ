@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import socket
 import time
 from typing import Optional
@@ -15,18 +16,26 @@ class DcsOverlayAckReceiver:
         host: str = "0.0.0.0",
         port: int = 7782,
         timeout: float = 0.2,
+        completed_cache_size: int = 2048,
         session_id: str | None = None,
     ) -> None:
         self.server = (host, port)
         self.session_id = session_id
         self._pending: dict[str, dict] = {}
-        self._completed: set[str] = set()
+        self._completed_cache_size = max(1, int(completed_cache_size))
+        self._completed: OrderedDict[str, None] = OrderedDict()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(self.server)
         self.sock.settimeout(timeout)
 
     def close(self) -> None:
         self.sock.close()
+
+    def _remember_completed(self, cmd_id: str) -> None:
+        self._completed.pop(cmd_id, None)
+        self._completed[cmd_id] = None
+        while len(self._completed) > self._completed_cache_size:
+            self._completed.popitem(last=False)
 
     def recv(self) -> Optional[dict]:
         try:
@@ -43,7 +52,7 @@ class DcsOverlayAckReceiver:
     def _pop_pending(self, cmd_id: str) -> Optional[dict]:
         ack = self._pending.pop(cmd_id, None)
         if ack is not None:
-            self._completed.add(cmd_id)
+            self._remember_completed(cmd_id)
         return ack
 
     def wait_for(self, cmd_id: str, timeout: float = 1.0) -> Optional[dict]:
@@ -63,7 +72,7 @@ class DcsOverlayAckReceiver:
             if ack_cmd_id in self._completed:
                 continue
             if ack_cmd_id == cmd_id:
-                self._completed.add(cmd_id)
+                self._remember_completed(cmd_id)
                 return ack
             self._pending.setdefault(ack_cmd_id, ack)
         return None

@@ -153,6 +153,7 @@ def test_sender_retries_idempotently_and_classifies_ack_timeout(monkeypatch) -> 
     ack = sender.send_intent(intent, expect_ack=True)
 
     assert ack is not None
+    assert "schema_version" not in ack
     assert ack["status"] == "failed"
     assert ack["failure_class"] == "ack_timeout"
     assert ack["attempt_count"] == 3
@@ -188,6 +189,7 @@ def test_sender_accepts_late_ack_during_retry_window(monkeypatch) -> None:
     ack = sender.send_intent(intent, expect_ack=True)
 
     assert ack is not None
+    assert "schema_version" not in ack
     assert ack["status"] == "ok"
     assert ack["attempt_count"] == 2
     assert len(dummy.sent) == 2
@@ -195,4 +197,24 @@ def test_sender_accepts_late_ack_during_retry_window(monkeypatch) -> None:
     assert {cmd["cmd_id"] for cmd in cmds} == {cmds[0]["cmd_id"]}
     applied = [event for event in events if event.kind == "overlay_applied"]
     assert len(applied) == 1
+    assert "schema_version" not in applied[0].payload
     assert applied[0].payload["attempt_count"] == 2
+
+
+def test_sender_uses_sender_session_id_for_remote_and_local_ack_results(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
+    sender = DcsOverlaySender(
+        ack_receiver=SequencedAckReceiver([{"status": "ok"}, None, None]),
+        event_sink=events.append,
+        session_id="sender-session",
+        ack_retry_count=1,
+    )
+
+    sender.send_intent(OverlayIntent(intent="highlight", target="battery_switch", element_id="pnt_331"), expect_ack=True)
+    sender.send_intent(OverlayIntent(intent="clear", target="battery_switch", element_id="pnt_331"), expect_ack=True)
+
+    ack_events = [event for event in events if event.kind in {"overlay_applied", "overlay_failed"}]
+    assert len(ack_events) == 2
+    assert all(event.session_id == "sender-session" for event in ack_events)

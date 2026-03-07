@@ -106,3 +106,16 @@ def test_wait_for_ignores_duplicate_ack_after_match(monkeypatch) -> None:
     assert received["cmd_id"] == ack["cmd_id"]
     duplicate = receiver.wait_for(ack["cmd_id"], timeout=0.01)
     assert duplicate is None
+
+
+def test_completed_cache_is_bounded(monkeypatch) -> None:
+    dummy = DummySocket([])
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    receiver = DcsOverlayAckReceiver(host="127.0.0.1", port=0, completed_cache_size=2)
+    try:
+        receiver._remember_completed("cmd-1")
+        receiver._remember_completed("cmd-2")
+        receiver._remember_completed("cmd-3")
+        assert list(receiver._completed.keys()) == ["cmd-2", "cmd-3"]
+    finally:
+        receiver.close()

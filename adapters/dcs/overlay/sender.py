@@ -118,7 +118,6 @@ class DcsOverlaySender:
         reason: str,
     ) -> dict[str, Any]:
         return {
-            "schema_version": "v2",
             "cmd_id": cmd["cmd_id"],
             "status": "failed",
             "reason": reason,
@@ -130,29 +129,28 @@ class DcsOverlaySender:
         }
 
     def _decorate_ack_result(self, ack: Mapping[str, Any], *, cmd: dict, intent: OverlayIntent, attempt_count: int) -> dict[str, Any]:
-        result = dict(ack)
-        result.setdefault("schema_version", "v2")
-        result.setdefault("cmd_id", cmd["cmd_id"])
-        result.setdefault("action", cmd["action"])
-        result.setdefault("intent", intent.intent)
-        result.setdefault("target", intent.element_id)
-        result["attempt_count"] = attempt_count
-        if result.get("status") == "failed":
-            result.setdefault("failure_class", "remote_failure")
+        result = {
+            "cmd_id": cmd["cmd_id"],
+            "status": ack.get("status"),
+            "reason": ack.get("reason"),
+            "attempt_count": attempt_count,
+            "action": cmd["action"],
+            "intent": intent.intent,
+            "target": intent.element_id,
+        }
+        if ack.get("status") == "failed":
+            result["failure_class"] = "remote_failure"
         return result
 
     def _emit_ack_result(self, ack: Mapping[str, Any], *, intent: OverlayIntent) -> None:
         payload = dict(ack)
-        if self.ack_receiver and "failure_class" not in payload:
-            event = self.ack_receiver.to_event(payload, intent=intent.intent, target=intent.element_id)
-        else:
-            kind = "overlay_applied" if payload.get("status") == "ok" else "overlay_failed"
-            event = Event(
-                kind=kind,
-                payload=payload,
-                t_wall=time.time(),
-                session_id=self.session_id,
-            )
+        kind = "overlay_applied" if payload.get("status") == "ok" else "overlay_failed"
+        event = Event(
+            kind=kind,
+            payload=payload,
+            t_wall=time.time(),
+            session_id=self.session_id,
+        )
         self._emit_event(event)
 
     def send_intent(self, intent: OverlayIntent, expect_ack: bool = True) -> Optional[dict]:
