@@ -50,6 +50,43 @@ def test_summarize_help_failures_aggregates_primary_and_all_codes() -> None:
     assert summary["provider_counts"] == {"openai_compat": 2}
 
 
+def test_summarize_help_failures_falls_back_to_primary_failure_code_when_failure_codes_missing() -> None:
+    events = [
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "status": "error",
+                "metadata": {
+                    "provider": "openai_compat",
+                    "failure_code": "schema_fail",
+                },
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "status": "error",
+                "metadata": {
+                    "provider": "ollama",
+                    "failure_code": "model_http_fail",
+                    "failure_codes": [None, ""],
+                },
+            },
+        },
+    ]
+
+    summary = summarize_help_failures(events)
+
+    assert summary["primary_failure_code_counts"] == {
+        "model_http_fail": 1,
+        "schema_fail": 1,
+    }
+    assert summary["all_failure_code_counts"] == {
+        "model_http_fail": 1,
+        "schema_fail": 1,
+    }
+
+
 def test_overlay_rejection_payload_keeps_overlay_failure_codes_separate_from_response_failure_codes() -> None:
     payload = overlay_rejection_payload(
         response_metadata={

@@ -54,9 +54,15 @@ def summarize_help_failures(events: Iterable[Mapping[str, Any]]) -> dict[str, An
 
         failure_codes = metadata.get("failure_codes")
         if isinstance(failure_codes, list):
+            counted_any = False
             for code in failure_codes:
                 if isinstance(code, str) and code:
                     all_counts[code] += 1
+                    counted_any = True
+            if not counted_any and isinstance(failure_code, str) and failure_code:
+                all_counts[failure_code] += 1
+        elif isinstance(failure_code, str) and failure_code:
+            all_counts[failure_code] += 1
 
     return {
         "total_tutor_responses": total_tutor_responses,
