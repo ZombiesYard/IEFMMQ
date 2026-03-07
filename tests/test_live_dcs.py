@@ -20,6 +20,7 @@ from live_dcs import (
     UdpHelpTrigger,
     build_arg_parser,
     _is_help_trigger_payload,
+    _build_source_chunk_ref,
     _load_overlay_allowlist,
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
@@ -240,6 +241,21 @@ class PolicyMixedKnowledge:
                 "snippet_id": "DCS FA-18C Early Access Guide EN_1",
                 "score": 0.9,
             },
+        ]
+
+
+class PolicyMixedKnowledgeWithDistinctChunkId:
+    def query(self, text: str, k: int = 5) -> list[dict[str, Any]]:
+        return [
+            {
+                "doc_id": "fa18c_startup_master",
+                "section": "Master Step Table",
+                "page_or_heading": "Master Step Table",
+                "snippet": "S03 APU switch to ON and wait for green APU READY light.",
+                "snippet_id": "custom_alias_for_chunk",
+                "chunk_id": "fa18c_startup_master_1",
+                "score": 1.0,
+            }
         ]
 
 
@@ -750,6 +766,48 @@ def test_live_loop_marks_policy_filtered_all_as_grounding_missing_and_logs_chunk
     assert req_meta["grounding_reason"] == "policy_filtered_all"
     assert req_meta["source_chunk_refs"] == []
     assert req_meta["grounding_policy_filtered_out_count"] == 1
+
+
+def test_live_loop_prefers_chunk_id_when_building_source_chunk_refs_for_policy_filtered_snippets(
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_policy_chunk_id.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_adapter=PolicyMixedKnowledgeWithDistinctChunkId(),
+        rag_top_k=2,
+        cold_start_production=False,
+        knowledge_source_policy_path=_default_policy_path(),
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    req_meta = tutor_request_payload["metadata"]
+    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-28"]
+
+
+def test_build_source_chunk_ref_falls_back_to_chunk_without_line_range() -> None:
+    assert _build_source_chunk_ref(
+        {
+            "doc_id": "fa18c_startup_master",
+            "snippet_id": "custom_alias",
+            "chunk_id": "fa18c_startup_master_1",
+        }
+    ) == "fa18c_startup_master/fa18c_startup_master_1"
 
 
 def test_sanitize_policy_error_handles_unc_paths_with_spaces() -> None:

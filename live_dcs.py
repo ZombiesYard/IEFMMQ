@@ -332,6 +332,29 @@ def _coerce_int(value: Any) -> int | None:
     return None
 
 
+def _build_source_chunk_ref(raw: Mapping[str, Any]) -> str | None:
+    doc_id_raw = raw.get("doc_id")
+    doc_id = doc_id_raw.strip() if isinstance(doc_id_raw, str) else None
+    if not doc_id:
+        return None
+
+    chunk_id_raw = raw.get("chunk_id")
+    if not isinstance(chunk_id_raw, str) or not chunk_id_raw.strip():
+        chunk_id_raw = raw.get("snippet_id")
+    chunk_id = chunk_id_raw.strip() if isinstance(chunk_id_raw, str) else None
+    if not chunk_id:
+        return None
+
+    line_start = _coerce_int(raw.get("line_start"))
+    line_end = _coerce_int(raw.get("line_end"))
+    if line_start is None or line_end is None or line_start < 1 or line_end < 1:
+        return f"{doc_id}/{chunk_id}"
+
+    start = min(line_start, line_end)
+    end = max(line_start, line_end)
+    return f"{doc_id}/{chunk_id}:{start}-{end}"
+
+
 def _json_safe_scalar(value: Any) -> str | int | float | bool | None:
     if value is None or isinstance(value, (str, bool, int)):
         return value
@@ -381,9 +404,19 @@ def _normalize_knowledge_snippet(raw: Mapping[str, Any], fallback_idx: int) -> d
         "snippet": snippet,
         "snippet_id": snippet_id,
     }
+    chunk_id_raw = raw.get("chunk_id")
+    chunk_id_scalar = _json_safe_scalar(chunk_id_raw)
+    if isinstance(chunk_id_scalar, str) and chunk_id_scalar:
+        normalized["chunk_id"] = chunk_id_scalar
     score = raw.get("score")
     if isinstance(score, (int, float)) and not isinstance(score, bool):
         normalized["score"] = float(score) if math.isfinite(float(score)) else str(score)
+    line_start = _coerce_int(raw.get("line_start"))
+    if line_start is not None and line_start >= 1:
+        normalized["line_start"] = line_start
+    line_end = _coerce_int(raw.get("line_end"))
+    if line_end is not None and line_end >= 1:
+        normalized["line_end"] = line_end
     return normalized
 
 
@@ -1196,22 +1229,11 @@ class LiveDcsTutorLoop:
                 retrieve_meta = dict(retrieve_meta)
                 retrieve_meta["grounding_missing"] = True
                 retrieve_meta["grounding_reason"] = "policy_filtered_all"
-            source_chunk_refs = [
-                f"{item['doc_id']}/{item['snippet_id']}:{item['line_start']}-{item['line_end']}"
-                for item in snippets
-                if (
-                    isinstance(item.get("doc_id"), str)
-                    and item.get("doc_id")
-                    and isinstance(item.get("snippet_id"), str)
-                    and item.get("snippet_id")
-                    and isinstance(item.get("line_start"), int)
-                    and not isinstance(item.get("line_start"), bool)
-                    and item.get("line_start") >= 1
-                    and isinstance(item.get("line_end"), int)
-                    and not isinstance(item.get("line_end"), bool)
-                    and item.get("line_end") >= 1
-                )
-            ]
+            source_chunk_refs = []
+            for item in snippets:
+                ref = _build_source_chunk_ref(item)
+                if ref is not None:
+                    source_chunk_refs.append(ref)
         elif bool(retrieve_meta.get("source_policy_applied")):
             policy_id_raw = retrieve_meta.get("source_policy_id")
             policy_version_raw = retrieve_meta.get("source_policy_version")
