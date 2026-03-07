@@ -61,10 +61,8 @@ class _StepCacheEntry:
     step_id: str
     query: str
     t_mono: float
-    snippets: list[dict[str, Any]]
-    requested_k: int
+    raw_snippets: list[dict[str, Any]]
     is_exhaustive: bool
-    metadata: dict[str, Any]
 
 
 def _extract_non_empty_str(value: Any) -> str | None:
@@ -118,6 +116,23 @@ def _source_chunk_refs(snippets: list[Mapping[str, Any]]) -> list[str]:
         seen.add(ref)
         out.append(ref)
     return out
+
+
+def _apply_source_policy(
+    snippets: list[dict[str, Any]],
+    *,
+    policy: KnowledgeSourcePolicy | None,
+) -> tuple[list[dict[str, Any]], int, bool, bool, str | None]:
+    filtered = [dict(item) for item in snippets]
+    if policy is None:
+        return filtered, 0, False, False, None
+
+    before_filter_count = len(filtered)
+    filtered = policy.filter_snippets(filtered)
+    policy_filtered_out_count = max(0, before_filter_count - len(filtered))
+    grounding_missing = before_filter_count > 0 and not filtered
+    grounding_reason = "policy_filtered_all" if grounding_missing else None
+    return filtered, policy_filtered_out_count, True, grounding_missing, grounding_reason
 
 
 class LocalKnowledgeAdapter(KnowledgePort):
@@ -296,68 +311,56 @@ class LocalKnowledgeAdapter(KnowledgePort):
                     cached is not None
                     and (now - cached.t_mono) <= self.step_cache_ttl_s
                     and cached.query == query
-                    and (len(cached.snippets) >= k or cached.is_exhaustive)
+                    and (len(cached.raw_snippets) >= k or cached.is_exhaustive)
                 ):
                     self._step_cache.move_to_end(cache_key)
-                    snippets = [dict(item) for item in cached.snippets[:k]]
-                    meta = dict(cached.metadata)
-                    meta.update(
-                        {
-                            "query": query,
-                            "top_k": k,
-                            "cache_hit": True,
-                            "cache_step_id": cache_key,
-                            "snippet_ids": _snippet_ids(snippets),
-                            "source_chunk_refs": _source_chunk_refs(snippets),
-                            "index_path": str(self.index_path),
-                        }
-                    )
+                    ranked_snippets = [dict(item) for item in cached.raw_snippets[:k]]
+                    (
+                        snippets,
+                        policy_filtered_out_count,
+                        source_policy_applied,
+                        grounding_missing,
+                        grounding_reason,
+                    ) = _apply_source_policy(ranked_snippets, policy=policy)
+                    meta = {
+                        "query": query,
+                        "top_k": k,
+                        "cache_hit": True,
+                        "cache_step_id": cache_key,
+                        "grounding_missing": grounding_missing,
+                        "grounding_reason": grounding_reason,
+                        "snippet_ids": _snippet_ids(snippets),
+                        "source_chunk_refs": _source_chunk_refs(snippets),
+                        "index_path": str(self.index_path),
+                        "source_policy_applied": source_policy_applied,
+                        "source_policy_id": policy_id,
+                        "source_policy_version": policy_version,
+                        "source_policy_filtered_out_count": policy_filtered_out_count,
+                    }
                     self._last_retrieve_metadata = dict(meta)
                     return snippets, meta
 
         raw_results = self.retriever.query(query, k=k)
-        snippets = [self._normalize_result(item, idx) for idx, item in enumerate(raw_results)]
+        ranked_snippets = [self._normalize_result(item, idx) for idx, item in enumerate(raw_results)]
         raw_result_count = len(raw_results)
-        policy_filtered_out_count = 0
-        source_policy_applied = False
-        grounding_missing = False
-        grounding_reason = None
-        if policy is not None:
-            source_policy_applied = True
-            before_filter_count = len(snippets)
-            snippets = policy.filter_snippets(snippets)
-            policy_filtered_out_count = max(0, before_filter_count - len(snippets))
-            if before_filter_count > 0 and not snippets:
-                grounding_missing = True
-                grounding_reason = "policy_filtered_all"
+        (
+            snippets,
+            policy_filtered_out_count,
+            source_policy_applied,
+            grounding_missing,
+            grounding_reason,
+        ) = _apply_source_policy(ranked_snippets, policy=policy)
         if cache_key is not None:
-            cache_meta = {
-                "query": query,
-                "top_k": k,
-                "cache_hit": False,
-                "cache_step_id": cache_key,
-                "grounding_missing": grounding_missing,
-                "grounding_reason": grounding_reason,
-                "snippet_ids": _snippet_ids(snippets),
-                "source_chunk_refs": _source_chunk_refs(snippets),
-                "index_path": str(self.index_path),
-                "source_policy_applied": source_policy_applied,
-                "source_policy_id": policy_id,
-                "source_policy_version": policy_version,
-                "source_policy_filtered_out_count": policy_filtered_out_count,
-            }
             with self._step_cache_lock:
                 self._step_cache[cache_key] = _StepCacheEntry(
                     step_id=cache_key,
                     query=query,
                     t_mono=now,
-                    snippets=[dict(item) for item in snippets],
-                    requested_k=k,
+                    raw_snippets=[dict(item) for item in ranked_snippets],
                     # Exhaustiveness must reflect the raw retriever ranking, not the
                     # post-policy filtered snippet count, otherwise a small `top_k`
                     # request can incorrectly cache an empty result as exhaustive.
                     is_exhaustive=raw_result_count < k,
-                    metadata=cache_meta,
                 )
                 self._step_cache.move_to_end(cache_key)
                 self._prune_step_cache(now)

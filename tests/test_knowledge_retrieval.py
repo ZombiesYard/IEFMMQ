@@ -281,6 +281,73 @@ def test_source_policy_cache_does_not_mark_filtered_small_topk_as_exhaustive(tmp
     assert second_meta["cache_hit"] is False
 
 
+def test_source_policy_cache_reapplies_policy_for_smaller_topk_requests(tmp_path: Path) -> None:
+    index_path = tmp_path / "index_cache_policy_smaller_topk.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {
+                        "doc_id": "manual",
+                        "chunks": [
+                            {
+                                "chunk_id": "manual_0",
+                                "snippet_id": "manual_0",
+                                "section": "Forbidden",
+                                "page_or_heading": "Forbidden",
+                                "text": "battery battery battery battery",
+                            },
+                            {
+                                "chunk_id": "manual_1",
+                                "snippet_id": "manual_1",
+                                "section": "Allowed",
+                                "page_or_heading": "Allowed",
+                                "text": "battery",
+                            },
+                        ],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    policy_path = tmp_path / "policy_cache_policy_smaller_topk.yaml"
+    policy_path.write_text(
+        "policy_id: retrieval_policy\n"
+        "allow:\n"
+        "  - doc_id: manual\n"
+        "    chunk_id: manual_1\n"
+        "    line_range: [1, 1]\n",
+        encoding="utf-8",
+    )
+    policy = KnowledgeSourcePolicy.from_yaml(policy_path, index_path=index_path)
+
+    now = [100.0]
+    adapter = LocalKnowledgeAdapter(index_path, source_policy=policy, time_fn=lambda: now[0], step_cache_ttl_s=60.0)
+    assert adapter.retriever is not None
+
+    calls = {"count": 0}
+    raw_query = adapter.retriever.query
+
+    def _counted_query(text: str, k: int = 5):
+        calls["count"] += 1
+        return raw_query(text, k)
+
+    adapter.retriever.query = _counted_query  # type: ignore[assignment]
+
+    first, first_meta = adapter.retrieve_with_meta("battery", top_k=2, step_id="S03")
+    second, second_meta = adapter.retrieve_with_meta("battery", top_k=1, step_id="S03")
+
+    assert [item["snippet_id"] for item in first] == ["manual_1"]
+    assert first_meta["cache_hit"] is False
+    assert second == []
+    assert second_meta["cache_hit"] is True
+    assert second_meta["grounding_reason"] == "policy_filtered_all"
+    assert calls["count"] == 1
+
+
 def test_retriever_pool_is_bounded(tmp_path: Path) -> None:
     for idx in range(RETRIEVER_POOL_MAX_SIZE + 4):
         doc = tmp_path / f"doc_{idx}.md"
