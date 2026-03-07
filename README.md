@@ -12,10 +12,11 @@ The current repository state covers:
 
 ## TL;DR
 
-All examples below assume bash/WSL and the project virtualenv:
+All examples below assume bash and a repository-local virtualenv:
 
 ```bash
-source ~/venvs/iefmmq-wsl/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -e .
 ```
 
@@ -57,7 +58,7 @@ Replay with a local vLLM OpenAI-compatible endpoint:
 
 ```bash
 export SIMTUTOR_MODEL_PROVIDER=openai_compat
-export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000/v1
+export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000
 export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
 export SIMTUTOR_MODEL_TIMEOUT_S=20
 export SIMTUTOR_MODEL_API_KEY=dummy
@@ -111,10 +112,11 @@ python -m tools.install_dcs_hook --dcs-variant DCS
 
 ### Install
 
-Using the repository virtualenv convention:
+Create and activate a local virtualenv:
 
 ```bash
-source ~/venvs/iefmmq-wsl/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -e .
 ```
 
@@ -152,7 +154,7 @@ There is no installed console script at the moment. Use module/script entrypoint
 
 ```bash
 export SIMTUTOR_MODEL_PROVIDER=openai_compat
-export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000/v1
+export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000
 export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
 export SIMTUTOR_MODEL_TIMEOUT_S=20
 export SIMTUTOR_MODEL_API_KEY=dummy
