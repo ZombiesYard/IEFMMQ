@@ -7,6 +7,7 @@ def test_stub_mode_a_sets_rule_card():
     stub = ModelStub(mode="A")
     res = stub.plan_next_step(obs)
     assert "[RULE]" in res.metadata["card"]
+    assert res.metadata["generation_mode"] == "model"
     assert "S05" in res.message
 
 
@@ -15,6 +16,7 @@ def test_stub_mode_c_adds_rag_note():
     stub = ModelStub(mode="C")
     res = stub.explain_error(obs)
     assert "RAG" in res.metadata["card"]
+    assert res.metadata["generation_mode"] == "model"
     assert "S06" in res.message
 
 
@@ -23,5 +25,6 @@ def test_stub_mode_b_sets_llm_card():
     stub = ModelStub(mode="B")
     res = stub.plan_next_step(obs)
     assert "[LLM-STUB]" in res.metadata["card"]
+    assert res.metadata["generation_mode"] == "model"
     assert "S07" in res.message
 

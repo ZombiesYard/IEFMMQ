@@ -27,6 +27,8 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
                 "target": "apu_switch",
                 "element_id": "pnt_hacked",
                 "ttl_s": 99,
+                "help_cycle_id": "cycle-123",
+                "generation_mode": "repair",
             }
         ]
     )
@@ -37,8 +39,14 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
     assert cmd["target"] == "pnt_375"
     assert len(report.executed) == 1
     assert report.executed[0]["target"] == "apu_switch"
+    assert report.executed[0]["help_cycle_id"] == "cycle-123"
+    assert report.executed[0]["generation_mode"] == "repair"
     overlay_requested_count = sum(1 for evt in events if evt.kind == "overlay_requested")
     assert overlay_requested_count == 1
+    overlay_requested = next(evt for evt in events if evt.kind == "overlay_requested")
+    assert overlay_requested.metadata["help_cycle_id"] == "cycle-123"
+    assert overlay_requested.metadata["generation_mode"] == "repair"
+    assert overlay_requested.payload["help_cycle_id"] == "cycle-123"
 
 
 def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> None:

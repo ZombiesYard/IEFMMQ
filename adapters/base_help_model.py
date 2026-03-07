@@ -33,6 +33,16 @@ from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
 
 
+def _generation_mode_from_repair_state(
+    *,
+    json_repaired: bool,
+    repair_applied: bool,
+) -> str:
+    if json_repaired or repair_applied:
+        return "repair"
+    return "model"
+
+
 class BaseHelpModel(ModelPort):
     provider: str = "unknown"
 
@@ -130,6 +140,10 @@ class BaseHelpModel(ModelPort):
                 {
                     "provider": self.provider,
                     "model": self.model_name,
+                    "generation_mode": _generation_mode_from_repair_state(
+                        json_repaired=extraction.json_repaired,
+                        repair_applied=bool(repair_details.get("repair_applied")),
+                    ),
                     "latency_ms": int((perf_counter() - start) * 1000),
                     "help_response": help_obj,
                     "json_repaired": extraction.json_repaired,
@@ -171,6 +185,7 @@ class BaseHelpModel(ModelPort):
             error_metadata = {
                 "provider": self.provider,
                 "model": self.model_name,
+                "generation_mode": "fallback",
                 "latency_ms": int((perf_counter() - start) * 1000),
                 "error_type": type(exc).__name__,
                 "error": str(exc),

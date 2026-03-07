@@ -490,6 +490,36 @@ def _normalize_cached_response_metadata(metadata: dict[str, Any]) -> None:
         metadata["fallback_overlay_reason"] = "not_needed"
 
 
+def _normalize_generation_mode(response: TutorResponse) -> str:
+    metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+    raw_mode = metadata.get("generation_mode")
+    if raw_mode in {"model", "repair", "fallback"}:
+        return str(raw_mode)
+    if bool(metadata.get("json_repaired")) or bool(metadata.get("repair_applied")):
+        return "repair"
+    if response.status == "error" or metadata.get("provider") == "fallback":
+        return "fallback"
+    return "model"
+
+
+def _attach_help_cycle_trace_to_actions(
+    actions: Sequence[Mapping[str, Any] | Any],
+    *,
+    help_cycle_id: str,
+    generation_mode: str,
+) -> list[Mapping[str, Any] | Any]:
+    traced: list[Mapping[str, Any] | Any] = []
+    for action in actions:
+        if not isinstance(action, Mapping):
+            traced.append(action)
+            continue
+        item = dict(action)
+        item["help_cycle_id"] = help_cycle_id
+        item.setdefault("generation_mode", generation_mode)
+        traced.append(item)
+    return traced
+
+
 def _dedupe_strings(items: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -1064,6 +1094,7 @@ class LiveDcsTutorLoop:
         payload: Mapping[str, Any],
         related_id: str | None = None,
         t_wall: float | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         if self.event_sink is None:
             return
@@ -1073,6 +1104,7 @@ class LiveDcsTutorLoop:
             related_id=related_id,
             t_wall=t_wall,
             session_id=self.session_id,
+            metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
         )
         self.event_sink(event)
 
@@ -1714,12 +1746,16 @@ class LiveDcsTutorLoop:
             return None, None
 
         request, prompt_meta, state_key = self._build_request(obs)
+        help_cycle_id = request.request_id
+        request.metadata = dict(request.metadata)
+        request.metadata["help_cycle_id"] = help_cycle_id
         now_wall = time.time()
         self._emit_event(
             kind="tutor_request",
             payload=request.to_dict(),
             related_id=request.request_id,
             t_wall=now_wall,
+            metadata={"help_cycle_id": help_cycle_id},
         )
         self._stats.help_cycles += 1
 
@@ -1750,6 +1786,13 @@ class LiveDcsTutorLoop:
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
             _normalize_cached_response_metadata(response.metadata)
+            response.metadata["help_cycle_id"] = help_cycle_id
+            response.metadata["generation_mode"] = _normalize_generation_mode(response)
+            response.actions = _attach_help_cycle_trace_to_actions(
+                response.actions,
+                help_cycle_id=help_cycle_id,
+                generation_mode=response.metadata["generation_mode"],
+            )
             overlay_report = self._execute_or_dry_run_actions(response.actions)
         else:
             hint = request.context.get("deterministic_step_hint", {})
@@ -1823,6 +1866,8 @@ class LiveDcsTutorLoop:
             response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
+            response.metadata["help_cycle_id"] = help_cycle_id
+            response.metadata["generation_mode"] = _normalize_generation_mode(response)
 
             mapped_actions, mapped_meta = self._map_response_actions(response, request)
             response.actions = mapped_actions
@@ -1847,6 +1892,11 @@ class LiveDcsTutorLoop:
             response.metadata["fallback_overlay_used"] = fallback_overlay_used
             response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
             _normalize_cached_response_metadata(response.metadata)
+            response.actions = _attach_help_cycle_trace_to_actions(
+                response.actions,
+                help_cycle_id=help_cycle_id,
+                generation_mode=response.metadata["generation_mode"],
+            )
 
             overlay_report = self._execute_or_dry_run_actions(response.actions)
             provider = response.metadata.get("provider")
@@ -1885,11 +1935,16 @@ class LiveDcsTutorLoop:
             response_mapping=response_mapping if isinstance(response_mapping, Mapping) else None,
         )
         if rejected_overlay is not None:
+            rejected_overlay["help_cycle_id"] = help_cycle_id
             self._emit_event(
                 kind="overlay_rejected",
                 payload=rejected_overlay,
                 related_id=request.request_id,
                 t_wall=time.time(),
+                metadata={
+                    "help_cycle_id": help_cycle_id,
+                    "generation_mode": response.metadata.get("generation_mode"),
+                },
             )
 
         self._emit_event(
@@ -1897,6 +1952,10 @@ class LiveDcsTutorLoop:
             payload=response.to_dict(),
             related_id=request.request_id,
             t_wall=time.time(),
+            metadata={
+                "help_cycle_id": help_cycle_id,
+                "generation_mode": response.metadata.get("generation_mode"),
+            },
         )
         return response, overlay_report
 

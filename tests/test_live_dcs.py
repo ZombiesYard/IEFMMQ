@@ -11,6 +11,8 @@ import time
 import pytest
 import yaml
 
+from adapters.action_executor import OverlayActionExecutor
+from adapters.dcs.overlay.sender import DcsOverlaySender
 from adapters.source_chunk_refs import build_source_chunk_ref
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL
 from core.types import Observation, TutorRequest, TutorResponse
@@ -28,6 +30,7 @@ from live_dcs import (
     _sanitize_policy_error_for_user,
 )
 from tools.index_docs import build_index
+from tests.adapters.socket_stubs import DummySocket
 
 
 def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
@@ -92,6 +95,57 @@ class FailingModel:
 
     def explain_error(self, observation: Observation, request=None) -> TutorResponse:
         raise RuntimeError("model unavailable")
+
+
+class SequencedGenerationModeModel:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+        return self.explain_error(observation, request)
+
+    def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+        self.calls += 1
+        if self.calls == 1:
+            mode = "model"
+            status = "ok"
+            message = "Model native response."
+            actions = [
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "apu_switch",
+                    "element_id": _apu_element_id_from_ui_map(),
+                }
+            ]
+        elif self.calls == 2:
+            mode = "repair"
+            status = "ok"
+            message = "Locally repaired response."
+            actions = [
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "apu_switch",
+                    "element_id": _apu_element_id_from_ui_map(),
+                }
+            ]
+        else:
+            mode = "fallback"
+            status = "error"
+            message = "Fallback: likely stuck at S03."
+            actions = []
+        return TutorResponse(
+            status=status,
+            in_reply_to=request.request_id if request else None,
+            message=message,
+            actions=actions,
+            explanations=[message],
+            metadata={
+                "provider": "mock_qwen" if mode != "fallback" else "fallback",
+                "generation_mode": mode,
+            },
+        )
 
 
 class RecordingExecutor:
@@ -511,6 +565,80 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
     prompt_build = tutor_response_payload["metadata"]["prompt_build"]
     assert prompt_build["grounding_missing"] is False
     assert prompt_build["rag_snippet_ids"] == req_meta["grounding_snippet_ids"]
+
+
+def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monkeypatch, tmp_path: Path) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+
+    replay_path = tmp_path / "bios_help_cycle_trace.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            _bios_frame(1, 10.0, apu_switch=0),
+            _bios_frame(2, 10.4, apu_switch=1),
+            _bios_frame(3, 10.8, apu_switch=0),
+        ],
+    )
+
+    source = ReplayBiosReceiver(replay_path)
+    model = SequencedGenerationModeModel()
+    events = []
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, event_sink=events.append)
+    executor = OverlayActionExecutor(sender=sender, event_sink=events.append, max_targets=1)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=0.0,
+        lang="en",
+    )
+    try:
+        stats = loop.run(max_frames=3, auto_help_every_n_frames=1)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 3
+    grouped: dict[str, list[Any]] = {}
+    for event in events:
+        if event.kind not in {
+            "tutor_request",
+            "tutor_response",
+            "overlay_requested",
+            "overlay_applied",
+            "overlay_failed",
+            "overlay_rejected",
+            "overlay_dry_run",
+        }:
+            continue
+        help_cycle_id = event.metadata.get("help_cycle_id")
+        assert isinstance(help_cycle_id, str) and help_cycle_id
+        grouped.setdefault(help_cycle_id, []).append(event)
+
+    assert len(grouped) == 3
+    observed_generation_modes: list[str] = []
+    overlay_event_kinds: set[str] = set()
+    for help_cycle_id, cycle_events in grouped.items():
+        request_events = [event for event in cycle_events if event.kind == "tutor_request"]
+        response_events = [event for event in cycle_events if event.kind == "tutor_response"]
+        assert len(request_events) == 1
+        assert len(response_events) == 1
+        request_payload = request_events[0].payload
+        response_payload = response_events[0].payload
+        assert request_payload["metadata"]["help_cycle_id"] == help_cycle_id
+        assert response_payload["metadata"]["help_cycle_id"] == help_cycle_id
+        generation_mode = response_payload["metadata"]["generation_mode"]
+        observed_generation_modes.append(generation_mode)
+        assert response_events[0].metadata["generation_mode"] == generation_mode
+        for event in cycle_events:
+            if event.kind.startswith("overlay_"):
+                overlay_event_kinds.add(event.kind)
+                assert event.payload["help_cycle_id"] == help_cycle_id
+                assert event.metadata["generation_mode"] == generation_mode
+
+    assert observed_generation_modes == ["model", "repair", "fallback"]
+    assert "overlay_requested" in overlay_event_kinds
 
 
 def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> None:

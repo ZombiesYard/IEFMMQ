@@ -29,6 +29,7 @@ def test_explain_error_success_with_valid_help_response() -> None:
     assert res.actions[0]["element_id"] == "pnt_375"
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3:8b"
+    assert res.metadata["generation_mode"] == "repair"
     assert isinstance(res.metadata["latency_ms"], int)
     assert res.metadata["json_repaired"] is True
     assert "removed_code_fence" in res.metadata["json_repair_reasons"]
@@ -59,6 +60,7 @@ def test_explain_error_bad_output_fallback_no_overlay() -> None:
     assert res.actions == []
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3:8b"
+    assert res.metadata["generation_mode"] == "fallback"
     assert isinstance(res.metadata["latency_ms"], int)
 
 
@@ -70,6 +72,7 @@ def test_explain_error_malformed_ollama_response_envelope_is_schema_fail() -> No
 
     assert res.status == "error"
     assert res.actions == []
+    assert res.metadata["generation_mode"] == "fallback"
     assert res.metadata["failure_code"] == SCHEMA_FAIL
     assert res.metadata["failure_stage"] == "model_response_envelope"
 
@@ -85,6 +88,7 @@ def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "ollama"
+    assert res.metadata["generation_mode"] == "fallback"
 
 
 def test_explain_error_invalid_evidence_ref_clears_overlay() -> None:
@@ -168,6 +172,7 @@ def test_explain_error_http_error_fallback() -> None:
 
     assert res.status == "error"
     assert res.metadata["provider"] == "ollama"
+    assert res.metadata["generation_mode"] == "fallback"
 
 
 def test_explain_error_timeout_or_connection_error_fallback() -> None:
@@ -181,6 +186,7 @@ def test_explain_error_timeout_or_connection_error_fallback() -> None:
         assert res.status == "error"
         assert res.actions == []
         assert res.metadata["provider"] == "ollama"
+        assert res.metadata["generation_mode"] == "fallback"
 
 
 def test_explain_error_step_id_not_in_candidate_steps_fallback() -> None:
@@ -196,6 +202,7 @@ def test_explain_error_step_id_not_in_candidate_steps_fallback() -> None:
 
     assert res.status == "error"
     assert res.metadata["provider"] == "ollama"
+    assert res.metadata["generation_mode"] == "fallback"
 
 
 def test_explain_error_alternate_response_format() -> None:
@@ -213,6 +220,7 @@ def test_explain_error_alternate_response_format() -> None:
     assert res.actions[0]["element_id"] == "pnt_375"
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3:8b"
+    assert res.metadata["generation_mode"] == "model"
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
     validate_help_response(res.metadata["help_response"])

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import socket
 import time
-from typing import Optional, Callable
+from typing import Any, Callable, Mapping, Optional
 from uuid import uuid4
 
 from core.overlay import OverlayIntent
@@ -36,13 +36,58 @@ class DcsOverlaySender:
         self.session_id = session_id
         self.event_sink = event_sink
         self._last_target: Optional[str] = None
+        self._event_metadata_stack: list[dict[str, Any]] = []
 
     def close(self) -> None:
         self.sock.close()
 
     def _emit_event(self, event: Event) -> None:
+        current_trace = self._current_event_metadata()
+        if current_trace:
+            event.payload = dict(event.payload)
+            merged_meta = dict(event.metadata)
+            merged_meta.update(current_trace)
+            event.metadata = merged_meta
+            help_cycle_id = current_trace.get("help_cycle_id")
+            if (
+                isinstance(help_cycle_id, str)
+                and help_cycle_id
+                and isinstance(event.payload, dict)
+                and "help_cycle_id" not in event.payload
+            ):
+                event.payload["help_cycle_id"] = help_cycle_id
+            generation_mode = current_trace.get("generation_mode")
+            if (
+                isinstance(generation_mode, str)
+                and generation_mode
+                and isinstance(event.payload, dict)
+                and "generation_mode" not in event.payload
+            ):
+                event.payload["generation_mode"] = generation_mode
         if self.event_sink:
             self.event_sink(event)
+
+    def _current_event_metadata(self) -> dict[str, Any]:
+        if not self._event_metadata_stack:
+            return {}
+        return dict(self._event_metadata_stack[-1])
+
+    def push_event_metadata(self, metadata: Mapping[str, Any] | None) -> None:
+        if not isinstance(metadata, Mapping):
+            self._event_metadata_stack.append({})
+            return
+        normalized: dict[str, Any] = {}
+        help_cycle_id = metadata.get("help_cycle_id")
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            normalized["help_cycle_id"] = help_cycle_id
+        generation_mode = metadata.get("generation_mode")
+        if isinstance(generation_mode, str) and generation_mode:
+            normalized["generation_mode"] = generation_mode
+        self._event_metadata_stack.append(normalized)
+
+    def pop_event_metadata(self) -> None:
+        if self._event_metadata_stack:
+            self._event_metadata_stack.pop()
 
     def _send_command(self, payload: dict) -> None:
         data = encode_command(payload)
