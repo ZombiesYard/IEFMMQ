@@ -7,7 +7,7 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - `ports/` contracts for environment/model/knowledge/event store, etc.
 - `adapters/` mock env, DCS UDP stub, model stub, local knowledge adapter.
 - `packs/fa18c_startup/` procedure/taxonomy/ui_map + instruments.
-- `simtutor/schemas/v1/` JSON Schemas for Observation/TutorRequest/TutorResponse/Event.
+- `simtutor/schemas/v1/` + `simtutor/schemas/v2/` JSON Schemas for stable contracts and DCS transports.
 - `mock_scenarios/` scripted observation sequences.
 - `tools/index_docs.py` offline indexer for `Doc/Evaluation` md/pdf.
 - `tools/build_coldstart_state_matrix.py` generates the cold-start status matrix and `replay-bios` input from pack/gates.
@@ -56,6 +56,12 @@ Simulator-agnostic tutoring backend with clean architecture (domain core + ports
 - JSON Schemas in `simtutor/schemas/v1/*.schema.json`
 - Python dataclasses in `core/types.py`
   - Observation, TutorRequest, TutorResponse, Event (versioned, UUID + ISO timestamps).
+
+## Vision Reserve (CS-019)
+- `ports/vision_port.py`: reserved `VisionPort` for future VLM adapters, frame-oriented and currently unused by core flows.
+- `core/types_v2.py` + `simtutor/schemas/v2/vision_observation.json`: `VisionObservation` contract for linking future screen/frame inputs without changing current tutor semantics.
+- `simtutor/schemas/__init__.py`: unified schema registry covering v1 + v2, including `vision_observation`.
+- `dcs_caps` may now include optional `vision_available`; absence keeps current behavior unchanged.
 
 ## Packs (fa18c_startup)
 - `pack.yaml` procedure steps S01-S25 mapped from `fa18c_startup_master.md`; deterministic `precondition_gates` / `completion_gates` keep full cold-start progression checkable.

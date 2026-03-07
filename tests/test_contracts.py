@@ -1,47 +1,27 @@
-import json
-from importlib import resources
-
-from jsonschema import Draft202012Validator, FormatChecker
-
 from core.types import CONTRACT_VERSION, Event, Observation, TutorRequest, TutorResponse
-
-
-SCHEMA_PACKAGE = "simtutor.schemas.v1"
-
-
-def load_schema(name: str) -> dict:
-    schema_path = resources.files(SCHEMA_PACKAGE) / f"{name}.schema.json"
-    if not schema_path.is_file():
-        raise FileNotFoundError(f"Schema not found: {schema_path}")
-    with schema_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def validate(obj: dict, schema_name: str) -> None:
-    schema = load_schema(schema_name)
-    Draft202012Validator(schema, format_checker=FormatChecker()).validate(obj)
+from simtutor.schemas import validate_instance
 
 
 def test_observation_schema_accepts_defaults():
     obs = Observation(source="mock_env", payload={"rpm": 60}).to_dict()
     assert obs["version"] == CONTRACT_VERSION
-    validate(obs, "observation")
+    validate_instance(obs, "observation")
 
 
 def test_tutor_request_schema_accepts_defaults():
     req = TutorRequest(intent="ask_hint", message="what next?").to_dict()
-    validate(req, "tutor_request")
+    validate_instance(req, "tutor_request")
 
 
 def test_tutor_response_schema_accepts_defaults():
     res = TutorResponse(message="Proceed to APU.").to_dict()
-    validate(res, "tutor_response")
+    validate_instance(res, "tutor_response")
 
 
 def test_event_schema_links_payloads():
     obs = Observation(source="mock_env", payload={"rpm": 60}).to_dict()
     evt = Event(kind="observation", payload=obs, related_id=obs["observation_id"]).to_dict()
-    validate(evt, "event")
+    validate_instance(evt, "event")
 
 
 def test_event_schema_accepts_overlay_rejected_event():
@@ -49,5 +29,14 @@ def test_event_schema_accepts_overlay_rejected_event():
         kind="overlay_rejected",
         payload={"failure_code": "evidence_fail", "reasons": ["missing_overlay_evidence"]},
     ).to_dict()
-    validate(evt, "event")
+    validate_instance(evt, "event")
+
+
+def test_event_schema_accepts_vision_placeholder_refs():
+    evt = Event(
+        kind="system",
+        payload={"status": "vision_unavailable"},
+        vision_refs=["4c0a8ee7-5043-46ee-8e70-d7c689c7f958"],
+    ).to_dict()
+    validate_instance(evt, "event")
 

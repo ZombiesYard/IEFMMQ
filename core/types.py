@@ -82,6 +82,7 @@ class Event:
     payload: Dict[str, Any] = field(default_factory=dict)
     version: str = CONTRACT_VERSION
     related_id: Optional[str] = None
+    vision_refs: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
