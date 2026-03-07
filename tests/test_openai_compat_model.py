@@ -1,4 +1,5 @@
 from adapters.openai_compat_model import OpenAICompatModel
+from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL, JSON_EXTRACT_FAIL, MODEL_HTTP_FAIL, SCHEMA_FAIL
 from core.llm_schema import validate_help_response
 from core.types import Observation
 from tests._fakes import (
@@ -108,12 +109,15 @@ def test_explain_error_http_429_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
+    assert res.metadata["failure_codes"] == [MODEL_HTTP_FAIL]
 
 
 def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:
     help_obj = _help_obj_ok()
     help_obj["overlay"]["evidence"] = []
-    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    invalid = FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)
+    fake = FakeClient(responses=[invalid, FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(client=fake)
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
@@ -121,6 +125,7 @@ def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == SCHEMA_FAIL
 
 
 def test_explain_error_invalid_evidence_ref_clears_overlay() -> None:
@@ -137,6 +142,7 @@ def test_explain_error_invalid_evidence_ref_clears_overlay() -> None:
     assert res.metadata["evidence_guardrail_applied"] is True
     assert "invalid_target_evidence_refs:apu_switch" in res.metadata["evidence_guardrail_reasons"]
     assert res.metadata["help_response"]["overlay"]["targets"] == []
+    assert res.metadata["failure_code"] == EVIDENCE_FAIL
 
 
 def test_explain_error_http_5xx_fallback_no_overlay() -> None:
@@ -148,6 +154,7 @@ def test_explain_error_http_5xx_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
 
 
 def test_explain_error_timeout_fallback_no_overlay() -> None:
@@ -159,6 +166,7 @@ def test_explain_error_timeout_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
 
 
 def test_explain_error_non_json_output_fallback_no_overlay() -> None:
@@ -170,7 +178,7 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
             }
         ]
     }
-    fake = FakeClient(responses=[FakeResponse(payload)])
+    fake = FakeClient(responses=[FakeResponse(payload), FakeResponse(payload)])
     model = OpenAICompatModel(client=fake)
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
@@ -178,6 +186,19 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == JSON_EXTRACT_FAIL
+
+
+def test_explain_error_malformed_openai_response_envelope_is_schema_fail() -> None:
+    fake = FakeClient(responses=[FakeResponse({"id": "chatcmpl-1"}), FakeResponse({"id": "chatcmpl-2"})])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert res.metadata["failure_code"] == SCHEMA_FAIL
+    assert res.metadata["failure_stage"] == "model_response_envelope"
 
 
 def test_explain_error_retries_once_after_structured_output_failure_and_recovers() -> None:
@@ -221,6 +242,7 @@ def test_explain_error_retries_once_and_returns_error_when_structured_output_sti
     assert len(fake.calls) == 2
     assert res.metadata["retry_count"] == 1
     assert isinstance(res.metadata["retry_reason"], str) and "ValueError" in res.metadata["retry_reason"]
+    assert res.metadata["failure_code"] == JSON_EXTRACT_FAIL
 
 
 def test_openai_compat_downgrades_request_when_json_schema_format_is_rejected() -> None:
@@ -465,11 +487,21 @@ def test_explain_error_step_id_not_in_candidate_steps_fallback_no_overlay() -> N
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == SCHEMA_FAIL
 
 
 def test_explain_error_overlay_target_not_in_allowlist_fallback_no_overlay() -> None:
     help_obj = _help_obj_ok()
     help_obj["overlay"]["targets"] = ["battery_switch"]
+    help_obj["overlay"]["evidence"] = [
+        {
+            "target": "battery_switch",
+            "type": "var",
+            "ref": "VARS.battery_on",
+            "quote": "Battery state is known.",
+            "grounding_confidence": 0.9,
+        }
+    ]
     fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(client=fake)
     req = _request_help()
@@ -480,6 +512,7 @@ def test_explain_error_overlay_target_not_in_allowlist_fallback_no_overlay() -> 
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["failure_code"] == ALLOWLIST_FAIL
 
 
 def test_explain_error_metadata_reads_delta_dropped_count_from_context() -> None:

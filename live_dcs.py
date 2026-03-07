@@ -46,6 +46,7 @@ from adapters.telemetry_pipeline import enrich_bios_observation
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
+from core.help_failure import classify_mapping_failure, merge_failure_metadata, overlay_rejection_payload
 from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
     STEP_OBSERVABILITY_VALUES,
@@ -1827,6 +1828,13 @@ class LiveDcsTutorLoop:
             response.actions = mapped_actions
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
+                mapping_failure_codes = classify_mapping_failure(mapped_meta)
+                if mapping_failure_codes:
+                    response.metadata = merge_failure_metadata(
+                        response.metadata,
+                        *mapping_failure_codes,
+                        stage="response_mapping",
+                    )
 
             fallback_overlay_used = False
             fallback_overlay_reason = "not_needed"
@@ -1869,6 +1877,19 @@ class LiveDcsTutorLoop:
                     ensure_ascii=False,
                     sort_keys=True,
                 )
+            )
+
+        response_mapping = response.metadata.get("response_mapping")
+        rejected_overlay = overlay_rejection_payload(
+            response_metadata=response.metadata,
+            response_mapping=response_mapping if isinstance(response_mapping, Mapping) else None,
+        )
+        if rejected_overlay is not None:
+            self._emit_event(
+                kind="overlay_rejected",
+                payload=rejected_overlay,
+                related_id=request.request_id,
+                t_wall=time.time(),
             )
 
         self._emit_event(

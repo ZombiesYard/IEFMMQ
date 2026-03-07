@@ -30,6 +30,7 @@
         "overlay_requested",
         "overlay_applied",
         "overlay_failed",
+        "overlay_rejected",
         "overlay_dry_run",
         "capabilities_negotiated"
       ]
