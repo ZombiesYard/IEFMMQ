@@ -1487,9 +1487,11 @@ def test_load_step_signal_profiles_parses_valid_step_metadata(tmp_path: Path) ->
 
     profiles = _load_step_signal_profiles(pack)
     assert profiles["S01"]["observability"] == "observable"
+    assert profiles["S01"]["observability_status"] == "observable"
     assert profiles["S01"]["evidence_requirements"] == ["var", "gate"]
     assert profiles["S01"]["requires_visual_confirmation"] is False
-    assert profiles["S02"]["observability"] == "unknown"
+    assert profiles["S02"]["observability"] == "unobservable"
+    assert profiles["S02"]["observability_status"] == "unobservable"
     assert profiles["S02"]["evidence_requirements"] == ["visual", "rag"]
     assert profiles["S02"]["requires_visual_confirmation"] is True
 

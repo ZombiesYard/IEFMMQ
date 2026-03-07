@@ -425,6 +425,29 @@ def test_explain_error_prefix_suffix_repair_marks_metadata() -> None:
     assert "dropped_suffix_text" in res.metadata["json_repair_reasons"]
 
 
+def test_explain_error_marks_unobservable_step_with_visual_confirmation_metadata() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["confidence"] = 0.97
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+    req = _request_help()
+    req.context["deterministic_step_hint"] = {
+        "inferred_step_id": "S20",
+        "observability_status": "unobservable",
+        "requires_visual_confirmation": True,
+    }
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S20"), req)
+
+    assert res.status == "ok"
+    assert res.metadata["observability_status"] == "unobservable"
+    assert res.metadata["requires_visual_confirmation"] is True
+    assert res.metadata["effective_confidence"] < res.metadata["model_confidence"]
+    assert res.metadata["confidence_adjustment_reason"] == "observability:unobservable"
+    assert res.metadata["evidence_strength"] == "limited"
+    assert any("待视觉确认" in item for item in res.explanations)
+
+
 def test_explain_error_step_id_not_in_candidate_steps_fallback_no_overlay() -> None:
     help_obj = _help_obj_ok()
     help_obj["next"]["step_id"] = "S01"

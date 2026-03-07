@@ -182,7 +182,7 @@ def _is_observability_hold_step(
     obs = _step_observability(step_id, step_meta)
     completion_map = pack_gates.get("completion_gates", {})
     comp_rules = completion_map.get(step_id, ()) if isinstance(completion_map, Mapping) else ()
-    return obs in {"partially", "unknown"} and len(comp_rules) == 0
+    return obs in {"partial", "unobservable"} and len(comp_rules) == 0
 
 
 def _completion_var_keys_after(
@@ -223,7 +223,7 @@ def _write_synthetic_inference_pack(pack_path: Path) -> None:
                 },
                 {
                     "id": "S03",
-                    "observability": "partially",
+                    "observability": "partial",
                     "ui_targets": ["eng_crank_switch"],
                 },
                 {
@@ -451,7 +451,7 @@ def test_infer_step_is_robust_on_invalid_inputs(synthetic_pack_ctx: Mapping[str,
 
 def test_infer_step_reads_nested_payload_vars_before_marking_soft_block() -> None:
     pack_steps = [
-        {"id": "S01", "observability": "partially", "ui_targets": ["s01_btn"]},
+        {"id": "S01", "observability": "partial", "ui_targets": ["s01_btn"]},
         {"id": "S02", "observability": "observable", "ui_targets": ["s02_btn"]},
     ]
     precondition_gates = {
@@ -517,7 +517,7 @@ def test_infer_step_prefers_nested_payload_vars_shape_when_present() -> None:
 
 def test_infer_step_qualified_var_path_prioritizes_nested_value_over_conflicting_top_level_key() -> None:
     pack_steps = [
-        {"id": "S01", "observability": "partially", "ui_targets": ["s01_btn"]},
+        {"id": "S01", "observability": "partial", "ui_targets": ["s01_btn"]},
         {"id": "S02", "observability": "observable", "ui_targets": ["s02_btn"]},
     ]
     precondition_gates = {

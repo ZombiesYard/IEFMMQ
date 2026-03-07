@@ -353,7 +353,7 @@ steps:
   - id: S02
     phase: P1
     critical: true
-    observability: partially
+    observability: partial
     evidence_requirements:
       - delta
       - gate
@@ -406,7 +406,7 @@ steps:
   - id: S05
     phase: P2
     critical: true
-    observability: partially
+    observability: partial
     evidence_requirements:
       - var
       - gate
@@ -441,7 +441,7 @@ steps:
   - id: S07
     phase: P2
     critical: false
-    observability: partially
+    observability: partial
     evidence_requirements:
       - delta
       - gate
@@ -481,7 +481,7 @@ steps:
   - id: S09
     phase: P3
     critical: false
-    observability: partially
+    observability: partial
     evidence_requirements:
       - delta
       - rag
@@ -518,7 +518,7 @@ steps:
   - id: S11
     phase: P4
     critical: true
-    observability: partially
+    observability: partial
     evidence_requirements:
       - var
       - gate
@@ -570,7 +570,7 @@ steps:
   - id: S14
     phase: P4
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -588,7 +588,7 @@ steps:
   - id: S15
     phase: P5
     critical: true
-    observability: partially
+    observability: partial
     evidence_requirements:
       - delta
       - gate
@@ -607,7 +607,7 @@ steps:
   - id: S16
     phase: P5
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -624,7 +624,7 @@ steps:
   - id: S17
     phase: P5
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -641,7 +641,7 @@ steps:
   - id: S18
     phase: P5
     critical: true
-    observability: partially
+    observability: partial
     evidence_requirements:
       - delta
       - gate
@@ -659,7 +659,7 @@ steps:
   - id: S19
     phase: P5
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -681,7 +681,7 @@ steps:
   - id: S20
     phase: P6
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -698,7 +698,7 @@ steps:
   - id: S21
     phase: P6
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -716,7 +716,7 @@ steps:
   - id: S22
     phase: P6
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -733,7 +733,7 @@ steps:
   - id: S23
     phase: P6
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -750,7 +750,7 @@ steps:
   - id: S24
     phase: P6
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag
@@ -767,7 +767,7 @@ steps:
   - id: S25
     phase: P6
     critical: true
-    observability: unknown
+    observability: unobservable
     evidence_requirements:
       - visual
       - rag

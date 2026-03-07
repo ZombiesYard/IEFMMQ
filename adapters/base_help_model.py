@@ -18,6 +18,7 @@ from adapters.step_inference import (
     normalize_recent_ui_targets,
 )
 from core.llm_schema import get_help_response_schema
+from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
 
@@ -108,7 +109,12 @@ class BaseHelpModel(ModelPort):
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
-            mapped = map_help_response_to_tutor_response(help_obj, request=request, status="ok")
+            mapped = map_help_response_to_tutor_response(
+                help_obj,
+                request=request,
+                status="ok",
+                lang=self.lang,
+            )
             metadata = dict(mapped.metadata)
             metadata.update(
                 {
@@ -301,11 +307,37 @@ class BaseHelpModel(ModelPort):
         else:
             inferred_step_id = inference.inferred_step_id
             missing_conditions = list(inference.missing_conditions)
-        return {
+        hint = {
             "inferred_step_id": inferred_step_id,
             "missing_conditions": missing_conditions,
             "recent_ui_targets": list(recent_ui_targets),
         }
+        if isinstance(inferred_step_id, str) and inferred_step_id:
+            step_signal = self._lookup_step_signal(inferred_step_id)
+            if step_signal:
+                hint.update(step_signal)
+        return hint
+
+    def _lookup_step_signal(self, step_id: str) -> dict[str, Any]:
+        for step in load_pack_steps():
+            candidate_id = step.get("id") or step.get("step_id")
+            if candidate_id != step_id:
+                continue
+            observability = normalize_observability_status(step.get("observability"))
+            requirements_raw = step.get("evidence_requirements")
+            requirements = (
+                [item for item in requirements_raw if isinstance(item, str) and item]
+                if isinstance(requirements_raw, list)
+                else []
+            )
+            requires_visual_confirmation = compute_requires_visual_confirmation(observability, requirements)
+            return {
+                "observability": observability,
+                "observability_status": observability,
+                "step_evidence_requirements": requirements,
+                "requires_visual_confirmation": requires_visual_confirmation,
+            }
+        return {}
 
     def _build_deterministic_fallback_message(self, inference: StepInferenceResult | None) -> str:
         inferred_step_id = inference.inferred_step_id if inference else None

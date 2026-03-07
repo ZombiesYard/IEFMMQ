@@ -20,7 +20,7 @@ from adapters.pack_gates import (
     load_pack_gate_config,
     normalize_scenario_profile,
 )
-from core.step_signal_metadata import STEP_OBSERVABILITY_VALUES
+from core.step_signal_metadata import normalize_observability_status
 from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -292,7 +292,7 @@ def infer_step_id(
     The inference is fully pack-driven:
     - scan ordered steps from pack
     - evaluate precondition/completion gates
-    - apply observability-aware hold behavior for partially/unknown steps
+    - apply observability-aware hold behavior for partial/unobservable steps
     """
     step_profiles = _ordered_step_profiles(pack_steps)
     if not step_profiles:
@@ -410,12 +410,7 @@ def _ordered_step_profiles(pack_steps: Sequence[Mapping[str, Any]]) -> list[_Ste
         if not step_id or step_id in seen:
             continue
         seen.add(step_id)
-        observability_raw = step.get("observability")
-        observability = (
-            observability_raw
-            if isinstance(observability_raw, str) and observability_raw in STEP_OBSERVABILITY_VALUES
-            else None
-        )
+        observability = normalize_observability_status(step.get("observability"))
         ui_targets_raw = step.get("ui_targets")
         ui_targets: list[str] = []
         if isinstance(ui_targets_raw, (list, tuple)):
@@ -703,7 +698,7 @@ def _should_hold_by_observability(
     profile: _StepProfile,
     completion_rules: Sequence[Mapping[str, Any]],
 ) -> bool:
-    if profile.observability not in {"partially", "unknown"}:
+    if profile.observability not in {"partial", "unobservable"}:
         return False
     return len(completion_rules) == 0
 

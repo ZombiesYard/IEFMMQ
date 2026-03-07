@@ -452,7 +452,8 @@ def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
     hint = payload["deterministic_step_hint"]
     assert hint["inferred_step_id"] == "S15"
-    assert hint["observability"] == "partially"
+    assert hint["observability"] == "partial"
+    assert hint["observability_status"] == "partial"
     assert hint["step_evidence_requirements"] == ["visual", "gate"]
     assert hint["requires_visual_confirmation"] is True
     assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
