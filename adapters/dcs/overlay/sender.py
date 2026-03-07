@@ -24,6 +24,7 @@ class DcsOverlaySender:
         ack_enabled: bool = True,
         session_id: str | None = None,
         event_sink: Optional[Callable[[Event], None]] = None,
+        ack_retry_count: int = 1,
     ) -> None:
         self.server = (host, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -33,6 +34,7 @@ class DcsOverlaySender:
         self.auto_clear = auto_clear
         self.enabled = enabled
         self.ack_enabled = ack_enabled
+        self.ack_retry_count = max(0, int(ack_retry_count))
         self.session_id = session_id
         self.event_sink = event_sink
         self._last_target: Optional[str] = None
@@ -93,20 +95,101 @@ class DcsOverlaySender:
         data = encode_command(payload)
         self.sock.sendto(data, self.server)
 
-    def _record_request(self, payload: dict) -> None:
+    def _record_request(self, payload: dict, *, attempt_count: int = 1) -> None:
+        event_payload = dict(payload)
+        event_payload["attempt_count"] = attempt_count
+        if attempt_count > 1:
+            event_payload["is_retry"] = True
         evt = Event(
             kind="overlay_requested",
-            payload=payload,
+            payload=event_payload,
             t_wall=time.time(),
             session_id=self.session_id,
         )
         self._emit_event(evt)
+
+    def _build_failed_result(
+        self,
+        *,
+        cmd: dict,
+        intent: OverlayIntent,
+        attempt_count: int,
+        failure_class: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        return {
+            "cmd_id": cmd["cmd_id"],
+            "status": "failed",
+            "reason": reason,
+            "failure_class": failure_class,
+            "attempt_count": attempt_count,
+            "action": cmd["action"],
+            "intent": intent.intent,
+            "target": intent.element_id,
+        }
+
+    def _build_failed_result_for_command(
+        self,
+        *,
+        cmd: Mapping[str, Any],
+        intent: str,
+        target: str,
+        attempt_count: int,
+        failure_class: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        return {
+            "cmd_id": cmd["cmd_id"],
+            "status": "failed",
+            "reason": reason,
+            "failure_class": failure_class,
+            "attempt_count": attempt_count,
+            "action": cmd["action"],
+            "intent": intent,
+            "target": target,
+        }
+
+    def _decorate_ack_result(self, ack: Mapping[str, Any], *, cmd: dict, intent: OverlayIntent, attempt_count: int) -> dict[str, Any]:
+        result = {
+            "cmd_id": cmd["cmd_id"],
+            "status": ack.get("status"),
+            "reason": ack.get("reason"),
+            "attempt_count": attempt_count,
+            "action": cmd["action"],
+            "intent": intent.intent,
+            "target": intent.element_id,
+        }
+        if ack.get("status") == "failed":
+            result["failure_class"] = "remote_failure"
+        return result
+
+    def _emit_ack_result(self, ack: Mapping[str, Any]) -> None:
+        payload = dict(ack)
+        kind = "overlay_applied" if payload.get("status") == "ok" else "overlay_failed"
+        event = Event(
+            kind=kind,
+            payload=payload,
+            t_wall=time.time(),
+            session_id=self.session_id,
+        )
+        self._emit_event(event)
+
+    def _should_track_last_target_after_ack(self, intent: OverlayIntent, ack: Mapping[str, Any]) -> bool:
+        status = ack.get("status")
+        if status == "ok":
+            return True
+        failure_class = ack.get("failure_class")
+        if failure_class == "ack_timeout" and intent.intent == "highlight":
+            return True
+        return False
 
     def send_intent(self, intent: OverlayIntent, expect_ack: bool = True) -> Optional[dict]:
         if not self.enabled:
             evt = Event(
                 kind="overlay_failed",
                 payload={
+                    "status": "failed",
+                    "failure_class": "overlay_disabled",
                     "reason": "overlay disabled",
                     "intent": intent.intent,
                     "target": intent.element_id,
@@ -125,27 +208,70 @@ class DcsOverlaySender:
                 "target": self._last_target,
             }
             self._record_request(clear_payload)
-            self._send_command(clear_payload)
+            try:
+                self._send_command(clear_payload)
+            except OSError as exc:
+                clear_failure = self._build_failed_result_for_command(
+                    cmd=clear_payload,
+                    intent="clear",
+                    target=self._last_target,
+                    attempt_count=1,
+                    failure_class="transport_error",
+                    reason=str(exc),
+                )
+                self._emit_ack_result(clear_failure)
+                return clear_failure
 
         cmd = command_from_intent(intent)
-        self._record_request(cmd)
-        self._send_command(cmd)
+        ack_expected = self.ack_enabled and expect_ack and self.ack_receiver is not None
+        total_attempts = self.ack_retry_count + 1 if ack_expected else 1
+        ack: Optional[dict[str, Any]] = None
+        for attempt in range(1, total_attempts + 1):
+            self._record_request(cmd, attempt_count=attempt)
+            try:
+                self._send_command(cmd)
+            except OSError as exc:
+                ack = self._build_failed_result(
+                    cmd=cmd,
+                    intent=intent,
+                    attempt_count=attempt,
+                    failure_class="transport_error",
+                    reason=str(exc),
+                )
+                self._emit_ack_result(ack)
+                return ack
+            if not ack_expected:
+                break
+            wait_timeout = self.sock.gettimeout()
+            if wait_timeout is None:
+                wait_timeout = 0.5
+            received = self.ack_receiver.wait_for(cmd["cmd_id"], timeout=wait_timeout)
+            if received:
+                ack = self._decorate_ack_result(received, cmd=cmd, intent=intent, attempt_count=attempt)
+                self._emit_ack_result(ack)
+                break
+        if ack_expected and ack is None:
+            ack = self._build_failed_result(
+                cmd=cmd,
+                intent=intent,
+                attempt_count=total_attempts,
+                failure_class="ack_timeout",
+                reason="overlay ack timeout",
+            )
+            self._emit_ack_result(ack)
 
-        if intent.intent == "highlight":
-            self._last_target = target
-        elif intent.intent == "clear":
-            self._last_target = None
-
-        if not self.ack_enabled or not expect_ack or not self.ack_receiver:
+        if not ack_expected:
+            if intent.intent == "highlight":
+                self._last_target = target
+            elif intent.intent == "clear":
+                self._last_target = None
             return None
-        wait_timeout = self.sock.gettimeout()
-        if wait_timeout is None:
-            wait_timeout = 0.5
-        # Note: ack_receiver has its own socket timeout for individual recv calls.
-        ack = self.ack_receiver.wait_for(cmd["cmd_id"], timeout=wait_timeout)
-        if ack:
-            event = self.ack_receiver.to_event(ack, intent=intent.intent, target=target)
-            self._emit_event(event)
+
+        if ack and self._should_track_last_target_after_ack(intent, ack):
+            if intent.intent == "highlight":
+                self._last_target = target
+            elif intent.intent == "clear":
+                self._last_target = None
         return ack
 
     def __enter__(self) -> "DcsOverlaySender":

@@ -187,6 +187,8 @@ class OverlayActionExecutor:
 
     def _reject(self, report: ActionExecutionReport, *, reason: str, action_idx: int, action: Any) -> None:
         detail = {
+            "status": "failed",
+            "failure_class": "action_rejected",
             "reason": reason,
             "action_index": action_idx,
             "action": action if isinstance(action, Mapping) else {"raw": str(action)},
