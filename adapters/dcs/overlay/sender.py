@@ -128,6 +128,27 @@ class DcsOverlaySender:
             "target": intent.element_id,
         }
 
+    def _build_failed_result_for_command(
+        self,
+        *,
+        cmd: Mapping[str, Any],
+        intent: str,
+        target: str,
+        attempt_count: int,
+        failure_class: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        return {
+            "cmd_id": cmd["cmd_id"],
+            "status": "failed",
+            "reason": reason,
+            "failure_class": failure_class,
+            "attempt_count": attempt_count,
+            "action": cmd["action"],
+            "intent": intent,
+            "target": target,
+        }
+
     def _decorate_ack_result(self, ack: Mapping[str, Any], *, cmd: dict, intent: OverlayIntent, attempt_count: int) -> dict[str, Any]:
         result = {
             "cmd_id": cmd["cmd_id"],
@@ -142,7 +163,7 @@ class DcsOverlaySender:
             result["failure_class"] = "remote_failure"
         return result
 
-    def _emit_ack_result(self, ack: Mapping[str, Any], *, intent: OverlayIntent) -> None:
+    def _emit_ack_result(self, ack: Mapping[str, Any]) -> None:
         payload = dict(ack)
         kind = "overlay_applied" if payload.get("status") == "ok" else "overlay_failed"
         event = Event(
@@ -178,7 +199,19 @@ class DcsOverlaySender:
                 "target": self._last_target,
             }
             self._record_request(clear_payload)
-            self._send_command(clear_payload)
+            try:
+                self._send_command(clear_payload)
+            except OSError as exc:
+                clear_failure = self._build_failed_result_for_command(
+                    cmd=clear_payload,
+                    intent="clear",
+                    target=self._last_target,
+                    attempt_count=1,
+                    failure_class="transport_error",
+                    reason=str(exc),
+                )
+                self._emit_ack_result(clear_failure)
+                return clear_failure
 
         cmd = command_from_intent(intent)
         ack_expected = self.ack_enabled and expect_ack and self.ack_receiver is not None
@@ -196,7 +229,7 @@ class DcsOverlaySender:
                     failure_class="transport_error",
                     reason=str(exc),
                 )
-                self._emit_ack_result(ack, intent=intent)
+                self._emit_ack_result(ack)
                 return ack
             if not ack_expected:
                 break
@@ -206,7 +239,7 @@ class DcsOverlaySender:
             received = self.ack_receiver.wait_for(cmd["cmd_id"], timeout=wait_timeout)
             if received:
                 ack = self._decorate_ack_result(received, cmd=cmd, intent=intent, attempt_count=attempt)
-                self._emit_ack_result(ack, intent=intent)
+                self._emit_ack_result(ack)
                 break
         if ack_expected and ack is None:
             ack = self._build_failed_result(
@@ -216,7 +249,7 @@ class DcsOverlaySender:
                 failure_class="ack_timeout",
                 reason="overlay ack timeout",
             )
-            self._emit_ack_result(ack, intent=intent)
+            self._emit_ack_result(ack)
 
         if not ack_expected:
             if intent.intent == "highlight":

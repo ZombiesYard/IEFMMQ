@@ -58,6 +58,18 @@ class SequencedAckReceiver:
         return Event(kind=kind, payload=payload, t_wall=0.0)
 
 
+class FailingSecondSendSocket(DummySocket):
+    def __init__(self) -> None:
+        super().__init__()
+        self._send_count = 0
+
+    def sendto(self, data: bytes, server) -> None:
+        self._send_count += 1
+        if self._send_count == 2:
+            raise OSError("auto-clear send failed")
+        super().sendto(data, server)
+
+
 def test_sender_sends_command_and_emits_events(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
@@ -134,6 +146,37 @@ def test_sender_disabled_emits_failed_event(monkeypatch) -> None:
     assert events[0].kind == "overlay_failed"
     assert events[0].payload["reason"] == "overlay disabled"
     assert events[0].payload["target"] == "pnt_331"
+
+
+def test_sender_auto_clear_transport_error_returns_failure_payload(monkeypatch) -> None:
+    dummy = FailingSecondSendSocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
+    sender = DcsOverlaySender(
+        host="127.0.0.1",
+        port=7781,
+        auto_clear=True,
+        ack_enabled=False,
+        event_sink=events.append,
+    )
+    sender.send_intent(
+        OverlayIntent(intent="highlight", target="first", element_id="pnt_100"),
+        expect_ack=False,
+    )
+
+    result = sender.send_intent(
+        OverlayIntent(intent="highlight", target="second", element_id="pnt_200"),
+        expect_ack=False,
+    )
+
+    assert result is not None
+    assert result["status"] == "failed"
+    assert result["failure_class"] == "transport_error"
+    assert result["intent"] == "clear"
+    assert result["target"] == "pnt_100"
+    failed = [event for event in events if event.kind == "overlay_failed"]
+    assert len(failed) == 1
+    assert failed[0].payload["reason"] == "auto-clear send failed"
 
 
 def test_sender_retries_idempotently_and_classifies_ack_timeout(monkeypatch) -> None:
