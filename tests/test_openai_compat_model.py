@@ -33,6 +33,7 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert res.actions[0]["element_id"] == "pnt_375"
     assert res.metadata["provider"] == "openai_compat"
     assert res.metadata["model"] == "Qwen3-8B-Instruct"
+    assert res.metadata["generation_mode"] == "model"
     assert isinstance(res.metadata["latency_ms"], int)
     assert res.metadata["json_repaired"] is False
     assert res.metadata["json_repair_reasons"] == []
@@ -109,6 +110,7 @@ def test_explain_error_http_429_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["generation_mode"] == "fallback"
     assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
     assert res.metadata["failure_codes"] == [MODEL_HTTP_FAIL]
 
@@ -125,6 +127,7 @@ def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["generation_mode"] == "fallback"
     assert res.metadata["failure_code"] == SCHEMA_FAIL
 
 
@@ -154,6 +157,7 @@ def test_explain_error_http_5xx_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["generation_mode"] == "fallback"
     assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
 
 
@@ -166,6 +170,7 @@ def test_explain_error_timeout_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["generation_mode"] == "fallback"
     assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
 
 
@@ -186,6 +191,7 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     assert res.status == "error"
     assert res.actions == []
     assert res.metadata["provider"] == "openai_compat"
+    assert res.metadata["generation_mode"] == "fallback"
     assert res.metadata["failure_code"] == JSON_EXTRACT_FAIL
 
 
@@ -218,6 +224,7 @@ def test_explain_error_retries_once_after_structured_output_failure_and_recovers
 
     assert res.status == "ok"
     assert len(res.actions) == 1
+    assert res.metadata["generation_mode"] == "model"
     assert len(fake.calls) == 2
     assert res.metadata["retry_count"] == 1
     assert isinstance(res.metadata["retry_reason"], str) and res.metadata["retry_reason"]
@@ -447,6 +454,7 @@ def test_explain_error_prefix_suffix_repair_marks_metadata() -> None:
 
     assert res.status == "ok"
     assert res.metadata["json_repaired"] is True
+    assert res.metadata["generation_mode"] == "repair"
     assert "dropped_prefix_text" in res.metadata["json_repair_reasons"]
     assert "dropped_suffix_text" in res.metadata["json_repair_reasons"]
 

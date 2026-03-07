@@ -42,8 +42,12 @@ def test_sender_sends_command_and_emits_events(monkeypatch) -> None:
         ack_receiver=ack_receiver,
         event_sink=events.append,
     )
+    sender.push_event_metadata({"help_cycle_id": "cycle-1", "generation_mode": "model"})
     intent = OverlayIntent(intent="highlight", target="battery_switch", element_id="pnt_331")
-    ack = sender.send_intent(intent, expect_ack=True)
+    try:
+        ack = sender.send_intent(intent, expect_ack=True)
+    finally:
+        sender.pop_event_metadata()
 
     assert ack is not None
     assert len(dummy.sent) == 1
@@ -55,6 +59,9 @@ def test_sender_sends_command_and_emits_events(monkeypatch) -> None:
     kinds = [evt.kind for evt in events]
     assert "overlay_requested" in kinds
     assert "overlay_applied" in kinds
+    assert all(evt.metadata["help_cycle_id"] == "cycle-1" for evt in events)
+    assert all(evt.metadata["generation_mode"] == "model" for evt in events)
+    assert all(evt.payload["help_cycle_id"] == "cycle-1" for evt in events)
 
 
 def test_sender_auto_clear_on_switch(monkeypatch) -> None:

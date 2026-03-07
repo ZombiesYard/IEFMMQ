@@ -19,11 +19,11 @@ class ModelStub(ModelPort):
 
     def plan_next_step(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         message, card = self._card_for(observation, request)
-        return TutorResponse(message=message, actions=[], metadata={"card": card})
+        return TutorResponse(message=message, actions=[], metadata={"card": card, "generation_mode": "model"})
 
     def explain_error(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         message, card = self._card_for(observation, request, explain=True)
-        return TutorResponse(message=message, actions=[], metadata={"card": card})
+        return TutorResponse(message=message, actions=[], metadata={"card": card, "generation_mode": "model"})
 
     def _card_for(self, observation: Observation, request: TutorRequest | None, explain: bool = False):
         # request kept for ModelPort signature consistency (future use)

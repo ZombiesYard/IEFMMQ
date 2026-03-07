@@ -118,7 +118,55 @@ class OverlayActionExecutor:
     def _emit(self, kind: str, payload: Mapping[str, Any]) -> None:
         if not self.event_sink:
             return
-        self.event_sink(Event(kind=kind, payload=dict(payload), t_wall=time.time(), session_id=self.session_id))
+        trace_metadata: dict[str, Any] = {}
+        help_cycle_id = payload.get("help_cycle_id")
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            trace_metadata["help_cycle_id"] = help_cycle_id
+        generation_mode = payload.get("generation_mode")
+        if isinstance(generation_mode, str) and generation_mode:
+            trace_metadata["generation_mode"] = generation_mode
+        self.event_sink(
+            Event(
+                kind=kind,
+                payload=dict(payload),
+                t_wall=time.time(),
+                session_id=self.session_id,
+                metadata=trace_metadata,
+            )
+        )
+
+    def _trace_payload(self, action: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
+        out = dict(payload)
+        help_cycle_id = action.get("help_cycle_id")
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            out.setdefault("help_cycle_id", help_cycle_id)
+        generation_mode = action.get("generation_mode")
+        if isinstance(generation_mode, str) and generation_mode:
+            out.setdefault("generation_mode", generation_mode)
+        return out
+
+    def _push_sender_trace(self, action: Mapping[str, Any]) -> bool:
+        push = getattr(self._sender, "push_event_metadata", None)
+        if not callable(push):
+            return False
+        trace_metadata: dict[str, Any] = {}
+        help_cycle_id = action.get("help_cycle_id")
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            trace_metadata["help_cycle_id"] = help_cycle_id
+        generation_mode = action.get("generation_mode")
+        if isinstance(generation_mode, str) and generation_mode:
+            trace_metadata["generation_mode"] = generation_mode
+        if not trace_metadata:
+            return False
+        push(trace_metadata)
+        return True
+
+    def _pop_sender_trace(self, pushed: bool) -> None:
+        if not pushed:
+            return
+        pop = getattr(self._sender, "pop_event_metadata", None)
+        if callable(pop):
+            pop()
 
     def _same_sink(self, left: Callable[[Event], None] | None, right: Callable[[Event], None] | None) -> bool:
         if left is None or right is None:
@@ -143,6 +191,8 @@ class OverlayActionExecutor:
             "action_index": action_idx,
             "action": action if isinstance(action, Mapping) else {"raw": str(action)},
         }
+        if isinstance(action, Mapping):
+            detail = self._trace_payload(action, detail)
         report.rejected.append(detail)
         self._emit("overlay_failed", detail)
 
@@ -201,6 +251,7 @@ class OverlayActionExecutor:
                     "ttl_s": self.ttl_s,
                     "pulse_enabled": self.pulse_enabled,
                 }
+                preview = self._trace_payload(action, preview)
                 report.dry_run.append(preview)
                 self._emit("overlay_dry_run", preview)
                 executed_count += 1
@@ -210,18 +261,24 @@ class OverlayActionExecutor:
                 self._reject(report, reason="overlay_sender_disabled", action_idx=idx, action=action)
                 continue
 
-            ack = self._sender.send_intent(intent, expect_ack=self.expect_ack)
+            pushed_trace = self._push_sender_trace(action)
+            try:
+                ack = self._sender.send_intent(intent, expect_ack=self.expect_ack)
+            finally:
+                self._pop_sender_trace(pushed_trace)
             if not self._sender_emits_to_executor_sink():
                 requested = {
                     "action": "highlight",
                     "target": intent.element_id,
                     "target_name": target,
                 }
+                requested = self._trace_payload(action, requested)
                 self._emit("overlay_requested", requested)
                 if isinstance(ack, Mapping):
                     ack_payload = dict(ack)
                     ack_payload["intent"] = "highlight"
                     ack_payload["target"] = intent.element_id
+                    ack_payload = self._trace_payload(action, ack_payload)
                     kind = "overlay_applied" if ack.get("status") == "ok" else "overlay_failed"
                     self._emit(kind, ack_payload)
             applied = {
@@ -230,6 +287,7 @@ class OverlayActionExecutor:
                 "intent": "highlight",
                 "ack": ack,
             }
+            applied = self._trace_payload(action, applied)
             report.executed.append(applied)
             executed_count += 1
 
