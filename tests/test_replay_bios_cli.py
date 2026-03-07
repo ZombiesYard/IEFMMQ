@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from adapters.model_stub import ModelStub
 from core.event_store import JsonlEventStore
 from core.types import Observation, TutorResponse
@@ -240,6 +242,109 @@ def test_cli_replay_bios_log_raw_llm_text_can_enable_when_env_default_off(monkey
     code = main()
     assert code == 0
     assert captured["log_raw_llm_text"] is True
+
+
+def test_cli_replay_bios_model_max_tokens_reads_env_default(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_model_max_tokens_env.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, int] = {}
+
+    def _fake_run_replay(args):
+        captured["model_max_tokens"] = int(args.model_max_tokens)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_MODEL_MAX_TOKENS", "256")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["model_max_tokens"] == 256
+
+
+def test_cli_replay_bios_model_max_tokens_can_be_overridden(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_model_max_tokens_arg.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, int] = {}
+
+    def _fake_run_replay(args):
+        captured["model_max_tokens"] = int(args.model_max_tokens)
+        return 0
+
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--model-max-tokens",
+            "128",
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["model_max_tokens"] == 128
+
+
+def test_cli_replay_bios_model_max_tokens_invalid_env_falls_back_to_zero(monkeypatch, tmp_path: Path, caplog) -> None:
+    replay_path = tmp_path / "bios_cli_model_max_tokens_invalid_env.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, int] = {}
+
+    def _fake_run_replay(args):
+        captured["model_max_tokens"] = int(args.model_max_tokens)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_MODEL_MAX_TOKENS", "")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["model_max_tokens"] == 0
+    assert "SIMTUTOR_MODEL_MAX_TOKENS" in caplog.text
+
+
+def test_cli_replay_bios_model_max_tokens_rejects_negative_value(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_model_max_tokens_negative.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--model-max-tokens",
+            "-1",
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        main()
 
 
 def test_cli_replay_bios_log_raw_llm_text_reads_true_false_env(monkeypatch, tmp_path: Path) -> None:

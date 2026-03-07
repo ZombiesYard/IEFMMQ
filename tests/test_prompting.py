@@ -228,8 +228,72 @@ def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> No
     )
     payload = json.loads(constraints_line[len("constraints=") :])
 
-    assert payload["allowed_overlay_targets"] == ["battery_switch"]
-    assert payload["overlay_target_policy"]["preferred_target"] == "battery_switch"
+    assert payload["allowed_overlay_targets"] == ["apu_switch"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "apu_switch"
+
+
+def test_prompt_prioritizes_generator_left_switch_from_missing_condition() -> None:
+    ctx = {
+        "candidate_steps": ["S01"],
+        "overlay_target_allowlist": [
+            "ampcd_off_brightness_knob",
+            "battery_switch",
+            "generator_left_switch",
+        ],
+        "vars": {
+            "battery_on": True,
+            "l_gen_on": False,
+            "r_gen_on": True,
+        },
+        "recent_deltas": [
+            {"ui_target": "ampcd_off_brightness_knob"},
+            {"ui_target": "battery_switch"},
+        ],
+        "deterministic_step_hint": {
+            "inferred_step_id": "S01",
+            "missing_conditions": ["vars.l_gen_on==true"],
+            "recent_ui_targets": [],
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["allowed_overlay_targets"][0] == "generator_left_switch"
+    assert payload["overlay_target_policy"]["preferred_target"] == "generator_left_switch"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "generator_left_switch"
+
+
+def test_prompt_trim_keeps_high_priority_generator_target_first() -> None:
+    ctx = {
+        "candidate_steps": ["S01", "S02", "S03", "S04", "S05"],
+        "overlay_target_allowlist": [
+            "ampcd_off_brightness_knob",
+            "apu_switch",
+            "battery_switch",
+            "generator_left_switch",
+            "generator_right_switch",
+        ],
+        "vars": {f"v_{i:02d}": "x" * 200 for i in range(60)},
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S01",
+            "missing_conditions": ["vars.l_gen_on==true"],
+            "recent_ui_targets": [],
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+
+    assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
+
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert payload["allowed_overlay_targets"] == ["generator_left_switch"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "generator_left_switch"
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:

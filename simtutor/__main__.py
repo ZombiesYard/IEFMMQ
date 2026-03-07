@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from adapters.pack_gates import DEFAULT_SCENARIO_PROFILE, SUPPORTED_SCENARIO_PROFILES
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
+from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
 from simtutor.schemas import SCHEMA_INDEX, load_schema
 from simtutor.runner import replay_log, run_simulation
 
@@ -273,6 +274,12 @@ def main() -> int:
     rep_bios.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
     rep_bios.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
     rep_bios.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
+    rep_bios.add_argument(
+        "--model-max-tokens",
+        type=parse_non_negative_int_arg,
+        default=parse_env_int("SIMTUTOR_MODEL_MAX_TOKENS", default=0, minimum=0),
+        help="Max completion tokens for model providers that support it (0 uses provider default).",
+    )
     rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
     rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
