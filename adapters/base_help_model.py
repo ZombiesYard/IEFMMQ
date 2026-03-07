@@ -543,8 +543,32 @@ class BaseHelpModel(ModelPort):
         try:
             return self._chat(messages)
         except Exception as exc:
-            annotate_exception(exc, code=MODEL_HTTP_FAIL, stage="model_http")
+            failure_code, failure_stage = self._classify_chat_exception(exc)
+            if failure_code is not None and failure_stage is not None:
+                annotate_exception(exc, code=failure_code, stage=failure_stage)
             raise
+
+    def _classify_chat_exception(self, exc: Exception) -> tuple[str | None, str | None]:
+        if self._is_transport_or_http_exception(exc):
+            return MODEL_HTTP_FAIL, "model_http"
+        if isinstance(exc, (ValueError, TypeError, KeyError)):
+            return SCHEMA_FAIL, "model_response_envelope"
+        return None, None
+
+    def _is_transport_or_http_exception(self, exc: Exception) -> bool:
+        if isinstance(exc, (TimeoutError, ConnectionError)):
+            return True
+        if isinstance(exc, RuntimeError):
+            message = str(exc).strip().lower()
+            if message.startswith("http "):
+                return True
+        try:
+            import httpx  # type: ignore
+        except ModuleNotFoundError:
+            httpx = None  # type: ignore[assignment]
+        if httpx is not None and isinstance(exc, (httpx.RequestError, httpx.HTTPStatusError)):
+            return True
+        return False
 
     def _empty_repair_details(self) -> dict[str, Any]:
         return {

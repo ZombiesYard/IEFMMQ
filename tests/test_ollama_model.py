@@ -1,4 +1,5 @@
 ﻿from adapters.ollama_model import OllamaModel
+from core.help_failure import SCHEMA_FAIL
 from core.llm_schema import validate_help_response
 from core.types import Observation
 from tests._fakes import (
@@ -59,6 +60,18 @@ def test_explain_error_bad_output_fallback_no_overlay() -> None:
     assert res.metadata["provider"] == "ollama"
     assert res.metadata["model"] == "qwen3:8b"
     assert isinstance(res.metadata["latency_ms"], int)
+
+
+def test_explain_error_malformed_ollama_response_envelope_is_schema_fail() -> None:
+    fake = FakeClient(responses=[FakeResponse({"done": True}), FakeResponse({"done": True})])
+    model = OllamaModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert res.metadata["failure_code"] == SCHEMA_FAIL
+    assert res.metadata["failure_stage"] == "model_response_envelope"
 
 
 def test_explain_error_missing_target_evidence_fallback_no_overlay() -> None:

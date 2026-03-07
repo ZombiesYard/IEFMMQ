@@ -189,6 +189,18 @@ def test_explain_error_non_json_output_fallback_no_overlay() -> None:
     assert res.metadata["failure_code"] == JSON_EXTRACT_FAIL
 
 
+def test_explain_error_malformed_openai_response_envelope_is_schema_fail() -> None:
+    fake = FakeClient(responses=[FakeResponse({"id": "chatcmpl-1"}), FakeResponse({"id": "chatcmpl-2"})])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.actions == []
+    assert res.metadata["failure_code"] == SCHEMA_FAIL
+    assert res.metadata["failure_stage"] == "model_response_envelope"
+
+
 def test_explain_error_retries_once_after_structured_output_failure_and_recovers() -> None:
     invalid_payload = {
         "choices": [
