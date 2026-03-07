@@ -144,10 +144,16 @@ def overlay_rejection_payload(
         ),
     }
     if isinstance(response_metadata, Mapping):
-        for key in ("failure_code", "failure_codes", "provider", "model"):
+        for key in ("provider", "model"):
             value = response_metadata.get(key)
             if value is not None:
                 payload[key] = value
+        response_failure_code = response_metadata.get("failure_code")
+        if response_failure_code is not None:
+            payload["response_failure_code"] = response_failure_code
+        response_failure_codes = response_metadata.get("failure_codes")
+        if response_failure_codes is not None:
+            payload["response_failure_codes"] = response_failure_codes
     if not payload.get("failure_code") and payload["failure_codes"]:
         payload["failure_code"] = payload["failure_codes"][0]
     return payload
