@@ -16,8 +16,8 @@ class DcsOverlayAckReceiver:
         host: str = "0.0.0.0",
         port: int = 7782,
         timeout: float = 0.2,
-        completed_cache_size: int = 2048,
         session_id: str | None = None,
+        completed_cache_size: int = 2048,
     ) -> None:
         self.server = (host, port)
         self.session_id = session_id

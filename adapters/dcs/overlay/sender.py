@@ -22,9 +22,9 @@ class DcsOverlaySender:
         auto_clear: bool = True,
         enabled: bool = True,
         ack_enabled: bool = True,
-        ack_retry_count: int = 1,
         session_id: str | None = None,
         event_sink: Optional[Callable[[Event], None]] = None,
+        ack_retry_count: int = 1,
     ) -> None:
         self.server = (host, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
