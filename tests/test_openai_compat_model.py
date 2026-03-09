@@ -20,7 +20,7 @@ def _attach_vision_context(
     primary_image: Path,
     pre_trigger_image: Path | None = None,
 ) -> None:
-    primary_frame = {
+    trigger_frame = {
         "frame_id": "1772872445010_000123",
         "role": "trigger_frame",
         "image_uri": str(primary_image),
@@ -28,17 +28,17 @@ def _attach_vision_context(
         "sync_status": "matched_future_fallback",
         "sync_delta_ms": 10,
     }
-    selected_frames = [primary_frame]
+    selected_frames = [trigger_frame]
     vision = {
         "status": "available",
         "vision_used": True,
-        "frame_id": primary_frame["frame_id"],
-        "frame_ids": [primary_frame["frame_id"]],
-        "trigger_frame": primary_frame,
+        "frame_id": trigger_frame["frame_id"],
+        "frame_ids": [trigger_frame["frame_id"]],
+        "trigger_frame": trigger_frame,
         "selected_frames": selected_frames,
-        "sync_status": "matched_past",
-        "sync_delta_ms": -50,
-        "frame_stale": True,
+        "sync_status": "matched_future_fallback",
+        "sync_delta_ms": 10,
+        "frame_stale": False,
         "sync_miss_reason": None,
     }
     if pre_trigger_image is not None:
@@ -51,8 +51,12 @@ def _attach_vision_context(
             "sync_delta_ms": -50,
         }
         vision["pre_trigger_frame"] = pre_trigger_frame
-        vision["selected_frames"] = [pre_trigger_frame, primary_frame]
-        vision["frame_ids"] = [pre_trigger_frame["frame_id"], primary_frame["frame_id"]]
+        vision["selected_frames"] = [pre_trigger_frame, trigger_frame]
+        vision["frame_id"] = pre_trigger_frame["frame_id"]
+        vision["frame_ids"] = [pre_trigger_frame["frame_id"], trigger_frame["frame_id"]]
+        vision["sync_status"] = "matched_past"
+        vision["sync_delta_ms"] = -50
+        vision["frame_stale"] = True
     request.context["vision"] = vision
 
 
@@ -416,9 +420,9 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert res.status == "ok"
     assert res.metadata["multimodal_capability_enabled"] is True
     assert res.metadata["multimodal_input_present"] is True
-    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872445010_000123", "1772872444950_000122"]
-    assert res.metadata["multimodal_primary_frame_id"] == "1772872445010_000123"
-    assert res.metadata["multimodal_frame_ids"] == ["1772872445010_000123", "1772872444950_000122"]
+    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert res.metadata["multimodal_primary_frame_id"] == "1772872444950_000122"
+    assert res.metadata["multimodal_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
     assert res.metadata["multimodal_images_built"] is True
     assert res.metadata["multimodal_image_count"] == 2
     assert res.metadata["multimodal_path_attempted"] is True
@@ -432,8 +436,8 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert [item["type"] for item in content] == ["image_url", "image_url", "text"]
     assert content[0]["image_url"]["url"].startswith("data:image/png;base64,")
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
-    assert "Primary visual frame: 1772872445010_000123" in content[2]["text"]
-    assert "Reference pre-trigger frame: 1772872444950_000122" in content[2]["text"]
+    assert "Primary visual frame: 1772872444950_000122" in content[2]["text"]
+    assert "Reference pre-trigger frame: 1772872445010_000123" in content[2]["text"]
 
 
 def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -> None:
@@ -458,8 +462,8 @@ def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -
     assert res.status == "ok"
     content = fake.calls[0]["json"]["messages"][1]["content"]
     assert isinstance(content, list)
-    assert "主视觉帧: 1772872445010_000123" in content[2]["text"]
-    assert "触发前参考帧: 1772872444950_000122" in content[2]["text"]
+    assert "主视觉帧: 1772872444950_000122" in content[2]["text"]
+    assert "触发前参考帧: 1772872445010_000123" in content[2]["text"]
     assert "Primary visual frame" not in content[2]["text"]
 
 

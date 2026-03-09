@@ -335,12 +335,19 @@ class OpenAICompatModel(BaseHelpModel):
         trigger_frame = self._coerce_frame_mapping(vision.get("trigger_frame"))
         pre_trigger_frame = self._coerce_frame_mapping(vision.get("pre_trigger_frame"))
         selected_frames = vision.get("selected_frames")
-        primary_frame = trigger_frame
+        primary_frame = self._raw_frame_payload_by_id(selected_frames, vision.get("frame_id"))
         if primary_frame is None:
-            primary_frame = self._raw_frame_payload_by_id(selected_frames, vision.get("frame_id"))
+            primary_frame = trigger_frame
         if primary_frame is None:
             primary_frame = pre_trigger_frame
-        secondary_frame = pre_trigger_frame
+        secondary_frame = None
+        for frame in (trigger_frame, pre_trigger_frame):
+            if frame is None:
+                continue
+            if primary_frame is not None and frame.get("frame_id") == primary_frame.get("frame_id"):
+                continue
+            secondary_frame = frame
+            break
         if (
             secondary_frame is not None
             and primary_frame is not None
