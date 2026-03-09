@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.install_dcs_monitor_setup import MONITOR_SETUP_BASENAME
 from tools.install_dcs_hook import (
+    MONITOR_SETUP_BASENAME,
     SIMTUTOR_EXPORT_SNIPPET,
     build_composite_panel_config,
     install_scripting_files,

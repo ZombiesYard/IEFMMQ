@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-import os
 from pathlib import Path
 import re
 import shutil
@@ -19,12 +18,8 @@ import subprocess
 import sys
 
 from adapters.vision_prompting import load_vision_layout, solve_layout_geometry
-from tools.install_dcs_hook import resolve_saved_games_dir
+from tools.install_dcs_hook import MONITOR_SETUP_BASENAME, resolve_saved_games_dir
 
-# Keep the Saved Games monitor-setup filename stable for DCS Options/backward
-# compatibility; the active visual contract version is tracked by layout_id in
-# packs/fa18c_startup/vision_layout.yaml.
-MONITOR_SETUP_BASENAME = "SimTutor_FA18C_CompositePanel_v1"
 COMPOSITE_CANVAS_WIDTH = 2560
 COMPOSITE_CANVAS_HEIGHT = 1440
 MODE_EXTENDED_RIGHT = "extended-right"
@@ -88,6 +83,8 @@ def _detect_resolution_windows() -> tuple[int, int] | None:
 
 
 def _detect_resolution_powershell() -> tuple[int, int] | None:
+    if sys.platform != "win32":
+        return None
     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
     if not powershell:
         return None
@@ -115,52 +112,13 @@ def _detect_resolution_powershell() -> tuple[int, int] | None:
     return _normalize_detected_resolution(int(match.group(1)), int(match.group(2)), "powershell")
 
 
-def _detect_resolution_xrandr() -> tuple[int, int] | None:
-    if not os.environ.get("DISPLAY"):
-        return None
-    xrandr = shutil.which("xrandr")
-    if not xrandr:
-        return None
-    result = subprocess.run(
-        [xrandr, "--current"],
-        capture_output=True,
-        check=False,
-        encoding="utf-8",
-        errors="replace",
-        timeout=5,
-    )
-    if result.returncode != 0:
-        return None
-    for line in result.stdout.splitlines():
-        match = re.search(r"(\d+)x(\d+)\s+\d+(?:\.\d+)?\*", line)
-        if match:
-            return _normalize_detected_resolution(int(match.group(1)), int(match.group(2)), "xrandr")
-    return None
-
-
-def _detect_resolution_tk() -> tuple[int, int] | None:
-    try:
-        import tkinter
-    except Exception:
-        return None
-    try:
-        root = tkinter.Tk()
-        root.withdraw()
-        width = root.winfo_screenwidth()
-        height = root.winfo_screenheight()
-        root.destroy()
-    except Exception:
-        return None
-    return _normalize_detected_resolution(width, height, "tk")
-
-
 def detect_main_resolution() -> tuple[int, int]:
-    # Prefer direct OS APIs first, then process-based fallbacks, then GUI probes.
+    # DCS-side monitor setup is Windows-specific. Keep auto-detection restricted
+    # to Windows so Linux/macOS shells running this installer must pass explicit
+    # dimensions instead of relying on host-desktop heuristics.
     for detector in (
         _detect_resolution_windows,
         _detect_resolution_powershell,
-        _detect_resolution_xrandr,
-        _detect_resolution_tk,
     ):
         try:
             resolution = detector()
@@ -394,8 +352,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=MODE_EXTENDED_RIGHT,
         help="Layout mode: extended-right uses a fixed debug canvas; single-monitor and ultrawide-left-stack both resolve the same normalized left-stack layout against the target screen.",
     )
-    parser.add_argument("--main-width", type=int, default=None, help="Main screen width in pixels. If omitted together with --main-height, the installer auto-detects the current primary-screen resolution.")
-    parser.add_argument("--main-height", type=int, default=None, help="Main screen height in pixels. If omitted together with --main-width, the installer auto-detects the current primary-screen resolution.")
+    parser.add_argument("--main-width", type=int, default=None, help="Main screen width in pixels. If omitted together with --main-height, the installer auto-detects the current primary-screen resolution on Windows; non-Windows shells must pass it explicitly.")
+    parser.add_argument("--main-height", type=int, default=None, help="Main screen height in pixels. If omitted together with --main-width, the installer auto-detects the current primary-screen resolution on Windows; non-Windows shells must pass it explicitly.")
     return parser
 
 

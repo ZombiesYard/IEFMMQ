@@ -106,7 +106,7 @@ python -m tools.install_dcs_hook \
   --monitor-mode extended-right
 ```
 
-若不传 `--main-width` / `--main-height`，安装器会自动探测当前主屏分辨率并据此生成 Monitor Setup；如果自动探测失败，再回退为手工显式传入宽高。
+若不传 `--main-width` / `--main-height`，安装器只会在 Windows 上自动探测当前主屏分辨率并据此生成 Monitor Setup；非 Windows shell 需要手工显式传入宽高。
 
 执行后，最少会涉及这些位置：
 
@@ -218,7 +218,7 @@ python -m tools.install_dcs_monitor_setup \
 ### 1. 安装配置
 
 - 执行 `python -m tools.install_dcs_hook --install-composite-panel ...`
-- 默认会自动探测当前主屏分辨率；若探测不到，再手工补 `--main-width` / `--main-height`
+- 默认仅在 Windows 上自动探测当前主屏分辨率；非 Windows shell 请直接补 `--main-width` / `--main-height`
 - 检查 `Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua`
 - 确认其中至少有：
   - `caps.vlm_frame = true`

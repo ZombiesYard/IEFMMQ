@@ -19,9 +19,9 @@ SIMTUTOR_EXPORT_SNIPPET = (
     "pcall(function() local SimTutorLfs=require('lfs');"
     "dofile(SimTutorLfs.writedir()..'Scripts/SimTutor/SimTutor.lua'); end)"
 )
+MONITOR_SETUP_BASENAME = "SimTutor_FA18C_CompositePanel_v1"
 DEFAULT_VISION_LAYOUT_ID = "fa18c_composite_panel_v2"
 DEFAULT_FRAME_CHANNEL = "composite_panel"
-DEFAULT_MONITOR_SETUP_NAME = "SimTutor_FA18C_CompositePanel_v1"
 DEFAULT_FRAME_MANIFEST_NAME = "frames.jsonl"
 DEFAULT_VISION_BACKGROUND_RGB = (15, 20, 24)
 
@@ -109,7 +109,7 @@ def build_composite_panel_config(
     *,
     saved_games_dir: Path,
     frames_root: Path | None = None,
-    monitor_setup_name: str = DEFAULT_MONITOR_SETUP_NAME,
+    monitor_setup_name: str = MONITOR_SETUP_BASENAME,
     layout_id: str = DEFAULT_VISION_LAYOUT_ID,
     channel: str = DEFAULT_FRAME_CHANNEL,
     background_rgb: Sequence[int] = DEFAULT_VISION_BACKGROUND_RGB,
@@ -176,7 +176,7 @@ def install_composite_panel_config(
     *,
     saved_games_dir: Path,
     frames_root: Path | None = None,
-    monitor_setup_name: str = DEFAULT_MONITOR_SETUP_NAME,
+    monitor_setup_name: str = MONITOR_SETUP_BASENAME,
     layout_id: str = DEFAULT_VISION_LAYOUT_ID,
     channel: str = DEFAULT_FRAME_CHANNEL,
     background_rgb: Sequence[int] = DEFAULT_VISION_BACKGROUND_RGB,
@@ -331,19 +331,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--monitor-mode",
         type=str,
         default="extended-right",
-        help="Monitor-setup mode used by --install-composite-panel; if width/height are omitted the installer auto-detects the current primary-screen resolution.",
+        help="Monitor-setup mode used by --install-composite-panel; if width/height are omitted on Windows the installer auto-detects the current primary-screen resolution.",
     )
     parser.add_argument(
         "--main-width",
         type=int,
         default=None,
-        help="Optional main display width in pixels for monitor-setup installation. Omit together with --main-height to auto-detect the current primary-screen resolution.",
+        help="Optional main display width in pixels for monitor-setup installation. Omit together with --main-height to auto-detect on Windows, or pass explicitly on non-Windows shells.",
     )
     parser.add_argument(
         "--main-height",
         type=int,
         default=None,
-        help="Optional main display height in pixels for monitor-setup installation. Omit together with --main-width to auto-detect the current primary-screen resolution.",
+        help="Optional main display height in pixels for monitor-setup installation. Omit together with --main-width to auto-detect on Windows, or pass explicitly on non-Windows shells.",
     )
     return parser
 

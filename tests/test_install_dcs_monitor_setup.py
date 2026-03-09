@@ -169,6 +169,17 @@ def test_install_monitor_setup_auto_detects_resolution_when_dimensions_missing(m
     assert "-- Recommended DCS resolution: 4480x1440" in result.monitor_setup_path.read_text(encoding="utf-8")
 
 
+def test_detect_main_resolution_raises_when_all_windows_detectors_fail(monkeypatch) -> None:
+    monkeypatch.setattr("tools.install_dcs_monitor_setup._detect_resolution_windows", lambda: None)
+    monkeypatch.setattr("tools.install_dcs_monitor_setup._detect_resolution_powershell", lambda: None)
+
+    with pytest.raises(
+        RuntimeError,
+        match="failed to detect current screen resolution automatically; pass --main-width and --main-height explicitly",
+    ):
+        resolve_main_dimensions(None, None)
+
+
 @pytest.mark.parametrize(
     ("main_width", "main_height"),
     [

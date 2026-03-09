@@ -90,7 +90,7 @@ Install the v0.4 composite-panel baseline in one pass. This copies the DCS hook,
 writes `Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua` with
 `vlm_frame = true`, and installs the matching monitor setup. If `--main-width`
 and `--main-height` are omitted, the installer auto-detects the current primary
-screen resolution:
+screen resolution on Windows. On non-Windows shells, pass them explicitly:
 
 ```bash
 python -m tools.install_dcs_hook \
@@ -100,7 +100,8 @@ python -m tools.install_dcs_hook \
 ```
 
 Install the monitor setup for the F/A-18C normalized three-viewport PoC. Width
-and height can also be omitted to auto-detect the current primary screen:
+and height can also be omitted to auto-detect the current primary screen on
+Windows; on non-Windows shells, pass them explicitly:
 
 ```bash
 python -m tools.install_dcs_monitor_setup \
@@ -494,9 +495,9 @@ python -m tools.install_dcs_hook --dcs-variant DCS
 | `--no-export` | No | Copy files only and do not patch `Export.lua` |
 | `--install-composite-panel` | No | Also write `Scripts/SimTutor/SimTutorConfig.lua`, enable `vlm_frame=true`, and prepare the v0.4 composite-panel baseline |
 | `--frame-output-root` | No | Override the default frame root; otherwise `<Saved Games>/<variant>/SimTutor/frames` |
-| `--monitor-mode` | No | Monitor-layout mode used by `--install-composite-panel`; if width/height are omitted the installer auto-detects the current primary-screen resolution |
-| `--main-width` | No | Main display width in pixels; omit together with `--main-height` to auto-detect the current primary-screen resolution |
-| `--main-height` | No | Main display height in pixels; omit together with `--main-width` to auto-detect the current primary-screen resolution |
+| `--monitor-mode` | No | Monitor-layout mode used by `--install-composite-panel`; if width/height are omitted the installer auto-detects the current primary-screen resolution on Windows |
+| `--main-width` | No | Main display width in pixels; omit together with `--main-height` to auto-detect on Windows, or pass explicitly on non-Windows shells |
+| `--main-height` | No | Main display height in pixels; omit together with `--main-width` to auto-detect on Windows, or pass explicitly on non-Windows shells |
 
 ### `python -m tools.record_dcs_telemetry`
 
@@ -581,8 +582,8 @@ Relevant DCS-side scripts live under:
 ### Typical Live Bring-Up
 
 1. Install the hook files with `python -m tools.install_dcs_hook`.
-2. For a fresh v0.4 setup, prefer `python -m tools.install_dcs_hook --install-composite-panel --monitor-mode <extended-right|ultrawide-left-stack|single-monitor>`. By default it auto-detects the current primary-screen resolution; you can still override it with `--main-width` and `--main-height`.
-3. If you only need the monitor profile, install it separately with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor>`. It uses the same auto-detection behavior unless width/height are passed explicitly.
+2. For a fresh v0.4 setup, prefer `python -m tools.install_dcs_hook --install-composite-panel --monitor-mode <extended-right|ultrawide-left-stack|single-monitor>`. On Windows it auto-detects the current primary-screen resolution; on non-Windows shells, pass `--main-width` and `--main-height`.
+3. If you only need the monitor profile, install it separately with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor>`. It uses the same Windows-only auto-detection behavior.
 4. The frozen v0.4 visual contract only uses the native `LEFT_MFCD`, `CENTER_MFCD` (`AMPCD`), and `RIGHT_MFCD` exports. Other evidence should still come from DCS-BIOS in the first release.
 5. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution. `single-monitor` and `ultrawide-left-stack` resolve the same normalized left-stack geometry against different screen sizes.
 6. Check `Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua` and confirm:
