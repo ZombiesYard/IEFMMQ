@@ -2047,15 +2047,15 @@ class LiveDcsTutorLoop:
             rejected_overlay["help_cycle_id"] = help_cycle_id
             self._emit_event(
                 kind="overlay_rejected",
-            payload=rejected_overlay,
-            related_id=request.request_id,
-            t_wall=time.time(),
-            metadata={
-                "help_cycle_id": help_cycle_id,
-                "generation_mode": response.metadata.get("generation_mode"),
-            },
-            vision_refs=vision_selection.frame_ids,
-        )
+                payload=rejected_overlay,
+                related_id=request.request_id,
+                t_wall=time.time(),
+                metadata={
+                    "help_cycle_id": help_cycle_id,
+                    "generation_mode": response.metadata.get("generation_mode"),
+                },
+                vision_refs=vision_selection.frame_ids,
+            )
 
         self._emit_event(
             kind="tutor_response",
@@ -2138,6 +2138,7 @@ def _build_vision_port_from_args(
     saved_games_dir = getattr(args, "vision_saved_games_dir", None)
     if not isinstance(saved_games_dir, str) or not saved_games_dir.strip():
         return None, None, None, None
+    saved_games_dir = saved_games_dir.strip()
 
     session_id = getattr(args, "vision_session_id", None) or getattr(args, "session_id", None)
     if not isinstance(session_id, str) or not session_id.strip():

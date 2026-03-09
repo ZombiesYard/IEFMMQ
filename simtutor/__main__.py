@@ -8,6 +8,8 @@ from typing import Any, Iterable, Tuple
 from jsonschema import Draft202012Validator, FormatChecker
 
 from adapters.pack_gates import DEFAULT_SCENARIO_PROFILE, SUPPORTED_SCENARIO_PROFILES
+from adapters.vision_frames import DEFAULT_FRAME_CHANNEL
+from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
@@ -267,10 +269,10 @@ def main() -> int:
         default=None,
         help="Frame sidecar session id. Defaults to --session-id when omitted.",
     )
-    rep_bios.add_argument("--vision-channel", default="composite_panel", help="Vision frame channel name")
+    rep_bios.add_argument("--vision-channel", default=DEFAULT_FRAME_CHANNEL, help="Vision frame channel name")
     rep_bios.add_argument(
         "--vision-layout-id",
-        default="fa18c_composite_panel_v2",
+        default=DEFAULT_LAYOUT_ID,
         help="Expected sidecar vision layout id",
     )
     rep_bios.add_argument(
