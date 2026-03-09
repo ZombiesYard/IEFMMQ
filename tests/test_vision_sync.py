@@ -83,6 +83,21 @@ def test_select_help_cycle_frames_treats_exact_match_as_trigger_frame() -> None:
     assert selection.sync_miss_reason == "missing_pre_trigger_frame"
 
 
+def test_select_help_cycle_frames_preserves_zero_capture_wall_ms_for_trigger_status() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("0_000000", 0),
+        ],
+        trigger_wall_ms=0,
+        sync_window_ms=250,
+    )
+
+    assert selection.trigger_frame is not None
+    assert selection.trigger_frame["frame_id"] == "0_000000"
+    assert selection.trigger_frame["sync_status"] == "matched_exact"
+    assert selection.sync_status == "matched_exact"
+
+
 def test_select_help_cycle_frames_marks_vision_unavailable_when_out_of_window() -> None:
     selection = select_help_cycle_frames(
         [

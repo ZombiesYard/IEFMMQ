@@ -235,13 +235,18 @@ def select_help_cycle_frames(
         if pre_observation is not None
         else None
     )
+    trigger_capture_wall_ms = _capture_wall_ms(trigger_observation) if trigger_observation is not None else None
     trigger_payload = (
         _frame_payload(
             trigger_observation,
             role="trigger_frame",
             trigger_wall_ms=trigger_wall_ms,
             sync_status=_trigger_sync_status(
-                capture_wall_ms=_capture_wall_ms(trigger_observation) or trigger_wall_ms,
+                capture_wall_ms=(
+                    trigger_capture_wall_ms
+                    if trigger_capture_wall_ms is not None
+                    else trigger_wall_ms
+                ),
                 trigger_wall_ms=trigger_wall_ms,
             ),
         )
