@@ -86,7 +86,22 @@ Install the DCS hook files into Saved Games:
 python -m tools.install_dcs_hook --dcs-variant DCS
 ```
 
-Install the monitor setup for the F/A-18C normalized three-viewport PoC:
+Install the v0.4 composite-panel baseline in one pass. This copies the DCS hook,
+writes `Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua` with
+`vlm_frame = true`, and installs the matching monitor setup. If `--main-width`
+and `--main-height` are omitted, the installer auto-detects the current primary
+screen resolution on Windows. On non-Windows shells, pass them explicitly:
+
+```bash
+python -m tools.install_dcs_hook \
+  --dcs-variant DCS \
+  --install-composite-panel \
+  --monitor-mode extended-right
+```
+
+Install the monitor setup for the F/A-18C normalized three-viewport PoC. Width
+and height can also be omitted to auto-detect the current primary screen on
+Windows; on non-Windows shells, pass them explicitly:
 
 ```bash
 python -m tools.install_dcs_monitor_setup \
@@ -478,6 +493,11 @@ python -m tools.install_dcs_hook --dcs-variant DCS
 | `--saved-games` | No | Explicit Saved Games path; otherwise `<home>/Saved Games/<variant>` |
 | `--dcs-variant` | No | DCS variant folder, for example `DCS` or `DCS.openbeta`; default `DCS` |
 | `--no-export` | No | Copy files only and do not patch `Export.lua` |
+| `--install-composite-panel` | No | Also write `Scripts/SimTutor/SimTutorConfig.lua`, enable `vlm_frame=true`, and prepare the v0.4 composite-panel baseline |
+| `--frame-output-root` | No | Override the default frame root; otherwise `<Saved Games>/<variant>/SimTutor/frames` |
+| `--monitor-mode` | No | Monitor-layout mode used by `--install-composite-panel`; if width/height are omitted the installer auto-detects the current primary-screen resolution on Windows |
+| `--main-width` | No | Main display width in pixels; omit together with `--main-height` to auto-detect on Windows, or pass explicitly on non-Windows shells |
+| `--main-height` | No | Main display height in pixels; omit together with `--main-width` to auto-detect on Windows, or pass explicitly on non-Windows shells |
 
 ### `python -m tools.record_dcs_telemetry`
 
@@ -562,12 +582,19 @@ Relevant DCS-side scripts live under:
 ### Typical Live Bring-Up
 
 1. Install the hook files with `python -m tools.install_dcs_hook`.
-2. If you are testing the viewport PoC, install the monitor setup with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor> --main-width <screen_width> --main-height <screen_height>`.
-3. The frozen v0.4 visual contract only uses the native `LEFT_MFCD`, `CENTER_MFCD` (`AMPCD`), and `RIGHT_MFCD` exports; all other evidence should come from DCS-BIOS.
-4. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution. `single-monitor` and `ultrawide-left-stack` now resolve the same normalized left-stack layout against different screen sizes.
-5. Ensure DCS or DCS.openbeta loads the copied Lua files.
-6. Start `python live_dcs.py`.
-7. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
+2. For a fresh v0.4 setup, prefer `python -m tools.install_dcs_hook --install-composite-panel --monitor-mode <extended-right|ultrawide-left-stack|single-monitor>`. On Windows it auto-detects the current primary-screen resolution; on non-Windows shells, pass `--main-width` and `--main-height`.
+3. If you only need the monitor profile, install it separately with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor>`. It uses the same Windows-only auto-detection behavior.
+4. The frozen v0.4 visual contract only uses the native `LEFT_MFCD`, `CENTER_MFCD` (`AMPCD`), and `RIGHT_MFCD` exports. Other evidence should still come from DCS-BIOS in the first release.
+5. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution. `single-monitor` and `ultrawide-left-stack` resolve the same normalized left-stack geometry against different screen sizes.
+6. Check `Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua` and confirm:
+   - `caps.vlm_frame = true`
+   - `vision.output_root` points to `Saved Games/<variant>/SimTutor/frames`
+   - `vision.monitor_setup` matches `SimTutor_FA18C_CompositePanel_v1`
+7. Start DCS and confirm the capability handshake reports `vlm_frame=true`.
+8. If the composite-panel frame writer/sidecar is installed, confirm `.png` frames and `frames.jsonl` grow under `Saved Games/<variant>/SimTutor/frames/<session_id>/composite_panel/`.
+9. Start `python live_dcs.py`.
+10. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
+11. Confirm the Python side emits `VisionObservation` records or logs a safe `vision_unavailable` downgrade instead of breaking the telemetry flow.
 
 ## Output Artifacts
 

@@ -95,6 +95,89 @@
 - `extended-right` 保留为调试模式，但其 3 块视口也由同一套 normalized region 几何求解
 - 这意味着后续采帧、切图、VLM 引用都只需要维护一套几何逻辑
 
+## DCS 侧最小配置模板
+
+推荐直接使用安装器生成 Saved Games 配置，而不是手工新建文件：
+
+```bash
+python -m tools.install_dcs_hook \
+  --dcs-variant DCS \
+  --install-composite-panel \
+  --monitor-mode extended-right
+```
+
+若不传 `--main-width` / `--main-height`，安装器只会在 Windows 上自动探测当前主屏分辨率并据此生成 Monitor Setup；非 Windows shell 需要手工显式传入宽高。
+
+执行后，最少会涉及这些位置：
+
+- `Saved Games/<DCS variant>/Scripts/Export.lua`
+  - 若尚未接入 SimTutor，安装器会追加 hook 入口
+- `Saved Games/<DCS variant>/Scripts/SimTutor/SimTutor.lua`
+- `Saved Games/<DCS variant>/Scripts/SimTutor/SimTutor Function.lua`
+- `Saved Games/<DCS variant>/Scripts/SimTutor/SimTutorConfig.lua`
+  - 这里是 v0.4 组合面板最小模板，包含 `caps.vlm_frame = true`
+  - 也包含 `vision.output_root`、`layout_id`、`channel`、背景色和推荐输出分辨率
+- `Saved Games/<DCS variant>/Config/MonitorSetup/SimTutor_FA18C_CompositePanel_v1.lua`
+  - 这是 DCS 原生视口导出排版文件
+
+如果你只想生成 Monitor Setup，不改 hook，可单独执行：
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode extended-right
+```
+
+## 如何把多个关键区域排成一张组合图
+
+首版冻结布局不是主视口截图，而是 DCS 原生导出的 3 个 viewport：
+
+- `LEFT_MFCD` -> 左 DDI
+- `CENTER_MFCD` -> AMPCD
+- `RIGHT_MFCD` -> 右 DDI
+
+布局规则：
+
+- 3 块区域固定在屏幕左侧，按上到下排列
+- 右侧保留给模拟器主画面
+- 背景建议保持深色纯色，默认模板为 `rgb(15, 20, 24)`
+- `extended-right` 模式会在主画面右侧追加固定 `2560x1440` 调试画布
+- `single-monitor` / `ultrawide-left-stack` 会把左侧导出带和右侧主视口一起解到同一屏幕
+
+也就是说，DCS 负责“把 3 个关键面板稳定导出到固定区域”，而后续 sidecar/frame writer 再按固定 contract 把这块组合图落到磁盘并写 `frames.jsonl`。
+
+## 首版纳入与不纳入范围
+
+首版优先依赖组合面板导出的区域：
+
+- 左 DDI
+- AMPCD
+- 右 DDI
+
+这些步骤优先依赖原生视口证据：
+
+- `S08`
+- `S15`
+- `S18`
+
+这些区域或步骤暂不纳入首版组合图优先范围，仍优先走 DCS-BIOS 或人工确认：
+
+- `MASTER CAUTION` 与左右告警/提示灯
+- `IFEI`
+- `UFC`
+- standby 仪表
+- HUD
+- `S02`
+- `S14`
+- `S16`
+- `S17`
+- `S19`
+- `S20`
+- `S22`
+- `S23`
+- `S24`
+- `S25`
+
 ## 帧工件规范
 
 - 默认交换方式固定为：磁盘目录落盘 + `frames.jsonl`
@@ -129,3 +212,45 @@
   - `AMPCD`
   - `Right DDI`
 - 该过程必须适配不同分辨率和宽高比，只能依赖当前冻结的 normalized layout 计算 crop，不允许写死像素
+
+## 最小联调检查清单
+
+### 1. 安装配置
+
+- 执行 `python -m tools.install_dcs_hook --install-composite-panel ...`
+- 默认仅在 Windows 上自动探测当前主屏分辨率；非 Windows shell 请直接补 `--main-width` / `--main-height`
+- 检查 `Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua`
+- 确认其中至少有：
+  - `caps.vlm_frame = true`
+  - `vision.output_root = <Saved Games>/<variant>/SimTutor/frames`
+  - `vision.channel = "composite_panel"`
+  - `vision.layout_id = "fa18c_composite_panel_v2"`
+
+### 2. DCS Options
+
+- 打开 DCS -> `Options` -> `System`
+- 选择 Monitor Setup：`SimTutor_FA18C_CompositePanel_v1`
+- 分辨率设置为安装器打印的 recommended resolution
+- 首次联调建议先用 `extended-right`
+
+### 3. 启动后检查 DCS 侧
+
+- `Saved Games/<variant>/Scripts/Export.lua` 中已有 SimTutor hook 入口
+- DCS 启动后 capability handshake 返回 `vlm_frame=true`
+- 若 sidecar/frame writer 已部署，`<Saved Games>/<variant>/SimTutor/frames/<session_id>/composite_panel/` 下会持续出现：
+  - `<capture_wall_ms>_<frame_seq>.png`
+  - `frames.jsonl`
+
+### 4. Python 侧检查
+
+- 启动 `python live_dcs.py`
+- 确认 Python 侧能看到 `VisionObservation`
+- 若视觉 sidecar 尚未就绪，也必须只出现 `vision_unavailable` 降级，而不是中断 telemetry 主链路
+
+### 5. 失败时优先排查
+
+- Monitor Setup 没选对，导致 `LEFT_MFCD/CENTER_MFCD/RIGHT_MFCD` 没有排到约定位置
+- DCS 分辨率没按推荐值设置，导致组合图几何漂移
+- `SimTutorConfig.lua` 中 `vision.output_root` 指到错误目录
+- sidecar/frame writer 没有按最终文件名写 `.png` 或没有原子 rename
+- Python 读取到的 `frames.jsonl` 中 `layout_id/channel/source_session_id` 不匹配

@@ -13,6 +13,7 @@ from tools.install_dcs_monitor_setup import (
     MONITOR_SETUP_BASENAME,
     build_monitor_setup_plan,
     install_monitor_setup,
+    resolve_main_dimensions,
 )
 
 
@@ -150,6 +151,35 @@ def test_install_monitor_setup_is_idempotent(tmp_path: Path) -> None:
     assert second.changed is False
 
 
+def test_resolve_main_dimensions_uses_auto_detection_when_dimensions_missing(monkeypatch) -> None:
+    monkeypatch.setattr("tools.install_dcs_monitor_setup.detect_main_resolution", lambda: (2560, 1440))
+
+    assert resolve_main_dimensions(None, None) == (2560, 1440)
+
+
+def test_install_monitor_setup_auto_detects_resolution_when_dimensions_missing(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("tools.install_dcs_monitor_setup.detect_main_resolution", lambda: (1920, 1080))
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+
+    result = install_monitor_setup(saved_games_dir=saved_games_dir, mode=MODE_EXTENDED_RIGHT)
+
+    assert result.total_width == 4480
+    assert result.total_height == 1440
+    assert result.monitor_setup_path.exists()
+    assert "-- Recommended DCS resolution: 4480x1440" in result.monitor_setup_path.read_text(encoding="utf-8")
+
+
+def test_detect_main_resolution_raises_when_all_windows_detectors_fail(monkeypatch) -> None:
+    monkeypatch.setattr("tools.install_dcs_monitor_setup._detect_resolution_windows", lambda: None)
+    monkeypatch.setattr("tools.install_dcs_monitor_setup._detect_resolution_powershell", lambda: None)
+
+    with pytest.raises(
+        RuntimeError,
+        match="failed to detect current screen resolution automatically; pass --main-width and --main-height explicitly",
+    ):
+        resolve_main_dimensions(None, None)
+
+
 @pytest.mark.parametrize(
     ("main_width", "main_height"),
     [
@@ -166,6 +196,11 @@ def test_build_monitor_setup_plan_rejects_non_positive_dimensions(main_width: in
 def test_build_monitor_setup_plan_rejects_unknown_mode() -> None:
     with pytest.raises(ValueError, match="unsupported mode"):
         build_monitor_setup_plan(main_width=1920, main_height=1080, mode="unknown")
+
+
+def test_resolve_main_dimensions_rejects_partial_manual_override() -> None:
+    with pytest.raises(ValueError, match="main_width and main_height must be provided together"):
+        resolve_main_dimensions(1920, None)
 
 
 def test_single_monitor_rejects_too_narrow_screen() -> None:

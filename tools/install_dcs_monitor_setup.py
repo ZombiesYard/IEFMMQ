@@ -12,14 +12,14 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
 
 from adapters.vision_prompting import load_vision_layout, solve_layout_geometry
-from tools.install_dcs_hook import resolve_saved_games_dir
+from tools.install_dcs_hook import MONITOR_SETUP_BASENAME, resolve_saved_games_dir
 
-# Keep the Saved Games monitor-setup filename stable for DCS Options/backward
-# compatibility; the active visual contract version is tracked by layout_id in
-# packs/fa18c_startup/vision_layout.yaml.
-MONITOR_SETUP_BASENAME = "SimTutor_FA18C_CompositePanel_v1"
 COMPOSITE_CANVAS_WIDTH = 2560
 COMPOSITE_CANVAS_HEIGHT = 1440
 MODE_EXTENDED_RIGHT = "extended-right"
@@ -63,6 +63,85 @@ def _require_positive_int(value: int, label: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ValueError(f"{label} must be a positive integer")
     return value
+
+
+def _normalize_detected_resolution(width: int, height: int, label: str) -> tuple[int, int]:
+    return (_require_positive_int(width, f"{label}.width"), _require_positive_int(height, f"{label}.height"))
+
+
+def _detect_resolution_windows() -> tuple[int, int] | None:
+    if sys.platform != "win32":
+        return None
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    try:
+        user32.SetProcessDPIAware()
+    except Exception:
+        pass
+    return _normalize_detected_resolution(user32.GetSystemMetrics(0), user32.GetSystemMetrics(1), "windows_api")
+
+
+def _detect_resolution_powershell() -> tuple[int, int] | None:
+    if sys.platform != "win32":
+        return None
+    powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+    if not powershell:
+        return None
+    command = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$bounds=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; "
+        "Write-Output ($bounds.Width.ToString() + ',' + $bounds.Height.ToString())"
+    )
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-Command", command],
+        capture_output=True,
+        check=False,
+        encoding="utf-8",
+        errors="replace",
+        timeout=5,
+    )
+    if result.returncode != 0:
+        return None
+    output = result.stdout.strip().splitlines()
+    if not output:
+        return None
+    match = re.fullmatch(r"\s*(\d+)\s*,\s*(\d+)\s*", output[-1])
+    if not match:
+        return None
+    return _normalize_detected_resolution(int(match.group(1)), int(match.group(2)), "powershell")
+
+
+def detect_main_resolution() -> tuple[int, int]:
+    # DCS-side monitor setup is Windows-specific. Keep auto-detection restricted
+    # to Windows so Linux/macOS shells running this installer must pass explicit
+    # dimensions instead of relying on host-desktop heuristics.
+    for detector in (
+        _detect_resolution_windows,
+        _detect_resolution_powershell,
+    ):
+        try:
+            resolution = detector()
+        except Exception:
+            resolution = None
+        if resolution is not None:
+            return resolution
+    raise RuntimeError(
+        "failed to detect current screen resolution automatically; "
+        "pass --main-width and --main-height explicitly"
+    )
+
+
+def resolve_main_dimensions(main_width: int | None, main_height: int | None) -> tuple[int, int]:
+    if main_width is None and main_height is None:
+        return detect_main_resolution()
+    if (main_width is None) ^ (main_height is None):
+        raise ValueError("main_width and main_height must be provided together")
+    assert main_width is not None and main_height is not None
+    return (
+        _require_positive_int(main_width, "main_width"),
+        _require_positive_int(main_height, "main_height"),
+    )
 
 
 def _region_id_to_dcs_name(region_id: str) -> str:
@@ -238,11 +317,12 @@ def _monitor_setup_path(saved_games_dir: Path) -> Path:
 def install_monitor_setup(
     *,
     saved_games_dir: Path,
-    main_width: int,
-    main_height: int,
+    main_width: int | None = None,
+    main_height: int | None = None,
     mode: str = MODE_EXTENDED_RIGHT,
 ) -> InstallResult:
-    plan = build_monitor_setup_plan(main_width=main_width, main_height=main_height, mode=mode)
+    resolved_width, resolved_height = resolve_main_dimensions(main_width, main_height)
+    plan = build_monitor_setup_plan(main_width=resolved_width, main_height=resolved_height, mode=mode)
     path = _monitor_setup_path(saved_games_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     changed = True
@@ -272,8 +352,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=MODE_EXTENDED_RIGHT,
         help="Layout mode: extended-right uses a fixed debug canvas; single-monitor and ultrawide-left-stack both resolve the same normalized left-stack layout against the target screen.",
     )
-    parser.add_argument("--main-width", type=int, required=True, help="Main screen width in pixels.")
-    parser.add_argument("--main-height", type=int, required=True, help="Main screen height in pixels.")
+    parser.add_argument("--main-width", type=int, default=None, help="Main screen width in pixels. If omitted together with --main-height, the installer auto-detects the current primary-screen resolution on Windows; non-Windows shells must pass it explicitly.")
+    parser.add_argument("--main-height", type=int, default=None, help="Main screen height in pixels. If omitted together with --main-width, the installer auto-detects the current primary-screen resolution on Windows; non-Windows shells must pass it explicitly.")
     return parser
 
 
@@ -289,7 +369,7 @@ def main() -> int:
             main_height=args.main_height,
             mode=args.mode,
         )
-    except ValueError as exc:
+    except (RuntimeError, ValueError) as exc:
         print(f"Install failed: {exc}")
         return 1
 
