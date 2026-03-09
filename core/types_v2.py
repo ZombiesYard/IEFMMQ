@@ -63,7 +63,13 @@ class VisionObservation:
     channel: Optional[str] = None
     layout_id: Optional[str] = None
     image_uri: Optional[str] = None
+    source_image_path: Optional[str] = None
     mime_type: Optional[str] = None
+    capture_wall_ms: Optional[int] = None
+    frame_seq: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    source_session_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

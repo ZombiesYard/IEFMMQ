@@ -44,7 +44,12 @@
     },
     "vision_refs": {
       "type": "array",
-      "items": { "type": "string", "format": "uuid" },
+      "items": {
+        "anyOf": [
+          { "type": "string", "format": "uuid" },
+          { "type": "string", "pattern": "^[0-9]{10,20}_[0-9]{6}$" }
+        ]
+      },
       "description": "Optional linked VisionObservation.frame_id values."
     },
     "payload": { "type": "object", "description": "Envelope contents; validated separately if desired" },

@@ -7,7 +7,19 @@
   "required": ["schema_version", "frame_id", "timestamp", "source"],
   "properties": {
     "schema_version": { "type": "string", "const": "v2" },
-    "frame_id": { "type": "string", "format": "uuid" },
+    "frame_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9]{10,20}_[0-9]{6}$"
+        }
+      ],
+      "description": "Backward-compatible vision frame reference. Manifest-backed observations use capture_wall_ms plus zero-padded frame_seq; legacy/non-manifest observations may still use UUIDs."
+    },
     "timestamp": { "type": "string", "format": "date-time" },
     "source": { "type": "string" },
     "session_id": { "type": ["string", "null"] },
@@ -26,10 +38,35 @@
     },
     "image_uri": {
       "type": ["string", "null"],
-      "format": "uri",
-      "description": "Optional URI to the stored image/frame artifact."
+      "description": "Absolute artifact path or URI for the VLM-ready frame produced by the Python-side crop pipeline."
+    },
+    "source_image_path": {
+      "type": ["string", "null"],
+      "description": "Original DCS-side source frame path referenced by frames.jsonl."
     },
     "mime_type": { "type": ["string", "null"] },
+    "capture_wall_ms": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "frame_seq": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "width": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Source frame width in pixels from the manifest."
+    },
+    "height": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Source frame height in pixels from the manifest."
+    },
+    "source_session_id": {
+      "type": ["string", "null"],
+      "description": "DCS-side capture session that produced the source frame."
+    },
     "metadata": { "type": "object", "description": "Free-form adapter metadata." }
   }
 }

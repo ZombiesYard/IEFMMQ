@@ -274,7 +274,7 @@ Parameters:
 | Argument | Required | Description |
 | --- | --- | --- |
 | `files` | Yes | One or more JSONL files |
-| `--schema` | No | One of `dcs_bios_frame`, `dcs_caps`, `dcs_hello`, `dcs_observation`, `dcs_overlay_ack`, `dcs_overlay_command`, `event`, `observation`, `telemetry_frame`, `tutor_request`, `tutor_response`, `vision_observation`; default `event` |
+| `--schema` | No | One of `dcs_bios_frame`, `dcs_caps`, `dcs_hello`, `dcs_observation`, `dcs_overlay_ack`, `dcs_overlay_command`, `event`, `observation`, `telemetry_frame`, `tutor_request`, `tutor_response`, `vision_frame_manifest_entry`, `vision_observation`; default `event` |
 
 #### `simtutor run`
 
@@ -581,6 +581,15 @@ Typical generated outputs:
 - `Doc/Evaluation/index.json`
 - `artifacts/regression/coldstart_state_matrix/`
 
+Frozen v0.4 frame sidecar layout for the composite panel:
+
+- `<Saved Games>/<DCS variant>/SimTutor/frames/<session_id>/<channel>/`
+- Source screenshot file name: `<capture_wall_ms>_<frame_seq:06d>.png` (example: `1772872444902_000123.png`)
+- Source manifest: `frames.jsonl` in the same channel directory
+- Python-generated VLM-ready artifact: `artifacts/<capture_wall_ms>_<frame_seq:06d>_vlm.png`
+
+The manifest line is the source-of-truth for replay/live reuse and must point at the final `.png` produced after the DCS-side temp-file to atomic-rename handoff. The Python-side crop pipeline then removes the right main-view region and writes a bordered, clearly labelled `Left DDI` / `AMPCD` / `Right DDI` artifact that `VisionObservation.image_uri` references.
+
 Event logs are designed to be replayed and validated with:
 
 ```bash
@@ -593,7 +602,7 @@ python -m simtutor replay logs/example.jsonl --pack packs/fa18c_startup/pack.yam
 - The authoritative machine-executable procedure data lives in `packs/fa18c_startup/`.
 - Grounding source material is indexed from `Doc/Evaluation/`.
 - Replay and live flows intentionally summarize and budget DCS-BIOS deltas before prompting.
-- `vision_observation` exists as a reserved forward-compatible contract, but there is no production VLM pipeline in this repository yet.
+- The repository now includes the frame-manifest and VLM-ready crop pipeline for `vision_observation`, but multimodal help fusion is still not wired into the live/replay tutor loop.
 
 ## License
 

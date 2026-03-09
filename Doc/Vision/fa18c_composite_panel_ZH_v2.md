@@ -94,3 +94,38 @@
 - `single-monitor` 与 `ultrawide-left-stack` 共享同一套 normalized left-stack solver
 - `extended-right` 保留为调试模式，但其 3 块视口也由同一套 normalized region 几何求解
 - 这意味着后续采帧、切图、VLM 引用都只需要维护一套几何逻辑
+
+## 帧工件规范
+
+- 默认交换方式固定为：磁盘目录落盘 + `frames.jsonl`
+- 目录固定为：`<Saved Games>/<DCS variant>/SimTutor/frames/<session_id>/<channel>/`
+- 帧文件名固定为：`<capture_wall_ms>_<frame_seq:06d>.png`，例如 `1772872444902_000123.png`
+- manifest 固定文件名：同目录 `frames.jsonl`
+- 每行至少包含：
+  - `frame_id`
+  - `capture_wall_ms`
+  - `frame_seq`
+  - `channel`
+  - `layout_id`
+  - `image_path`
+  - `width`
+  - `height`
+  - `source_session_id`
+
+## 原子落盘与 Python 侧消费规则
+
+- DCS 侧必须先写临时文件，再原子 rename 成最终 `.png`
+- Python 侧只消费 manifest 中声明且已经存在的最终 `.png`
+- `.tmp / .part / .partial` 一律视为未完成工件，不进入 `VisionObservation`
+- `VisionObservation.image_uri` 固定指向 Python 生成的 VLM-ready 最终工件
+- 原始截图路径保留在 `VisionObservation.source_image_path` 与 metadata 中，靠 `frame_id` 统一关联日志、重放、模型请求和调试工具
+
+## Python 裁剪与标注规则
+
+- Python 先按整屏 solver 切掉右侧模拟器主画面，只保留左侧导出带
+- 然后在导出带上叠加 VLM-friendly 边框与英文标签
+- 标签顺序固定为：
+  - `Left DDI`
+  - `AMPCD`
+  - `Right DDI`
+- 该过程必须适配不同分辨率和宽高比，只能依赖当前冻结的 normalized layout 计算 crop，不允许写死像素

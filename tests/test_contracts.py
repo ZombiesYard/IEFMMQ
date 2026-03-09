@@ -40,3 +40,12 @@ def test_event_schema_accepts_vision_placeholder_refs():
     ).to_dict()
     validate_instance(evt, "event")
 
+
+def test_event_schema_accepts_vision_frame_refs() -> None:
+    evt = Event(
+        kind="system",
+        payload={"status": "vision_available"},
+        vision_refs=["1772872444902_000123"],
+    ).to_dict()
+    validate_instance(evt, "event")
+
