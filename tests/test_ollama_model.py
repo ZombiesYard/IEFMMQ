@@ -175,6 +175,24 @@ def test_explain_error_http_error_fallback() -> None:
     assert res.metadata["generation_mode"] == "fallback"
 
 
+def test_ollama_chat_rejects_non_string_message_content() -> None:
+    model = OllamaModel(client=FakeClient())
+
+    try:
+        model._chat(
+            [
+                {
+                    "role": "user",
+                    "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}],
+                }
+            ]
+        )
+    except ValueError as exc:
+        assert str(exc) == "Ollama messages must have string content"
+    else:
+        raise AssertionError("expected ValueError for non-string message content")
+
+
 def test_explain_error_timeout_or_connection_error_fallback() -> None:
     for exc in (TimeoutError("request timeout"), ConnectionError("connection failed")):
         fake = FakeClient(to_raise=exc)

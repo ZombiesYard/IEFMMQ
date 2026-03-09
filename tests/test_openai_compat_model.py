@@ -609,6 +609,27 @@ def test_openai_compat_keeps_text_only_when_multimodal_capability_is_disabled(tm
     assert res.metadata["multimodal_failure_reason"] is None
 
 
+def test_openai_compat_reports_multimodal_capability_on_early_prompt_failure(monkeypatch) -> None:
+    model = OpenAICompatModel(
+        client=FakeClient(),
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("prompt build failed")
+
+    monkeypatch.setattr(model, "_build_messages", _boom)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "error"
+    assert res.metadata["multimodal_capability_enabled"] is True
+    assert res.metadata["multimodal_input_present"] is False
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_path_attempted"] is False
+
+
 def test_openai_compat_retry_after_multimodal_rejection_stays_text_only(tmp_path: Path) -> None:
     primary_image = tmp_path / "trigger_frame.png"
     primary_image.write_bytes(b"primary-frame")

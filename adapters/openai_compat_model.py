@@ -51,7 +51,9 @@ class OpenAICompatModel(BaseHelpModel):
             else self._DEFAULT_MAX_LOCAL_IMAGE_BYTES
         )
         self._help_response_schema = get_help_response_schema()
-        self._runtime_metadata = self._empty_multimodal_metadata()
+        self._runtime_metadata = self._empty_multimodal_metadata(
+            multimodal_capability_enabled=self.enable_multimodal
+        )
         super().__init__(
             model_name=model_name,
             base_url=base_url,
@@ -62,7 +64,9 @@ class OpenAICompatModel(BaseHelpModel):
         )
 
     def _reset_runtime_metadata(self) -> None:
-        self._runtime_metadata = self._empty_multimodal_metadata()
+        self._runtime_metadata = self._empty_multimodal_metadata(
+            multimodal_capability_enabled=self.enable_multimodal
+        )
 
     def _collect_runtime_metadata(self) -> dict[str, Any]:
         return dict(self._runtime_metadata)
@@ -115,7 +119,6 @@ class OpenAICompatModel(BaseHelpModel):
                             user_text,
                             primary_frame_id=multimodal_spec["primary_frame_id"],
                             secondary_frame_id=multimodal_spec["secondary_frame_id"],
-                            primary_frame_role=multimodal_spec["primary_frame_role"],
                             secondary_frame_role=multimodal_spec["secondary_frame_role"],
                         ),
                     },
@@ -306,7 +309,6 @@ class OpenAICompatModel(BaseHelpModel):
                 "frame_ids": [],
                 "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
                 "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
-                "primary_frame_role": self._frame_role(candidate_frames[0]) if candidate_frames else None,
                 "secondary_frame_role": self._frame_role(candidate_frames[1]) if len(candidate_frames) > 1 else None,
                 "failure_reason": None,
             }
@@ -331,7 +333,6 @@ class OpenAICompatModel(BaseHelpModel):
             "frame_ids": frame_ids,
             "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
             "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
-            "primary_frame_role": self._frame_role(candidate_frames[0]) if candidate_frames else None,
             "secondary_frame_role": self._frame_role(candidate_frames[1]) if len(candidate_frames) > 1 else None,
             "failure_reason": failure_reason,
         }
@@ -379,7 +380,6 @@ class OpenAICompatModel(BaseHelpModel):
         *,
         primary_frame_id: str | None,
         secondary_frame_id: str | None,
-        primary_frame_role: str | None,
         secondary_frame_role: str | None,
     ) -> str:
         frame_notes: list[str] = []
@@ -545,9 +545,12 @@ class OpenAICompatModel(BaseHelpModel):
         return None
 
     @staticmethod
-    def _empty_multimodal_metadata() -> dict[str, Any]:
+    def _empty_multimodal_metadata(
+        *,
+        multimodal_capability_enabled: bool = False,
+    ) -> dict[str, Any]:
         return {
-            "multimodal_capability_enabled": False,
+            "multimodal_capability_enabled": bool(multimodal_capability_enabled),
             "multimodal_input_present": False,
             "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,
