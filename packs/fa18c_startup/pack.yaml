@@ -6,7 +6,7 @@ description: >
   Doc/Evaluation/fa18c_startup_master.md and Appendix - Training Task Syllabus.md.
 metadata:
   step_registry_path: step_registry.yaml
-  vision_layout_id: fa18c_composite_panel_v1
+  vision_layout_id: fa18c_composite_panel_v2
   vision_priority_steps:
     - S08
     - S15

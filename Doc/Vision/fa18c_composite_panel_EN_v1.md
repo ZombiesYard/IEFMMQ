@@ -85,6 +85,7 @@ The frozen deployment layout is the current `3440x1440` ultrawide single-monitor
 - The left `880px` strip stacks the three native display exports vertically
 - The right side keeps a full `2560x1440` `16:9` playable main view
 - The VLM side must only consume the left `880x1440` export strip and must not ingest the right-side main camera
+- On a `16:9` single screen, `single-monitor` now uses the same left-stack geometry family and only scales the export strip by screen height, so downstream code does not need a second single-screen layout model
 
 Install command:
 
@@ -96,4 +97,10 @@ After installation:
 
 - Select `SimTutor_FA18C_CompositePanel_v1` in DCS Options
 - Set the resolution to `3440x1440`
-- `single-monitor` and `extended-right` remain available for debugging, but they are no longer the frozen visual contract
+- For a `16:9` single-screen setup, use:
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode single-monitor --main-width 1920 --main-height 1080
+```
+
+- `single-monitor` and `ultrawide-left-stack` now share the same left-stack three-viewport family; `extended-right` remains debug-only

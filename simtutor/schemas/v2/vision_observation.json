@@ -22,7 +22,7 @@
     },
     "layout_id": {
       "type": ["string", "null"],
-      "description": "Stable visual-layout identifier, resolved to canonical native-viewport geometry via pack vision_layout.yaml."
+      "description": "Stable visual-layout identifier, resolved to canonical normalized native-viewport geometry via pack vision_layout.yaml."
     },
     "image_uri": {
       "type": ["string", "null"],

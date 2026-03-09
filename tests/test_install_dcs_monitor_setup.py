@@ -16,24 +16,23 @@ from tools.install_dcs_monitor_setup import (
 )
 
 
-def test_build_monitor_setup_plan_uses_frozen_top_row_coordinates() -> None:
+def test_build_monitor_setup_plan_uses_normalized_strip_inside_extended_canvas() -> None:
     plan = build_monitor_setup_plan(main_width=1920, main_height=1080, mode=MODE_EXTENDED_RIGHT)
 
     assert plan.setup_name == MONITOR_SETUP_BASENAME
     assert plan.mode == MODE_EXTENDED_RIGHT
     assert plan.canvas_width == COMPOSITE_CANVAS_WIDTH
     assert plan.canvas_height == COMPOSITE_CANVAS_HEIGHT
-    assert plan.total_width == 1920 + 2560
+    assert plan.total_width == 4480
     assert plan.total_height == 1440
-
     assert [(viewport.name, viewport.x, viewport.y, viewport.width, viewport.height) for viewport in plan.viewports] == [
-        ("LEFT_MFCD", 1952, 32, 768, 768),
-        ("CENTER_MFCD", 2816, 32, 768, 768),
-        ("RIGHT_MFCD", 3680, 32, 768, 768),
+        ("LEFT_MFCD", 2136, 24, 448, 448),
+        ("CENTER_MFCD", 2136, 496, 448, 448),
+        ("RIGHT_MFCD", 2136, 968, 448, 448),
     ]
 
 
-def test_monitor_setup_lua_contains_center_and_three_viewports() -> None:
+def test_monitor_setup_lua_contains_extended_canvas_viewports() -> None:
     plan = build_monitor_setup_plan(main_width=2560, main_height=1440, mode=MODE_EXTENDED_RIGHT)
     lua_text = plan.lua_text
 
@@ -45,9 +44,8 @@ def test_monitor_setup_lua_contains_center_and_three_viewports() -> None:
     assert "LEFT_MFCD =" in lua_text
     assert "CENTER_MFCD =" in lua_text
     assert "RIGHT_MFCD =" in lua_text
-    assert "x = 2592;" in lua_text
-    assert "x = 3456;" in lua_text
-    assert "x = 4320;" in lua_text
+    assert "x = 2776;" in lua_text
+    assert "y = 968;" in lua_text
 
 
 def test_build_monitor_setup_plan_supports_single_monitor_mode() -> None:
@@ -56,27 +54,27 @@ def test_build_monitor_setup_plan_supports_single_monitor_mode() -> None:
     assert plan.mode == MODE_SINGLE_MONITOR
     assert plan.total_width == 1920
     assert plan.total_height == 1080
-    assert plan.canvas_width == 1920
-    assert plan.canvas_height < 1080
-    assert plan.main_width == 1920
-    assert plan.main_height == 480
+    assert plan.canvas_width == 660
+    assert plan.canvas_height == 1080
+    assert plan.main_width == 1260
+    assert plan.main_height == 1080
     assert [(viewport.name, viewport.x, viewport.y, viewport.width, viewport.height) for viewport in plan.viewports] == [
-        ("LEFT_MFCD", 24, 24, 576, 576),
-        ("CENTER_MFCD", 672, 24, 576, 576),
-        ("RIGHT_MFCD", 1320, 24, 576, 576),
+        ("LEFT_MFCD", 162, 18, 336, 336),
+        ("CENTER_MFCD", 162, 372, 336, 336),
+        ("RIGHT_MFCD", 162, 726, 336, 336),
     ]
 
 
-def test_single_monitor_lua_places_main_view_below_top_row() -> None:
+def test_single_monitor_lua_places_main_view_on_right_of_left_stack() -> None:
     plan = build_monitor_setup_plan(main_width=1920, main_height=1080, mode=MODE_SINGLE_MONITOR)
     lua_text = plan.lua_text
 
     assert "-- Recommended DCS resolution: 1920x1080" in lua_text
-    assert "Description = 'SimTutor F/A-18C composite panel viewport PoC (single monitor top-row layout)'" in lua_text
-    assert "    y = 600;" in lua_text
-    assert "    width = 1920;" in lua_text
-    assert "    height = 480;" in lua_text
-    assert "CENTER_MFCD =" in lua_text
+    assert "Description = 'SimTutor F/A-18C composite panel viewport PoC (single monitor normalized left-stack layout)'" in lua_text
+    assert "    x = 660;" in lua_text
+    assert "    y = 0;" in lua_text
+    assert "    width = 1260;" in lua_text
+    assert "    height = 1080;" in lua_text
 
 
 def test_build_monitor_setup_plan_supports_ultrawide_left_stack_mode() -> None:
@@ -101,12 +99,17 @@ def test_ultrawide_left_stack_lua_places_main_view_on_right() -> None:
     lua_text = plan.lua_text
 
     assert "-- Recommended DCS resolution: 3440x1440" in lua_text
-    assert "Description = 'SimTutor F/A-18C composite panel viewport PoC (ultrawide left-stack layout)'" in lua_text
+    assert "Description = 'SimTutor F/A-18C composite panel viewport PoC (ultrawide normalized left-stack layout)'" in lua_text
     assert "    x = 880;" in lua_text
-    assert "    y = 0;" in lua_text
     assert "    width = 2560;" in lua_text
-    assert "    height = 1440;" in lua_text
     assert "CENTER_MFCD =" in lua_text
+
+
+def test_ultrawide_and_single_monitor_share_same_normalized_solver_family() -> None:
+    single = build_monitor_setup_plan(main_width=2560, main_height=1440, mode=MODE_SINGLE_MONITOR)
+    ultrawide = build_monitor_setup_plan(main_width=2560, main_height=1440, mode=MODE_ULTRAWIDE_LEFT_STACK)
+    assert single.viewports == ultrawide.viewports
+    assert single.main_width == ultrawide.main_width
 
 
 def test_install_monitor_setup_writes_saved_games_config_path(tmp_path: Path) -> None:
@@ -165,6 +168,6 @@ def test_build_monitor_setup_plan_rejects_unknown_mode() -> None:
         build_monitor_setup_plan(main_width=1920, main_height=1080, mode="unknown")
 
 
-def test_ultrawide_left_stack_rejects_non_ultrawide_screen() -> None:
-    with pytest.raises(ValueError, match="not wide enough"):
-        build_monitor_setup_plan(main_width=2560, main_height=1440, mode=MODE_ULTRAWIDE_LEFT_STACK)
+def test_single_monitor_rejects_too_narrow_screen() -> None:
+    with pytest.raises(ValueError, match="too small"):
+        build_monitor_setup_plan(main_width=639, main_height=1080, mode=MODE_SINGLE_MONITOR)

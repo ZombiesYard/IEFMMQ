@@ -85,6 +85,7 @@
 - 左侧 `880px` 窄条竖排导出 3 块原生视口
 - 右侧保留完整 `2560x1440` 的 `16:9` 正常游戏画面
 - VLM 侧只应消费左侧这块 `880x1440` 导出带，不能把右侧主视角送进模型
+- 对 `16:9` 单屏，`single-monitor` 现在也使用同一套左栈布局语义，只是按屏幕高度缩放左侧导出带，避免后续代码维护两套单屏几何
 
 安装命令：
 
@@ -96,4 +97,10 @@ python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode ultrawide-lef
 
 - 在 DCS Options 中选择 `SimTutor_FA18C_CompositePanel_v1`
 - 分辨率设为 `3440x1440`
-- 如果只是临时调试，`single-monitor` 和 `extended-right` 仍可用，但它们不再是冻结后的标准视觉 contract
+- 如果是 `16:9` 单屏，可使用：
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode single-monitor --main-width 1920 --main-height 1080
+```
+
+- `single-monitor` 与 `ultrawide-left-stack` 共享同一套左栈三视口布局；`extended-right` 仅保留为调试模式

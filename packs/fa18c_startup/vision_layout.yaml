@@ -1,24 +1,31 @@
-layout_id: fa18c_composite_panel_v1
-title: "F/A-18C Native Viewport Layout v1"
+layout_id: fa18c_composite_panel_v2
+title: "F/A-18C Native Viewport Layout v2"
 description: >
-  Fixed native-viewport layout for v0.4 visual grounding. Only the three DCS
-  native display exports remain in the visual contract; UFC, IFEI, and warning
-  blocks are expected from DCS-BIOS instead of image crops.
-canvas:
+  Normalized left-stack native viewport layout for v0.4 visual grounding. The
+  strip is resolved relative to the full screen first, then the three display
+  regions are resolved relative to that strip.
+logical_canvas:
   width: 880
   height: 1440
 background:
   style: matte_neutral_dark
   fill: "#101416"
-  description: "Dark neutral matte background for the three stacked native display exports, with no main camera view."
+  description: "Dark neutral matte preview background for the native export strip."
+strip_norm:
+  anchor: left
+  x_norm: 0.0
+  y_norm: 0.0
+  height_norm: 1.0
+  target_aspect_ratio: 0.6111111111
+  min_main_view_width_px: 640
 regions:
   - region_id: left_ddi
     display_name_zh: 左 DDI
     display_name_en: Left DDI
-    x: 216
-    y: 24
-    width: 448
-    height: 448
+    x_norm: 0.2454545455
+    y_norm: 0.0166666667
+    width_norm: 0.5090909091
+    height_norm: 0.3111111111
     intended_contents:
       - "Native LEFT_MFCD export showing left DDI pages such as FCS or HSI."
       - "Page text, page labels, and display-only step evidence."
@@ -27,10 +34,10 @@ regions:
   - region_id: ampcd
     display_name_zh: AMPCD
     display_name_en: AMPCD
-    x: 216
-    y: 496
-    width: 448
-    height: 448
+    x_norm: 0.2454545455
+    y_norm: 0.3444444444
+    width_norm: 0.5090909091
+    height_norm: 0.3111111111
     intended_contents:
       - "Native CENTER_MFCD export showing AMPCD page state and center display text."
       - "Page labels and display symbology required by pack steps."
@@ -39,10 +46,10 @@ regions:
   - region_id: right_ddi
     display_name_zh: 右 DDI
     display_name_en: Right DDI
-    x: 216
-    y: 968
-    width: 448
-    height: 448
+    x_norm: 0.2454545455
+    y_norm: 0.6722222222
+    width_norm: 0.5090909091
+    height_norm: 0.3111111111
     intended_contents:
       - "Native RIGHT_MFCD export showing right DDI pages such as BIT or FCS."
       - "Display text and BIT-result review."

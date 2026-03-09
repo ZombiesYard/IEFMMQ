@@ -24,7 +24,7 @@ def test_vision_observation_schema_accepts_layout_id() -> None:
     obs = VisionObservation(
         source="vision_stub",
         channel="native_viewports_strip",
-        layout_id="fa18c_composite_panel_v1",
+        layout_id="fa18c_composite_panel_v2",
     ).to_dict()
     validate_instance(obs, "vision_observation")
 
