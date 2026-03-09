@@ -669,6 +669,7 @@ Relevant DCS-side scripts live under:
 9. Start `python live_dcs.py`.
 10. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
 11. Confirm the Python side emits `VisionObservation` records or logs a safe `vision_unavailable` downgrade instead of breaking the telemetry flow.
+   Vision frames are recorded as `observation` events tagged with `metadata.observation_kind=vision`; `payload.attachments` carries the VLM-ready artifact/source image URIs and `event.vision_refs` carries the linked `frame_id`.
 
 ## Output Artifacts
 
@@ -690,6 +691,7 @@ Frozen v0.4 frame sidecar layout for the composite panel:
 - Python-generated VLM-ready artifact: `artifacts/<capture_wall_ms>_<frame_seq:06d>_vlm.png`
 
 The manifest line is the source-of-truth for replay/live reuse and must point at the final `.png` produced after the DCS-side temp-file to atomic-rename handoff. The Python-side crop pipeline then removes the right main-view region and writes a bordered, clearly labelled `Left DDI` / `AMPCD` / `Right DDI` artifact that `VisionObservation.image_uri` references.
+Each emitted vision record is wrapped into the existing v1 `observation` event envelope so replay logs can trace `vision_refs` back to concrete artifact URIs without introducing a second event transport.
 
 Event logs are designed to be replayed and validated with:
 

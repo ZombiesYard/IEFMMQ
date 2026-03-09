@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
+from urllib.parse import urlparse
+from uuid import UUID, uuid4
 
 import yaml
 
@@ -98,6 +100,103 @@ def _default_knowledge_source_policy_path() -> Path:
 
 def _normalize_fs_path(path_like: str | Path) -> Path:
     return Path(path_like).expanduser().resolve()
+
+
+def _path_like_to_uri(raw_value: Any) -> str | None:
+    if not isinstance(raw_value, str):
+        return None
+    text = raw_value.strip()
+    if not text:
+        return None
+    windows_path = PureWindowsPath(text)
+    if windows_path.drive and windows_path.is_absolute():
+        return windows_path.as_uri()
+    parsed = urlparse(text)
+    if parsed.scheme:
+        return text
+    path = Path(text).expanduser()
+    if path.is_absolute():
+        return path.resolve().as_uri()
+    return None
+
+
+def _normalize_uuid_text(raw_value: Any) -> str | None:
+    if not isinstance(raw_value, str):
+        return None
+    text = raw_value.strip()
+    if not text:
+        return None
+    try:
+        return str(UUID(text))
+    except ValueError:
+        return None
+
+
+def _build_vision_event_attachments(observation: Any) -> list[str]:
+    attachments: list[str] = []
+    for candidate in (
+        getattr(observation, "image_uri", None),
+        getattr(observation, "source_image_path", None),
+    ):
+        uri = _path_like_to_uri(candidate)
+        if uri is None or uri in attachments:
+            continue
+        attachments.append(uri)
+    return attachments
+
+
+def _emit_vision_observation_event(
+    *,
+    observation: Any,
+    event_sink: Callable[[Event], None] | None,
+    fallback_session_id: str | None,
+) -> None:
+    if event_sink is None:
+        return
+    payload = observation.to_dict()
+    observation_id = _normalize_uuid_text(payload.get("observation_ref"))
+    if observation_id is None:
+        observation_id = str(uuid4())
+    payload["observation_ref"] = observation_id
+    attachments = _build_vision_event_attachments(observation)
+    wrapped = Observation(
+        observation_id=observation_id,
+        timestamp=(
+            payload.get("timestamp")
+            if isinstance(payload.get("timestamp"), str)
+            else datetime.now(tz=timezone.utc).isoformat()
+        ),
+        source=payload.get("source") if isinstance(payload.get("source"), str) else "vision",
+        payload=payload,
+        attachments=attachments,
+        metadata={
+            "observation_kind": "vision",
+            "frame_id": payload.get("frame_id"),
+            "layout_id": payload.get("layout_id"),
+            "channel": payload.get("channel"),
+        },
+    )
+    capture_wall_ms = payload.get("capture_wall_ms")
+    t_wall = None
+    if isinstance(capture_wall_ms, int) and capture_wall_ms >= 0:
+        t_wall = capture_wall_ms / 1000.0
+    event_sink(
+        Event(
+            kind="observation",
+            payload=wrapped.to_dict(),
+            related_id=wrapped.observation_id,
+            t_wall=t_wall,
+            session_id=fallback_session_id,
+            vision_refs=[
+                payload["frame_id"],
+            ]
+            if isinstance(payload.get("frame_id"), str) and payload.get("frame_id")
+            else [],
+            metadata={
+                "observation_kind": "vision",
+            },
+        )
+    )
 
 
 class ObservationSource(Protocol):
@@ -1075,6 +1174,11 @@ class LiveDcsTutorLoop:
                 sync_window_ms=self.vision_sync_window_ms,
                 trigger_wait_ms=self.vision_trigger_wait_ms,
                 live_mode=self.vision_mode == "live",
+                observation_sink=lambda observation: _emit_vision_observation_event(
+                    observation=observation,
+                    event_sink=self.event_sink,
+                    fallback_session_id=self.session_id,
+                ),
             )
 
         self._latest_raw_obs: Observation | None = None

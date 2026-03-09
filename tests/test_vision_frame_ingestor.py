@@ -219,6 +219,100 @@ def test_replay_can_reuse_same_manifest_and_artifact_directory(tmp_path: Path) -
     assert [item.image_uri for item in replay_obs] == [item.image_uri for item in live_obs]
 
 
+def test_live_port_emits_incremental_vision_observation_sequence(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-live-seq",
+        channel=DEFAULT_FRAME_CHANNEL,
+    )
+    port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
+    port.start("sess-live-seq")
+    try:
+        first_frame_path = channel_dir / build_frame_filename(capture_wall_ms=1772872444902, frame_seq=123)
+        _make_source_frame(first_frame_path, width=2560, height=1440)
+        _append_manifest_entry(
+            channel_dir,
+            _manifest_entry(
+                channel_dir=channel_dir,
+                capture_wall_ms=1772872444902,
+                frame_seq=123,
+                width=2560,
+                height=1440,
+                session_id="sess-live-seq",
+            ),
+        )
+
+        first_batch = port.poll()
+
+        second_frame_path = channel_dir / build_frame_filename(capture_wall_ms=1772872445002, frame_seq=124)
+        _make_source_frame(second_frame_path, width=2560, height=1440)
+        _append_manifest_entry(
+            channel_dir,
+            _manifest_entry(
+                channel_dir=channel_dir,
+                capture_wall_ms=1772872445002,
+                frame_seq=124,
+                width=2560,
+                height=1440,
+                session_id="sess-live-seq",
+            ),
+        )
+
+        second_batch = port.poll()
+    finally:
+        port.stop()
+
+    assert [item.frame_id for item in first_batch] == ["1772872444902_000123"]
+    assert [item.frame_id for item in second_batch] == ["1772872445002_000124"]
+    assert first_batch[0].image_uri is not None
+    assert second_batch[0].image_uri is not None
+    assert Path(first_batch[0].image_uri).exists()
+    assert Path(second_batch[0].image_uri).exists()
+
+
+def test_replay_port_rebuilds_vision_stream_in_capture_time_order(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-replay-order",
+        channel=DEFAULT_FRAME_CHANNEL,
+    )
+    frame_specs = [
+        (1772872445002, 124),
+        (1772872444902, 123),
+        (1772872445102, 125),
+    ]
+    for capture_wall_ms, frame_seq in frame_specs:
+        frame_path = channel_dir / build_frame_filename(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
+        _make_source_frame(frame_path, width=2560, height=1440)
+    for capture_wall_ms, frame_seq in frame_specs:
+        _append_manifest_entry(
+            channel_dir,
+            _manifest_entry(
+                channel_dir=channel_dir,
+                capture_wall_ms=capture_wall_ms,
+                frame_seq=frame_seq,
+                width=2560,
+                height=1440,
+                session_id="sess-replay-order",
+            ),
+        )
+
+    port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
+    port.start("sess-replay-order")
+    try:
+        observations = port.poll()
+    finally:
+        port.stop()
+
+    assert [item.frame_id for item in observations] == [
+        "1772872444902_000123",
+        "1772872445002_000124",
+        "1772872445102_000125",
+    ]
+
+
 def test_frame_directory_port_rejects_manifest_layout_id_mismatch(tmp_path: Path) -> None:
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     channel_dir = build_frame_channel_dir(

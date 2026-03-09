@@ -8,7 +8,7 @@ from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import datetime
 import time
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from core.types_v2 import VisionObservation
 from ports.vision_port import VisionPort
@@ -178,6 +178,7 @@ class BufferedVisionSession:
         trigger_wait_ms: int = 0,
         retention_ms: int | None = None,
         live_mode: bool,
+        observation_sink: Callable[[VisionObservation], None] | None = None,
     ) -> None:
         if not session_id or not isinstance(session_id, str):
             raise ValueError("vision session_id must be a non-empty string")
@@ -191,6 +192,7 @@ class BufferedVisionSession:
             else max(2000, self.sync_window_ms * 4 + self.trigger_wait_ms)
         )
         self.live_mode = bool(live_mode)
+        self.observation_sink = observation_sink
         self._history: list[VisionObservation] = []
         self._frame_ids: set[str] = set()
         self.vision_port.start(session_id)
@@ -242,6 +244,8 @@ class BufferedVisionSession:
             self._frame_ids.add(observation.frame_id)
             self._insert_observation(observation)
             added.append(observation)
+            if self.observation_sink is not None:
+                self.observation_sink(observation)
         self._prune_history()
         return added
 

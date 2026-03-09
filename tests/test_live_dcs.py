@@ -4,9 +4,10 @@ import builtins
 import json
 import socket
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 import time
+from uuid import UUID
 
 import pytest
 import yaml
@@ -25,12 +26,15 @@ from live_dcs import (
     UdpHelpTrigger,
     build_arg_parser,
     _build_vision_port_from_args,
+    _emit_vision_observation_event,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
+    _path_like_to_uri,
     _sanitize_policy_error_for_user,
 )
+from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
 from tests.adapters.socket_stubs import DummySocket
 
@@ -2465,6 +2469,148 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     tutor_response = next(event for event in events if event["kind"] == "tutor_response")
     assert tutor_request["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
     assert tutor_response["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+
+
+def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_with_vision_events.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    artifact_dir = tmp_path / "vision"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    first_artifact = artifact_dir / "1772872444950_000122_vlm.png"
+    first_source = artifact_dir / "1772872444950_000122.png"
+    second_artifact = artifact_dir / "1772872445010_000123_vlm.png"
+    second_source = artifact_dir / "1772872445010_000123.png"
+
+    class StaticVisionPort:
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-live"
+
+        def poll(self) -> list[VisionObservation]:
+            return [
+                VisionObservation(
+                    frame_id="1772872444950_000122",
+                    source="vision_test",
+                    capture_wall_ms=1772872444950,
+                    frame_seq=122,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri=str(first_artifact),
+                    source_image_path=str(first_source),
+                ),
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    source="vision_test",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri=str(second_artifact),
+                    source_image_path=str(second_source),
+                ),
+            ]
+
+        def stop(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    events: list[dict[str, Any]] = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-live",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-live",
+        vision_mode="live",
+        event_sink=lambda event: events.append(event.to_dict()),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    vision_events = [
+        event
+        for event in events
+        if event["kind"] == "observation"
+        and event.get("metadata", {}).get("observation_kind") == "vision"
+    ]
+    assert [event["vision_refs"] for event in vision_events] == [
+        ["1772872444950_000122"],
+        ["1772872445010_000123"],
+    ]
+    first_payload = vision_events[0]["payload"]
+    validate_instance(vision_events[0], "event")
+    validate_instance(first_payload, "observation")
+    assert first_payload["attachments"] == [
+        first_artifact.resolve().as_uri(),
+        first_source.resolve().as_uri(),
+    ]
+    assert first_payload["payload"]["frame_id"] == "1772872444950_000122"
+    assert first_payload["payload"]["observation_ref"] == first_payload["observation_id"]
+
+
+def test_path_like_to_uri_normalizes_windows_drive_paths() -> None:
+    raw_path = r"C:\SimTutor\frames\1772872444950_000122.png"
+    assert _path_like_to_uri(raw_path) == PureWindowsPath(raw_path).as_uri()
+
+
+def test_emit_vision_observation_event_replaces_invalid_observation_ref_with_uuid(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "vision" / "1772872444950_000122_vlm.png"
+    source_path = tmp_path / "vision" / "1772872444950_000122.png"
+    events: list[dict[str, Any]] = []
+
+    _emit_vision_observation_event(
+        observation=VisionObservation(
+            frame_id="1772872444950_000122",
+            source="vision_test",
+            observation_ref="not-a-uuid",
+            capture_wall_ms=1772872444950,
+            frame_seq=122,
+            layout_id="fa18c_composite_panel_v2",
+            channel="composite_panel",
+            image_uri=str(artifact_path),
+            source_image_path=str(source_path),
+        ),
+        event_sink=lambda event: events.append(event.to_dict()),
+        fallback_session_id="sess-live",
+    )
+
+    assert len(events) == 1
+    payload = events[0]["payload"]
+    validate_instance(events[0], "event")
+    validate_instance(payload, "observation")
+    assert payload["payload"]["observation_ref"] == payload["observation_id"]
+    assert str(UUID(payload["observation_id"])) == payload["observation_id"]
+
+
+def test_emit_vision_observation_event_uses_tutor_session_id_over_payload_session_id(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "vision" / "1772872444950_000122_vlm.png"
+    source_path = tmp_path / "vision" / "1772872444950_000122.png"
+    events: list[dict[str, Any]] = []
+
+    _emit_vision_observation_event(
+        observation=VisionObservation(
+            frame_id="1772872444950_000122",
+            source="vision_test",
+            session_id="vision-sidecar-session",
+            capture_wall_ms=1772872444950,
+            frame_seq=122,
+            layout_id="fa18c_composite_panel_v2",
+            channel="composite_panel",
+            image_uri=str(artifact_path),
+            source_image_path=str(source_path),
+        ),
+        event_sink=lambda event: events.append(event.to_dict()),
+        fallback_session_id="sess-live",
+    )
+
+    assert len(events) == 1
+    assert events[0]["session_id"] == "sess-live"
+    assert events[0]["payload"]["payload"]["session_id"] == "vision-sidecar-session"
 
 
 def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:
