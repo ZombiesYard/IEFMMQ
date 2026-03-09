@@ -2463,7 +2463,8 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     vision = request.context["vision"]
     assert vision["status"] == "available"
     assert vision["observation_ref"] == request.observation_ref
-    assert vision["observation_t_wall_ms"] == 1772872445000
+    assert vision["observation_t_wall_ms"] == 10000
+    assert vision["trigger_wall_ms"] == 1772872445000
     assert vision["frame_id"] == "1772872444950_000122"
     assert vision["sync_status"] == "matched_past"
     assert vision["sync_delta_ms"] == -50
@@ -2650,3 +2651,31 @@ def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> N
     assert vision["frame_ids"] == []
     assert vision["sync_status"] is None
     assert vision["sync_miss_reason"] == "vision_port_unconfigured"
+
+
+def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_observation_anchor.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-anchor",
+        vision_mode="replay",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        selection = loop._build_vision_selection(
+            observation=loop._latest_enriched_obs,
+            trigger_t_wall=10.25,
+        )
+    finally:
+        loop.close()
+
+    assert selection.observation_t_wall_s == 10.0
+    assert selection.observation_t_wall_ms == 10000
+    assert selection.trigger_wall_ms == 10250

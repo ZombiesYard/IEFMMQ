@@ -1302,13 +1302,14 @@ class LiveDcsTutorLoop:
         observation_t_wall_s = _coerce_float(payload.get("t_wall"))
         if observation_t_wall_s is None:
             observation_t_wall_s = float(trigger_t_wall)
+        observation_t_wall_ms = int(round(float(observation_t_wall_s) * 1000.0))
         if self._vision_session is None:
             return HelpCycleVisionSelection(
                 status="vision_unavailable",
                 observation_ref=observation.observation_id,
                 observation_seq=observation_seq,
                 observation_t_wall_s=observation_t_wall_s,
-                observation_t_wall_ms=trigger_wall_ms,
+                observation_t_wall_ms=observation_t_wall_ms,
                 trigger_wall_ms=trigger_wall_ms,
                 sync_window_ms=self.vision_sync_window_ms,
                 vision_used=False,
@@ -1328,7 +1329,7 @@ class LiveDcsTutorLoop:
             observation_ref=observation.observation_id,
             observation_seq=observation_seq,
             observation_t_wall_s=observation_t_wall_s,
-            observation_t_wall_ms=trigger_wall_ms,
+            observation_t_wall_ms=observation_t_wall_ms,
             trigger_wall_ms=selection.trigger_wall_ms,
             sync_window_ms=selection.sync_window_ms,
             vision_used=selection.vision_used,

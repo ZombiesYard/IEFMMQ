@@ -76,6 +76,7 @@ def test_select_help_cycle_frames_treats_exact_match_as_trigger_frame() -> None:
     assert selection.trigger_frame is not None
     assert selection.trigger_frame["frame_id"] == "1772872445000_000123"
     assert selection.sync_status == "matched_exact"
+    assert selection.trigger_frame["sync_status"] == "matched_exact"
     assert selection.trigger_frame["sync_delta_ms"] == 0
     assert selection.sync_miss_reason == "missing_pre_trigger_frame"
 
@@ -126,6 +127,21 @@ def test_select_help_cycle_frames_prefers_past_frame_for_primary_sync() -> None:
     assert selection.pre_trigger_frame["frame_id"] == "1772872444950_000122"
     assert selection.trigger_frame is not None
     assert selection.trigger_frame["frame_id"] == "1772872445010_000123"
+
+
+def test_select_help_cycle_frames_derives_observation_anchor_ms_from_observation_time() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("1772872444950_000122", 1772872444950),
+        ],
+        trigger_wall_ms=1772872445300,
+        sync_window_ms=400,
+        observation_t_wall_s=1772872445.0,
+    )
+
+    assert selection.observation_t_wall_s == 1772872445.0
+    assert selection.observation_t_wall_ms == 1772872445000
+    assert selection.trigger_wall_ms == 1772872445300
 
 
 def test_select_help_cycle_frames_falls_back_to_future_frame_when_past_missing() -> None:

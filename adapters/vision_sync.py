@@ -86,6 +86,18 @@ def _primary_sync_payload(
     }
 
 
+def _observation_anchor_wall_ms(*, observation_t_wall_s: float | None, trigger_wall_ms: int) -> int:
+    if isinstance(observation_t_wall_s, (int, float)):
+        return int(round(float(observation_t_wall_s) * 1000.0))
+    return int(trigger_wall_ms)
+
+
+def _trigger_sync_status(*, capture_wall_ms: int, trigger_wall_ms: int) -> str:
+    if capture_wall_ms == trigger_wall_ms:
+        return "matched_exact"
+    return "matched_future_fallback"
+
+
 @dataclass(frozen=True)
 class HelpCycleVisionSelection:
     status: str
@@ -166,6 +178,10 @@ def select_help_cycle_frames(
     observation_t_wall_s: float | None = None,
 ) -> HelpCycleVisionSelection:
     window_ms = max(0, int(sync_window_ms))
+    observation_t_wall_ms = _observation_anchor_wall_ms(
+        observation_t_wall_s=observation_t_wall_s,
+        trigger_wall_ms=trigger_wall_ms,
+    )
     normalized: list[tuple[int, str, VisionObservation]] = []
     seen_frame_ids: set[str] = set()
     for observation in observations:
@@ -214,7 +230,10 @@ def select_help_cycle_frames(
             trigger_observation,
             role="trigger_frame",
             trigger_wall_ms=trigger_wall_ms,
-            sync_status="matched_future_fallback",
+            sync_status=_trigger_sync_status(
+                capture_wall_ms=_capture_wall_ms(trigger_observation) or trigger_wall_ms,
+                trigger_wall_ms=trigger_wall_ms,
+            ),
         )
         if trigger_observation is not None
         else None
@@ -245,7 +264,7 @@ def select_help_cycle_frames(
         observation_ref=observation_ref,
         observation_seq=observation_seq,
         observation_t_wall_s=observation_t_wall_s,
-        observation_t_wall_ms=int(trigger_wall_ms),
+        observation_t_wall_ms=observation_t_wall_ms,
         trigger_wall_ms=int(trigger_wall_ms),
         sync_window_ms=window_ms,
         vision_used=bool(selected_frames),
