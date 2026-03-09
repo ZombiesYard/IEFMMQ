@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "frame_id",
     "capture_wall_ms",
     "frame_seq",
@@ -16,6 +17,10 @@
     "source_session_id"
   ],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "v2"
+    },
     "frame_id": {
       "type": "string",
       "pattern": "^[0-9]{10,20}_[0-9]{6}$"

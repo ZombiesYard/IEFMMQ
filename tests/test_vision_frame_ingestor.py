@@ -75,6 +75,7 @@ def _manifest_entry(
 ) -> dict[str, object]:
     image = image_path or channel_dir / build_frame_filename(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
     return {
+        "schema_version": "v2",
         "frame_id": build_frame_id(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq),
         "capture_wall_ms": capture_wall_ms,
         "frame_seq": frame_seq,
@@ -333,3 +334,41 @@ def test_manifest_path_uses_frozen_frames_jsonl_name(tmp_path: Path) -> None:
     )
 
     assert build_frame_manifest_path(channel_dir).name == DEFAULT_FRAME_MANIFEST_NAME
+
+
+def test_frame_directory_port_retries_after_invalid_json_line(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-bad-json",
+        channel=DEFAULT_FRAME_CHANNEL,
+    )
+    manifest_path = build_frame_manifest_path(channel_dir)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text("{bad-json}\n", encoding="utf-8")
+
+    port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
+    port.start("sess-bad-json")
+    assert port.poll() == []
+
+    frame_path = channel_dir / build_frame_filename(capture_wall_ms=1772872444902, frame_seq=123)
+    _make_source_frame(frame_path, width=1920, height=1080)
+    manifest_path.write_text(
+        json.dumps(
+            _manifest_entry(
+                channel_dir=channel_dir,
+                capture_wall_ms=1772872444902,
+                frame_seq=123,
+                width=1920,
+                height=1080,
+            ),
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    observations = port.poll()
+    port.stop()
+
+    assert [obs.frame_id for obs in observations] == ["1772872444902_000123"]

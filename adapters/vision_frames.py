@@ -6,6 +6,7 @@ left-stack composite panel layout.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from functools import lru_cache
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -230,8 +231,13 @@ class FrameDirectoryVisionPort(VisionPort):
                 if not line.endswith("\n"):
                     handle.seek(line_start)
                     break
-                self._manifest_offset = handle.tell()
-                entry_raw = json.loads(line)
+                next_offset = handle.tell()
+                try:
+                    entry_raw = json.loads(line)
+                except json.JSONDecodeError:
+                    handle.seek(line_start)
+                    break
+                self._manifest_offset = next_offset
                 if not isinstance(entry_raw, dict):
                     raise ValueError(f"vision frame manifest line must be an object: {self._manifest_path}")
                 validate_instance(entry_raw, "vision_frame_manifest_entry")
@@ -333,6 +339,7 @@ class FrameDirectoryVisionPort(VisionPort):
         return observation
 
 
+@lru_cache(maxsize=16)
 def _load_font(size: int) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
     candidates = (
         "DejaVuSans-Bold.ttf",
