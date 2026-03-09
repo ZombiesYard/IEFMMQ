@@ -249,6 +249,12 @@ class FrameDirectoryVisionPort(VisionPort):
                     self._manifest_offset = line_start
                     break
                 observations.append(self._build_observation(entry, image_path=image_path))
+        observations.sort(
+            key=lambda observation: (
+                observation.capture_wall_ms if isinstance(observation.capture_wall_ms, int) else -1,
+                observation.frame_id,
+            )
+        )
         return observations
 
     def stop(self) -> None:

@@ -31,6 +31,7 @@ from live_dcs import (
     _normalize_cached_response_metadata,
     _sanitize_policy_error_for_user,
 )
+from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
 from tests.adapters.socket_stubs import DummySocket
 
@@ -2465,6 +2466,82 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     tutor_response = next(event for event in events if event["kind"] == "tutor_response")
     assert tutor_request["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
     assert tutor_response["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+
+
+def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_with_vision_events.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-live"
+
+        def poll(self) -> list[VisionObservation]:
+            return [
+                VisionObservation(
+                    frame_id="1772872444950_000122",
+                    source="vision_test",
+                    capture_wall_ms=1772872444950,
+                    frame_seq=122,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri="/tmp/vision/1772872444950_000122_vlm.png",
+                    source_image_path="/tmp/vision/1772872444950_000122.png",
+                ),
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    source="vision_test",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri="/tmp/vision/1772872445010_000123_vlm.png",
+                    source_image_path="/tmp/vision/1772872445010_000123.png",
+                ),
+            ]
+
+        def stop(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    events: list[dict[str, Any]] = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-live",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-live",
+        vision_mode="live",
+        event_sink=lambda event: events.append(event.to_dict()),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    vision_events = [
+        event
+        for event in events
+        if event["kind"] == "observation"
+        and event.get("metadata", {}).get("observation_kind") == "vision"
+    ]
+    assert [event["vision_refs"] for event in vision_events] == [
+        ["1772872444950_000122"],
+        ["1772872445010_000123"],
+    ]
+    first_payload = vision_events[0]["payload"]
+    validate_instance(vision_events[0], "event")
+    validate_instance(first_payload, "observation")
+    assert first_payload["attachments"] == [
+        "file:///tmp/vision/1772872444950_000122_vlm.png",
+        "file:///tmp/vision/1772872444950_000122.png",
+    ]
+    assert first_payload["payload"]["frame_id"] == "1772872444950_000122"
+    assert first_payload["payload"]["observation_ref"] == first_payload["observation_id"]
 
 
 def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:
