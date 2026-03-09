@@ -7,6 +7,7 @@ from __future__ import annotations
 from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import datetime
+import math
 import time
 from typing import Any, Callable, Iterable
 
@@ -59,12 +60,68 @@ def _frame_payload(
     }
 
 
+def _primary_sync_payload(
+    observation: VisionObservation | None,
+    *,
+    trigger_wall_ms: int,
+    sync_status: str | None,
+) -> dict[str, Any]:
+    if observation is None or sync_status is None:
+        return {
+            "frame_id": None,
+            "sync_status": None,
+            "sync_delta_ms": None,
+            "frame_stale": None,
+        }
+    payload = _frame_payload(
+        observation,
+        role="resolved_frame",
+        trigger_wall_ms=trigger_wall_ms,
+        sync_status=sync_status,
+    )
+    return {
+        "frame_id": payload["frame_id"],
+        "sync_status": payload["sync_status"],
+        "sync_delta_ms": payload["sync_delta_ms"],
+        "frame_stale": payload["frame_stale"],
+    }
+
+
+def _normalize_observation_anchor(
+    *,
+    observation_t_wall_s: float | None,
+    trigger_wall_ms: int,
+) -> tuple[float, int]:
+    fallback_s = float(trigger_wall_ms) / 1000.0
+    if isinstance(observation_t_wall_s, bool):
+        return fallback_s, int(trigger_wall_ms)
+    if isinstance(observation_t_wall_s, (int, float)):
+        normalized_s = float(observation_t_wall_s)
+        if math.isfinite(normalized_s):
+            return normalized_s, int(round(normalized_s * 1000.0))
+    return fallback_s, int(trigger_wall_ms)
+
+
+def _trigger_sync_status(*, capture_wall_ms: int, trigger_wall_ms: int) -> str:
+    if capture_wall_ms == trigger_wall_ms:
+        return "matched_exact"
+    return "matched_future_fallback"
+
+
 @dataclass(frozen=True)
 class HelpCycleVisionSelection:
     status: str
+    observation_ref: str | None
+    observation_seq: int | None
+    observation_t_wall_s: float | None
+    observation_t_wall_ms: int
     trigger_wall_ms: int
     sync_window_ms: int
     vision_used: bool
+    frame_id: str | None
+    sync_status: str | None
+    sync_delta_ms: int | None
+    frame_stale: bool | None
     frame_ids: list[str]
     selected_frames: list[dict[str, Any]]
     pre_trigger_frame: dict[str, Any] | None
@@ -74,9 +131,17 @@ class HelpCycleVisionSelection:
     def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
+            "observation_ref": self.observation_ref,
+            "observation_seq": self.observation_seq,
+            "observation_t_wall_s": self.observation_t_wall_s,
+            "observation_t_wall_ms": self.observation_t_wall_ms,
             "trigger_wall_ms": self.trigger_wall_ms,
             "sync_window_ms": self.sync_window_ms,
             "vision_used": self.vision_used,
+            "frame_id": self.frame_id,
+            "sync_status": self.sync_status,
+            "sync_delta_ms": self.sync_delta_ms,
+            "frame_stale": self.frame_stale,
             "frame_ids": list(self.frame_ids),
             "selected_frames": [dict(item) for item in self.selected_frames],
             "pre_trigger_frame": dict(self.pre_trigger_frame) if self.pre_trigger_frame is not None else None,
@@ -85,13 +150,48 @@ class HelpCycleVisionSelection:
         }
 
 
+def _select_primary_observation(
+    observations: Iterable[tuple[int, str, VisionObservation]],
+    *,
+    trigger_wall_ms: int,
+    sync_window_ms: int,
+) -> tuple[VisionObservation | None, str | None]:
+    latest_past: tuple[int, VisionObservation] | None = None
+    earliest_future: tuple[int, VisionObservation] | None = None
+    for capture_wall_ms, _frame_id, observation in observations:
+        delta_ms = capture_wall_ms - trigger_wall_ms
+        if abs(delta_ms) > sync_window_ms:
+            continue
+        if delta_ms <= 0:
+            latest_past = (capture_wall_ms, observation)
+            continue
+        if earliest_future is None:
+            earliest_future = (capture_wall_ms, observation)
+
+    if latest_past is not None:
+        capture_wall_ms, observation = latest_past
+        if capture_wall_ms == trigger_wall_ms:
+            return observation, "matched_exact"
+        return observation, "matched_past"
+    if earliest_future is not None:
+        return earliest_future[1], "matched_future_fallback"
+    return None, None
+
+
 def select_help_cycle_frames(
     observations: Iterable[VisionObservation],
     *,
     trigger_wall_ms: int,
     sync_window_ms: int,
+    observation_ref: str | None = None,
+    observation_seq: int | None = None,
+    observation_t_wall_s: float | None = None,
 ) -> HelpCycleVisionSelection:
     window_ms = max(0, int(sync_window_ms))
+    normalized_observation_t_wall_s, observation_t_wall_ms = _normalize_observation_anchor(
+        observation_t_wall_s=observation_t_wall_s,
+        trigger_wall_ms=trigger_wall_ms,
+    )
     normalized: list[tuple[int, str, VisionObservation]] = []
     seen_frame_ids: set[str] = set()
     for observation in observations:
@@ -103,6 +203,17 @@ def select_help_cycle_frames(
         seen_frame_ids.add(observation.frame_id)
         normalized.append((capture_wall_ms, observation.frame_id, observation))
     normalized.sort(key=lambda item: (item[0], item[1]))
+
+    resolved_observation, resolved_sync_status = _select_primary_observation(
+        normalized,
+        trigger_wall_ms=trigger_wall_ms,
+        sync_window_ms=window_ms,
+    )
+    resolved_sync = _primary_sync_payload(
+        resolved_observation,
+        trigger_wall_ms=trigger_wall_ms,
+        sync_status=resolved_sync_status,
+    )
 
     pre_observation: VisionObservation | None = None
     trigger_observation: VisionObservation | None = None
@@ -124,12 +235,20 @@ def select_help_cycle_frames(
         if pre_observation is not None
         else None
     )
+    trigger_capture_wall_ms = _capture_wall_ms(trigger_observation) if trigger_observation is not None else None
     trigger_payload = (
         _frame_payload(
             trigger_observation,
             role="trigger_frame",
             trigger_wall_ms=trigger_wall_ms,
-            sync_status="matched_future",
+            sync_status=_trigger_sync_status(
+                capture_wall_ms=(
+                    trigger_capture_wall_ms
+                    if trigger_capture_wall_ms is not None
+                    else trigger_wall_ms
+                ),
+                trigger_wall_ms=trigger_wall_ms,
+            ),
         )
         if trigger_observation is not None
         else None
@@ -157,9 +276,17 @@ def select_help_cycle_frames(
 
     return HelpCycleVisionSelection(
         status=status,
+        observation_ref=observation_ref,
+        observation_seq=observation_seq,
+        observation_t_wall_s=normalized_observation_t_wall_s,
+        observation_t_wall_ms=observation_t_wall_ms,
         trigger_wall_ms=int(trigger_wall_ms),
         sync_window_ms=window_ms,
         vision_used=bool(selected_frames),
+        frame_id=resolved_sync["frame_id"],
+        sync_status=resolved_sync["sync_status"],
+        sync_delta_ms=resolved_sync["sync_delta_ms"],
+        frame_stale=resolved_sync["frame_stale"],
         frame_ids=frame_ids,
         selected_frames=selected_frames,
         pre_trigger_frame=pre_payload,
@@ -261,7 +388,7 @@ class BufferedVisionSession:
             )
             if not self.live_mode:
                 return selection
-            if selection.trigger_frame is not None:
+            if selection.frame_id is not None:
                 return selection
             if time.monotonic() >= deadline:
                 return selection

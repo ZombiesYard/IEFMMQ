@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import math
 import socket
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
@@ -2462,6 +2463,13 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     request = model.calls[0]["request"]
     vision = request.context["vision"]
     assert vision["status"] == "available"
+    assert vision["observation_ref"] == request.observation_ref
+    assert vision["observation_t_wall_ms"] == 10000
+    assert vision["trigger_wall_ms"] == 1772872445000
+    assert vision["frame_id"] == "1772872444950_000122"
+    assert vision["sync_status"] == "matched_past"
+    assert vision["sync_delta_ms"] == -50
+    assert vision["frame_stale"] is True
     assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
     assert vision["pre_trigger_frame"]["frame_id"] == "1772872444950_000122"
     assert vision["trigger_frame"]["frame_id"] == "1772872445010_000123"
@@ -2639,6 +2647,100 @@ def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> N
     request = model.calls[0]["request"]
     vision = request.context["vision"]
     assert vision["status"] == "vision_unavailable"
+    assert vision["frame_id"] is None
     assert vision["vision_used"] is False
     assert vision["frame_ids"] == []
+    assert vision["sync_status"] is None
     assert vision["sync_miss_reason"] == "vision_port_unconfigured"
+
+
+def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_observation_anchor.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-anchor",
+        vision_mode="replay",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        selection = loop._build_vision_selection(
+            observation=loop._latest_enriched_obs,
+            trigger_t_wall=10.25,
+        )
+    finally:
+        loop.close()
+
+    assert selection.observation_t_wall_s == 10.0
+    assert selection.observation_t_wall_ms == 10000
+    assert selection.trigger_wall_ms == 10250
+
+
+def test_build_vision_selection_falls_back_when_observation_time_is_non_finite(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_observation_anchor_non_finite.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-anchor",
+        vision_mode="replay",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        assert loop._latest_enriched_obs is not None
+        loop._latest_enriched_obs.payload["t_wall"] = math.nan
+        selection = loop._build_vision_selection(
+            observation=loop._latest_enriched_obs,
+            trigger_t_wall=10.25,
+        )
+    finally:
+        loop.close()
+
+    assert selection.observation_t_wall_s == 10.25
+    assert selection.observation_t_wall_ms == 10250
+    assert selection.trigger_wall_ms == 10250
+
+
+def test_build_vision_selection_falls_back_when_trigger_time_is_non_finite(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_trigger_anchor_non_finite.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-anchor",
+        vision_mode="replay",
+    )
+    monkeypatch.setattr("live_dcs.time.time", lambda: 42.5)
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        assert loop._latest_enriched_obs is not None
+        loop._latest_enriched_obs.payload["t_wall"] = math.nan
+        selection = loop._build_vision_selection(
+            observation=loop._latest_enriched_obs,
+            trigger_t_wall=math.nan,
+        )
+    finally:
+        loop.close()
+
+    assert selection.observation_t_wall_s == 42.5
+    assert selection.observation_t_wall_ms == 42500
+    assert selection.trigger_wall_ms == 42500
