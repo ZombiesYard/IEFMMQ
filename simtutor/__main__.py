@@ -8,6 +8,8 @@ from typing import Any, Iterable, Tuple
 from jsonschema import Draft202012Validator, FormatChecker
 
 from adapters.pack_gates import DEFAULT_SCENARIO_PROFILE, SUPPORTED_SCENARIO_PROFILES
+from adapters.vision_frames import DEFAULT_FRAME_CHANNEL
+from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
@@ -70,6 +72,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
         ReplayBiosReceiver,
         StdinHelpTrigger,
         UdpHelpTrigger,
+        _build_vision_port_from_args,
     )
 
     output = Path(args.output) if args.output else _new_replay_bios_log_path()
@@ -85,6 +88,10 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
     try:
         source = ReplayBiosReceiver(args.input, speed=args.speed)
         model = _build_replay_model_from_args(args)
+        vision_port, vision_session_id, vision_sync_window_ms, vision_trigger_wait_ms = _build_vision_port_from_args(
+            args,
+            mode="replay",
+        )
         with JsonlEventStore(output, mode="w") as store:
             with OverlayActionExecutor(
                 ui_map_path=args.ui_map,
@@ -111,6 +118,11 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     scenario_profile=args.scenario_profile,
                     event_sink=store.append,
                     dry_run_overlay=bool(args.dry_run_overlay),
+                    vision_port=vision_port,
+                    vision_session_id=vision_session_id,
+                    vision_mode="replay",
+                    vision_sync_window_ms=vision_sync_window_ms,
+                    vision_trigger_wait_ms=vision_trigger_wait_ms,
                 )
 
                 stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
@@ -247,6 +259,34 @@ def main() -> int:
 
     rep_bios.add_argument("--output", help="Event log JSONL output path")
     rep_bios.add_argument("--session-id", default=None, help="Optional event session id")
+    rep_bios.add_argument(
+        "--vision-saved-games-dir",
+        default=None,
+        help="Saved Games/<variant> root for historical vision sidecar replay.",
+    )
+    rep_bios.add_argument(
+        "--vision-session-id",
+        default=None,
+        help="Frame sidecar session id. Defaults to --session-id when omitted.",
+    )
+    rep_bios.add_argument("--vision-channel", default=DEFAULT_FRAME_CHANNEL, help="Vision frame channel name")
+    rep_bios.add_argument(
+        "--vision-layout-id",
+        default=DEFAULT_LAYOUT_ID,
+        help="Expected sidecar vision layout id",
+    )
+    rep_bios.add_argument(
+        "--vision-sync-window-ms",
+        type=parse_non_negative_int_arg,
+        default=0,
+        help="Frame selection sync window in milliseconds (0 uses replay default).",
+    )
+    rep_bios.add_argument(
+        "--vision-trigger-wait-ms",
+        type=parse_non_negative_int_arg,
+        default=0,
+        help="Reserved extra wait budget for trigger-frame arrival.",
+    )
     rep_bios.add_argument("--cooldown-s", type=float, default=4.0, help="Help cache cooldown seconds")
     rep_bios.add_argument("--max-frames", type=int, default=0, help="Max frames to process (0 means unlimited)")
     rep_bios.add_argument("--duration", type=float, default=0.0, help="Run duration seconds (0 means unlimited)")

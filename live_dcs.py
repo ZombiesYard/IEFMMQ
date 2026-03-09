@@ -43,6 +43,15 @@ from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
+from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort
+from adapters.vision_prompting import DEFAULT_LAYOUT_ID
+from adapters.vision_sync import (
+    DEFAULT_LIVE_SYNC_WINDOW_MS,
+    DEFAULT_LIVE_TRIGGER_WAIT_MS,
+    DEFAULT_REPLAY_SYNC_WINDOW_MS,
+    BufferedVisionSession,
+    HelpCycleVisionSelection,
+)
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
@@ -343,6 +352,31 @@ def _json_safe_scalar(value: Any) -> str | int | float | bool | None:
             return value
         return str(value)
     return str(value)
+
+
+def _normalize_vision_mode(value: str) -> str:
+    if value not in {"live", "replay"}:
+        raise ValueError("vision_mode must be 'live' or 'replay'")
+    return value
+
+
+def _normalize_path_segment(value: Any, *, flag_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{flag_name} must be a non-empty path segment")
+    normalized = value.strip()
+    path = Path(normalized)
+    if (
+        path.is_absolute()
+        or path.drive
+        or path.anchor
+        or ":" in normalized
+        or len(path.parts) != 1
+        or path.parts[0] in {"", ".", ".."}
+    ):
+        raise ValueError(f"{flag_name} must be a simple path segment without path separators")
+    if "\\" in normalized or "/" in normalized:
+        raise ValueError(f"{flag_name} must be a simple path segment without path separators")
+    return normalized
 
 
 def _normalize_knowledge_snippet(raw: Mapping[str, Any], fallback_idx: int) -> dict[str, Any]:
@@ -948,6 +982,11 @@ class LiveDcsTutorLoop:
         rag_top_k: int = 5,
         cold_start_production: bool = False,
         knowledge_source_policy_path: str | Path | None = None,
+        vision_port: Any | None = None,
+        vision_session_id: str | None = None,
+        vision_mode: str = "live",
+        vision_sync_window_ms: int | None = None,
+        vision_trigger_wait_ms: int | None = None,
     ) -> None:
         self.source = source
         self.model = model
@@ -958,6 +997,7 @@ class LiveDcsTutorLoop:
         self.scenario_profile = normalize_scenario_profile(scenario_profile)
         self.event_sink = event_sink
         self.dry_run_overlay = dry_run_overlay
+        self.vision_mode = _normalize_vision_mode(vision_mode)
 
         self.pack_path = Path(pack_path) if pack_path else _default_pack_path()
         self.ui_map_path = Path(ui_map_path) if ui_map_path else _default_ui_map_path()
@@ -1007,6 +1047,35 @@ class LiveDcsTutorLoop:
             completion_gates=self.completion_gates,
         )
         self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
+        self.vision_sync_window_ms = (
+            int(vision_sync_window_ms)
+            if isinstance(vision_sync_window_ms, int) and vision_sync_window_ms > 0
+            else (
+                DEFAULT_LIVE_SYNC_WINDOW_MS
+                if self.vision_mode == "live"
+                else DEFAULT_REPLAY_SYNC_WINDOW_MS
+            )
+        )
+        live_trigger_wait_ms = (
+            DEFAULT_LIVE_TRIGGER_WAIT_MS if self.vision_mode == "live" else 0
+        )
+        self.vision_trigger_wait_ms = (
+            int(vision_trigger_wait_ms)
+            if isinstance(vision_trigger_wait_ms, int) and vision_trigger_wait_ms >= 0
+            else live_trigger_wait_ms
+        )
+        effective_vision_session_id = vision_session_id or self.session_id
+        self._vision_session: BufferedVisionSession | None = None
+        if vision_port is not None:
+            if not isinstance(effective_vision_session_id, str) or not effective_vision_session_id:
+                raise ValueError("vision_session_id or session_id is required when vision_port is configured")
+            self._vision_session = BufferedVisionSession(
+                vision_port=vision_port,
+                session_id=effective_vision_session_id,
+                sync_window_ms=self.vision_sync_window_ms,
+                trigger_wait_ms=self.vision_trigger_wait_ms,
+                live_mode=self.vision_mode == "live",
+            )
 
         self._latest_raw_obs: Observation | None = None
         self._latest_enriched_obs: Observation | None = None
@@ -1018,6 +1087,8 @@ class LiveDcsTutorLoop:
         return self._stats
 
     def close(self) -> None:
+        if self._vision_session is not None:
+            self._vision_session.close()
         if hasattr(self.action_executor, "close"):
             self.action_executor.close()
         if hasattr(self.source, "close"):
@@ -1096,6 +1167,7 @@ class LiveDcsTutorLoop:
         related_id: str | None = None,
         t_wall: float | None = None,
         metadata: Mapping[str, Any] | None = None,
+        vision_refs: Sequence[str] | None = None,
     ) -> None:
         if self.event_sink is None:
             return
@@ -1105,9 +1177,30 @@ class LiveDcsTutorLoop:
             related_id=related_id,
             t_wall=t_wall,
             session_id=self.session_id,
+            vision_refs=[item for item in (vision_refs or []) if isinstance(item, str) and item],
             metadata=dict(metadata) if isinstance(metadata, Mapping) else {},
         )
         self.event_sink(event)
+
+    def _poll_vision_sidecar(self) -> None:
+        if self._vision_session is not None:
+            self._vision_session.poll()
+
+    def _build_vision_selection(self, *, trigger_t_wall: float) -> HelpCycleVisionSelection:
+        trigger_wall_ms = int(round(float(trigger_t_wall) * 1000.0))
+        if self._vision_session is None:
+            return HelpCycleVisionSelection(
+                status="vision_unavailable",
+                trigger_wall_ms=trigger_wall_ms,
+                sync_window_ms=self.vision_sync_window_ms,
+                vision_used=False,
+                frame_ids=[],
+                selected_frames=[],
+                pre_trigger_frame=None,
+                trigger_frame=None,
+                sync_miss_reason="vision_port_unconfigured",
+            )
+        return self._vision_session.select_for_help(trigger_wall_s=trigger_t_wall)
 
     def _ingest_observation(self, raw_obs: Observation) -> Observation:
         self._latest_raw_obs = raw_obs
@@ -1289,12 +1382,18 @@ class LiveDcsTutorLoop:
             "grounding_policy_filtered_out_count": policy_filtered_out_count,
         }
 
-    def _build_request(self, obs: Observation) -> tuple[TutorRequest, dict[str, Any], str]:
+    def _build_request(
+        self,
+        obs: Observation,
+        *,
+        vision_selection: HelpCycleVisionSelection,
+    ) -> tuple[TutorRequest, dict[str, Any], str]:
         payload = obs.payload if isinstance(obs.payload, Mapping) else {}
         vars_map = payload.get("vars")
         if not isinstance(vars_map, Mapping):
             vars_map = {}
         vars_selected = dict(vars_map)
+        vision_context = vision_selection.to_dict()
 
         now_t_wall = _coerce_float(payload.get("t_wall"))
         recent_frames = self.recent_ring.snapshot(now_t_wall=now_t_wall) if now_t_wall is not None else self.recent_ring.snapshot()
@@ -1381,6 +1480,7 @@ class LiveDcsTutorLoop:
             "grounding_query": grounding_meta.get("grounding_query"),
             "delta_summary": payload.get("delta_summary", {}),
             "delta_dropped_count": obs.metadata.get("delta_dropped_count"),
+            "vision": vision_context,
         }
 
         prompt_result = build_help_prompt_result(context, self.lang)
@@ -1413,6 +1513,8 @@ class LiveDcsTutorLoop:
                     grounding_meta.get("grounding_policy_filtered_out_count") or 0
                 ),
                 "scenario_profile": self.scenario_profile,
+                "vision_status": vision_context["status"],
+                "vision_frame_ids": list(vision_context["frame_ids"]),
             },
         )
 
@@ -1427,6 +1529,11 @@ class LiveDcsTutorLoop:
             "overlay_target_allowlist": self.overlay_allowlist,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
+            "vision": {
+                "status": vision_context["status"],
+                "frame_ids": list(vision_context["frame_ids"]),
+                "sync_miss_reason": vision_context["sync_miss_reason"],
+            },
         }
         state_key = _stable_hash_json(state_signature)
         return req, prompt_result.metadata, state_key
@@ -1741,22 +1848,36 @@ class LiveDcsTutorLoop:
         overlay_raw_report = self.action_executor.execute_actions(actions)
         return _normalize_help_report(overlay_raw_report)
 
-    def run_help_cycle(self) -> tuple[TutorResponse | None, dict[str, Any] | None]:
+    def run_help_cycle(self, *, trigger_t_wall: float | None = None) -> tuple[TutorResponse | None, dict[str, Any] | None]:
         obs = self._latest_enriched_obs
         if obs is None:
             return None, None
 
-        request, prompt_meta, state_key = self._build_request(obs)
+        resolved_trigger_t_wall = trigger_t_wall
+        if resolved_trigger_t_wall is None:
+            payload = obs.payload if isinstance(obs.payload, Mapping) else {}
+            resolved_trigger_t_wall = _coerce_float(payload.get("t_wall"))
+        if resolved_trigger_t_wall is None:
+            resolved_trigger_t_wall = time.time()
+
+        vision_selection = self._build_vision_selection(trigger_t_wall=resolved_trigger_t_wall)
+        request, prompt_meta, state_key = self._build_request(obs, vision_selection=vision_selection)
         help_cycle_id = request.request_id
         request.metadata = dict(request.metadata)
         request.metadata["help_cycle_id"] = help_cycle_id
+        request.metadata["vision_status"] = vision_selection.status
+        request.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
         now_wall = time.time()
         self._emit_event(
             kind="tutor_request",
             payload=request.to_dict(),
             related_id=request.request_id,
             t_wall=now_wall,
-            metadata={"help_cycle_id": help_cycle_id},
+            metadata={
+                "help_cycle_id": help_cycle_id,
+                "vision_status": vision_selection.status,
+            },
+            vision_refs=vision_selection.frame_ids,
         )
         self._stats.help_cycles += 1
 
@@ -1788,6 +1909,9 @@ class LiveDcsTutorLoop:
             response.metadata["prompt_build"] = dict(prompt_meta)
             _normalize_cached_response_metadata(response.metadata)
             response.metadata["help_cycle_id"] = help_cycle_id
+            response.metadata["vision"] = vision_selection.to_dict()
+            response.metadata["vision_status"] = vision_selection.status
+            response.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
             response.metadata["generation_mode"] = _normalize_generation_mode(response)
             response.actions = _attach_help_cycle_trace_to_actions(
                 response.actions,
@@ -1868,6 +1992,9 @@ class LiveDcsTutorLoop:
             response.metadata["state_key"] = state_key
             response.metadata["prompt_build"] = dict(prompt_meta)
             response.metadata["help_cycle_id"] = help_cycle_id
+            response.metadata["vision"] = vision_selection.to_dict()
+            response.metadata["vision_status"] = vision_selection.status
+            response.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
             response.metadata["generation_mode"] = _normalize_generation_mode(response)
 
             mapped_actions, mapped_meta = self._map_response_actions(response, request)
@@ -1946,6 +2073,7 @@ class LiveDcsTutorLoop:
                     "help_cycle_id": help_cycle_id,
                     "generation_mode": response.metadata.get("generation_mode"),
                 },
+                vision_refs=vision_selection.frame_ids,
             )
 
         self._emit_event(
@@ -1957,6 +2085,7 @@ class LiveDcsTutorLoop:
                 "help_cycle_id": help_cycle_id,
                 "generation_mode": response.metadata.get("generation_mode"),
             },
+            vision_refs=vision_selection.frame_ids,
         )
         return response, overlay_report
 
@@ -1981,6 +2110,7 @@ class LiveDcsTutorLoop:
         first_help_done = False
 
         while True:
+            self._poll_vision_sidecar()
             if duration_s > 0 and (time.time() - start) >= duration_s:
                 break
 
@@ -1988,19 +2118,22 @@ class LiveDcsTutorLoop:
             if obs is not None:
                 self._ingest_observation(obs)
                 self._stats.frames += 1
+                obs_payload = obs.payload if isinstance(obs.payload, Mapping) else {}
+                obs_t_wall = _coerce_float(obs_payload.get("t_wall"))
                 if auto_help_on_first_frame and not first_help_done:
-                    self.run_help_cycle()
+                    self.run_help_cycle(trigger_t_wall=obs_t_wall)
                     first_help_done = True
                 if auto_help_every_n_frames > 0:
                     if self._stats.frames % auto_help_every_n_frames == 0:
-                        self.run_help_cycle()
+                        self.run_help_cycle(trigger_t_wall=obs_t_wall)
             else:
                 exhausted = bool(getattr(self.source, "is_exhausted", False))
                 if exhausted:
                     break
 
             if help_trigger is not None and help_trigger.poll():
-                self.run_help_cycle()
+                help_trigger_t_wall = time.time() if self.vision_mode == "live" else None
+                self.run_help_cycle(trigger_t_wall=help_trigger_t_wall)
 
             if max_frames > 0 and self._stats.frames >= max_frames:
                 break
@@ -2014,6 +2147,47 @@ class LiveDcsTutorLoop:
 def _new_default_log_path() -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return Path("logs") / f"live_dcs_{ts}.jsonl"
+
+
+def _build_vision_port_from_args(
+    args: argparse.Namespace,
+    *,
+    mode: str,
+) -> tuple[Any | None, str | None, int | None, int | None]:
+    saved_games_dir = getattr(args, "vision_saved_games_dir", None)
+    if not isinstance(saved_games_dir, str) or not saved_games_dir.strip():
+        return None, None, None, None
+    saved_games_dir = saved_games_dir.strip()
+
+    raw_session_id = getattr(args, "vision_session_id", None) or getattr(args, "session_id", None)
+    if not isinstance(raw_session_id, str) or not raw_session_id.strip():
+        raise ValueError("--vision-session-id or --session-id is required when vision sidecar is enabled")
+    session_id = _normalize_path_segment(raw_session_id, flag_name="--vision-session-id")
+
+    channel = _normalize_path_segment(
+        getattr(args, "vision_channel", DEFAULT_FRAME_CHANNEL),
+        flag_name="--vision-channel",
+    )
+    layout_id = getattr(args, "vision_layout_id", DEFAULT_LAYOUT_ID)
+    sync_window_ms_raw = getattr(args, "vision_sync_window_ms", 0)
+    trigger_wait_ms_raw = getattr(args, "vision_trigger_wait_ms", 0)
+    sync_window_ms = int(sync_window_ms_raw) if isinstance(sync_window_ms_raw, int) and sync_window_ms_raw > 0 else None
+    trigger_wait_ms = (
+        int(trigger_wait_ms_raw)
+        if isinstance(trigger_wait_ms_raw, int) and trigger_wait_ms_raw > 0
+        else None
+    )
+
+    return (
+        FrameDirectoryVisionPort(
+            saved_games_dir=saved_games_dir,
+            channel=channel,
+            layout_id=layout_id,
+        ),
+        session_id,
+        sync_window_ms,
+        trigger_wait_ms,
+    )
 
 
 def _build_model_from_args(args: argparse.Namespace) -> Any:
@@ -2115,6 +2289,30 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--output", help="Event log JSONL output path")
     parser.add_argument("--session-id", default=None, help="Optional event session id")
+    parser.add_argument(
+        "--vision-saved-games-dir",
+        default=None,
+        help="Saved Games/<variant> root for frames/<session>/<channel>/frames.jsonl sidecar consumption.",
+    )
+    parser.add_argument(
+        "--vision-session-id",
+        default=None,
+        help="Frame sidecar session id. Defaults to --session-id when omitted.",
+    )
+    parser.add_argument("--vision-channel", default=DEFAULT_FRAME_CHANNEL, help="Vision frame channel name")
+    parser.add_argument("--vision-layout-id", default=DEFAULT_LAYOUT_ID, help="Expected vision layout id")
+    parser.add_argument(
+        "--vision-sync-window-ms",
+        type=parse_non_negative_int_arg,
+        default=0,
+        help="Frame selection sync window in milliseconds (0 uses live/replay default).",
+    )
+    parser.add_argument(
+        "--vision-trigger-wait-ms",
+        type=parse_non_negative_int_arg,
+        default=0,
+        help="Extra wait budget for live help-trigger frame arrival (0 uses mode default).",
+    )
 
     parser.add_argument("--cooldown-s", type=float, default=4.0, help="Cooldown window for same-state help reuse")
     parser.add_argument("--max-frames", type=int, default=0, help="Max frames to process (0 means unlimited)")
@@ -2205,6 +2403,10 @@ def main() -> int:
         )
 
     model = _build_model_from_args(args)
+    vision_port, vision_session_id, vision_sync_window_ms, vision_trigger_wait_ms = _build_vision_port_from_args(
+        args,
+        mode="live",
+    )
 
     with JsonlEventStore(output, mode="w") as store:
         executor = OverlayActionExecutor(
@@ -2232,6 +2434,11 @@ def main() -> int:
             scenario_profile=args.scenario_profile,
             event_sink=store.append,
             dry_run_overlay=bool(args.dry_run_overlay),
+            vision_port=vision_port,
+            vision_session_id=vision_session_id,
+            vision_mode="live",
+            vision_sync_window_ms=vision_sync_window_ms,
+            vision_trigger_wait_ms=vision_trigger_wait_ms,
         )
 
         stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
