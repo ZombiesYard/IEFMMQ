@@ -4,7 +4,7 @@ Ollama-backed ModelPort adapter for HelpResponse generation.
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Any, Mapping
 
 from adapters.base_help_model import BaseHelpModel
 
@@ -30,10 +30,11 @@ class OllamaModel(BaseHelpModel):
             client=client,
         )
 
-    def _chat(self, messages: list[dict[str, str]]) -> str:
+    def _chat(self, messages: list[dict[str, Any]]) -> str:
+        payload_messages = self._normalize_messages(messages)
         payload = {
             "model": self.model_name,
-            "messages": messages,
+            "messages": payload_messages,
             "stream": False,
             "options": {"temperature": 0},
         }
@@ -53,6 +54,19 @@ class OllamaModel(BaseHelpModel):
         if isinstance(body.get("response"), str):
             return body["response"]
         raise ValueError("Ollama response missing assistant content")
+
+    @staticmethod
+    def _normalize_messages(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+        normalized: list[dict[str, str]] = []
+        for message in messages:
+            role = message.get("role")
+            content = message.get("content")
+            if not isinstance(role, str) or not role:
+                raise ValueError("Ollama messages must include a string role")
+            if not isinstance(content, str):
+                raise ValueError("Ollama messages must have string content")
+            normalized.append({"role": role, "content": content})
+        return normalized
 
 
 __all__ = ["OllamaModel"]
