@@ -1303,12 +1303,15 @@ class LiveDcsTutorLoop:
         observation: Observation,
         trigger_t_wall: float,
     ) -> HelpCycleVisionSelection:
-        trigger_wall_ms = int(round(float(trigger_t_wall) * 1000.0))
+        normalized_trigger_t_wall = _coerce_finite_float(trigger_t_wall)
+        if normalized_trigger_t_wall is None:
+            normalized_trigger_t_wall = time.time()
+        trigger_wall_ms = int(round(float(normalized_trigger_t_wall) * 1000.0))
         payload = observation.payload if isinstance(observation.payload, Mapping) else {}
         observation_seq = _coerce_int(payload.get("seq"))
         observation_t_wall_s = _coerce_finite_float(payload.get("t_wall"))
         if observation_t_wall_s is None:
-            observation_t_wall_s = float(trigger_t_wall)
+            observation_t_wall_s = normalized_trigger_t_wall
         observation_t_wall_ms = int(round(float(observation_t_wall_s) * 1000.0))
         if self._vision_session is None:
             return HelpCycleVisionSelection(
@@ -1330,7 +1333,7 @@ class LiveDcsTutorLoop:
                 trigger_frame=None,
                 sync_miss_reason="vision_port_unconfigured",
             )
-        selection = self._vision_session.select_for_help(trigger_wall_s=trigger_t_wall)
+        selection = self._vision_session.select_for_help(trigger_wall_s=normalized_trigger_t_wall)
         return HelpCycleVisionSelection(
             status=selection.status,
             observation_ref=observation.observation_id,
@@ -2005,7 +2008,7 @@ class LiveDcsTutorLoop:
         resolved_trigger_t_wall = trigger_t_wall
         if resolved_trigger_t_wall is None:
             payload = obs.payload if isinstance(obs.payload, Mapping) else {}
-            resolved_trigger_t_wall = _coerce_float(payload.get("t_wall"))
+            resolved_trigger_t_wall = _coerce_finite_float(payload.get("t_wall"))
         if resolved_trigger_t_wall is None:
             resolved_trigger_t_wall = time.time()
 
