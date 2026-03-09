@@ -32,6 +32,7 @@ logic does not change when switching runtime backends.
 - `SIMTUTOR_MODEL_PROVIDER=ollama|openai_compat|stub`
 - `SIMTUTOR_MODEL_NAME` (Ollama tag or OpenAI-compatible model name)
 - `SIMTUTOR_MODEL_BASE_URL` (required for `openai_compat`, optional for `ollama`)
+- `SIMTUTOR_MODEL_ENABLE_MULTIMODAL` (optional boolean; default off, enable only for VLM-capable `openai_compat` models)
 - `SIMTUTOR_MODEL_TIMEOUT_S` (positive number)
 - `SIMTUTOR_LANG=zh|en`
 - `SIMTUTOR_MODEL_API_KEY` (required for `openai_compat`)

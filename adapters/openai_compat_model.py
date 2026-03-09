@@ -357,10 +357,16 @@ class OpenAICompatModel(BaseHelpModel):
         secondary_frame_id: str | None,
     ) -> str:
         frame_notes: list[str] = []
+        if self.lang == "zh":
+            primary_label = "主视觉帧"
+            secondary_label = "触发前参考帧"
+        else:
+            primary_label = "Primary visual frame"
+            secondary_label = "Reference pre-trigger frame"
         if isinstance(primary_frame_id, str) and primary_frame_id:
-            frame_notes.append(f"Primary visual frame: {primary_frame_id}")
+            frame_notes.append(f"{primary_label}: {primary_frame_id}")
         if isinstance(secondary_frame_id, str) and secondary_frame_id:
-            frame_notes.append(f"Reference pre-trigger frame: {secondary_frame_id}")
+            frame_notes.append(f"{secondary_label}: {secondary_frame_id}")
         if not frame_notes:
             return prompt_text
         return "\n".join([*frame_notes, "", prompt_text])

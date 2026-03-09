@@ -404,6 +404,7 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     model = OpenAICompatModel(
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
+        lang="en",
         enable_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
@@ -433,6 +434,33 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
     assert "Primary visual frame: 1772872445010_000123" in content[2]["text"]
     assert "Reference pre-trigger frame: 1772872444950_000122" in content[2]["text"]
+
+
+def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    pre_trigger_image = tmp_path / "pre_trigger_frame.png"
+    pre_trigger_image.write_bytes(b"pre-trigger-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        lang="zh",
+        enable_multimodal=True,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image, pre_trigger_image=pre_trigger_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    content = fake.calls[0]["json"]["messages"][1]["content"]
+    assert isinstance(content, list)
+    assert "主视觉帧: 1772872445010_000123" in content[2]["text"]
+    assert "触发前参考帧: 1772872444950_000122" in content[2]["text"]
+    assert "Primary visual frame" not in content[2]["text"]
 
 
 def test_openai_compat_multimodal_failure_falls_back_to_text_only_and_records_metadata(tmp_path: Path) -> None:
