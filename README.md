@@ -96,6 +96,8 @@ python -m tools.install_dcs_monitor_setup \
   --main-height 1080
 ```
 
+Note: the generated DCS monitor-setup file/profile name remains `SimTutor_FA18C_CompositePanel_v1` for Saved Games compatibility, while the active vision layout contract is `fa18c_composite_panel_v2`.
+
 Install the single-monitor variant that solves the normalized left-stack layout on one screen and keeps the main view on the right:
 
 ```bash

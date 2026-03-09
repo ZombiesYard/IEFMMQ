@@ -16,6 +16,9 @@ from pathlib import Path
 from adapters.vision_prompting import load_vision_layout, solve_layout_geometry
 from tools.install_dcs_hook import resolve_saved_games_dir
 
+# Keep the Saved Games monitor-setup filename stable for DCS Options/backward
+# compatibility; the active visual contract version is tracked by layout_id in
+# packs/fa18c_startup/vision_layout.yaml.
 MONITOR_SETUP_BASENAME = "SimTutor_FA18C_CompositePanel_v1"
 COMPOSITE_CANVAS_WIDTH = 2560
 COMPOSITE_CANVAS_HEIGHT = 1440

@@ -320,6 +320,7 @@ def render_layout_svg(layout: Mapping[str, Any] | None = None) -> str:
         region_id = region["region_id"]
         fill = _REGION_FILL_BY_ID[region_id]
         accent = _REGION_ACCENT_BY_ID[region_id]
+        ocr_priority = region["ocr_priority"]
         x = int(round(width * float(region["x_norm"])))
         y = int(round(height * float(region["y_norm"])))
         w = int(round(width * float(region["width_norm"])))
@@ -330,7 +331,7 @@ def render_layout_svg(layout: Mapping[str, Any] | None = None) -> str:
                 f'      <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="26" ry="26" fill="{fill}" stroke="{accent}" stroke-width="6" />',
                 f'      <text x="{x + 28}" y="{y + 62}" fill="#f4f7fb" font-size="40" font-weight="700">{region["display_name_en"]}</text>',
                 f'      <text x="{x + 28}" y="{y + 112}" fill="{accent}" font-size="28">{region_id}</text>',
-                f'      <text x="{x + 28}" y="{y + h - 44}" fill="#d0dae4" font-size="24">OCR priority: high</text>',
+                f'      <text x="{x + 28}" y="{y + h - 44}" fill="#d0dae4" font-size="24">OCR priority: {ocr_priority}</text>',
                 "    </g>",
             ]
         )
