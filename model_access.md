@@ -11,7 +11,7 @@ logic does not change when switching runtime backends.
 - API key required: `SIMTUTOR_MODEL_API_KEY`
 - Default model if `SIMTUTOR_MODEL_NAME` is omitted: `Qwen3-8B-Instruct`
 - Set `SIMTUTOR_MODEL_ENABLE_MULTIMODAL=1` (or CLI `--model-enable-multimodal`) to allow synchronized vision frames to be sent as OpenAI-compatible `image_url` content for Qwen3.5 VLM.
-- Local image reads are restricted to the configured `Saved Games/.../SimTutor/frames` root and guarded by a max file-size limit before base64 encoding.
+- Only local frame files under the configured `Saved Games/.../SimTutor/frames` root are accepted for multimodal input; remote `http(s)` URLs and inline `data:` URLs are rejected, and local files are guarded by a max file-size limit before base64 encoding.
 - Note: this repository appends `/v1/chat/completions` itself, so `SIMTUTOR_MODEL_BASE_URL` should be the provider root rather than an OpenAI SDK-style `/v1` base URL.
 
 ## Provider B (Fallback): Ollama

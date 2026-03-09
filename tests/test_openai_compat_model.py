@@ -720,6 +720,64 @@ def test_openai_compat_rejects_local_image_path_exceeding_size_limit(tmp_path: P
     assert "1772872445010_000123" in res.metadata["multimodal_failure_reason"]
 
 
+def test_openai_compat_rejects_inline_data_urls_in_vision_context() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+    )
+    request = _request_help()
+    request.context["vision"] = {
+        "status": "available",
+        "vision_used": True,
+        "frame_id": "1772872445010_000123",
+        "trigger_frame": {
+            "frame_id": "1772872445010_000123",
+            "role": "trigger_frame",
+            "image_uri": "data:image/png;base64,AAAA",
+        },
+    }
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 1
+    assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_failure_reason"] == "ValueError: inline vision frame data URLs are not allowed"
+
+
+def test_openai_compat_rejects_remote_image_urls_in_vision_context() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+    )
+    request = _request_help()
+    request.context["vision"] = {
+        "status": "available",
+        "vision_used": True,
+        "frame_id": "1772872445010_000123",
+        "trigger_frame": {
+            "frame_id": "1772872445010_000123",
+            "role": "trigger_frame",
+            "image_uri": "https://example.com/frame.png",
+        },
+    }
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 1
+    assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_failure_reason"] == "ValueError: remote vision frame URLs are not allowed"
+
+
 def test_openai_compat_text_only_path_is_unchanged_without_vision_context() -> None:
     valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
     fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])

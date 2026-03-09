@@ -463,10 +463,12 @@ class OpenAICompatModel(BaseHelpModel):
         if not isinstance(raw_url, str) or not raw_url.strip():
             raise ValueError("vision frame is missing image_uri/source_image_path")
         image_url = raw_url.strip()
-        if image_url.startswith("data:") or image_url.startswith("http://") or image_url.startswith("https://"):
-            return image_url
+        if image_url.startswith("data:"):
+            raise ValueError("inline vision frame data URLs are not allowed")
+        if image_url.startswith("http://") or image_url.startswith("https://"):
+            raise ValueError("remote vision frame URLs are not allowed")
         parsed_scheme = image_url.split(":", 1)[0].lower() if ":" in image_url else ""
-        if parsed_scheme and parsed_scheme not in {"http", "https", "data"} and not self._looks_like_windows_path(image_url):
+        if parsed_scheme and not self._looks_like_windows_path(image_url):
             raise ValueError(f"unsupported vision frame URI scheme: {parsed_scheme}")
         path = Path(image_url).expanduser().resolve()
         label = self._frame_label(frame, path=path)
