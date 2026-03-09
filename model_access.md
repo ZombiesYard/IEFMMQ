@@ -10,6 +10,7 @@ logic does not change when switching runtime backends.
 - Base URL required: `SIMTUTOR_MODEL_BASE_URL` (example: `http://127.0.0.1:8000/v1`)
 - API key required: `SIMTUTOR_MODEL_API_KEY`
 - Default model if `SIMTUTOR_MODEL_NAME` is omitted: `Qwen3-8B-Instruct`
+- When `request.context["vision"]` carries synchronized frame artifacts, `openai_compat` can send them as OpenAI-compatible `image_url` content for Qwen3.5 VLM and automatically falls back to text-only if the multimodal path fails.
 
 ## Provider B (Fallback): Ollama
 

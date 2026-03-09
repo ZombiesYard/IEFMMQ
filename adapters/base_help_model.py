@@ -87,6 +87,7 @@ class BaseHelpModel(ModelPort):
 
     def explain_error(self, observation: Observation, request: TutorRequest | None = None) -> TutorResponse:
         start = perf_counter()
+        self._reset_runtime_metadata()
         deterministic_inference = StepInferenceResult(
             inferred_step_id=observation.procedure_hint if isinstance(observation.procedure_hint, str) else None,
             missing_conditions=(),
@@ -163,6 +164,7 @@ class BaseHelpModel(ModelPort):
                     "fallback_overlay_reason": None,
                 }
             )
+            metadata.update(self._collect_runtime_metadata())
             if evidence_guardrail_reasons:
                 metadata = merge_failure_metadata(
                     metadata,
@@ -201,6 +203,7 @@ class BaseHelpModel(ModelPort):
                 "fallback_overlay_used": False,
                 "fallback_overlay_reason": None,
             }
+            error_metadata.update(self._collect_runtime_metadata())
             failure_code = exception_failure_code(exc)
             failure_stage = exception_failure_stage(exc)
             if failure_code is not None:
@@ -228,7 +231,7 @@ class BaseHelpModel(ModelPort):
         deterministic_inference: StepInferenceResult | None = None,
         recent_ui_targets: list[str] | None = None,
         deterministic_hint: Mapping[str, Any] | None = None,
-    ) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         schema = get_help_response_schema()
         schema_step_ids = schema["properties"]["next"]["properties"]["step_id"]["enum"]
         schema_targets = schema["properties"]["overlay"]["properties"]["targets"]["items"]["enum"]
@@ -532,9 +535,9 @@ class BaseHelpModel(ModelPort):
 
     def _build_retry_messages(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         parse_error: Exception,
-    ) -> list[dict[str, str]]:
+    ) -> list[dict[str, Any]]:
         error_text = f"{type(parse_error).__name__}: {parse_error}"
         if len(error_text) > 240:
             error_text = error_text[:240] + "..."
@@ -554,7 +557,7 @@ class BaseHelpModel(ModelPort):
         retry_messages.append({"role": "user", "content": retry_hint})
         return retry_messages
 
-    def _chat_with_failure_classification(self, messages: list[dict[str, str]]) -> str:
+    def _chat_with_failure_classification(self, messages: list[dict[str, Any]]) -> str:
         try:
             return self._chat(messages)
         except Exception as exc:
@@ -593,5 +596,11 @@ class BaseHelpModel(ModelPort):
             "details": [],
         }
 
-    def _chat(self, messages: list[dict[str, str]]) -> str:  # pragma: no cover - implemented by subclasses
+    def _reset_runtime_metadata(self) -> None:
+        return None
+
+    def _collect_runtime_metadata(self) -> dict[str, Any]:
+        return {}
+
+    def _chat(self, messages: list[dict[str, Any]]) -> str:  # pragma: no cover - implemented by subclasses
         raise NotImplementedError

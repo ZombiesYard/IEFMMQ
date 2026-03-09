@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from adapters.openai_compat_model import OpenAICompatModel
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL, JSON_EXTRACT_FAIL, MODEL_HTTP_FAIL, SCHEMA_FAIL
 from core.llm_schema import validate_help_response
@@ -10,6 +12,48 @@ from tests._fakes import (
     _openai_chat_payload_from_help_obj,
     _request_help,
 )
+
+
+def _attach_vision_context(
+    request,
+    *,
+    primary_image: Path,
+    pre_trigger_image: Path | None = None,
+) -> None:
+    primary_frame = {
+        "frame_id": "1772872445010_000123",
+        "role": "trigger_frame",
+        "image_uri": str(primary_image),
+        "mime_type": "image/png",
+        "sync_status": "matched_future_fallback",
+        "sync_delta_ms": 10,
+    }
+    selected_frames = [primary_frame]
+    vision = {
+        "status": "available",
+        "vision_used": True,
+        "frame_id": primary_frame["frame_id"],
+        "frame_ids": [primary_frame["frame_id"]],
+        "trigger_frame": primary_frame,
+        "selected_frames": selected_frames,
+        "sync_status": "matched_past",
+        "sync_delta_ms": -50,
+        "frame_stale": True,
+        "sync_miss_reason": None,
+    }
+    if pre_trigger_image is not None:
+        pre_trigger_frame = {
+            "frame_id": "1772872444950_000122",
+            "role": "pre_trigger_frame",
+            "image_uri": str(pre_trigger_image),
+            "mime_type": "image/png",
+            "sync_status": "matched_past",
+            "sync_delta_ms": -50,
+        }
+        vision["pre_trigger_frame"] = pre_trigger_frame
+        vision["selected_frames"] = [pre_trigger_frame, primary_frame]
+        vision["frame_ids"] = [pre_trigger_frame["frame_id"], primary_frame["frame_id"]]
+    request.context["vision"] = vision
 
 
 def test_explain_error_success_200_valid_help_response() -> None:
@@ -348,6 +392,86 @@ def test_openai_compat_qwen35_disables_thinking_and_caps_output_tokens() -> None
     request_payload = fake.calls[0]["json"]
     assert request_payload["max_tokens"] == 384
     assert request_payload["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_available(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    pre_trigger_image = tmp_path / "pre_trigger_frame.png"
+    pre_trigger_image.write_bytes(b"pre-trigger-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-27B")
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image, pre_trigger_image=pre_trigger_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_primary_frame_id"] == "1772872445010_000123"
+    assert res.metadata["multimodal_frame_ids"] == ["1772872445010_000123", "1772872444950_000122"]
+    assert res.metadata["multimodal_image_count"] == 2
+    assert res.metadata["multimodal_path_attempted"] is True
+    assert res.metadata["multimodal_path_success"] is True
+    assert res.metadata["multimodal_fallback_to_text"] is False
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["max_tokens"] == 640
+    assert request_payload["chat_template_kwargs"] == {"enable_thinking": False}
+    content = request_payload["messages"][1]["content"]
+    assert isinstance(content, list)
+    assert [item["type"] for item in content] == ["image_url", "image_url", "text"]
+    assert content[0]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert "Primary visual frame: 1772872445010_000123" in content[2]["text"]
+    assert "Reference pre-trigger frame: 1772872444950_000122" in content[2]["text"]
+
+
+def test_openai_compat_multimodal_failure_falls_back_to_text_only_and_records_metadata(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse({"error": {"message": "Unknown field image_url"}}, status_code=400),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-27B")
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], list)
+    assert isinstance(fake.calls[1]["json"]["messages"][1]["content"], str)
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_image_count"] == 1
+    assert res.metadata["multimodal_path_attempted"] is True
+    assert res.metadata["multimodal_path_success"] is False
+    assert res.metadata["multimodal_fallback_to_text"] is True
+    assert "RuntimeError: http 400" in res.metadata["multimodal_failure_reason"]
+
+
+def test_openai_compat_text_only_path_is_unchanged_without_vision_context() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-27B")
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert res.metadata["multimodal_input_present"] is False
+    assert res.metadata["multimodal_primary_frame_id"] is None
+    assert res.metadata["multimodal_frame_ids"] == []
+    assert res.metadata["multimodal_image_count"] == 0
+    assert res.metadata["multimodal_path_attempted"] is False
+    assert res.metadata["multimodal_path_success"] is False
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["max_tokens"] == 384
+    assert isinstance(request_payload["messages"][1]["content"], str)
 
 
 def test_openai_compat_respects_explicit_max_tokens_for_qwen35_fallback_retry() -> None:

@@ -706,7 +706,7 @@ python -m simtutor replay logs/example.jsonl --pack packs/fa18c_startup/pack.yam
 - The authoritative machine-executable procedure data lives in `packs/fa18c_startup/`.
 - Grounding source material is indexed from `Doc/Evaluation/`.
 - Replay and live flows intentionally summarize and budget DCS-BIOS deltas before prompting.
-- The repository now includes the frame-manifest and VLM-ready crop pipeline for `vision_observation`, but multimodal help fusion is still not wired into the live/replay tutor loop.
+- The repository now includes the frame-manifest and VLM-ready crop pipeline for `vision_observation`, and `openai_compat` can pass synchronized composite-panel frames to Qwen3.5 VLM with automatic text-only downgrade when the multimodal path fails.
 
 ## License
 
