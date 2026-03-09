@@ -227,6 +227,54 @@ To validate the environment without printing secrets:
 python -m simtutor model-config
 ```
 
+### Supported Deployment Topologies
+
+Officially supported topologies for v0.4 are:
+
+- Single machine: `DCS + simtutor + Qwen/vLLM` on one host
+- Split model host: `DCS + simtutor` on one host, `Qwen/vLLM` on another host
+
+Single-machine template:
+
+```bash
+export SIMTUTOR_MODEL_PROVIDER=openai_compat
+export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000
+export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
+export SIMTUTOR_MODEL_TIMEOUT_S=20
+export SIMTUTOR_MODEL_API_KEY=dummy
+```
+
+`Saved Games/<variant>/Scripts/SimTutor/SimTutorConfig.lua`:
+
+```lua
+return {
+    telemetry = { host = "127.0.0.1", port = 7780, hz = 20 },
+    handshake = { host = "127.0.0.1", port = 7793 },
+    overlay = {
+        command_host = "127.0.0.1",
+        command_port = 7781,
+        ack_host = "127.0.0.1",
+        ack_port = 7782,
+    },
+}
+```
+
+Split-model template (`DCS + simtutor` local, remote Qwen/vLLM):
+
+```bash
+export SIMTUTOR_MODEL_PROVIDER=openai_compat
+export SIMTUTOR_MODEL_BASE_URL=http://10.0.0.42:8000
+export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
+export SIMTUTOR_MODEL_TIMEOUT_S=20
+export SIMTUTOR_MODEL_API_KEY=dummy
+```
+
+Keep the DCS-side telemetry / handshake / overlay loopback settings above when
+`live_dcs.py` still runs on the same machine as DCS. If you later move the
+Python process off-box, keep `telemetry.host` and `overlay.ack_host` pointed at
+the Python host, and set `handshake.host` / `overlay.command_host` to a local
+bindable address on the DCS machine (typically `0.0.0.0` or the DCS NIC IP).
+
 ## Main Workflows
 
 ### 1. Mock / Deterministic Flow
@@ -615,6 +663,7 @@ Relevant DCS-side scripts live under:
    - `caps.vlm_frame = true`
    - `vision.output_root` points to `Saved Games/<variant>/SimTutor/frames`
    - `vision.monitor_setup` matches `SimTutor_FA18C_CompositePanel_v1`
+   - `overlay.command_host` / `overlay.ack_host` match your deployment topology; defaults stay on `127.0.0.1`
 7. Start DCS and confirm the capability handshake reports `vlm_frame=true`.
 8. If the composite-panel frame writer/sidecar is installed, confirm `.png` frames and `frames.jsonl` grow under `Saved Games/<variant>/SimTutor/frames/<session_id>/composite_panel/`.
 9. Start `python live_dcs.py`.

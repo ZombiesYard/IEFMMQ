@@ -140,8 +140,35 @@ def test_build_composite_panel_config_enables_vlm_frame_and_frames_root(tmp_path
     assert 'layout_id = "fa18c_composite_panel_v2"' in config
     assert 'channel = "composite_panel"' in config
     assert str((saved_games_dir / "SimTutor" / "frames").resolve()) in config
+    assert 'command_host = "127.0.0.1"' in config
+    assert "command_port = 7781" in config
+    assert 'ack_host = "127.0.0.1"' in config
+    assert "ack_port = 7782" in config
+    assert "auto_clear = true" in config
+    assert "hilite_id = 9101" in config
     assert "width = 4480" in config
     assert "height = 1440" in config
+
+
+def test_build_composite_panel_config_supports_custom_overlay_transport(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+
+    config = build_composite_panel_config(
+        saved_games_dir=saved_games_dir,
+        overlay_command_host="0.0.0.0",
+        overlay_command_port=9001,
+        overlay_ack_host="192.168.10.20",
+        overlay_ack_port=9002,
+        overlay_auto_clear=False,
+        overlay_hilite_id=9200,
+    )
+
+    assert 'command_host = "0.0.0.0"' in config
+    assert "command_port = 9001" in config
+    assert 'ack_host = "192.168.10.20"' in config
+    assert "ack_port = 9002" in config
+    assert "auto_clear = false" in config
+    assert "hilite_id = 9200" in config
 
 
 def test_install_composite_panel_config_is_idempotent(tmp_path: Path) -> None:

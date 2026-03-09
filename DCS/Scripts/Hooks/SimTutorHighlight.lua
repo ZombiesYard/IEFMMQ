@@ -24,12 +24,72 @@ if not ok_json then
   return
 end
 
-local CMD_HOST, CMD_PORT = "127.0.0.1", 7781
-local ACK_HOST, ACK_PORT = "127.0.0.1", 7782
+local DEFAULT_OVERLAY = {
+  command_host = "127.0.0.1",
+  command_port = 7781,
+  ack_host = "127.0.0.1",
+  ack_port = 7782,
+  auto_clear = true,
+  hilite_id = 9101,
+}
+
+local function string_or_default(value, fallback)
+  if type(value) == "string" and value ~= "" then
+    return value
+  end
+  return fallback
+end
+
+local function number_or_default(value, fallback)
+  if type(value) == "number" and value > 0 then
+    return math.floor(value)
+  end
+  return fallback
+end
+
+local function load_overlay_config()
+  local overlay = {}
+  for key, value in pairs(DEFAULT_OVERLAY) do
+    overlay[key] = value
+  end
+
+  if not ok_lfs or not lfs or not lfs.writedir then
+    return overlay
+  end
+
+  local cfg_path = lfs.writedir() .. "Scripts\\SimTutor\\SimTutorConfig.lua"
+  local ok_cfg, cfg = pcall(function()
+    return dofile(cfg_path)
+  end)
+  if not ok_cfg then
+    logi("SimTutorConfig.lua not loaded for overlay settings: " .. tostring(cfg))
+    return overlay
+  end
+  if type(cfg) ~= "table" or type(cfg.overlay) ~= "table" then
+    return overlay
+  end
+
+  local loaded = cfg.overlay
+  overlay.command_host = string_or_default(loaded.command_host, overlay.command_host)
+  overlay.command_port = number_or_default(loaded.command_port, overlay.command_port)
+  overlay.ack_host = string_or_default(loaded.ack_host, overlay.ack_host)
+  overlay.ack_port = number_or_default(loaded.ack_port, overlay.ack_port)
+  if type(loaded.auto_clear) == "boolean" then
+    overlay.auto_clear = loaded.auto_clear
+  end
+  if type(loaded.hilite_id) == "number" and loaded.hilite_id >= 0 then
+    overlay.hilite_id = math.floor(loaded.hilite_id)
+  end
+  return overlay
+end
+
+local OVERLAY = load_overlay_config()
+local CMD_HOST, CMD_PORT = OVERLAY.command_host, OVERLAY.command_port
+local ACK_HOST, ACK_PORT = OVERLAY.ack_host, OVERLAY.ack_port
 -- AUTO_CLEAR clears any existing highlight before each new highlight (even if target is unchanged).
 -- This differs from the Python sender which only clears when switching targets.
-local AUTO_CLEAR = true
-local HILITE_ID = 9101
+local AUTO_CLEAR = OVERLAY.auto_clear
+local HILITE_ID = OVERLAY.hilite_id
 
 local udp_cmd = assert(socket.udp())
 assert(udp_cmd:setsockname(CMD_HOST, CMD_PORT))
@@ -38,7 +98,16 @@ udp_cmd:settimeout(0)
 local udp_ack = assert(socket.udp())
 udp_ack:settimeout(0)
 
-logi(("Listening UDP on %s:%d"):format(CMD_HOST, CMD_PORT))
+logi(
+  ("Listening UDP on %s:%d; ACK -> %s:%d; auto_clear=%s; hilite_id=%d"):format(
+    CMD_HOST,
+    CMD_PORT,
+    ACK_HOST,
+    ACK_PORT,
+    tostring(AUTO_CLEAR),
+    HILITE_ID
+  )
+)
 
 local function missionEval(chunk)
   if not net or not net.dostring_in then
