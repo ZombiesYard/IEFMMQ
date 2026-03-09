@@ -560,7 +560,7 @@ Relevant DCS-side scripts live under:
 ### Typical Live Bring-Up
 
 1. Install the hook files with `python -m tools.install_dcs_hook`.
-2. If you are testing the viewport PoC, install the monitor setup with `python -m tools.install_dcs_monitor_setup --mode <extended-right|single-monitor> --main-width <screen_width> --main-height <screen_height>`.
+2. If you are testing the viewport PoC, install the monitor setup with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor> --main-width <screen_width> --main-height <screen_height>`.
 3. For `extended-right`, ensure a right-side extended desktop region exists with at least `2560x1440` pixels.
 4. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution.
 5. Ensure DCS or DCS.openbeta loads the copied Lua files.
