@@ -71,6 +71,7 @@ Replay with a local vLLM OpenAI-compatible endpoint:
 export SIMTUTOR_MODEL_PROVIDER=openai_compat
 export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000
 export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
+export SIMTUTOR_MODEL_ENABLE_MULTIMODAL=0
 export SIMTUTOR_MODEL_TIMEOUT_S=20
 export SIMTUTOR_MODEL_API_KEY=dummy
 export SIMTUTOR_LANG=zh
@@ -202,6 +203,7 @@ There is no installed console script at the moment. Use module/script entrypoint
 | `SIMTUTOR_MODEL_PROVIDER` | Model provider used by `model-config` and CLI defaults | `stub`, `openai_compat`, or `ollama` |
 | `SIMTUTOR_MODEL_NAME` | Model identifier | Defaults by provider; for OpenAI-compatible mode the CLI default is `Qwen3-8B-Instruct` |
 | `SIMTUTOR_MODEL_BASE_URL` | Base URL for the model API | Required for `openai_compat`; default for `ollama` is `http://127.0.0.1:11434` |
+| `SIMTUTOR_MODEL_ENABLE_MULTIMODAL` | Default switch for OpenAI-compatible multimodal image inputs | Off by default; enable for VLM-capable models such as Qwen3.5 VLM |
 | `SIMTUTOR_MODEL_TIMEOUT_S` | Model timeout in seconds | Positive float; CLI default is `20` |
 | `SIMTUTOR_MODEL_API_KEY` | API key for provider access | Required for `openai_compat`; can be a dummy token for a local vLLM endpoint if that endpoint ignores auth |
 | `SIMTUTOR_LANG` | Tutor language | `zh` or `en`; CLI default is `zh` |

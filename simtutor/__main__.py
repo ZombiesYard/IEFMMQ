@@ -321,6 +321,21 @@ def main() -> int:
         help="Max completion tokens for model providers that support it (0 uses provider default).",
     )
     rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
+    replay_model_multimodal_default = parse_env_bool("SIMTUTOR_MODEL_ENABLE_MULTIMODAL", default=False)
+    replay_model_multimodal_group = rep_bios.add_mutually_exclusive_group()
+    replay_model_multimodal_group.add_argument(
+        "--model-enable-multimodal",
+        dest="model_enable_multimodal",
+        action="store_true",
+        help="Allow OpenAI-compatible models to send synchronized vision frames as multimodal image inputs.",
+    )
+    replay_model_multimodal_group.add_argument(
+        "--no-model-enable-multimodal",
+        dest="model_enable_multimodal",
+        action="store_false",
+        help="Force text-only requests even when synchronized vision frames are available.",
+    )
+    rep_bios.set_defaults(model_enable_multimodal=replay_model_multimodal_default)
     rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
     rep_bios.add_argument(

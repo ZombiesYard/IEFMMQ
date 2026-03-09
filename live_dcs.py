@@ -45,7 +45,7 @@ from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
-from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort
+from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort, build_frames_root
 from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from adapters.vision_sync import (
     DEFAULT_LIVE_SYNC_WINDOW_MS,
@@ -2357,6 +2357,11 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
     if model_max_tokens_value < 0:
         raise ValueError("--model-max-tokens must be >= 0")
     model_max_tokens = model_max_tokens_value if model_max_tokens_value > 0 else None
+    model_enable_multimodal = bool(getattr(args, "model_enable_multimodal", False))
+    allowed_local_image_roots: list[Path] = []
+    vision_saved_games_dir = getattr(args, "vision_saved_games_dir", None)
+    if isinstance(vision_saved_games_dir, str) and vision_saved_games_dir.strip():
+        allowed_local_image_roots.append(build_frames_root(vision_saved_games_dir))
     if provider == "openai_compat":
         if not args.model_base_url:
             raise ValueError("--model-base-url is required for openai_compat")
@@ -2368,6 +2373,8 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
             api_key=args.model_api_key,
+            enable_multimodal=model_enable_multimodal,
+            allowed_local_image_roots=allowed_local_image_roots,
         )
     if provider == "ollama":
         base_url = args.model_base_url or "http://127.0.0.1:11434"
@@ -2514,6 +2521,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Max completion tokens for model providers that support it (0 uses provider default).",
     )
     parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
+    model_multimodal_default = parse_env_bool("SIMTUTOR_MODEL_ENABLE_MULTIMODAL", default=False)
+    model_multimodal_group = parser.add_mutually_exclusive_group()
+    model_multimodal_group.add_argument(
+        "--model-enable-multimodal",
+        dest="model_enable_multimodal",
+        action="store_true",
+        help="Allow OpenAI-compatible models to send synchronized vision frames as multimodal image inputs.",
+    )
+    model_multimodal_group.add_argument(
+        "--no-model-enable-multimodal",
+        dest="model_enable_multimodal",
+        action="store_false",
+        help="Force text-only requests even when synchronized vision frames are available.",
+    )
+    parser.set_defaults(model_enable_multimodal=model_multimodal_default)
     parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
     parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
     parser.add_argument(

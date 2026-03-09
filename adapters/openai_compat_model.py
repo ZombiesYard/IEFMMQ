@@ -5,10 +5,11 @@ OpenAI-compatible ModelPort adapter (vLLM/llama.cpp/TGI compatible).
 from __future__ import annotations
 
 import base64
+import copy
 import mimetypes
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from adapters.base_help_model import BaseHelpModel
 from core.llm_schema import get_help_response_schema
@@ -22,6 +23,7 @@ class OpenAICompatModel(BaseHelpModel):
     provider = "openai_compat"
     _DEFAULT_QWEN35_MAX_TOKENS = 384
     _DEFAULT_QWEN35_VLM_MAX_TOKENS = 640
+    _DEFAULT_MAX_LOCAL_IMAGE_BYTES = 4 * 1024 * 1024
 
     def __init__(
         self,
@@ -32,10 +34,23 @@ class OpenAICompatModel(BaseHelpModel):
         lang: str = "zh",
         log_raw_llm_text: bool = False,
         api_key: str | None = None,
+        enable_multimodal: bool = False,
+        allowed_local_image_roots: Sequence[str | Path] | None = None,
+        max_local_image_bytes: int | None = None,
         client: object | None = None,
     ) -> None:
         self.api_key = api_key
         self.max_tokens = int(max_tokens) if isinstance(max_tokens, int) and max_tokens > 0 else None
+        self.enable_multimodal = bool(enable_multimodal)
+        self.allowed_local_image_roots = tuple(
+            Path(item).expanduser().resolve()
+            for item in (allowed_local_image_roots or ())
+        )
+        self.max_local_image_bytes = (
+            int(max_local_image_bytes)
+            if isinstance(max_local_image_bytes, int) and max_local_image_bytes > 0
+            else self._DEFAULT_MAX_LOCAL_IMAGE_BYTES
+        )
         self._help_response_schema = get_help_response_schema()
         self._runtime_metadata = self._empty_multimodal_metadata()
         super().__init__(
@@ -72,6 +87,7 @@ class OpenAICompatModel(BaseHelpModel):
         multimodal_spec = self._build_multimodal_spec(request)
         self._runtime_metadata.update(
             {
+                "multimodal_capability_enabled": self.enable_multimodal,
                 "multimodal_input_present": bool(multimodal_spec["candidate_frames"]),
                 "multimodal_candidate_frame_ids": list(multimodal_spec["candidate_frame_ids"]),
                 "multimodal_primary_frame_id": multimodal_spec["primary_frame_id"],
@@ -84,7 +100,7 @@ class OpenAICompatModel(BaseHelpModel):
                 "multimodal_failure_reason": multimodal_spec["failure_reason"],
             }
         )
-        if not multimodal_spec["image_contents"]:
+        if not self.enable_multimodal or not multimodal_spec["image_contents"]:
             return messages, prompt_meta
 
         rewritten: list[dict[str, Any]] = []
@@ -127,7 +143,9 @@ class OpenAICompatModel(BaseHelpModel):
                 self._runtime_metadata["multimodal_path_success"] = False
                 self._runtime_metadata["multimodal_fallback_to_text"] = True
                 self._runtime_metadata["multimodal_failure_reason"] = str(exc)
-                return self._chat_once(self._strip_images_from_messages(messages), headers=headers, has_vision=False)
+                stripped_messages = self._strip_images_from_messages(messages)
+                messages[:] = [dict(item) for item in stripped_messages]
+                return self._chat_once(stripped_messages, headers=headers, has_vision=False)
             except Exception as exc:
                 self._runtime_metadata["multimodal_path_success"] = False
                 self._runtime_metadata["multimodal_fallback_to_text"] = False
@@ -210,7 +228,7 @@ class OpenAICompatModel(BaseHelpModel):
     ) -> dict[str, object]:
         payload = {
             "model": self.model_name,
-            "messages": messages,
+            "messages": copy.deepcopy(messages),
             **self._build_generation_payload(
                 include_request_overrides=include_request_overrides,
                 has_vision=has_vision,
@@ -279,6 +297,16 @@ class OpenAICompatModel(BaseHelpModel):
         image_contents: list[dict[str, Any]] = []
         frame_ids: list[str] = []
         failure_reason: str | None = None
+        if not self.enable_multimodal:
+            return {
+                "candidate_frames": candidate_frames,
+                "candidate_frame_ids": candidate_frame_ids,
+                "image_contents": [],
+                "frame_ids": [],
+                "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
+                "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
+                "failure_reason": None,
+            }
         for frame in candidate_frames:
             frame_id = frame.get("frame_id")
             if not isinstance(frame_id, str) or not frame_id:
@@ -374,14 +402,36 @@ class OpenAICompatModel(BaseHelpModel):
         image_url = raw_url.strip()
         if image_url.startswith("data:") or image_url.startswith("http://") or image_url.startswith("https://"):
             return image_url
-        path = Path(image_url).expanduser()
+        parsed_scheme = image_url.split(":", 1)[0].lower() if ":" in image_url else ""
+        if parsed_scheme and parsed_scheme not in {"http", "https", "data"} and not self._looks_like_windows_path(image_url):
+            raise ValueError(f"unsupported vision frame URI scheme: {parsed_scheme}")
+        path = Path(image_url).expanduser().resolve()
+        if not self._is_allowed_local_image_path(path):
+            raise ValueError(f"vision frame path is outside allowed roots: {path}")
         if not path.is_file():
             raise FileNotFoundError(f"vision frame image not found: {path}")
+        file_size = path.stat().st_size
+        if file_size > self.max_local_image_bytes:
+            raise ValueError(
+                f"vision frame image exceeds max size {self.max_local_image_bytes} bytes: {path}"
+            )
         mime_type = frame.get("mime_type")
         if not isinstance(mime_type, str) or not mime_type:
             mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
         encoded = base64.b64encode(path.read_bytes()).decode("ascii")
         return f"data:{mime_type};base64,{encoded}"
+
+    def _is_allowed_local_image_path(self, path: Path) -> bool:
+        if not self.allowed_local_image_roots:
+            return False
+        for root in self.allowed_local_image_roots:
+            if path == root or root in path.parents:
+                return True
+        return False
+
+    @staticmethod
+    def _looks_like_windows_path(value: str) -> bool:
+        return len(value) >= 3 and value[1] == ":" and value[2] in ("\\", "/")
 
     @staticmethod
     def _coerce_frame_mapping(frame: Any) -> dict[str, Any] | None:
@@ -424,6 +474,7 @@ class OpenAICompatModel(BaseHelpModel):
     @staticmethod
     def _empty_multimodal_metadata() -> dict[str, Any]:
         return {
+            "multimodal_capability_enabled": False,
             "multimodal_input_present": False,
             "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,
