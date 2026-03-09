@@ -4,7 +4,7 @@ import builtins
 import json
 import socket
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 import time
 from uuid import UUID
@@ -2554,7 +2554,8 @@ def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Pa
 
 
 def test_path_like_to_uri_normalizes_windows_drive_paths() -> None:
-    assert _path_like_to_uri(r"C:\SimTutor\frames\1772872444950_000122.png") == "file:///C:/SimTutor/frames/1772872444950_000122.png"
+    raw_path = r"C:\SimTutor\frames\1772872444950_000122.png"
+    assert _path_like_to_uri(raw_path) == PureWindowsPath(raw_path).as_uri()
 
 
 def test_emit_vision_observation_event_replaces_invalid_observation_ref_with_uuid(tmp_path: Path) -> None:
