@@ -558,6 +558,35 @@ def test_openai_compat_keeps_multimodal_input_present_when_image_build_fails() -
     assert "image_uri/source_image_path" in res.metadata["multimodal_failure_reason"]
 
 
+def test_openai_compat_falls_back_to_trigger_frame_when_resolved_frame_lacks_image_path(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    pre_trigger_image = tmp_path / "pre_trigger_frame.png"
+    pre_trigger_image.write_bytes(b"pre-trigger-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        lang="en",
+        enable_multimodal=True,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image, pre_trigger_image=pre_trigger_image)
+    request.context["vision"]["pre_trigger_frame"].pop("image_uri")
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert res.metadata["multimodal_primary_frame_id"] == "1772872445010_000123"
+    assert res.metadata["multimodal_frame_ids"] == ["1772872445010_000123"]
+    content = fake.calls[0]["json"]["messages"][1]["content"]
+    assert isinstance(content, list)
+    assert [item["type"] for item in content] == ["image_url", "text"]
+    assert "Primary visual frame: 1772872445010_000123" in content[1]["text"]
+
+
 def test_openai_compat_keeps_text_only_when_multimodal_capability_is_disabled(tmp_path: Path) -> None:
     primary_image = tmp_path / "trigger_frame.png"
     primary_image.write_bytes(b"primary-frame")
@@ -640,6 +669,8 @@ def test_openai_compat_rejects_local_image_path_outside_allowed_roots(tmp_path: 
     assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
     assert res.metadata["multimodal_images_built"] is False
     assert "outside allowed roots" in res.metadata["multimodal_failure_reason"]
+    assert str(outside_image) not in res.metadata["multimodal_failure_reason"]
+    assert "1772872445010_000123" in res.metadata["multimodal_failure_reason"]
 
 
 def test_openai_compat_rejects_local_image_path_exceeding_size_limit(tmp_path: Path) -> None:
@@ -664,6 +695,8 @@ def test_openai_compat_rejects_local_image_path_exceeding_size_limit(tmp_path: P
     assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
     assert res.metadata["multimodal_images_built"] is False
     assert "exceeds max size" in res.metadata["multimodal_failure_reason"]
+    assert str(primary_image) not in res.metadata["multimodal_failure_reason"]
+    assert "1772872445010_000123" in res.metadata["multimodal_failure_reason"]
 
 
 def test_openai_compat_text_only_path_is_unchanged_without_vision_context() -> None:

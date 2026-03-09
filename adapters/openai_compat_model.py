@@ -5,7 +5,6 @@ OpenAI-compatible ModelPort adapter (vLLM/llama.cpp/TGI compatible).
 from __future__ import annotations
 
 import base64
-import copy
 import mimetypes
 from pathlib import Path
 import re
@@ -228,7 +227,7 @@ class OpenAICompatModel(BaseHelpModel):
     ) -> dict[str, object]:
         payload = {
             "model": self.model_name,
-            "messages": copy.deepcopy(messages),
+            "messages": self._copy_messages_for_payload(messages),
             **self._build_generation_payload(
                 include_request_overrides=include_request_overrides,
                 has_vision=has_vision,
@@ -335,13 +334,25 @@ class OpenAICompatModel(BaseHelpModel):
         trigger_frame = self._coerce_frame_mapping(vision.get("trigger_frame"))
         pre_trigger_frame = self._coerce_frame_mapping(vision.get("pre_trigger_frame"))
         selected_frames = vision.get("selected_frames")
-        primary_frame = self._raw_frame_payload_by_id(selected_frames, vision.get("frame_id"))
+        usable_trigger_frame = self._normalize_frame_payload(trigger_frame)
+        usable_pre_trigger_frame = self._normalize_frame_payload(pre_trigger_frame)
+        primary_frame = self._frame_payload_by_id(selected_frames, vision.get("frame_id"))
+        if primary_frame is None:
+            primary_frame = usable_trigger_frame
+        if primary_frame is None:
+            primary_frame = usable_pre_trigger_frame
+        if primary_frame is None:
+            primary_frame = self._raw_frame_payload_by_id(selected_frames, vision.get("frame_id"))
         if primary_frame is None:
             primary_frame = trigger_frame
         if primary_frame is None:
             primary_frame = pre_trigger_frame
+        primary_frame_usable = self._normalize_frame_payload(primary_frame) is not None
         secondary_frame = None
-        for frame in (trigger_frame, pre_trigger_frame):
+        secondary_candidates: list[dict[str, Any] | None] = [usable_trigger_frame, usable_pre_trigger_frame]
+        if not primary_frame_usable:
+            secondary_candidates.extend([trigger_frame, pre_trigger_frame])
+        for frame in secondary_candidates:
             if frame is None:
                 continue
             if primary_frame is not None and frame.get("frame_id") == primary_frame.get("frame_id"):
@@ -408,6 +419,19 @@ class OpenAICompatModel(BaseHelpModel):
             )
         return stripped
 
+    def _copy_messages_for_payload(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        copied: list[dict[str, Any]] = []
+        for message in messages:
+            cloned = dict(message)
+            content = cloned.get("content")
+            if isinstance(content, list):
+                cloned["content"] = [
+                    dict(item) if isinstance(item, Mapping) else item
+                    for item in content
+                ]
+            copied.append(cloned)
+        return copied
+
     def _frame_to_data_url(self, frame: Mapping[str, Any]) -> str:
         raw_url = frame.get("image_uri") or frame.get("source_image_path")
         if not isinstance(raw_url, str) or not raw_url.strip():
@@ -419,20 +443,30 @@ class OpenAICompatModel(BaseHelpModel):
         if parsed_scheme and parsed_scheme not in {"http", "https", "data"} and not self._looks_like_windows_path(image_url):
             raise ValueError(f"unsupported vision frame URI scheme: {parsed_scheme}")
         path = Path(image_url).expanduser().resolve()
+        label = self._frame_label(frame, path=path)
         if not self._is_allowed_local_image_path(path):
-            raise ValueError(f"vision frame path is outside allowed roots: {path}")
+            raise ValueError(f"vision frame path is outside allowed roots: {label}")
         if not path.is_file():
-            raise FileNotFoundError(f"vision frame image not found: {path}")
+            raise FileNotFoundError(f"vision frame image not found: {label}")
         file_size = path.stat().st_size
         if file_size > self.max_local_image_bytes:
             raise ValueError(
-                f"vision frame image exceeds max size {self.max_local_image_bytes} bytes: {path}"
+                f"vision frame image exceeds max size {self.max_local_image_bytes} bytes: {label}"
             )
         mime_type = frame.get("mime_type")
         if not isinstance(mime_type, str) or not mime_type:
             mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
         encoded = base64.b64encode(path.read_bytes()).decode("ascii")
         return f"data:{mime_type};base64,{encoded}"
+
+    @staticmethod
+    def _frame_label(frame: Mapping[str, Any], *, path: Path | None = None) -> str:
+        frame_id = frame.get("frame_id")
+        if isinstance(frame_id, str) and frame_id:
+            return frame_id
+        if path is not None:
+            return path.name or "<frame>"
+        return "<frame>"
 
     def _is_allowed_local_image_path(self, path: Path) -> bool:
         if not self.allowed_local_image_roots:
