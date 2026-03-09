@@ -53,6 +53,23 @@ def test_select_help_cycle_frames_marks_partial_when_trigger_frame_missing() -> 
     assert selection.frame_ids == ["1772872444950_000122"]
 
 
+def test_select_help_cycle_frames_treats_exact_match_as_trigger_frame() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("1772872445000_000123", 1772872445000),
+        ],
+        trigger_wall_ms=1772872445000,
+        sync_window_ms=250,
+    )
+
+    assert selection.status == "partial"
+    assert selection.pre_trigger_frame is None
+    assert selection.trigger_frame is not None
+    assert selection.trigger_frame["frame_id"] == "1772872445000_000123"
+    assert selection.trigger_frame["sync_delta_ms"] == 0
+    assert selection.sync_miss_reason == "missing_pre_trigger_frame"
+
+
 def test_select_help_cycle_frames_marks_vision_unavailable_when_out_of_window() -> None:
     selection = select_help_cycle_frames(
         [
@@ -107,3 +124,36 @@ def test_buffered_vision_session_waits_for_trigger_frame_in_live_mode(monkeypatc
     assert selection.frame_ids == ["1772872444950_000122", "1772872445010_000123"]
     assert sleeps
 
+
+def test_buffered_vision_session_prunes_history_outside_retention_window() -> None:
+    class StaticVisionPort:
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-live"
+
+        def poll(self) -> list[VisionObservation]:
+            return [
+                _vision_obs("1772872444000_000100", 1772872444000),
+                _vision_obs("1772872444950_000122", 1772872444950),
+                _vision_obs("1772872445010_000123", 1772872445010),
+            ]
+
+        def stop(self) -> None:
+            return
+
+    session = BufferedVisionSession(
+        vision_port=StaticVisionPort(),
+        session_id="sess-live",
+        sync_window_ms=250,
+        trigger_wait_ms=50,
+        retention_ms=400,
+        live_mode=True,
+    )
+    try:
+        session.poll()
+    finally:
+        session.close()
+
+    assert [item.frame_id for item in session._history] == [
+        "1772872444950_000122",
+        "1772872445010_000123",
+    ]

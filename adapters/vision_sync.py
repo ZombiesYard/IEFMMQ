@@ -4,6 +4,7 @@ Shared buffering and help-cycle frame selection for live/replay vision sidecars.
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import datetime
 import time
@@ -107,7 +108,7 @@ def select_help_cycle_frames(
     trigger_observation: VisionObservation | None = None
     for capture_wall_ms, _frame_id, observation in normalized:
         delta_ms = capture_wall_ms - trigger_wall_ms
-        if delta_ms <= 0 and abs(delta_ms) <= window_ms:
+        if delta_ms < 0 and abs(delta_ms) <= window_ms:
             pre_observation = observation
             continue
         if delta_ms >= 0 and delta_ms <= window_ms and trigger_observation is None:
@@ -175,6 +176,7 @@ class BufferedVisionSession:
         session_id: str,
         sync_window_ms: int,
         trigger_wait_ms: int = 0,
+        retention_ms: int | None = None,
         live_mode: bool,
     ) -> None:
         if not session_id or not isinstance(session_id, str):
@@ -183,10 +185,52 @@ class BufferedVisionSession:
         self.session_id = session_id
         self.sync_window_ms = max(0, int(sync_window_ms))
         self.trigger_wait_ms = max(0, int(trigger_wait_ms))
+        self.retention_ms = (
+            max(0, int(retention_ms))
+            if isinstance(retention_ms, int)
+            else max(2000, self.sync_window_ms * 4 + self.trigger_wait_ms)
+        )
         self.live_mode = bool(live_mode)
         self._history: list[VisionObservation] = []
         self._frame_ids: set[str] = set()
         self.vision_port.start(session_id)
+
+    @staticmethod
+    def _history_key(observation: VisionObservation) -> tuple[int, str]:
+        return ((_capture_wall_ms(observation) or -1), observation.frame_id)
+
+    def _insert_observation(self, observation: VisionObservation) -> None:
+        key = self._history_key(observation)
+        if not self._history:
+            self._history.append(observation)
+            return
+        if key >= self._history_key(self._history[-1]):
+            self._history.append(observation)
+            return
+        keys = [self._history_key(item) for item in self._history]
+        insert_at = bisect_left(keys, key)
+        self._history.insert(insert_at, observation)
+
+    def _prune_history(self) -> None:
+        if not self._history or self.retention_ms <= 0:
+            return
+        latest_capture_wall_ms = _capture_wall_ms(self._history[-1])
+        if latest_capture_wall_ms is None:
+            return
+        cutoff_wall_ms = latest_capture_wall_ms - self.retention_ms
+        prune_count = 0
+        for observation in self._history:
+            capture_wall_ms = _capture_wall_ms(observation)
+            if capture_wall_ms is None or capture_wall_ms < cutoff_wall_ms:
+                prune_count += 1
+                continue
+            break
+        if prune_count <= 0:
+            return
+        removed = self._history[:prune_count]
+        self._history = self._history[prune_count:]
+        for observation in removed:
+            self._frame_ids.discard(observation.frame_id)
 
     def poll(self) -> list[VisionObservation]:
         observations = self.vision_port.poll()
@@ -195,9 +239,9 @@ class BufferedVisionSession:
             if observation.frame_id in self._frame_ids:
                 continue
             self._frame_ids.add(observation.frame_id)
-            self._history.append(observation)
+            self._insert_observation(observation)
             added.append(observation)
-        self._history.sort(key=lambda item: ((_capture_wall_ms(item) or -1), item.frame_id))
+        self._prune_history()
         return added
 
     def select_for_help(self, *, trigger_wall_s: float) -> HelpCycleVisionSelection:
