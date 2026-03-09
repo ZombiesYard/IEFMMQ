@@ -561,8 +561,8 @@ Relevant DCS-side scripts live under:
 
 1. Install the hook files with `python -m tools.install_dcs_hook`.
 2. If you are testing the viewport PoC, install the monitor setup with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor> --main-width <screen_width> --main-height <screen_height>`.
-3. For `extended-right`, ensure a right-side extended desktop region exists with at least `2560x1440` pixels.
-4. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution.
+3. The frozen v0.4 visual contract only uses the native `LEFT_MFCD`, `CENTER_MFCD`(`AMPCD`), and `RIGHT_MFCD` exports; all other evidence should come from DCS-BIOS.
+4. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution. On `3440x1440` ultrawide, `ultrawide-left-stack` is the reference layout.
 5. Ensure DCS or DCS.openbeta loads the copied Lua files.
 6. Start `python live_dcs.py`.
 7. Trigger help with Enter on stdin or send `help` to the configured UDP help port.

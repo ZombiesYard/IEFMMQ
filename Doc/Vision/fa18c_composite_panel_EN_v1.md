@@ -1,110 +1,99 @@
-# F/A-18C Composite Panel Layout v1
+# F/A-18C Native Viewport Layout v1
 
 `layout_id`: `fa18c_composite_panel_v1`
 
-This document freezes the first v0.4 visual input layout. The goal is to help Qwen3.5 recognize display pages, text, and annunciator states more reliably, not to recreate a photoreal cockpit screenshot.
+This document freezes the current v0.4 visual-input contract: only the three DCS-native display exports remain in scope. `warning_panel`, `ufc`, `ifei`, and `standby_hud` are no longer part of the visual contract.
 
 ## Fixed Coverage
 
 - `left_ddi`
 - `ampcd`
 - `right_ddi`
-- `warning_panel`
-- `ufc`
-- `ifei`
-- `standby_hud`
 
-## Explicitly Excluded
+## Explicitly Removed From Visual Input
 
-- Outside scenery
-- Large cockpit background areas
-- Unrelated consoles
-- Extra cropped regions that are not required by the current pack
+- `MASTER CAUTION` and the left/right warning-caution-advisory blocks
+- All `IFEI` numeric content and BINGO readouts
+- UFC scratchpad, option windows, and COMM1/COMM2 displays
+- Standby instruments and any HUD crop
+- Outside scenery, the main camera view, large cockpit background areas, and unrelated consoles
+
+These signals should now come from DCS-BIOS instead of image recognition.
 
 ## Region Naming Rules
 
-- All future VLM prompts, manifests, documents, and debug output may only use these 7 `region_id` values
+- All future VLM prompts, manifests, documents, and debug output may only use these 3 `region_id` values
 - Alias drift is forbidden; for example, do not rename `ampcd` to `mpcd`
-- The region order is fixed: `left_ddi -> ampcd -> right_ddi -> warning_panel -> ufc -> ifei -> standby_hud`
+- The region order is fixed: `left_ddi -> ampcd -> right_ddi`
 
 ## Region Definitions
 
-| region_id | English Name | Position and Size (x,y,w,h) | Primary Content |
-| --- | --- | --- | --- |
-| `left_ddi` | Left DDI | `32,32,768,768` | Left DDI pages such as FCS/HSI/ENG |
-| `ampcd` | AMPCD | `896,32,768,768` | Central AMPCD page text and symbols |
-| `right_ddi` | Right DDI | `1760,32,768,768` | Right DDI pages such as BIT/FCS |
-| `warning_panel` | Warning Panel | `32,832,848,248` | `MASTER CAUTION`, caution/warning/advisory lamps, and fire-related indicators |
-| `ufc` | UFC | `912,832,736,248` | UFC display and COMM-related readouts |
-| `ifei` | IFEI | `1680,832,848,248` | Engine/fuel display and BINGO-related readouts |
-| `standby_hud` | Standby / HUD | `912,1112,736,296` | Standby instruments and any small HUD crop required by the pack |
+The canonical canvas is fixed to `880x1440`, matching the cropped left export strip used in the current ultrawide deployment.
+
+| region_id | English Name | Position and Size (x,y,w,h) | Native DCS viewport | Primary Content |
+| --- | --- | --- | --- | --- |
+| `left_ddi` | Left DDI | `216,24,448,448` | `LEFT_MFCD` | Left DDI pages such as FCS/HSI |
+| `ampcd` | AMPCD | `216,496,448,448` | `CENTER_MFCD` | Center AMPCD page text and symbology |
+| `right_ddi` | Right DDI | `216,968,448,448` | `RIGHT_MFCD` | Right DDI pages such as BIT/FCS |
 
 ## Step Priority Boundary
 
-Prefer the composite panel first:
+Prefer native viewports first:
 
-- `S02`
-- `S07`
 - `S08`
-- `S09`
 - `S15`
 - `S18`
-- `S21`
-- `S22`
-- `S23`
-- `S24`
-- `S25`
 
 Still prefer DCS-BIOS first:
 
 - `S01`
 - `S03`
 - `S04`
+- `S05`
 - `S06`
+- `S07`
+- `S09`
 - `S10`
+- `S11`
 - `S12`
 - `S13`
+- `S21`
 
-Currently outside the first composite-panel priority scope, requiring manual confirmation or remaining out of layout:
+Currently outside the first native-viewport scope, requiring manual confirmation or remaining out of layout:
 
-- `S05`
-- `S11`
+- `S02`
 - `S14`
 - `S16`
 - `S17`
 - `S19`
 - `S20`
+- `S22`
+- `S23`
+- `S24`
+- `S25`
 
 ## Sample Asset
 
 - Asset path: `Doc/Vision/assets/fa18c_composite_panel_v1.svg`
-- The sample image is generated from the frozen layout and is only used to validate region naming, crop stability, and human readability
+- The sample image only validates the three `region_id` values, their order, and border treatment; it does not represent the main game camera layout
 
-## Three-Screen Native Viewport PoC
+## Current Deployment Layout
 
-- The first PoC only validates `left_ddi`, `ampcd`, and `right_ddi`
-- These three regions are exported through DCS native monitor viewports: `LEFT_MFCD`, `CENTER_MFCD`, and `RIGHT_MFCD`
-- The composite export canvas is fixed at `2560x1440` and must live on a desktop region extended to the right of the main screen
-- Install command:
+The frozen deployment layout is the current `3440x1440` ultrawide single-monitor setup:
 
-```bash
-python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode extended-right --main-width 1920 --main-height 1080
-```
+- DCS monitor setup uses `ultrawide-left-stack`
+- The left `880px` strip stacks the three native display exports vertically
+- The right side keeps a full `2560x1440` `16:9` playable main view
+- The VLM side must only consume the left `880x1440` export strip and must not ingest the right-side main camera
 
-- After installation, select `SimTutor_FA18C_CompositePanel_v1` in DCS Options
-- The recommended total DCS resolution is `main_width + 2560` by `max(main_height, 1440)`
-- This PoC does not yet export `warning_panel`, `ufc`, `ifei`, or `standby_hud` as native viewports
-- If you only have one screen, use single-monitor mode instead:
-
-```bash
-python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode single-monitor --main-width 1920 --main-height 1080
-```
-
-- Single-monitor mode places the three MFCD/AMPCD exports on the top band and keeps the main camera on the lower band
-- For `3440x1440` and similar 21:9 screens, the ultrawide mode is usually better:
+Install command:
 
 ```bash
 python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode ultrawide-left-stack --main-width 3440 --main-height 1440
 ```
 
-- This mode stacks the three exported screens vertically in the extra left strip and keeps a full `2560x1440` `16:9` main view on the right
+After installation:
+
+- Select `SimTutor_FA18C_CompositePanel_v1` in DCS Options
+- Set the resolution to `3440x1440`
+- `single-monitor` and `extended-right` remain available for debugging, but they are no longer the frozen visual contract

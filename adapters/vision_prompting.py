@@ -1,6 +1,6 @@
 """
-Utilities for frozen composite-panel layout loading, scaling, prompt snippets,
-and SVG sample generation.
+Utilities for the frozen native-viewport layout, scaling, prompt snippets, and
+SVG sample generation.
 """
 
 from __future__ import annotations
@@ -15,10 +15,6 @@ VISION_REGION_ORDER: tuple[str, ...] = (
     "left_ddi",
     "ampcd",
     "right_ddi",
-    "warning_panel",
-    "ufc",
-    "ifei",
-    "standby_hud",
 )
 DEFAULT_LAYOUT_ID = "fa18c_composite_panel_v1"
 
@@ -26,19 +22,11 @@ _REGION_FILL_BY_ID: dict[str, str] = {
     "left_ddi": "#18272d",
     "ampcd": "#1b3138",
     "right_ddi": "#18272d",
-    "warning_panel": "#3d251e",
-    "ufc": "#2c2f34",
-    "ifei": "#202b24",
-    "standby_hud": "#203037",
 }
 _REGION_ACCENT_BY_ID: dict[str, str] = {
     "left_ddi": "#74d1ff",
     "ampcd": "#6ee7c8",
     "right_ddi": "#74d1ff",
-    "warning_panel": "#ff8b6b",
-    "ufc": "#f6d365",
-    "ifei": "#b7f171",
-    "standby_hud": "#b9c7ff",
 }
 
 
@@ -236,12 +224,12 @@ def build_vlm_region_prompt(layout: Mapping[str, Any] | None = None, *, lang: st
         segments.append(f"{region_id}={label}")
     if lang == "zh":
         return (
-            "固定组合图区域命名（按顺序引用，禁止使用任何显示器别名）："
+            "固定原生视口区域命名（按顺序引用，禁止使用任何显示器别名）："
             + "; ".join(segments)
             + "。引用时必须使用 region_id。"
         )
     return (
-        "Frozen composite-panel region names (reference in order; do not use any display aliases): "
+        "Frozen native-viewport region names (reference in order; do not use any display aliases): "
         + "; ".join(segments)
         + ". Always cite the region_id verbatim."
     )
@@ -254,7 +242,7 @@ def render_layout_svg(layout: Mapping[str, Any] | None = None) -> str:
     height = canvas["height"]
     background = current_layout["background"]
     lines = [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440" role="img" aria-labelledby="title desc">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">',
         f"  <title id=\"title\">{current_layout['title']}</title>",
         f"  <desc id=\"desc\">{background['description']}</desc>",
         f"  <rect width=\"{width}\" height=\"{height}\" fill=\"{background['fill']}\" />",

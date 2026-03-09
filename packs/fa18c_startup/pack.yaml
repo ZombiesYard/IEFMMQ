@@ -8,40 +8,40 @@ metadata:
   step_registry_path: step_registry.yaml
   vision_layout_id: fa18c_composite_panel_v1
   vision_priority_steps:
-    - S02
-    - S07
     - S08
-    - S09
     - S15
     - S18
-    - S21
-    - S22
-    - S23
-    - S24
-    - S25
   bios_priority_steps:
     - S01
     - S03
     - S04
+    - S05
     - S06
+    - S07
+    - S09
     - S10
+    - S11
     - S12
     - S13
+    - S21
   manual_or_out_of_layout_steps:
-    - S05
-    - S11
+    - S02
     - S14
     - S16
     - S17
     - S19
     - S20
+    - S22
+    - S23
+    - S24
+    - S25
   source_documents:
     - Doc/Evaluation/fa18c_startup_master.md
     - Doc/Evaluation/Appendix - Training Task Syllabus.md
   notes: >
     Full cold-start procedure coverage for steps S01-S25 (phases P1-P6).
-    Pack-level gate maps prioritize observable signals and keep unknown steps
-    extensible for future VLM-assisted confirmation.
+    The frozen v0.4 visual contract only uses native left/right DDI plus AMPCD
+    exports; UFC, IFEI, and warning/advisory evidence should come from DCS-BIOS.
 
 prerequisites:
   - "Aircraft cold and dark at ramp or carrier; parking brake set."

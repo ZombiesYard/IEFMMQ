@@ -1,49 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1440" viewBox="0 0 2560 1440" role="img" aria-labelledby="title desc">
-  <title id="title">F/A-18C Composite Panel Layout v1</title>
-  <desc id="desc">Dark neutral matte background with no cockpit scenery or decorative texture.</desc>
-  <rect width="2560" height="1440" fill="#101416" />
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1440" viewBox="0 0 880 1440" role="img" aria-labelledby="title desc">
+  <title id="title">F/A-18C Native Viewport Layout v1</title>
+  <desc id="desc">Dark neutral matte background for the three stacked native display exports, with no main camera view.</desc>
+  <rect width="880" height="1440" fill="#101416" />
   <g font-family="DejaVu Sans Mono, monospace">
     <g id="left_ddi">
-      <rect x="32" y="32" width="768" height="768" rx="26" ry="26" fill="#18272d" stroke="#74d1ff" stroke-width="6" />
-      <text x="60" y="94" fill="#f4f7fb" font-size="40" font-weight="700">Left DDI</text>
-      <text x="60" y="144" fill="#74d1ff" font-size="28">left_ddi · 左 DDI</text>
-      <text x="60" y="756" fill="#d0dae4" font-size="24">OCR priority: high</text>
+      <rect x="216" y="24" width="448" height="448" rx="26" ry="26" fill="#18272d" stroke="#74d1ff" stroke-width="6" />
+      <text x="244" y="86" fill="#f4f7fb" font-size="40" font-weight="700">Left DDI</text>
+      <text x="244" y="136" fill="#74d1ff" font-size="28">left_ddi · 左 DDI</text>
+      <text x="244" y="428" fill="#d0dae4" font-size="24">OCR priority: high</text>
     </g>
     <g id="ampcd">
-      <rect x="896" y="32" width="768" height="768" rx="26" ry="26" fill="#1b3138" stroke="#6ee7c8" stroke-width="6" />
-      <text x="924" y="94" fill="#f4f7fb" font-size="40" font-weight="700">AMPCD</text>
-      <text x="924" y="144" fill="#6ee7c8" font-size="28">ampcd · AMPCD</text>
-      <text x="924" y="756" fill="#d0dae4" font-size="24">OCR priority: high</text>
+      <rect x="216" y="496" width="448" height="448" rx="26" ry="26" fill="#1b3138" stroke="#6ee7c8" stroke-width="6" />
+      <text x="244" y="558" fill="#f4f7fb" font-size="40" font-weight="700">AMPCD</text>
+      <text x="244" y="608" fill="#6ee7c8" font-size="28">ampcd · AMPCD</text>
+      <text x="244" y="900" fill="#d0dae4" font-size="24">OCR priority: high</text>
     </g>
     <g id="right_ddi">
-      <rect x="1760" y="32" width="768" height="768" rx="26" ry="26" fill="#18272d" stroke="#74d1ff" stroke-width="6" />
-      <text x="1788" y="94" fill="#f4f7fb" font-size="40" font-weight="700">Right DDI</text>
-      <text x="1788" y="144" fill="#74d1ff" font-size="28">right_ddi · 右 DDI</text>
-      <text x="1788" y="756" fill="#d0dae4" font-size="24">OCR priority: high</text>
-    </g>
-    <g id="warning_panel">
-      <rect x="32" y="832" width="848" height="248" rx="26" ry="26" fill="#3d251e" stroke="#ff8b6b" stroke-width="6" />
-      <text x="60" y="894" fill="#f4f7fb" font-size="40" font-weight="700">Warning Panel</text>
-      <text x="60" y="944" fill="#ff8b6b" font-size="28">warning_panel · 告警灯区</text>
-      <text x="60" y="1036" fill="#d0dae4" font-size="24">OCR priority: high</text>
-    </g>
-    <g id="ufc">
-      <rect x="912" y="832" width="736" height="248" rx="26" ry="26" fill="#2c2f34" stroke="#f6d365" stroke-width="6" />
-      <text x="940" y="894" fill="#f4f7fb" font-size="40" font-weight="700">UFC</text>
-      <text x="940" y="944" fill="#f6d365" font-size="28">ufc · UFC</text>
-      <text x="940" y="1036" fill="#d0dae4" font-size="24">OCR priority: high</text>
-    </g>
-    <g id="ifei">
-      <rect x="1680" y="832" width="848" height="248" rx="26" ry="26" fill="#202b24" stroke="#b7f171" stroke-width="6" />
-      <text x="1708" y="894" fill="#f4f7fb" font-size="40" font-weight="700">IFEI</text>
-      <text x="1708" y="944" fill="#b7f171" font-size="28">ifei · IFEI</text>
-      <text x="1708" y="1036" fill="#d0dae4" font-size="24">OCR priority: high</text>
-    </g>
-    <g id="standby_hud">
-      <rect x="912" y="1112" width="736" height="296" rx="26" ry="26" fill="#203037" stroke="#b9c7ff" stroke-width="6" />
-      <text x="940" y="1174" fill="#f4f7fb" font-size="40" font-weight="700">Standby / HUD</text>
-      <text x="940" y="1224" fill="#b9c7ff" font-size="28">standby_hud · 备用仪表/HUD</text>
-      <text x="940" y="1364" fill="#d0dae4" font-size="24">OCR priority: medium</text>
+      <rect x="216" y="968" width="448" height="448" rx="26" ry="26" fill="#18272d" stroke="#74d1ff" stroke-width="6" />
+      <text x="244" y="1030" fill="#f4f7fb" font-size="40" font-weight="700">Right DDI</text>
+      <text x="244" y="1080" fill="#74d1ff" font-size="28">right_ddi · 右 DDI</text>
+      <text x="244" y="1372" fill="#d0dae4" font-size="24">OCR priority: high</text>
     </g>
   </g>
 </svg>

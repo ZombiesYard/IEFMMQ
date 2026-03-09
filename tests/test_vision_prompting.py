@@ -30,8 +30,16 @@ def test_load_vision_layout_returns_frozen_contract() -> None:
     layout = load_vision_layout()
 
     assert layout["layout_id"] == DEFAULT_LAYOUT_ID
-    assert layout["canvas"] == {"width": 2560, "height": 1440}
+    assert layout["canvas"] == {"width": 880, "height": 1440}
     assert [region["region_id"] for region in layout["regions"]] == list(VISION_REGION_ORDER)
+    assert [
+        (region["x"], region["y"], region["width"], region["height"])
+        for region in layout["regions"]
+    ] == [
+        (216, 24, 448, 448),
+        (216, 496, 448, 448),
+        (216, 968, 448, 448),
+    ]
 
 
 def test_layout_regions_fit_canvas_and_do_not_overlap() -> None:
@@ -104,15 +112,11 @@ def test_svg_asset_matches_rendered_layout() -> None:
 def test_svg_contains_viewbox_and_all_region_labels() -> None:
     svg = _asset_path().read_text(encoding="utf-8")
 
-    assert 'viewBox="0 0 2560 1440"' in svg
+    assert 'viewBox="0 0 880 1440"' in svg
     for expected in (
         "Left DDI",
         "AMPCD",
         "Right DDI",
-        "Warning Panel",
-        "UFC",
-        "IFEI",
-        "Standby / HUD",
     ):
         assert expected in svg
 
@@ -136,7 +140,7 @@ def test_layout_yaml_declares_required_region_fields() -> None:
     data = yaml.safe_load(_layout_path().read_text(encoding="utf-8"))
     regions = data["regions"]
 
-    assert len(regions) == 7
+    assert len(regions) == 3
     for region in regions:
         assert set(region) >= {
             "region_id",
