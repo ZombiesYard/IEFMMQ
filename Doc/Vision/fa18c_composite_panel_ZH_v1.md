@@ -79,3 +79,32 @@
 
 - 资产路径：`Doc/Vision/assets/fa18c_composite_panel_v1.svg`
 - 样例图按冻结版式生成，仅用于验证区域命名、裁切稳定性和人工可读性
+
+## 三屏真视口 PoC（首轮）
+
+- 首轮只验证 `left_ddi`、`ampcd`、`right_ddi`
+- 这三块通过 DCS 原生 `LEFT_MFCD`、`CENTER_MFCD`、`RIGHT_MFCD` monitor viewport 导出
+- 组合画布固定放在主屏右侧扩展桌面，尺寸固定为 `2560x1440`
+- 生成安装命令：
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode extended-right --main-width 1920 --main-height 1080
+```
+
+- 安装后需要在 DCS Options 中选择 `SimTutor_FA18C_CompositePanel_v1`
+- 推荐总分辨率为 `main_width + 2560` 乘以 `max(main_height, 1440)`
+- 本轮不包含 `warning_panel`、`ufc`、`ifei`、`standby_hud` 的真视口导出
+- 如果只有一块屏幕，可改用单屏模式：
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode single-monitor --main-width 1920 --main-height 1080
+```
+
+- 单屏模式会把三块 MFCD/AMPCD 缩放排在屏幕上半区，主视角放在下半区
+- 如果是 `3440x1440` 这类 21:9 屏幕，更推荐超宽屏模式：
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode ultrawide-left-stack --main-width 3440 --main-height 1440
+```
+
+- 该模式会把三块导出屏竖着排在最左侧多出来的窄条里，右侧保留完整 `2560x1440` 的 `16:9` 主视角

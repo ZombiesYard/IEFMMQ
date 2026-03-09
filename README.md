@@ -86,6 +86,36 @@ Install the DCS hook files into Saved Games:
 python -m tools.install_dcs_hook --dcs-variant DCS
 ```
 
+Install the monitor setup for the F/A-18C three-screen viewport PoC:
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode extended-right \
+  --main-width 1920 \
+  --main-height 1080
+```
+
+Install the single-monitor variant that places left/center/right MFCDs on the top band of one screen:
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode single-monitor \
+  --main-width 1920 \
+  --main-height 1080
+```
+
+Install the ultrawide variant that stacks the three exported screens in the extra left strip and keeps a full 16:9 main view on the right:
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode ultrawide-left-stack \
+  --main-width 3440 \
+  --main-height 1440
+```
+
 ## Repository Layout
 
 - `core/`: pure domain logic, procedure engine, gating, scoring, overlay planning
@@ -530,9 +560,12 @@ Relevant DCS-side scripts live under:
 ### Typical Live Bring-Up
 
 1. Install the hook files with `python -m tools.install_dcs_hook`.
-2. Ensure DCS or DCS.openbeta loads the copied Lua files.
-3. Start `python live_dcs.py`.
-4. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
+2. If you are testing the viewport PoC, install the monitor setup with `python -m tools.install_dcs_monitor_setup --mode <extended-right|single-monitor> --main-width <screen_width> --main-height <screen_height>`.
+3. For `extended-right`, ensure a right-side extended desktop region exists with at least `2560x1440` pixels.
+4. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution.
+5. Ensure DCS or DCS.openbeta loads the copied Lua files.
+6. Start `python live_dcs.py`.
+7. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
 
 ## Output Artifacts
 

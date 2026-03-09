@@ -79,3 +79,32 @@ Currently outside the first composite-panel priority scope, requiring manual con
 
 - Asset path: `Doc/Vision/assets/fa18c_composite_panel_v1.svg`
 - The sample image is generated from the frozen layout and is only used to validate region naming, crop stability, and human readability
+
+## Three-Screen Native Viewport PoC
+
+- The first PoC only validates `left_ddi`, `ampcd`, and `right_ddi`
+- These three regions are exported through DCS native monitor viewports: `LEFT_MFCD`, `CENTER_MFCD`, and `RIGHT_MFCD`
+- The composite export canvas is fixed at `2560x1440` and must live on a desktop region extended to the right of the main screen
+- Install command:
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode extended-right --main-width 1920 --main-height 1080
+```
+
+- After installation, select `SimTutor_FA18C_CompositePanel_v1` in DCS Options
+- The recommended total DCS resolution is `main_width + 2560` by `max(main_height, 1440)`
+- This PoC does not yet export `warning_panel`, `ufc`, `ifei`, or `standby_hud` as native viewports
+- If you only have one screen, use single-monitor mode instead:
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode single-monitor --main-width 1920 --main-height 1080
+```
+
+- Single-monitor mode places the three MFCD/AMPCD exports on the top band and keeps the main camera on the lower band
+- For `3440x1440` and similar 21:9 screens, the ultrawide mode is usually better:
+
+```bash
+python -m tools.install_dcs_monitor_setup --dcs-variant DCS --mode ultrawide-left-stack --main-width 3440 --main-height 1440
+```
+
+- This mode stacks the three exported screens vertically in the extra left strip and keeps a full `2560x1440` `16:9` main view on the right
