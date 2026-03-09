@@ -197,7 +197,8 @@ class BufferedVisionSession:
 
     @staticmethod
     def _history_key(observation: VisionObservation) -> tuple[int, str]:
-        return ((_capture_wall_ms(observation) or -1), observation.frame_id)
+        capture_wall_ms = _capture_wall_ms(observation)
+        return ((capture_wall_ms if capture_wall_ms is not None else -1), observation.frame_id)
 
     def _insert_observation(self, observation: VisionObservation) -> None:
         key = self._history_key(observation)

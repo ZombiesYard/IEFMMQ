@@ -157,3 +157,7 @@ def test_buffered_vision_session_prunes_history_outside_retention_window() -> No
         "1772872444950_000122",
         "1772872445010_000123",
     ]
+
+
+def test_history_key_preserves_zero_capture_wall_ms() -> None:
+    assert BufferedVisionSession._history_key(_vision_obs("0_000000", 0)) == (0, "0_000000")

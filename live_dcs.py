@@ -360,6 +360,18 @@ def _normalize_vision_mode(value: str) -> str:
     return value
 
 
+def _normalize_path_segment(value: Any, *, flag_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{flag_name} must be a non-empty path segment")
+    normalized = value.strip()
+    path = Path(normalized)
+    if path.is_absolute() or len(path.parts) != 1 or path.parts[0] in {"", ".", ".."}:
+        raise ValueError(f"{flag_name} must be a simple path segment without path separators")
+    if "\\" in normalized or "/" in normalized:
+        raise ValueError(f"{flag_name} must be a simple path segment without path separators")
+    return normalized
+
+
 def _normalize_knowledge_snippet(raw: Mapping[str, Any], fallback_idx: int) -> dict[str, Any]:
     snippet_id_raw = raw.get("snippet_id")
     if not isinstance(snippet_id_raw, str) or not snippet_id_raw:
@@ -2140,11 +2152,15 @@ def _build_vision_port_from_args(
         return None, None, None, None
     saved_games_dir = saved_games_dir.strip()
 
-    session_id = getattr(args, "vision_session_id", None) or getattr(args, "session_id", None)
-    if not isinstance(session_id, str) or not session_id.strip():
+    raw_session_id = getattr(args, "vision_session_id", None) or getattr(args, "session_id", None)
+    if not isinstance(raw_session_id, str) or not raw_session_id.strip():
         raise ValueError("--vision-session-id or --session-id is required when vision sidecar is enabled")
+    session_id = _normalize_path_segment(raw_session_id, flag_name="--vision-session-id")
 
-    channel = getattr(args, "vision_channel", DEFAULT_FRAME_CHANNEL)
+    channel = _normalize_path_segment(
+        getattr(args, "vision_channel", DEFAULT_FRAME_CHANNEL),
+        flag_name="--vision-channel",
+    )
     layout_id = getattr(args, "vision_layout_id", DEFAULT_LAYOUT_ID)
     sync_window_ms_raw = getattr(args, "vision_sync_window_ms", 0)
     trigger_wait_ms_raw = getattr(args, "vision_trigger_wait_ms", 0)
@@ -2163,7 +2179,7 @@ def _build_vision_port_from_args(
             channel=channel,
             layout_id=layout_id,
         ),
-        session_id.strip(),
+        session_id,
         sync_window_ms,
         trigger_wait_ms,
     )

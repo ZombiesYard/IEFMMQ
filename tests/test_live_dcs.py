@@ -24,6 +24,7 @@ from live_dcs import (
     StdinHelpTrigger,
     UdpHelpTrigger,
     build_arg_parser,
+    _build_vision_port_from_args,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
     _load_step_signal_profiles,
@@ -2333,6 +2334,38 @@ def test_normalize_cached_response_metadata_normalizes_fallback_reason() -> None
     explicit_reason: dict[str, Any] = {"fallback_overlay_reason": "deterministic_step:S01"}
     _normalize_cached_response_metadata(explicit_reason)
     assert explicit_reason["fallback_overlay_reason"] == "deterministic_step:S01"
+
+
+def test_build_vision_port_from_args_rejects_session_id_with_path_separators() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--vision-saved-games-dir",
+            "/tmp/saved games",
+            "--vision-session-id",
+            "../escape",
+        ]
+    )
+
+    with pytest.raises(ValueError, match="--vision-session-id"):
+        _build_vision_port_from_args(args, mode="live")
+
+
+def test_build_vision_port_from_args_rejects_channel_with_path_separators() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--vision-saved-games-dir",
+            "/tmp/saved games",
+            "--vision-session-id",
+            "sess-live",
+            "--vision-channel",
+            "nested/channel",
+        ]
+    )
+
+    with pytest.raises(ValueError, match="--vision-channel"):
+        _build_vision_port_from_args(args, mode="live")
 
 
 def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_events(tmp_path: Path) -> None:
