@@ -115,6 +115,8 @@ class OpenAICompatModel(BaseHelpModel):
                             user_text,
                             primary_frame_id=multimodal_spec["primary_frame_id"],
                             secondary_frame_id=multimodal_spec["secondary_frame_id"],
+                            primary_frame_role=multimodal_spec["primary_frame_role"],
+                            secondary_frame_role=multimodal_spec["secondary_frame_role"],
                         ),
                     },
                 ]
@@ -304,6 +306,8 @@ class OpenAICompatModel(BaseHelpModel):
                 "frame_ids": [],
                 "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
                 "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
+                "primary_frame_role": self._frame_role(candidate_frames[0]) if candidate_frames else None,
+                "secondary_frame_role": self._frame_role(candidate_frames[1]) if len(candidate_frames) > 1 else None,
                 "failure_reason": None,
             }
         for frame in candidate_frames:
@@ -327,6 +331,8 @@ class OpenAICompatModel(BaseHelpModel):
             "frame_ids": frame_ids,
             "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
             "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
+            "primary_frame_role": self._frame_role(candidate_frames[0]) if candidate_frames else None,
+            "secondary_frame_role": self._frame_role(candidate_frames[1]) if len(candidate_frames) > 1 else None,
             "failure_reason": failure_reason,
         }
 
@@ -373,21 +379,41 @@ class OpenAICompatModel(BaseHelpModel):
         *,
         primary_frame_id: str | None,
         secondary_frame_id: str | None,
+        primary_frame_role: str | None,
+        secondary_frame_role: str | None,
     ) -> str:
         frame_notes: list[str] = []
         if self.lang == "zh":
             primary_label = "主视觉帧"
-            secondary_label = "触发前参考帧"
+            role_labels = {
+                "trigger_frame": "触发帧",
+                "pre_trigger_frame": "触发前帧",
+            }
+            default_secondary_label = "参考帧"
         else:
             primary_label = "Primary visual frame"
-            secondary_label = "Reference pre-trigger frame"
+            role_labels = {
+                "trigger_frame": "Trigger frame",
+                "pre_trigger_frame": "Pre-trigger frame",
+            }
+            default_secondary_label = "Reference frame"
         if isinstance(primary_frame_id, str) and primary_frame_id:
             frame_notes.append(f"{primary_label}: {primary_frame_id}")
         if isinstance(secondary_frame_id, str) and secondary_frame_id:
+            secondary_label = role_labels.get(secondary_frame_role, default_secondary_label)
             frame_notes.append(f"{secondary_label}: {secondary_frame_id}")
         if not frame_notes:
             return prompt_text
         return "\n".join([*frame_notes, "", prompt_text])
+
+    @staticmethod
+    def _frame_role(frame: Mapping[str, Any] | None) -> str | None:
+        if not isinstance(frame, Mapping):
+            return None
+        role = frame.get("role")
+        if isinstance(role, str) and role:
+            return role
+        return None
 
     def _messages_contain_images(self, messages: list[dict[str, Any]]) -> bool:
         for message in messages:

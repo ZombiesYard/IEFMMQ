@@ -437,7 +437,7 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert content[0]["image_url"]["url"].startswith("data:image/png;base64,")
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
     assert "Primary visual frame: 1772872444950_000122" in content[2]["text"]
-    assert "Reference pre-trigger frame: 1772872445010_000123" in content[2]["text"]
+    assert "Trigger frame: 1772872445010_000123" in content[2]["text"]
 
 
 def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -> None:
@@ -463,7 +463,7 @@ def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -
     content = fake.calls[0]["json"]["messages"][1]["content"]
     assert isinstance(content, list)
     assert "主视觉帧: 1772872444950_000122" in content[2]["text"]
-    assert "触发前参考帧: 1772872445010_000123" in content[2]["text"]
+    assert "触发帧: 1772872445010_000123" in content[2]["text"]
     assert "Primary visual frame" not in content[2]["text"]
 
 
