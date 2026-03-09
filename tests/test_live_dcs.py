@@ -2462,6 +2462,12 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     request = model.calls[0]["request"]
     vision = request.context["vision"]
     assert vision["status"] == "available"
+    assert vision["observation_ref"] == request.observation_ref
+    assert vision["observation_t_wall_ms"] == 1772872445000
+    assert vision["frame_id"] == "1772872444950_000122"
+    assert vision["sync_status"] == "matched_past"
+    assert vision["sync_delta_ms"] == -50
+    assert vision["frame_stale"] is True
     assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
     assert vision["pre_trigger_frame"]["frame_id"] == "1772872444950_000122"
     assert vision["trigger_frame"]["frame_id"] == "1772872445010_000123"
@@ -2639,6 +2645,8 @@ def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> N
     request = model.calls[0]["request"]
     vision = request.context["vision"]
     assert vision["status"] == "vision_unavailable"
+    assert vision["frame_id"] is None
     assert vision["vision_used"] is False
     assert vision["frame_ids"] == []
+    assert vision["sync_status"] is None
     assert vision["sync_miss_reason"] == "vision_port_unconfigured"

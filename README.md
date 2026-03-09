@@ -670,6 +670,7 @@ Relevant DCS-side scripts live under:
 10. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
 11. Confirm the Python side emits `VisionObservation` records or logs a safe `vision_unavailable` downgrade instead of breaking the telemetry flow.
    Vision frames are recorded as `observation` events tagged with `metadata.observation_kind=vision`; `payload.attachments` carries the VLM-ready artifact/source image URIs and `event.vision_refs` carries the linked `frame_id`.
+   Each help-cycle `request.context["vision"]` record now carries the audit anchor (`observation_ref` / `observation_seq` / `observation_t_wall_ms`) plus the resolved sync result (`frame_id`, `sync_status`, `sync_delta_ms`, `frame_stale`, `sync_miss_reason`) so replay/live runs can explain exactly which frame was aligned and why.
 
 ## Output Artifacts
 

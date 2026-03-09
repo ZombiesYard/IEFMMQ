@@ -1290,21 +1290,58 @@ class LiveDcsTutorLoop:
         if self._vision_session is not None:
             self._vision_session.poll()
 
-    def _build_vision_selection(self, *, trigger_t_wall: float) -> HelpCycleVisionSelection:
+    def _build_vision_selection(
+        self,
+        *,
+        observation: Observation,
+        trigger_t_wall: float,
+    ) -> HelpCycleVisionSelection:
         trigger_wall_ms = int(round(float(trigger_t_wall) * 1000.0))
+        payload = observation.payload if isinstance(observation.payload, Mapping) else {}
+        observation_seq = _coerce_int(payload.get("seq"))
+        observation_t_wall_s = _coerce_float(payload.get("t_wall"))
+        if observation_t_wall_s is None:
+            observation_t_wall_s = float(trigger_t_wall)
         if self._vision_session is None:
             return HelpCycleVisionSelection(
                 status="vision_unavailable",
+                observation_ref=observation.observation_id,
+                observation_seq=observation_seq,
+                observation_t_wall_s=observation_t_wall_s,
+                observation_t_wall_ms=trigger_wall_ms,
                 trigger_wall_ms=trigger_wall_ms,
                 sync_window_ms=self.vision_sync_window_ms,
                 vision_used=False,
+                frame_id=None,
+                sync_status=None,
+                sync_delta_ms=None,
+                frame_stale=None,
                 frame_ids=[],
                 selected_frames=[],
                 pre_trigger_frame=None,
                 trigger_frame=None,
                 sync_miss_reason="vision_port_unconfigured",
             )
-        return self._vision_session.select_for_help(trigger_wall_s=trigger_t_wall)
+        selection = self._vision_session.select_for_help(trigger_wall_s=trigger_t_wall)
+        return HelpCycleVisionSelection(
+            status=selection.status,
+            observation_ref=observation.observation_id,
+            observation_seq=observation_seq,
+            observation_t_wall_s=observation_t_wall_s,
+            observation_t_wall_ms=trigger_wall_ms,
+            trigger_wall_ms=selection.trigger_wall_ms,
+            sync_window_ms=selection.sync_window_ms,
+            vision_used=selection.vision_used,
+            frame_id=selection.frame_id,
+            sync_status=selection.sync_status,
+            sync_delta_ms=selection.sync_delta_ms,
+            frame_stale=selection.frame_stale,
+            frame_ids=list(selection.frame_ids),
+            selected_frames=[dict(item) for item in selection.selected_frames],
+            pre_trigger_frame=dict(selection.pre_trigger_frame) if selection.pre_trigger_frame is not None else None,
+            trigger_frame=dict(selection.trigger_frame) if selection.trigger_frame is not None else None,
+            sync_miss_reason=selection.sync_miss_reason,
+        )
 
     def _ingest_observation(self, raw_obs: Observation) -> Observation:
         self._latest_raw_obs = raw_obs
@@ -1964,7 +2001,10 @@ class LiveDcsTutorLoop:
         if resolved_trigger_t_wall is None:
             resolved_trigger_t_wall = time.time()
 
-        vision_selection = self._build_vision_selection(trigger_t_wall=resolved_trigger_t_wall)
+        vision_selection = self._build_vision_selection(
+            observation=obs,
+            trigger_t_wall=resolved_trigger_t_wall,
+        )
         request, prompt_meta, state_key = self._build_request(obs, vision_selection=vision_selection)
         help_cycle_id = request.request_id
         request.metadata = dict(request.metadata)
