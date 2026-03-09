@@ -173,6 +173,20 @@ def test_select_help_cycle_frames_falls_back_to_trigger_time_for_non_finite_obse
     assert selection.observation_t_wall_ms == 1772872445300
 
 
+def test_select_help_cycle_frames_rejects_boolean_observation_time() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("1772872444950_000122", 1772872444950),
+        ],
+        trigger_wall_ms=1772872445300,
+        sync_window_ms=400,
+        observation_t_wall_s=True,
+    )
+
+    assert selection.observation_t_wall_s == 1772872445.3
+    assert selection.observation_t_wall_ms == 1772872445300
+
+
 def test_select_help_cycle_frames_falls_back_to_future_frame_when_past_missing() -> None:
     selection = select_help_cycle_frames(
         [

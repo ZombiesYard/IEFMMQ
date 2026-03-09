@@ -93,6 +93,8 @@ def _normalize_observation_anchor(
     trigger_wall_ms: int,
 ) -> tuple[float, int]:
     fallback_s = float(trigger_wall_ms) / 1000.0
+    if isinstance(observation_t_wall_s, bool):
+        return fallback_s, int(trigger_wall_ms)
     if isinstance(observation_t_wall_s, (int, float)):
         normalized_s = float(observation_t_wall_s)
         if math.isfinite(normalized_s):
