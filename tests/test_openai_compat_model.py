@@ -587,6 +587,41 @@ def test_openai_compat_falls_back_to_trigger_frame_when_resolved_frame_lacks_ima
     assert "Primary visual frame: 1772872445010_000123" in content[1]["text"]
 
 
+def test_openai_compat_keeps_multimodal_when_primary_frame_file_is_missing(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    missing_pre_trigger_image = tmp_path / "missing_pre_trigger_frame.png"
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        lang="en",
+        enable_multimodal=True,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(
+        request,
+        primary_image=primary_image,
+        pre_trigger_image=missing_pre_trigger_image,
+    )
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert res.metadata["multimodal_primary_frame_id"] == "1772872445010_000123"
+    assert res.metadata["multimodal_frame_ids"] == ["1772872445010_000123"]
+    assert res.metadata["multimodal_failed_frame_ids"] == ["1772872444950_000122"]
+    assert "1772872444950_000122" in res.metadata["multimodal_frame_failures"]
+    assert "not found" in res.metadata["multimodal_frame_failures"]["1772872444950_000122"]
+    assert "1772872444950_000122" in res.metadata["multimodal_failure_reason"]
+    content = fake.calls[0]["json"]["messages"][1]["content"]
+    assert isinstance(content, list)
+    assert [item["type"] for item in content] == ["image_url", "text"]
+    assert "Primary visual frame: 1772872445010_000123" in content[1]["text"]
+
+
 def test_openai_compat_keeps_text_only_when_multimodal_capability_is_disabled(tmp_path: Path) -> None:
     primary_image = tmp_path / "trigger_frame.png"
     primary_image.write_bytes(b"primary-frame")
@@ -746,7 +781,13 @@ def test_openai_compat_rejects_inline_data_urls_in_vision_context() -> None:
     assert len(fake.calls) == 1
     assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
     assert res.metadata["multimodal_images_built"] is False
-    assert res.metadata["multimodal_failure_reason"] == "ValueError: inline vision frame data URLs are not allowed"
+    assert res.metadata["multimodal_failed_frame_ids"] == ["1772872445010_000123"]
+    assert (
+        res.metadata["multimodal_frame_failures"]["1772872445010_000123"]
+        == "ValueError: inline vision frame data URLs are not allowed"
+    )
+    assert "1772872445010_000123" in res.metadata["multimodal_failure_reason"]
+    assert "inline vision frame data URLs are not allowed" in res.metadata["multimodal_failure_reason"]
 
 
 def test_openai_compat_rejects_remote_image_urls_in_vision_context() -> None:
@@ -775,7 +816,13 @@ def test_openai_compat_rejects_remote_image_urls_in_vision_context() -> None:
     assert len(fake.calls) == 1
     assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
     assert res.metadata["multimodal_images_built"] is False
-    assert res.metadata["multimodal_failure_reason"] == "ValueError: remote vision frame URLs are not allowed"
+    assert res.metadata["multimodal_failed_frame_ids"] == ["1772872445010_000123"]
+    assert (
+        res.metadata["multimodal_frame_failures"]["1772872445010_000123"]
+        == "ValueError: remote vision frame URLs are not allowed"
+    )
+    assert "1772872445010_000123" in res.metadata["multimodal_failure_reason"]
+    assert "remote vision frame URLs are not allowed" in res.metadata["multimodal_failure_reason"]
 
 
 def test_openai_compat_text_only_path_is_unchanged_without_vision_context() -> None:

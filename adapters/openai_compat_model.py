@@ -95,6 +95,8 @@ class OpenAICompatModel(BaseHelpModel):
                 "multimodal_candidate_frame_ids": list(multimodal_spec["candidate_frame_ids"]),
                 "multimodal_primary_frame_id": multimodal_spec["primary_frame_id"],
                 "multimodal_frame_ids": list(multimodal_spec["frame_ids"]),
+                "multimodal_failed_frame_ids": list(multimodal_spec["failed_frame_ids"]),
+                "multimodal_frame_failures": dict(multimodal_spec["frame_failures"]),
                 "multimodal_images_built": bool(multimodal_spec["image_contents"]),
                 "multimodal_image_count": len(multimodal_spec["image_contents"]),
                 "multimodal_path_attempted": False,
@@ -157,7 +159,8 @@ class OpenAICompatModel(BaseHelpModel):
                 raise
             self._runtime_metadata["multimodal_path_success"] = True
             self._runtime_metadata["multimodal_fallback_to_text"] = False
-            self._runtime_metadata["multimodal_failure_reason"] = None
+            if not self._runtime_metadata.get("multimodal_frame_failures"):
+                self._runtime_metadata["multimodal_failure_reason"] = None
             return content
 
         self._runtime_metadata["multimodal_path_attempted"] = False
@@ -286,8 +289,11 @@ class OpenAICompatModel(BaseHelpModel):
                 "candidate_frame_ids": [],
                 "image_contents": [],
                 "frame_ids": [],
+                "failed_frame_ids": [],
+                "frame_failures": {},
                 "primary_frame_id": None,
                 "secondary_frame_id": None,
+                "secondary_frame_role": None,
                 "failure_reason": None,
             }
 
@@ -300,6 +306,9 @@ class OpenAICompatModel(BaseHelpModel):
 
         image_contents: list[dict[str, Any]] = []
         frame_ids: list[str] = []
+        successful_frames: list[dict[str, Any]] = []
+        failed_frame_ids: list[str] = []
+        frame_failures: dict[str, str] = {}
         failure_reason: str | None = None
         if not self.enable_multimodal:
             return {
@@ -307,6 +316,8 @@ class OpenAICompatModel(BaseHelpModel):
                 "candidate_frame_ids": candidate_frame_ids,
                 "image_contents": [],
                 "frame_ids": [],
+                "failed_frame_ids": [],
+                "frame_failures": {},
                 "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
                 "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
                 "secondary_frame_role": self._frame_role(candidate_frames[1]) if len(candidate_frames) > 1 else None,
@@ -319,21 +330,27 @@ class OpenAICompatModel(BaseHelpModel):
             try:
                 data_url = self._frame_to_data_url(frame)
             except Exception as exc:
-                failure_reason = f"{type(exc).__name__}: {exc}"
-                image_contents = []
-                frame_ids = []
-                break
+                failure = f"{type(exc).__name__}: {exc}"
+                failed_frame_ids.append(frame_id)
+                frame_failures[frame_id] = failure
+                continue
             image_contents.append({"type": "image_url", "image_url": {"url": data_url}})
             frame_ids.append(frame_id)
+            successful_frames.append(frame)
+
+        if frame_failures:
+            failure_reason = self._summarize_frame_failures(frame_failures)
 
         return {
             "candidate_frames": candidate_frames,
             "candidate_frame_ids": candidate_frame_ids,
             "image_contents": image_contents,
             "frame_ids": frame_ids,
-            "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
-            "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
-            "secondary_frame_role": self._frame_role(candidate_frames[1]) if len(candidate_frames) > 1 else None,
+            "failed_frame_ids": failed_frame_ids,
+            "frame_failures": frame_failures,
+            "primary_frame_id": frame_ids[0] if frame_ids else (candidate_frame_ids[0] if candidate_frame_ids else None),
+            "secondary_frame_id": frame_ids[1] if len(frame_ids) > 1 else None,
+            "secondary_frame_role": self._frame_role(successful_frames[1]) if len(successful_frames) > 1 else None,
             "failure_reason": failure_reason,
         }
 
@@ -557,6 +574,8 @@ class OpenAICompatModel(BaseHelpModel):
             "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,
             "multimodal_frame_ids": [],
+            "multimodal_failed_frame_ids": [],
+            "multimodal_frame_failures": {},
             "multimodal_images_built": False,
             "multimodal_image_count": 0,
             "multimodal_path_attempted": False,
@@ -564,6 +583,11 @@ class OpenAICompatModel(BaseHelpModel):
             "multimodal_fallback_to_text": False,
             "multimodal_failure_reason": None,
         }
+
+    @staticmethod
+    def _summarize_frame_failures(frame_failures: Mapping[str, str]) -> str:
+        parts = [f"{frame_id}: {reason}" for frame_id, reason in frame_failures.items()]
+        return "; ".join(parts)
 
     def _should_disable_thinking(self) -> bool:
         return self._is_qwen35_model()
