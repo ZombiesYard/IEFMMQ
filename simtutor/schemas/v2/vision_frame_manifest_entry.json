@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/vision_frame_manifest_entry.json",
+  "title": "Vision Frame Manifest Entry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "frame_id",
+    "capture_wall_ms",
+    "frame_seq",
+    "channel",
+    "layout_id",
+    "image_path",
+    "width",
+    "height",
+    "source_session_id"
+  ],
+  "properties": {
+    "frame_id": {
+      "type": "string",
+      "pattern": "^[0-9]{10,20}_[0-9]{6}$"
+    },
+    "capture_wall_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "frame_seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "layout_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Final source screenshot path written after temp-file staging and atomic rename."
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_session_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
