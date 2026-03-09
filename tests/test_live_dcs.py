@@ -11,6 +11,7 @@ import time
 import pytest
 import yaml
 
+from core.types_v2 import VisionObservation
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from adapters.source_chunk_refs import build_source_chunk_ref
@@ -1630,7 +1631,49 @@ def test_stdin_help_trigger_reader_does_not_enqueue_after_stop_set_during_input(
     assert trigger.poll() is False
 
 
-def test_udp_help_trigger_receives_help_datagram() -> None:
+def test_udp_help_trigger_receives_help_datagram(monkeypatch) -> None:
+    class FakeDatagramSocket:
+        _registry: dict[tuple[str, int], "FakeDatagramSocket"] = {}
+        _next_port = 40000
+
+        def __init__(self, *_args, **_kwargs) -> None:
+            self._timeout = 0.0
+            self._bound = ("127.0.0.1", 0)
+            self._recv_queue: list[tuple[bytes, tuple[str, int]]] = []
+
+        def settimeout(self, timeout: float) -> None:
+            self._timeout = float(timeout)
+
+        def bind(self, addr: tuple[str, int]) -> None:
+            host, port = addr
+            if port == 0:
+                port = FakeDatagramSocket._next_port
+                FakeDatagramSocket._next_port += 1
+            self._bound = (host, port)
+            FakeDatagramSocket._registry[self._bound] = self
+
+        def getsockname(self) -> tuple[str, int]:
+            return self._bound
+
+        def recvfrom(self, _size: int) -> tuple[bytes, tuple[str, int]]:
+            deadline = time.time() + self._timeout
+            while True:
+                if self._recv_queue:
+                    return self._recv_queue.pop(0)
+                if time.time() >= deadline:
+                    raise socket.timeout()
+                time.sleep(0.001)
+
+        def sendto(self, payload: bytes, addr: tuple[str, int]) -> None:
+            target = FakeDatagramSocket._registry[addr]
+            target._recv_queue.append((payload, self._bound))
+
+        def close(self) -> None:
+            FakeDatagramSocket._registry.pop(self._bound, None)
+
+    monkeypatch.setattr("live_dcs.socket.socket", lambda *_args, **_kwargs: FakeDatagramSocket())
+    monkeypatch.setattr(socket, "socket", lambda *_args, **_kwargs: FakeDatagramSocket())
+
     trigger = UdpHelpTrigger(host="127.0.0.1", port=0, timeout=0.05)
     trigger.start()
     try:
@@ -2290,3 +2333,103 @@ def test_normalize_cached_response_metadata_normalizes_fallback_reason() -> None
     explicit_reason: dict[str, Any] = {"fallback_overlay_reason": "deterministic_step:S01"}
     _normalize_cached_response_metadata(explicit_reason)
     assert explicit_reason["fallback_overlay_reason"] == "deterministic_step:S01"
+
+
+def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_events(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_with_vision.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-live"
+
+        def poll(self) -> list[VisionObservation]:
+            return [
+                VisionObservation(
+                    frame_id="1772872444950_000122",
+                    source="vision_test",
+                    capture_wall_ms=1772872444950,
+                    frame_seq=122,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri="/tmp/1772872444950_000122.png",
+                ),
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    source="vision_test",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri="/tmp/1772872445010_000123.png",
+                ),
+            ]
+
+        def stop(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events: list[dict[str, Any]] = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        session_id="sess-live",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-live",
+        vision_mode="live",
+        event_sink=lambda event: events.append(event.to_dict()),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert len(model.calls) == 1
+    request = model.calls[0]["request"]
+    vision = request.context["vision"]
+    assert vision["status"] == "available"
+    assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert vision["pre_trigger_frame"]["frame_id"] == "1772872444950_000122"
+    assert vision["trigger_frame"]["frame_id"] == "1772872445010_000123"
+    tutor_request = next(event for event in events if event["kind"] == "tutor_request")
+    tutor_response = next(event for event in events if event["kind"] == "tutor_response")
+    assert tutor_request["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert tutor_response["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+
+
+def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_without_vision.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        session_id="sess-no-vision",
+        vision_mode="replay",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    vision = request.context["vision"]
+    assert vision["status"] == "vision_unavailable"
+    assert vision["vision_used"] is False
+    assert vision["frame_ids"] == []
+    assert vision["sync_miss_reason"] == "vision_port_unconfigured"

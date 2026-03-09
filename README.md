@@ -54,6 +54,17 @@ python -m simtutor replay-bios \
   --dry-run-overlay
 ```
 
+Replay against a recorded vision sidecar without re-screenshotting:
+
+```bash
+python -m simtutor replay-bios \
+  --input logs/dcs_bios_raw.jsonl \
+  --auto-help-once \
+  --vision-saved-games-dir "$HOME/Saved Games/DCS" \
+  --vision-session-id sess-replay \
+  --dry-run-overlay
+```
+
 Replay with a local vLLM OpenAI-compatible endpoint:
 
 ```bash
@@ -77,6 +88,8 @@ Run the live DCS loop:
 python live_dcs.py \
   --stdin-help \
   --help-udp-port 7792 \
+  --vision-saved-games-dir "$HOME/Saved Games/DCS" \
+  --vision-session-id sess-live \
   --output logs/live_dcs.jsonl
 ```
 
@@ -391,6 +404,12 @@ Parameters:
 | `--knowledge-source-policy` | No | Path to `knowledge_source_policy.yaml`; also enables policy filtering outside production mode |
 | `--output` | No | Output JSONL path; default `logs/replay_bios_<timestamp>.jsonl` |
 | `--session-id` | No | Optional session id for emitted events |
+| `--vision-saved-games-dir` | No | Saved Games root that contains `SimTutor/frames/<session>/<channel>/frames.jsonl` |
+| `--vision-session-id` | No | Vision sidecar session id; falls back to `--session-id` when omitted |
+| `--vision-channel` | No | Vision frame channel; default `composite_panel` |
+| `--vision-layout-id` | No | Expected manifest layout id; default `fa18c_composite_panel_v2` |
+| `--vision-sync-window-ms` | No | Frame selection window in milliseconds; `0` uses replay default `100` |
+| `--vision-trigger-wait-ms` | No | Reserved trigger wait budget in milliseconds; replay normally keeps `0` |
 | `--cooldown-s` | No | Help cache cooldown in seconds; default `4.0` |
 | `--max-frames` | No | Maximum frames to process; `0` means unlimited |
 | `--duration` | No | Run duration in seconds; `0` means unlimited |
@@ -441,6 +460,12 @@ Parameters:
 | `--knowledge-source-policy` | No | Path to `knowledge_source_policy.yaml`; also enables policy filtering outside production mode |
 | `--output` | No | Event log JSONL output path; default `logs/live_dcs_<timestamp>.jsonl` |
 | `--session-id` | No | Optional event session id |
+| `--vision-saved-games-dir` | No | Saved Games root that contains live `SimTutor/frames/<session>/<channel>/frames.jsonl` |
+| `--vision-session-id` | No | Vision sidecar session id; falls back to `--session-id` when omitted |
+| `--vision-channel` | No | Vision frame channel; default `composite_panel` |
+| `--vision-layout-id` | No | Expected manifest layout id; default `fa18c_composite_panel_v2` |
+| `--vision-sync-window-ms` | No | Frame selection window in milliseconds; `0` uses live default `250` |
+| `--vision-trigger-wait-ms` | No | Live help-trigger extra wait budget in milliseconds; `0` uses live default `250` |
 | `--cooldown-s` | No | Same-state help reuse cooldown; default `4.0` |
 | `--max-frames` | No | Maximum frames to process; `0` means unlimited |
 | `--duration` | No | Run duration in seconds; `0` means unlimited |

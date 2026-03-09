@@ -9,8 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from PIL import Image, ImageDraw
 
 from adapters.model_stub import ModelStub
+from adapters.vision_frames import build_frame_channel_dir, build_frame_filename, build_frame_id, build_frame_manifest_path
+from adapters.vision_prompting import load_vision_layout, solve_layout_geometry
 from core.event_store import JsonlEventStore
 from core.types import Observation, TutorResponse
 from live_dcs import UdpHelpTrigger
@@ -42,6 +45,74 @@ def _write_replay(path: Path, frames: list[dict[str, Any]]) -> None:
 
 def _default_policy_path() -> Path:
     return Path(__file__).resolve().parents[1] / "knowledge_source_policy.yaml"
+
+
+def _make_source_frame(path: Path, *, width: int = 1920, height: int = 1080) -> None:
+    layout = load_vision_layout()
+    solved = solve_layout_geometry(layout, output_width=width, output_height=height)
+    strip = solved["strip_rect"]
+
+    image = Image.new("RGB", (width, height), (200, 32, 32))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle(
+        (
+            strip["x"],
+            strip["y"],
+            strip["x"] + strip["width"],
+            strip["y"] + strip["height"],
+        ),
+        fill=(16, 20, 22),
+    )
+    for region in solved["regions"]:
+        draw.rectangle(
+            (
+                region["x"],
+                region["y"],
+                region["x"] + region["width"],
+                region["y"] + region["height"],
+            ),
+            fill=(28, 41, 48),
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path, format="PNG")
+
+
+def _append_manifest_entry(channel_dir: Path, entry: dict[str, object]) -> None:
+    manifest_path = build_frame_manifest_path(channel_dir)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    with manifest_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _write_sidecar_frame(
+    *,
+    saved_games_dir: Path,
+    session_id: str,
+    capture_wall_ms: int,
+    frame_seq: int,
+) -> None:
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id=session_id,
+        channel="composite_panel",
+    )
+    frame_path = channel_dir / build_frame_filename(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
+    _make_source_frame(frame_path)
+    _append_manifest_entry(
+        channel_dir,
+        {
+            "schema_version": "v2",
+            "frame_id": build_frame_id(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq),
+            "capture_wall_ms": capture_wall_ms,
+            "frame_seq": frame_seq,
+            "channel": "composite_panel",
+            "layout_id": "fa18c_composite_panel_v2",
+            "image_path": str(frame_path.resolve()),
+            "width": 1920,
+            "height": 1080,
+            "source_session_id": session_id,
+        },
+    )
 
 
 class OverlayModel:
@@ -89,14 +160,39 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
     )
     output_path = tmp_path / "replay_events.jsonl"
     udp_state: dict[str, int] = {}
+    trigger_instances: list["FakeUdpHelpTrigger"] = []
 
-    class EphemeralUdpHelpTrigger(UdpHelpTrigger):
+    class FakeUdpHelpTrigger:
         def __init__(self, host: str = "127.0.0.1", port: int = 7794, timeout: float = 0.2) -> None:
-            super().__init__(host=host, port=0, timeout=timeout)
-            udp_state["port"] = self.bound_port
+            self.host = host
+            self.port = port
+            self.timeout = timeout
+            self._pending = False
+            udp_state["port"] = 1
+            trigger_instances.append(self)
+
+        @property
+        def bound_port(self) -> int:
+            return 1
+
+        def start(self) -> None:
+            return
+
+        def poll(self) -> bool:
+            if self._pending:
+                self._pending = False
+                return True
+            return False
+
+        def close(self) -> None:
+            return
 
     monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: OverlayModel())
-    monkeypatch.setattr("live_dcs.UdpHelpTrigger", EphemeralUdpHelpTrigger)
+    monkeypatch.setattr("live_dcs.UdpHelpTrigger", FakeUdpHelpTrigger)
+    monkeypatch.setattr(
+        "adapters.action_executor.DcsOverlaySender",
+        lambda **_kwargs: type("DummySender", (), {"close": lambda self: None})(),
+    )
     monkeypatch.setattr(
         sys,
         "argv",
@@ -120,14 +216,10 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
 
     def _send_help() -> None:
         deadline = time.time() + 2.0
-        while "port" not in udp_state and time.time() < deadline:
+        while not trigger_instances and time.time() < deadline:
             time.sleep(0.01)
-        assert "port" in udp_state
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            sock.sendto(b"help", ("127.0.0.1", udp_state["port"]))
-        finally:
-            sock.close()
+        assert trigger_instances
+        trigger_instances[0]._pending = True
 
     sender = threading.Thread(target=_send_help, daemon=True)
     sender.start()
@@ -435,6 +527,10 @@ def test_cli_replay_bios_rejects_missing_policy_in_cold_start_production(
     output_path = tmp_path / "replay_missing_policy.jsonl"
     missing_policy_path = tmp_path / "dir with spaces" / "missing_knowledge_source_policy.yaml"
 
+    monkeypatch.setattr(
+        "adapters.action_executor.DcsOverlaySender",
+        lambda **_kwargs: type("DummySender", (), {"close": lambda self: None})(),
+    )
     monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: ModelStub(mode="A"))
     monkeypatch.setattr(
         sys,
@@ -471,6 +567,10 @@ def test_cli_replay_bios_cold_start_production_prints_policy_summary(
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
     output_path = tmp_path / "replay_cold_start_ok.jsonl"
 
+    monkeypatch.setattr(
+        "adapters.action_executor.DcsOverlaySender",
+        lambda **_kwargs: type("DummySender", (), {"close": lambda self: None})(),
+    )
     monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: ModelStub(mode="A"))
     monkeypatch.setattr(
         sys,
@@ -575,3 +675,127 @@ def test_cli_replay_bios_scenario_profile_accepts_carrier(monkeypatch, tmp_path:
     code = main()
     assert code == 0
     assert captured["scenario_profile"] == "carrier"
+
+
+def test_cli_replay_bios_consumes_sidecar_frames_and_selects_stable_history(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_cli_with_sidecar.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 1772872445.0, apu_switch=0)])
+    output_path = tmp_path / "replay_with_sidecar.jsonl"
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    _write_sidecar_frame(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-replay",
+        capture_wall_ms=1772872444950,
+        frame_seq=122,
+    )
+    _write_sidecar_frame(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-replay",
+        capture_wall_ms=1772872445010,
+        frame_seq=123,
+    )
+    captured: dict[str, Any] = {}
+
+    class RecordingVisionModel:
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            captured["vision"] = dict(request.context["vision"]) if request else {}
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Turn on APU.",
+                actions=[],
+                explanations=["Turn on APU."],
+                metadata={"provider": "mock_qwen"},
+            )
+
+    class DummySender:
+        def close(self) -> None:
+            return
+
+    monkeypatch.setattr("adapters.action_executor.DcsOverlaySender", lambda **_kwargs: DummySender())
+    monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: RecordingVisionModel())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--output",
+            str(output_path),
+            "--speed",
+            "0",
+            "--max-frames",
+            "1",
+            "--auto-help-once",
+            "--vision-saved-games-dir",
+            str(saved_games_dir),
+            "--vision-session-id",
+            "sess-replay",
+        ],
+    )
+
+    code = main()
+
+    assert code == 0
+    assert captured["vision"]["status"] == "available"
+    assert captured["vision"]["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+
+
+def test_cli_replay_bios_without_sidecar_marks_vision_unavailable(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_without_sidecar.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    output_path = tmp_path / "replay_without_sidecar.jsonl"
+    captured: dict[str, Any] = {}
+
+    class RecordingVisionModel:
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            captured["vision"] = dict(request.context["vision"]) if request else {}
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Turn on APU.",
+                actions=[],
+                explanations=["Turn on APU."],
+                metadata={"provider": "mock_qwen"},
+            )
+
+    class DummySender:
+        def close(self) -> None:
+            return
+
+    monkeypatch.setattr("adapters.action_executor.DcsOverlaySender", lambda **_kwargs: DummySender())
+    monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: RecordingVisionModel())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--output",
+            str(output_path),
+            "--speed",
+            "0",
+            "--max-frames",
+            "1",
+            "--auto-help-once",
+        ],
+    )
+
+    code = main()
+
+    assert code == 0
+    assert captured["vision"]["status"] == "vision_unavailable"
+    assert captured["vision"]["sync_miss_reason"] == "vision_port_unconfigured"
