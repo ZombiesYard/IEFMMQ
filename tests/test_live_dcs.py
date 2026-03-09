@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 import time
+from uuid import UUID
 
 import pytest
 import yaml
@@ -25,10 +26,12 @@ from live_dcs import (
     UdpHelpTrigger,
     build_arg_parser,
     _build_vision_port_from_args,
+    _emit_vision_observation_event,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
+    _path_like_to_uri,
     _sanitize_policy_error_for_user,
 )
 from simtutor.schemas import validate_instance
@@ -2471,6 +2474,12 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
 def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_with_vision_events.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    artifact_dir = tmp_path / "vision"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    first_artifact = artifact_dir / "1772872444950_000122_vlm.png"
+    first_source = artifact_dir / "1772872444950_000122.png"
+    second_artifact = artifact_dir / "1772872445010_000123_vlm.png"
+    second_source = artifact_dir / "1772872445010_000123.png"
 
     class StaticVisionPort:
         def start(self, session_id: str) -> None:
@@ -2485,8 +2494,8 @@ def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Pa
                     frame_seq=122,
                     layout_id="fa18c_composite_panel_v2",
                     channel="composite_panel",
-                    image_uri="/tmp/vision/1772872444950_000122_vlm.png",
-                    source_image_path="/tmp/vision/1772872444950_000122.png",
+                    image_uri=str(first_artifact),
+                    source_image_path=str(first_source),
                 ),
                 VisionObservation(
                     frame_id="1772872445010_000123",
@@ -2495,8 +2504,8 @@ def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Pa
                     frame_seq=123,
                     layout_id="fa18c_composite_panel_v2",
                     channel="composite_panel",
-                    image_uri="/tmp/vision/1772872445010_000123_vlm.png",
-                    source_image_path="/tmp/vision/1772872445010_000123.png",
+                    image_uri=str(second_artifact),
+                    source_image_path=str(second_source),
                 ),
             ]
 
@@ -2537,11 +2546,44 @@ def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Pa
     validate_instance(vision_events[0], "event")
     validate_instance(first_payload, "observation")
     assert first_payload["attachments"] == [
-        "file:///tmp/vision/1772872444950_000122_vlm.png",
-        "file:///tmp/vision/1772872444950_000122.png",
+        first_artifact.resolve().as_uri(),
+        first_source.resolve().as_uri(),
     ]
     assert first_payload["payload"]["frame_id"] == "1772872444950_000122"
     assert first_payload["payload"]["observation_ref"] == first_payload["observation_id"]
+
+
+def test_path_like_to_uri_normalizes_windows_drive_paths() -> None:
+    assert _path_like_to_uri(r"C:\SimTutor\frames\1772872444950_000122.png") == "file:///C:/SimTutor/frames/1772872444950_000122.png"
+
+
+def test_emit_vision_observation_event_replaces_invalid_observation_ref_with_uuid(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "vision" / "1772872444950_000122_vlm.png"
+    source_path = tmp_path / "vision" / "1772872444950_000122.png"
+    events: list[dict[str, Any]] = []
+
+    _emit_vision_observation_event(
+        observation=VisionObservation(
+            frame_id="1772872444950_000122",
+            source="vision_test",
+            observation_ref="not-a-uuid",
+            capture_wall_ms=1772872444950,
+            frame_seq=122,
+            layout_id="fa18c_composite_panel_v2",
+            channel="composite_panel",
+            image_uri=str(artifact_path),
+            source_image_path=str(source_path),
+        ),
+        event_sink=lambda event: events.append(event.to_dict()),
+        fallback_session_id="sess-live",
+    )
+
+    assert len(events) == 1
+    payload = events[0]["payload"]
+    validate_instance(events[0], "event")
+    validate_instance(payload, "observation")
+    assert payload["payload"]["observation_ref"] == payload["observation_id"]
+    assert str(UUID(payload["observation_id"])) == payload["observation_id"]
 
 
 def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:

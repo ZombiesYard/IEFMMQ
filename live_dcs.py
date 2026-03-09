@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 from urllib.parse import urlparse
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import yaml
 
@@ -108,16 +108,28 @@ def _path_like_to_uri(raw_value: Any) -> str | None:
     text = raw_value.strip()
     if not text:
         return None
+    windows_path = PureWindowsPath(text)
+    if windows_path.drive and windows_path.is_absolute():
+        return windows_path.as_uri()
     parsed = urlparse(text)
     if parsed.scheme:
         return text
-    windows_path = PureWindowsPath(text)
-    if windows_path.is_absolute():
-        return windows_path.as_uri()
     path = Path(text).expanduser()
     if path.is_absolute():
         return path.resolve().as_uri()
     return None
+
+
+def _normalize_uuid_text(raw_value: Any) -> str | None:
+    if not isinstance(raw_value, str):
+        return None
+    text = raw_value.strip()
+    if not text:
+        return None
+    try:
+        return str(UUID(text))
+    except ValueError:
+        return None
 
 
 def _build_vision_event_attachments(observation: Any) -> list[str]:
@@ -142,10 +154,10 @@ def _emit_vision_observation_event(
     if event_sink is None:
         return
     payload = observation.to_dict()
-    observation_id = payload.get("observation_ref")
-    if not isinstance(observation_id, str) or not observation_id:
+    observation_id = _normalize_uuid_text(payload.get("observation_ref"))
+    if observation_id is None:
         observation_id = str(uuid4())
-        payload["observation_ref"] = observation_id
+    payload["observation_ref"] = observation_id
     attachments = _build_vision_event_attachments(observation)
     wrapped = Observation(
         observation_id=observation_id,
