@@ -238,7 +238,7 @@ Single-machine template:
 
 ```bash
 export SIMTUTOR_MODEL_PROVIDER=openai_compat
-export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000/v1
+export SIMTUTOR_MODEL_BASE_URL=http://127.0.0.1:8000
 export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
 export SIMTUTOR_MODEL_TIMEOUT_S=20
 export SIMTUTOR_MODEL_API_KEY=dummy
@@ -263,7 +263,7 @@ Split-model template (`DCS + simtutor` local, remote Qwen/vLLM):
 
 ```bash
 export SIMTUTOR_MODEL_PROVIDER=openai_compat
-export SIMTUTOR_MODEL_BASE_URL=http://10.0.0.42:8000/v1
+export SIMTUTOR_MODEL_BASE_URL=http://10.0.0.42:8000
 export SIMTUTOR_MODEL_NAME=Qwen3-8B-Instruct
 export SIMTUTOR_MODEL_TIMEOUT_S=20
 export SIMTUTOR_MODEL_API_KEY=dummy

@@ -142,7 +142,7 @@ v0.4 当前正式支持两种部署方式：
 ```bash
 python live_dcs.py \
   --model-provider openai_compat \
-  --model-base-url http://10.0.0.42:8000/v1
+  --model-base-url http://10.0.0.42:8000
 ```
 
 此时 `SimTutorConfig.lua` 里的 `telemetry` / `handshake` / `overlay` 地址通常仍保持
