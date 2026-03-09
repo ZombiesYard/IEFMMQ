@@ -60,7 +60,8 @@ def build_frame_manifest_path(channel_dir: str | Path) -> Path:
 
 def build_vlm_artifact_path(image_path: str | Path, *, artifact_dir_name: str = DEFAULT_ARTIFACT_DIRNAME) -> Path:
     source_path = Path(image_path)
-    return source_path.parent / artifact_dir_name / f"{source_path.stem}{DEFAULT_ARTIFACT_SUFFIX}"
+    normalized_artifact_dir = _normalize_artifact_dir_name(artifact_dir_name)
+    return source_path.parent / normalized_artifact_dir / f"{source_path.stem}{DEFAULT_ARTIFACT_SUFFIX}"
 
 
 def is_final_frame_path(path_like: str | Path) -> bool:
@@ -110,8 +111,10 @@ def render_vlm_ready_frame(
         local_h = int(region["height"])
         region_id = str(region["region_id"])
         label_text = str(region["display_name_en"])
-        accent = _REGION_ACCENTS[region_id]
-        label_background = _LABEL_BACKGROUNDS[region_id]
+        accent = _REGION_ACCENTS.get(region_id)
+        label_background = _LABEL_BACKGROUNDS.get(region_id)
+        if accent is None or label_background is None:
+            raise ValueError(f"unsupported vision layout region_id for VLM artifact rendering: {region_id!r}")
 
         draw.rounded_rectangle(
             (
@@ -186,7 +189,7 @@ class FrameDirectoryVisionPort(VisionPort):
         self.saved_games_dir = Path(saved_games_dir).expanduser().resolve()
         self.channel = channel
         self.layout_id = _require_text(layout_id, "layout_id")
-        self.artifact_dir_name = artifact_dir_name
+        self.artifact_dir_name = _normalize_artifact_dir_name(artifact_dir_name)
         self._layout = load_vision_layout()
         loaded_layout_id = _require_text(self._layout.get("layout_id"), "loaded layout_id")
         if self.layout_id != loaded_layout_id:
@@ -275,6 +278,11 @@ class FrameDirectoryVisionPort(VisionPort):
             raise ValueError(
                 f"vision frame manifest layout_id mismatch: expected {self.layout_id!r}, got {manifest_layout_id!r}"
             )
+        manifest_channel = _require_text(entry["channel"], "channel")
+        if manifest_channel != self.channel:
+            raise ValueError(
+                f"vision frame manifest channel mismatch: expected {self.channel!r}, got {manifest_channel!r}"
+            )
         expected_frame_id = build_frame_id(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
         expected_filename = build_frame_filename(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
         frame_id = _require_text(entry["frame_id"], "frame_id")
@@ -304,7 +312,7 @@ class FrameDirectoryVisionPort(VisionPort):
             timestamp=datetime.fromtimestamp(capture_wall_ms / 1000.0, tz=timezone.utc).isoformat(),
             source="vision_frame_manifest",
             session_id=source_session_id,
-            channel=_require_text(entry["channel"], "channel"),
+            channel=self.channel,
             layout_id=self.layout_id,
             image_uri=str(artifact_path.resolve()),
             source_image_path=str(image_path.resolve()),
@@ -343,6 +351,18 @@ def _require_text(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{label} must be a non-empty string")
     return value.strip()
+
+
+def _normalize_artifact_dir_name(value: str | Path) -> str:
+    text = str(value).strip()
+    if not text:
+        raise ValueError("artifact_dir_name must be a non-empty simple directory name")
+    path = Path(text)
+    if path.is_absolute():
+        raise ValueError("artifact_dir_name must be relative to the frame channel directory")
+    if len(path.parts) != 1 or path.parts[0] in {"", ".", ".."}:
+        raise ValueError("artifact_dir_name must be a simple directory name without path traversal")
+    return path.parts[0]
 
 
 def _require_non_negative_int(value: Any, label: str) -> int:

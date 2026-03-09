@@ -4,15 +4,12 @@ Versioned data contracts for simulator-specific telemetry (v2).
 
 from __future__ import annotations
 
-from itertools import count
-import time
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
 CONTRACT_VERSION_V2 = "v2"
-_VISION_FRAME_SEQ = count()
 
 
 def _now_iso() -> str:
@@ -21,12 +18,6 @@ def _now_iso() -> str:
 
 def _uuid() -> str:
     return str(uuid4())
-
-
-def _next_frame_id() -> str:
-    capture_wall_ms = int(time.time() * 1000)
-    frame_seq = next(_VISION_FRAME_SEQ) % 1_000_000
-    return f"{capture_wall_ms}_{frame_seq:06d}"
 
 
 @dataclass

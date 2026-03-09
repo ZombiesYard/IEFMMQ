@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -117,6 +118,17 @@ def test_render_vlm_ready_frame_crops_main_view_and_draws_region_guides(
     assert metadata["source_size"] == {"width": width, "height": height}
     assert metadata["artifact_size"]["width"] == processed_size[0]
     assert metadata["crop_rect"]["width"] < width
+
+
+def test_render_vlm_ready_frame_rejects_unknown_region_id(tmp_path: Path) -> None:
+    source_path = tmp_path / "source_unknown_region.png"
+    output_path = tmp_path / "source_unknown_region_vlm.png"
+    _make_source_frame(source_path, width=1920, height=1080)
+    bad_layout = copy.deepcopy(load_vision_layout())
+    bad_layout["regions"][0]["region_id"] = "unknown_ddi"
+
+    with pytest.raises(ValueError, match="unsupported vision layout region_id"):
+        render_vlm_ready_frame(source_path, output_path, layout=bad_layout)
 
 
 def test_frame_directory_port_consumes_only_manifested_final_png_files(tmp_path: Path) -> None:
@@ -243,6 +255,20 @@ def test_frame_directory_port_rejects_unsupported_port_layout_id(tmp_path: Path)
         )
 
 
+@pytest.mark.parametrize("artifact_dir_name", ["/tmp/outside", "../artifacts", "nested/artifacts"])
+def test_frame_directory_port_rejects_non_simple_artifact_dir_name(
+    tmp_path: Path,
+    artifact_dir_name: str,
+) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    with pytest.raises(ValueError, match="artifact_dir_name"):
+        FrameDirectoryVisionPort(
+            saved_games_dir=saved_games_dir,
+            channel=DEFAULT_FRAME_CHANNEL,
+            artifact_dir_name=artifact_dir_name,
+        )
+
+
 def test_frame_directory_port_rejects_image_path_outside_channel_dir(tmp_path: Path) -> None:
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     channel_dir = build_frame_channel_dir(
@@ -268,6 +294,33 @@ def test_frame_directory_port_rejects_image_path_outside_channel_dir(tmp_path: P
     port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
     port.start("sess-path-escape")
     with pytest.raises(ValueError, match="escapes channel directory"):
+        port.poll()
+
+
+def test_frame_directory_port_rejects_manifest_channel_mismatch(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-channel-mismatch",
+        channel=DEFAULT_FRAME_CHANNEL,
+    )
+    frame_path = channel_dir / build_frame_filename(capture_wall_ms=1772872444902, frame_seq=123)
+    _make_source_frame(frame_path, width=1920, height=1080)
+    _append_manifest_entry(
+        channel_dir,
+        _manifest_entry(
+            channel_dir=channel_dir,
+            capture_wall_ms=1772872444902,
+            frame_seq=123,
+            width=1920,
+            height=1080,
+            channel="right_ddi_only",
+        ),
+    )
+
+    port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
+    port.start("sess-channel-mismatch")
+    with pytest.raises(ValueError, match="channel mismatch"):
         port.poll()
 
 
