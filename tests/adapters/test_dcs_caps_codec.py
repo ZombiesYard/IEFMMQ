@@ -32,6 +32,18 @@ def test_caps_schema_validates() -> None:
     validate_caps(caps)
 
 
+def test_caps_schema_validates_when_vlm_frame_enabled() -> None:
+    caps = {
+        "schema_version": "v2",
+        "telemetry": True,
+        "overlay": False,
+        "overlay_ack": False,
+        "clickable_actions": False,
+        "vlm_frame": True,
+    }
+    validate_caps(caps)
+
+
 def test_caps_schema_accepts_legacy_payload_without_vision_flag() -> None:
     caps = {
         "schema_version": "v2",
