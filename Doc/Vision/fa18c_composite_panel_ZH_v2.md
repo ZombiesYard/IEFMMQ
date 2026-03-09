@@ -99,7 +99,7 @@
 
 - 默认交换方式固定为：磁盘目录落盘 + `frames.jsonl`
 - 目录固定为：`<Saved Games>/<DCS variant>/SimTutor/frames/<session_id>/<channel>/`
-- 帧文件名固定为：`<capture_wall_ms>_<frame_seq>.png`
+- 帧文件名固定为：`<capture_wall_ms>_<frame_seq:06d>.png`，例如 `1772872444902_000123.png`
 - manifest 固定文件名：同目录 `frames.jsonl`
 - 每行至少包含：
   - `frame_id`

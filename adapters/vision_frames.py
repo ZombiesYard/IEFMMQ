@@ -185,9 +185,14 @@ class FrameDirectoryVisionPort(VisionPort):
     ) -> None:
         self.saved_games_dir = Path(saved_games_dir).expanduser().resolve()
         self.channel = channel
-        self.layout_id = layout_id
+        self.layout_id = _require_text(layout_id, "layout_id")
         self.artifact_dir_name = artifact_dir_name
         self._layout = load_vision_layout()
+        loaded_layout_id = _require_text(self._layout.get("layout_id"), "loaded layout_id")
+        if self.layout_id != loaded_layout_id:
+            raise ValueError(
+                f"unsupported layout_id {self.layout_id!r}; current crop pipeline only supports {loaded_layout_id!r}"
+            )
         self._manifest_offset = 0
         self._session_id: str | None = None
         self._channel_dir: Path | None = None
@@ -257,6 +262,11 @@ class FrameDirectoryVisionPort(VisionPort):
         artifact_path = build_vlm_artifact_path(image_path, artifact_dir_name=self.artifact_dir_name)
         capture_wall_ms = _require_non_negative_int(entry["capture_wall_ms"], "capture_wall_ms")
         frame_seq = _require_non_negative_int(entry["frame_seq"], "frame_seq")
+        manifest_layout_id = _require_text(entry["layout_id"], "layout_id")
+        if manifest_layout_id != self.layout_id:
+            raise ValueError(
+                f"vision frame manifest layout_id mismatch: expected {self.layout_id!r}, got {manifest_layout_id!r}"
+            )
         expected_frame_id = build_frame_id(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
         expected_filename = build_frame_filename(capture_wall_ms=capture_wall_ms, frame_seq=frame_seq)
         frame_id = _require_text(entry["frame_id"], "frame_id")
@@ -287,7 +297,7 @@ class FrameDirectoryVisionPort(VisionPort):
             source="vision_frame_manifest",
             session_id=source_session_id,
             channel=_require_text(entry["channel"], "channel"),
-            layout_id=_require_text(entry["layout_id"], "layout_id"),
+            layout_id=self.layout_id,
             image_uri=str(artifact_path.resolve()),
             source_image_path=str(image_path.resolve()),
             mime_type=DEFAULT_MIME_TYPE,

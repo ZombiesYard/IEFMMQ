@@ -584,9 +584,9 @@ Typical generated outputs:
 Frozen v0.4 frame sidecar layout for the composite panel:
 
 - `<Saved Games>/<DCS variant>/SimTutor/frames/<session_id>/<channel>/`
-- Source screenshot file name: `<capture_wall_ms>_<frame_seq>.png`
+- Source screenshot file name: `<capture_wall_ms>_<frame_seq:06d>.png` (example: `1772872444902_000123.png`)
 - Source manifest: `frames.jsonl` in the same channel directory
-- Python-generated VLM-ready artifact: `artifacts/<capture_wall_ms>_<frame_seq>_vlm.png`
+- Python-generated VLM-ready artifact: `artifacts/<capture_wall_ms>_<frame_seq:06d>_vlm.png`
 
 The manifest line is the source-of-truth for replay/live reuse and must point at the final `.png` produced after the DCS-side temp-file to atomic-rename handoff. The Python-side crop pipeline then removes the right main-view region and writes a bordered, clearly labelled `Left DDI` / `AMPCD` / `Right DDI` artifact that `VisionObservation.image_uri` references.
 

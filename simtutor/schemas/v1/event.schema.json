@@ -45,8 +45,10 @@
     "vision_refs": {
       "type": "array",
       "items": {
-        "type": "string",
-        "pattern": "^[0-9]{10,20}_[0-9]{6}$"
+        "anyOf": [
+          { "type": "string", "format": "uuid" },
+          { "type": "string", "pattern": "^[0-9]{10,20}_[0-9]{6}$" }
+        ]
       },
       "description": "Optional linked VisionObservation.frame_id values."
     },

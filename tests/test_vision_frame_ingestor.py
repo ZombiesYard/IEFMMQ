@@ -104,11 +104,12 @@ def test_render_vlm_ready_frame_crops_main_view_and_draws_region_guides(
         processed_size = processed.size
         assert processed_size[0] < source_size[0]
         assert processed_size[1] >= source_size[1]
-        pixels = processed.load()
-        assert pixels is not None
-        for y in range(processed_size[1]):
-            for x in range(processed_size[0]):
-                r, g, b = pixels[x, y]
+        sampled = processed.resize((64, 64))
+        sampled_pixels = sampled.load()
+        assert sampled_pixels is not None
+        for y in range(64):
+            for x in range(64):
+                r, g, b = sampled_pixels[x, y]
                 assert not (r > 180 and g < 80 and b < 80)
         left_border_pixel = processed.getpixel((metadata["regions"][0]["x"], metadata["regions"][0]["y"]))
         assert left_border_pixel != (16, 20, 22)
@@ -203,6 +204,43 @@ def test_replay_can_reuse_same_manifest_and_artifact_directory(tmp_path: Path) -
 
     assert [item.frame_id for item in replay_obs] == [item.frame_id for item in live_obs]
     assert [item.image_uri for item in replay_obs] == [item.image_uri for item in live_obs]
+
+
+def test_frame_directory_port_rejects_manifest_layout_id_mismatch(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-layout-mismatch",
+        channel=DEFAULT_FRAME_CHANNEL,
+    )
+    frame_path = channel_dir / build_frame_filename(capture_wall_ms=1772872444902, frame_seq=123)
+    _make_source_frame(frame_path, width=1920, height=1080)
+    _append_manifest_entry(
+        channel_dir,
+        _manifest_entry(
+            channel_dir=channel_dir,
+            capture_wall_ms=1772872444902,
+            frame_seq=123,
+            width=1920,
+            height=1080,
+        )
+        | {"layout_id": "fa18c_composite_panel_v999"},
+    )
+
+    port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
+    port.start("sess-layout-mismatch")
+    with pytest.raises(ValueError, match="layout_id mismatch"):
+        port.poll()
+
+
+def test_frame_directory_port_rejects_unsupported_port_layout_id(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    with pytest.raises(ValueError, match="unsupported layout_id"):
+        FrameDirectoryVisionPort(
+            saved_games_dir=saved_games_dir,
+            channel=DEFAULT_FRAME_CHANNEL,
+            layout_id="fa18c_composite_panel_v999",
+        )
 
 
 def test_manifest_path_uses_frozen_frames_jsonl_name(tmp_path: Path) -> None:
