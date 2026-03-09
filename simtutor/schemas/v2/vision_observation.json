@@ -8,9 +8,17 @@
   "properties": {
     "schema_version": { "type": "string", "const": "v2" },
     "frame_id": {
-      "type": "string",
-      "pattern": "^[0-9]{10,20}_[0-9]{6}$",
-      "description": "Stable frame identifier derived from capture_wall_ms and zero-padded frame_seq."
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9]{10,20}_[0-9]{6}$"
+        }
+      ],
+      "description": "Backward-compatible vision frame reference. Manifest-backed observations use capture_wall_ms plus zero-padded frame_seq; legacy/non-manifest observations may still use UUIDs."
     },
     "timestamp": { "type": "string", "format": "date-time" },
     "source": { "type": "string" },

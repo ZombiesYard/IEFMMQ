@@ -251,12 +251,20 @@ class FrameDirectoryVisionPort(VisionPort):
     def _resolve_image_path(self, raw_path: Any) -> Path:
         if not isinstance(raw_path, str) or not raw_path.strip():
             raise ValueError("vision frame manifest image_path must be a non-empty string")
-        candidate = Path(raw_path).expanduser()
-        if candidate.is_absolute():
-            return candidate.resolve()
         if self._channel_dir is None:
             raise RuntimeError("channel directory is not initialized")
-        return (self._channel_dir / candidate).resolve()
+        candidate = Path(raw_path).expanduser()
+        if candidate.is_absolute():
+            resolved = candidate.resolve()
+        else:
+            resolved = (self._channel_dir / candidate).resolve()
+        try:
+            resolved.relative_to(self._channel_dir)
+        except ValueError as exc:
+            raise ValueError(
+                f"vision frame manifest image_path escapes channel directory: {resolved}"
+            ) from exc
+        return resolved
 
     def _build_observation(self, entry: Mapping[str, Any], *, image_path: Path) -> VisionObservation:
         artifact_path = build_vlm_artifact_path(image_path, artifact_dir_name=self.artifact_dir_name)

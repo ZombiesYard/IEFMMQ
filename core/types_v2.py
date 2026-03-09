@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 CONTRACT_VERSION_V2 = "v2"
 _VISION_FRAME_SEQ = count()
@@ -16,6 +17,10 @@ _VISION_FRAME_SEQ = count()
 
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
+
+
+def _uuid() -> str:
+    return str(uuid4())
 
 
 def _next_frame_id() -> str:
@@ -59,7 +64,7 @@ class TelemetryFrame:
 @dataclass
 class VisionObservation:
     schema_version: str = CONTRACT_VERSION_V2
-    frame_id: str = field(default_factory=_next_frame_id)
+    frame_id: str = field(default_factory=_uuid)
     timestamp: str = field(default_factory=_now_iso)
     source: str = "vision"
     session_id: Optional[str] = None

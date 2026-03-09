@@ -26,6 +26,16 @@ def test_vision_observation_schema_accepts_defaults() -> None:
     validate_instance(obs, "vision_observation")
 
 
+def test_vision_observation_schema_accepts_manifest_frame_id_pattern() -> None:
+    obs = VisionObservation(
+        frame_id="1772872444902_000123",
+        source="vision_stub",
+        channel="native_viewports_strip",
+        layout_id="fa18c_composite_panel_v2",
+    ).to_dict()
+    validate_instance(obs, "vision_observation")
+
+
 def test_vision_observation_schema_accepts_layout_id() -> None:
     obs = VisionObservation(
         frame_id="1772872444902_000123",

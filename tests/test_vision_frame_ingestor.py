@@ -243,6 +243,34 @@ def test_frame_directory_port_rejects_unsupported_port_layout_id(tmp_path: Path)
         )
 
 
+def test_frame_directory_port_rejects_image_path_outside_channel_dir(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    channel_dir = build_frame_channel_dir(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-path-escape",
+        channel=DEFAULT_FRAME_CHANNEL,
+    )
+    outside_dir = tmp_path / "outside"
+    outside_path = outside_dir / build_frame_filename(capture_wall_ms=1772872444902, frame_seq=123)
+    _make_source_frame(outside_path, width=1920, height=1080)
+    _append_manifest_entry(
+        channel_dir,
+        _manifest_entry(
+            channel_dir=channel_dir,
+            capture_wall_ms=1772872444902,
+            frame_seq=123,
+            width=1920,
+            height=1080,
+            image_path=outside_path,
+        ),
+    )
+
+    port = FrameDirectoryVisionPort(saved_games_dir=saved_games_dir, channel=DEFAULT_FRAME_CHANNEL)
+    port.start("sess-path-escape")
+    with pytest.raises(ValueError, match="escapes channel directory"):
+        port.poll()
+
+
 def test_manifest_path_uses_frozen_frames_jsonl_name(tmp_path: Path) -> None:
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     channel_dir = build_frame_channel_dir(
