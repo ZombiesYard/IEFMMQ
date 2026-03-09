@@ -98,6 +98,10 @@ def build_monitor_setup_plan(*, main_width: int, main_height: int, mode: str = M
     layout = load_vision_layout()
 
     if mode == MODE_EXTENDED_RIGHT:
+        # The debug canvas stays fixed at 2560x1440, but the three native
+        # viewports inside that canvas are still solved from the normalized
+        # left-strip contract so DCS export geometry and VLM crop geometry do
+        # not drift apart.
         export_solution = solve_layout_geometry(
             layout,
             output_width=COMPOSITE_CANVAS_WIDTH,
@@ -113,6 +117,8 @@ def build_monitor_setup_plan(*, main_width: int, main_height: int, mode: str = M
         canvas_height = COMPOSITE_CANVAS_HEIGHT
         viewports = _region_viewports(export_solution, x_offset=width)
     elif mode in {MODE_SINGLE_MONITOR, MODE_ULTRAWIDE_LEFT_STACK}:
+        # Both single-monitor and ultrawide-left-stack intentionally share the
+        # same normalized solver family; only the target screen size changes.
         solution = solve_layout_geometry(layout, output_width=width, output_height=height)
         main_rect = solution["main_view_rect"]
         strip_rect = solution["strip_rect"]
