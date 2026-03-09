@@ -2351,6 +2351,21 @@ def test_build_vision_port_from_args_rejects_session_id_with_path_separators() -
         _build_vision_port_from_args(args, mode="live")
 
 
+def test_build_vision_port_from_args_rejects_drive_qualified_session_id() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--vision-saved-games-dir",
+            "/tmp/saved games",
+            "--vision-session-id",
+            "C:escape",
+        ]
+    )
+
+    with pytest.raises(ValueError, match="--vision-session-id"):
+        _build_vision_port_from_args(args, mode="live")
+
+
 def test_build_vision_port_from_args_rejects_channel_with_path_separators() -> None:
     parser = build_arg_parser()
     args = parser.parse_args(

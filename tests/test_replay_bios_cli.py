@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import socket
 import sys
 import threading
 import time
@@ -16,7 +15,6 @@ from adapters.vision_frames import build_frame_channel_dir, build_frame_filename
 from adapters.vision_prompting import load_vision_layout, solve_layout_geometry
 from core.event_store import JsonlEventStore
 from core.types import Observation, TutorResponse
-from live_dcs import UdpHelpTrigger
 from simtutor.__main__ import main
 
 
@@ -159,7 +157,6 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
         ],
     )
     output_path = tmp_path / "replay_events.jsonl"
-    udp_state: dict[str, int] = {}
     trigger_instances: list["FakeUdpHelpTrigger"] = []
 
     class FakeUdpHelpTrigger:
@@ -168,7 +165,6 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
             self.port = port
             self.timeout = timeout
             self._pending = False
-            udp_state["port"] = 1
             trigger_instances.append(self)
 
         @property

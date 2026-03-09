@@ -365,7 +365,14 @@ def _normalize_path_segment(value: Any, *, flag_name: str) -> str:
         raise ValueError(f"{flag_name} must be a non-empty path segment")
     normalized = value.strip()
     path = Path(normalized)
-    if path.is_absolute() or len(path.parts) != 1 or path.parts[0] in {"", ".", ".."}:
+    if (
+        path.is_absolute()
+        or path.drive
+        or path.anchor
+        or ":" in normalized
+        or len(path.parts) != 1
+        or path.parts[0] in {"", ".", ".."}
+    ):
         raise ValueError(f"{flag_name} must be a simple path segment without path separators")
     if "\\" in normalized or "/" in normalized:
         raise ValueError(f"{flag_name} must be a simple path segment without path separators")
