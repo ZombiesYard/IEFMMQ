@@ -86,6 +86,38 @@ Install the DCS hook files into Saved Games:
 python -m tools.install_dcs_hook --dcs-variant DCS
 ```
 
+Install the monitor setup for the F/A-18C normalized three-viewport PoC:
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode extended-right \
+  --main-width 1920 \
+  --main-height 1080
+```
+
+Note: the generated DCS monitor-setup file/profile name remains `SimTutor_FA18C_CompositePanel_v1` for Saved Games compatibility, while the active vision layout contract is `fa18c_composite_panel_v2`.
+
+Install the single-monitor variant that solves the normalized left-stack layout on one screen and keeps the main view on the right:
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode single-monitor \
+  --main-width 1920 \
+  --main-height 1080
+```
+
+Install the ultrawide variant that solves the same normalized left-stack layout on an ultrawide screen:
+
+```bash
+python -m tools.install_dcs_monitor_setup \
+  --dcs-variant DCS \
+  --mode ultrawide-left-stack \
+  --main-width 3440 \
+  --main-height 1440
+```
+
 ## Repository Layout
 
 - `core/`: pure domain logic, procedure engine, gating, scoring, overlay planning
@@ -530,9 +562,12 @@ Relevant DCS-side scripts live under:
 ### Typical Live Bring-Up
 
 1. Install the hook files with `python -m tools.install_dcs_hook`.
-2. Ensure DCS or DCS.openbeta loads the copied Lua files.
-3. Start `python live_dcs.py`.
-4. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
+2. If you are testing the viewport PoC, install the monitor setup with `python -m tools.install_dcs_monitor_setup --mode <extended-right|ultrawide-left-stack|single-monitor> --main-width <screen_width> --main-height <screen_height>`.
+3. The frozen v0.4 visual contract only uses the native `LEFT_MFCD`, `CENTER_MFCD` (`AMPCD`), and `RIGHT_MFCD` exports; all other evidence should come from DCS-BIOS.
+4. In DCS Options, select `SimTutor_FA18C_CompositePanel_v1` as the monitor setup and set the total resolution to the tool's printed recommended resolution. `single-monitor` and `ultrawide-left-stack` now resolve the same normalized left-stack layout against different screen sizes.
+5. Ensure DCS or DCS.openbeta loads the copied Lua files.
+6. Start `python live_dcs.py`.
+7. Trigger help with Enter on stdin or send `help` to the configured UDP help port.
 
 ## Output Artifacts
 

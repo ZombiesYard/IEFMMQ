@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="1440" viewBox="0 0 880 1440" role="img" aria-labelledby="title desc">
+  <title id="title">F/A-18C Native Viewport Layout v2 Strip Preview</title>
+  <desc id="desc">Dark neutral matte preview background for the native export strip.</desc>
+  <rect width="880" height="1440" fill="#101416" />
+  <g font-family="DejaVu Sans Mono, monospace">
+    <text x="28" y="48" fill="#d9e2ea" font-size="24" font-weight="700">Normalized Export Strip</text>
+    <text x="28" y="80" fill="#8ba1b3" font-size="18">Three native display exports resolved inside the left stack.</text>
+    <g id="left_ddi">
+      <rect x="216" y="24" width="448" height="448" rx="26" ry="26" fill="#18272d" stroke="#74d1ff" stroke-width="6" />
+      <text x="244" y="86" fill="#f4f7fb" font-size="40" font-weight="700">Left DDI</text>
+      <text x="244" y="136" fill="#74d1ff" font-size="28">left_ddi</text>
+      <text x="244" y="428" fill="#d0dae4" font-size="24">OCR priority: high</text>
+    </g>
+    <g id="ampcd">
+      <rect x="216" y="496" width="448" height="448" rx="26" ry="26" fill="#1b3138" stroke="#6ee7c8" stroke-width="6" />
+      <text x="244" y="558" fill="#f4f7fb" font-size="40" font-weight="700">AMPCD</text>
+      <text x="244" y="608" fill="#6ee7c8" font-size="28">ampcd</text>
+      <text x="244" y="900" fill="#d0dae4" font-size="24">OCR priority: high</text>
+    </g>
+    <g id="right_ddi">
+      <rect x="216" y="968" width="448" height="448" rx="26" ry="26" fill="#18272d" stroke="#74d1ff" stroke-width="6" />
+      <text x="244" y="1030" fill="#f4f7fb" font-size="40" font-weight="700">Right DDI</text>
+      <text x="244" y="1080" fill="#74d1ff" font-size="28">right_ddi</text>
+      <text x="244" y="1372" fill="#d0dae4" font-size="24">OCR priority: high</text>
+    </g>
+  </g>
+</svg>

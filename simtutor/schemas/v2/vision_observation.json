@@ -20,6 +20,10 @@
       "type": ["string", "null"],
       "description": "Stable logical camera or display channel, e.g. center_mfd."
     },
+    "layout_id": {
+      "type": ["string", "null"],
+      "description": "Stable visual-layout identifier, resolved to canonical normalized native-viewport geometry via pack vision_layout.yaml."
+    },
     "image_uri": {
       "type": ["string", "null"],
       "format": "uri",

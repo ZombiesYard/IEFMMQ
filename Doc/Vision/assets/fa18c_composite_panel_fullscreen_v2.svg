@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">F/A-18C Normalized Full-Screen Layout Diagram</title>
+  <desc id="desc">Generic full-screen diagram showing the normalized export strip on the left and the main simulator view on the right.</desc>
+  <rect width="100%" height="100%" fill="#0d1216" />
+  <rect x="550" y="0" width="1050" height="900" fill="#101d28" stroke="#415564" stroke-width="2" />
+  <rect x="0" y="0" width="550" height="900" fill="#101416" stroke="#8ca4b8" stroke-width="3" />
+  <g font-family="DejaVu Sans Mono, monospace">
+    <text x="578" y="46" fill="#f0f4f8" font-size="24" font-weight="700">Main Simulator View</text>
+    <text x="578" y="76" fill="#8aa0b2" font-size="18">The playable camera occupies the remaining screen space.</text>
+    <text x="24" y="46" fill="#f0f4f8" font-size="24" font-weight="700">Export Strip</text>
+    <text x="24" y="76" fill="#8aa0b2" font-size="18">VLM input is cut from this strip first, then split into three regions.</text>
+    <line x1="590" y1="495" x2="1540" y2="495" stroke="#4f6676" stroke-width="2" stroke-dasharray="8 8" />
+    <line x1="590" y1="630" x2="1540" y2="468" stroke="#38515e" stroke-width="2" />
+    <g id="fullscreen_left_ddi">
+      <rect x="135" y="15" width="280" height="280" rx="20" ry="20" fill="#18272d" stroke="#74d1ff" stroke-width="4" />
+      <text x="153" y="57" fill="#f4f7fb" font-size="22" font-weight="700">Left DDI</text>
+      <text x="153" y="85" fill="#74d1ff" font-size="16">left_ddi</text>
+    </g>
+    <g id="fullscreen_ampcd">
+      <rect x="135" y="310" width="280" height="280" rx="20" ry="20" fill="#1b3138" stroke="#6ee7c8" stroke-width="4" />
+      <text x="153" y="352" fill="#f4f7fb" font-size="22" font-weight="700">AMPCD</text>
+      <text x="153" y="380" fill="#6ee7c8" font-size="16">ampcd</text>
+    </g>
+    <g id="fullscreen_right_ddi">
+      <rect x="135" y="605" width="280" height="280" rx="20" ry="20" fill="#18272d" stroke="#74d1ff" stroke-width="4" />
+      <text x="153" y="647" fill="#f4f7fb" font-size="22" font-weight="700">Right DDI</text>
+      <text x="153" y="675" fill="#74d1ff" font-size="16">right_ddi</text>
+    </g>
+  </g>
+</svg>

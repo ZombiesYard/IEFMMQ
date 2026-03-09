@@ -61,6 +61,7 @@ class VisionObservation:
     session_id: Optional[str] = None
     observation_ref: Optional[str] = None
     channel: Optional[str] = None
+    layout_id: Optional[str] = None
     image_uri: Optional[str] = None
     mime_type: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
