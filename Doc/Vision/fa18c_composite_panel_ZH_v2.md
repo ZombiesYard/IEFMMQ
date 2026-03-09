@@ -117,6 +117,7 @@ python -m tools.install_dcs_hook \
 - `Saved Games/<DCS variant>/Scripts/SimTutor/SimTutorConfig.lua`
   - 这里是 v0.4 组合面板最小模板，包含 `caps.vlm_frame = true`
   - 也包含 `vision.output_root`、`layout_id`、`channel`、背景色和推荐输出分辨率
+  - 现在也包含 `overlay.command_host/command_port/ack_host/ack_port`，默认仍是单机 `127.0.0.1`
 - `Saved Games/<DCS variant>/Config/MonitorSetup/SimTutor_FA18C_CompositePanel_v1.lua`
   - 这是 DCS 原生视口导出排版文件
 
@@ -127,6 +128,30 @@ python -m tools.install_dcs_monitor_setup \
   --dcs-variant DCS \
   --mode extended-right
 ```
+
+## 正式支持的部署拓扑
+
+v0.4 当前正式支持两种部署方式：
+
+- 单机：`DCS + simtutor + Qwen/vLLM` 都在同一台机器
+- 双机：`DCS + simtutor` 同机，`Qwen/vLLM` 远程部署
+
+双机场景下，若 `live_dcs.py` 仍与 DCS 同机运行，则只需要把 Python 侧
+`--model-base-url` 指向远程 Qwen/vLLM，例如：
+
+```bash
+python live_dcs.py \
+  --model-provider openai_compat \
+  --model-base-url http://10.0.0.42:8000/v1
+```
+
+此时 `SimTutorConfig.lua` 里的 `telemetry` / `handshake` / `overlay` 地址通常仍保持
+`127.0.0.1` 即可。只有当后续把 Python 主控进程迁到另一台机器时，才需要进一步调整：
+
+- `telemetry.host`：改成 Python 主控机地址
+- `overlay.ack_host`：改成 Python 主控机地址
+- `handshake.host`：改成 DCS 机上可绑定的地址，例如 `0.0.0.0`
+- `overlay.command_host`：改成 DCS 机上可绑定的地址，例如 `0.0.0.0`
 
 ## 如何把多个关键区域排成一张组合图
 
@@ -225,6 +250,8 @@ python -m tools.install_dcs_monitor_setup \
   - `vision.output_root = <Saved Games>/<variant>/SimTutor/frames`
   - `vision.channel = "composite_panel"`
   - `vision.layout_id = "fa18c_composite_panel_v2"`
+  - `overlay.command_host = "127.0.0.1"`（默认单机）
+  - `overlay.ack_host = "127.0.0.1"`（默认单机）
 
 ### 2. DCS Options
 

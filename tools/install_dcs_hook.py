@@ -24,6 +24,10 @@ DEFAULT_VISION_LAYOUT_ID = "fa18c_composite_panel_v2"
 DEFAULT_FRAME_CHANNEL = "composite_panel"
 DEFAULT_FRAME_MANIFEST_NAME = "frames.jsonl"
 DEFAULT_VISION_BACKGROUND_RGB = (15, 20, 24)
+DEFAULT_OVERLAY_COMMAND_HOST = "127.0.0.1"
+DEFAULT_OVERLAY_COMMAND_PORT = 7781
+DEFAULT_OVERLAY_ACK_HOST = "127.0.0.1"
+DEFAULT_OVERLAY_ACK_PORT = 7782
 
 
 @dataclass(frozen=True)
@@ -115,6 +119,12 @@ def build_composite_panel_config(
     background_rgb: Sequence[int] = DEFAULT_VISION_BACKGROUND_RGB,
     capture_width: int | None = None,
     capture_height: int | None = None,
+    overlay_command_host: str = DEFAULT_OVERLAY_COMMAND_HOST,
+    overlay_command_port: int = DEFAULT_OVERLAY_COMMAND_PORT,
+    overlay_ack_host: str = DEFAULT_OVERLAY_ACK_HOST,
+    overlay_ack_port: int = DEFAULT_OVERLAY_ACK_PORT,
+    overlay_auto_clear: bool = True,
+    overlay_hilite_id: int = 9101,
 ) -> str:
     effective_frames_root = (frames_root or _vision_frames_root(saved_games_dir)).expanduser().resolve()
     background = tuple(int(value) for value in background_rgb)
@@ -122,6 +132,16 @@ def build_composite_panel_config(
         raise ValueError("background_rgb must contain exactly three integers between 0 and 255")
     if (capture_width is None) ^ (capture_height is None):
         raise ValueError("capture_width and capture_height must be provided together")
+    if not overlay_command_host:
+        raise ValueError("overlay_command_host must be non-empty")
+    if not overlay_ack_host:
+        raise ValueError("overlay_ack_host must be non-empty")
+    if overlay_command_port <= 0:
+        raise ValueError("overlay_command_port must be positive")
+    if overlay_ack_port <= 0:
+        raise ValueError("overlay_ack_port must be positive")
+    if overlay_hilite_id < 0:
+        raise ValueError("overlay_hilite_id must be non-negative")
 
     lines = [
         "-- SimTutor composite-panel baseline for v0.4 vision bring-up.",
@@ -142,6 +162,14 @@ def build_composite_panel_config(
         "        overlay_ack = false,",
         "        clickable_actions = false,",
         "        vlm_frame = true,",
+        "    },",
+        "    overlay = {",
+        f'        command_host = "{overlay_command_host}",',
+        f"        command_port = {int(overlay_command_port)},",
+        f'        ack_host = "{overlay_ack_host}",',
+        f"        ack_port = {int(overlay_ack_port)},",
+        f"        auto_clear = {'true' if overlay_auto_clear else 'false'},",
+        f"        hilite_id = {int(overlay_hilite_id)},",
         "    },",
         "    vision = {",
         "        enabled = true,",
@@ -182,6 +210,12 @@ def install_composite_panel_config(
     background_rgb: Sequence[int] = DEFAULT_VISION_BACKGROUND_RGB,
     capture_width: int | None = None,
     capture_height: int | None = None,
+    overlay_command_host: str = DEFAULT_OVERLAY_COMMAND_HOST,
+    overlay_command_port: int = DEFAULT_OVERLAY_COMMAND_PORT,
+    overlay_ack_host: str = DEFAULT_OVERLAY_ACK_HOST,
+    overlay_ack_port: int = DEFAULT_OVERLAY_ACK_PORT,
+    overlay_auto_clear: bool = True,
+    overlay_hilite_id: int = 9101,
 ) -> ConfigInstallResult:
     config_path = saved_games_dir / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
     config_text = build_composite_panel_config(
@@ -193,6 +227,12 @@ def install_composite_panel_config(
         background_rgb=background_rgb,
         capture_width=capture_width,
         capture_height=capture_height,
+        overlay_command_host=overlay_command_host,
+        overlay_command_port=overlay_command_port,
+        overlay_ack_host=overlay_ack_host,
+        overlay_ack_port=overlay_ack_port,
+        overlay_auto_clear=overlay_auto_clear,
+        overlay_hilite_id=overlay_hilite_id,
     )
     _ensure_parent(config_path)
     changed = True
