@@ -186,11 +186,7 @@ def _emit_vision_observation_event(
             payload=wrapped.to_dict(),
             related_id=wrapped.observation_id,
             t_wall=t_wall,
-            session_id=(
-                payload.get("session_id")
-                if isinstance(payload.get("session_id"), str) and payload.get("session_id")
-                else fallback_session_id
-            ),
+            session_id=fallback_session_id,
             vision_refs=[
                 payload["frame_id"],
             ]

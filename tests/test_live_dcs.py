@@ -2587,6 +2587,32 @@ def test_emit_vision_observation_event_replaces_invalid_observation_ref_with_uui
     assert str(UUID(payload["observation_id"])) == payload["observation_id"]
 
 
+def test_emit_vision_observation_event_uses_tutor_session_id_over_payload_session_id(tmp_path: Path) -> None:
+    artifact_path = tmp_path / "vision" / "1772872444950_000122_vlm.png"
+    source_path = tmp_path / "vision" / "1772872444950_000122.png"
+    events: list[dict[str, Any]] = []
+
+    _emit_vision_observation_event(
+        observation=VisionObservation(
+            frame_id="1772872444950_000122",
+            source="vision_test",
+            session_id="vision-sidecar-session",
+            capture_wall_ms=1772872444950,
+            frame_seq=122,
+            layout_id="fa18c_composite_panel_v2",
+            channel="composite_panel",
+            image_uri=str(artifact_path),
+            source_image_path=str(source_path),
+        ),
+        event_sink=lambda event: events.append(event.to_dict()),
+        fallback_session_id="sess-live",
+    )
+
+    assert len(events) == 1
+    assert events[0]["session_id"] == "sess-live"
+    assert events[0]["payload"]["payload"]["session_id"] == "vision-sidecar-session"
+
+
 def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_without_vision.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
