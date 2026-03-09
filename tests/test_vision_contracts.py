@@ -14,7 +14,7 @@ def test_schema_registry_exposes_vision_observation() -> None:
 def test_schema_registry_exposes_vision_frame_manifest_entry() -> None:
     assert "vision_frame_manifest_entry" in SCHEMA_INDEX
     schema = load_schema("vision_frame_manifest_entry")
-    assert schema["title"] == "Vision Frame Manifest Entry v1"
+    assert schema["title"] == "Vision Frame Manifest Entry v2"
 
 
 def test_vision_observation_schema_accepts_defaults() -> None:

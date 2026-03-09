@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://simtutor.dev/schemas/v2/vision_frame_manifest_entry.json",
-  "title": "Vision Frame Manifest Entry v1",
+  "title": "Vision Frame Manifest Entry v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
