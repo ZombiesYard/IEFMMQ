@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from core.types_v2 import VisionObservation
 
 from adapters.vision_sync import BufferedVisionSession, select_help_cycle_frames
@@ -142,6 +144,33 @@ def test_select_help_cycle_frames_derives_observation_anchor_ms_from_observation
     assert selection.observation_t_wall_s == 1772872445.0
     assert selection.observation_t_wall_ms == 1772872445000
     assert selection.trigger_wall_ms == 1772872445300
+
+
+def test_select_help_cycle_frames_defaults_anchor_seconds_when_observation_time_missing() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("1772872444950_000122", 1772872444950),
+        ],
+        trigger_wall_ms=1772872445300,
+        sync_window_ms=400,
+    )
+
+    assert selection.observation_t_wall_s == 1772872445.3
+    assert selection.observation_t_wall_ms == 1772872445300
+
+
+def test_select_help_cycle_frames_falls_back_to_trigger_time_for_non_finite_observation_time() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("1772872444950_000122", 1772872444950),
+        ],
+        trigger_wall_ms=1772872445300,
+        sync_window_ms=400,
+        observation_t_wall_s=math.nan,
+    )
+
+    assert selection.observation_t_wall_s == 1772872445.3
+    assert selection.observation_t_wall_ms == 1772872445300
 
 
 def test_select_help_cycle_frames_falls_back_to_future_frame_when_past_missing() -> None:

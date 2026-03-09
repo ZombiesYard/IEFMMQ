@@ -7,6 +7,7 @@ from __future__ import annotations
 from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import datetime
+import math
 import time
 from typing import Any, Callable, Iterable
 
@@ -86,10 +87,17 @@ def _primary_sync_payload(
     }
 
 
-def _observation_anchor_wall_ms(*, observation_t_wall_s: float | None, trigger_wall_ms: int) -> int:
+def _normalize_observation_anchor(
+    *,
+    observation_t_wall_s: float | None,
+    trigger_wall_ms: int,
+) -> tuple[float, int]:
+    fallback_s = float(trigger_wall_ms) / 1000.0
     if isinstance(observation_t_wall_s, (int, float)):
-        return int(round(float(observation_t_wall_s) * 1000.0))
-    return int(trigger_wall_ms)
+        normalized_s = float(observation_t_wall_s)
+        if math.isfinite(normalized_s):
+            return normalized_s, int(round(normalized_s * 1000.0))
+    return fallback_s, int(trigger_wall_ms)
 
 
 def _trigger_sync_status(*, capture_wall_ms: int, trigger_wall_ms: int) -> str:
@@ -178,7 +186,7 @@ def select_help_cycle_frames(
     observation_t_wall_s: float | None = None,
 ) -> HelpCycleVisionSelection:
     window_ms = max(0, int(sync_window_ms))
-    observation_t_wall_ms = _observation_anchor_wall_ms(
+    normalized_observation_t_wall_s, observation_t_wall_ms = _normalize_observation_anchor(
         observation_t_wall_s=observation_t_wall_s,
         trigger_wall_ms=trigger_wall_ms,
     )
@@ -263,7 +271,7 @@ def select_help_cycle_frames(
         status=status,
         observation_ref=observation_ref,
         observation_seq=observation_seq,
-        observation_t_wall_s=observation_t_wall_s,
+        observation_t_wall_s=normalized_observation_t_wall_s,
         observation_t_wall_ms=observation_t_wall_ms,
         trigger_wall_ms=int(trigger_wall_ms),
         sync_window_ms=window_ms,

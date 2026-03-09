@@ -435,6 +435,13 @@ def _coerce_float(value: Any) -> float | None:
     return None
 
 
+def _coerce_finite_float(value: Any) -> float | None:
+    normalized = _coerce_float(value)
+    if normalized is None or not math.isfinite(normalized):
+        return None
+    return normalized
+
+
 def _coerce_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
@@ -1299,7 +1306,7 @@ class LiveDcsTutorLoop:
         trigger_wall_ms = int(round(float(trigger_t_wall) * 1000.0))
         payload = observation.payload if isinstance(observation.payload, Mapping) else {}
         observation_seq = _coerce_int(payload.get("seq"))
-        observation_t_wall_s = _coerce_float(payload.get("t_wall"))
+        observation_t_wall_s = _coerce_finite_float(payload.get("t_wall"))
         if observation_t_wall_s is None:
             observation_t_wall_s = float(trigger_t_wall)
         observation_t_wall_ms = int(round(float(observation_t_wall_s) * 1000.0))
