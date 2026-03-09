@@ -14,6 +14,10 @@ from adapters.base_help_model import BaseHelpModel
 from core.llm_schema import get_help_response_schema
 
 
+class _MultimodalRequestRejected(RuntimeError):
+    """Raised when the upstream server explicitly rejects multimodal fields."""
+
+
 class OpenAICompatModel(BaseHelpModel):
     provider = "openai_compat"
     _DEFAULT_QWEN35_MAX_TOKENS = 384
@@ -68,9 +72,11 @@ class OpenAICompatModel(BaseHelpModel):
         multimodal_spec = self._build_multimodal_spec(request)
         self._runtime_metadata.update(
             {
-                "multimodal_input_present": bool(multimodal_spec["image_contents"]),
+                "multimodal_input_present": bool(multimodal_spec["candidate_frames"]),
+                "multimodal_candidate_frame_ids": list(multimodal_spec["candidate_frame_ids"]),
                 "multimodal_primary_frame_id": multimodal_spec["primary_frame_id"],
                 "multimodal_frame_ids": list(multimodal_spec["frame_ids"]),
+                "multimodal_images_built": bool(multimodal_spec["image_contents"]),
                 "multimodal_image_count": len(multimodal_spec["image_contents"]),
                 "multimodal_path_attempted": False,
                 "multimodal_path_success": False,
@@ -117,11 +123,16 @@ class OpenAICompatModel(BaseHelpModel):
             self._runtime_metadata["multimodal_path_attempted"] = True
             try:
                 content = self._chat_once(messages, headers=headers, has_vision=True)
-            except Exception as exc:
+            except _MultimodalRequestRejected as exc:
                 self._runtime_metadata["multimodal_path_success"] = False
                 self._runtime_metadata["multimodal_fallback_to_text"] = True
-                self._runtime_metadata["multimodal_failure_reason"] = f"{type(exc).__name__}: {exc}"
+                self._runtime_metadata["multimodal_failure_reason"] = str(exc)
                 return self._chat_once(self._strip_images_from_messages(messages), headers=headers, has_vision=False)
+            except Exception as exc:
+                self._runtime_metadata["multimodal_path_success"] = False
+                self._runtime_metadata["multimodal_fallback_to_text"] = False
+                self._runtime_metadata["multimodal_failure_reason"] = f"{type(exc).__name__}: {exc}"
+                raise
             self._runtime_metadata["multimodal_path_success"] = True
             self._runtime_metadata["multimodal_fallback_to_text"] = False
             self._runtime_metadata["multimodal_failure_reason"] = None
@@ -165,6 +176,9 @@ class OpenAICompatModel(BaseHelpModel):
                 continue
             break
 
+        if has_vision and self._is_multimodal_unsupported_400(response):
+            error_text = self._extract_response_error_text(response) or "server rejected multimodal request"
+            raise _MultimodalRequestRejected(error_text)
         response.raise_for_status()
         body = response.json()
         if not isinstance(body, Mapping):
@@ -246,6 +260,8 @@ class OpenAICompatModel(BaseHelpModel):
         vision = context.get("vision")
         if not isinstance(vision, Mapping):
             return {
+                "candidate_frames": [],
+                "candidate_frame_ids": [],
                 "image_contents": [],
                 "frame_ids": [],
                 "primary_frame_id": None,
@@ -253,32 +269,17 @@ class OpenAICompatModel(BaseHelpModel):
                 "failure_reason": None,
             }
 
-        trigger_frame = vision.get("trigger_frame")
-        pre_trigger_frame = vision.get("pre_trigger_frame")
-        selected_frames = vision.get("selected_frames")
-        primary_frame = self._normalize_frame_payload(trigger_frame)
-        if primary_frame is None:
-            primary_frame = self._frame_payload_by_id(selected_frames, vision.get("frame_id"))
-        if primary_frame is None:
-            primary_frame = self._normalize_frame_payload(pre_trigger_frame)
-        secondary_frame = self._normalize_frame_payload(pre_trigger_frame)
-        if (
-            secondary_frame is not None
-            and primary_frame is not None
-            and secondary_frame.get("frame_id") == primary_frame.get("frame_id")
-        ):
-            secondary_frame = None
-
-        frames: list[dict[str, Any]] = []
-        for frame in (primary_frame, secondary_frame):
-            if frame is None:
-                continue
-            frames.append(frame)
+        candidate_frames = self._candidate_multimodal_frames(vision)
+        candidate_frame_ids = [
+            str(frame["frame_id"])
+            for frame in candidate_frames
+            if isinstance(frame.get("frame_id"), str) and frame.get("frame_id")
+        ]
 
         image_contents: list[dict[str, Any]] = []
         frame_ids: list[str] = []
         failure_reason: str | None = None
-        for frame in frames:
+        for frame in candidate_frames:
             frame_id = frame.get("frame_id")
             if not isinstance(frame_id, str) or not frame_id:
                 continue
@@ -293,12 +294,32 @@ class OpenAICompatModel(BaseHelpModel):
             frame_ids.append(frame_id)
 
         return {
+            "candidate_frames": candidate_frames,
+            "candidate_frame_ids": candidate_frame_ids,
             "image_contents": image_contents,
             "frame_ids": frame_ids,
-            "primary_frame_id": frame_ids[0] if frame_ids else None,
-            "secondary_frame_id": frame_ids[1] if len(frame_ids) > 1 else None,
+            "primary_frame_id": candidate_frame_ids[0] if candidate_frame_ids else None,
+            "secondary_frame_id": candidate_frame_ids[1] if len(candidate_frame_ids) > 1 else None,
             "failure_reason": failure_reason,
         }
+
+    def _candidate_multimodal_frames(self, vision: Mapping[str, Any]) -> list[dict[str, Any]]:
+        trigger_frame = self._coerce_frame_mapping(vision.get("trigger_frame"))
+        pre_trigger_frame = self._coerce_frame_mapping(vision.get("pre_trigger_frame"))
+        selected_frames = vision.get("selected_frames")
+        primary_frame = trigger_frame
+        if primary_frame is None:
+            primary_frame = self._raw_frame_payload_by_id(selected_frames, vision.get("frame_id"))
+        if primary_frame is None:
+            primary_frame = pre_trigger_frame
+        secondary_frame = pre_trigger_frame
+        if (
+            secondary_frame is not None
+            and primary_frame is not None
+            and secondary_frame.get("frame_id") == primary_frame.get("frame_id")
+        ):
+            secondary_frame = None
+        return [frame for frame in (primary_frame, secondary_frame) if frame is not None]
 
     def _build_multimodal_prompt_text(
         self,
@@ -349,7 +370,7 @@ class OpenAICompatModel(BaseHelpModel):
     def _frame_to_data_url(self, frame: Mapping[str, Any]) -> str:
         raw_url = frame.get("image_uri") or frame.get("source_image_path")
         if not isinstance(raw_url, str) or not raw_url.strip():
-            raise ValueError("vision frame is missing image_uri")
+            raise ValueError("vision frame is missing image_uri/source_image_path")
         image_url = raw_url.strip()
         if image_url.startswith("data:") or image_url.startswith("http://") or image_url.startswith("https://"):
             return image_url
@@ -363,14 +384,21 @@ class OpenAICompatModel(BaseHelpModel):
         return f"data:{mime_type};base64,{encoded}"
 
     @staticmethod
-    def _normalize_frame_payload(frame: Any) -> dict[str, Any] | None:
+    def _coerce_frame_mapping(frame: Any) -> dict[str, Any] | None:
         if not isinstance(frame, Mapping):
             return None
         normalized = dict(frame)
         frame_id = normalized.get("frame_id")
-        image_uri = normalized.get("image_uri") or normalized.get("source_image_path")
         if not isinstance(frame_id, str) or not frame_id:
             return None
+        return normalized
+
+    @staticmethod
+    def _normalize_frame_payload(frame: Any) -> dict[str, Any] | None:
+        normalized = OpenAICompatModel._coerce_frame_mapping(frame)
+        if normalized is None:
+            return None
+        image_uri = normalized.get("image_uri") or normalized.get("source_image_path")
         if not isinstance(image_uri, str) or not image_uri:
             return None
         return normalized
@@ -384,12 +412,23 @@ class OpenAICompatModel(BaseHelpModel):
                 return normalized
         return None
 
+    def _raw_frame_payload_by_id(self, selected_frames: Any, frame_id: Any) -> dict[str, Any] | None:
+        if not isinstance(frame_id, str) or not frame_id or not isinstance(selected_frames, list):
+            return None
+        for item in selected_frames:
+            normalized = self._coerce_frame_mapping(item)
+            if normalized is not None and normalized.get("frame_id") == frame_id:
+                return normalized
+        return None
+
     @staticmethod
     def _empty_multimodal_metadata() -> dict[str, Any]:
         return {
             "multimodal_input_present": False,
+            "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,
             "multimodal_frame_ids": [],
+            "multimodal_images_built": False,
             "multimodal_image_count": 0,
             "multimodal_path_attempted": False,
             "multimodal_path_success": False,
@@ -453,6 +492,37 @@ class OpenAICompatModel(BaseHelpModel):
             r"\bextra\s+inputs?\s+are\s+not\s+permitted\b",
             r"\bextra\s+fields?\s+not\s+permitted\b",
             r"\bdoes\s+not\s+support\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in unsupported_patterns)
+
+    def _is_multimodal_unsupported_400(self, response: Any) -> bool:
+        status_code = getattr(response, "status_code", None)
+        if status_code != 400:
+            return False
+        error_text = self._extract_response_error_text(response)
+        if not error_text:
+            return False
+        normalized = error_text.lower()
+        multimodal_tokens = (
+            "image_url",
+            "multimodal",
+            "multi-modal",
+            "vision",
+            "image input",
+            "input_image",
+        )
+        if not any(token in normalized for token in multimodal_tokens):
+            return False
+        unsupported_patterns = (
+            r"\bunsupported\b",
+            r"\bnot\s+supported\b",
+            r"\bunknown\s+field\b",
+            r"\bunrecognized\s+field\b",
+            r"\bunexpected\s+field\b",
+            r"\bextra\s+inputs?\s+are\s+not\s+permitted\b",
+            r"\bextra\s+fields?\s+not\s+permitted\b",
+            r"\bdoes\s+not\s+support\b",
+            r"\binvalid\b",
         )
         return any(re.search(pattern, normalized) for pattern in unsupported_patterns)
 

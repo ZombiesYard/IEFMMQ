@@ -409,8 +409,10 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
 
     assert res.status == "ok"
     assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872445010_000123", "1772872444950_000122"]
     assert res.metadata["multimodal_primary_frame_id"] == "1772872445010_000123"
     assert res.metadata["multimodal_frame_ids"] == ["1772872445010_000123", "1772872444950_000122"]
+    assert res.metadata["multimodal_images_built"] is True
     assert res.metadata["multimodal_image_count"] == 2
     assert res.metadata["multimodal_path_attempted"] is True
     assert res.metadata["multimodal_path_success"] is True
@@ -448,11 +450,64 @@ def test_openai_compat_multimodal_failure_falls_back_to_text_only_and_records_me
     assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], list)
     assert isinstance(fake.calls[1]["json"]["messages"][1]["content"], str)
     assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872445010_000123"]
     assert res.metadata["multimodal_image_count"] == 1
+    assert res.metadata["multimodal_images_built"] is True
     assert res.metadata["multimodal_path_attempted"] is True
     assert res.metadata["multimodal_path_success"] is False
     assert res.metadata["multimodal_fallback_to_text"] is True
-    assert "RuntimeError: http 400" in res.metadata["multimodal_failure_reason"]
+    assert "Unknown field image_url" in res.metadata["multimodal_failure_reason"]
+
+
+def test_openai_compat_does_not_fallback_to_text_only_for_non_multimodal_transport_errors(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    fake = FakeClient(to_raise=TimeoutError("request timeout"))
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-27B")
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "error"
+    assert len(fake.calls) == 1
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_images_built"] is True
+    assert res.metadata["multimodal_path_attempted"] is True
+    assert res.metadata["multimodal_path_success"] is False
+    assert res.metadata["multimodal_fallback_to_text"] is False
+    assert "TimeoutError: request timeout" == res.metadata["multimodal_failure_reason"]
+    assert res.metadata["failure_code"] == MODEL_HTTP_FAIL
+
+
+def test_openai_compat_keeps_multimodal_input_present_when_image_build_fails() -> None:
+    request = _request_help()
+    request.context["vision"] = {
+        "status": "partial",
+        "vision_used": True,
+        "frame_id": "1772872445010_000123",
+        "trigger_frame": {
+            "frame_id": "1772872445010_000123",
+            "role": "trigger_frame",
+        },
+    }
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-27B")
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 1
+    assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], str)
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872445010_000123"]
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_frame_ids"] == []
+    assert res.metadata["multimodal_image_count"] == 0
+    assert res.metadata["multimodal_path_attempted"] is False
+    assert res.metadata["multimodal_fallback_to_text"] is False
+    assert "image_uri/source_image_path" in res.metadata["multimodal_failure_reason"]
 
 
 def test_openai_compat_text_only_path_is_unchanged_without_vision_context() -> None:
@@ -464,8 +519,10 @@ def test_openai_compat_text_only_path_is_unchanged_without_vision_context() -> N
 
     assert res.status == "ok"
     assert res.metadata["multimodal_input_present"] is False
+    assert res.metadata["multimodal_candidate_frame_ids"] == []
     assert res.metadata["multimodal_primary_frame_id"] is None
     assert res.metadata["multimodal_frame_ids"] == []
+    assert res.metadata["multimodal_images_built"] is False
     assert res.metadata["multimodal_image_count"] == 0
     assert res.metadata["multimodal_path_attempted"] is False
     assert res.metadata["multimodal_path_success"] is False

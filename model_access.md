@@ -7,10 +7,11 @@ logic does not change when switching runtime backends.
 
 - Use case: vLLM / llama.cpp server / TGI, all through OpenAI-compatible APIs.
 - Provider value: `SIMTUTOR_MODEL_PROVIDER=openai_compat`
-- Base URL required: `SIMTUTOR_MODEL_BASE_URL` (example: `http://127.0.0.1:8000/v1`)
+- Base URL required: `SIMTUTOR_MODEL_BASE_URL` (example: `http://127.0.0.1:8000`)
 - API key required: `SIMTUTOR_MODEL_API_KEY`
 - Default model if `SIMTUTOR_MODEL_NAME` is omitted: `Qwen3-8B-Instruct`
 - When `request.context["vision"]` carries synchronized frame artifacts, `openai_compat` can send them as OpenAI-compatible `image_url` content for Qwen3.5 VLM and automatically falls back to text-only if the multimodal path fails.
+- Note: this repository appends `/v1/chat/completions` itself, so `SIMTUTOR_MODEL_BASE_URL` should be the provider root rather than an OpenAI SDK-style `/v1` base URL.
 
 ## Provider B (Fallback): Ollama
 
