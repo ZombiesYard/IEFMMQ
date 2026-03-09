@@ -2174,11 +2174,9 @@ def _build_vision_port_from_args(
     sync_window_ms = int(sync_window_ms_raw) if isinstance(sync_window_ms_raw, int) and sync_window_ms_raw > 0 else None
     trigger_wait_ms = (
         int(trigger_wait_ms_raw)
-        if isinstance(trigger_wait_ms_raw, int) and trigger_wait_ms_raw >= 0
+        if isinstance(trigger_wait_ms_raw, int) and trigger_wait_ms_raw > 0
         else None
     )
-    if mode != "live" and trigger_wait_ms == 0:
-        trigger_wait_ms = None
 
     return (
         FrameDirectoryVisionPort(

@@ -2383,6 +2383,21 @@ def test_build_vision_port_from_args_rejects_channel_with_path_separators() -> N
         _build_vision_port_from_args(args, mode="live")
 
 
+def test_build_vision_port_from_args_live_zero_trigger_wait_uses_mode_default() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--vision-saved-games-dir",
+            "/tmp/saved games",
+            "--vision-session-id",
+            "sess-live",
+        ]
+    )
+
+    _vision_port, _session_id, _sync_window_ms, trigger_wait_ms = _build_vision_port_from_args(args, mode="live")
+    assert trigger_wait_ms is None
+
+
 def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_events(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_with_vision.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
