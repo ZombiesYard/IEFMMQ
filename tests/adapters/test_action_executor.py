@@ -29,6 +29,14 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
                 "ttl_s": 99,
                 "help_cycle_id": "cycle-123",
                 "generation_mode": "repair",
+                "vision_used": True,
+                "frame_id": "1772872445000_000123",
+                "sync_delta_ms": 0,
+                "vision_fact_summary": {"status": "available", "seen_fact_ids": ["fcs_reset_seen"]},
+                "fused_step_id": "S03",
+                "fused_missing_conditions": ["vision_facts.fcs_reset_seen==seen"],
+                "vision_fallback_reason": None,
+                "layout_id": "fa18c_composite_panel_v2",
             }
         ]
     )
@@ -47,6 +55,14 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
     assert overlay_requested.metadata["help_cycle_id"] == "cycle-123"
     assert overlay_requested.metadata["generation_mode"] == "repair"
     assert overlay_requested.payload["help_cycle_id"] == "cycle-123"
+    assert overlay_requested.payload["vision_used"] is True
+    assert overlay_requested.payload["frame_id"] == "1772872445000_000123"
+    assert overlay_requested.payload["sync_delta_ms"] == 0
+    assert overlay_requested.payload["vision_fact_summary"]["status"] == "available"
+    assert overlay_requested.payload["fused_step_id"] == "S03"
+    assert overlay_requested.payload["fused_missing_conditions"] == ["vision_facts.fcs_reset_seen==seen"]
+    assert overlay_requested.payload["vision_fallback_reason"] is None
+    assert overlay_requested.payload["layout_id"] == "fa18c_composite_panel_v2"
 
 
 def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> None:
@@ -62,6 +78,28 @@ def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> N
     assert len(report.rejected) == 1
     assert report.rejected[0]["reason"] == "rejected_non_overlay_action"
     assert any(evt.kind == "overlay_failed" for evt in events)
+
+
+def test_executor_does_not_push_sender_trace_for_none_only_audit_fields(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, event_sink=events.append)
+    executor = OverlayActionExecutor(sender=sender, event_sink=events.append, max_targets=1)
+
+    report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "apu_switch",
+                "vision_fallback_reason": None,
+            }
+        ]
+    )
+
+    assert len(report.executed) == 1
+    overlay_requested = next(evt for evt in events if evt.kind == "overlay_requested")
+    assert "vision_fallback_reason" not in overlay_requested.payload
 
 
 def test_executor_rejects_invalid_action_payload(monkeypatch) -> None:

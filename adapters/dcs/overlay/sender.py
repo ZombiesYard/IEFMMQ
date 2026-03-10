@@ -5,6 +5,7 @@ import time
 from typing import Any, Callable, Mapping, Optional
 from uuid import uuid4
 
+from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.overlay import OverlayIntent
 from core.types import Event
 
@@ -50,22 +51,10 @@ class DcsOverlaySender:
             merged_meta = dict(event.metadata)
             merged_meta.update(current_trace)
             event.metadata = merged_meta
-            help_cycle_id = current_trace.get("help_cycle_id")
-            if (
-                isinstance(help_cycle_id, str)
-                and help_cycle_id
-                and isinstance(event.payload, dict)
-                and "help_cycle_id" not in event.payload
-            ):
-                event.payload["help_cycle_id"] = help_cycle_id
-            generation_mode = current_trace.get("generation_mode")
-            if (
-                isinstance(generation_mode, str)
-                and generation_mode
-                and isinstance(event.payload, dict)
-                and "generation_mode" not in event.payload
-            ):
-                event.payload["generation_mode"] = generation_mode
+            if isinstance(event.payload, dict):
+                for key, value in current_trace.items():
+                    if key not in event.payload:
+                        event.payload[key] = value
         if self.event_sink:
             self.event_sink(event)
 
@@ -75,17 +64,7 @@ class DcsOverlaySender:
         return dict(self._event_metadata_stack[-1])
 
     def push_event_metadata(self, metadata: Mapping[str, Any] | None) -> None:
-        if not isinstance(metadata, Mapping):
-            self._event_metadata_stack.append({})
-            return
-        normalized: dict[str, Any] = {}
-        help_cycle_id = metadata.get("help_cycle_id")
-        if isinstance(help_cycle_id, str) and help_cycle_id:
-            normalized["help_cycle_id"] = help_cycle_id
-        generation_mode = metadata.get("generation_mode")
-        if isinstance(generation_mode, str) and generation_mode:
-            normalized["generation_mode"] = generation_mode
-        self._event_metadata_stack.append(normalized)
+        self._event_metadata_stack.append(normalize_help_cycle_audit_fields(metadata))
 
     def pop_event_metadata(self) -> None:
         if self._event_metadata_stack:

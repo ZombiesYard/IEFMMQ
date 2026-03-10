@@ -58,7 +58,17 @@ from adapters.vision_sync import (
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
-from core.help_failure import classify_mapping_failure, merge_failure_metadata, overlay_rejection_payload
+from core.help_cycle_audit import normalize_help_cycle_audit_fields
+from core.help_failure import (
+    VISION_CONFLICT_UNRESOLVED,
+    VISION_PARSE_FAIL,
+    VISION_SYNC_MISS,
+    VISION_TEXT_FALLBACK,
+    VISION_UNAVAILABLE,
+    classify_mapping_failure,
+    merge_failure_metadata,
+    overlay_rejection_payload,
+)
 from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
     STEP_OBSERVABILITY_VALUES,
@@ -748,20 +758,132 @@ def _normalize_generation_mode(response: TutorResponse) -> str:
     return "model"
 
 
+def _coerce_string_list(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, str) and item]
+
+
+def _extract_selected_layout_id(vision_selection: HelpCycleVisionSelection) -> str | None:
+    for frame in (vision_selection.trigger_frame, vision_selection.pre_trigger_frame):
+        if isinstance(frame, Mapping):
+            layout_id = frame.get("layout_id")
+            if isinstance(layout_id, str) and layout_id:
+                return layout_id
+    return None
+
+
+def _extract_fused_step_audit(request: TutorRequest) -> tuple[str | None, list[str]]:
+    context = request.context if isinstance(request.context, Mapping) else {}
+    hint = context.get("deterministic_step_hint")
+    if not isinstance(hint, Mapping):
+        return None, []
+    fused_step_id = hint.get("inferred_step_id")
+    if not isinstance(fused_step_id, str) or not fused_step_id:
+        fused_step_id = None
+    return fused_step_id, _coerce_string_list(hint.get("missing_conditions"))
+
+
+def _extract_model_next_step_id(metadata: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(metadata, Mapping):
+        return None
+    help_response = metadata.get("help_response")
+    if not isinstance(help_response, Mapping):
+        return None
+    next_payload = help_response.get("next")
+    if not isinstance(next_payload, Mapping):
+        return None
+    step_id = next_payload.get("step_id")
+    if not isinstance(step_id, str) or not step_id:
+        return None
+    return step_id
+
+
+def _classify_vision_fallback_reason(
+    *,
+    vision_selection: HelpCycleVisionSelection,
+    vision_fact_context: Mapping[str, Any],
+    response_metadata: Mapping[str, Any] | None = None,
+    fused_step_id: str | None = None,
+) -> str | None:
+    if isinstance(response_metadata, Mapping) and bool(response_metadata.get("multimodal_fallback_to_text")):
+        return VISION_TEXT_FALLBACK
+
+    vision_fact_status = vision_fact_context.get("status")
+    if vision_fact_status == "extractor_failed":
+        return VISION_PARSE_FAIL
+    if vision_fact_status == "vision_unavailable" and vision_selection.vision_used:
+        return VISION_UNAVAILABLE
+
+    model_next_step_id = _extract_model_next_step_id(response_metadata)
+    if (
+        isinstance(fused_step_id, str)
+        and fused_step_id
+        and isinstance(model_next_step_id, str)
+        and model_next_step_id
+        and model_next_step_id != fused_step_id
+        and vision_selection.vision_used
+    ):
+        return VISION_CONFLICT_UNRESOLVED
+
+    if not vision_selection.vision_used:
+        if vision_selection.sync_miss_reason == "vision_port_unconfigured":
+            return VISION_UNAVAILABLE
+        if isinstance(vision_selection.sync_miss_reason, str) and vision_selection.sync_miss_reason:
+            return VISION_SYNC_MISS
+        return VISION_UNAVAILABLE
+
+    return None
+
+
+def _build_help_cycle_audit_fields(
+    *,
+    request: TutorRequest,
+    vision_selection: HelpCycleVisionSelection,
+    vision_fact_context: Mapping[str, Any],
+    response_metadata: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    fused_step_id, fused_missing_conditions = _extract_fused_step_audit(request)
+    return {
+        "vision_used": bool(vision_selection.vision_used),
+        "frame_id": vision_selection.frame_id,
+        "sync_delta_ms": vision_selection.sync_delta_ms,
+        "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
+        "fused_step_id": fused_step_id,
+        "fused_missing_conditions": fused_missing_conditions,
+        "vision_fallback_reason": _classify_vision_fallback_reason(
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
+            response_metadata=response_metadata,
+            fused_step_id=fused_step_id,
+        ),
+        "layout_id": _extract_selected_layout_id(vision_selection),
+    }
+
+
+def _apply_help_cycle_audit_fields(target: dict[str, Any], audit_fields: Mapping[str, Any]) -> None:
+    target.update(normalize_help_cycle_audit_fields(audit_fields))
+
+
 def _attach_help_cycle_trace_to_actions(
     actions: Sequence[Mapping[str, Any] | Any],
     *,
-    help_cycle_id: str,
-    generation_mode: str,
+    trace_metadata: Mapping[str, Any],
 ) -> list[Mapping[str, Any] | Any]:
+    normalized_trace = normalize_help_cycle_audit_fields(trace_metadata)
     traced: list[Mapping[str, Any] | Any] = []
     for action in actions:
         if not isinstance(action, Mapping):
             traced.append(action)
             continue
         item = dict(action)
-        item["help_cycle_id"] = help_cycle_id
-        item.setdefault("generation_mode", generation_mode)
+        help_cycle_id = normalized_trace.get("help_cycle_id")
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            item["help_cycle_id"] = help_cycle_id
+        for key, value in normalized_trace.items():
+            if key == "help_cycle_id":
+                continue
+            item.setdefault(key, value)
         traced.append(item)
     return traced
 
@@ -940,6 +1062,9 @@ class LiveLoopStats:
     help_cycles: int = 0
     model_calls: int = 0
     cache_hits: int = 0
+    vision_cycles: int = 0
+    vision_sync_miss_count: int = 0
+    vision_text_fallback_count: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -947,6 +1072,9 @@ class LiveLoopStats:
             "help_cycles": self.help_cycles,
             "model_calls": self.model_calls,
             "cache_hits": self.cache_hits,
+            "vision_cycles": self.vision_cycles,
+            "vision_sync_miss_count": self.vision_sync_miss_count,
+            "vision_text_fallback_count": self.vision_text_fallback_count,
         }
 
 
@@ -2242,6 +2370,12 @@ class LiveDcsTutorLoop:
         request.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
         request.metadata["vision_fact_status"] = vision_fact_context["status"]
         request.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
+        request_audit_fields = _build_help_cycle_audit_fields(
+            request=request,
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
+        )
+        _apply_help_cycle_audit_fields(request.metadata, request_audit_fields)
         now_wall = time.time()
         self._emit_event(
             kind="tutor_request",
@@ -2252,10 +2386,15 @@ class LiveDcsTutorLoop:
                 "help_cycle_id": help_cycle_id,
                 "vision_status": vision_selection.status,
                 "vision_fact_status": vision_fact_context["status"],
+                **normalize_help_cycle_audit_fields(request_audit_fields),
             },
             vision_refs=vision_selection.frame_ids,
         )
         self._stats.help_cycles += 1
+        if request_audit_fields["vision_used"] is True:
+            self._stats.vision_cycles += 1
+        if request_audit_fields["vision_fallback_reason"] == VISION_SYNC_MISS:
+            self._stats.vision_sync_miss_count += 1
 
         use_cache = False
         cached = self._help_cache
@@ -2292,10 +2431,27 @@ class LiveDcsTutorLoop:
             response.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
             response.metadata["vision_facts"] = list(vision_fact_context["vision_facts"])
             response.metadata["generation_mode"] = _normalize_generation_mode(response)
+            response_audit_fields = _build_help_cycle_audit_fields(
+                request=request,
+                vision_selection=vision_selection,
+                vision_fact_context=vision_fact_context,
+                response_metadata=response.metadata,
+            )
+            _apply_help_cycle_audit_fields(response.metadata, response_audit_fields)
+            if isinstance(response_audit_fields.get("vision_fallback_reason"), str):
+                response.metadata = merge_failure_metadata(
+                    response.metadata,
+                    response_audit_fields["vision_fallback_reason"],
+                    stage="vision",
+                )
+            trace_metadata = {
+                "help_cycle_id": help_cycle_id,
+                "generation_mode": response.metadata["generation_mode"],
+                **response_audit_fields,
+            }
             response.actions = _attach_help_cycle_trace_to_actions(
                 response.actions,
-                help_cycle_id=help_cycle_id,
-                generation_mode=response.metadata["generation_mode"],
+                trace_metadata=trace_metadata,
             )
             overlay_report = self._execute_or_dry_run_actions(response.actions)
         else:
@@ -2402,10 +2558,27 @@ class LiveDcsTutorLoop:
             response.metadata["fallback_overlay_used"] = fallback_overlay_used
             response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
             _normalize_cached_response_metadata(response.metadata)
+            response_audit_fields = _build_help_cycle_audit_fields(
+                request=request,
+                vision_selection=vision_selection,
+                vision_fact_context=vision_fact_context,
+                response_metadata=response.metadata,
+            )
+            _apply_help_cycle_audit_fields(response.metadata, response_audit_fields)
+            if isinstance(response_audit_fields.get("vision_fallback_reason"), str):
+                response.metadata = merge_failure_metadata(
+                    response.metadata,
+                    response_audit_fields["vision_fallback_reason"],
+                    stage="vision",
+                )
+            trace_metadata = {
+                "help_cycle_id": help_cycle_id,
+                "generation_mode": response.metadata["generation_mode"],
+                **response_audit_fields,
+            }
             response.actions = _attach_help_cycle_trace_to_actions(
                 response.actions,
-                help_cycle_id=help_cycle_id,
-                generation_mode=response.metadata["generation_mode"],
+                trace_metadata=trace_metadata,
             )
 
             overlay_report = self._execute_or_dry_run_actions(response.actions)
@@ -2429,6 +2602,8 @@ class LiveDcsTutorLoop:
             if isinstance(requires_visual_confirmation, bool):
                 response.metadata["requires_visual_confirmation"] = requires_visual_confirmation
         response.metadata["scenario_profile"] = self.scenario_profile
+        if response.metadata.get("vision_fallback_reason") == VISION_TEXT_FALLBACK:
+            self._stats.vision_text_fallback_count += 1
 
         if self.dry_run_overlay and overlay_report.get("dry_run"):
             print(
@@ -2454,6 +2629,7 @@ class LiveDcsTutorLoop:
                 metadata={
                     "help_cycle_id": help_cycle_id,
                     "generation_mode": response.metadata.get("generation_mode"),
+                    **normalize_help_cycle_audit_fields(response.metadata),
                 },
                 vision_refs=vision_selection.frame_ids,
             )
@@ -2466,6 +2642,7 @@ class LiveDcsTutorLoop:
             metadata={
                 "help_cycle_id": help_cycle_id,
                 "generation_mode": response.metadata.get("generation_mode"),
+                **normalize_help_cycle_audit_fields(response.metadata),
             },
             vision_refs=vision_selection.frame_ids,
         )
