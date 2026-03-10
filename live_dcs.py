@@ -875,13 +875,19 @@ def _attach_help_cycle_trace_to_actions(
     *,
     trace_metadata: Mapping[str, Any],
 ) -> list[Mapping[str, Any] | Any]:
+    normalized_trace = normalize_help_cycle_audit_fields(trace_metadata)
     traced: list[Mapping[str, Any] | Any] = []
     for action in actions:
         if not isinstance(action, Mapping):
             traced.append(action)
             continue
         item = dict(action)
-        for key, value in normalize_help_cycle_audit_fields(trace_metadata).items():
+        help_cycle_id = normalized_trace.get("help_cycle_id")
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            item["help_cycle_id"] = help_cycle_id
+        for key, value in normalized_trace.items():
+            if key == "help_cycle_id":
+                continue
             item.setdefault(key, value)
         traced.append(item)
     return traced
