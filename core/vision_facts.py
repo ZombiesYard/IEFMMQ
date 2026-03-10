@@ -1,0 +1,331 @@
+"""
+Vision-fact configuration, sticky aggregation, and summary helpers.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from core.types_v2 import VisionFactObservation
+
+VISION_FACT_IDS: tuple[str, ...] = (
+    "fcs_page_visible",
+    "bit_page_visible",
+    "fcs_reset_seen",
+    "fcs_bit_interaction_seen",
+    "fcs_bit_result_visible",
+    "takeoff_trim_seen",
+    "ins_alignment_page_visible",
+    "ins_go",
+)
+VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"})
+_STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def default_vision_facts_path(pack_path: str | Path | None = None) -> Path:
+    if pack_path is None:
+        return _repo_root() / "packs" / "fa18c_startup" / "vision_facts.yaml"
+    return Path(pack_path).expanduser().resolve().parent / "vision_facts.yaml"
+
+
+def _path_signature(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+@lru_cache(maxsize=8)
+def _load_vision_facts_config_cached(
+    resolved_path: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> dict[str, Any]:
+    del mtime_ns, size_bytes
+    path = Path(resolved_path)
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"vision facts config must be a mapping: {path}")
+    return _normalize_vision_facts_config(payload)
+
+
+def load_vision_facts_config(path: str | Path | None = None) -> dict[str, Any]:
+    resolved = (Path(path) if path is not None else default_vision_facts_path()).expanduser().resolve()
+    return _load_vision_facts_config_cached(str(resolved), *_path_signature(resolved))
+
+
+def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
+    facts_raw = raw.get("facts")
+    if not isinstance(facts_raw, list) or not facts_raw:
+        raise ValueError("vision facts config missing non-empty facts list")
+    facts_by_id: dict[str, dict[str, Any]] = {}
+    for item in facts_raw:
+        if not isinstance(item, Mapping):
+            raise ValueError("vision facts entries must be mappings")
+        fact_id = item.get("fact_id")
+        if not isinstance(fact_id, str) or fact_id not in VISION_FACT_IDS:
+            raise ValueError(f"unsupported vision fact id: {fact_id!r}")
+        if fact_id in facts_by_id:
+            raise ValueError(f"duplicate vision fact id: {fact_id}")
+        expires_after_ms = item.get("expires_after_ms")
+        if isinstance(expires_after_ms, bool) or not isinstance(expires_after_ms, int) or expires_after_ms < 0:
+            raise ValueError(f"vision fact {fact_id} expires_after_ms must be a non-negative int")
+        sticky = item.get("sticky")
+        if not isinstance(sticky, bool):
+            raise ValueError(f"vision fact {fact_id} sticky must be a bool")
+        facts_by_id[fact_id] = {
+            "fact_id": fact_id,
+            "sticky": sticky,
+            "expires_after_ms": expires_after_ms,
+            "intended_regions": [
+                value for value in item.get("intended_regions", []) if isinstance(value, str) and value
+            ],
+            "steps": [value for value in item.get("steps", []) if isinstance(value, str) and value],
+        }
+
+    bindings_raw = raw.get("step_bindings", {})
+    if not isinstance(bindings_raw, Mapping):
+        raise ValueError("vision facts config step_bindings must be a mapping")
+    step_bindings: dict[str, tuple[str, ...]] = {}
+    for step_id, binding in bindings_raw.items():
+        if not isinstance(step_id, str) or not step_id:
+            raise ValueError("vision facts config step_bindings keys must be non-empty strings")
+        if not isinstance(binding, Mapping):
+            raise ValueError(f"vision step binding for {step_id} must be a mapping")
+        all_of = binding.get("all_of")
+        if not isinstance(all_of, list) or not all_of:
+            raise ValueError(f"vision step binding for {step_id} requires non-empty all_of")
+        normalized = []
+        for fact_id in all_of:
+            if not isinstance(fact_id, str) or fact_id not in facts_by_id:
+                raise ValueError(f"vision step binding for {step_id} references unsupported fact {fact_id!r}")
+            normalized.append(fact_id)
+        step_bindings[step_id] = tuple(normalized)
+
+    return {
+        "layout_id": raw.get("layout_id"),
+        "facts_by_id": facts_by_id,
+        "step_bindings": step_bindings,
+    }
+
+
+def normalize_fact_state(raw_state: Any) -> str:
+    if isinstance(raw_state, str) and raw_state in VISION_FACT_STATES:
+        return raw_state
+    return "uncertain"
+
+
+def normalize_vision_fact(
+    raw_fact: Mapping[str, Any],
+    *,
+    config: Mapping[str, Any] | None = None,
+    default_observed_at_wall_ms: int | None = None,
+) -> dict[str, Any]:
+    facts_by_id = (config or load_vision_facts_config()).get("facts_by_id", {})
+    fact_id = raw_fact.get("fact_id")
+    if not isinstance(fact_id, str) or fact_id not in facts_by_id:
+        raise ValueError(f"unsupported vision fact id: {fact_id!r}")
+    spec = facts_by_id[fact_id]
+    source_frame_id = raw_fact.get("source_frame_id")
+    if not isinstance(source_frame_id, str) or not source_frame_id:
+        raise ValueError(f"vision fact {fact_id} missing source_frame_id")
+    confidence = raw_fact.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise ValueError(f"vision fact {fact_id} confidence must be numeric")
+    confidence_value = max(0.0, min(1.0, float(confidence)))
+    evidence_note = raw_fact.get("evidence_note")
+    if not isinstance(evidence_note, str) or not evidence_note.strip():
+        raise ValueError(f"vision fact {fact_id} evidence_note must be non-empty")
+    observed_at_wall_ms = raw_fact.get("observed_at_wall_ms")
+    if observed_at_wall_ms is None:
+        observed_at_wall_ms = default_observed_at_wall_ms
+    if observed_at_wall_ms is not None:
+        if (
+            isinstance(observed_at_wall_ms, bool)
+            or not isinstance(observed_at_wall_ms, int)
+            or observed_at_wall_ms < 0
+        ):
+            raise ValueError(f"vision fact {fact_id} observed_at_wall_ms must be a non-negative int")
+
+    normalized = {
+        "fact_id": fact_id,
+        "state": normalize_fact_state(raw_fact.get("state")),
+        "source_frame_id": source_frame_id,
+        "confidence": confidence_value,
+        "expires_after_ms": int(spec["expires_after_ms"]),
+        "evidence_note": evidence_note.strip(),
+        "observed_at_wall_ms": observed_at_wall_ms,
+        "sticky": bool(spec["sticky"]),
+    }
+    if normalized["observed_at_wall_ms"] is not None:
+        normalized["expires_at_wall_ms"] = normalized["observed_at_wall_ms"] + normalized["expires_after_ms"]
+    else:
+        normalized["expires_at_wall_ms"] = None
+    return normalized
+
+
+def prune_expired_facts(
+    snapshot: Mapping[str, Mapping[str, Any]] | None,
+    *,
+    now_wall_ms: int,
+) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    if not isinstance(snapshot, Mapping):
+        return out
+    for fact_id, fact in snapshot.items():
+        if not isinstance(fact_id, str) or not isinstance(fact, Mapping):
+            continue
+        expires_at_wall_ms = fact.get("expires_at_wall_ms")
+        if isinstance(expires_at_wall_ms, int) and expires_at_wall_ms < now_wall_ms:
+            continue
+        out[fact_id] = dict(fact)
+    return out
+
+
+def merge_vision_fact_observation(
+    snapshot: Mapping[str, Mapping[str, Any]] | None,
+    observation: VisionFactObservation | Mapping[str, Any],
+    *,
+    config: Mapping[str, Any] | None = None,
+    now_wall_ms: int | None = None,
+) -> dict[str, dict[str, Any]]:
+    payload = observation.to_dict() if isinstance(observation, VisionFactObservation) else dict(observation)
+    trigger_wall_ms = payload.get("trigger_wall_ms")
+    effective_now_wall_ms = (
+        trigger_wall_ms if isinstance(trigger_wall_ms, int) and trigger_wall_ms >= 0 else (now_wall_ms or 0)
+    )
+    merged = prune_expired_facts(snapshot, now_wall_ms=effective_now_wall_ms)
+    facts_raw = payload.get("facts")
+    if not isinstance(facts_raw, list):
+        return merged
+    for raw_fact in facts_raw:
+        if not isinstance(raw_fact, Mapping):
+            continue
+        normalized = normalize_vision_fact(
+            raw_fact,
+            config=config,
+            default_observed_at_wall_ms=effective_now_wall_ms if effective_now_wall_ms > 0 else None,
+        )
+        fact_id = normalized["fact_id"]
+        existing = merged.get(fact_id)
+        if (
+            existing is not None
+            and existing.get("sticky") is True
+            and existing.get("state") == "seen"
+            and normalized["state"] in _STICKY_PRESERVE_STATES
+        ):
+            continue
+        merged[fact_id] = normalized
+    return merged
+
+
+def snapshot_to_list(snapshot: Mapping[str, Mapping[str, Any]] | None) -> list[dict[str, Any]]:
+    if not isinstance(snapshot, Mapping):
+        return []
+    out: list[dict[str, Any]] = []
+    for fact_id in VISION_FACT_IDS:
+        fact = snapshot.get(fact_id)
+        if isinstance(fact, Mapping):
+            out.append(dict(fact))
+    return out
+
+
+def facts_satisfy_step_binding(
+    snapshot: Mapping[str, Mapping[str, Any]] | None,
+    *,
+    step_id: str,
+    config: Mapping[str, Any] | None = None,
+) -> bool:
+    step_bindings = (config or load_vision_facts_config()).get("step_bindings", {})
+    required = step_bindings.get(step_id)
+    if not required:
+        return False
+    if not isinstance(snapshot, Mapping):
+        return False
+    for fact_id in required:
+        fact = snapshot.get(fact_id)
+        if not isinstance(fact, Mapping) or fact.get("state") != "seen":
+            return False
+    return True
+
+
+def build_vision_fact_summary(
+    snapshot: Mapping[str, Mapping[str, Any]] | None,
+    *,
+    status: str,
+    frame_ids: Sequence[str] | None = None,
+    fresh_fact_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    seen_fact_ids: list[str] = []
+    uncertain_fact_ids: list[str] = []
+    not_seen_fact_ids: list[str] = []
+    if isinstance(snapshot, Mapping):
+        for fact_id in VISION_FACT_IDS:
+            fact = snapshot.get(fact_id)
+            if not isinstance(fact, Mapping):
+                continue
+            state = fact.get("state")
+            if state == "seen":
+                seen_fact_ids.append(fact_id)
+            elif state == "not_seen":
+                not_seen_fact_ids.append(fact_id)
+            else:
+                uncertain_fact_ids.append(fact_id)
+    segments: list[str] = []
+    if seen_fact_ids:
+        segments.append("seen=" + ",".join(seen_fact_ids))
+    if uncertain_fact_ids:
+        segments.append("uncertain=" + ",".join(uncertain_fact_ids))
+    if not_seen_fact_ids:
+        segments.append("not_seen=" + ",".join(not_seen_fact_ids))
+    summary_text = "; ".join(segments) if segments else "no_active_vision_facts"
+    return {
+        "status": status,
+        "frame_ids": [item for item in (frame_ids or []) if isinstance(item, str) and item],
+        "fresh_fact_ids": [item for item in (fresh_fact_ids or []) if isinstance(item, str) and item],
+        "seen_fact_ids": seen_fact_ids,
+        "uncertain_fact_ids": uncertain_fact_ids,
+        "not_seen_fact_ids": not_seen_fact_ids,
+        "summary_text": summary_text,
+    }
+
+
+def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
+    if isinstance(raw, Mapping):
+        if "snapshot" in raw and isinstance(raw.get("snapshot"), list):
+            raw = raw.get("snapshot")
+        elif "vision_facts" in raw and isinstance(raw.get("vision_facts"), list):
+            raw = raw.get("vision_facts")
+    if not isinstance(raw, list):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        fact_id = item.get("fact_id")
+        if isinstance(fact_id, str) and fact_id in VISION_FACT_IDS:
+            out[fact_id] = dict(item)
+    return out
+
+
+__all__ = [
+    "VISION_FACT_IDS",
+    "VISION_FACT_STATES",
+    "build_vision_fact_summary",
+    "default_vision_facts_path",
+    "extract_vision_fact_snapshot",
+    "facts_satisfy_step_binding",
+    "load_vision_facts_config",
+    "merge_vision_fact_observation",
+    "normalize_fact_state",
+    "normalize_vision_fact",
+    "prune_expired_facts",
+    "snapshot_to_list",
+]

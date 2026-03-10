@@ -1,0 +1,77 @@
+schema_version: v1
+layout_id: fa18c_composite_panel_v2
+facts:
+  - fact_id: fcs_page_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - left_ddi
+      - right_ddi
+    steps:
+      - S08
+      - S15
+  - fact_id: bit_page_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S08
+      - S18
+  - fact_id: fcs_reset_seen
+    sticky: true
+    expires_after_ms: 600000
+    intended_regions:
+      - left_ddi
+    steps:
+      - S15
+  - fact_id: fcs_bit_interaction_seen
+    sticky: true
+    expires_after_ms: 600000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S18
+  - fact_id: fcs_bit_result_visible
+    sticky: true
+    expires_after_ms: 600000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S18
+  - fact_id: takeoff_trim_seen
+    sticky: true
+    expires_after_ms: 600000
+    intended_regions:
+      - left_ddi
+    steps:
+      - S17
+  - fact_id: ins_alignment_page_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - ampcd
+    steps:
+      - S12
+  - fact_id: ins_go
+    sticky: true
+    expires_after_ms: 900000
+    intended_regions:
+      - ampcd
+    steps:
+      - S12
+step_bindings:
+  S08:
+    all_of:
+      - fcs_page_visible
+      - bit_page_visible
+  S15:
+    all_of:
+      - fcs_reset_seen
+  S17:
+    all_of:
+      - takeoff_trim_seen
+  S18:
+    all_of:
+      - fcs_bit_interaction_seen
+      - fcs_bit_result_visible

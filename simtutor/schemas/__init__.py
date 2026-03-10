@@ -21,6 +21,7 @@ SCHEMA_INDEX: dict[str, tuple[str, str]] = {
     "dcs_caps": ("simtutor.schemas.v2", "dcs_caps.json"),
     "vision_observation": ("simtutor.schemas.v2", "vision_observation.json"),
     "vision_frame_manifest_entry": ("simtutor.schemas.v2", "vision_frame_manifest_entry.json"),
+    "vision_fact_observation": ("simtutor.schemas.v2", "vision_fact_observation.json"),
 }
 
 

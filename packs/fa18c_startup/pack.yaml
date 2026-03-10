@@ -7,6 +7,7 @@ description: >
 metadata:
   step_registry_path: step_registry.yaml
   vision_layout_id: fa18c_composite_panel_v2
+  vision_facts_path: vision_facts.yaml
   vision_priority_steps:
     - S08
     - S15

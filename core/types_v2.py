@@ -76,5 +76,44 @@ class VisionObservation:
         return asdict(self)
 
 
-__all__ = ["DcsObservation", "TelemetryFrame", "VisionObservation", "CONTRACT_VERSION_V2"]
+@dataclass
+class VisionFact:
+    fact_id: str = ""
+    state: str = "uncertain"
+    source_frame_id: str = ""
+    confidence: float = 0.0
+    expires_after_ms: int = 0
+    evidence_note: str = ""
+    observed_at_wall_ms: Optional[int] = None
+    sticky: Optional[bool] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class VisionFactObservation:
+    schema_version: str = CONTRACT_VERSION_V2
+    observation_id: str = field(default_factory=_uuid)
+    timestamp: str = field(default_factory=_now_iso)
+    source: str = "vision_fact_extractor"
+    session_id: Optional[str] = None
+    trigger_wall_ms: Optional[int] = None
+    frame_ids: list[str] = field(default_factory=list)
+    facts: list[VisionFact] = field(default_factory=list)
+    summary: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+__all__ = [
+    "DcsObservation",
+    "TelemetryFrame",
+    "VisionObservation",
+    "VisionFact",
+    "VisionFactObservation",
+    "CONTRACT_VERSION_V2",
+]
 
