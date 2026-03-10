@@ -1,4 +1,5 @@
 import argparse
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import os
@@ -13,6 +14,7 @@ from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
+from simtutor.replay_eval import ReplayEvalOracleModel, load_replay_eval_suite, run_replay_eval_suite
 from simtutor.schemas import SCHEMA_INDEX, load_schema
 from simtutor.runner import replay_log, run_simulation
 
@@ -61,6 +63,52 @@ def _build_replay_model_from_args(args: argparse.Namespace) -> Any:
     from live_dcs import _build_model_from_args
 
     return _build_model_from_args(args)
+
+
+def _add_model_args(parser: argparse.ArgumentParser, *, default_provider: str, provider_choices: list[str]) -> None:
+    parser.add_argument("--model-provider", choices=provider_choices, default=default_provider)
+    parser.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
+    parser.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
+    parser.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
+    parser.add_argument(
+        "--model-max-tokens",
+        type=parse_non_negative_int_arg,
+        default=parse_env_int("SIMTUTOR_MODEL_MAX_TOKENS", default=0, minimum=0),
+        help="Max completion tokens for model providers that support it (0 uses provider default).",
+    )
+    parser.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
+    model_multimodal_default = parse_env_bool("SIMTUTOR_MODEL_ENABLE_MULTIMODAL", default=False)
+    model_multimodal_group = parser.add_mutually_exclusive_group()
+    model_multimodal_group.add_argument(
+        "--model-enable-multimodal",
+        dest="model_enable_multimodal",
+        action="store_true",
+        help="Allow OpenAI-compatible models to send synchronized vision frames as multimodal image inputs.",
+    )
+    model_multimodal_group.add_argument(
+        "--no-model-enable-multimodal",
+        dest="model_enable_multimodal",
+        action="store_false",
+        help="Force text-only requests even when synchronized vision frames are available.",
+    )
+    parser.set_defaults(model_enable_multimodal=model_multimodal_default)
+    parser.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
+    parser.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
+    log_raw_group = parser.add_mutually_exclusive_group()
+    log_raw_group.add_argument(
+        "--log-raw-llm-text",
+        dest="log_raw_llm_text",
+        action="store_true",
+        help="Log raw model text into tutor_response.metadata.raw_llm_text(_attempts)",
+    )
+    log_raw_group.add_argument(
+        "--no-log-raw-llm-text",
+        dest="log_raw_llm_text",
+        action="store_false",
+        help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
+    )
+    parser.set_defaults(log_raw_llm_text=log_raw_default)
 
 
 def _run_replay_bios(args: argparse.Namespace) -> int:
@@ -175,6 +223,32 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
 
     print(f"[REPLAY_BIOS] wrote events to {output}")
     print(f"[REPLAY_BIOS] stats={json.dumps(stats, ensure_ascii=False, sort_keys=True)}")
+    return 0
+
+
+def _run_replay_eval(args: argparse.Namespace) -> int:
+    suite = replace(load_replay_eval_suite(args.suite), lang=args.lang)
+
+    def _model_factory(case) -> Any:
+        if args.model_provider == "oracle":
+            return ReplayEvalOracleModel(case, lang=args.lang)
+        runtime_args = argparse.Namespace(**vars(args))
+        runtime_args.session_id = case.session_id
+        runtime_args.vision_saved_games_dir = str(case.vision.saved_games_dir) if case.vision is not None else None
+        runtime_args.vision_session_id = case.vision.session_id if case.vision is not None else None
+        runtime_args.vision_channel = case.vision.channel if case.vision is not None else DEFAULT_FRAME_CHANNEL
+        runtime_args.vision_layout_id = case.vision.layout_id if case.vision is not None else DEFAULT_LAYOUT_ID
+        return _build_replay_model_from_args(runtime_args)
+
+    report = run_replay_eval_suite(
+        suite,
+        output_dir=args.output_dir,
+        report_path=args.report,
+        model_factory=_model_factory,
+        provider_name=args.model_provider,
+    )
+    print(f"[REPLAY_EVAL] suite={suite.suite_id}")
+    print(f"[REPLAY_EVAL] summary={json.dumps(report['summary'], ensure_ascii=False, sort_keys=True)}")
     return 0
 
 
@@ -310,55 +384,27 @@ def main() -> int:
         help="Disable dry-run overlay and send overlay commands",
     )
 
-    rep_bios.add_argument("--model-provider", choices=["stub", "openai_compat", "ollama"], default="stub")
-    rep_bios.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
-    rep_bios.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
-    rep_bios.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
-    rep_bios.add_argument(
-        "--model-max-tokens",
-        type=parse_non_negative_int_arg,
-        default=parse_env_int("SIMTUTOR_MODEL_MAX_TOKENS", default=0, minimum=0),
-        help="Max completion tokens for model providers that support it (0 uses provider default).",
-    )
-    rep_bios.add_argument("--model-api-key", default=os.getenv("SIMTUTOR_MODEL_API_KEY"))
-    replay_model_multimodal_default = parse_env_bool("SIMTUTOR_MODEL_ENABLE_MULTIMODAL", default=False)
-    replay_model_multimodal_group = rep_bios.add_mutually_exclusive_group()
-    replay_model_multimodal_group.add_argument(
-        "--model-enable-multimodal",
-        dest="model_enable_multimodal",
-        action="store_true",
-        help="Allow OpenAI-compatible models to send synchronized vision frames as multimodal image inputs.",
-    )
-    replay_model_multimodal_group.add_argument(
-        "--no-model-enable-multimodal",
-        dest="model_enable_multimodal",
-        action="store_false",
-        help="Force text-only requests even when synchronized vision frames are available.",
-    )
-    rep_bios.set_defaults(model_enable_multimodal=replay_model_multimodal_default)
-    rep_bios.add_argument("--stub-mode", default="A", help="ModelStub mode (A/B/C)")
-    rep_bios.add_argument("--lang", choices=["zh", "en"], default=os.getenv("SIMTUTOR_LANG", "zh"))
+    _add_model_args(rep_bios, default_provider="stub", provider_choices=["stub", "openai_compat", "ollama"])
     rep_bios.add_argument(
         "--scenario-profile",
         choices=sorted(SUPPORTED_SCENARIO_PROFILES),
         default=DEFAULT_SCENARIO_PROFILE,
         help="Scenario profile to parameterize pack gate branches (default: airfield).",
     )
-    replay_log_raw_default = parse_env_bool("SIMTUTOR_LOG_RAW_LLM_TEXT", default=False)
-    replay_log_raw_group = rep_bios.add_mutually_exclusive_group()
-    replay_log_raw_group.add_argument(
-        "--log-raw-llm-text",
-        dest="log_raw_llm_text",
-        action="store_true",
-        help="Log raw model text into tutor_response.metadata.raw_llm_text(_attempts)",
+
+    rep_eval = sub.add_parser("replay-eval", help="Run fixed replay regression suite and emit a stable report")
+    rep_eval.add_argument(
+        "--suite",
+        default="replay_eval/fa18c_startup_v04/suite.yaml",
+        help="Replay evaluation suite YAML path",
     )
-    replay_log_raw_group.add_argument(
-        "--no-log-raw-llm-text",
-        dest="log_raw_llm_text",
-        action="store_false",
-        help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
+    rep_eval.add_argument(
+        "--output-dir",
+        default="logs/replay_eval",
+        help="Directory for per-case replay event logs and the report",
     )
-    rep_bios.set_defaults(log_raw_llm_text=replay_log_raw_default)
+    rep_eval.add_argument("--report", default=None, help="Optional explicit report JSON path")
+    _add_model_args(rep_eval, default_provider="oracle", provider_choices=["oracle", "stub", "openai_compat", "ollama"])
 
     args = parser.parse_args()
     if args.command == "validate":
@@ -424,6 +470,12 @@ def main() -> int:
             return _run_replay_bios(args)
         except Exception as exc:
             print(f"[REPLAY_BIOS] error: {exc}")
+            return 1
+    if args.command == "replay-eval":
+        try:
+            return _run_replay_eval(args)
+        except Exception as exc:
+            print(f"[REPLAY_EVAL] error: {exc}")
             return 1
     parser.print_help()
     return 0

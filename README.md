@@ -338,6 +338,7 @@ Top-level subcommands:
 - `batch`
 - `model-config`
 - `replay-bios`
+- `replay-eval`
 
 #### `simtutor validate`
 
@@ -468,6 +469,26 @@ Parameters:
 | `--stdin-help` | No | Enable stdin help trigger |
 | `--help-udp-host` | No | UDP host for the help trigger listener; default `127.0.0.1` |
 | `--help-udp-port` | No | UDP port for help trigger; `0` disables it |
+
+#### `simtutor replay-eval`
+
+Syntax:
+
+```bash
+python -m simtutor replay-eval [--suite SUITE] [--output-dir OUTPUT_DIR] [--report REPORT] [options]
+```
+
+Parameters:
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `--suite` | No | Replay regression suite YAML; default `replay_eval/fa18c_startup_v04/suite.yaml` |
+| `--output-dir` | No | Output directory for per-case replay logs and report; default `logs/replay_eval` |
+| `--report` | No | Optional explicit report JSON path |
+| `--model-provider` | No | `oracle`, `stub`, `openai_compat`, or `ollama`; default `oracle` |
+| `--model-enable-multimodal` | No | Enable multimodal requests for runtime OpenAI-compatible model runs |
+
+The bundled `fa18c_startup_v04` suite is a synthetic timing/contract regression set: it fixes replay BIOS inputs, optional vision sidecars, expected step/highlight/visual-confirmation outputs, and expected frame-alignment metadata. It is intended to catch replay/VLM wiring regressions and produce a stable machine-readable report without manual log inspection.
 | `--help-udp-timeout` | No | UDP trigger timeout in seconds; default `0.2` |
 | `--dry-run-overlay` | No | Keep overlay in dry-run mode; default enabled for replay safety |
 | `--no-dry-run-overlay` | No | Send overlay commands instead of dry-run planning |
@@ -680,11 +701,13 @@ Typical generated outputs:
 
 - `logs/run_<timestamp>.jsonl`
 - `logs/replay_bios_<timestamp>.jsonl`
+- `logs/replay_eval/report.json`
 - `logs/live_dcs_<timestamp>.jsonl`
 - `logs/dcs_telemetry.jsonl`
 - `logs/results.csv`
 - `Doc/Evaluation/index.json`
 - `artifacts/regression/coldstart_state_matrix/`
+- `replay_eval/fa18c_startup_v04/`
 
 Frozen v0.4 frame sidecar layout for the composite panel:
 
