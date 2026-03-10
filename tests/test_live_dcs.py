@@ -180,15 +180,16 @@ class RecordingExecutor:
 def _make_evented_overlay_executor(monkeypatch, events: list[dict[str, Any]], *, session_id: str) -> OverlayActionExecutor:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sink = lambda event: events.append(event.to_dict())
     return OverlayActionExecutor(
         sender=DcsOverlaySender(
             auto_clear=False,
             ack_enabled=False,
             session_id=session_id,
-            event_sink=lambda event: events.append(event.to_dict()),
+            event_sink=sink,
         ),
         session_id=session_id,
-        event_sink=lambda event: events.append(event.to_dict()),
+        event_sink=sink,
         max_targets=1,
     )
 
