@@ -30,3 +30,14 @@ def test_vision_fact_prompt_example_matches_extractor_response_shape_in_en() -> 
         '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain",'
         '"source_frame_id":"1772872445010_000123","confidence":0.0,"evidence_note":"..."}]}'
     )
+
+
+def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="en",
+        config={},
+    )
+
+    assert '"facts":[]' in prompt
+    assert '"step_bindings":{}' in prompt

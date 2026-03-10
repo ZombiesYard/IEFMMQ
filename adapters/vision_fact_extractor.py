@@ -5,7 +5,6 @@ VLM-backed structured vision-fact extraction.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 

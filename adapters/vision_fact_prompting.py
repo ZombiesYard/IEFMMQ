@@ -5,7 +5,7 @@ Prompt builder for structured visual-fact extraction.
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from adapters.vision_prompting import build_vlm_region_prompt
 from core.vision_facts import load_vision_facts_config
@@ -17,7 +17,7 @@ def build_vision_fact_prompt(
     lang: str = "zh",
     config: Mapping[str, Any] | None = None,
 ) -> str:
-    current_config = config or load_vision_facts_config()
+    current_config = config if config is not None else load_vision_facts_config()
     fact_specs = current_config.get("facts_by_id", {})
     fact_ids = [fact_id for fact_id in fact_specs.keys() if isinstance(fact_id, str) and fact_id]
     frame_ids = [item for item in vision.get("frame_ids", []) if isinstance(item, str) and item]
