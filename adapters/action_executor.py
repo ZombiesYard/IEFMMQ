@@ -38,6 +38,20 @@ def _load_pack_ui_targets(pack_path: Path) -> set[str] | None:
     return out
 
 
+def _has_meaningful_trace_metadata(trace_metadata: Mapping[str, Any]) -> bool:
+    for value in trace_metadata.values():
+        if value is None:
+            continue
+        if isinstance(value, str):
+            if value:
+                return True
+            continue
+        if isinstance(value, (list, tuple, dict, set)) and not value:
+            continue
+        return True
+    return False
+
+
 @dataclass
 class ActionExecutionReport:
     executed: list[dict[str, Any]] = field(default_factory=list)
@@ -141,7 +155,7 @@ class OverlayActionExecutor:
         if not callable(push):
             return False
         trace_metadata = normalize_help_cycle_audit_fields(action)
-        if not trace_metadata:
+        if not trace_metadata or not _has_meaningful_trace_metadata(trace_metadata):
             return False
         push(trace_metadata)
         return True

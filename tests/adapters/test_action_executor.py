@@ -80,6 +80,28 @@ def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> N
     assert any(evt.kind == "overlay_failed" for evt in events)
 
 
+def test_executor_does_not_push_sender_trace_for_none_only_audit_fields(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    events: list[Event] = []
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False, event_sink=events.append)
+    executor = OverlayActionExecutor(sender=sender, event_sink=events.append, max_targets=1)
+
+    report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "apu_switch",
+                "vision_fallback_reason": None,
+            }
+        ]
+    )
+
+    assert len(report.executed) == 1
+    overlay_requested = next(evt for evt in events if evt.kind == "overlay_requested")
+    assert "vision_fallback_reason" not in overlay_requested.payload
+
+
 def test_executor_rejects_invalid_action_payload(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)

@@ -770,11 +770,6 @@ def _extract_selected_layout_id(vision_selection: HelpCycleVisionSelection) -> s
             layout_id = frame.get("layout_id")
             if isinstance(layout_id, str) and layout_id:
                 return layout_id
-    for frame in vision_selection.selected_frames:
-        if isinstance(frame, Mapping):
-            layout_id = frame.get("layout_id")
-            if isinstance(layout_id, str) and layout_id:
-                return layout_id
     return None
 
 
