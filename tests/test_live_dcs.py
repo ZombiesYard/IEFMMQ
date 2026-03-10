@@ -2849,9 +2849,10 @@ def test_live_loop_passes_vision_session_id_to_vision_fact_extractor(tmp_path: P
             return
 
     source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
     loop = LiveDcsTutorLoop(
         source=source,
-        model=RecordingModel(),
+        model=model,
         action_executor=RecordingExecutor(),
         session_id="sess-main",
         vision_port=StaticVisionPort(),
@@ -3180,6 +3181,12 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
         loop.close()
 
     assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fact_status"] == "vision_unavailable"
+    assert request.metadata["vision_fallback_reason"] == "vision_unavailable"
+    assert response.metadata["vision_fallback_reason"] == "vision_unavailable"
+    assert response.metadata["failure_code"] == "vision_unavailable"
+    assert "vision_unavailable" in response.metadata["failure_codes"]
     tutor_request = next(event for event in events if event["kind"] == "tutor_request")
     tutor_response = next(event for event in events if event["kind"] == "tutor_response")
     overlay_requested = next(event for event in events if event["kind"] == "overlay_requested")
