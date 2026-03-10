@@ -948,11 +948,11 @@ def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
 
     assert res.status == "error"
-    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S03" in (res.message or "")
-    assert "\u4e0b\u4e00\u6b65\u8bf7\u5148\u6ee1\u8db3" in (res.message or "")
+    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S02" in (res.message or "")
+    assert "\u4e0b\u4e00\u6b65\u8bf7\u6309\u8be5\u6b65\u9aa4\u68c0\u67e5\u5e76\u6267\u884c" in (res.message or "")
     hint = res.metadata["deterministic_step_hint"]
-    assert hint["inferred_step_id"] == "S03"
-    assert hint["missing_conditions"]
+    assert hint["inferred_step_id"] == "S02"
+    assert hint["missing_conditions"] == []
 
 
 def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions() -> None:
@@ -971,7 +971,7 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S07" in (res.message or "")
+    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S02" in (res.message or "")
     assert "\u4e0b\u4e00\u6b65\u8bf7\u6309\u8be5\u6b65\u9aa4\u68c0\u67e5\u5e76\u6267\u884c" in (res.message or "")
 
 
@@ -1014,7 +1014,7 @@ def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S03. Please satisfy: vars.apu_ready==true."
+    assert res.message == "You are likely stuck at S02. Please re-check and execute that step."
 
 
 def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions() -> None:
@@ -1033,7 +1033,7 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S07. Please re-check and execute that step."
+    assert res.message == "You are likely stuck at S02. Please re-check and execute that step."
 
 
 def test_explain_error_en_fallback_without_inferred_step(monkeypatch) -> None:

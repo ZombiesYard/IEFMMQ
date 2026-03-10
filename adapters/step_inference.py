@@ -25,7 +25,6 @@ from core.step_registry import StepRegistryError, default_step_registry_path, lo
 from core.vision_facts import (
     VisionFactsConfigError,
     extract_vision_fact_snapshot,
-    facts_satisfy_step_binding,
     load_vision_facts_config,
 )
 
@@ -49,6 +48,18 @@ class _StepProfile:
 class StepInferenceResult:
     inferred_step_id: str | None
     missing_conditions: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _StepCompletionEvidence:
+    has_gate_rules: bool
+    has_visual_requirements: bool
+    visual_satisfied: bool
+    missing_conditions: tuple[str, ...]
+
+    @property
+    def has_explicit_evidence(self) -> bool:
+        return self.has_gate_rules or self.has_visual_requirements
 
 
 def _empty_vision_fact_config() -> dict[str, Any]:
@@ -316,7 +327,6 @@ def infer_step_id(
     vars_safe = vars_map if isinstance(vars_map, Mapping) else {}
     recent = normalize_recent_ui_targets(recent_ui_targets or ())
     recent_set = set(recent)
-
     effective_pack_path = Path(pack_path).expanduser().resolve() if pack_path else _DEFAULT_PACK_PATH
     try:
         vision_fact_config = load_vision_facts_config(pack_path=effective_pack_path)
@@ -343,6 +353,12 @@ def infer_step_id(
         pre_gate = gate_statuses.get(f"{step_id}.precondition")
         comp_gate = gate_statuses.get(f"{step_id}.completion")
         completion_rules = comp_map.get(step_id, ())
+        completion_evidence = _resolve_step_completion_evidence(
+            step_id=step_id,
+            completion_rules=completion_rules,
+            vision_fact_snapshot=vision_fact_snapshot,
+            vision_fact_config=vision_fact_config,
+        )
         pre_reason_code = pre_gate.get("reason_code") if isinstance(pre_gate, Mapping) else None
         comp_reason_code = comp_gate.get("reason_code") if isinstance(comp_gate, Mapping) else None
         pre_failed_rule = _pick_failed_rule(pre_map.get(step_id, ()), pre_reason_code)
@@ -359,17 +375,15 @@ def infer_step_id(
                 if soft_candidate is None:
                     soft_candidate = (step_id, pre_missing)
                 if _should_hold_by_observability(profile, completion_rules):
-                    if _has_progression_evidence(
-                        step_profiles,
-                        idx,
-                        gate_statuses,
-                        comp_map,
-                        recent_set,
-                        vars_safe,
-                        vars_source_missing,
+                    if _can_advance_past_hold_step(
+                        step_profiles=step_profiles,
+                        idx=idx,
+                        recent_set=recent_set,
+                        completion_evidence=completion_evidence,
+                        comp_gate=comp_gate,
                     ):
                         continue
-                    return _result(step_id, ())
+                    return _result(step_id, completion_evidence.missing_conditions or ())
             else:
                 return _result(step_id, pre_missing)
             continue
@@ -388,34 +402,19 @@ def infer_step_id(
                 return _result(step_id, comp_missing)
             continue
 
-        if step_id in vision_fact_config["step_bindings"]:
-            if facts_satisfy_step_binding(
-                vision_fact_snapshot,
-                step_id=step_id,
-                config=vision_fact_config,
-            ):
-                continue
-            return _result(
-                step_id,
-                _vision_binding_missing_conditions(
-                    step_id,
-                    vision_fact_snapshot=vision_fact_snapshot,
-                    config=vision_fact_config,
-                ),
-            )
+        if completion_evidence.has_visual_requirements and not completion_evidence.visual_satisfied:
+            return _result(step_id, completion_evidence.missing_conditions)
 
         if _should_hold_by_observability(profile, completion_rules):
-            if _has_progression_evidence(
-                step_profiles,
-                idx,
-                gate_statuses,
-                comp_map,
-                recent_set,
-                vars_safe,
-                vars_source_missing,
+            if _can_advance_past_hold_step(
+                step_profiles=step_profiles,
+                idx=idx,
+                recent_set=recent_set,
+                completion_evidence=completion_evidence,
+                comp_gate=comp_gate,
             ):
                 continue
-            return _result(step_id, ())
+            return _result(step_id, completion_evidence.missing_conditions or ())
 
     if soft_candidate is not None:
         return _result(soft_candidate[0], soft_candidate[1])
@@ -739,6 +738,68 @@ def _should_hold_by_observability(
     return len(completion_rules) == 0
 
 
+def _resolve_step_completion_evidence(
+    *,
+    step_id: str,
+    completion_rules: Sequence[Mapping[str, Any]],
+    vision_fact_snapshot: Mapping[str, Mapping[str, Any]],
+    vision_fact_config: Mapping[str, Any],
+) -> _StepCompletionEvidence:
+    visual_missing = _vision_binding_missing_conditions(
+        step_id,
+        vision_fact_snapshot=vision_fact_snapshot,
+        config=vision_fact_config,
+    )
+    has_visual_requirements = len(visual_missing) > 0 or step_id in vision_fact_config.get("step_bindings", {})
+    return _StepCompletionEvidence(
+        has_gate_rules=bool(completion_rules),
+        has_visual_requirements=has_visual_requirements,
+        visual_satisfied=not visual_missing,
+        missing_conditions=visual_missing,
+    )
+
+
+def _step_completion_evidence_satisfied(
+    evidence: _StepCompletionEvidence,
+    *,
+    comp_gate: Mapping[str, Any] | None,
+) -> bool:
+    if evidence.has_gate_rules and _is_gate_blocked(comp_gate):
+        return False
+    if evidence.has_visual_requirements and not evidence.visual_satisfied:
+        return False
+    return evidence.has_explicit_evidence
+
+
+def _can_advance_past_hold_step(
+    *,
+    step_profiles: Sequence[_StepProfile],
+    idx: int,
+    recent_set: set[str],
+    completion_evidence: _StepCompletionEvidence,
+    comp_gate: Mapping[str, Any] | None,
+) -> bool:
+    if completion_evidence.has_explicit_evidence:
+        return _step_completion_evidence_satisfied(completion_evidence, comp_gate=comp_gate)
+    return _has_current_step_interaction_evidence(step_profiles, idx=idx, recent_set=recent_set)
+
+
+def _has_current_step_interaction_evidence(
+    step_profiles: Sequence[_StepProfile],
+    *,
+    idx: int,
+    recent_set: set[str],
+) -> bool:
+    current = step_profiles[idx]
+    if not current.ui_targets or not recent_set:
+        return False
+    earlier_targets = {target for step in step_profiles[:idx] for target in step.ui_targets}
+    for target in current.ui_targets:
+        if target in recent_set and target not in earlier_targets:
+            return True
+    return False
+
+
 def _vision_binding_missing_conditions(
     step_id: str,
     *,
@@ -753,55 +814,6 @@ def _vision_binding_missing_conditions(
             continue
         out.append(f"vision_facts.{fact_id}==seen")
     return tuple(out)
-
-
-def _has_progression_evidence(
-    step_profiles: Sequence[_StepProfile],
-    idx: int,
-    gate_statuses: Mapping[str, Mapping[str, Any]],
-    completion_gates: Mapping[str, Sequence[Mapping[str, Any]]],
-    recent_set: set[str],
-    vars_map: Mapping[str, Any],
-    vars_source_missing: set[str],
-) -> bool:
-    current = step_profiles[idx]
-    if current.ui_targets:
-        earlier_targets = {target for step in step_profiles[:idx] for target in step.ui_targets}
-        for target in current.ui_targets:
-            if target in recent_set and target not in earlier_targets:
-                return True
-    for later in step_profiles[idx + 1 :]:
-        completion_gate = gate_statuses.get(f"{later.step_id}.completion")
-        reason_code = completion_gate.get("reason_code") if isinstance(completion_gate, Mapping) else None
-        failed_rule = _pick_failed_rule(completion_gates.get(later.step_id, ()), reason_code)
-        if _is_strong_gate_signal(
-            completion_gate,
-            failed_rule=failed_rule,
-            vars_map=vars_map,
-            vars_source_missing=vars_source_missing,
-        ):
-            return True
-    return False
-
-
-def _is_strong_gate_signal(
-    gate_info: Mapping[str, Any] | None,
-    *,
-    failed_rule: Mapping[str, Any] | None,
-    vars_map: Mapping[str, Any],
-    vars_source_missing: set[str],
-) -> bool:
-    if not isinstance(gate_info, Mapping):
-        return False
-    status = gate_info.get("status")
-    reason_code = gate_info.get("reason_code")
-    if status == "allowed":
-        return reason_code == "ok"
-    if status != "blocked":
-        return False
-    if isinstance(reason_code, str) and reason_code == "no_rules":
-        return False
-    return not _is_soft_block_from_rule(failed_rule, vars_map, vars_source_missing)
 
 
 def _is_soft_block_from_rule(

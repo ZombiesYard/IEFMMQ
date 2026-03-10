@@ -344,7 +344,9 @@ def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(
             assert expected_condition in result.missing_conditions
 
 
-def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready(real_pack_ctx: Mapping[str, Any]) -> None:
+def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fire_test_evidence(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     result = infer_step_id(
@@ -356,8 +358,8 @@ def test_infer_step_mvp_progresses_to_s03_when_apu_not_ready(real_pack_ctx: Mapp
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S03"
-    assert "vars.apu_ready==true" in result.missing_conditions
+    assert result.inferred_step_id == "S02"
+    assert result.missing_conditions == ()
 
 
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
@@ -410,7 +412,9 @@ def test_infer_step_accepts_mapping_recent_ui_targets(synthetic_pack_ctx: Mappin
     assert "vars.battery_on==true" in result.missing_conditions
 
 
-def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(real_pack_ctx: Mapping[str, Any]) -> None:
+def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_ready(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     result = infer_step_id(
@@ -428,7 +432,7 @@ def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(real_pack_c
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S07"
+    assert result.inferred_step_id == "S02"
     assert result.missing_conditions == ()
 
 
@@ -464,6 +468,26 @@ def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Ma
     assert advanced.inferred_step_id != "S08"
 
 
+def test_infer_step_holds_partial_step_without_completion_evidence_despite_later_strong_signals(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets=["battery_switch", "generator_left_switch", "generator_right_switch"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    assert result.inferred_step_id == "S02"
+    assert result.missing_conditions == ()
+
+
 def test_infer_step_uses_sticky_fcs_reset_fact_to_advance_past_s15(real_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
@@ -496,6 +520,77 @@ def test_infer_step_uses_sticky_fcs_reset_fact_to_advance_past_s15(real_pack_ctx
     assert blocked.inferred_step_id == "S15"
     assert "vision_facts.fcs_reset_seen==seen" in blocked.missing_conditions
     assert advanced.inferred_step_id != "S15"
+
+
+def test_infer_step_pack_specific_visual_completion_requires_all_required_facts(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    vision_facts_path = tmp_path / "configs" / "vision_facts.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "custom_visual_completion_pack",
+            "metadata": {"vision_facts_path": "configs/vision_facts.yaml"},
+            "steps": [
+                {
+                    "id": "S15",
+                    "observability": "partial",
+                    "ui_targets": ["fcs_reset_button"],
+                },
+                {
+                    "id": "S16",
+                    "observability": "observable",
+                    "ui_targets": ["flap_switch"],
+                },
+            ],
+        },
+    )
+    _write_yaml(
+        vision_facts_path,
+        {
+            "schema_version": "v1",
+            "layout_id": "custom_layout",
+            "facts": [
+                {
+                    "fact_id": "fcs_page_visible",
+                    "sticky": False,
+                    "expires_after_ms": 2000,
+                },
+                {
+                    "fact_id": "fcs_reset_seen",
+                    "sticky": True,
+                    "expires_after_ms": 600000,
+                },
+            ],
+            "step_bindings": {
+                "S15": {
+                    "all_of": ["fcs_reset_seen", "fcs_page_visible"],
+                }
+            },
+        },
+    )
+
+    pack_steps = load_pack_steps(pack_path)
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map={},
+        recent_ui_targets=[],
+        pack_path=pack_path,
+        vision_facts=[{"fact_id": "fcs_reset_seen", "state": "seen"}],
+    )
+    advanced = infer_step_id(
+        pack_steps,
+        vars_map={},
+        recent_ui_targets=[],
+        pack_path=pack_path,
+        vision_facts=[
+            {"fact_id": "fcs_reset_seen", "state": "seen"},
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+        ],
+    )
+
+    assert blocked.inferred_step_id == "S15"
+    assert blocked.missing_conditions == ("vision_facts.fcs_page_visible==seen",)
+    assert advanced.inferred_step_id == "S16"
 
 
 def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx: Mapping[str, Any]) -> None:

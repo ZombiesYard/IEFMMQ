@@ -37,7 +37,7 @@ Each fact carries:
 ## Step Bindings
 
 - `S08`: `fcs_page_visible` and `bit_page_visible`
-- `S15`: `fcs_reset_seen`
+- `S15`: `fcs_reset_seen` and `fcs_page_visible`
 - `S17`: `takeoff_trim_seen`
 - `S18`: `fcs_bit_interaction_seen` and `fcs_bit_result_visible`
 
