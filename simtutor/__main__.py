@@ -14,7 +14,6 @@ from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
-from simtutor.replay_eval import ReplayEvalOracleModel, load_replay_eval_suite, run_replay_eval_suite
 from simtutor.schemas import SCHEMA_INDEX, load_schema
 from simtutor.runner import replay_log, run_simulation
 
@@ -227,6 +226,8 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
 
 
 def _run_replay_eval(args: argparse.Namespace) -> int:
+    from simtutor.replay_eval import ReplayEvalOracleModel, load_replay_eval_suite, run_replay_eval_suite
+
     suite = replace(load_replay_eval_suite(args.suite), lang=args.lang)
     provider_name = "replay_eval_oracle" if args.model_provider == "oracle" else args.model_provider
 

@@ -13,7 +13,6 @@ from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPo
 from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.event_store import JsonlEventStore
 from core.types import TutorRequest, TutorResponse
-from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
 
 
 def _repo_root() -> Path:
@@ -451,18 +450,20 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
     if not isinstance(response_meta, Mapping):
         response_meta = {}
 
+    help_response = response_meta.get("help_response")
+    if not isinstance(help_response, Mapping):
+        help_response = {}
+
     diagnosis = response_meta.get("diagnosis")
     if not isinstance(diagnosis, Mapping):
-        help_response = response_meta.get("help_response")
-        if isinstance(help_response, Mapping):
-            diagnosis = help_response.get("diagnosis")
-            if not isinstance(diagnosis, Mapping):
-                diagnosis = {}
-        else:
+        diagnosis = help_response.get("diagnosis")
+        if not isinstance(diagnosis, Mapping):
             diagnosis = {}
     next_step = response_meta.get("next")
     if not isinstance(next_step, Mapping):
-        next_step = {}
+        next_step = help_response.get("next")
+        if not isinstance(next_step, Mapping):
+            next_step = {}
 
     actions = response_payload.get("actions")
     if not isinstance(actions, list):
@@ -584,6 +585,8 @@ def run_replay_eval_suite(
     model_factory: Callable[[ReplayEvalCase], Any] | None = None,
     provider_name: str = "replay_eval_oracle",
 ) -> dict[str, Any]:
+    from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
+
     resolved_output_dir = Path(output_dir).expanduser().resolve()
     resolved_output_dir.mkdir(parents=True, exist_ok=True)
 

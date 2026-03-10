@@ -271,3 +271,55 @@ def test_extract_case_outcome_preserves_missing_boolean_metadata_as_none() -> No
     assert outcome["checks"]["requires_visual_confirmation_match"] is False
     assert outcome["fallback_used"] is False
     assert outcome["status"] == "failed"
+
+
+def test_extract_case_outcome_falls_back_to_help_response_next_step_id() -> None:
+    case = ReplayEvalCase(
+        case_id="c2",
+        input_path=REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "cases" / "noop_2min" / "dcs_bios_raw.jsonl",
+        session_id="sess-c2",
+        scenario_profile="airfield",
+        max_frames=2,
+        expectation=ReplayEvalExpectation(
+            step_id="S03",
+            overlay_target="apu_switch",
+            requires_visual_confirmation=False,
+            vision_status="vision_unavailable",
+            sync_status=None,
+            sync_delta_ms=None,
+            frame_ids=(),
+        ),
+    )
+    events = [
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "context": {
+                    "vision": {
+                        "status": "vision_unavailable",
+                        "sync_status": None,
+                        "sync_delta_ms": None,
+                        "frame_ids": [],
+                    }
+                }
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "actions": [{"target": "apu_switch"}],
+                "metadata": {
+                    "help_response": {
+                        "next": {"step_id": "S03"},
+                    },
+                    "requires_visual_confirmation": False,
+                    "generation_mode": "model",
+                },
+            },
+        },
+    ]
+
+    outcome = _extract_case_outcome(events, case=case)
+
+    assert outcome["actual"]["step_id"] == "S03"
+    assert outcome["checks"]["step_match"] is True
