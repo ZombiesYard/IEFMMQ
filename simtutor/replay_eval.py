@@ -9,6 +9,7 @@ import yaml
 
 from adapters.action_executor import OverlayActionExecutor
 from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
+from adapters.pack_gates import normalize_scenario_profile
 from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort
 from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.event_store import JsonlEventStore
@@ -77,6 +78,23 @@ def _extract_optional_bool(raw: Any) -> bool | None:
     if isinstance(raw, bool):
         return raw
     return None
+
+
+def _extract_optional_text(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    normalized = raw.strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _ensure_scenario_profile(raw: Any, *, field_name: str) -> str:
+    value = _ensure_text(raw, field_name=field_name)
+    try:
+        return normalize_scenario_profile(value)
+    except ValueError as exc:
+        raise ValueError(f"{field_name}: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -258,7 +276,7 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
     lang = raw.get("lang", "zh")
     if lang not in {"zh", "en"}:
         raise ValueError("lang must be zh or en")
-    scenario_profile = _ensure_text(
+    scenario_profile = _ensure_scenario_profile(
         raw.get("scenario_profile", defaults.get("scenario_profile", "airfield")),
         field_name="scenario_profile",
     )
@@ -318,10 +336,14 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
     )
 
     cases: list[ReplayEvalCase] = []
+    seen_case_ids: set[str] = set()
     for item in cases_raw:
         if not isinstance(item, Mapping):
             raise ValueError("each suite case must be a mapping")
         case_id = _ensure_text(item.get("case_id"), field_name="case_id")
+        if case_id in seen_case_ids:
+            raise ValueError(f"duplicate case_id: {case_id}")
+        seen_case_ids.add(case_id)
         input_path = _resolve_required_path(
             suite_dir=suite_dir,
             raw_value=item.get("input"),
@@ -329,7 +351,10 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
             field_name=f"{case_id}.input",
         )
         session_id = _ensure_text(item.get("session_id", case_id), field_name=f"{case_id}.session_id")
-        case_profile = _ensure_text(item.get("scenario_profile", scenario_profile), field_name=f"{case_id}.scenario_profile")
+        case_profile = _ensure_scenario_profile(
+            item.get("scenario_profile", scenario_profile),
+            field_name=f"{case_id}.scenario_profile",
+        )
         max_frames = _ensure_non_negative_int(
             item.get("max_frames", default_max_frames),
             field_name=f"{case_id}.max_frames",
@@ -476,8 +501,11 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
             if isinstance(target, str) and target:
                 overlay_target = target
 
+    diagnosis_step_id = _extract_optional_text(diagnosis.get("step_id"))
+    next_step_id = _extract_optional_text(next_step.get("step_id"))
+
     actual = {
-        "step_id": diagnosis.get("step_id") if isinstance(diagnosis.get("step_id"), str) else next_step.get("step_id"),
+        "step_id": diagnosis_step_id or next_step_id,
         "overlay_target": overlay_target,
         "requires_visual_confirmation": _extract_optional_bool(response_meta.get("requires_visual_confirmation")),
         "vision_status": vision.get("status"),

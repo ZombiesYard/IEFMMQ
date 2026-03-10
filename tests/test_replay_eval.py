@@ -203,6 +203,44 @@ def test_load_replay_eval_suite_rejects_negative_case_max_frames(tmp_path: Path)
         load_replay_eval_suite(suite_path)
 
 
+def test_load_replay_eval_suite_rejects_duplicate_case_ids(tmp_path: Path) -> None:
+    suite_path = tmp_path / "suite.yaml"
+    suite_path.write_text(
+        "schema_version: v1\n"
+        "suite_id: duplicate_cases\n"
+        "dataset_kind: synthetic\n"
+        "ui_map_path: packs/fa18c_startup/ui_map.yaml\n"
+        "telemetry_map_path: packs/fa18c_startup/telemetry_map.yaml\n"
+        "bios_to_ui_path: packs/fa18c_startup/bios_to_ui.yaml\n"
+        "knowledge_index_path: Doc/Evaluation/index.json\n"
+        "cases:\n"
+        "  - case_id: c1\n"
+        "    input: replay_eval/fa18c_startup_v04/cases/noop_2min/dcs_bios_raw.jsonl\n"
+        "    expected:\n"
+        "      step_id: S01\n"
+        "      overlay_target: battery_switch\n"
+        "      requires_visual_confirmation: false\n"
+        "      vision_status: vision_unavailable\n"
+        "      sync_status:\n"
+        "      sync_delta_ms:\n"
+        "      frame_ids: []\n"
+        "  - case_id: c1\n"
+        "    input: replay_eval/fa18c_startup_v04/cases/batteryon_2min/dcs_bios_raw.jsonl\n"
+        "    expected:\n"
+        "      step_id: S02\n"
+        "      overlay_target: battery_switch\n"
+        "      requires_visual_confirmation: false\n"
+        "      vision_status: vision_unavailable\n"
+        "      sync_status:\n"
+        "      sync_delta_ms:\n"
+        "      frame_ids: []\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="duplicate case_id: c1"):
+        load_replay_eval_suite(suite_path)
+
+
 def test_load_replay_eval_suite_rejects_boolean_vision_sync_values(tmp_path: Path) -> None:
     suite_path = tmp_path / "suite.yaml"
     suite_path.write_text(
@@ -231,6 +269,35 @@ def test_load_replay_eval_suite_rejects_boolean_vision_sync_values(tmp_path: Pat
     )
 
     with pytest.raises(ValueError, match="c1.vision.sync_window_ms must be a non-negative integer"):
+        load_replay_eval_suite(suite_path)
+
+
+def test_load_replay_eval_suite_rejects_unsupported_case_scenario_profile(tmp_path: Path) -> None:
+    suite_path = tmp_path / "suite.yaml"
+    suite_path.write_text(
+        "schema_version: v1\n"
+        "suite_id: bad_profile_suite\n"
+        "dataset_kind: synthetic\n"
+        "ui_map_path: packs/fa18c_startup/ui_map.yaml\n"
+        "telemetry_map_path: packs/fa18c_startup/telemetry_map.yaml\n"
+        "bios_to_ui_path: packs/fa18c_startup/bios_to_ui.yaml\n"
+        "knowledge_index_path: Doc/Evaluation/index.json\n"
+        "cases:\n"
+        "  - case_id: c1\n"
+        "    scenario_profile: orbit\n"
+        "    input: replay_eval/fa18c_startup_v04/cases/noop_2min/dcs_bios_raw.jsonl\n"
+        "    expected:\n"
+        "      step_id: S01\n"
+        "      overlay_target: battery_switch\n"
+        "      requires_visual_confirmation: false\n"
+        "      vision_status: vision_unavailable\n"
+        "      sync_status:\n"
+        "      sync_delta_ms:\n"
+        "      frame_ids: []\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="c1.scenario_profile: unsupported scenario_profile 'orbit'"):
         load_replay_eval_suite(suite_path)
 
 
@@ -335,6 +402,57 @@ def test_extract_case_outcome_falls_back_to_help_response_next_step_id() -> None
     outcome = _extract_case_outcome(events, case=case)
 
     assert outcome["actual"]["step_id"] == "S03"
+    assert outcome["checks"]["step_match"] is True
+
+
+def test_extract_case_outcome_ignores_blank_diagnosis_step_id_and_falls_back_to_next_step() -> None:
+    case = ReplayEvalCase(
+        case_id="c3",
+        input_path=REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "cases" / "noop_2min" / "dcs_bios_raw.jsonl",
+        session_id="sess-c3",
+        scenario_profile="airfield",
+        max_frames=2,
+        expectation=ReplayEvalExpectation(
+            step_id="S04",
+            overlay_target="battery_switch",
+            requires_visual_confirmation=False,
+            vision_status="vision_unavailable",
+            sync_status=None,
+            sync_delta_ms=None,
+            frame_ids=(),
+        ),
+    )
+    events = [
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "context": {
+                    "vision": {
+                        "status": "vision_unavailable",
+                        "sync_status": None,
+                        "sync_delta_ms": None,
+                        "frame_ids": [],
+                    }
+                }
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "actions": [{"target": "battery_switch"}],
+                "metadata": {
+                    "diagnosis": {"step_id": "   "},
+                    "next": {"step_id": "S04"},
+                    "requires_visual_confirmation": False,
+                    "generation_mode": "model",
+                },
+            },
+        },
+    ]
+
+    outcome = _extract_case_outcome(events, case=case)
+
+    assert outcome["actual"]["step_id"] == "S04"
     assert outcome["checks"]["step_match"] is True
 
 
