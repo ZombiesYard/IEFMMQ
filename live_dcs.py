@@ -55,10 +55,10 @@ from adapters.vision_sync import (
     BufferedVisionSession,
     HelpCycleVisionSelection,
 )
-from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
+from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.help_failure import (
     VISION_CONFLICT_UNRESOLVED,
     VISION_PARSE_FAIL,

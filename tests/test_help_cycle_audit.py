@@ -3,7 +3,7 @@ from __future__ import annotations
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
 
 
-def test_normalize_help_cycle_audit_fields_rejects_none_and_non_mapping() -> None:
+def test_normalize_help_cycle_audit_fields_returns_empty_dict_for_none_and_non_mapping() -> None:
     assert normalize_help_cycle_audit_fields(None) == {}
     assert normalize_help_cycle_audit_fields("not-a-mapping") == {}
     assert normalize_help_cycle_audit_fields(["not", "a", "mapping"]) == {}

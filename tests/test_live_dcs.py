@@ -3058,6 +3058,9 @@ def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> N
     assert vision["frame_ids"] == []
     assert vision["sync_status"] is None
     assert vision["sync_miss_reason"] == "vision_port_unconfigured"
+    assert response.metadata["vision_fallback_reason"] == "vision_unavailable"
+    assert response.metadata["failure_code"] == "vision_unavailable"
+    assert "vision_unavailable" in response.metadata["failure_codes"]
 
 
 def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypatch, tmp_path: Path) -> None:

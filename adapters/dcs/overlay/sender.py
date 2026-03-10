@@ -5,8 +5,8 @@ import time
 from typing import Any, Callable, Mapping, Optional
 from uuid import uuid4
 
-from core.overlay import OverlayIntent
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
+from core.overlay import OverlayIntent
 from core.types import Event
 
 from adapters.dcs.overlay.ack_receiver import DcsOverlayAckReceiver
