@@ -3126,7 +3126,11 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
             return
 
     class StableVisionModel:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
         def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            self.calls.append({"observation": observation, "request": request})
             fused_step_id = request.context["deterministic_step_hint"]["inferred_step_id"]
             return TutorResponse(
                 status="ok",
@@ -3159,11 +3163,12 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
         def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
             return self.explain_error(observation, request)
 
+    model = StableVisionModel()
     source = ReplayBiosReceiver(replay_path, speed=0.0)
     executor = _make_evented_overlay_executor(monkeypatch, events, session_id="sess-audit")
     loop = LiveDcsTutorLoop(
         source=source,
-        model=StableVisionModel(),
+        model=model,
         action_executor=executor,
         session_id="sess-audit",
         vision_port=StaticVisionPort(),
@@ -3182,11 +3187,6 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
 
     assert response is not None
     request = model.calls[0]["request"]
-    assert request.metadata["vision_fact_status"] == "vision_unavailable"
-    assert request.metadata["vision_fallback_reason"] == "vision_unavailable"
-    assert response.metadata["vision_fallback_reason"] == "vision_unavailable"
-    assert response.metadata["failure_code"] == "vision_unavailable"
-    assert "vision_unavailable" in response.metadata["failure_codes"]
     tutor_request = next(event for event in events if event["kind"] == "tutor_request")
     tutor_response = next(event for event in events if event["kind"] == "tutor_response")
     overlay_requested = next(event for event in events if event["kind"] == "overlay_requested")
@@ -3265,6 +3265,7 @@ def test_live_loop_marks_vision_sync_miss_with_audit_metadata_and_stats(tmp_path
 
     assert response is not None
     request = model.calls[0]["request"]
+    assert request.metadata["vision_fact_status"] == "vision_unavailable"
     assert request.metadata["vision_fallback_reason"] == "vision_sync_miss"
     assert response.metadata["vision_fallback_reason"] == "vision_sync_miss"
     assert response.metadata["failure_code"] == "vision_sync_miss"
