@@ -2802,6 +2802,7 @@ def test_build_vision_fact_extractor_from_model_uses_pack_metadata_path(tmp_path
     vision_facts_path.write_text(
         yaml.safe_dump(
             {
+                "schema_version": "v1",
                 "layout_id": "custom_layout",
                 "facts": [
                     {

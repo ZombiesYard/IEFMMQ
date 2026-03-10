@@ -212,6 +212,7 @@ def test_load_vision_facts_config_uses_pack_metadata_path(tmp_path: Path) -> Non
     vision_config_path.write_text(
         yaml.safe_dump(
             {
+                "schema_version": "v1",
                 "layout_id": "custom_layout",
                 "facts": [
                     {
@@ -232,3 +233,54 @@ def test_load_vision_facts_config_uses_pack_metadata_path(tmp_path: Path) -> Non
 
     assert config["layout_id"] == "custom_layout"
     assert config["facts_by_id"]["fcs_page_visible"]["expires_after_ms"] == 1234
+
+
+def test_load_vision_facts_config_rejects_missing_schema_version(tmp_path: Path) -> None:
+    path = tmp_path / "vision_facts.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="schema_version"):
+        load_vision_facts_config(path)
+
+
+def test_load_vision_facts_config_rejects_unsupported_schema_version(tmp_path: Path) -> None:
+    path = tmp_path / "vision_facts.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "v2",
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="unsupported vision facts schema_version"):
+        load_vision_facts_config(path)

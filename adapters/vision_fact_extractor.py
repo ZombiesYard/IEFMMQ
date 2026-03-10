@@ -124,7 +124,7 @@ class VisionFactExtractor:
         trigger_wall_ms: int,
     ) -> VisionFactExtractionResult:
         candidate_frames = self._candidate_frames(vision)
-        frame_ids = [
+        candidate_frame_ids = [
             str(frame["frame_id"])
             for frame in candidate_frames
             if isinstance(frame.get("frame_id"), str) and frame.get("frame_id")
@@ -138,7 +138,7 @@ class VisionFactExtractor:
             return VisionFactExtractionResult(
                 status="extractor_failed",
                 error="multimodal_disabled",
-                metadata={"frame_ids": frame_ids, "multimodal_failure_reason": "multimodal_disabled"},
+                metadata={"frame_ids": candidate_frame_ids, "multimodal_failure_reason": "multimodal_disabled"},
             )
 
         built = build_multimodal_image_contents(
@@ -146,6 +146,7 @@ class VisionFactExtractor:
             allowed_local_image_roots=self.allowed_local_image_roots,
             max_local_image_bytes=self.max_local_image_bytes,
         )
+        frame_ids = [item for item in built["frame_ids"] if isinstance(item, str) and item]
         if not built["image_contents"]:
             return VisionFactExtractionResult(
                 status="extractor_failed",
@@ -158,7 +159,11 @@ class VisionFactExtractor:
                 },
             )
 
-        prompt = build_vision_fact_prompt(vision=vision, lang=self.lang, config=self._config)
+        prompt = build_vision_fact_prompt(
+            vision=self._effective_vision_context(vision, successful_frames=built["successful_frames"], frame_ids=frame_ids),
+            lang=self.lang,
+            config=self._config,
+        )
         messages = [
             {"role": "system", "content": "You are SimTutor visual fact extractor. Reply with JSON only."},
             {
@@ -244,6 +249,29 @@ class VisionFactExtractor:
             seen.add(frame_id)
             out.append(dict(item))
         return out[:2]
+
+    def _effective_vision_context(
+        self,
+        vision: Mapping[str, Any],
+        *,
+        successful_frames: Sequence[Mapping[str, Any]],
+        frame_ids: Sequence[str],
+    ) -> dict[str, Any]:
+        effective = dict(vision)
+        successful = [dict(frame) for frame in successful_frames]
+        frame_id_set = {item for item in frame_ids if isinstance(item, str) and item}
+        effective["frame_ids"] = [item for item in frame_ids if isinstance(item, str) and item]
+        effective["frame_id"] = effective["frame_ids"][0] if effective["frame_ids"] else None
+        effective["selected_frames"] = successful
+        for key in ("pre_trigger_frame", "trigger_frame"):
+            raw = effective.get(key)
+            if not isinstance(raw, Mapping):
+                continue
+            raw_frame_id = raw.get("frame_id")
+            if isinstance(raw_frame_id, str) and raw_frame_id in frame_id_set:
+                continue
+            effective.pop(key, None)
+        return effective
 
     def _chat(self, messages: list[dict[str, Any]]) -> str:
         headers = {"Content-Type": "application/json"}

@@ -24,6 +24,7 @@ VISION_FACT_IDS: tuple[str, ...] = (
     "ins_go",
 )
 VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"})
+_SUPPORTED_SCHEMA_VERSIONS = {"v1"}
 _STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
 
 
@@ -129,6 +130,14 @@ def load_vision_facts_config(
 
 
 def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
+    schema_version = raw.get("schema_version")
+    if not isinstance(schema_version, str) or not schema_version.strip():
+        raise ValueError("vision facts config missing non-empty schema_version")
+    if schema_version not in _SUPPORTED_SCHEMA_VERSIONS:
+        supported = ", ".join(sorted(_SUPPORTED_SCHEMA_VERSIONS))
+        raise ValueError(
+            f"unsupported vision facts schema_version {schema_version!r}; supported versions: {supported}"
+        )
     facts_raw = raw.get("facts")
     if not isinstance(facts_raw, list) or not facts_raw:
         raise ValueError("vision facts config missing non-empty facts list")
@@ -177,6 +186,7 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         step_bindings[step_id] = tuple(normalized)
 
     return {
+        "schema_version": schema_version,
         "layout_id": raw.get("layout_id"),
         "facts_by_id": facts_by_id,
         "step_bindings": step_bindings,

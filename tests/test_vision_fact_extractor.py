@@ -176,6 +176,50 @@ def test_vision_fact_extractor_downgrades_when_multimodal_rejected(tmp_path: Pat
     assert "Unknown field image_url" in str(result.error)
 
 
+def test_vision_fact_extractor_uses_only_successful_frame_ids_in_prompt_and_metadata(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    missing = tmp_path / "1772872444950_000122.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "fcs_page_visible",
+                            "state": "seen",
+                            "source_frame_id": "1772872445010_000123",
+                            "confidence": 0.91,
+                            "evidence_note": "FCS page is visible on the surviving frame.",
+                        }
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary, missing),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    assert result.observation.frame_ids == ["1772872445010_000123"]
+    assert result.metadata["frame_ids"] == ["1772872445010_000123"]
+    assert result.metadata["multimodal_failed_frame_ids"] == ["1772872444950_000122"]
+    assert "1772872444950_000122" in result.metadata["multimodal_frame_failures"]
+    call = fake.calls[0]
+    content = call["json"]["messages"][1]["content"]
+    assert [item["type"] for item in content] == ["image_url", "text"]
+    assert '"frame_ids":["1772872445010_000123"]' in content[1]["text"]
+    assert "1772872444950_000122" not in content[1]["text"]
+
+
 def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)

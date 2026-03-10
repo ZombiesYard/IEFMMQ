@@ -558,6 +558,7 @@ def test_infer_step_uses_pack_specific_vision_fact_bindings(tmp_path: Path) -> N
     _write_yaml(
         vision_facts_path,
         {
+            "schema_version": "v1",
             "layout_id": "custom_layout",
             "facts": [
                 {
