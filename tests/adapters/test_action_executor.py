@@ -29,6 +29,14 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
                 "ttl_s": 99,
                 "help_cycle_id": "cycle-123",
                 "generation_mode": "repair",
+                "vision_used": True,
+                "frame_id": "1772872445000_000123",
+                "sync_delta_ms": 0,
+                "vision_fact_summary": {"status": "available", "seen_fact_ids": ["fcs_reset_seen"]},
+                "fused_step_id": "S03",
+                "fused_missing_conditions": ["vision_facts.fcs_reset_seen==seen"],
+                "vision_fallback_reason": None,
+                "layout_id": "fa18c_composite_panel_v2",
             }
         ]
     )
@@ -47,6 +55,14 @@ def test_executor_maps_target_and_sends_highlight_udp(monkeypatch) -> None:
     assert overlay_requested.metadata["help_cycle_id"] == "cycle-123"
     assert overlay_requested.metadata["generation_mode"] == "repair"
     assert overlay_requested.payload["help_cycle_id"] == "cycle-123"
+    assert overlay_requested.payload["vision_used"] is True
+    assert overlay_requested.payload["frame_id"] == "1772872445000_000123"
+    assert overlay_requested.payload["sync_delta_ms"] == 0
+    assert overlay_requested.payload["vision_fact_summary"]["status"] == "available"
+    assert overlay_requested.payload["fused_step_id"] == "S03"
+    assert overlay_requested.payload["fused_missing_conditions"] == ["vision_facts.fcs_reset_seen==seen"]
+    assert overlay_requested.payload["vision_fallback_reason"] is None
+    assert overlay_requested.payload["layout_id"] == "fa18c_composite_panel_v2"
 
 
 def test_executor_rejects_non_overlay_action_and_records_event(monkeypatch) -> None:

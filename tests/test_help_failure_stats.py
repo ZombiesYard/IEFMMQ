@@ -107,3 +107,24 @@ def test_overlay_rejection_payload_keeps_overlay_failure_codes_separate_from_res
     assert payload["failure_codes"] == ["evidence_fail"]
     assert payload["response_failure_code"] == "json_extract_fail"
     assert payload["response_failure_codes"] == ["json_extract_fail"]
+
+
+def test_summarize_help_failures_accepts_legacy_jsonl_without_vision_audit_fields() -> None:
+    summary = summarize_help_failures(
+        [
+            {
+                "kind": "tutor_response",
+                "payload": {
+                    "status": "ok",
+                    "metadata": {
+                        "provider": "legacy_stub",
+                    },
+                },
+            }
+        ]
+    )
+
+    assert summary["total_tutor_responses"] == 1
+    assert summary["primary_failure_code_counts"] == {}
+    assert summary["all_failure_code_counts"] == {}
+    assert summary["provider_counts"] == {"legacy_stub": 1}

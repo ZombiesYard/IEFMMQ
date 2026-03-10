@@ -177,6 +177,22 @@ class RecordingExecutor:
         return
 
 
+def _make_evented_overlay_executor(monkeypatch, events: list[dict[str, Any]], *, session_id: str) -> OverlayActionExecutor:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    return OverlayActionExecutor(
+        sender=DcsOverlaySender(
+            auto_clear=False,
+            ack_enabled=False,
+            session_id=session_id,
+            event_sink=lambda event: events.append(event.to_dict()),
+        ),
+        session_id=session_id,
+        event_sink=lambda event: events.append(event.to_dict()),
+        max_targets=1,
+    )
+
+
 class QueryOnlyKnowledge:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -3041,6 +3057,531 @@ def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> N
     assert vision["frame_ids"] == []
     assert vision["sync_status"] is None
     assert vision["sync_miss_reason"] == "vision_port_unconfigured"
+
+
+def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_audit_fields.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+    events: list[dict[str, Any]] = []
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-audit"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000123",
+                    capture_wall_ms=10000,
+                    frame_seq=123,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000123.png"),
+                )
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            assert session_id == "sess-audit"
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_reset_seen",
+                                state="seen",
+                                source_frame_id="10000_000123",
+                                confidence=0.91,
+                                expires_after_ms=600000,
+                                evidence_note="FCS RESET visible.",
+                            )
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    class StableVisionModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            fused_step_id = request.context["deterministic_step_hint"]["inferred_step_id"]
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Turn on APU.",
+                actions=[],
+                explanations=["Turn on APU."],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": fused_step_id, "error_category": "OM"},
+                        "next": {"step_id": fused_step_id},
+                        "overlay": {
+                            "targets": ["apu_switch"],
+                            "evidence": [
+                                {
+                                    "target": "apu_switch",
+                                    "type": "delta",
+                                    "ref": "RECENT_UI_TARGETS.apu_switch",
+                                    "quote": "Recent delta shows APU switch activity.",
+                                }
+                            ],
+                        },
+                        "explanations": ["Turn on APU."],
+                        "confidence": 0.9,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    executor = _make_evented_overlay_executor(monkeypatch, events, session_id="sess-audit")
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=StableVisionModel(),
+        action_executor=executor,
+        session_id="sess-audit",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-audit",
+        vision_mode="replay",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+        event_sink=lambda event: events.append(event.to_dict()),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    tutor_request = next(event for event in events if event["kind"] == "tutor_request")
+    tutor_response = next(event for event in events if event["kind"] == "tutor_response")
+    overlay_requested = next(event for event in events if event["kind"] == "overlay_requested")
+
+    request_meta = tutor_request["payload"]["metadata"]
+    response_meta = tutor_response["payload"]["metadata"]
+    overlay_payload = overlay_requested["payload"]
+
+    assert request_meta["vision_used"] is True
+    assert request_meta["frame_id"] == "10000_000123"
+    assert request_meta["sync_delta_ms"] == 0
+    assert request_meta["vision_fact_summary"]["status"] == "available"
+    assert request_meta["vision_fallback_reason"] is None
+    assert request_meta["layout_id"] == "fa18c_composite_panel_v2"
+    assert response_meta["fused_step_id"] == request_meta["fused_step_id"]
+    assert response_meta["fused_missing_conditions"] == request_meta["fused_missing_conditions"]
+    assert overlay_payload["vision_used"] is True
+    assert overlay_payload["frame_id"] == "10000_000123"
+    assert overlay_payload["sync_delta_ms"] == 0
+    assert overlay_payload["vision_fact_summary"]["status"] == "available"
+    assert overlay_payload["fused_step_id"] == response_meta["fused_step_id"]
+    assert overlay_payload["fused_missing_conditions"] == response_meta["fused_missing_conditions"]
+    assert overlay_payload["vision_fallback_reason"] is None
+    assert overlay_payload["layout_id"] == "fa18c_composite_panel_v2"
+
+
+def test_live_loop_marks_vision_sync_miss_with_audit_metadata_and_stats(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_sync_miss.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class OutOfWindowVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-sync-miss"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="9500_000001",
+                    capture_wall_ms=9500,
+                    frame_seq=1,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "9500_000001.png"),
+                )
+            ]
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-sync-miss",
+        vision_port=OutOfWindowVisionPort(),
+        vision_session_id="sess-sync-miss",
+        vision_mode="replay",
+        vision_sync_window_ms=100,
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+        stats = loop.stats.to_dict()
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fallback_reason"] == "vision_sync_miss"
+    assert response.metadata["vision_fallback_reason"] == "vision_sync_miss"
+    assert response.metadata["failure_code"] == "vision_sync_miss"
+    assert "vision_sync_miss" in response.metadata["failure_codes"]
+    assert stats["vision_cycles"] == 0
+    assert stats["vision_sync_miss_count"] == 1
+    assert stats["vision_text_fallback_count"] == 0
+
+
+def test_live_loop_marks_vision_parse_fail_with_deterministic_metadata(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_parse_fail.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-parse-fail"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000123",
+                    capture_wall_ms=10000,
+                    frame_seq=123,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000123.png"),
+                )
+            ]
+
+    class FailingVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            del vision, session_id, trigger_wall_ms
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "extractor_failed",
+                    "error": "ValueError: invalid vision fact payload",
+                    "metadata": {"error": "ValueError: invalid vision fact payload"},
+                    "observation": None,
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-parse-fail",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-parse-fail",
+        vision_mode="replay",
+        vision_fact_extractor=FailingVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fallback_reason"] == "vision_parse_fail"
+    assert response.metadata["vision_fallback_reason"] == "vision_parse_fail"
+    assert response.metadata["failure_code"] == "vision_parse_fail"
+    assert "vision_parse_fail" in response.metadata["failure_codes"]
+
+
+def test_live_loop_tracks_vision_text_fallback_in_metadata_and_stats(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_text_fallback.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-text-fallback"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000123",
+                    capture_wall_ms=10000,
+                    frame_seq=123,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000123.png"),
+                )
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_reset_seen",
+                                state="seen",
+                                source_frame_id="10000_000123",
+                                confidence=0.9,
+                                expires_after_ms=600000,
+                                evidence_note="FCS RESET visible.",
+                            )
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    class TextFallbackModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Turn on APU.",
+                actions=[],
+                explanations=["Turn on APU."],
+                metadata={
+                    "provider": "openai_compat",
+                    "multimodal_fallback_to_text": True,
+                    "multimodal_failure_reason": "server rejected multimodal request",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                        "next": {"step_id": request.context["deterministic_step_hint"]["inferred_step_id"]},
+                        "overlay": {
+                            "targets": ["apu_switch"],
+                            "evidence": [
+                                {
+                                    "target": "apu_switch",
+                                    "type": "delta",
+                                    "ref": "RECENT_UI_TARGETS.apu_switch",
+                                    "quote": "Recent delta shows APU switch activity.",
+                                }
+                            ],
+                        },
+                        "explanations": ["Turn on APU."],
+                        "confidence": 0.88,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=TextFallbackModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-text-fallback",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-text-fallback",
+        vision_mode="replay",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+        stats = loop.stats.to_dict()
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.metadata["vision_fallback_reason"] == "vision_text_fallback"
+    assert response.metadata["failure_code"] == "vision_text_fallback"
+    assert "vision_text_fallback" in response.metadata["failure_codes"]
+    assert stats["vision_cycles"] == 1
+    assert stats["vision_text_fallback_count"] == 1
+
+
+def test_live_loop_marks_vision_conflict_unresolved_when_model_disagrees_with_fused_step(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_conflict_unresolved.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-conflict"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000123",
+                    capture_wall_ms=10000,
+                    frame_seq=123,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000123.png"),
+                )
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_reset_seen",
+                                state="seen",
+                                source_frame_id="10000_000123",
+                                confidence=0.9,
+                                expires_after_ms=600000,
+                                evidence_note="FCS RESET visible.",
+                            )
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    class ConflictingModel:
+        def __init__(self) -> None:
+            self.fused_step_id: str | None = None
+
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            fused_step_id = request.context["deterministic_step_hint"]["inferred_step_id"]
+            self.fused_step_id = fused_step_id
+            conflicting_step = "S01" if fused_step_id != "S01" else "S05"
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Check the highlighted switch.",
+                actions=[],
+                explanations=["Check the highlighted switch."],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": conflicting_step, "error_category": "OM"},
+                        "next": {"step_id": conflicting_step},
+                        "overlay": {
+                            "targets": ["apu_switch"],
+                            "evidence": [
+                                {
+                                    "target": "apu_switch",
+                                    "type": "delta",
+                                    "ref": "RECENT_UI_TARGETS.apu_switch",
+                                    "quote": "Recent delta shows APU switch activity.",
+                                }
+                            ],
+                        },
+                        "explanations": ["Check the highlighted switch."],
+                        "confidence": 0.7,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    model = ConflictingModel()
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-conflict",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-conflict",
+        vision_mode="replay",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.metadata["fused_step_id"] == model.fused_step_id
+    assert response.metadata["vision_fallback_reason"] == "vision_conflict_unresolved"
+    assert response.metadata["failure_code"] == "vision_conflict_unresolved"
+    assert "vision_conflict_unresolved" in response.metadata["failure_codes"]
 
 
 def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:

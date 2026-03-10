@@ -8,6 +8,7 @@ from typing import Any, Callable, Mapping, Sequence
 import yaml
 
 from adapters.dcs.overlay.sender import DcsOverlaySender
+from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.overlay import OverlayPlanner
 from core.types import Event
 
@@ -118,13 +119,7 @@ class OverlayActionExecutor:
     def _emit(self, kind: str, payload: Mapping[str, Any]) -> None:
         if not self.event_sink:
             return
-        trace_metadata: dict[str, Any] = {}
-        help_cycle_id = payload.get("help_cycle_id")
-        if isinstance(help_cycle_id, str) and help_cycle_id:
-            trace_metadata["help_cycle_id"] = help_cycle_id
-        generation_mode = payload.get("generation_mode")
-        if isinstance(generation_mode, str) and generation_mode:
-            trace_metadata["generation_mode"] = generation_mode
+        trace_metadata = normalize_help_cycle_audit_fields(payload)
         self.event_sink(
             Event(
                 kind=kind,
@@ -137,25 +132,15 @@ class OverlayActionExecutor:
 
     def _trace_payload(self, action: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
         out = dict(payload)
-        help_cycle_id = action.get("help_cycle_id")
-        if isinstance(help_cycle_id, str) and help_cycle_id:
-            out.setdefault("help_cycle_id", help_cycle_id)
-        generation_mode = action.get("generation_mode")
-        if isinstance(generation_mode, str) and generation_mode:
-            out.setdefault("generation_mode", generation_mode)
+        for key, value in normalize_help_cycle_audit_fields(action).items():
+            out.setdefault(key, value)
         return out
 
     def _push_sender_trace(self, action: Mapping[str, Any]) -> bool:
         push = getattr(self._sender, "push_event_metadata", None)
         if not callable(push):
             return False
-        trace_metadata: dict[str, Any] = {}
-        help_cycle_id = action.get("help_cycle_id")
-        if isinstance(help_cycle_id, str) and help_cycle_id:
-            trace_metadata["help_cycle_id"] = help_cycle_id
-        generation_mode = action.get("generation_mode")
-        if isinstance(generation_mode, str) and generation_mode:
-            trace_metadata["generation_mode"] = generation_mode
+        trace_metadata = normalize_help_cycle_audit_fields(action)
         if not trace_metadata:
             return False
         push(trace_metadata)

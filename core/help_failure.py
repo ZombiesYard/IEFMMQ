@@ -12,6 +12,11 @@ SCHEMA_FAIL = "schema_fail"
 EVIDENCE_FAIL = "evidence_fail"
 ALLOWLIST_FAIL = "allowlist_fail"
 MODEL_HTTP_FAIL = "model_http_fail"
+VISION_UNAVAILABLE = "vision_unavailable"
+VISION_SYNC_MISS = "vision_sync_miss"
+VISION_PARSE_FAIL = "vision_parse_fail"
+VISION_CONFLICT_UNRESOLVED = "vision_conflict_unresolved"
+VISION_TEXT_FALLBACK = "vision_text_fallback"
 
 HELP_FAILURE_CODES = (
     JSON_EXTRACT_FAIL,
@@ -19,6 +24,11 @@ HELP_FAILURE_CODES = (
     EVIDENCE_FAIL,
     ALLOWLIST_FAIL,
     MODEL_HTTP_FAIL,
+    VISION_UNAVAILABLE,
+    VISION_SYNC_MISS,
+    VISION_PARSE_FAIL,
+    VISION_CONFLICT_UNRESOLVED,
+    VISION_TEXT_FALLBACK,
 )
 
 _EVIDENCE_REASON_PREFIXES = (
@@ -175,6 +185,11 @@ __all__ = [
     "JSON_EXTRACT_FAIL",
     "MODEL_HTTP_FAIL",
     "SCHEMA_FAIL",
+    "VISION_CONFLICT_UNRESOLVED",
+    "VISION_PARSE_FAIL",
+    "VISION_SYNC_MISS",
+    "VISION_TEXT_FALLBACK",
+    "VISION_UNAVAILABLE",
     "annotate_exception",
     "classify_mapping_failure",
     "exception_failure_code",
