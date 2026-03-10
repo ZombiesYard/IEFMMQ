@@ -469,6 +469,19 @@ Parameters:
 | `--stdin-help` | No | Enable stdin help trigger |
 | `--help-udp-host` | No | UDP host for the help trigger listener; default `127.0.0.1` |
 | `--help-udp-port` | No | UDP port for help trigger; `0` disables it |
+| `--help-udp-timeout` | No | UDP trigger timeout in seconds; default `0.2` |
+| `--dry-run-overlay` | No | Keep overlay in dry-run mode; default enabled for replay safety |
+| `--no-dry-run-overlay` | No | Send overlay commands instead of dry-run planning |
+| `--model-provider` | No | `stub`, `openai_compat`, or `ollama`; default `stub` |
+| `--model-name` | No | Model name; default from env or `Qwen3-8B-Instruct` |
+| `--model-base-url` | No | Provider base URL |
+| `--model-timeout-s` | No | Model timeout in seconds; default env or `20` |
+| `--model-api-key` | No | Provider API key |
+| `--stub-mode` | No | Stub model mode; default `A` |
+| `--lang` | No | `zh` or `en`; default env or `zh` |
+| `--scenario-profile` | No | `airfield` or `carrier`; default `airfield` |
+| `--log-raw-llm-text` | No | Log raw model text into `tutor_response.metadata` |
+| `--no-log-raw-llm-text` | No | Force-disable raw LLM text logging even if the env flag is on |
 
 #### `simtutor replay-eval`
 
@@ -489,19 +502,6 @@ Parameters:
 | `--model-enable-multimodal` | No | Enable multimodal requests for runtime OpenAI-compatible model runs |
 
 The bundled `fa18c_startup_v04` suite is a synthetic timing/contract regression set: it fixes replay BIOS inputs, optional vision sidecars, expected step/highlight/visual-confirmation outputs, and expected frame-alignment metadata. It is intended to catch replay/VLM wiring regressions and produce a stable machine-readable report without manual log inspection.
-| `--help-udp-timeout` | No | UDP trigger timeout in seconds; default `0.2` |
-| `--dry-run-overlay` | No | Keep overlay in dry-run mode; default enabled for replay safety |
-| `--no-dry-run-overlay` | No | Send overlay commands instead of dry-run planning |
-| `--model-provider` | No | `stub`, `openai_compat`, or `ollama`; default `stub` |
-| `--model-name` | No | Model name; default from env or `Qwen3-8B-Instruct` |
-| `--model-base-url` | No | Provider base URL |
-| `--model-timeout-s` | No | Model timeout in seconds; default env or `20` |
-| `--model-api-key` | No | Provider API key |
-| `--stub-mode` | No | Stub model mode; default `A` |
-| `--lang` | No | `zh` or `en`; default env or `zh` |
-| `--scenario-profile` | No | `airfield` or `carrier`; default `airfield` |
-| `--log-raw-llm-text` | No | Log raw model text into `tutor_response.metadata` |
-| `--no-log-raw-llm-text` | No | Force-disable raw LLM text logging even if the env flag is on |
 
 ### `python live_dcs.py`
 

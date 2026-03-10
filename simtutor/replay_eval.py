@@ -206,12 +206,33 @@ class _NoopOverlaySender:
         return
 
 
+def _resolve_required_path(
+    *,
+    suite_dir: Path,
+    raw_value: Any,
+    default_value: Any,
+    field_name: str,
+) -> Path:
+    effective_raw = default_value if raw_value is None else raw_value
+    if not isinstance(effective_raw, str) or not effective_raw.strip():
+        raise ValueError(f"{field_name} must be a non-empty path string")
+    resolved = _resolve_repo_or_suite_path(suite_dir=suite_dir, raw_path=effective_raw)
+    if resolved is None:
+        raise ValueError(f"{field_name} could not be resolved")
+    if not resolved.exists():
+        raise ValueError(f"{field_name} does not exist: {resolved}")
+    return resolved
+
+
 def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
     suite_path = Path(path).expanduser().resolve()
     suite_dir = suite_path.parent
     raw = yaml.safe_load(suite_path.read_text(encoding="utf-8"))
     if not isinstance(raw, Mapping):
         raise ValueError(f"replay eval suite must be a mapping: {suite_path}")
+    schema_version = raw.get("schema_version")
+    if schema_version != "v1":
+        raise ValueError(f"unsupported replay eval suite schema_version {schema_version!r}; expected 'v1'")
 
     defaults = raw.get("defaults")
     if defaults is None:
@@ -224,35 +245,47 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
     lang = raw.get("lang", "zh")
     if lang not in {"zh", "en"}:
         raise ValueError("lang must be zh or en")
-    scenario_profile = _ensure_text(raw.get("scenario_profile", defaults.get("scenario_profile", "airfield")), field_name="scenario_profile")
+    scenario_profile = _ensure_text(
+        raw.get("scenario_profile", defaults.get("scenario_profile", "airfield")),
+        field_name="scenario_profile",
+    )
 
-    pack_path = _resolve_repo_or_suite_path(suite_dir=suite_dir, raw_path=str(raw.get("pack_path", defaults.get("pack_path", "packs/fa18c_startup/pack.yaml"))))
-    ui_map_path = _resolve_repo_or_suite_path(suite_dir=suite_dir, raw_path=str(raw.get("ui_map_path", defaults.get("ui_map_path", "packs/fa18c_startup/ui_map.yaml"))))
-    telemetry_map_path = _resolve_repo_or_suite_path(
+    pack_path = _resolve_required_path(
         suite_dir=suite_dir,
-        raw_path=str(raw.get("telemetry_map_path", defaults.get("telemetry_map_path", "packs/fa18c_startup/telemetry_map.yaml"))),
+        raw_value=raw.get("pack_path"),
+        default_value=str(defaults.get("pack_path", "packs/fa18c_startup/pack.yaml")),
+        field_name="pack_path",
     )
-    bios_to_ui_path = _resolve_repo_or_suite_path(
+    ui_map_path = _resolve_required_path(
         suite_dir=suite_dir,
-        raw_path=str(raw.get("bios_to_ui_path", defaults.get("bios_to_ui_path", "packs/fa18c_startup/bios_to_ui.yaml"))),
+        raw_value=raw.get("ui_map_path"),
+        default_value=str(defaults.get("ui_map_path", "packs/fa18c_startup/ui_map.yaml")),
+        field_name="ui_map_path",
     )
-    knowledge_index_path = _resolve_repo_or_suite_path(
+    telemetry_map_path = _resolve_required_path(
         suite_dir=suite_dir,
-        raw_path=str(raw.get("knowledge_index_path", defaults.get("knowledge_index_path", "Doc/Evaluation/index.json"))),
+        raw_value=raw.get("telemetry_map_path"),
+        default_value=str(defaults.get("telemetry_map_path", "packs/fa18c_startup/telemetry_map.yaml")),
+        field_name="telemetry_map_path",
+    )
+    bios_to_ui_path = _resolve_required_path(
+        suite_dir=suite_dir,
+        raw_value=raw.get("bios_to_ui_path"),
+        default_value=str(defaults.get("bios_to_ui_path", "packs/fa18c_startup/bios_to_ui.yaml")),
+        field_name="bios_to_ui_path",
+    )
+    knowledge_index_path = _resolve_required_path(
+        suite_dir=suite_dir,
+        raw_value=raw.get("knowledge_index_path"),
+        default_value=str(defaults.get("knowledge_index_path", "Doc/Evaluation/index.json")),
+        field_name="knowledge_index_path",
     )
     knowledge_source_policy_path = _resolve_repo_or_suite_path(
         suite_dir=suite_dir,
         raw_path=raw.get("knowledge_source_policy_path", defaults.get("knowledge_source_policy_path")),
     )
-    for field_name, resolved in (
-        ("pack_path", pack_path),
-        ("ui_map_path", ui_map_path),
-        ("telemetry_map_path", telemetry_map_path),
-        ("bios_to_ui_path", bios_to_ui_path),
-        ("knowledge_index_path", knowledge_index_path),
-    ):
-        if resolved is None:
-            raise ValueError(f"{field_name} could not be resolved")
+    if knowledge_source_policy_path is not None and not knowledge_source_policy_path.exists():
+        raise ValueError(f"knowledge_source_policy_path does not exist: {knowledge_source_policy_path}")
 
     cases_raw = raw.get("cases")
     if not isinstance(cases_raw, list) or not cases_raw:
@@ -267,9 +300,12 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
         if not isinstance(item, Mapping):
             raise ValueError("each suite case must be a mapping")
         case_id = _ensure_text(item.get("case_id"), field_name="case_id")
-        input_path = _resolve_repo_or_suite_path(suite_dir=suite_dir, raw_path=_ensure_text(item.get("input"), field_name=f"{case_id}.input"))
-        if input_path is None:
-            raise ValueError(f"{case_id}.input could not be resolved")
+        input_path = _resolve_required_path(
+            suite_dir=suite_dir,
+            raw_value=item.get("input"),
+            default_value="",
+            field_name=f"{case_id}.input",
+        )
         session_id = _ensure_text(item.get("session_id", case_id), field_name=f"{case_id}.session_id")
         case_profile = _ensure_text(item.get("scenario_profile", scenario_profile), field_name=f"{case_id}.scenario_profile")
         max_frames = int(item.get("max_frames", default_max_frames))
@@ -299,12 +335,12 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
         if vision is not None:
             if not isinstance(vision, Mapping):
                 raise ValueError(f"{case_id}.vision must be a mapping when provided")
-            saved_games_dir = _resolve_repo_or_suite_path(
+            saved_games_dir = _resolve_required_path(
                 suite_dir=suite_dir,
-                raw_path=_ensure_text(vision.get("saved_games_dir"), field_name=f"{case_id}.vision.saved_games_dir"),
+                raw_value=vision.get("saved_games_dir"),
+                default_value="",
+                field_name=f"{case_id}.vision.saved_games_dir",
             )
-            if saved_games_dir is None:
-                raise ValueError(f"{case_id}.vision.saved_games_dir could not be resolved")
             vision_config = ReplayEvalVisionConfig(
                 saved_games_dir=saved_games_dir,
                 session_id=_ensure_text(
