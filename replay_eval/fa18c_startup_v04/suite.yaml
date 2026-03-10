@@ -1,0 +1,87 @@
+schema_version: v1
+suite_id: fa18c_startup_v04_replay_regression
+dataset_kind: synthetic_replay_regression
+pack_path: packs/fa18c_startup/pack.yaml
+ui_map_path: packs/fa18c_startup/ui_map.yaml
+telemetry_map_path: packs/fa18c_startup/telemetry_map.yaml
+bios_to_ui_path: packs/fa18c_startup/bios_to_ui.yaml
+knowledge_index_path: Doc/Evaluation/index.json
+lang: zh
+scenario_profile: airfield
+defaults:
+  max_frames: 2
+  vision_sync_window_ms: 100
+  vision_trigger_wait_ms: 0
+cases:
+  - case_id: noop_2min
+    input: cases/noop_2min/dcs_bios_raw.jsonl
+    session_id: replay-eval-noop-2min
+    expected:
+      step_id: S01
+      overlay_target: battery_switch
+      requires_visual_confirmation: false
+      vision_status: vision_unavailable
+      sync_status: null
+      sync_delta_ms: null
+      frame_ids: []
+
+  - case_id: batteryon_2min
+    input: cases/batteryon_2min/dcs_bios_raw.jsonl
+    session_id: replay-eval-batteryon-2min
+    expected:
+      step_id: S02
+      overlay_target: fire_test_switch
+      requires_visual_confirmation: true
+      vision_status: vision_unavailable
+      sync_status: null
+      sync_delta_ms: null
+      frame_ids: []
+
+  - case_id: Batteryon_enginGenoff_2min
+    input: cases/Batteryon_enginGenoff_2min/dcs_bios_raw.jsonl
+    session_id: replay-eval-batteryon-engingoff-2min
+    vision:
+      saved_games_dir: cases/Batteryon_enginGenoff_2min/Saved Games/DCS
+      session_id: replay-eval-batteryon-engingoff-2min
+    expected:
+      step_id: S01
+      overlay_target: generator_left_switch
+      requires_visual_confirmation: false
+      vision_status: vision_unavailable
+      sync_status: null
+      sync_delta_ms: null
+      frame_ids: []
+
+  - case_id: fcs_reset_fcs_bit_2min
+    input: cases/fcs_reset_fcs_bit_2min/dcs_bios_raw.jsonl
+    session_id: replay-eval-fcs-reset-fcs-bit-2min
+    vision:
+      saved_games_dir: cases/fcs_reset_fcs_bit_2min/Saved Games/DCS
+      session_id: replay-eval-fcs-reset-fcs-bit-2min
+    expected:
+      step_id: S18
+      overlay_target: fcs_bit_switch
+      requires_visual_confirmation: true
+      vision_status: available
+      sync_status: matched_past
+      sync_delta_ms: -50
+      frame_ids:
+        - "1772872444950_000001"
+        - "1772872445010_000002"
+
+  - case_id: ins_2min
+    input: cases/ins_2min/dcs_bios_raw.jsonl
+    session_id: replay-eval-ins-2min
+    vision:
+      saved_games_dir: cases/ins_2min/Saved Games/DCS
+      session_id: replay-eval-ins-2min
+    expected:
+      step_id: S12
+      overlay_target: ins_mode_knob
+      requires_visual_confirmation: true
+      vision_status: available
+      sync_status: matched_past
+      sync_delta_ms: -40
+      frame_ids:
+        - "1772872444960_000010"
+        - "1772872445020_000011"
