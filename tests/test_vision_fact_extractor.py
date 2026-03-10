@@ -148,6 +148,36 @@ def test_vision_fact_extractor_returns_uncertain_when_model_is_unsure(tmp_path: 
     assert facts_by_id["fcs_reset_seen"].state == "uncertain"
 
 
+def test_vision_fact_extractor_defaults_empty_fact_array_to_all_uncertain(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload([])
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.status == "uncertain"
+    assert result.observation is not None
+    assert all(fact.state == "uncertain" for fact in result.observation.facts)
+    assert result.metadata["vision_fact_summary"]["seen_fact_ids"] == []
+    assert set(result.metadata["vision_fact_summary"]["uncertain_fact_ids"]) == {
+        fact.fact_id for fact in result.observation.facts
+    }
+
+
 def test_vision_fact_extractor_downgrades_when_multimodal_rejected(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)

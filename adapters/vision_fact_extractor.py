@@ -36,7 +36,7 @@ def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
         "properties": {
             "facts": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 0,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
