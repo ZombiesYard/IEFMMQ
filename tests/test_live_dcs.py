@@ -2784,6 +2784,116 @@ def test_live_loop_marks_vision_fact_unavailable_without_extractor(tmp_path: Pat
     assert request.context["vision_fact_summary"]["status"] == "vision_unavailable"
 
 
+def test_extract_vision_fact_context_degrades_when_merge_raises(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_merge_failure.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    pack_path = tmp_path / "pack.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "merge_failure_pack",
+                "version": "v1",
+                "steps": [{"id": "S01", "ui_targets": ["apu_switch"]}],
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            del session_id
+            return
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="1772872444950_000122",
+                    capture_wall_ms=1772872444950,
+                    frame_seq=122,
+                    channel="panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1772872444950_000122.png"),
+                ),
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    channel="panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1772872445010_000123.png"),
+                ),
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            assert session_id == "sess-merge-fail"
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_reset_seen",
+                                state="seen",
+                                source_frame_id="1772872445010_000123",
+                                confidence=0.9,
+                                expires_after_ms=600000,
+                                evidence_note="FCS reset visible.",
+                            )
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-merge-fail",
+        pack_path=pack_path,
+        ui_map_path=Path(_default_pack_path()).parent / "ui_map.yaml",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-merge-fail",
+        vision_mode="live",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        vision_selection = loop._build_vision_selection(observation=obs, trigger_t_wall=1772872445.0)
+        context = loop._extract_vision_fact_context(vision_selection=vision_selection)
+    finally:
+        loop.close()
+
+    assert context["status"] == "extractor_failed"
+    assert context["vision_facts"] == []
+    assert context["vision_fact_summary"]["status"] == "extractor_failed"
+    assert "vision fact id" in context["metadata"]["vision_fact_merge_error"]
+
+
 def test_build_vision_fact_extractor_from_model_uses_pack_metadata_path(tmp_path: Path) -> None:
     pack_path = tmp_path / "pack.yaml"
     vision_facts_path = tmp_path / "configs" / "vision_facts_custom.yaml"

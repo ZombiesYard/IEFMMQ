@@ -355,7 +355,9 @@ class VisionFactExtractor:
             raise ValueError("vision fact response facts must be a list")
 
         default_frame_id = frame_ids[0] if frame_ids else "unknown_frame"
+        valid_frame_ids = {item for item in frame_ids if isinstance(item, str) and item}
         facts_by_id: dict[str, VisionFact] = {}
+        coerced_source_frame_fact_ids: list[str] = []
         for item in facts_raw:
             if not isinstance(item, Mapping):
                 continue
@@ -363,14 +365,17 @@ class VisionFactExtractor:
             if not isinstance(fact_id, str) or fact_id not in self._fact_ids or fact_id in facts_by_id:
                 continue
             spec = self._config["facts_by_id"][fact_id]
+            source_frame_id = default_frame_id
+            raw_source_frame_id = item.get("source_frame_id")
+            if isinstance(raw_source_frame_id, str) and raw_source_frame_id:
+                if raw_source_frame_id in valid_frame_ids:
+                    source_frame_id = raw_source_frame_id
+                else:
+                    coerced_source_frame_fact_ids.append(fact_id)
             facts_by_id[fact_id] = VisionFact(
                 fact_id=fact_id,
                 state=str(item.get("state")),
-                source_frame_id=(
-                    str(item.get("source_frame_id"))
-                    if isinstance(item.get("source_frame_id"), str) and item.get("source_frame_id")
-                    else default_frame_id
-                ),
+                source_frame_id=source_frame_id,
                 confidence=float(item.get("confidence")),
                 expires_after_ms=int(spec["expires_after_ms"]),
                 evidence_note=str(item.get("evidence_note")).strip(),
@@ -403,6 +408,7 @@ class VisionFactExtractor:
             metadata={
                 "raw_fact_count": len(facts_raw),
                 "configured_fact_count": len(self._fact_ids),
+                "coerced_source_frame_fact_ids": coerced_source_frame_fact_ids,
             },
         )
 

@@ -1858,34 +1858,44 @@ class LiveDcsTutorLoop:
             session_id=self.session_id,
             trigger_wall_ms=trigger_wall_ms,
         )
+        effective_status = result.status
+        merge_error: str | None = None
         if result.observation is not None:
-            self._vision_fact_snapshot = merge_vision_fact_observation(
-                self._vision_fact_snapshot,
-                result.observation,
-                config=self._vision_fact_config,
-                now_wall_ms=trigger_wall_ms,
-            )
-            _emit_vision_fact_observation_event(
-                observation=result.observation,
-                event_sink=self.event_sink,
-                fallback_session_id=self.session_id,
-            )
+            try:
+                self._vision_fact_snapshot = merge_vision_fact_observation(
+                    self._vision_fact_snapshot,
+                    result.observation,
+                    config=self._vision_fact_config,
+                    now_wall_ms=trigger_wall_ms,
+                )
+            except (ValueError, VisionFactsConfigError) as exc:
+                merge_error = f"{type(exc).__name__}: {exc}"
+                effective_status = "extractor_failed"
+            else:
+                _emit_vision_fact_observation_event(
+                    observation=result.observation,
+                    event_sink=self.event_sink,
+                    fallback_session_id=self.session_id,
+                )
 
         summary = build_vision_fact_summary(
             self._vision_fact_snapshot,
-            status=result.status,
+            status=effective_status,
             frame_ids=vision_selection.frame_ids,
             fresh_fact_ids=(
                 [fact.fact_id for fact in result.observation.facts if fact.state == "seen"]
-                if result.observation is not None
+                if result.observation is not None and merge_error is None
                 else []
             ),
         )
         metadata = dict(result.metadata)
         if result.error:
             metadata["error"] = result.error
+        if merge_error is not None:
+            metadata["vision_fact_merge_error"] = merge_error
+            metadata.setdefault("error", merge_error)
         return {
-            "status": result.status,
+            "status": effective_status,
             "vision_facts": snapshot_to_list(self._vision_fact_snapshot),
             "vision_fact_summary": summary,
             "observation": result.observation.to_dict() if result.observation is not None else None,

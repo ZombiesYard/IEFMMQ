@@ -178,6 +178,43 @@ def test_vision_fact_extractor_defaults_empty_fact_array_to_all_uncertain(tmp_pa
     }
 
 
+def test_vision_fact_extractor_coerces_unknown_source_frame_id_to_default(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "fcs_reset_seen",
+                            "state": "seen",
+                            "source_frame_id": "unknown_frame_from_model",
+                            "confidence": 0.82,
+                            "evidence_note": "Reset marks appear cleared.",
+                        }
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
+    assert facts_by_id["fcs_reset_seen"].source_frame_id == "1772872445010_000123"
+    assert result.observation.metadata["coerced_source_frame_fact_ids"] == ["fcs_reset_seen"]
+
+
 def test_vision_fact_extractor_downgrades_when_multimodal_rejected(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)
