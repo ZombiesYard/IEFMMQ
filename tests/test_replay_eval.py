@@ -76,6 +76,7 @@ def test_cli_replay_eval_writes_report(monkeypatch, tmp_path: Path) -> None:
 
     assert code == 0
     report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["model_provider"] == "replay_eval_oracle"
     assert report["summary"]["case_count"] == 5
     assert report["summary"]["passed_case_count"] == 5
 
@@ -122,3 +123,93 @@ def test_load_replay_eval_suite_treats_null_required_path_as_missing_not_literal
     suite = load_replay_eval_suite(suite_path)
 
     assert suite.pack_path == REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
+
+
+def test_load_replay_eval_suite_rejects_invalid_default_integer_budget(tmp_path: Path) -> None:
+    suite_path = tmp_path / "suite.yaml"
+    suite_path.write_text(
+        "schema_version: v1\n"
+        "suite_id: bad_defaults\n"
+        "dataset_kind: synthetic\n"
+        "ui_map_path: packs/fa18c_startup/ui_map.yaml\n"
+        "telemetry_map_path: packs/fa18c_startup/telemetry_map.yaml\n"
+        "bios_to_ui_path: packs/fa18c_startup/bios_to_ui.yaml\n"
+        "knowledge_index_path: Doc/Evaluation/index.json\n"
+        "defaults:\n"
+        "  vision_sync_window_ms: true\n"
+        "cases:\n"
+        "  - case_id: c1\n"
+        "    input: replay_eval/fa18c_startup_v04/cases/noop_2min/dcs_bios_raw.jsonl\n"
+        "    expected:\n"
+        "      step_id: S01\n"
+        "      overlay_target: battery_switch\n"
+        "      requires_visual_confirmation: false\n"
+        "      vision_status: vision_unavailable\n"
+        "      sync_status:\n"
+        "      sync_delta_ms:\n"
+        "      frame_ids: []\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="defaults.vision_sync_window_ms must be a non-negative integer"):
+        load_replay_eval_suite(suite_path)
+
+
+def test_load_replay_eval_suite_rejects_negative_case_max_frames(tmp_path: Path) -> None:
+    suite_path = tmp_path / "suite.yaml"
+    suite_path.write_text(
+        "schema_version: v1\n"
+        "suite_id: bad_case_budget\n"
+        "dataset_kind: synthetic\n"
+        "ui_map_path: packs/fa18c_startup/ui_map.yaml\n"
+        "telemetry_map_path: packs/fa18c_startup/telemetry_map.yaml\n"
+        "bios_to_ui_path: packs/fa18c_startup/bios_to_ui.yaml\n"
+        "knowledge_index_path: Doc/Evaluation/index.json\n"
+        "cases:\n"
+        "  - case_id: c1\n"
+        "    input: replay_eval/fa18c_startup_v04/cases/noop_2min/dcs_bios_raw.jsonl\n"
+        "    max_frames: -1\n"
+        "    expected:\n"
+        "      step_id: S01\n"
+        "      overlay_target: battery_switch\n"
+        "      requires_visual_confirmation: false\n"
+        "      vision_status: vision_unavailable\n"
+        "      sync_status:\n"
+        "      sync_delta_ms:\n"
+        "      frame_ids: []\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="c1.max_frames must be >= 0"):
+        load_replay_eval_suite(suite_path)
+
+
+def test_load_replay_eval_suite_rejects_boolean_vision_sync_values(tmp_path: Path) -> None:
+    suite_path = tmp_path / "suite.yaml"
+    suite_path.write_text(
+        "schema_version: v1\n"
+        "suite_id: bad_vision_budget\n"
+        "dataset_kind: synthetic\n"
+        "ui_map_path: packs/fa18c_startup/ui_map.yaml\n"
+        "telemetry_map_path: packs/fa18c_startup/telemetry_map.yaml\n"
+        "bios_to_ui_path: packs/fa18c_startup/bios_to_ui.yaml\n"
+        "knowledge_index_path: Doc/Evaluation/index.json\n"
+        "cases:\n"
+        "  - case_id: c1\n"
+        "    input: replay_eval/fa18c_startup_v04/cases/noop_2min/dcs_bios_raw.jsonl\n"
+        "    vision:\n"
+        "      saved_games_dir: replay_eval/fa18c_startup_v04/cases/ins_2min/Saved Games/DCS\n"
+        "      sync_window_ms: false\n"
+        "    expected:\n"
+        "      step_id: S01\n"
+        "      overlay_target: battery_switch\n"
+        "      requires_visual_confirmation: false\n"
+        "      vision_status: vision_unavailable\n"
+        "      sync_status:\n"
+        "      sync_delta_ms:\n"
+        "      frame_ids: []\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="c1.vision.sync_window_ms must be a non-negative integer"):
+        load_replay_eval_suite(suite_path)

@@ -228,6 +228,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
 
 def _run_replay_eval(args: argparse.Namespace) -> int:
     suite = replace(load_replay_eval_suite(args.suite), lang=args.lang)
+    provider_name = "replay_eval_oracle" if args.model_provider == "oracle" else args.model_provider
 
     def _model_factory(case) -> Any:
         if args.model_provider == "oracle":
@@ -245,7 +246,7 @@ def _run_replay_eval(args: argparse.Namespace) -> int:
         output_dir=args.output_dir,
         report_path=args.report,
         model_factory=_model_factory,
-        provider_name=args.model_provider,
+        provider_name=provider_name,
     )
     print(f"[REPLAY_EVAL] suite={suite.suite_id}")
     print(f"[REPLAY_EVAL] summary={json.dumps(report['summary'], ensure_ascii=False, sort_keys=True)}")

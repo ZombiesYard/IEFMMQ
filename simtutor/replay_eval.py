@@ -53,6 +53,14 @@ def _ensure_optional_int(raw: Any, *, field_name: str) -> int | None:
     return raw
 
 
+def _ensure_non_negative_int(raw: Any, *, field_name: str) -> int:
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ValueError(f"{field_name} must be a non-negative integer")
+    if raw < 0:
+        raise ValueError(f"{field_name} must be >= 0")
+    return raw
+
+
 def _normalize_string_list(raw: Any, *, field_name: str) -> tuple[str, ...]:
     if raw is None:
         return ()
@@ -253,31 +261,31 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
     pack_path = _resolve_required_path(
         suite_dir=suite_dir,
         raw_value=raw.get("pack_path"),
-        default_value=str(defaults.get("pack_path", "packs/fa18c_startup/pack.yaml")),
+        default_value=defaults.get("pack_path", "packs/fa18c_startup/pack.yaml"),
         field_name="pack_path",
     )
     ui_map_path = _resolve_required_path(
         suite_dir=suite_dir,
         raw_value=raw.get("ui_map_path"),
-        default_value=str(defaults.get("ui_map_path", "packs/fa18c_startup/ui_map.yaml")),
+        default_value=defaults.get("ui_map_path", "packs/fa18c_startup/ui_map.yaml"),
         field_name="ui_map_path",
     )
     telemetry_map_path = _resolve_required_path(
         suite_dir=suite_dir,
         raw_value=raw.get("telemetry_map_path"),
-        default_value=str(defaults.get("telemetry_map_path", "packs/fa18c_startup/telemetry_map.yaml")),
+        default_value=defaults.get("telemetry_map_path", "packs/fa18c_startup/telemetry_map.yaml"),
         field_name="telemetry_map_path",
     )
     bios_to_ui_path = _resolve_required_path(
         suite_dir=suite_dir,
         raw_value=raw.get("bios_to_ui_path"),
-        default_value=str(defaults.get("bios_to_ui_path", "packs/fa18c_startup/bios_to_ui.yaml")),
+        default_value=defaults.get("bios_to_ui_path", "packs/fa18c_startup/bios_to_ui.yaml"),
         field_name="bios_to_ui_path",
     )
     knowledge_index_path = _resolve_required_path(
         suite_dir=suite_dir,
         raw_value=raw.get("knowledge_index_path"),
-        default_value=str(defaults.get("knowledge_index_path", "Doc/Evaluation/index.json")),
+        default_value=defaults.get("knowledge_index_path", "Doc/Evaluation/index.json"),
         field_name="knowledge_index_path",
     )
     knowledge_source_policy_path = _resolve_repo_or_suite_path(
@@ -291,9 +299,18 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
     if not isinstance(cases_raw, list) or not cases_raw:
         raise ValueError("suite.cases must be a non-empty list")
 
-    default_sync_window_ms = int(defaults.get("vision_sync_window_ms", 100))
-    default_trigger_wait_ms = int(defaults.get("vision_trigger_wait_ms", 0))
-    default_max_frames = int(defaults.get("max_frames", 2))
+    default_sync_window_ms = _ensure_non_negative_int(
+        defaults.get("vision_sync_window_ms", 100),
+        field_name="defaults.vision_sync_window_ms",
+    )
+    default_trigger_wait_ms = _ensure_non_negative_int(
+        defaults.get("vision_trigger_wait_ms", 0),
+        field_name="defaults.vision_trigger_wait_ms",
+    )
+    default_max_frames = _ensure_non_negative_int(
+        defaults.get("max_frames", 2),
+        field_name="defaults.max_frames",
+    )
 
     cases: list[ReplayEvalCase] = []
     for item in cases_raw:
@@ -308,7 +325,10 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
         )
         session_id = _ensure_text(item.get("session_id", case_id), field_name=f"{case_id}.session_id")
         case_profile = _ensure_text(item.get("scenario_profile", scenario_profile), field_name=f"{case_id}.scenario_profile")
-        max_frames = int(item.get("max_frames", default_max_frames))
+        max_frames = _ensure_non_negative_int(
+            item.get("max_frames", default_max_frames),
+            field_name=f"{case_id}.max_frames",
+        )
 
         expected = item.get("expected")
         if not isinstance(expected, Mapping):
@@ -355,8 +375,14 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
                     vision.get("layout_id", DEFAULT_LAYOUT_ID),
                     field_name=f"{case_id}.vision.layout_id",
                 ),
-                sync_window_ms=int(vision.get("sync_window_ms", default_sync_window_ms)),
-                trigger_wait_ms=int(vision.get("trigger_wait_ms", default_trigger_wait_ms)),
+                sync_window_ms=_ensure_non_negative_int(
+                    vision.get("sync_window_ms", default_sync_window_ms),
+                    field_name=f"{case_id}.vision.sync_window_ms",
+                ),
+                trigger_wait_ms=_ensure_non_negative_int(
+                    vision.get("trigger_wait_ms", default_trigger_wait_ms),
+                    field_name=f"{case_id}.vision.trigger_wait_ms",
+                ),
             )
 
         cases.append(
