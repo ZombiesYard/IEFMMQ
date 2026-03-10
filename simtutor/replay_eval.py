@@ -74,6 +74,12 @@ def _normalize_string_list(raw: Any, *, field_name: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _extract_optional_bool(raw: Any) -> bool | None:
+    if isinstance(raw, bool):
+        return raw
+    return None
+
+
 @dataclass(frozen=True)
 class ReplayEvalVisionConfig:
     saved_games_dir: Path
@@ -472,7 +478,7 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
     actual = {
         "step_id": diagnosis.get("step_id") if isinstance(diagnosis.get("step_id"), str) else next_step.get("step_id"),
         "overlay_target": overlay_target,
-        "requires_visual_confirmation": bool(response_meta.get("requires_visual_confirmation")),
+        "requires_visual_confirmation": _extract_optional_bool(response_meta.get("requires_visual_confirmation")),
         "vision_status": vision.get("status"),
         "sync_status": vision.get("sync_status"),
         "sync_delta_ms": vision.get("sync_delta_ms"),
@@ -483,7 +489,7 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
         if isinstance(vision.get("frame_ids"), (list, tuple))
         else (),
         "generation_mode": response_meta.get("generation_mode"),
-        "multimodal_fallback_to_text": bool(response_meta.get("multimodal_fallback_to_text")),
+        "multimodal_fallback_to_text": _extract_optional_bool(response_meta.get("multimodal_fallback_to_text")),
     }
     checks = {
         "step_match": actual["step_id"] == case.expectation.step_id,
@@ -496,7 +502,9 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
         "sync_delta_ms_match": actual["sync_delta_ms"] == case.expectation.sync_delta_ms,
         "frame_ids_match": tuple(actual["frame_ids"]) == tuple(case.expectation.frame_ids),
     }
-    fallback_used = bool(actual["generation_mode"] == "fallback" or actual["multimodal_fallback_to_text"])
+    fallback_used = bool(
+        actual["generation_mode"] == "fallback" or actual["multimodal_fallback_to_text"] is True
+    )
     return {
         "case_id": case.case_id,
         "expected": {

@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from simtutor.__main__ import main
-from simtutor.replay_eval import load_replay_eval_suite, run_replay_eval_suite
+from simtutor.replay_eval import (
+    ReplayEvalCase,
+    ReplayEvalExpectation,
+    _extract_case_outcome,
+    load_replay_eval_suite,
+    run_replay_eval_suite,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -213,3 +219,55 @@ def test_load_replay_eval_suite_rejects_boolean_vision_sync_values(tmp_path: Pat
 
     with pytest.raises(ValueError, match="c1.vision.sync_window_ms must be a non-negative integer"):
         load_replay_eval_suite(suite_path)
+
+
+def test_extract_case_outcome_preserves_missing_boolean_metadata_as_none() -> None:
+    case = ReplayEvalCase(
+        case_id="c1",
+        input_path=REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "cases" / "noop_2min" / "dcs_bios_raw.jsonl",
+        session_id="sess-c1",
+        scenario_profile="airfield",
+        max_frames=2,
+        expectation=ReplayEvalExpectation(
+            step_id="S01",
+            overlay_target="battery_switch",
+            requires_visual_confirmation=False,
+            vision_status="vision_unavailable",
+            sync_status=None,
+            sync_delta_ms=None,
+            frame_ids=(),
+        ),
+    )
+    events = [
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "context": {
+                    "vision": {
+                        "status": "vision_unavailable",
+                        "sync_status": None,
+                        "sync_delta_ms": None,
+                        "frame_ids": [],
+                    }
+                }
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "actions": [{"target": "battery_switch"}],
+                "metadata": {
+                    "diagnosis": {"step_id": "S01"},
+                    "generation_mode": "model",
+                },
+            },
+        },
+    ]
+
+    outcome = _extract_case_outcome(events, case=case)
+
+    assert outcome["actual"]["requires_visual_confirmation"] is None
+    assert outcome["actual"]["multimodal_fallback_to_text"] is None
+    assert outcome["checks"]["requires_visual_confirmation_match"] is False
+    assert outcome["fallback_used"] is False
+    assert outcome["status"] == "failed"

@@ -499,9 +499,19 @@ Parameters:
 | `--output-dir` | No | Output directory for per-case replay logs and report; default `logs/replay_eval` |
 | `--report` | No | Optional explicit report JSON path |
 | `--model-provider` | No | `oracle`, `stub`, `openai_compat`, or `ollama`; default `oracle` |
+| `--model-name` | No | Shared model flag; default from env or `Qwen3-8B-Instruct` |
+| `--model-base-url` | No | Shared model flag; required for `openai_compat` |
+| `--model-timeout-s` | No | Shared model timeout in seconds; default env or `20` |
+| `--model-max-tokens` | No | Shared model max completion tokens; `0` uses provider default |
+| `--model-api-key` | No | Shared provider API key |
 | `--model-enable-multimodal` | No | Enable multimodal requests for runtime OpenAI-compatible model runs |
+| `--no-model-enable-multimodal` | No | Force text-only runtime model requests |
+| `--stub-mode` | No | Shared stub model mode; default `A` |
+| `--lang` | No | Shared response language flag: `zh` or `en` |
+| `--log-raw-llm-text` | No | Shared model debug flag to persist raw model text |
+| `--no-log-raw-llm-text` | No | Force-disable raw model text logging |
 
-The bundled `fa18c_startup_v04` suite is a synthetic timing/contract regression set: it fixes replay BIOS inputs, optional vision sidecars, expected step/highlight/visual-confirmation outputs, and expected frame-alignment metadata. It is intended to catch replay/VLM wiring regressions and produce a stable machine-readable report without manual log inspection.
+The bundled `fa18c_startup_v04` suite is a synthetic timing/contract regression set: it fixes replay BIOS inputs, optional vision sidecars, expected step/highlight/visual-confirmation outputs, and expected frame-alignment metadata. It is intended to catch replay/VLM wiring regressions and produce a stable machine-readable report without manual log inspection. Runtime model flags are shared with `replay-bios`; only `scenario-profile` remains suite-driven.
 
 ### `python live_dcs.py`
 
