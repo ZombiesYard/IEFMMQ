@@ -68,6 +68,7 @@ step_bindings:
   S15:
     all_of:
       - fcs_reset_seen
+      - fcs_page_visible
   S17:
     all_of:
       - takeoff_trim_seen
