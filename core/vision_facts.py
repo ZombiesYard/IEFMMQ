@@ -359,7 +359,8 @@ def facts_satisfy_step_binding(
     step_id: str,
     config: Mapping[str, Any] | None = None,
 ) -> bool:
-    step_bindings = (config or load_vision_facts_config()).get("step_bindings", {})
+    current_config = config if config is not None else load_vision_facts_config()
+    step_bindings = current_config.get("step_bindings", {})
     required = step_bindings.get(step_id)
     if not required:
         return False

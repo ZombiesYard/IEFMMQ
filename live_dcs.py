@@ -1277,6 +1277,7 @@ class LiveDcsTutorLoop:
             else live_trigger_wait_ms
         )
         effective_vision_session_id = vision_session_id or self.session_id
+        self.vision_session_id = effective_vision_session_id
         self._vision_session: BufferedVisionSession | None = None
         self.vision_fact_extractor = (
             vision_fact_extractor
@@ -1855,7 +1856,7 @@ class LiveDcsTutorLoop:
 
         result = self.vision_fact_extractor.extract(
             vision_selection.to_dict(),
-            session_id=self.session_id,
+            session_id=self.vision_session_id,
             trigger_wall_ms=trigger_wall_ms,
         )
         effective_status = result.status

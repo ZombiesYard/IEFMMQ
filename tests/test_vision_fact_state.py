@@ -10,6 +10,7 @@ from core.vision_facts import (
     VisionFactsConfigError,
     build_vision_fact_summary,
     default_vision_facts_path,
+    facts_satisfy_step_binding,
     load_vision_facts_config,
     merge_vision_fact_observation,
     prune_expired_facts,
@@ -374,3 +375,12 @@ def test_merge_vision_fact_observation_requires_config() -> None:
                 trigger_wall_ms=1772872445000,
             ),
         )
+
+
+def test_facts_satisfy_step_binding_respects_explicit_empty_config() -> None:
+    snapshot = {
+        "fcs_page_visible": {"fact_id": "fcs_page_visible", "state": "seen"},
+        "bit_page_visible": {"fact_id": "bit_page_visible", "state": "seen"},
+    }
+
+    assert facts_satisfy_step_binding(snapshot, step_id="S08", config={}) is False

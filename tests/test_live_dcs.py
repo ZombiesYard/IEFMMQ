@@ -2784,6 +2784,75 @@ def test_live_loop_marks_vision_fact_unavailable_without_extractor(tmp_path: Pat
     assert request.context["vision_fact_summary"]["status"] == "vision_unavailable"
 
 
+def test_live_loop_passes_vision_session_id_to_vision_fact_extractor(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_with_distinct_vision_session.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-vision"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    channel="panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1772872445010_000123.png"),
+                )
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            del vision, trigger_wall_ms
+            assert session_id == "sess-vision"
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "vision_unavailable",
+                    "error": None,
+                    "metadata": {},
+                    "observation": None,
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-main",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-vision",
+        vision_mode="live",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+
+
 def test_extract_vision_fact_context_degrades_when_merge_raises(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_merge_failure.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
