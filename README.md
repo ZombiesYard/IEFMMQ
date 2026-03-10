@@ -707,6 +707,9 @@ Typical generated outputs:
 - `logs/results.csv`
 - `Doc/Evaluation/index.json`
 - `artifacts/regression/coldstart_state_matrix/`
+
+Bundled evaluation inputs:
+
 - `replay_eval/fa18c_startup_v04/`
 
 Frozen v0.4 frame sidecar layout for the composite panel:
