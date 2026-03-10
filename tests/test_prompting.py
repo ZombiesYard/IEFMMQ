@@ -55,6 +55,7 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
     assert payload["deterministic_step_hint"]["inferred_step_id"] is None
     assert payload["deterministic_step_hint"]["missing_conditions"] == []
+    assert payload["vision_fact_summary"]["status"] == "vision_unavailable"
     assert payload["grounding"]["missing"] is True
     assert payload["grounding"]["applied"] is False
 
@@ -108,9 +109,33 @@ def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
         "current_inferred_step_id is null, evidence conflicts, or no verifiable evidence exists"
     )
     assert payload["deterministic_step_hint"]["requires_visual_confirmation"] is True
+    assert "vision_fact_summary" in payload
     assert "Return at most one overlay target." in result.prompt
     assert "If uncertainty_policy.partial applies" in result.prompt
     assert "If uncertainty_policy.unknown applies" in result.prompt
+
+
+def test_prompt_includes_vision_fact_summary_but_keeps_overlay_evidence_enum_unchanged() -> None:
+    ctx = _base_context()
+    ctx["vision_fact_summary"] = {
+        "status": "available",
+        "frame_ids": ["1772872444950_000122", "1772872445010_000123"],
+        "seen_fact_ids": ["fcs_reset_seen"],
+        "uncertain_fact_ids": ["fcs_bit_result_visible"],
+        "not_seen_fact_ids": [],
+        "summary_text": "seen=fcs_reset_seen; uncertain=fcs_bit_result_visible",
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["vision_fact_summary"]["status"] == "available"
+    assert payload["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["decision_priority"][:3] == [
+        "deterministic_step_hint",
+        "gates_summary",
+        "vision_fact_summary",
+    ]
 
 
 def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:

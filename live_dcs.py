@@ -28,6 +28,7 @@ from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, 
 from adapters.model_stub import ModelStub
 from adapters.ollama_model import OllamaModel
 from adapters.openai_compat_model import OpenAICompatModel
+from adapters.vision_fact_extractor import VisionFactExtractor
 from adapters.pack_gates import (
     DEFAULT_SCENARIO_PROFILE,
     SUPPORTED_SCENARIO_PROFILES,
@@ -65,6 +66,14 @@ from core.step_signal_metadata import (
     normalize_observability_status,
 )
 from core.types import Event, Observation, TutorRequest, TutorResponse
+from core.vision_facts import (
+    VisionFactsConfigError,
+    build_vision_fact_summary,
+    load_vision_facts_config,
+    merge_vision_fact_observation,
+    prune_expired_facts,
+    snapshot_to_list,
+)
 from core.vars import VarResolver
 from ports.knowledge_port import KnowledgePort, KnowledgeRetrieveWithMetaPort
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
@@ -197,6 +206,102 @@ def _emit_vision_observation_event(
             },
         )
     )
+
+
+def _emit_vision_fact_observation_event(
+    *,
+    observation: Any,
+    event_sink: Callable[[Event], None] | None,
+    fallback_session_id: str | None,
+) -> None:
+    if event_sink is None:
+        return
+    payload = observation.to_dict()
+    observation_id = _normalize_uuid_text(payload.get("observation_id"))
+    if observation_id is None:
+        observation_id = str(uuid4())
+    payload["observation_id"] = observation_id
+    wrapped = Observation(
+        observation_id=observation_id,
+        timestamp=(
+            payload.get("timestamp")
+            if isinstance(payload.get("timestamp"), str)
+            else datetime.now(tz=timezone.utc).isoformat()
+        ),
+        source=payload.get("source") if isinstance(payload.get("source"), str) else "vision_fact",
+        payload=payload,
+        metadata={
+            "observation_kind": "vision_fact",
+            "frame_ids": [
+                item for item in payload.get("frame_ids", [])
+                if isinstance(item, str) and item
+            ],
+        },
+    )
+    trigger_wall_ms = payload.get("trigger_wall_ms")
+    t_wall = None
+    if isinstance(trigger_wall_ms, int) and trigger_wall_ms >= 0:
+        t_wall = trigger_wall_ms / 1000.0
+    event_sink(
+        Event(
+            kind="observation",
+            payload=wrapped.to_dict(),
+            related_id=wrapped.observation_id,
+            t_wall=t_wall,
+            session_id=fallback_session_id,
+            vision_refs=[
+                item for item in payload.get("frame_ids", [])
+                if isinstance(item, str) and item
+            ],
+            metadata={
+                "observation_kind": "vision_fact",
+            },
+        )
+    )
+
+
+def _build_vision_fact_extractor_from_model(
+    *,
+    model: Any,
+    lang: str,
+    pack_path: str | Path | None = None,
+) -> VisionFactExtractor | None:
+    if not isinstance(model, OpenAICompatModel):
+        return None
+    if not getattr(model, "enable_multimodal", False):
+        return None
+    try:
+        return VisionFactExtractor(
+            model_name=model.model_name,
+            base_url=model.base_url,
+            timeout_s=model.timeout_s,
+            api_key=model.api_key,
+            allowed_local_image_roots=[str(path) for path in model.allowed_local_image_roots],
+            max_local_image_bytes=model.max_local_image_bytes,
+            lang=lang,
+            pack_path=pack_path,
+        )
+    except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
+        return None
+
+
+def _resolve_vision_fact_config(
+    *,
+    extractor: Any | None,
+    pack_path: Path,
+) -> dict[str, Any]:
+    extractor_config = getattr(extractor, "config", None)
+    if isinstance(extractor_config, Mapping):
+        return dict(extractor_config)
+    try:
+        return load_vision_facts_config(pack_path=pack_path)
+    except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
+        return {
+            "schema_version": "v1",
+            "layout_id": None,
+            "facts_by_id": {},
+            "step_bindings": {},
+        }
 
 
 class ObservationSource(Protocol):
@@ -1093,6 +1198,7 @@ class LiveDcsTutorLoop:
         vision_mode: str = "live",
         vision_sync_window_ms: int | None = None,
         vision_trigger_wait_ms: int | None = None,
+        vision_fact_extractor: Any | None = None,
     ) -> None:
         self.source = source
         self.model = model
@@ -1171,7 +1277,21 @@ class LiveDcsTutorLoop:
             else live_trigger_wait_ms
         )
         effective_vision_session_id = vision_session_id or self.session_id
+        self.vision_session_id = effective_vision_session_id
         self._vision_session: BufferedVisionSession | None = None
+        self.vision_fact_extractor = (
+            vision_fact_extractor
+            if vision_fact_extractor is not None
+            else _build_vision_fact_extractor_from_model(
+                model=self.model,
+                lang=self.lang,
+                pack_path=self.pack_path,
+            )
+        )
+        self._vision_fact_config = _resolve_vision_fact_config(
+            extractor=self.vision_fact_extractor,
+            pack_path=self.pack_path,
+        )
         if vision_port is not None:
             if not isinstance(effective_vision_session_id, str) or not effective_vision_session_id:
                 raise ValueError("vision_session_id or session_id is required when vision_port is configured")
@@ -1191,6 +1311,7 @@ class LiveDcsTutorLoop:
         self._latest_raw_obs: Observation | None = None
         self._latest_enriched_obs: Observation | None = None
         self._help_cache: HelpCacheEntry | None = None
+        self._vision_fact_snapshot: dict[str, dict[str, Any]] = {}
         self._stats = LiveLoopStats()
 
     @property
@@ -1200,6 +1321,8 @@ class LiveDcsTutorLoop:
     def close(self) -> None:
         if self._vision_session is not None:
             self._vision_session.close()
+        if self.vision_fact_extractor is not None and hasattr(self.vision_fact_extractor, "close"):
+            self.vision_fact_extractor.close()
         if hasattr(self.action_executor, "close"):
             self.action_executor.close()
         if hasattr(self.source, "close"):
@@ -1539,6 +1662,7 @@ class LiveDcsTutorLoop:
         obs: Observation,
         *,
         vision_selection: HelpCycleVisionSelection,
+        vision_fact_context: Mapping[str, Any],
     ) -> tuple[TutorRequest, dict[str, Any], str]:
         payload = obs.payload if isinstance(obs.payload, Mapping) else {}
         vars_map = payload.get("vars")
@@ -1570,6 +1694,7 @@ class LiveDcsTutorLoop:
             completion_gates=self.completion_gates,
             scenario_profile=self.scenario_profile,
             pack_path=self.pack_path,
+            vision_facts=vision_fact_context.get("vision_facts"),
         )
         gates = _select_gates_for_context(
             all_gates,
@@ -1599,6 +1724,7 @@ class LiveDcsTutorLoop:
             "recent_ui_targets": recent_buttons,
             "gate_blockers": inferred_gate_blockers,
             "scenario_profile": self.scenario_profile,
+            "vision_fact_status": vision_fact_context.get("status"),
         }
         if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
             step_signal_profile = self.step_signal_profiles.get(inference.inferred_step_id)
@@ -1633,6 +1759,8 @@ class LiveDcsTutorLoop:
             "delta_summary": payload.get("delta_summary", {}),
             "delta_dropped_count": obs.metadata.get("delta_dropped_count"),
             "vision": vision_context,
+            "vision_facts": list(vision_fact_context.get("vision_facts", [])),
+            "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
         }
 
         prompt_result = build_help_prompt_result(context, self.lang)
@@ -1667,6 +1795,10 @@ class LiveDcsTutorLoop:
                 "scenario_profile": self.scenario_profile,
                 "vision_status": vision_context["status"],
                 "vision_frame_ids": list(vision_context["frame_ids"]),
+                "vision_fact_status": vision_fact_context.get("status"),
+                "vision_fact_seen_ids": list(
+                    vision_fact_context.get("vision_fact_summary", {}).get("seen_fact_ids", [])
+                ),
             },
         )
 
@@ -1686,9 +1818,90 @@ class LiveDcsTutorLoop:
                 "frame_ids": list(vision_context["frame_ids"]),
                 "sync_miss_reason": vision_context["sync_miss_reason"],
             },
+            "vision_facts": {
+                "status": vision_fact_context.get("status"),
+                "seen_fact_ids": list(
+                    vision_fact_context.get("vision_fact_summary", {}).get("seen_fact_ids", [])
+                ),
+                "uncertain_fact_ids": list(
+                    vision_fact_context.get("vision_fact_summary", {}).get("uncertain_fact_ids", [])
+                ),
+            },
         }
         state_key = _stable_hash_json(state_signature)
         return req, prompt_result.metadata, state_key
+
+    def _extract_vision_fact_context(
+        self,
+        *,
+        vision_selection: HelpCycleVisionSelection,
+    ) -> dict[str, Any]:
+        trigger_wall_ms = int(vision_selection.trigger_wall_ms)
+        self._vision_fact_snapshot = prune_expired_facts(
+            self._vision_fact_snapshot,
+            now_wall_ms=trigger_wall_ms,
+        )
+        if self.vision_fact_extractor is None:
+            summary = build_vision_fact_summary(
+                self._vision_fact_snapshot,
+                status="vision_unavailable",
+                frame_ids=vision_selection.frame_ids,
+            )
+            return {
+                "status": "vision_unavailable",
+                "vision_facts": snapshot_to_list(self._vision_fact_snapshot),
+                "vision_fact_summary": summary,
+                "metadata": {"reason": "vision_fact_extractor_unconfigured"},
+            }
+
+        result = self.vision_fact_extractor.extract(
+            vision_selection.to_dict(),
+            session_id=self.vision_session_id,
+            trigger_wall_ms=trigger_wall_ms,
+        )
+        effective_status = result.status
+        merge_error: str | None = None
+        if result.observation is not None:
+            try:
+                self._vision_fact_snapshot = merge_vision_fact_observation(
+                    self._vision_fact_snapshot,
+                    result.observation,
+                    config=self._vision_fact_config,
+                    now_wall_ms=trigger_wall_ms,
+                )
+            except (ValueError, VisionFactsConfigError) as exc:
+                merge_error = f"{type(exc).__name__}: {exc}"
+                effective_status = "extractor_failed"
+            else:
+                _emit_vision_fact_observation_event(
+                    observation=result.observation,
+                    event_sink=self.event_sink,
+                    fallback_session_id=self.session_id,
+                )
+
+        summary = build_vision_fact_summary(
+            self._vision_fact_snapshot,
+            status=effective_status,
+            frame_ids=vision_selection.frame_ids,
+            fresh_fact_ids=(
+                [fact.fact_id for fact in result.observation.facts if fact.state == "seen"]
+                if result.observation is not None and merge_error is None
+                else []
+            ),
+        )
+        metadata = dict(result.metadata)
+        if result.error:
+            metadata["error"] = result.error
+        if merge_error is not None:
+            metadata["vision_fact_merge_error"] = merge_error
+            metadata.setdefault("error", merge_error)
+        return {
+            "status": effective_status,
+            "vision_facts": snapshot_to_list(self._vision_fact_snapshot),
+            "vision_fact_summary": summary,
+            "observation": result.observation.to_dict() if result.observation is not None else None,
+            "metadata": metadata,
+        }
 
     def _fallback_message(self, inferred_step_id: str | None, missing_conditions: Sequence[str]) -> str:
         if self.lang == "zh":
@@ -2016,12 +2229,19 @@ class LiveDcsTutorLoop:
             observation=obs,
             trigger_t_wall=resolved_trigger_t_wall,
         )
-        request, prompt_meta, state_key = self._build_request(obs, vision_selection=vision_selection)
+        vision_fact_context = self._extract_vision_fact_context(vision_selection=vision_selection)
+        request, prompt_meta, state_key = self._build_request(
+            obs,
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
+        )
         help_cycle_id = request.request_id
         request.metadata = dict(request.metadata)
         request.metadata["help_cycle_id"] = help_cycle_id
         request.metadata["vision_status"] = vision_selection.status
         request.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
+        request.metadata["vision_fact_status"] = vision_fact_context["status"]
+        request.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
         now_wall = time.time()
         self._emit_event(
             kind="tutor_request",
@@ -2031,6 +2251,7 @@ class LiveDcsTutorLoop:
             metadata={
                 "help_cycle_id": help_cycle_id,
                 "vision_status": vision_selection.status,
+                "vision_fact_status": vision_fact_context["status"],
             },
             vision_refs=vision_selection.frame_ids,
         )
@@ -2067,6 +2288,9 @@ class LiveDcsTutorLoop:
             response.metadata["vision"] = vision_selection.to_dict()
             response.metadata["vision_status"] = vision_selection.status
             response.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
+            response.metadata["vision_fact_status"] = vision_fact_context["status"]
+            response.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
+            response.metadata["vision_facts"] = list(vision_fact_context["vision_facts"])
             response.metadata["generation_mode"] = _normalize_generation_mode(response)
             response.actions = _attach_help_cycle_trace_to_actions(
                 response.actions,
@@ -2150,6 +2374,9 @@ class LiveDcsTutorLoop:
             response.metadata["vision"] = vision_selection.to_dict()
             response.metadata["vision_status"] = vision_selection.status
             response.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
+            response.metadata["vision_fact_status"] = vision_fact_context["status"]
+            response.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
+            response.metadata["vision_facts"] = list(vision_fact_context["vision_facts"])
             response.metadata["generation_mode"] = _normalize_generation_mode(response)
 
             mapped_actions, mapped_meta = self._map_response_actions(response, request)

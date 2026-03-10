@@ -634,6 +634,23 @@ def _build_grounding_payload(
     }
 
 
+def _build_vision_fact_summary_payload(context: Mapping[str, Any]) -> dict[str, Any]:
+    raw = context.get("vision_fact_summary")
+    if not isinstance(raw, Mapping):
+        return {"status": "vision_unavailable"}
+    payload = {
+        "status": raw.get("status") if isinstance(raw.get("status"), str) else "vision_unavailable",
+    }
+    for key in ("frame_ids", "seen_fact_ids", "uncertain_fact_ids", "not_seen_fact_ids"):
+        values = [item for item in raw.get(key, []) if isinstance(item, str) and item]
+        if values:
+            payload[key] = values
+    summary_text = raw.get("summary_text")
+    if isinstance(summary_text, str) and summary_text:
+        payload["summary_text"] = summary_text
+    return payload
+
+
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -683,6 +700,7 @@ def build_help_prompt_result(
     recent_actions_signal = _build_recent_actions_signal(context)
     deterministic_step_hint = _build_deterministic_step_hint(context)
     uncertainty_policy = _build_uncertainty_policy(deterministic_step_hint)
+    vision_fact_summary = _build_vision_fact_summary_payload(context)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
         scenario_profile_raw
@@ -707,6 +725,7 @@ def build_help_prompt_result(
             "overlay.evidence 字段顺序必须固定为 target,type,ref,quote,grounding_confidence，且 type 必须与 ref 前缀匹配。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
             "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
+            "vision_fact_summary 只能辅助 diagnosis/next/explanations；overlay.evidence 仍只能引用 allowed_evidence_refs 中的 var/gate/rag/delta。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
             "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认，且 overlay 仍只能返回单目标。",
@@ -729,6 +748,7 @@ def build_help_prompt_result(
             "Emit overlay.evidence fields in this exact order: target, type, ref, quote, grounding_confidence, and type must match the ref prefix.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
             "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
+            "vision_fact_summary may support diagnosis/next/explanations, but overlay.evidence must still cite allowed var/gate/rag/delta refs only.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
             "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation and overlay stays single-target only.",
@@ -804,6 +824,7 @@ def build_help_prompt_result(
             "decision_priority": [
                 "deterministic_step_hint",
                 "gates_summary",
+                "vision_fact_summary",
                 "overlay_target_policy",
                 "recent_actions_signal",
                 "recent_deltas_summary",
@@ -816,6 +837,7 @@ def build_help_prompt_result(
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
+            "vision_fact_summary": vision_fact_summary,
             "overlay_target_policy": current_overlay_target_policy,
             "overlay_evidence_contract": current_overlay_evidence_contract,
             "uncertainty_policy": uncertainty_policy,
@@ -953,6 +975,8 @@ def build_help_prompt_result(
         "grounding_missing_requested": bool(grounding_payload["requested_missing"]),
         "grounding_missing": bool(grounding_payload["missing"]),
         "grounding_reason": grounding_payload["reason"],
+        "vision_fact_status": vision_fact_summary["status"],
+        "vision_fact_seen_ids": list(vision_fact_summary.get("seen_fact_ids", [])),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
 

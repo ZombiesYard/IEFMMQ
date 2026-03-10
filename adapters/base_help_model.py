@@ -310,6 +310,7 @@ class BaseHelpModel(ModelPort):
             inference_vars,
             recent_ui_targets,
             scenario_profile=scenario_profile,
+            vision_facts=context.get("vision_facts"),
         )
         if inference.inferred_step_id is None and isinstance(observation.procedure_hint, str) and observation.procedure_hint:
             inference = StepInferenceResult(

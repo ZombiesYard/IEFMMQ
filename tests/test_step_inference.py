@@ -432,6 +432,156 @@ def test_infer_step_mvp_progresses_to_s07_without_missing_conditions(real_pack_c
     assert result.missing_conditions == ()
 
 
+def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    _vars_map, recent_ui_targets, _ = _build_step_blocking_scenario("S08", real_pack_ctx)
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+    advanced = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "bit_page_visible", "state": "seen"},
+        ],
+    )
+
+    assert blocked.inferred_step_id == "S08"
+    assert "vision_facts.fcs_page_visible==seen" in blocked.missing_conditions
+    assert advanced.inferred_step_id != "S08"
+
+
+def test_infer_step_uses_sticky_fcs_reset_fact_to_advance_past_s15(real_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    _vars_map, recent_ui_targets, _ = _build_step_blocking_scenario("S15", real_pack_ctx)
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+    prior_vision_facts = [
+        {"fact_id": "fcs_page_visible", "state": "seen"},
+        {"fact_id": "bit_page_visible", "state": "seen"},
+    ]
+
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=prior_vision_facts,
+    )
+    advanced = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[*prior_vision_facts, {"fact_id": "fcs_reset_seen", "state": "seen"}],
+    )
+
+    assert blocked.inferred_step_id == "S15"
+    assert "vision_facts.fcs_reset_seen==seen" in blocked.missing_conditions
+    assert advanced.inferred_step_id != "S15"
+
+
+def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    _vars_map, recent_ui_targets, _ = _build_step_blocking_scenario("S18", real_pack_ctx)
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+    prior_vision_facts = [
+        {"fact_id": "fcs_page_visible", "state": "seen"},
+        {"fact_id": "bit_page_visible", "state": "seen"},
+        {"fact_id": "fcs_reset_seen", "state": "seen"},
+        {"fact_id": "takeoff_trim_seen", "state": "seen"},
+    ]
+
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=prior_vision_facts,
+    )
+    advanced = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            *prior_vision_facts,
+            {"fact_id": "fcs_bit_interaction_seen", "state": "seen"},
+            {"fact_id": "fcs_bit_result_visible", "state": "seen"},
+        ],
+    )
+
+    assert blocked.inferred_step_id == "S18"
+    assert "vision_facts.fcs_bit_interaction_seen==seen" in blocked.missing_conditions
+    assert advanced.inferred_step_id != "S18"
+
+
+def test_infer_step_uses_pack_specific_vision_fact_bindings(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    vision_facts_path = tmp_path / "configs" / "custom_vision_facts.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "custom_pack",
+            "metadata": {"vision_facts_path": "configs/custom_vision_facts.yaml"},
+            "steps": [
+                {
+                    "id": "S08",
+                    "observability": "observable",
+                    "ui_targets": ["custom_target"],
+                }
+            ],
+        },
+    )
+    _write_yaml(
+        vision_facts_path,
+        {
+            "schema_version": "v1",
+            "layout_id": "custom_layout",
+            "facts": [
+                {
+                    "fact_id": "fcs_page_visible",
+                    "sticky": False,
+                    "expires_after_ms": 2000,
+                }
+            ],
+            "step_bindings": {},
+        },
+    )
+
+    result = infer_step_id(
+        load_pack_steps(pack_path),
+        vars_map={},
+        recent_ui_targets=[],
+        pack_path=pack_path,
+    )
+
+    assert result.inferred_step_id == "S08"
+    assert result.missing_conditions == ()
+
+
 def test_infer_step_is_robust_on_invalid_inputs(synthetic_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]

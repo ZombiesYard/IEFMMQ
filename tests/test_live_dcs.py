@@ -13,9 +13,10 @@ from uuid import UUID
 import pytest
 import yaml
 
-from core.types_v2 import VisionObservation
+from core.types_v2 import VisionFact, VisionFactObservation, VisionObservation
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.overlay.sender import DcsOverlaySender
+from adapters.openai_compat_model import OpenAICompatModel
 from adapters.source_chunk_refs import build_source_chunk_ref
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL
 from core.types import Observation, TutorRequest, TutorResponse
@@ -26,8 +27,10 @@ from live_dcs import (
     StdinHelpTrigger,
     UdpHelpTrigger,
     build_arg_parser,
+    _build_vision_fact_extractor_from_model,
     _build_vision_port_from_args,
     _emit_vision_observation_event,
+    _emit_vision_fact_observation_event,
     _is_help_trigger_payload,
     _load_overlay_allowlist,
     _load_step_signal_profiles,
@@ -37,6 +40,7 @@ from live_dcs import (
 )
 from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
+from tests._fakes import FakeClient
 from tests.adapters.socket_stubs import DummySocket
 
 
@@ -2619,6 +2623,391 @@ def test_emit_vision_observation_event_uses_tutor_session_id_over_payload_sessio
     assert len(events) == 1
     assert events[0]["session_id"] == "sess-live"
     assert events[0]["payload"]["payload"]["session_id"] == "vision-sidecar-session"
+
+
+def test_emit_vision_fact_observation_event_uses_frame_refs() -> None:
+    events: list[dict[str, Any]] = []
+
+    _emit_vision_fact_observation_event(
+        observation=VisionFactObservation(
+            session_id="vision-sidecar-session",
+            trigger_wall_ms=1772872445000,
+            frame_ids=["1772872444950_000122", "1772872445010_000123"],
+            facts=[
+                VisionFact(
+                    fact_id="fcs_reset_seen",
+                    state="seen",
+                    source_frame_id="1772872445010_000123",
+                    confidence=0.91,
+                    expires_after_ms=600000,
+                    evidence_note="FCS reset evidence visible on the left DDI.",
+                )
+            ],
+        ),
+        event_sink=lambda event: events.append(event.to_dict()),
+        fallback_session_id="sess-live",
+    )
+
+    assert len(events) == 1
+    assert events[0]["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert events[0]["metadata"]["observation_kind"] == "vision_fact"
+    assert events[0]["payload"]["metadata"]["observation_kind"] == "vision_fact"
+
+
+def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_with_vision_facts.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-live"
+
+        def poll(self) -> list[VisionObservation]:
+            return [
+                VisionObservation(
+                    frame_id="1772872444950_000122",
+                    source="vision_test",
+                    capture_wall_ms=1772872444950,
+                    frame_seq=122,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri=str(tmp_path / "1772872444950_000122.png"),
+                ),
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    source="vision_test",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    layout_id="fa18c_composite_panel_v2",
+                    channel="composite_panel",
+                    image_uri=str(tmp_path / "1772872445010_000123.png"),
+                ),
+            ]
+
+        def stop(self) -> None:
+            return
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            assert session_id == "sess-live"
+            assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=["1772872444950_000122", "1772872445010_000123"],
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_reset_seen",
+                                state="seen",
+                                source_frame_id="1772872445010_000123",
+                                confidence=0.93,
+                                expires_after_ms=600000,
+                                evidence_note="FCS reset visible on the left DDI.",
+                            )
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events: list[dict[str, Any]] = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        session_id="sess-live",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-live",
+        vision_mode="live",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+        event_sink=lambda event: events.append(event.to_dict()),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.context["vision_fact_summary"]["status"] == "available"
+    assert request.context["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
+    assert request.metadata["vision_fact_status"] == "available"
+    assert response.metadata["vision_fact_status"] == "available"
+    assert response.metadata["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
+    fact_events = [
+        event
+        for event in events
+        if event["kind"] == "observation"
+        and event.get("metadata", {}).get("observation_kind") == "vision_fact"
+    ]
+    assert len(fact_events) == 1
+    assert fact_events[0]["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+
+
+def test_live_loop_marks_vision_fact_unavailable_without_extractor(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_without_vision_facts.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-no-vision-facts",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fact_status"] == "vision_unavailable"
+    assert request.context["vision_fact_summary"]["status"] == "vision_unavailable"
+
+
+def test_live_loop_passes_vision_session_id_to_vision_fact_extractor(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_with_distinct_vision_session.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-vision"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    channel="panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1772872445010_000123.png"),
+                )
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            del vision, trigger_wall_ms
+            assert session_id == "sess-vision"
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "vision_unavailable",
+                    "error": None,
+                    "metadata": {},
+                    "observation": None,
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-main",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-vision",
+        vision_mode="live",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=1772872445.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+
+
+def test_extract_vision_fact_context_degrades_when_merge_raises(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_merge_failure.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    pack_path = tmp_path / "pack.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "merge_failure_pack",
+                "version": "v1",
+                "steps": [{"id": "S01", "ui_targets": ["apu_switch"]}],
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            del session_id
+            return
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="1772872444950_000122",
+                    capture_wall_ms=1772872444950,
+                    frame_seq=122,
+                    channel="panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1772872444950_000122.png"),
+                ),
+                VisionObservation(
+                    frame_id="1772872445010_000123",
+                    capture_wall_ms=1772872445010,
+                    frame_seq=123,
+                    channel="panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1772872445010_000123.png"),
+                ),
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            assert session_id == "sess-merge-fail"
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_reset_seen",
+                                state="seen",
+                                source_frame_id="1772872445010_000123",
+                                confidence=0.9,
+                                expires_after_ms=600000,
+                                evidence_note="FCS reset visible.",
+                            )
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-merge-fail",
+        pack_path=pack_path,
+        ui_map_path=Path(_default_pack_path()).parent / "ui_map.yaml",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-merge-fail",
+        vision_mode="live",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        vision_selection = loop._build_vision_selection(observation=obs, trigger_t_wall=1772872445.0)
+        context = loop._extract_vision_fact_context(vision_selection=vision_selection)
+    finally:
+        loop.close()
+
+    assert context["status"] == "extractor_failed"
+    assert context["vision_facts"] == []
+    assert context["vision_fact_summary"]["status"] == "extractor_failed"
+    assert "vision fact id" in context["metadata"]["vision_fact_merge_error"]
+
+
+def test_build_vision_fact_extractor_from_model_uses_pack_metadata_path(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    vision_facts_path = tmp_path / "configs" / "vision_facts_custom.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "custom_pack",
+                "metadata": {"vision_facts_path": "configs/vision_facts_custom.yaml"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    vision_facts_path.parent.mkdir(parents=True, exist_ok=True)
+    vision_facts_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "v1",
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 4321,
+                    }
+                ],
+                "step_bindings": {},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    model = OpenAICompatModel(client=FakeClient(), enable_multimodal=True)
+
+    extractor = _build_vision_fact_extractor_from_model(
+        model=model,
+        lang="zh",
+        pack_path=pack_path,
+    )
+
+    assert extractor is not None
+    assert extractor._config["layout_id"] == "custom_layout"
+    assert extractor._config["facts_by_id"]["fcs_page_visible"]["expires_after_ms"] == 4321
 
 
 def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:

@@ -22,6 +22,12 @@ from adapters.pack_gates import (
 )
 from core.step_signal_metadata import normalize_observability_status
 from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
+from core.vision_facts import (
+    VisionFactsConfigError,
+    extract_vision_fact_snapshot,
+    facts_satisfy_step_binding,
+    load_vision_facts_config,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
@@ -43,6 +49,14 @@ class _StepProfile:
 class StepInferenceResult:
     inferred_step_id: str | None
     missing_conditions: tuple[str, ...]
+
+
+def _empty_vision_fact_config() -> dict[str, Any]:
+    return {
+        "layout_id": None,
+        "facts_by_id": {},
+        "step_bindings": {},
+    }
 
 
 def _path_signature(path: Path) -> tuple[int, int] | None:
@@ -286,6 +300,7 @@ def infer_step_id(
     completion_gates: Mapping[str, IterableABC[Mapping[str, Any]]] | None = None,
     scenario_profile: str | None = None,
     pack_path: str | Path | None = None,
+    vision_facts: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
 ) -> StepInferenceResult:
     """
     Infer likely blocked step for deterministic help fallback.
@@ -303,6 +318,11 @@ def infer_step_id(
     recent_set = set(recent)
 
     effective_pack_path = Path(pack_path).expanduser().resolve() if pack_path else _DEFAULT_PACK_PATH
+    try:
+        vision_fact_config = load_vision_facts_config(pack_path=effective_pack_path)
+    except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
+        vision_fact_config = _empty_vision_fact_config()
+    vision_fact_snapshot = extract_vision_fact_snapshot(vision_facts)
     vars_source_missing = _extract_source_missing_vars(vars_safe)
     pre_map, comp_map = _resolve_gate_maps(
         precondition_gates=precondition_gates,
@@ -367,6 +387,22 @@ def infer_step_id(
             else:
                 return _result(step_id, comp_missing)
             continue
+
+        if step_id in vision_fact_config["step_bindings"]:
+            if facts_satisfy_step_binding(
+                vision_fact_snapshot,
+                step_id=step_id,
+                config=vision_fact_config,
+            ):
+                continue
+            return _result(
+                step_id,
+                _vision_binding_missing_conditions(
+                    step_id,
+                    vision_fact_snapshot=vision_fact_snapshot,
+                    config=vision_fact_config,
+                ),
+            )
 
         if _should_hold_by_observability(profile, completion_rules):
             if _has_progression_evidence(
@@ -701,6 +737,22 @@ def _should_hold_by_observability(
     if profile.observability not in {"partial", "unobservable"}:
         return False
     return len(completion_rules) == 0
+
+
+def _vision_binding_missing_conditions(
+    step_id: str,
+    *,
+    vision_fact_snapshot: Mapping[str, Mapping[str, Any]],
+    config: Mapping[str, Any],
+) -> tuple[str, ...]:
+    required = config.get("step_bindings", {}).get(step_id, ())
+    out: list[str] = []
+    for fact_id in required:
+        fact = vision_fact_snapshot.get(fact_id)
+        if isinstance(fact, Mapping) and fact.get("state") == "seen":
+            continue
+        out.append(f"vision_facts.{fact_id}==seen")
+    return tuple(out)
 
 
 def _has_progression_evidence(
