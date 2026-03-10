@@ -44,7 +44,8 @@ def build_vision_fact_prompt(
     if lang == "zh":
         rules = [
             "你是 SimTutor 的视觉事实抽取器。只能输出一个 JSON 对象，禁止输出 tutor answer、markdown 或自然语言段落。",
-            "你必须只输出 facts 数组；每个 fact_id 只能出现一次。",
+            "你必须输出一个 JSON 对象，且顶层只允许 facts 字段；不要输出其他顶层键。",
+            "facts 必须是数组；每个 fact_id 只能出现一次。",
             "state 只能是 seen、not_seen、uncertain。",
             "只有在图像证据明确时才能输出 seen；模糊、遮挡、页面不完整时必须输出 uncertain。",
             "source_frame_id 必须引用提供的 frame_ids 之一。",
@@ -59,7 +60,8 @@ def build_vision_fact_prompt(
     else:
         rules = [
             "You are SimTutor's visual fact extractor. Output exactly one JSON object only.",
-            "Return facts array only; each fact_id must appear at most once.",
+            "The top-level object must contain only the facts field; do not output any other top-level keys.",
+            "facts must be an array, and each fact_id must appear at most once.",
             "state must be one of seen, not_seen, uncertain.",
             "Use seen only when the image evidence is clear; if blurry, occluded, or incomplete, use uncertain.",
             "source_frame_id must cite one of the provided frame_ids.",
@@ -78,7 +80,7 @@ def build_vision_fact_prompt(
         "Context JSON:\n"
         f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
         "Output JSON shape exactly:\n"
-        '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain","source_frame_id":"1772872445010_000123","confidence":0.0,"expires_after_ms":2000,"evidence_note":"..."}]}'
+        '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain","source_frame_id":"1772872445010_000123","confidence":0.0,"evidence_note":"..."}]}'
     )
 
 

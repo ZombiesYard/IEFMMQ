@@ -98,7 +98,12 @@ def _load_vision_facts_path_from_pack_metadata(pack_path: Path) -> Path | None:
 
 
 def _path_signature(path: Path) -> tuple[int, int]:
-    stat = path.stat()
+    try:
+        stat = path.stat()
+    except FileNotFoundError as exc:
+        raise VisionFactsConfigError(f"vision facts config not found: {path}") from exc
+    except OSError as exc:
+        raise VisionFactsConfigError(f"failed to stat vision facts config: {path}") from exc
     return (int(stat.st_mtime_ns), int(stat.st_size))
 
 
@@ -110,7 +115,16 @@ def _load_vision_facts_config_cached(
 ) -> dict[str, Any]:
     del mtime_ns, size_bytes
     path = Path(resolved_path)
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise VisionFactsConfigError(f"vision facts config not found: {path}") from exc
+    except OSError as exc:
+        raise VisionFactsConfigError(f"failed to read vision facts config: {path}") from exc
+    try:
+        payload = yaml.safe_load(raw_text)
+    except yaml.YAMLError as exc:
+        raise VisionFactsConfigError(f"failed to parse vision facts config: {path}") from exc
     if not isinstance(payload, Mapping):
         raise ValueError(f"vision facts config must be a mapping: {path}")
     return _normalize_vision_facts_config(payload)
@@ -156,14 +170,22 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         sticky = item.get("sticky")
         if not isinstance(sticky, bool):
             raise ValueError(f"vision fact {fact_id} sticky must be a bool")
+        intended_regions = _normalize_string_list_field(
+            item.get("intended_regions"),
+            field_name="intended_regions",
+            fact_id=fact_id,
+        )
+        steps = _normalize_string_list_field(
+            item.get("steps"),
+            field_name="steps",
+            fact_id=fact_id,
+        )
         facts_by_id[fact_id] = {
             "fact_id": fact_id,
             "sticky": sticky,
             "expires_after_ms": expires_after_ms,
-            "intended_regions": [
-                value for value in item.get("intended_regions", []) if isinstance(value, str) and value
-            ],
-            "steps": [value for value in item.get("steps", []) if isinstance(value, str) and value],
+            "intended_regions": intended_regions,
+            "steps": steps,
         }
 
     bindings_raw = raw.get("step_bindings", {})
@@ -191,6 +213,19 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         "facts_by_id": facts_by_id,
         "step_bindings": step_bindings,
     }
+
+
+def _normalize_string_list_field(
+    raw_value: Any,
+    *,
+    field_name: str,
+    fact_id: str,
+) -> list[str]:
+    if raw_value is None:
+        return []
+    if not isinstance(raw_value, (list, tuple)):
+        raise ValueError(f"vision fact {fact_id} {field_name} must be a list")
+    return [value for value in raw_value if isinstance(value, str) and value]
 
 
 def normalize_fact_state(raw_state: Any) -> str:
