@@ -6,6 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 from adapters.vision_fact_extractor import VisionFactExtractor
+from core.vision_facts import VISION_FACT_IDS
 from tests._fakes import FakeClient, FakeResponse
 
 
@@ -97,7 +98,7 @@ def test_vision_fact_extractor_builds_two_image_request_and_parses_positive_fact
         trigger_wall_ms=1772872445000,
     )
 
-    assert result.status == "available"
+    assert result.status == "uncertain"
     assert result.observation is not None
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["fcs_bit_interaction_seen"].state == "seen"
@@ -184,19 +185,13 @@ def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: 
                 _chat_payload(
                     [
                         {
-                            "fact_id": "fcs_bit_interaction_seen",
+                            "fact_id": fact_id,
                             "state": "not_seen",
                             "source_frame_id": "1772872445010_000123",
                             "confidence": 0.84,
-                            "evidence_note": "BIT page is visible but no active FCS BIT interaction is shown.",
-                        },
-                        {
-                            "fact_id": "fcs_bit_result_visible",
-                            "state": "not_seen",
-                            "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.85,
-                            "evidence_note": "No readable FCS BIT result is visible.",
-                        },
+                            "evidence_note": f"{fact_id} is confidently not visible in this frame.",
+                        }
+                        for fact_id in VISION_FACT_IDS
                     ]
                 )
             )
@@ -213,7 +208,9 @@ def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: 
         trigger_wall_ms=1772872445000,
     )
 
+    assert result.status == "available"
     assert result.observation is not None
+    assert result.metadata["vision_fact_summary"]["status"] == "available"
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["fcs_bit_interaction_seen"].state == "not_seen"
     assert facts_by_id["fcs_bit_result_visible"].state == "not_seen"

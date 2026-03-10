@@ -27,6 +27,10 @@ VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"}
 _STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
 
 
+class VisionFactsConfigError(ValueError):
+    """Raised when pack-driven vision-facts config resolution fails."""
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
@@ -34,7 +38,62 @@ def _repo_root() -> Path:
 def default_vision_facts_path(pack_path: str | Path | None = None) -> Path:
     if pack_path is None:
         return _repo_root() / "packs" / "fa18c_startup" / "vision_facts.yaml"
-    return Path(pack_path).expanduser().resolve().parent / "vision_facts.yaml"
+    resolved_pack_path = Path(pack_path).expanduser().resolve()
+    configured = _load_vision_facts_path_from_pack_metadata(resolved_pack_path)
+    if configured is not None:
+        return configured
+    return resolved_pack_path.parent / "vision_facts.yaml"
+
+
+def _safe_stat(path: Path, *, label: str) -> tuple[int, int]:
+    try:
+        stat = path.stat()
+    except FileNotFoundError as exc:
+        raise VisionFactsConfigError(f"{label} not found: {path}") from exc
+    except OSError as exc:
+        raise VisionFactsConfigError(f"failed to stat {label}: {path}") from exc
+    return int(stat.st_mtime_ns), int(stat.st_size)
+
+
+@lru_cache(maxsize=32)
+def _load_vision_facts_path_from_pack_metadata_cached(
+    resolved_pack_path: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> Path | None:
+    del mtime_ns, size_bytes
+    path = Path(resolved_pack_path)
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise VisionFactsConfigError(f"pack metadata source not found: {path}") from exc
+    except OSError as exc:
+        raise VisionFactsConfigError(f"failed to read pack metadata source: {path}") from exc
+    except yaml.YAMLError as exc:
+        raise VisionFactsConfigError(f"failed to parse pack metadata source: {path}") from exc
+    if not isinstance(payload, Mapping):
+        raise VisionFactsConfigError(f"pack metadata source must be a mapping: {path}")
+    metadata = payload.get("metadata")
+    if metadata is None:
+        return None
+    if not isinstance(metadata, Mapping):
+        raise VisionFactsConfigError(f"pack metadata must be a mapping: {path}")
+    vision_facts_path_raw = metadata.get("vision_facts_path")
+    if vision_facts_path_raw is None:
+        return None
+    if not isinstance(vision_facts_path_raw, str) or not vision_facts_path_raw.strip():
+        raise VisionFactsConfigError(f"metadata.vision_facts_path must be a non-empty string: {path}")
+    candidate = Path(vision_facts_path_raw.strip()).expanduser()
+    if not candidate.is_absolute():
+        candidate = path.parent / candidate
+    return candidate.resolve()
+
+
+def _load_vision_facts_path_from_pack_metadata(pack_path: Path) -> Path | None:
+    return _load_vision_facts_path_from_pack_metadata_cached(
+        str(pack_path),
+        *_safe_stat(pack_path, label="pack metadata source"),
+    )
 
 
 def _path_signature(path: Path) -> tuple[int, int]:
@@ -56,8 +115,16 @@ def _load_vision_facts_config_cached(
     return _normalize_vision_facts_config(payload)
 
 
-def load_vision_facts_config(path: str | Path | None = None) -> dict[str, Any]:
-    resolved = (Path(path) if path is not None else default_vision_facts_path()).expanduser().resolve()
+def load_vision_facts_config(
+    path: str | Path | None = None,
+    *,
+    pack_path: str | Path | None = None,
+) -> dict[str, Any]:
+    resolved = (
+        Path(path)
+        if path is not None
+        else default_vision_facts_path(pack_path)
+    ).expanduser().resolve()
     return _load_vision_facts_config_cached(str(resolved), *_path_signature(resolved))
 
 
@@ -318,6 +385,7 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
 __all__ = [
     "VISION_FACT_IDS",
     "VISION_FACT_STATES",
+    "VisionFactsConfigError",
     "build_vision_fact_summary",
     "default_vision_facts_path",
     "extract_vision_fact_snapshot",

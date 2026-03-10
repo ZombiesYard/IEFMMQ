@@ -16,6 +16,7 @@ import yaml
 from core.types_v2 import VisionFact, VisionFactObservation, VisionObservation
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.overlay.sender import DcsOverlaySender
+from adapters.openai_compat_model import OpenAICompatModel
 from adapters.source_chunk_refs import build_source_chunk_ref
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL
 from core.types import Observation, TutorRequest, TutorResponse
@@ -26,6 +27,7 @@ from live_dcs import (
     StdinHelpTrigger,
     UdpHelpTrigger,
     build_arg_parser,
+    _build_vision_fact_extractor_from_model,
     _build_vision_port_from_args,
     _emit_vision_observation_event,
     _emit_vision_fact_observation_event,
@@ -38,6 +40,7 @@ from live_dcs import (
 )
 from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
+from tests._fakes import FakeClient
 from tests.adapters.socket_stubs import DummySocket
 
 
@@ -2779,6 +2782,52 @@ def test_live_loop_marks_vision_fact_unavailable_without_extractor(tmp_path: Pat
     request = model.calls[0]["request"]
     assert request.metadata["vision_fact_status"] == "vision_unavailable"
     assert request.context["vision_fact_summary"]["status"] == "vision_unavailable"
+
+
+def test_build_vision_fact_extractor_from_model_uses_pack_metadata_path(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    vision_facts_path = tmp_path / "configs" / "vision_facts_custom.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "custom_pack",
+                "metadata": {"vision_facts_path": "configs/vision_facts_custom.yaml"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    vision_facts_path.parent.mkdir(parents=True, exist_ok=True)
+    vision_facts_path.write_text(
+        yaml.safe_dump(
+            {
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 4321,
+                    }
+                ],
+                "step_bindings": {},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    model = OpenAICompatModel(client=FakeClient(), enable_multimodal=True)
+
+    extractor = _build_vision_fact_extractor_from_model(
+        model=model,
+        lang="zh",
+        pack_path=pack_path,
+    )
+
+    assert extractor is not None
+    assert extractor._config["layout_id"] == "custom_layout"
+    assert extractor._config["facts_by_id"]["fcs_page_visible"]["expires_after_ms"] == 4321
 
 
 def test_live_loop_marks_vision_unavailable_without_sidecar(tmp_path: Path) -> None:

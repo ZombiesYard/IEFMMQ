@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
@@ -87,6 +88,7 @@ class VisionFactExtractor:
         client: object | None = None,
         enable_multimodal: bool = True,
         config_path: str | None = None,
+        pack_path: str | Path | None = None,
     ) -> None:
         self.model_name = model_name
         self.base_url = base_url.rstrip("/")
@@ -100,7 +102,7 @@ class VisionFactExtractor:
             if isinstance(max_local_image_bytes, int) and max_local_image_bytes > 0
             else self._DEFAULT_MAX_LOCAL_IMAGE_BYTES
         )
-        self._config = load_vision_facts_config(config_path)
+        self._config = load_vision_facts_config(config_path, pack_path=pack_path)
         if client is None:
             import httpx
 
@@ -187,18 +189,21 @@ class VisionFactExtractor:
                 },
             )
 
+        result_status = "available"
         summary = build_vision_fact_summary(
             {fact.fact_id: fact.to_dict() for fact in observation.facts},
-            status="available",
+            status=result_status,
             frame_ids=frame_ids,
             fresh_fact_ids=[fact.fact_id for fact in observation.facts if fact.state == "seen"],
         )
+        if summary["uncertain_fact_ids"]:
+            result_status = "uncertain"
+            summary["status"] = result_status
         observation.summary = summary["summary_text"]
         observation.metadata = {
             **dict(observation.metadata),
             "vision_fact_summary": summary,
         }
-        result_status = "uncertain" if summary["seen_fact_ids"] == [] else "available"
         return VisionFactExtractionResult(
             status=result_status,
             observation=observation,

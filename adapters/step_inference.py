@@ -22,7 +22,12 @@ from adapters.pack_gates import (
 )
 from core.step_signal_metadata import normalize_observability_status
 from core.step_registry import StepRegistryError, default_step_registry_path, load_step_registry_dicts
-from core.vision_facts import extract_vision_fact_snapshot, facts_satisfy_step_binding, load_vision_facts_config
+from core.vision_facts import (
+    VisionFactsConfigError,
+    extract_vision_fact_snapshot,
+    facts_satisfy_step_binding,
+    load_vision_facts_config,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
@@ -44,6 +49,14 @@ class _StepProfile:
 class StepInferenceResult:
     inferred_step_id: str | None
     missing_conditions: tuple[str, ...]
+
+
+def _empty_vision_fact_config() -> dict[str, Any]:
+    return {
+        "layout_id": None,
+        "facts_by_id": {},
+        "step_bindings": {},
+    }
 
 
 def _path_signature(path: Path) -> tuple[int, int] | None:
@@ -305,7 +318,10 @@ def infer_step_id(
     recent_set = set(recent)
 
     effective_pack_path = Path(pack_path).expanduser().resolve() if pack_path else _DEFAULT_PACK_PATH
-    vision_fact_config = load_vision_facts_config()
+    try:
+        vision_fact_config = load_vision_facts_config(pack_path=effective_pack_path)
+    except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
+        vision_fact_config = _empty_vision_fact_config()
     vision_fact_snapshot = extract_vision_fact_snapshot(vision_facts)
     vars_source_missing = _extract_source_missing_vars(vars_safe)
     pre_map, comp_map = _resolve_gate_maps(

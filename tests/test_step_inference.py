@@ -538,6 +538,49 @@ def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx:
     assert advanced.inferred_step_id != "S18"
 
 
+def test_infer_step_uses_pack_specific_vision_fact_bindings(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    vision_facts_path = tmp_path / "configs" / "custom_vision_facts.yaml"
+    _write_yaml(
+        pack_path,
+        {
+            "pack_id": "custom_pack",
+            "metadata": {"vision_facts_path": "configs/custom_vision_facts.yaml"},
+            "steps": [
+                {
+                    "id": "S08",
+                    "observability": "observable",
+                    "ui_targets": ["custom_target"],
+                }
+            ],
+        },
+    )
+    _write_yaml(
+        vision_facts_path,
+        {
+            "layout_id": "custom_layout",
+            "facts": [
+                {
+                    "fact_id": "fcs_page_visible",
+                    "sticky": False,
+                    "expires_after_ms": 2000,
+                }
+            ],
+            "step_bindings": {},
+        },
+    )
+
+    result = infer_step_id(
+        load_pack_steps(pack_path),
+        vars_map={},
+        recent_ui_targets=[],
+        pack_path=pack_path,
+    )
+
+    assert result.inferred_step_id == "S08"
+    assert result.missing_conditions == ()
+
+
 def test_infer_step_is_robust_on_invalid_inputs(synthetic_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]

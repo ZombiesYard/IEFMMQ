@@ -1,7 +1,19 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+import yaml
+
 from core.types_v2 import VisionFact, VisionFactObservation
-from core.vision_facts import build_vision_fact_summary, merge_vision_fact_observation, prune_expired_facts
+from core.vision_facts import (
+    VisionFactsConfigError,
+    build_vision_fact_summary,
+    default_vision_facts_path,
+    load_vision_facts_config,
+    merge_vision_fact_observation,
+    prune_expired_facts,
+)
 
 
 def _obs(
@@ -140,3 +152,83 @@ def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
     assert summary["seen_fact_ids"] == ["fcs_bit_interaction_seen"]
     assert summary["uncertain_fact_ids"] == ["fcs_bit_result_visible"]
     assert "fcs_bit_interaction_seen" in summary["summary_text"]
+
+
+def test_default_vision_facts_path_reads_pack_metadata_override(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack_dir"
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    pack_path = pack_dir / "pack.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "test_pack",
+                "metadata": {"vision_facts_path": "configs/vision/custom.yaml"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    expected = (pack_dir / "configs" / "vision" / "custom.yaml").resolve()
+    assert default_vision_facts_path(pack_path) == expected
+
+
+def test_default_vision_facts_path_rejects_invalid_metadata_type(tmp_path: Path) -> None:
+    pack_path = tmp_path / "pack.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "test_pack",
+                "metadata": {"vision_facts_path": 123},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(VisionFactsConfigError, match="metadata.vision_facts_path must be a non-empty string"):
+        default_vision_facts_path(pack_path)
+
+
+def test_load_vision_facts_config_uses_pack_metadata_path(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack_dir"
+    config_dir = pack_dir / "configs"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    pack_path = pack_dir / "pack.yaml"
+    vision_config_path = config_dir / "vision.yaml"
+    pack_path.write_text(
+        yaml.safe_dump(
+            {
+                "pack_id": "test_pack",
+                "metadata": {"vision_facts_path": "configs/vision.yaml"},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    vision_config_path.write_text(
+        yaml.safe_dump(
+            {
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {},
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_vision_facts_config(pack_path=pack_path)
+
+    assert config["layout_id"] == "custom_layout"
+    assert config["facts_by_id"]["fcs_page_visible"]["expires_after_ms"] == 1234

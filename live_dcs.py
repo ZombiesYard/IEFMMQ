@@ -67,6 +67,7 @@ from core.step_signal_metadata import (
 )
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vision_facts import (
+    VisionFactsConfigError,
     build_vision_fact_summary,
     merge_vision_fact_observation,
     prune_expired_facts,
@@ -262,20 +263,25 @@ def _build_vision_fact_extractor_from_model(
     *,
     model: Any,
     lang: str,
+    pack_path: str | Path | None = None,
 ) -> VisionFactExtractor | None:
     if not isinstance(model, OpenAICompatModel):
         return None
     if not getattr(model, "enable_multimodal", False):
         return None
-    return VisionFactExtractor(
-        model_name=model.model_name,
-        base_url=model.base_url,
-        timeout_s=model.timeout_s,
-        api_key=model.api_key,
-        allowed_local_image_roots=[str(path) for path in model.allowed_local_image_roots],
-        max_local_image_bytes=model.max_local_image_bytes,
-        lang=lang,
-    )
+    try:
+        return VisionFactExtractor(
+            model_name=model.model_name,
+            base_url=model.base_url,
+            timeout_s=model.timeout_s,
+            api_key=model.api_key,
+            allowed_local_image_roots=[str(path) for path in model.allowed_local_image_roots],
+            max_local_image_bytes=model.max_local_image_bytes,
+            lang=lang,
+            pack_path=pack_path,
+        )
+    except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
+        return None
 
 
 class ObservationSource(Protocol):
@@ -1255,7 +1261,11 @@ class LiveDcsTutorLoop:
         self.vision_fact_extractor = (
             vision_fact_extractor
             if vision_fact_extractor is not None
-            else _build_vision_fact_extractor_from_model(model=self.model, lang=self.lang)
+            else _build_vision_fact_extractor_from_model(
+                model=self.model,
+                lang=self.lang,
+                pack_path=self.pack_path,
+            )
         )
         if vision_port is not None:
             if not isinstance(effective_vision_session_id, str) or not effective_vision_session_id:
