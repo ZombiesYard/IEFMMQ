@@ -577,6 +577,69 @@ def _default_model_factory(case: ReplayEvalCase, *, lang: str) -> ReplayEvalOrac
     return ReplayEvalOracleModel(case, lang=lang)
 
 
+def _error_case_result(
+    *,
+    case: ReplayEvalCase,
+    primary_stage: str,
+    primary_exc: Exception,
+    event_log_path: Path,
+    secondary_stage: str | None = None,
+    secondary_exc: Exception | None = None,
+) -> dict[str, Any]:
+    return {
+        "case_id": case.case_id,
+        "expected": {
+            "step_id": case.expectation.step_id,
+            "overlay_target": case.expectation.overlay_target,
+            "requires_visual_confirmation": case.expectation.requires_visual_confirmation,
+            "vision_status": case.expectation.vision_status,
+            "sync_status": case.expectation.sync_status,
+            "sync_delta_ms": case.expectation.sync_delta_ms,
+            "frame_ids": list(case.expectation.frame_ids),
+        },
+        "actual": {
+            "step_id": None,
+            "overlay_target": None,
+            "requires_visual_confirmation": None,
+            "vision_status": None,
+            "sync_status": None,
+            "sync_delta_ms": None,
+            "frame_ids": [],
+            "generation_mode": None,
+            "multimodal_fallback_to_text": None,
+        },
+        "checks": {
+            "step_match": False,
+            "overlay_target_match": False,
+            "requires_visual_confirmation_match": False,
+            "vision_status_match": False,
+            "sync_status_match": False,
+            "sync_delta_ms_match": False,
+            "frame_ids_match": False,
+        },
+        "vision_sidecar_configured": case.vision is not None,
+        "fallback_used": False,
+        "vision_unavailable": False,
+        "sync_failed": False,
+        "status": "error",
+        "error": {
+            "stage": primary_stage,
+            "type": type(primary_exc).__name__,
+            "message": str(primary_exc),
+            "event_log_path": str(event_log_path),
+        },
+        "secondary_error": (
+            {
+                "stage": secondary_stage,
+                "type": type(secondary_exc).__name__,
+                "message": str(secondary_exc),
+            }
+            if secondary_stage is not None and secondary_exc is not None
+            else None
+        ),
+    }
+
+
 def run_replay_eval_suite(
     suite: ReplayEvalSuite,
     *,
@@ -601,6 +664,7 @@ def run_replay_eval_suite(
         source = ReplayBiosReceiver(case.input_path, speed=0.0)
         model = None
         loop = None
+        execution_error: Exception | None = None
         try:
             model = factory(case)
             with JsonlEventStore(event_log_path, mode="w") as store:
@@ -651,6 +715,8 @@ def run_replay_eval_suite(
                         auto_help_every_n_frames=0,
                         help_trigger=None,
                     )
+        except Exception as exc:
+            execution_error = exc
         finally:
             if loop is not None:
                 loop.close()
@@ -658,9 +724,46 @@ def run_replay_eval_suite(
                 source.close()
                 if model is not None and hasattr(model, "close"):
                     model.close()
+        load_error: Exception | None = None
+        events: list[dict[str, Any]] | None = None
+        try:
+            events = JsonlEventStore.load(event_log_path)
+        except Exception as exc:
+            load_error = exc
 
-        events = JsonlEventStore.load(event_log_path)
-        case_results.append(_extract_case_outcome(events, case=case))
+        if execution_error is not None:
+            case_results.append(
+                _error_case_result(
+                    case=case,
+                    primary_stage="execution",
+                    primary_exc=execution_error,
+                    event_log_path=event_log_path,
+                    secondary_stage="event_load" if load_error is not None else None,
+                    secondary_exc=load_error,
+                )
+            )
+            continue
+        if load_error is not None or events is None:
+            case_results.append(
+                _error_case_result(
+                    case=case,
+                    primary_stage="event_load",
+                    primary_exc=(load_error if load_error is not None else RuntimeError("event log unavailable")),
+                    event_log_path=event_log_path,
+                )
+            )
+            continue
+        try:
+            case_results.append(_extract_case_outcome(events, case=case))
+        except Exception as exc:
+            case_results.append(
+                _error_case_result(
+                    case=case,
+                    primary_stage="outcome_extract",
+                    primary_exc=exc,
+                    event_log_path=event_log_path,
+                )
+            )
 
     case_results.sort(key=lambda item: str(item.get("case_id")))
     report = {

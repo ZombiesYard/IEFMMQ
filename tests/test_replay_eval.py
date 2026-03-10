@@ -10,6 +10,7 @@ from simtutor.__main__ import main
 from simtutor.replay_eval import (
     ReplayEvalCase,
     ReplayEvalExpectation,
+    ReplayEvalOracleModel,
     _extract_case_outcome,
     load_replay_eval_suite,
     run_replay_eval_suite,
@@ -323,3 +324,29 @@ def test_extract_case_outcome_falls_back_to_help_response_next_step_id() -> None
 
     assert outcome["actual"]["step_id"] == "S03"
     assert outcome["checks"]["step_match"] is True
+
+
+def test_run_replay_eval_suite_continues_after_case_error(tmp_path: Path) -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+
+    def _factory(case: ReplayEvalCase):
+        if case.case_id == "batteryon_2min":
+            raise RuntimeError("synthetic case failure")
+        return ReplayEvalOracleModel(case, lang=suite.lang)
+
+    report = run_replay_eval_suite(
+        suite,
+        output_dir=tmp_path / "error_tolerant",
+        model_factory=_factory,
+    )
+
+    assert report["summary"]["case_count"] == 5
+    assert report["summary"]["passed_case_count"] == 4
+    failed_case = next(case for case in report["cases"] if case["case_id"] == "batteryon_2min")
+    assert failed_case["status"] == "error"
+    assert failed_case["error"]["stage"] == "execution"
+    assert failed_case["error"]["type"] == "RuntimeError"
+    assert failed_case["error"]["message"] == "synthetic case failure"
+    passed_case_ids = [case["case_id"] for case in report["cases"] if case["status"] == "passed"]
+    assert "noop_2min" in passed_case_ids
+    assert "ins_2min" in passed_case_ids
