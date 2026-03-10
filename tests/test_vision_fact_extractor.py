@@ -258,3 +258,64 @@ def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: 
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["fcs_bit_interaction_seen"].state == "not_seen"
     assert facts_by_id["fcs_bit_result_visible"].state == "not_seen"
+
+
+def test_vision_fact_extractor_uses_configured_fact_subset_without_keyerror(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    config_path = tmp_path / "vision_facts_subset.yaml"
+    _write_png(primary)
+    config_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "v1",
+                "layout_id": "subset_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 2000,
+                        "intended_regions": ["left_ddi"],
+                        "steps": ["S08"],
+                    }
+                ],
+                "step_bindings": {},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "fcs_page_visible",
+                            "state": "seen",
+                            "source_frame_id": "1772872445010_000123",
+                            "confidence": 0.95,
+                            "evidence_note": "FCS page is visible.",
+                        }
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+        config_path=str(config_path),
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    assert [fact.fact_id for fact in result.observation.facts] == ["fcs_page_visible"]
+    assert result.observation.facts[0].state == "seen"
+    call = fake.calls[0]
+    response_schema = call["json"]["response_format"]["json_schema"]["schema"]
+    assert response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"] == ["fcs_page_visible"]

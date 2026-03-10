@@ -8,7 +8,7 @@ import json
 from typing import Any, Mapping, Sequence
 
 from adapters.vision_prompting import build_vlm_region_prompt
-from core.vision_facts import VISION_FACT_IDS, load_vision_facts_config
+from core.vision_facts import load_vision_facts_config
 
 
 def build_vision_fact_prompt(
@@ -19,6 +19,7 @@ def build_vision_fact_prompt(
 ) -> str:
     current_config = config or load_vision_facts_config()
     fact_specs = current_config.get("facts_by_id", {})
+    fact_ids = [fact_id for fact_id in fact_specs.keys() if isinstance(fact_id, str) and fact_id]
     frame_ids = [item for item in vision.get("frame_ids", []) if isinstance(item, str) and item]
     bindings = current_config.get("step_bindings", {})
 
@@ -37,7 +38,7 @@ def build_vision_fact_prompt(
                 "expires_after_ms": fact_specs.get(fact_id, {}).get("expires_after_ms"),
                 "intended_regions": list(fact_specs.get(fact_id, {}).get("intended_regions", [])),
             }
-            for fact_id in VISION_FACT_IDS
+            for fact_id in fact_ids
         ],
     }
 

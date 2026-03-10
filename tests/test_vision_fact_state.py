@@ -15,6 +15,8 @@ from core.vision_facts import (
     prune_expired_facts,
 )
 
+_DEFAULT_VISION_FACT_CONFIG = load_vision_facts_config()
+
 
 def _obs(
     fact_id: str,
@@ -50,6 +52,7 @@ def test_merge_vision_fact_observation_preserves_sticky_seen_after_not_seen() ->
             frame_id="1772872445010_000123",
             trigger_wall_ms=1772872445000,
         ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
         now_wall_ms=1772872445000,
     )
 
@@ -61,6 +64,7 @@ def test_merge_vision_fact_observation_preserves_sticky_seen_after_not_seen() ->
             frame_id="1772872447010_000124",
             trigger_wall_ms=1772872447000,
         ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
         now_wall_ms=1772872447000,
     )
 
@@ -77,6 +81,7 @@ def test_merge_vision_fact_observation_updates_nonsticky_visibility() -> None:
             frame_id="1772872445010_000123",
             trigger_wall_ms=1772872445000,
         ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
         now_wall_ms=1772872445000,
     )
 
@@ -88,6 +93,7 @@ def test_merge_vision_fact_observation_updates_nonsticky_visibility() -> None:
             frame_id="1772872447010_000124",
             trigger_wall_ms=1772872447000,
         ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
         now_wall_ms=1772872447000,
     )
 
@@ -104,6 +110,7 @@ def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
             frame_id="1772872445010_000123",
             trigger_wall_ms=1772872445000,
         ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
         now_wall_ms=1772872445000,
     )
 
@@ -138,6 +145,7 @@ def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
                 ),
             ],
         ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
         now_wall_ms=1772872445000,
     )
 
@@ -353,3 +361,16 @@ def test_load_vision_facts_config_rejects_string_steps(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="steps must be a list"):
         load_vision_facts_config(path)
+
+
+def test_merge_vision_fact_observation_requires_config() -> None:
+    with pytest.raises(ValueError, match="vision fact merge requires config"):
+        merge_vision_fact_observation(
+            {},
+            _obs(
+                "fcs_page_visible",
+                state="seen",
+                frame_id="1772872445010_000123",
+                trigger_wall_ms=1772872445000,
+            ),
+        )

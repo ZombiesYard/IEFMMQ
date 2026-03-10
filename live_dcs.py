@@ -69,6 +69,7 @@ from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vision_facts import (
     VisionFactsConfigError,
     build_vision_fact_summary,
+    load_vision_facts_config,
     merge_vision_fact_observation,
     prune_expired_facts,
     snapshot_to_list,
@@ -282,6 +283,25 @@ def _build_vision_fact_extractor_from_model(
         )
     except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
         return None
+
+
+def _resolve_vision_fact_config(
+    *,
+    extractor: Any | None,
+    pack_path: Path,
+) -> dict[str, Any]:
+    extractor_config = getattr(extractor, "config", None)
+    if isinstance(extractor_config, Mapping):
+        return dict(extractor_config)
+    try:
+        return load_vision_facts_config(pack_path=pack_path)
+    except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
+        return {
+            "schema_version": "v1",
+            "layout_id": None,
+            "facts_by_id": {},
+            "step_bindings": {},
+        }
 
 
 class ObservationSource(Protocol):
@@ -1267,6 +1287,10 @@ class LiveDcsTutorLoop:
                 pack_path=self.pack_path,
             )
         )
+        self._vision_fact_config = _resolve_vision_fact_config(
+            extractor=self.vision_fact_extractor,
+            pack_path=self.pack_path,
+        )
         if vision_port is not None:
             if not isinstance(effective_vision_session_id, str) or not effective_vision_session_id:
                 raise ValueError("vision_session_id or session_id is required when vision_port is configured")
@@ -1838,6 +1862,7 @@ class LiveDcsTutorLoop:
             self._vision_fact_snapshot = merge_vision_fact_observation(
                 self._vision_fact_snapshot,
                 result.observation,
+                config=self._vision_fact_config,
                 now_wall_ms=trigger_wall_ms,
             )
             _emit_vision_fact_observation_event(

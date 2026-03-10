@@ -240,7 +240,9 @@ def normalize_vision_fact(
     config: Mapping[str, Any] | None = None,
     default_observed_at_wall_ms: int | None = None,
 ) -> dict[str, Any]:
-    facts_by_id = (config or load_vision_facts_config()).get("facts_by_id", {})
+    if not isinstance(config, Mapping):
+        raise ValueError("vision fact normalization requires config")
+    facts_by_id = config.get("facts_by_id", {})
     fact_id = raw_fact.get("fact_id")
     if not isinstance(fact_id, str) or fact_id not in facts_by_id:
         raise ValueError(f"unsupported vision fact id: {fact_id!r}")
@@ -308,6 +310,8 @@ def merge_vision_fact_observation(
     config: Mapping[str, Any] | None = None,
     now_wall_ms: int | None = None,
 ) -> dict[str, dict[str, Any]]:
+    if not isinstance(config, Mapping):
+        raise ValueError("vision fact merge requires config")
     payload = observation.to_dict() if isinstance(observation, VisionFactObservation) else dict(observation)
     trigger_wall_ms = payload.get("trigger_wall_ms")
     effective_now_wall_ms = (

@@ -24,10 +24,10 @@ from adapters.openai_compat_multimodal import (
 )
 from adapters.vision_fact_prompting import build_vision_fact_prompt
 from core.types_v2 import VisionFact, VisionFactObservation
-from core.vision_facts import VISION_FACT_IDS, build_vision_fact_summary, load_vision_facts_config
+from core.vision_facts import build_vision_fact_summary, load_vision_facts_config
 
 
-def _vision_fact_response_schema() -> dict[str, Any]:
+def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -48,7 +48,7 @@ def _vision_fact_response_schema() -> dict[str, Any]:
                         "evidence_note",
                     ],
                     "properties": {
-                        "fact_id": {"type": "string", "enum": list(VISION_FACT_IDS)},
+                        "fact_id": {"type": "string", "enum": list(fact_ids)},
                         "state": {"type": "string", "enum": ["seen", "not_seen", "uncertain"]},
                         "source_frame_id": {"type": "string", "minLength": 1},
                         "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
@@ -58,10 +58,6 @@ def _vision_fact_response_schema() -> dict[str, Any]:
             }
         },
     }
-
-
-_RESPONSE_VALIDATOR = Draft202012Validator(_vision_fact_response_schema())
-
 
 @dataclass
 class VisionFactExtractionResult:
@@ -103,6 +99,12 @@ class VisionFactExtractor:
             else self._DEFAULT_MAX_LOCAL_IMAGE_BYTES
         )
         self._config = load_vision_facts_config(config_path, pack_path=pack_path)
+        self._fact_ids = tuple(
+            fact_id
+            for fact_id in self._config.get("facts_by_id", {}).keys()
+            if isinstance(fact_id, str) and fact_id
+        )
+        self._response_validator = Draft202012Validator(_vision_fact_response_schema(fact_ids=self._fact_ids))
         if client is None:
             import httpx
 
@@ -115,6 +117,10 @@ class VisionFactExtractor:
     def close(self) -> None:
         if self._owns_client and hasattr(self._client, "close"):
             self._client.close()
+
+    @property
+    def config(self) -> Mapping[str, Any]:
+        return self._config
 
     def extract(
         self,
@@ -295,7 +301,7 @@ class VisionFactExtractor:
                     "json_schema": {
                         "name": "VisionFactResponse",
                         "strict": True,
-                        "schema": _vision_fact_response_schema(),
+                        "schema": _vision_fact_response_schema(fact_ids=self._fact_ids),
                     },
                 }
             response = self._client.post(
@@ -343,7 +349,7 @@ class VisionFactExtractor:
         obj, _ = parse_first_json(raw_text)
         if not isinstance(obj, Mapping):
             raise ValueError("vision fact response must be a JSON object")
-        _RESPONSE_VALIDATOR.validate(obj)
+        self._response_validator.validate(obj)
         facts_raw = obj.get("facts")
         if not isinstance(facts_raw, list):
             raise ValueError("vision fact response facts must be a list")
@@ -354,7 +360,7 @@ class VisionFactExtractor:
             if not isinstance(item, Mapping):
                 continue
             fact_id = item.get("fact_id")
-            if not isinstance(fact_id, str) or fact_id not in VISION_FACT_IDS or fact_id in facts_by_id:
+            if not isinstance(fact_id, str) or fact_id not in self._fact_ids or fact_id in facts_by_id:
                 continue
             spec = self._config["facts_by_id"][fact_id]
             facts_by_id[fact_id] = VisionFact(
@@ -373,7 +379,7 @@ class VisionFactExtractor:
             )
 
         facts: list[VisionFact] = []
-        for fact_id in VISION_FACT_IDS:
+        for fact_id in self._fact_ids:
             fact = facts_by_id.get(fact_id)
             if fact is None:
                 spec = self._config["facts_by_id"][fact_id]
@@ -396,7 +402,7 @@ class VisionFactExtractor:
             facts=facts,
             metadata={
                 "raw_fact_count": len(facts_raw),
-                "configured_fact_count": len(VISION_FACT_IDS),
+                "configured_fact_count": len(self._fact_ids),
             },
         )
 
