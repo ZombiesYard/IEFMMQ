@@ -62,6 +62,18 @@ def test_run_replay_eval_suite_is_stable_across_repeated_runs(tmp_path: Path) ->
     assert first == second
 
 
+def test_run_replay_eval_suite_does_not_print_dry_run_actions(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+
+    run_replay_eval_suite(suite, output_dir=tmp_path / "quiet")
+
+    captured = capsys.readouterr()
+    assert "dry_run_actions" not in captured.out
+
+
 def test_cli_replay_eval_writes_report(monkeypatch, tmp_path: Path) -> None:
     report_path = tmp_path / "replay_eval_report.json"
     monkeypatch.setattr(

@@ -693,7 +693,7 @@ def run_replay_eval_suite(
                         lang=suite.lang,
                         scenario_profile=case.scenario_profile,
                         event_sink=store.append,
-                        dry_run_overlay=True,
+                        dry_run_overlay=False,
                         vision_port=(
                             None
                             if case.vision is None
