@@ -583,9 +583,9 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
 
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     req_meta = tutor_request_payload["metadata"]
-    assert req_meta["grounding_missing"] is True
-    assert req_meta["grounding_reason"] == "rag_snippets_not_injected"
-    assert req_meta["grounding_snippet_ids"] == []
+    assert req_meta["grounding_missing"] is False
+    assert req_meta["grounding_reason"] is None
+    assert req_meta["grounding_snippet_ids"] == ["fa18c_startup_master_0"]
     rag_topk = tutor_request_payload["context"]["rag_topk"]
     assert rag_topk
     assert rag_topk[0]["snippet_id"]
@@ -593,7 +593,7 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
     prompt_build = tutor_response_payload["metadata"]["prompt_build"]
-    assert prompt_build["grounding_missing"] is True
+    assert prompt_build["grounding_missing"] is False
     assert prompt_build["rag_snippet_ids"] == req_meta["grounding_snippet_ids"]
 
 
@@ -1037,9 +1037,9 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     assert knowledge.calls[0]["k"] == 2
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     req_meta = tutor_request_payload["metadata"]
-    assert req_meta["grounding_missing"] is True
-    assert req_meta["grounding_reason"] == "rag_snippets_not_injected"
-    assert req_meta["grounding_snippet_ids"] == []
+    assert req_meta["grounding_missing"] is False
+    assert req_meta["grounding_reason"] is None
+    assert req_meta["grounding_snippet_ids"] == ["manual_s02_1"]
     assert req_meta["grounding_index_path"] is None
     assert tutor_request_payload["context"]["grounding_reason"] is None
     assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
@@ -1144,8 +1144,8 @@ def test_live_loop_normalizes_query_only_snippets_to_json_safe_scalars(tmp_path:
     assert isinstance(first["page_or_heading"], str)
     assert isinstance(first["snippet"], str)
     assert first["snippet_id"] == "snippet_0"
-    assert req_meta["grounding_snippet_ids"] == []
-    assert req_meta["grounding_reason"] == "rag_snippets_not_injected"
+    assert req_meta["grounding_snippet_ids"] == ["snippet_0"]
+    assert req_meta["grounding_reason"] is None
     json.dumps(tutor_request_payload, ensure_ascii=False)
 
 
@@ -2042,8 +2042,8 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
     assert tutor_response_payload["message"] == "Turn on APU."
     assert tutor_response_payload["explanations"] == ["Turn on APU."]
-    assert meta["original_message"] == "Turn on APU."
-    assert meta["original_explanations"] == ["Turn on APU."]
+    assert meta["fallback_message"] == "Please operate fire_test_switch first."
+    assert "Please operate fire_test_switch first." in meta["fallback_explanations"]
 
 
 def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> None:

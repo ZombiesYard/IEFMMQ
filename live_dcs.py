@@ -2366,16 +2366,15 @@ class LiveDcsTutorLoop:
             return False, "fallback_mapping_failed"
 
         response.actions = list(mapped.actions)
-        original_message = response.message
         if mapped.message and not response.message:
             response.message = mapped.message
-        elif mapped.message and original_message and mapped.message != original_message:
-            response.metadata["original_message"] = original_message
+        elif mapped.message and mapped.message != response.message:
+            response.metadata["fallback_message"] = mapped.message
         original_explanations = list(response.explanations)
         if mapped.explanations and not response.explanations:
             response.explanations = list(mapped.explanations)
         elif mapped.explanations and original_explanations and list(mapped.explanations) != original_explanations:
-            response.metadata["original_explanations"] = original_explanations
+            response.metadata["fallback_explanations"] = list(mapped.explanations)
         return True, fallback_reason
 
     def _new_response_from_cached(

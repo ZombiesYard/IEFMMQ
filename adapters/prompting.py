@@ -881,7 +881,7 @@ def build_help_prompt_result(
             if "trimmed_overlay_enum" not in trim_reasons:
                 trim_reasons.append("trimmed_overlay_enum")
             changed = True
-        elif len(rag_snippets) > 0:
+        elif len(rag_snippets) > 1:
             rag_snippets = rag_snippets[:-1]
             if "trimmed_rag_snippets" not in trim_reasons:
                 trim_reasons.append("trimmed_rag_snippets")
@@ -896,8 +896,12 @@ def build_help_prompt_result(
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
-        final_rag_snippets = []
-        final_allowed_refs = []
+        final_rag_snippets = list(final_rag_snippets[:1])
+        final_allowed_refs = [
+            ref
+            for ref in final_allowed_refs
+            if isinstance(ref, str) and ref.startswith("RAG_SNIPPETS.")
+        ][:1]
         compact_hint = {
             "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),
             "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
@@ -927,6 +931,9 @@ def build_help_prompt_result(
             },
             "allowed_evidence_refs": final_allowed_refs,
         }
+        if final_rag_snippets:
+            compact_payload["decision_priority"].append("EVIDENCE_SOURCES.RAG_SNIPPETS")
+            compact_payload["EVIDENCE_SOURCES"] = {"RAG_SNIPPETS": final_rag_snippets}
         prompt = (
             f"{compact_header}\n"
             f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"

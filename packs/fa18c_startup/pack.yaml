@@ -121,7 +121,7 @@ precondition_gates:
     - op: flag_true
       var: vars.engine_crank_right_complete
       reason_code: s05_requires_engine_crank_right
-      reason: "ENG CRANK must be in RIGHT before right throttle idle."
+      reason: "Right engine start must have begun before right throttle idle."
   S06:
     - op: flag_true
       var: vars.rpm_r_gte_60
@@ -269,7 +269,7 @@ completion_gates:
     - op: flag_true
       var: vars.engine_crank_right_complete
       reason_code: s04_requires_engine_crank_right
-      reason: "ENG CRANK must be in RIGHT."
+      reason: "Right engine start must have begun."
   S05:
     - op: var_gte
       var: vars.rpm_r
