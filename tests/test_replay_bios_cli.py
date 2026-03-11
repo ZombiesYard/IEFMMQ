@@ -931,7 +931,11 @@ def test_cli_replay_bios_without_sidecar_marks_vision_unavailable(monkeypatch, t
     assert captured["vision"]["sync_miss_reason"] == "vision_port_unconfigured"
 
 
-def test_cli_record_vlm_writes_bios_jsonl_and_counts_sidecar_frames(monkeypatch, tmp_path: Path) -> None:
+def test_cli_record_vlm_writes_bios_jsonl_and_counts_sidecar_frames(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     output_path = tmp_path / "recorded" / "dcs_bios_raw.jsonl"
     _write_sidecar_frame(
@@ -982,9 +986,65 @@ def test_cli_record_vlm_writes_bios_jsonl_and_counts_sidecar_frames(monkeypatch,
     code = main()
 
     assert code == 0
+    captured = capsys.readouterr()
     lines = output_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     payload = json.loads(lines[0])
     assert payload["schema_version"] == "v2"
     assert payload["seq"] == 1
     assert payload["bios"]["APU_CONTROL_SW"] == 0
+    stats_line = next(
+        line for line in captured.out.splitlines() if line.startswith("[RECORD_VLM] stats=")
+    )
+    stats = json.loads(stats_line.split("=", 1)[1])
+    assert stats["vision_frames"] == 1
+    assert stats["last_vision_frame_id"] == "1772872445010_000123"
+
+
+def test_cli_record_vlm_rejects_negative_duration(monkeypatch, tmp_path: Path) -> None:
+    output_path = tmp_path / "recorded" / "dcs_bios_raw.jsonl"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "record-vlm",
+            "--output",
+            str(output_path),
+            "--vision-saved-games-dir",
+            str(tmp_path / "Saved Games" / "DCS"),
+            "--vision-session-id",
+            "sess-record",
+            "--duration",
+            "-1",
+            "--max-frames",
+            "1",
+        ],
+    )
+
+    code = main()
+
+    assert code == 1
+
+
+def test_cli_record_vlm_rejects_negative_max_frames(monkeypatch, tmp_path: Path) -> None:
+    output_path = tmp_path / "recorded" / "dcs_bios_raw.jsonl"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "record-vlm",
+            "--output",
+            str(output_path),
+            "--vision-saved-games-dir",
+            str(tmp_path / "Saved Games" / "DCS"),
+            "--vision-session-id",
+            "sess-record",
+            "--max-frames",
+            "-1",
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        main()

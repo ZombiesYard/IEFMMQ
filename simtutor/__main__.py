@@ -245,6 +245,10 @@ def _run_record_vlm(args: argparse.Namespace) -> int:
     from adapters.dcs_bios.receiver import DcsBiosReceiver
     from live_dcs import _build_vision_port_from_args
 
+    if args.duration < 0:
+        raise ValueError("record-vlm requires --duration >= 0")
+    if args.max_frames < 0:
+        raise ValueError("record-vlm requires --max-frames >= 0")
     if args.duration <= 0 and args.max_frames <= 0:
         raise ValueError("record-vlm requires --duration or --max-frames")
 
@@ -505,7 +509,7 @@ def main() -> int:
     )
     rec_vlm.add_argument(
         "--max-frames",
-        type=int,
+        type=parse_non_negative_int_arg,
         default=0,
         help="Max BIOS frames to record (0 means use --duration).",
     )
