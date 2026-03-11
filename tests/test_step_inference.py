@@ -746,6 +746,41 @@ def test_infer_step_reads_nested_payload_vars_before_marking_soft_block() -> Non
     assert "vars.power_available==true" in result.missing_conditions
 
 
+def test_infer_step_prefers_current_observability_hold_over_earlier_soft_candidate() -> None:
+    pack_steps = [
+        {"id": "S01", "observability": "observable", "ui_targets": ["s01_btn"]},
+        {"id": "S02", "observability": "partial", "ui_targets": ["s02_btn"]},
+        {"id": "S03", "observability": "observable", "ui_targets": ["s03_btn"]},
+    ]
+    precondition_gates = {
+        "S01": (
+            {
+                "op": "flag_true",
+                "var": "vars.power_available",
+                "reason_code": "s01_requires_power",
+            },
+        ),
+        "S02": (),
+        "S03": (),
+    }
+    completion_gates = {
+        "S01": (),
+        "S02": (),
+        "S03": (),
+    }
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map={"power_available": "unknown"},
+        recent_ui_targets=[],
+        precondition_gates=precondition_gates,
+        completion_gates=completion_gates,
+    )
+
+    assert result.inferred_step_id == "S02"
+    assert result.missing_conditions == ()
+
+
 def test_infer_step_prefers_nested_payload_vars_shape_when_present() -> None:
     pack_steps = [{"id": "S01"}, {"id": "S02"}]
     precondition_gates = {
