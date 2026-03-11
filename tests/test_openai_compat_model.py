@@ -149,6 +149,23 @@ def test_explain_error_records_raw_llm_text_when_enabled() -> None:
     assert attempts[0] == res.metadata["raw_llm_text"]
 
 
+def test_explain_error_print_model_io_outputs_prompt_and_unicode_reply(capsys) -> None:
+    help_obj = _help_obj_ok()
+    help_obj["explanations"] = ["请先打开 APU。"]
+    payload = _openai_chat_payload_from_help_obj(help_obj)
+    fake = FakeClient(responses=[FakeResponse(payload, status_code=200)])
+    model = OpenAICompatModel(client=fake, print_model_io=True)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    out = capsys.readouterr().out
+    assert "[MODEL_IO][PROMPT]" in out
+    assert "你是 SimTutor 助教" in out
+    assert "[MODEL_IO][REPLY]" in out
+    assert "请先打开 APU。" in out
+
+
 def test_explain_error_http_429_fallback_no_overlay() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake)

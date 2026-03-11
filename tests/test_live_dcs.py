@@ -2400,6 +2400,50 @@ def test_live_dcs_cli_log_raw_llm_text_invalid_env_falls_back_false_with_warning
     )
 
 
+def test_live_dcs_cli_print_model_io_can_disable_env_default(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "1")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--no-print-model-io"])
+    assert args.print_model_io is False
+
+
+def test_live_dcs_cli_print_model_io_can_enable_when_env_default_off(monkeypatch) -> None:
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "0")
+    parser = build_arg_parser()
+    args = parser.parse_args(["--print-model-io"])
+    assert args.print_model_io is True
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected"),
+    [
+        ("true", True),
+        ("false", False),
+    ],
+)
+def test_live_dcs_cli_print_model_io_reads_common_boolean_env_values(
+    monkeypatch,
+    env_value: str,
+    expected: bool,
+) -> None:
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", env_value)
+    parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.print_model_io is expected
+
+
+def test_live_dcs_cli_print_model_io_invalid_env_falls_back_false_with_warning(monkeypatch, caplog) -> None:
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "abc")
+    with caplog.at_level("WARNING"):
+        parser = build_arg_parser()
+    args = parser.parse_args([])
+    assert args.print_model_io is False
+    assert any(
+        "SIMTUTOR_PRINT_MODEL_IO" in record.message and "Invalid boolean environment value" in record.message
+        for record in caplog.records
+    )
+
+
 def test_live_dcs_cli_cold_start_production_reads_env_default(monkeypatch) -> None:
     monkeypatch.setenv("SIMTUTOR_COLD_START_PRODUCTION", "true")
     parser = build_arg_parser()

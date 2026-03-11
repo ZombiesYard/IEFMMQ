@@ -108,6 +108,21 @@ def _add_model_args(parser: argparse.ArgumentParser, *, default_provider: str, p
         help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
     )
     parser.set_defaults(log_raw_llm_text=log_raw_default)
+    print_model_io_default = parse_env_bool("SIMTUTOR_PRINT_MODEL_IO", default=False)
+    print_model_io_group = parser.add_mutually_exclusive_group()
+    print_model_io_group.add_argument(
+        "--print-model-io",
+        dest="print_model_io",
+        action="store_true",
+        help="Print the full prompt text and decoded raw model reply to the terminal for debugging.",
+    )
+    print_model_io_group.add_argument(
+        "--no-print-model-io",
+        dest="print_model_io",
+        action="store_false",
+        help="Disable terminal model I/O debug printing even if SIMTUTOR_PRINT_MODEL_IO=1.",
+    )
+    parser.set_defaults(print_model_io=print_model_io_default)
 
 
 def _run_replay_bios(args: argparse.Namespace) -> int:

@@ -209,6 +209,7 @@ There is no installed console script at the moment. Use module/script entrypoint
 | `SIMTUTOR_LANG` | Tutor language | `zh` or `en`; CLI default is `zh` |
 | `SIMTUTOR_COLD_START_PRODUCTION` | Default switch for cold-start production mode | Boolean-like string such as `1`, `0`, `true`, `false` |
 | `SIMTUTOR_LOG_RAW_LLM_TEXT` | Default switch for raw LLM text logging | Off by default; enable only for debugging |
+| `SIMTUTOR_PRINT_MODEL_IO` | Default switch for terminal model I/O debug printing | Off by default; prints full prompt text and decoded raw replies when enabled |
 | `SIMTUTOR_FA18C_CLICKABLEDATA_PATH` | Optional path for clickable-data validation tests | Used by `tests/test_pack_ui_targets_valid.py` |
 | `SIMTUTOR_PROMPT_TRIM_PRINT` | Debug print switch for prompt trimming | Developer-only diagnostic toggle |
 
@@ -482,6 +483,8 @@ Parameters:
 | `--scenario-profile` | No | `airfield` or `carrier`; default `airfield` |
 | `--log-raw-llm-text` | No | Log raw model text into `tutor_response.metadata` |
 | `--no-log-raw-llm-text` | No | Force-disable raw LLM text logging even if the env flag is on |
+| `--print-model-io` | No | Print the full prompt text and decoded raw model reply to the terminal for debugging |
+| `--no-print-model-io` | No | Force-disable terminal model I/O printing even if the env flag is on |
 
 #### `simtutor replay-eval`
 
@@ -510,6 +513,8 @@ Parameters:
 | `--lang` | No | Shared response language flag: `zh` or `en` |
 | `--log-raw-llm-text` | No | Shared model debug flag to persist raw model text |
 | `--no-log-raw-llm-text` | No | Force-disable raw model text logging |
+| `--print-model-io` | No | Shared model debug flag to print full prompt text and decoded raw replies to the terminal |
+| `--no-print-model-io` | No | Force-disable terminal model I/O printing |
 
 The bundled `fa18c_startup_v04` suite is a synthetic timing/contract regression set: it fixes replay BIOS inputs, optional vision sidecars, expected step/highlight/visual-confirmation outputs, and expected frame-alignment metadata. It is intended to catch replay/VLM wiring regressions and produce a stable machine-readable report without manual log inspection. Runtime model flags are shared with `replay-bios`; only `scenario-profile` remains suite-driven.
 
@@ -569,6 +574,8 @@ Parameters:
 | `--scenario-profile` | No | `airfield` or `carrier`; default `airfield` |
 | `--log-raw-llm-text` | No | Log raw model text into `tutor_response.metadata` |
 | `--no-log-raw-llm-text` | No | Force-disable raw LLM text logging even if the env flag is on |
+| `--print-model-io` | No | Print the full prompt text and decoded raw model reply to the terminal for debugging |
+| `--no-print-model-io` | No | Force-disable terminal model I/O printing even if the env flag is on |
 
 ## Supporting Utilities
 
