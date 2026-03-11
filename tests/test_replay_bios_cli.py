@@ -929,3 +929,62 @@ def test_cli_replay_bios_without_sidecar_marks_vision_unavailable(monkeypatch, t
     assert code == 0
     assert captured["vision"]["status"] == "vision_unavailable"
     assert captured["vision"]["sync_miss_reason"] == "vision_port_unconfigured"
+
+
+def test_cli_record_vlm_writes_bios_jsonl_and_counts_sidecar_frames(monkeypatch, tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    output_path = tmp_path / "recorded" / "dcs_bios_raw.jsonl"
+    _write_sidecar_frame(
+        saved_games_dir=saved_games_dir,
+        session_id="sess-record",
+        capture_wall_ms=1772872445010,
+        frame_seq=123,
+    )
+
+    class FakeReceiver:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self._emitted = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def get_observation(self):
+            if self._emitted:
+                return None
+            self._emitted = True
+            return Observation(
+                source="dcs_bios",
+                payload=_bios_frame(1, 10.0, apu_switch=0),
+                metadata={"seq": 1},
+            )
+
+    monkeypatch.setattr("adapters.dcs_bios.receiver.DcsBiosReceiver", FakeReceiver)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "record-vlm",
+            "--output",
+            str(output_path),
+            "--vision-saved-games-dir",
+            str(saved_games_dir),
+            "--vision-session-id",
+            "sess-record",
+            "--max-frames",
+            "1",
+        ],
+    )
+
+    code = main()
+
+    assert code == 0
+    lines = output_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    payload = json.loads(lines[0])
+    assert payload["schema_version"] == "v2"
+    assert payload["seq"] == 1
+    assert payload["bios"]["APU_CONTROL_SW"] == 0

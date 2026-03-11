@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Iterable, Tuple
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -240,6 +241,75 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_record_vlm(args: argparse.Namespace) -> int:
+    from adapters.dcs_bios.receiver import DcsBiosReceiver
+    from live_dcs import _build_vision_port_from_args
+
+    if args.duration <= 0 and args.max_frames <= 0:
+        raise ValueError("record-vlm requires --duration or --max-frames")
+
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    vision_port, vision_session_id, _sync_window_ms, _trigger_wait_ms = _build_vision_port_from_args(
+        args,
+        mode="replay",
+    )
+    if vision_port is None or not vision_session_id:
+        raise ValueError("record-vlm requires --vision-saved-games-dir plus --vision-session-id or --session-id")
+
+    bios_frames = 0
+    vision_frames = 0
+    last_vision_frame_id: str | None = None
+    start = time.time()
+
+    with DcsBiosReceiver(
+        host=args.host,
+        port=args.port,
+        timeout=args.timeout,
+        merge_full_state=bool(args.merge_full_state),
+    ) as source:
+        vision_port.start(vision_session_id)
+        try:
+            with output.open("w", encoding="utf-8") as handle:
+                while True:
+                    for observation in vision_port.poll():
+                        vision_frames += 1
+                        last_vision_frame_id = observation.frame_id
+
+                    obs = source.get_observation()
+                    if obs is not None:
+                        payload = obs.payload if isinstance(obs.payload, dict) else {}
+                        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                        handle.flush()
+                        bios_frames += 1
+
+                    if args.max_frames > 0 and bios_frames >= args.max_frames:
+                        break
+                    if args.duration > 0 and (time.time() - start) >= args.duration:
+                        break
+        except KeyboardInterrupt:
+            pass
+        finally:
+            vision_port.stop()
+
+    print(f"[RECORD_VLM] wrote bios frames to {output}")
+    print(
+        "[RECORD_VLM] stats="
+        + json.dumps(
+            {
+                "bios_frames": bios_frames,
+                "vision_frames": vision_frames,
+                "vision_session_id": vision_session_id,
+                "last_vision_frame_id": last_vision_frame_id,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def _run_replay_eval(args: argparse.Namespace) -> int:
     from simtutor.replay_eval import ReplayEvalOracleModel, load_replay_eval_suite, run_replay_eval_suite
 
@@ -409,6 +479,51 @@ def main() -> int:
         help="Scenario profile to parameterize pack gate branches (default: airfield).",
     )
 
+    rec_vlm = sub.add_parser("record-vlm", help="Record DCS-BIOS JSONL while monitoring VLM frame sidecar growth")
+    rec_vlm.add_argument("--output", required=True, help="Path to dcs_bios_raw.jsonl")
+    rec_vlm.add_argument("--host", default="0.0.0.0", help="DCS-BIOS UDP bind host (default 0.0.0.0)")
+    rec_vlm.add_argument("--port", type=int, default=7790, help="DCS-BIOS UDP bind port (default 7790)")
+    rec_vlm.add_argument("--timeout", type=float, default=0.2, help="Receiver socket timeout seconds")
+    rec_vlm.add_argument("--session-id", default=None, help="Optional shared session id for BIOS log and frame sidecar")
+    rec_vlm.add_argument(
+        "--vision-saved-games-dir",
+        required=True,
+        help="Saved Games/<variant> root that contains SimTutor/frames/<session>/<channel>/frames.jsonl.",
+    )
+    rec_vlm.add_argument(
+        "--vision-session-id",
+        default=None,
+        help="Frame sidecar session id. Defaults to --session-id when omitted.",
+    )
+    rec_vlm.add_argument("--vision-channel", default=DEFAULT_FRAME_CHANNEL, help="Vision frame channel name")
+    rec_vlm.add_argument("--vision-layout-id", default=DEFAULT_LAYOUT_ID, help="Expected vision layout id")
+    rec_vlm.add_argument(
+        "--duration",
+        type=float,
+        default=0.0,
+        help="Record duration seconds (0 means use --max-frames).",
+    )
+    rec_vlm.add_argument(
+        "--max-frames",
+        type=int,
+        default=0,
+        help="Max BIOS frames to record (0 means use --duration).",
+    )
+    merge_group = rec_vlm.add_mutually_exclusive_group()
+    merge_group.add_argument(
+        "--merge-full-state",
+        dest="merge_full_state",
+        action="store_true",
+        help="Merge BIOS deltas to full state before writing each JSONL line (default: enabled).",
+    )
+    merge_group.add_argument(
+        "--no-merge-full-state",
+        dest="merge_full_state",
+        action="store_false",
+        help="Write delta-only BIOS state instead of a merged full-state payload.",
+    )
+    rec_vlm.set_defaults(merge_full_state=True)
+
     rep_eval = sub.add_parser("replay-eval", help="Run fixed replay regression suite and emit a stable report")
     rep_eval.add_argument(
         "--suite",
@@ -487,6 +602,12 @@ def main() -> int:
             return _run_replay_bios(args)
         except Exception as exc:
             print(f"[REPLAY_BIOS] error: {exc}")
+            return 1
+    if args.command == "record-vlm":
+        try:
+            return _run_record_vlm(args)
+        except Exception as exc:
+            print(f"[RECORD_VLM] error: {exc}")
             return 1
     if args.command == "replay-eval":
         try:

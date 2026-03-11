@@ -65,6 +65,17 @@ python -m simtutor replay-bios \
   --dry-run-overlay
 ```
 
+Record a VLM replay package: keep the DCS-side low-fps frame sidecar growing under the
+same session while SimTutor records replay-compatible BIOS JSONL:
+
+```bash
+python -m simtutor record-vlm \
+  --output logs/dcs_bios_raw.jsonl \
+  --session-id sess-record \
+  --vision-saved-games-dir "$HOME/Saved Games/DCS" \
+  --max-frames 2000
+```
+
 Replay with a local vLLM OpenAI-compatible endpoint:
 
 ```bash
@@ -93,6 +104,12 @@ python live_dcs.py \
   --vision-session-id sess-live \
   --output logs/live_dcs.jsonl
 ```
+
+`live_dcs.py` no longer assumes continuous low-fps frame recording. In live mode, BIOS
+streaming remains continuous, while vision is treated as help-triggered capture: SimTutor
+waits for the post-help frame written into the configured sidecar directory. Use
+`record-vlm` when you want replay material with BIOS plus continuously recorded composite-panel
+frames.
 
 Install the DCS hook files into Saved Games:
 

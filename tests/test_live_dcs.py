@@ -2663,17 +2663,17 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     assert vision["observation_ref"] == request.observation_ref
     assert vision["observation_t_wall_ms"] == 10000
     assert vision["trigger_wall_ms"] == 1772872445000
-    assert vision["frame_id"] == "1772872444950_000122"
-    assert vision["sync_status"] == "matched_past"
-    assert vision["sync_delta_ms"] == -50
-    assert vision["frame_stale"] is True
-    assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
-    assert vision["pre_trigger_frame"]["frame_id"] == "1772872444950_000122"
+    assert vision["frame_id"] == "1772872445010_000123"
+    assert vision["sync_status"] == "matched_future_fallback"
+    assert vision["sync_delta_ms"] == 10
+    assert vision["frame_stale"] is False
+    assert vision["frame_ids"] == ["1772872445010_000123"]
+    assert vision["pre_trigger_frame"] is None
     assert vision["trigger_frame"]["frame_id"] == "1772872445010_000123"
     tutor_request = next(event for event in events if event["kind"] == "tutor_request")
     tutor_response = next(event for event in events if event["kind"] == "tutor_response")
-    assert tutor_request["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
-    assert tutor_response["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert tutor_request["vision_refs"] == ["1772872445010_000123"]
+    assert tutor_response["vision_refs"] == ["1772872445010_000123"]
 
 
 def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Path) -> None:
@@ -2883,7 +2883,7 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
     class StaticVisionFactExtractor:
         def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
             assert session_id == "sess-live"
-            assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+            assert vision["frame_ids"] == ["1772872445010_000123"]
             return type(
                 "Result",
                 (),
@@ -2894,7 +2894,7 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
                     "observation": VisionFactObservation(
                         session_id=session_id,
                         trigger_wall_ms=trigger_wall_ms,
-                        frame_ids=["1772872444950_000122", "1772872445010_000123"],
+                        frame_ids=["1772872445010_000123"],
                         facts=[
                             VisionFact(
                                 fact_id="fcs_reset_seen",
@@ -2949,7 +2949,7 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
         and event.get("metadata", {}).get("observation_kind") == "vision_fact"
     ]
     assert len(fact_events) == 1
-    assert fact_events[0]["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert fact_events[0]["vision_refs"] == ["1772872445010_000123"]
 
 
 def test_live_loop_marks_vision_fact_unavailable_without_extractor(tmp_path: Path) -> None:

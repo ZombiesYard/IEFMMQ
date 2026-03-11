@@ -220,6 +220,28 @@ def test_select_help_cycle_frames_falls_back_to_future_frame_when_past_missing()
     assert selection.trigger_frame["sync_status"] == "matched_future_fallback"
 
 
+def test_select_help_cycle_frames_trigger_only_ignores_past_frame() -> None:
+    selection = select_help_cycle_frames(
+        [
+            _vision_obs("1772872444950_000122", 1772872444950),
+            _vision_obs("1772872445010_000123", 1772872445010),
+        ],
+        trigger_wall_ms=1772872445000,
+        sync_window_ms=250,
+        selection_policy="trigger_only",
+    )
+
+    assert selection.status == "available"
+    assert selection.frame_id == "1772872445010_000123"
+    assert selection.frame_ids == ["1772872445010_000123"]
+    assert selection.pre_trigger_frame is None
+    assert selection.trigger_frame is not None
+    assert selection.trigger_frame["frame_id"] == "1772872445010_000123"
+    assert selection.sync_status == "matched_future_fallback"
+    assert selection.sync_delta_ms == 10
+    assert selection.frame_stale is False
+
+
 def test_select_help_cycle_frames_is_stable_for_replay_inputs() -> None:
     frames = [
         _vision_obs("1772872445010_000123", 1772872445010),
@@ -275,12 +297,12 @@ def test_buffered_vision_session_waits_for_future_fallback_in_live_mode(monkeypa
     finally:
         session.close()
 
-    assert selection.status == "partial"
+    assert selection.status == "available"
     assert selection.frame_id == "1772872445010_000123"
     assert sleeps
 
 
-def test_buffered_vision_session_returns_immediately_when_past_frame_is_usable(monkeypatch) -> None:
+def test_buffered_vision_session_live_mode_rejects_past_only_frame(monkeypatch) -> None:
     class SequencedVisionPort:
         def start(self, session_id: str) -> None:
             assert session_id == "sess-live"
@@ -298,7 +320,7 @@ def test_buffered_vision_session_returns_immediately_when_past_frame_is_usable(m
         vision_port=SequencedVisionPort(),
         session_id="sess-live",
         sync_window_ms=250,
-        trigger_wait_ms=50,
+        trigger_wait_ms=0,
         live_mode=True,
     )
     try:
@@ -306,8 +328,9 @@ def test_buffered_vision_session_returns_immediately_when_past_frame_is_usable(m
     finally:
         session.close()
 
-    assert selection.frame_id == "1772872444950_000122"
-    assert selection.sync_status == "matched_past"
+    assert selection.status == "vision_unavailable"
+    assert selection.frame_id is None
+    assert selection.sync_status is None
     assert sleeps == []
 
 
