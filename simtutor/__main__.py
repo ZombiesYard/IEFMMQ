@@ -265,7 +265,7 @@ def _run_record_vlm(args: argparse.Namespace) -> int:
     bios_frames = 0
     vision_frames = 0
     last_vision_frame_id: str | None = None
-    start = time.time()
+    start_monotonic = time.monotonic()
 
     with DcsBiosReceiver(
         host=args.host,
@@ -283,14 +283,16 @@ def _run_record_vlm(args: argparse.Namespace) -> int:
 
                     obs = source.get_observation()
                     if obs is not None:
-                        payload = obs.payload if isinstance(obs.payload, dict) else {}
+                        if not isinstance(obs.payload, dict):
+                            raise ValueError("record-vlm observed non-object BIOS payload")
+                        payload = obs.payload
                         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
                         handle.flush()
                         bios_frames += 1
 
                     if args.max_frames > 0 and bios_frames >= args.max_frames:
                         break
-                    if args.duration > 0 and (time.time() - start) >= args.duration:
+                    if args.duration > 0 and (time.monotonic() - start_monotonic) >= args.duration:
                         break
         except KeyboardInterrupt:
             pass
