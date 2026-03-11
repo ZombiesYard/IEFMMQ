@@ -1370,6 +1370,25 @@ def test_resolve_step_overlay_allowlist_treats_tuple_hint_blockers_as_hard() -> 
     assert allowlist == ["apu_switch", "battery_switch"]
 
 
+def test_resolve_step_overlay_allowlist_uses_tuple_recent_ui_targets_for_partial_observability() -> None:
+    allowlist = _resolve_step_overlay_allowlist(
+        "S03",
+        step_fallback_profiles={
+            "S03": {
+                "ui_targets": [],
+            }
+        },
+        overlay_allowset={"apu_switch", "battery_switch"},
+        default_allowlist=["battery_switch", "apu_switch"],
+        deterministic_hint={
+            "observability_status": "partial",
+            "recent_ui_targets": ("apu_switch",),
+        },
+    )
+
+    assert allowlist == ["apu_switch"]
+
+
 def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_allowlist_partial_filter.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

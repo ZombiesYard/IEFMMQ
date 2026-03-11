@@ -977,7 +977,7 @@ def _extract_step_id(step: Mapping[str, Any]) -> str | None:
 
 
 def _normalize_step_ui_targets(raw: Any) -> list[str]:
-    if not isinstance(raw, list):
+    if not isinstance(raw, (list, tuple)):
         return []
     out: list[str] = []
     seen: set[str] = set()
