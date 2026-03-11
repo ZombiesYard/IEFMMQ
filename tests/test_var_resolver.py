@@ -315,6 +315,38 @@ def test_var_resolver_pack_engine_crank_switch_three_position_mapping() -> None:
     assert vars_right["engine_crank_right"] is True
 
 
+def test_var_resolver_pack_fire_test_complete_uses_downstream_progress_without_source_missing() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame = TelemetryFrame(
+        seq=250,
+        t_wall=250.0,
+        source="dcs_bios",
+        bios={
+            "BATTERY_SW": 2,
+            "L_GEN_SW": 1,
+            "R_GEN_SW": 1,
+            "APU_CONTROL_SW": 1,
+            "APU_READY_LT": 1,
+            "ENGINE_CRANK_SW": 0,
+            "IFEI_RPM_R": 68,
+            "IFEI_RPM_L": 65,
+            "INS_SW": 1,
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["fire_test_complete"] is True
+    assert vars_out["engine_crank_right_complete"] is True
+    assert vars_out["throttle_r_idle_complete"] is True
+    assert vars_out["bleed_air_cycle_complete"] is True
+    assert "engine_crank_right_complete" not in vars_out["vars_source_missing"]
+    assert "throttle_r_idle_complete" not in vars_out["vars_source_missing"]
+    assert "bleed_air_cycle_complete" not in vars_out["vars_source_missing"]
+    assert "fire_test_complete" not in vars_out["vars_source_missing"]
+
+
 def test_var_resolver_pack_throttle_not_off_flags_track_internal_throttle_axes() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
 

@@ -258,6 +258,27 @@ class BaseHelpModel(ModelPort):
             if isinstance(deterministic_hint, Mapping)
             else self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
         )
+        step_ui_targets = hint_payload.get("step_ui_targets")
+        missing_conditions = hint_payload.get("missing_conditions")
+        gate_blockers = hint_payload.get("gate_blockers")
+        has_hard_blocker = (
+            isinstance(missing_conditions, list)
+            and any(isinstance(item, str) and item for item in missing_conditions)
+        ) or (
+            isinstance(gate_blockers, list)
+            and any(
+                (isinstance(item, str) and item)
+                or (isinstance(item, Mapping) and any(isinstance(item.get(key), str) and item.get(key) for key in ("ref", "reason_code", "reason")))
+                for item in gate_blockers
+            )
+        )
+        if has_hard_blocker and isinstance(step_ui_targets, list):
+            step_target_allowset = {item for item in step_ui_targets if isinstance(item, str) and item}
+            narrowed_allowlist = [
+                item for item in allowlist if isinstance(item, str) and item in step_target_allowset
+            ]
+            if narrowed_allowlist:
+                allowlist = narrowed_allowlist
         if scenario_profile is not None and "scenario_profile" not in hint_payload:
             hint_payload["scenario_profile"] = scenario_profile
 
@@ -378,6 +399,13 @@ class BaseHelpModel(ModelPort):
                 "observability": observability,
                 "observability_status": observability,
                 "step_evidence_requirements": requirements,
+                "step_ui_targets": [
+                    item
+                    for item in step.get("ui_targets", [])
+                    if isinstance(item, str) and item
+                ]
+                if isinstance(step.get("ui_targets"), list)
+                else [],
                 "requires_visual_confirmation": requires_visual_confirmation,
             }
         return {}

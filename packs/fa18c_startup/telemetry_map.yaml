@@ -39,6 +39,8 @@ vars:
   rpm_r_gte_60: "derived(vars.rpm_r >= 60)"
   rpm_l_gte_25: "derived(vars.rpm_l >= 25)"
   rpm_l_gte_60: "derived(vars.rpm_l >= 60)"
+  engine_crank_right_complete: "derived(vars.engine_crank_right or vars.rpm_r_gte_25 or vars.rpm_r_gte_60 or vars.engine_crank_left or vars.rpm_l_gte_60)"
+  throttle_r_idle_complete: "derived(vars.throttle_r_not_off or vars.rpm_r_gte_25 or vars.rpm_r_gte_60 or vars.engine_crank_left or vars.rpm_l_gte_60)"
   rpm_r_in_range: "derived(vars.rpm_r >= 63 and vars.rpm_r <= 70)"
   rpm_l_in_range: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70)"
   temp_r_in_range: "derived(vars.temp_r >= 190 and vars.temp_r <= 590)"
@@ -58,10 +60,15 @@ vars:
   right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"
   mpcd_on: "bios.AMPCD_BRT_CTL > 0"
   hud_on: "bios.HUD_SYM_BRT > 0"
+  bleed_air_cycle_complete: "derived(vars.bleed_air_norm or vars.engine_crank_left or vars.left_ddi_on or vars.right_ddi_on or vars.rpm_l_gte_60)"
   core_avionics_online: "derived(bios.LEFT_DDI_BRT_CTL > 0 and bios.RIGHT_DDI_BRT_CTL > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
 
   # Key switches / sensor panel
   fire_test_active: "bios.FIRE_TEST_SW == 1"
+  # FIRE_TEST_SW is spring-loaded and often absent from replay/live captures once the
+  # learner has already moved past S02. Keep completion inference anchored to stable
+  # downstream vars so late-stage help does not regress back to FIRE TEST.
+  fire_test_complete: "derived(vars.fire_test_active or vars.apu_on or vars.apu_ready or vars.engine_crank_left or vars.rpm_r_gte_60 or vars.rpm_l_gte_60)"
   ins_mode: "bios.INS_SW"
   ins_mode_set: "derived(vars.ins_mode >= 1)"
   ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 4)"

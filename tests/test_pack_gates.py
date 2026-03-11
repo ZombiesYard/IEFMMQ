@@ -108,6 +108,34 @@ def test_evaluate_pack_gates_reports_blocked_reason_code_for_s04_precondition() 
     assert isinstance(s04_pre["reason"], str) and s04_pre["reason"]
 
 
+def test_evaluate_pack_gates_blocks_s03_precondition_until_fire_test_is_complete() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(power_available=True, fire_test_complete="unknown")],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+
+    s03_pre = gates["S03.precondition"]
+    assert s03_pre["status"] == "blocked"
+    assert s03_pre["allowed"] is False
+    assert s03_pre["reason_code"] == "s03_requires_fire_test_complete"
+
+
+def test_evaluate_pack_gates_blocks_s02_completion_until_fire_test_is_complete() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(fire_test_complete=False)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+
+    s02_comp = gates["S02.completion"]
+    assert s02_comp["status"] == "blocked"
+    assert s02_comp["allowed"] is False
+    assert s02_comp["reason_code"] == "s02_requires_fire_test_complete"
+
+
 def test_evaluate_pack_gates_allows_s04_precondition_when_apu_ready_true() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(

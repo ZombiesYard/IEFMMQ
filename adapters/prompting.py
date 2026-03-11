@@ -44,11 +44,15 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.apu_ready": ("apu_switch",),
     "vars.battery_on": ("battery_switch",),
     "vars.bleed_air_norm": ("bleed_air_knob",),
+    "vars.bleed_air_cycle_complete": ("bleed_air_knob",),
     "vars.engine_crank_left": ("eng_crank_switch",),
     "vars.engine_crank_right": ("eng_crank_switch",),
+    "vars.engine_crank_right_complete": ("eng_crank_switch",),
+    "vars.fire_test_complete": ("fire_test_switch",),
     "vars.fcs_reset_pressed": ("fcs_reset_button",),
     "vars.l_gen_on": ("generator_left_switch",),
     "vars.r_gen_on": ("generator_right_switch",),
+    "vars.throttle_r_idle_complete": ("throttle_quadrant_reference",),
 }
 
 
@@ -861,16 +865,16 @@ def build_help_prompt_result(
             if "trimmed_delta_summary" not in trim_reasons:
                 trim_reasons.append("trimmed_delta_summary")
             changed = True
+        elif len(candidate_steps) > 1:
+            candidate_steps = candidate_steps[:-1]
+            if "trimmed_step_enum" not in trim_reasons:
+                trim_reasons.append("trimmed_step_enum")
+            changed = True
         elif max_vars > 0:
             max_vars = max(0, max_vars - 5)
             selected_vars = _pick_vars(context.get("vars"), max_items=max_vars)
             if "trimmed_vars" not in trim_reasons:
                 trim_reasons.append("trimmed_vars")
-            changed = True
-        elif len(candidate_steps) > 1:
-            candidate_steps = candidate_steps[:-1]
-            if "trimmed_step_enum" not in trim_reasons:
-                trim_reasons.append("trimmed_step_enum")
             changed = True
         elif len(overlay_targets) > 1:
             overlay_targets = overlay_targets[:-1]

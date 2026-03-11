@@ -942,17 +942,24 @@ def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -
     model = OpenAICompatModel(client=fake, lang="zh")
     req = _request_help()
     req.context["candidate_steps"] = ["S03", "S04"]
-    req.context["vars"] = {"power_available": True, "apu_on": True, "apu_ready": False}
+    req.context["vars"] = {
+        "power_available": True,
+        "battery_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
+        "apu_on": True,
+        "apu_ready": False,
+    }
     req.context["recent_ui_targets"] = ["apu_switch"]
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
 
     assert res.status == "error"
     assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S02" in (res.message or "")
-    assert "\u4e0b\u4e00\u6b65\u8bf7\u6309\u8be5\u6b65\u9aa4\u68c0\u67e5\u5e76\u6267\u884c" in (res.message or "")
+    assert "vars.fire_test_complete==true" in (res.message or "")
     hint = res.metadata["deterministic_step_hint"]
     assert hint["inferred_step_id"] == "S02"
-    assert hint["missing_conditions"] == []
+    assert hint["missing_conditions"] == ["vars.fire_test_complete==true"]
 
 
 def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions() -> None:
@@ -961,6 +968,9 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
     req = _request_help()
     req.context["vars"] = {
         "power_available": True,
+        "battery_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
         "apu_ready": True,
         "engine_crank_right": True,
         "rpm_r": 65,
@@ -972,7 +982,7 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
 
     assert res.status == "error"
     assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S02" in (res.message or "")
-    assert "\u4e0b\u4e00\u6b65\u8bf7\u6309\u8be5\u6b65\u9aa4\u68c0\u67e5\u5e76\u6267\u884c" in (res.message or "")
+    assert "vars.fire_test_complete==true" in (res.message or "")
 
 
 def test_explain_error_zh_fallback_without_inferred_step(monkeypatch) -> None:
@@ -1008,13 +1018,20 @@ def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -
     model = OpenAICompatModel(client=fake, lang="en")
     req = _request_help()
     req.context["candidate_steps"] = ["S03", "S04"]
-    req.context["vars"] = {"power_available": True, "apu_on": True, "apu_ready": False}
+    req.context["vars"] = {
+        "power_available": True,
+        "battery_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
+        "apu_on": True,
+        "apu_ready": False,
+    }
     req.context["recent_ui_targets"] = ["apu_switch"]
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S02. Please re-check and execute that step."
+    assert res.message == "You are likely stuck at S02. Please satisfy: vars.fire_test_complete==true."
 
 
 def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions() -> None:
@@ -1023,6 +1040,9 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
     req = _request_help()
     req.context["vars"] = {
         "power_available": True,
+        "battery_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
         "apu_ready": True,
         "engine_crank_right": True,
         "rpm_r": 65,
@@ -1033,7 +1053,7 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S02. Please re-check and execute that step."
+    assert res.message == "You are likely stuck at S02. Please satisfy: vars.fire_test_complete==true."
 
 
 def test_explain_error_en_fallback_without_inferred_step(monkeypatch) -> None:
