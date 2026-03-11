@@ -18,6 +18,7 @@ DEFAULT_LIVE_SYNC_WINDOW_MS = 250
 DEFAULT_REPLAY_SYNC_WINDOW_MS = 100
 DEFAULT_LIVE_TRIGGER_WAIT_MS = 250
 _POLL_SLEEP_S = 0.02
+_SELECTION_POLICIES = {"window", "trigger_only"}
 
 
 def _capture_wall_ms(observation: VisionObservation) -> int | None:
@@ -186,7 +187,10 @@ def select_help_cycle_frames(
     observation_ref: str | None = None,
     observation_seq: int | None = None,
     observation_t_wall_s: float | None = None,
+    selection_policy: str = "window",
 ) -> HelpCycleVisionSelection:
+    if selection_policy not in _SELECTION_POLICIES:
+        raise ValueError(f"unsupported vision selection_policy: {selection_policy!r}")
     window_ms = max(0, int(sync_window_ms))
     normalized_observation_t_wall_s, observation_t_wall_ms = _normalize_observation_anchor(
         observation_t_wall_s=observation_t_wall_s,
@@ -219,7 +223,7 @@ def select_help_cycle_frames(
     trigger_observation: VisionObservation | None = None
     for capture_wall_ms, _frame_id, observation in normalized:
         delta_ms = capture_wall_ms - trigger_wall_ms
-        if delta_ms < 0 and abs(delta_ms) <= window_ms:
+        if selection_policy == "window" and delta_ms < 0 and abs(delta_ms) <= window_ms:
             pre_observation = observation
             continue
         if delta_ms >= 0 and delta_ms <= window_ms and trigger_observation is None:
@@ -254,25 +258,46 @@ def select_help_cycle_frames(
         else None
     )
 
-    selected_frames = [
-        item
-        for item in (pre_payload, trigger_payload)
-        if item is not None
-    ]
+    if selection_policy == "trigger_only":
+        resolved_sync = _primary_sync_payload(
+            trigger_observation,
+            trigger_wall_ms=trigger_wall_ms,
+            sync_status=(
+                trigger_payload["sync_status"]
+                if trigger_payload is not None and isinstance(trigger_payload.get("sync_status"), str)
+                else None
+            ),
+        )
+        pre_payload = None
+        selected_frames = [trigger_payload] if trigger_payload is not None else []
+    else:
+        selected_frames = [
+            item
+            for item in (pre_payload, trigger_payload)
+            if item is not None
+        ]
     frame_ids = [str(item["frame_id"]) for item in selected_frames if isinstance(item.get("frame_id"), str)]
 
-    if pre_payload is not None and trigger_payload is not None:
-        status = "available"
-        sync_miss_reason = None
-    elif selected_frames:
-        status = "partial"
-        if pre_payload is None:
-            sync_miss_reason = "missing_pre_trigger_frame"
+    if selection_policy == "trigger_only":
+        if trigger_payload is not None:
+            status = "available"
+            sync_miss_reason = None
         else:
+            status = "vision_unavailable"
             sync_miss_reason = "missing_trigger_frame"
     else:
-        status = "vision_unavailable"
-        sync_miss_reason = "no_frame_within_window"
+        if pre_payload is not None and trigger_payload is not None:
+            status = "available"
+            sync_miss_reason = None
+        elif selected_frames:
+            status = "partial"
+            if pre_payload is None:
+                sync_miss_reason = "missing_pre_trigger_frame"
+            else:
+                sync_miss_reason = "missing_trigger_frame"
+        else:
+            status = "vision_unavailable"
+            sync_miss_reason = "no_frame_within_window"
 
     return HelpCycleVisionSelection(
         status=status,
@@ -305,6 +330,7 @@ class BufferedVisionSession:
         trigger_wait_ms: int = 0,
         retention_ms: int | None = None,
         live_mode: bool,
+        selection_policy: str | None = None,
         observation_sink: Callable[[VisionObservation], None] | None = None,
     ) -> None:
         if not session_id or not isinstance(session_id, str):
@@ -319,6 +345,9 @@ class BufferedVisionSession:
             else max(2000, self.sync_window_ms * 4 + self.trigger_wait_ms)
         )
         self.live_mode = bool(live_mode)
+        self.selection_policy = selection_policy or ("trigger_only" if self.live_mode else "window")
+        if self.selection_policy not in _SELECTION_POLICIES:
+            raise ValueError(f"unsupported vision selection_policy: {self.selection_policy!r}")
         self.observation_sink = observation_sink
         self._history: list[VisionObservation] = []
         self._frame_ids: set[str] = set()
@@ -385,6 +414,7 @@ class BufferedVisionSession:
                 self._history,
                 trigger_wall_ms=trigger_wall_ms,
                 sync_window_ms=self.sync_window_ms,
+                selection_policy=self.selection_policy,
             )
             if not self.live_mode:
                 return selection
