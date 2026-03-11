@@ -28,6 +28,7 @@ from core.help_failure import (
     merge_failure_metadata,
 )
 from core.llm_schema import get_help_response_schema
+from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
@@ -46,30 +47,6 @@ def _dedupe_non_empty_strings(raw: Any) -> list[str]:
         seen.add(item)
         out.append(item)
     return out
-
-
-def _hint_items(raw: Any) -> tuple[Any, ...]:
-    if isinstance(raw, (list, tuple)):
-        return tuple(raw)
-    return ()
-
-
-def _has_hard_blocker(missing_conditions: Any, gate_blockers: Any) -> bool:
-    normalized_missing = _hint_items(missing_conditions)
-    if any(isinstance(item, str) and item for item in normalized_missing):
-        return True
-    normalized_blockers = _hint_items(gate_blockers)
-    return any(
-        (isinstance(item, str) and item)
-        or (
-            isinstance(item, Mapping)
-            and any(
-                isinstance(item.get(key), str) and item.get(key)
-                for key in ("ref", "reason_code", "reason")
-            )
-        )
-        for item in normalized_blockers
-    )
 
 
 def _generation_mode_from_repair_state(
@@ -300,7 +277,7 @@ class BaseHelpModel(ModelPort):
         step_ui_targets = hint_payload.get("step_ui_targets")
         missing_conditions = hint_payload.get("missing_conditions")
         gate_blockers = hint_payload.get("gate_blockers")
-        has_hard_blocker = _has_hard_blocker(missing_conditions, gate_blockers)
+        has_hard_blocker = hint_has_hard_blocker(missing_conditions, gate_blockers)
         if has_hard_blocker and isinstance(step_ui_targets, list):
             step_target_allowset = {item for item in step_ui_targets if isinstance(item, str) and item}
             narrowed_allowlist = [

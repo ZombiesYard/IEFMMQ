@@ -212,17 +212,18 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     result = build_help_prompt_result(ctx, "en", max_prompt_chars=560, max_prompt_tokens_est=140)
 
     assert "compact_template" in result.metadata["trim_reasons"]
-    assert result.metadata["grounding_applied"] is True
-    assert result.metadata["grounding_missing"] is False
-    assert result.metadata["grounding_reason"] is None
-    assert result.metadata["rag_snippet_count"] == 1
-    assert result.metadata["rag_snippet_ids"] == ["manual_s03_1"]
-    assert result.metadata["allowed_evidence_refs"] == ["RAG_SNIPPETS.manual_s03_1"]
-    assert result.metadata["evidence_refs_count"] == 1
+    assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+    assert result.metadata["grounding_reason"] == "rag_snippets_not_injected"
+    assert result.metadata["rag_snippet_count"] == 0
+    assert result.metadata["rag_snippet_ids"] == []
+    assert result.metadata["allowed_evidence_refs"] == []
+    assert result.metadata["evidence_refs_count"] == 0
     assert "constraints=" in result.prompt
-    assert '"EVIDENCE_SOURCES":{"RAG_SNIPPETS":[' in result.prompt
-    assert '"manual_s03_1"' in result.prompt
-    assert '"RAG_SNIPPETS.manual_s03_1"' in result.prompt
+    assert '"grounding":{"applied":false,"missing":true,"reason":"rag_snippets_not_injected"}' in result.prompt
+    assert "RAG_SNIPPETS" not in result.prompt
 
 
 def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:

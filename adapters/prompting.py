@@ -896,51 +896,63 @@ def build_help_prompt_result(
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
+        compact_hint = {
+            "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),
+            "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
+        }
         final_rag_snippets = list(final_rag_snippets[:1])
         final_allowed_refs = [
             ref
             for ref in final_allowed_refs
             if isinstance(ref, str) and ref.startswith("RAG_SNIPPETS.")
         ][:1]
-        compact_hint = {
-            "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),
-            "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
-        }
-        compact_grounding_payload = _build_grounding_payload(
-            context,
-            final_rag_snippets,
-            rag_input_count=rag_input_count,
-        )
-        compact_payload = {
-            "allowed_step_ids": candidate_steps[:3],
-            "allowed_overlay_targets": overlay_targets,
-            "decision_priority": [
-                "deterministic_step_hint",
-                "gates_summary",
-            ],
-            "gates_summary": gates_summary,
-            "deterministic_step_hint": compact_hint,
-            "overlay_target_policy": {
-                "mode": current_overlay_target_policy["mode"],
-                "preferred_target": current_overlay_target_policy.get("preferred_target"),
-            },
-            "grounding": {
-                "applied": bool(compact_grounding_payload["applied"]),
-                "missing": bool(compact_grounding_payload["missing"]),
-                "reason": compact_grounding_payload["reason"],
-            },
-            "allowed_evidence_refs": final_allowed_refs,
-        }
-        if final_rag_snippets:
-            compact_payload["decision_priority"].append("EVIDENCE_SOURCES.RAG_SNIPPETS")
-            compact_payload["EVIDENCE_SOURCES"] = {"RAG_SNIPPETS": final_rag_snippets}
-        prompt = (
-            f"{compact_header}\n"
-            f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
-            "JSON only."
-        )
-        chars = len(prompt)
-        tokens = _estimate_tokens(prompt)
+
+        def _render_compact_prompt(
+            compact_rag_snippets: list[dict[str, Any]],
+            compact_allowed_refs: list[str],
+        ) -> tuple[str, int, int]:
+            compact_grounding_payload = _build_grounding_payload(
+                context,
+                compact_rag_snippets,
+                rag_input_count=rag_input_count,
+            )
+            compact_payload = {
+                "allowed_step_ids": candidate_steps[:3],
+                "allowed_overlay_targets": overlay_targets,
+                "decision_priority": [
+                    "deterministic_step_hint",
+                    "gates_summary",
+                ],
+                "gates_summary": gates_summary,
+                "deterministic_step_hint": compact_hint,
+                "overlay_target_policy": {
+                    "mode": current_overlay_target_policy["mode"],
+                    "preferred_target": current_overlay_target_policy.get("preferred_target"),
+                },
+                "grounding": {
+                    "applied": bool(compact_grounding_payload["applied"]),
+                    "missing": bool(compact_grounding_payload["missing"]),
+                    "reason": compact_grounding_payload["reason"],
+                },
+                "allowed_evidence_refs": compact_allowed_refs,
+            }
+            if compact_rag_snippets:
+                compact_payload["decision_priority"].append("EVIDENCE_SOURCES.RAG_SNIPPETS")
+                compact_payload["EVIDENCE_SOURCES"] = {"RAG_SNIPPETS": compact_rag_snippets}
+            compact_prompt = (
+                f"{compact_header}\n"
+                f"constraints={json.dumps(compact_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
+                "JSON only."
+            )
+            return compact_prompt, len(compact_prompt), _estimate_tokens(compact_prompt)
+
+        prompt, chars, tokens = _render_compact_prompt(final_rag_snippets, final_allowed_refs)
+        if (chars > max_prompt_chars or tokens > max_prompt_tokens_est) and final_rag_snippets:
+            final_rag_snippets = []
+            final_allowed_refs = []
+            if "trimmed_rag_snippets" not in trim_reasons:
+                trim_reasons.append("trimmed_rag_snippets")
+            prompt, chars, tokens = _render_compact_prompt(final_rag_snippets, final_allowed_refs)
         if "compact_template" not in trim_reasons:
             trim_reasons.append("compact_template")
 
