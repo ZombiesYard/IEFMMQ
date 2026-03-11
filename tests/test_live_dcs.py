@@ -1343,6 +1343,9 @@ def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: P
     response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
+    assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_codes"] == [ALLOWLIST_FAIL]
+    assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_code"] == ALLOWLIST_FAIL
+    assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_stage"] == "response_mapping"
     assert tutor_response_payloads[0]["metadata"]["fallback_overlay_used"] is True
     assert tutor_response_payloads[0]["metadata"]["fallback_overlay_reason"].startswith("deterministic_step:")
 
@@ -1847,7 +1850,7 @@ def test_load_step_signal_profiles_parses_valid_step_metadata(tmp_path: Path) ->
         "  - id: S01\n"
         "    observability: observable\n"
         "    evidence_requirements: [var, gate]\n"
-        "    ui_targets: [battery_switch]\n"
+        "    ui_targets: [battery_switch, battery_switch]\n"
         "  - id: S02\n"
         "    observability: unknown\n"
         "    evidence_requirements: [visual, rag]\n",
@@ -1894,6 +1897,22 @@ def test_load_step_signal_profiles_rejects_invalid_evidence_requirement(tmp_path
     )
 
     with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.evidence_requirements\[2\] must be one of"):
+        _load_step_signal_profiles(pack)
+
+
+def test_load_step_signal_profiles_rejects_invalid_ui_target(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: observable\n"
+        "    ui_targets: [battery_switch, '']\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.ui_targets\[1\] must be non-empty string"):
         _load_step_signal_profiles(pack)
 
 

@@ -347,6 +347,28 @@ def test_var_resolver_pack_fire_test_complete_uses_downstream_progress_without_s
     assert "fire_test_complete" not in vars_out["vars_source_missing"]
 
 
+def test_var_resolver_pack_fire_test_complete_accepts_right_engine_crank_progress() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame = TelemetryFrame(
+        seq=251,
+        t_wall=251.0,
+        source="dcs_bios",
+        bios={
+            "BATTERY_SW": 2,
+            "L_GEN_SW": 1,
+            "R_GEN_SW": 1,
+            "ENGINE_CRANK_SW": 2,
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["engine_crank_right"] is True
+    assert vars_out["fire_test_complete"] is True
+    assert "fire_test_complete" not in vars_out["vars_source_missing"]
+
+
 def test_var_resolver_pack_throttle_not_off_flags_track_internal_throttle_axes() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
 

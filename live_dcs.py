@@ -453,7 +453,18 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
         if ui_targets_raw is not None:
             if not isinstance(ui_targets_raw, list):
                 raise ValueError(f"pack.steps[{step_idx}].ui_targets must be a list: {pack_path}")
-            profile["ui_targets"] = [item for item in ui_targets_raw if isinstance(item, str) and item]
+            ui_targets: list[str] = []
+            seen_targets: set[str] = set()
+            for target_idx, target in enumerate(ui_targets_raw):
+                if not isinstance(target, str) or not target:
+                    raise ValueError(
+                        f"pack.steps[{step_idx}].ui_targets[{target_idx}] must be non-empty string: {pack_path}"
+                    )
+                if target in seen_targets:
+                    continue
+                seen_targets.add(target)
+                ui_targets.append(target)
+            profile["ui_targets"] = ui_targets
 
         if profile:
             observability_value = profile.get("observability")
@@ -2626,12 +2637,16 @@ class LiveDcsTutorLoop:
 
             if mapped_meta:
                 mapping_failure_codes = classify_mapping_failure(mapped_meta)
-                if mapping_failure_codes and not fallback_overlay_used:
-                    response.metadata = merge_failure_metadata(
-                        response.metadata,
-                        *mapping_failure_codes,
-                        stage="response_mapping",
-                    )
+                if mapping_failure_codes:
+                    response.metadata["response_mapping_failure_codes"] = list(mapping_failure_codes)
+                    response.metadata["response_mapping_failure_code"] = mapping_failure_codes[0]
+                    response.metadata.setdefault("response_mapping_failure_stage", "response_mapping")
+                    if not fallback_overlay_used:
+                        response.metadata = merge_failure_metadata(
+                            response.metadata,
+                            *mapping_failure_codes,
+                            stage="response_mapping",
+                        )
 
             response.metadata["fallback_overlay_used"] = fallback_overlay_used
             response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
