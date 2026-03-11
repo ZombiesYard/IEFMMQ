@@ -2842,6 +2842,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
     provider = args.model_provider
     lang = args.lang
     log_raw_llm_text = bool(getattr(args, "log_raw_llm_text", False))
+    print_model_io = bool(getattr(args, "print_model_io", False))
     if provider == "stub":
         return ModelStub(mode=args.stub_mode)
 
@@ -2865,6 +2866,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             max_tokens=model_max_tokens,
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
+            print_model_io=print_model_io,
             api_key=args.model_api_key,
             enable_multimodal=model_enable_multimodal,
             allowed_local_image_roots=allowed_local_image_roots,
@@ -2877,6 +2879,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             timeout_s=timeout_s,
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
+            print_model_io=print_model_io,
         )
     raise ValueError(f"Unsupported model provider: {provider}")
 
@@ -3052,6 +3055,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Disable raw model text logging even if SIMTUTOR_LOG_RAW_LLM_TEXT=1",
     )
     parser.set_defaults(log_raw_llm_text=log_raw_default)
+    print_model_io_default = parse_env_bool("SIMTUTOR_PRINT_MODEL_IO", default=False)
+    print_model_io_group = parser.add_mutually_exclusive_group()
+    print_model_io_group.add_argument(
+        "--print-model-io",
+        dest="print_model_io",
+        action="store_true",
+        help="Print the full prompt text and decoded raw model reply to the terminal for debugging.",
+    )
+    print_model_io_group.add_argument(
+        "--no-print-model-io",
+        dest="print_model_io",
+        action="store_false",
+        help="Disable terminal model I/O debug printing even if SIMTUTOR_PRINT_MODEL_IO=1.",
+    )
+    parser.set_defaults(print_model_io=print_model_io_default)
     return parser
 
 

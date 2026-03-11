@@ -513,6 +513,140 @@ def test_cli_replay_bios_log_raw_llm_text_invalid_env_falls_back_false_with_warn
     )
 
 
+def test_cli_replay_bios_print_model_io_can_disable_env_default(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_print_model_io_env_on.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, bool] = {}
+
+    def _fake_run_replay(args):
+        captured["print_model_io"] = bool(args.print_model_io)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "1")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--no-print-model-io",
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["print_model_io"] is False
+
+
+def test_cli_replay_bios_print_model_io_can_enable_when_env_default_off(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_print_model_io_env_off.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, bool] = {}
+
+    def _fake_run_replay(args):
+        captured["print_model_io"] = bool(args.print_model_io)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "0")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--print-model-io",
+        ],
+    )
+
+    code = main()
+    assert code == 0
+    assert captured["print_model_io"] is True
+
+
+def test_cli_replay_bios_print_model_io_reads_true_false_env(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_print_model_io_true_false.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, bool] = {}
+
+    def _fake_run_replay(args):
+        captured["print_model_io"] = bool(args.print_model_io)
+        return 0
+
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "true")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+        ],
+    )
+    code = main()
+    assert code == 0
+    assert captured["print_model_io"] is True
+
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "false")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+        ],
+    )
+    code = main()
+    assert code == 0
+    assert captured["print_model_io"] is False
+
+
+def test_cli_replay_bios_print_model_io_invalid_env_falls_back_false_with_warning(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    replay_path = tmp_path / "bios_cli_print_model_io_invalid.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    captured: dict[str, bool] = {}
+
+    def _fake_run_replay(args):
+        captured["print_model_io"] = bool(args.print_model_io)
+        return 0
+
+    monkeypatch.setenv("SIMTUTOR_PRINT_MODEL_IO", "abc")
+    monkeypatch.setattr("simtutor.__main__._run_replay_bios", _fake_run_replay)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+        ],
+    )
+
+    with caplog.at_level("WARNING"):
+        code = main()
+    assert code == 0
+    assert captured["print_model_io"] is False
+    assert any(
+        "SIMTUTOR_PRINT_MODEL_IO" in record.message and "Invalid boolean environment value" in record.message
+        for record in caplog.records
+    )
+
+
 def test_cli_replay_bios_rejects_missing_policy_in_cold_start_production(
     monkeypatch,
     tmp_path: Path,

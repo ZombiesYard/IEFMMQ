@@ -19,6 +19,7 @@ class OllamaModel(BaseHelpModel):
         timeout_s: float = 20.0,
         lang: str = "zh",
         log_raw_llm_text: bool = False,
+        print_model_io: bool = False,
         client: object | None = None,
     ) -> None:
         super().__init__(
@@ -27,6 +28,7 @@ class OllamaModel(BaseHelpModel):
             timeout_s=timeout_s,
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
+            print_model_io=print_model_io,
             client=client,
         )
 

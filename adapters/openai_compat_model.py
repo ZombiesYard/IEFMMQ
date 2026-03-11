@@ -40,6 +40,7 @@ class OpenAICompatModel(BaseHelpModel):
         max_tokens: int | None = None,
         lang: str = "zh",
         log_raw_llm_text: bool = False,
+        print_model_io: bool = False,
         api_key: str | None = None,
         enable_multimodal: bool = False,
         allowed_local_image_roots: Sequence[str | Path] | None = None,
@@ -65,6 +66,7 @@ class OpenAICompatModel(BaseHelpModel):
             timeout_s=timeout_s,
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
+            print_model_io=print_model_io,
             client=client,
         )
 

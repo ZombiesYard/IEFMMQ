@@ -69,6 +69,7 @@ class BaseHelpModel(ModelPort):
         timeout_s: float,
         lang: str,
         log_raw_llm_text: bool = False,
+        print_model_io: bool = False,
         client: Any | None = None,
     ) -> None:
         self.model_name = model_name
@@ -76,6 +77,7 @@ class BaseHelpModel(ModelPort):
         self.timeout_s = timeout_s
         self.lang = lang
         self.log_raw_llm_text = bool(log_raw_llm_text)
+        self.print_model_io = bool(print_model_io)
 
         if client is None:
             try:
@@ -131,7 +133,15 @@ class BaseHelpModel(ModelPort):
                 deterministic_hint=deterministic_hint,
             )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
+            if self.print_model_io:
+                self._print_model_io_block(
+                    "PROMPT",
+                    self._render_debug_messages(messages),
+                    request=request,
+                    attempt=1,
+                )
             raw_text = self._chat_with_failure_classification(messages)
+            self._print_model_io_block("REPLY", raw_text, request=request, attempt=1)
             if self.log_raw_llm_text:
                 raw_text_attempts.append(raw_text)
             try:
@@ -140,7 +150,15 @@ class BaseHelpModel(ModelPort):
                 retry_count = 1
                 retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
                 retry_messages = self._build_retry_messages(messages, first_parse_exc)
+                if self.print_model_io:
+                    self._print_model_io_block(
+                        "PROMPT",
+                        self._render_debug_messages(retry_messages),
+                        request=request,
+                        attempt=2,
+                    )
                 raw_text = self._chat_with_failure_classification(retry_messages)
+                self._print_model_io_block("REPLY", raw_text, request=request, attempt=2)
                 if self.log_raw_llm_text:
                     raw_text_attempts.append(raw_text)
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
@@ -316,6 +334,56 @@ class BaseHelpModel(ModelPort):
             ],
             prompt_meta,
         )
+
+    def _print_model_io_block(
+        self,
+        kind: str,
+        text: str,
+        *,
+        request: TutorRequest | None,
+        attempt: int,
+    ) -> None:
+        if not self.print_model_io:
+            return
+        request_id = request.request_id if request is not None else None
+        header = f"[MODEL_IO][{kind}]"
+        if isinstance(request_id, str) and request_id:
+            header += f"[request_id={request_id}]"
+        header += f"[attempt={attempt}]"
+        print(header)
+        print(text)
+        print(f"{header}[END]")
+
+    @staticmethod
+    def _render_debug_messages(messages: list[dict[str, Any]]) -> str:
+        rendered: list[str] = []
+        for message in messages:
+            role = message.get("role")
+            role_text = role if isinstance(role, str) and role else "unknown"
+            rendered.append(f"[{role_text}]")
+            content = message.get("content")
+            if isinstance(content, str):
+                rendered.append(content)
+                continue
+            if isinstance(content, list):
+                image_count = 0
+                for item in content:
+                    if not isinstance(item, Mapping):
+                        rendered.append(str(item))
+                        continue
+                    item_type = item.get("type")
+                    if item_type == "text" and isinstance(item.get("text"), str):
+                        rendered.append(str(item["text"]))
+                        continue
+                    if item_type == "image_url":
+                        image_count += 1
+                        continue
+                    rendered.append(str(dict(item)))
+                if image_count > 0:
+                    rendered.append(f"[multimodal_images={image_count}]")
+                continue
+            rendered.append(str(content))
+        return "\n".join(rendered)
 
     def _compute_deterministic_inference(
         self,
