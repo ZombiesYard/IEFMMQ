@@ -33,6 +33,21 @@ from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
 
 
+def _dedupe_non_empty_strings(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str) or not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
 def _generation_mode_from_repair_state(
     *,
     json_repaired: bool,
@@ -390,22 +405,14 @@ class BaseHelpModel(ModelPort):
             observability = normalize_observability_status(step.get("observability"))
             requirements_raw = step.get("evidence_requirements")
             requirements = (
-                [item for item in requirements_raw if isinstance(item, str) and item]
-                if isinstance(requirements_raw, list)
-                else []
+                _dedupe_non_empty_strings(requirements_raw)
             )
             requires_visual_confirmation = compute_requires_visual_confirmation(observability, requirements)
             return {
                 "observability": observability,
                 "observability_status": observability,
                 "step_evidence_requirements": requirements,
-                "step_ui_targets": [
-                    item
-                    for item in step.get("ui_targets", [])
-                    if isinstance(item, str) and item
-                ]
-                if isinstance(step.get("ui_targets"), list)
-                else [],
+                "step_ui_targets": _dedupe_non_empty_strings(step.get("ui_targets")),
                 "requires_visual_confirmation": requires_visual_confirmation,
             }
         return {}

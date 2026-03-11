@@ -1013,6 +1013,26 @@ def test_explain_error_handles_deterministic_inference_exception(monkeypatch) ->
     assert res.metadata["deterministic_inference_error"] == "RuntimeError: inference boom"
 
 
+def test_lookup_step_signal_dedupes_step_ui_targets(monkeypatch) -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="zh")
+    monkeypatch.setattr(
+        "adapters.base_help_model.load_pack_steps",
+        lambda: [
+            {
+                "id": "S03",
+                "observability": "partial",
+                "evidence_requirements": ["visual", "visual", "gate"],
+                "ui_targets": ["apu_switch", "apu_switch", "battery_switch"],
+            }
+        ],
+    )
+
+    signal = model._lookup_step_signal("S03")
+
+    assert signal["step_evidence_requirements"] == ["visual", "gate"]
+    assert signal["step_ui_targets"] == ["apu_switch", "battery_switch"]
+
+
 def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake, lang="en")

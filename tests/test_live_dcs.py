@@ -2040,7 +2040,10 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
     response_mapping = meta["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["apu_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
-    assert tutor_response_payload["message"] == "Please operate fire_test_switch first."
+    assert tutor_response_payload["message"] == "Turn on APU."
+    assert tutor_response_payload["explanations"] == ["Turn on APU."]
+    assert meta["original_message"] == "Turn on APU."
+    assert meta["original_explanations"] == ["Turn on APU."]
 
 
 def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> None:
