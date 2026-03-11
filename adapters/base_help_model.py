@@ -133,7 +133,13 @@ class BaseHelpModel(ModelPort):
                 deterministic_hint=deterministic_hint,
             )
             prompt_budget_used = int(prompt_meta.get("prompt_tokens_est") or 0)
-            self._print_model_io_block("PROMPT", self._render_debug_messages(messages), request=request, attempt=1)
+            if self.print_model_io:
+                self._print_model_io_block(
+                    "PROMPT",
+                    self._render_debug_messages(messages),
+                    request=request,
+                    attempt=1,
+                )
             raw_text = self._chat_with_failure_classification(messages)
             self._print_model_io_block("REPLY", raw_text, request=request, attempt=1)
             if self.log_raw_llm_text:
@@ -144,7 +150,13 @@ class BaseHelpModel(ModelPort):
                 retry_count = 1
                 retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
                 retry_messages = self._build_retry_messages(messages, first_parse_exc)
-                self._print_model_io_block("PROMPT", self._render_debug_messages(retry_messages), request=request, attempt=2)
+                if self.print_model_io:
+                    self._print_model_io_block(
+                        "PROMPT",
+                        self._render_debug_messages(retry_messages),
+                        request=request,
+                        attempt=2,
+                    )
                 raw_text = self._chat_with_failure_classification(retry_messages)
                 self._print_model_io_block("REPLY", raw_text, request=request, attempt=2)
                 if self.log_raw_llm_text:

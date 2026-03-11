@@ -161,7 +161,9 @@ def test_explain_error_print_model_io_outputs_prompt_and_unicode_reply(capsys) -
     assert res.status == "ok"
     out = capsys.readouterr().out
     assert "[MODEL_IO][PROMPT]" in out
-    assert "你是 SimTutor 助教" in out
+    assert "[attempt=1]" in out
+    assert "[system]" in out
+    assert "[user]" in out
     assert "[MODEL_IO][REPLY]" in out
     assert "请先打开 APU。" in out
 
