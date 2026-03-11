@@ -130,8 +130,11 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "apu_ready": _set_enum("APU_READY_LT", true_value=1, false_value=0),
     "battery_on": _set_enum("BATTERY_SW", true_value=2, false_value=1),
     "bleed_air_norm": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
+    "bleed_air_cycle_complete": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
     "engine_crank_left": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
     "engine_crank_right": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
+    "engine_crank_right_complete": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
+    "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=1, false_value=0),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
     "l_gen_on": _set_enum("L_GEN_SW", true_value=1, false_value=0),
@@ -152,6 +155,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "rpm_r_gte_60": _set_threshold_numeric("IFEI_RPM_R", pass_value=65, fail_value=59),
     "throttle_l_not_off": _set_enum("INT_THROTTLE_LEFT", true_value=1, false_value=0),
     "throttle_r_not_off": _set_enum("INT_THROTTLE_RIGHT", true_value=1, false_value=0),
+    "throttle_r_idle_complete": _set_enum("INT_THROTTLE_RIGHT", true_value=1, false_value=0),
 }
 
 

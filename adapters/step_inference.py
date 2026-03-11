@@ -383,8 +383,12 @@ def infer_step_id(
                         comp_gate=comp_gate,
                     ):
                         continue
+                    if soft_candidate is not None:
+                        return _result(soft_candidate[0], soft_candidate[1])
                     return _result(step_id, completion_evidence.missing_conditions or ())
             else:
+                if soft_candidate is not None:
+                    return _result(soft_candidate[0], soft_candidate[1])
                 return _result(step_id, pre_missing)
             continue
 
@@ -399,6 +403,8 @@ def infer_step_id(
                 if soft_candidate is None:
                     soft_candidate = (step_id, comp_missing)
             else:
+                if soft_candidate is not None:
+                    return _result(soft_candidate[0], soft_candidate[1])
                 return _result(step_id, comp_missing)
             continue
 

@@ -28,9 +28,25 @@ from core.help_failure import (
     merge_failure_metadata,
 )
 from core.llm_schema import get_help_response_schema
+from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
 from ports.model_port import ModelPort
+
+
+def _dedupe_non_empty_strings(raw: Any) -> list[str]:
+    if not isinstance(raw, (list, tuple)):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str) or not item:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
 
 
 def _generation_mode_from_repair_state(
@@ -258,6 +274,17 @@ class BaseHelpModel(ModelPort):
             if isinstance(deterministic_hint, Mapping)
             else self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
         )
+        step_ui_targets = hint_payload.get("step_ui_targets")
+        missing_conditions = hint_payload.get("missing_conditions")
+        gate_blockers = hint_payload.get("gate_blockers")
+        has_hard_blocker = hint_has_hard_blocker(missing_conditions, gate_blockers)
+        if has_hard_blocker and isinstance(step_ui_targets, list):
+            step_target_allowset = {item for item in step_ui_targets if isinstance(item, str) and item}
+            narrowed_allowlist = [
+                item for item in allowlist if isinstance(item, str) and item in step_target_allowset
+            ]
+            if narrowed_allowlist:
+                allowlist = narrowed_allowlist
         if scenario_profile is not None and "scenario_profile" not in hint_payload:
             hint_payload["scenario_profile"] = scenario_profile
 
@@ -369,15 +396,14 @@ class BaseHelpModel(ModelPort):
             observability = normalize_observability_status(step.get("observability"))
             requirements_raw = step.get("evidence_requirements")
             requirements = (
-                [item for item in requirements_raw if isinstance(item, str) and item]
-                if isinstance(requirements_raw, list)
-                else []
+                _dedupe_non_empty_strings(requirements_raw)
             )
             requires_visual_confirmation = compute_requires_visual_confirmation(observability, requirements)
             return {
                 "observability": observability,
                 "observability_status": observability,
                 "step_evidence_requirements": requirements,
+                "step_ui_targets": _dedupe_non_empty_strings(step.get("ui_targets")),
                 "requires_visual_confirmation": requires_visual_confirmation,
             }
         return {}

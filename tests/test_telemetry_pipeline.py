@@ -74,6 +74,9 @@ def test_enrich_bios_observation_compacts_payload_and_keeps_metadata() -> None:
     assert enriched.payload["t_wall"] == 123.45
     assert enriched.payload["vars"]["rpm_r"] == 64
     assert enriched.payload["vars"]["rpm_r_gte_25"] is True
+    assert enriched.payload["vars"]["fire_test_complete"] is True
+    assert enriched.payload["vars"]["engine_crank_right_complete"] is True
+    assert enriched.payload["vars"]["throttle_r_idle_complete"] is True
     assert enriched.payload["delta_summary"]["delta_count"] == 4
     assert "battery_switch" in enriched.payload["recent_ui_targets"]
     assert "eng_crank_switch" in enriched.payload["recent_ui_targets"]

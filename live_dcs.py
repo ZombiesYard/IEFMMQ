@@ -75,6 +75,7 @@ from core.step_signal_metadata import (
     compute_requires_visual_confirmation,
     normalize_observability_status,
 )
+from core.step_hint import hint_has_hard_blocker
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vision_facts import (
     VisionFactsConfigError,
@@ -448,6 +449,23 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
                 seen.add(req)
                 evidence_requirements.append(req)
             profile["evidence_requirements"] = evidence_requirements
+
+        ui_targets_raw = step.get("ui_targets")
+        if ui_targets_raw is not None:
+            if not isinstance(ui_targets_raw, list):
+                raise ValueError(f"pack.steps[{step_idx}].ui_targets must be a list: {pack_path}")
+            ui_targets: list[str] = []
+            seen_targets: set[str] = set()
+            for target_idx, target in enumerate(ui_targets_raw):
+                if not isinstance(target, str) or not target:
+                    raise ValueError(
+                        f"pack.steps[{step_idx}].ui_targets[{target_idx}] must be non-empty string: {pack_path}"
+                    )
+                if target in seen_targets:
+                    continue
+                seen_targets.add(target)
+                ui_targets.append(target)
+            profile["ui_targets"] = ui_targets
 
         if profile:
             observability_value = profile.get("observability")
@@ -960,7 +978,7 @@ def _extract_step_id(step: Mapping[str, Any]) -> str | None:
 
 
 def _normalize_step_ui_targets(raw: Any) -> list[str]:
-    if not isinstance(raw, list):
+    if not isinstance(raw, (list, tuple)):
         return []
     out: list[str] = []
     seen: set[str] = set()
@@ -1043,6 +1061,48 @@ def _build_step_fallback_profiles(
             "gate_var_refs": gate_var_refs,
         }
     return profiles
+
+
+def _resolve_step_overlay_allowlist(
+    inferred_step_id: str | None,
+    *,
+    step_fallback_profiles: Mapping[str, Mapping[str, Any]],
+    overlay_allowset: set[str],
+    default_allowlist: Sequence[str],
+    deterministic_hint: Mapping[str, Any] | None = None,
+) -> list[str]:
+    if not isinstance(inferred_step_id, str) or not inferred_step_id:
+        return list(default_allowlist)
+    profile = step_fallback_profiles.get(inferred_step_id)
+    if not isinstance(profile, Mapping):
+        return list(default_allowlist)
+    step_targets = _normalize_step_ui_targets(profile.get("ui_targets"))
+    hint = deterministic_hint if isinstance(deterministic_hint, Mapping) else {}
+    missing_conditions = hint.get("missing_conditions")
+    gate_blockers = hint.get("gate_blockers")
+    has_hard_blocker = hint_has_hard_blocker(missing_conditions, gate_blockers)
+    narrowed = [target for target in step_targets if target in overlay_allowset]
+    if has_hard_blocker:
+        if narrowed:
+            return narrowed
+        return list(default_allowlist)
+    observability = hint.get("observability_status")
+    if not isinstance(observability, str) or not observability:
+        observability = hint.get("observability")
+    if observability in {"partial", "unobservable"}:
+        recent_targets = _normalize_step_ui_targets(hint.get("recent_ui_targets"))
+        merged: list[str] = []
+        seen: set[str] = set()
+        for target in [*step_targets, *recent_targets]:
+            if target not in overlay_allowset or target in seen:
+                continue
+            seen.add(target)
+            merged.append(target)
+        if merged:
+            return merged
+    if narrowed:
+        return narrowed
+    return list(default_allowlist)
 
 
 def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
@@ -1866,10 +1926,22 @@ class LiveDcsTutorLoop:
                     deterministic_hint["step_evidence_requirements"] = [
                         item for item in evidence_requirements if isinstance(item, str) and item
                     ]
+                step_ui_targets = step_signal_profile.get("ui_targets")
+                if isinstance(step_ui_targets, list):
+                    deterministic_hint["step_ui_targets"] = [
+                        item for item in step_ui_targets if isinstance(item, str) and item
+                    ]
                 requires_visual_confirmation = step_signal_profile.get("requires_visual_confirmation")
                 if isinstance(requires_visual_confirmation, bool):
                     deterministic_hint["requires_visual_confirmation"] = requires_visual_confirmation
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
+        overlay_target_allowlist = _resolve_step_overlay_allowlist(
+            inference.inferred_step_id,
+            step_fallback_profiles=self.step_fallback_profiles,
+            overlay_allowset=self.overlay_allowset,
+            default_allowlist=self.overlay_allowlist,
+            deterministic_hint=deterministic_hint,
+        )
 
         context = {
             "vars": vars_selected,
@@ -1877,7 +1949,7 @@ class LiveDcsTutorLoop:
             "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
             "candidate_steps": list(self.candidate_steps),
-            "overlay_target_allowlist": list(self.overlay_allowlist),
+            "overlay_target_allowlist": overlay_target_allowlist,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
             "rag_topk": rag_topk,
@@ -2285,10 +2357,15 @@ class LiveDcsTutorLoop:
             return False, "fallback_mapping_failed"
 
         response.actions = list(mapped.actions)
-        if not response.message and mapped.message:
+        if mapped.message and not response.message:
             response.message = mapped.message
-        if not response.explanations and mapped.explanations:
+        elif mapped.message and mapped.message != response.message:
+            response.metadata["fallback_message"] = mapped.message
+        original_explanations = list(response.explanations)
+        if mapped.explanations and not response.explanations:
             response.explanations = list(mapped.explanations)
+        elif mapped.explanations and original_explanations and list(mapped.explanations) != original_explanations:
+            response.metadata["fallback_explanations"] = list(mapped.explanations)
         return True, fallback_reason
 
     def _new_response_from_cached(
@@ -2539,21 +2616,33 @@ class LiveDcsTutorLoop:
             response.actions = mapped_actions
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
-                mapping_failure_codes = classify_mapping_failure(mapped_meta)
-                if mapping_failure_codes:
-                    response.metadata = merge_failure_metadata(
-                        response.metadata,
-                        *mapping_failure_codes,
-                        stage="response_mapping",
-                    )
 
             fallback_overlay_used = False
             fallback_overlay_reason = "not_needed"
-            if response.status == "error" and not response.actions:
+            should_apply_safe_fallback = response.status == "error" and not response.actions
+            if not should_apply_safe_fallback and not response.actions and mapped_meta:
+                should_apply_safe_fallback = bool(
+                    mapped_meta.get("overlay_rejected")
+                    or mapped_meta.get("rejected_targets_by_request_allowlist")
+                )
+            if should_apply_safe_fallback:
                 fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
                     response,
                     request,
                 )
+
+            if mapped_meta:
+                mapping_failure_codes = classify_mapping_failure(mapped_meta)
+                if mapping_failure_codes:
+                    response.metadata["response_mapping_failure_codes"] = list(mapping_failure_codes)
+                    response.metadata["response_mapping_failure_code"] = mapping_failure_codes[0]
+                    response.metadata.setdefault("response_mapping_failure_stage", "response_mapping")
+                    if not fallback_overlay_used:
+                        response.metadata = merge_failure_metadata(
+                            response.metadata,
+                            *mapping_failure_codes,
+                            stage="response_mapping",
+                        )
 
             response.metadata["fallback_overlay_used"] = fallback_overlay_used
             response.metadata["fallback_overlay_reason"] = fallback_overlay_reason

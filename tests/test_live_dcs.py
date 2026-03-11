@@ -36,6 +36,7 @@ from live_dcs import (
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
     _path_like_to_uri,
+    _resolve_step_overlay_allowlist,
     _sanitize_policy_error_for_user,
 )
 from simtutor.schemas import validate_instance
@@ -203,10 +204,10 @@ class QueryOnlyKnowledge:
         return [
             {
                 "doc_id": "manual",
-                "section": "S03",
-                "page_or_heading": "S03",
-                "snippet": "APU switch to ON and wait for APU READY.",
-                "snippet_id": "manual_s03_1",
+                "section": "S02",
+                "page_or_heading": "S02",
+                "snippet": "Complete FIRE TEST A and FIRE TEST B before APU start.",
+                "snippet_id": "manual_s02_1",
                 "score": 1.0,
             }
         ]
@@ -227,10 +228,10 @@ class NonSerializableKnowledge:
         return [
             {
                 "doc_id": Path("manual.md"),
-                "section": Path("S03"),
+                "section": Path("S02"),
                 "page_or_heading": datetime(2026, 1, 1, tzinfo=timezone.utc),
-                "snippet": {"text": "APU switch to ON"},
-                "snippet_id": Path("manual_s03_1"),
+                "snippet": {"text": "Complete FIRE TEST A/B before APU start"},
+                "snippet_id": Path("manual_s02_1"),
                 "score": 0.9,
                 "unexpected": {"nested": True},
             }
@@ -252,10 +253,10 @@ class MetaKnowledge:
         snippets = [
             {
                 "doc_id": "meta_manual",
-                "section": "S03",
-                "page_or_heading": "S03",
-                "snippet": "APU switch ON.",
-                "snippet_id": "meta_s03_1",
+                "section": "S02",
+                "page_or_heading": "S02",
+                "snippet": "Complete FIRE TEST A/B before APU.",
+                "snippet_id": "meta_s02_1",
                 "score": 1.0,
             }
         ]
@@ -263,7 +264,7 @@ class MetaKnowledge:
             "cache_hit": True,
             "grounding_missing": False,
             "grounding_reason": None,
-            "snippet_ids": ["meta_s03_1"],
+            "snippet_ids": ["meta_s02_1"],
             "index_path": "meta://store",
         }
         return snippets, meta
@@ -285,8 +286,8 @@ class NonSerializableMetaKnowledge:
                 "doc_id": Path("meta_manual.md"),
                 "section": {"unexpected": "mapping"},
                 "page_or_heading": datetime(2026, 1, 2, tzinfo=timezone.utc),
-                "snippet": {"text": "APU switch ON"},
-                "snippet_id": Path("meta_s03_1"),
+                "snippet": {"text": "Complete FIRE TEST A/B before APU"},
+                "snippet_id": Path("meta_s02_1"),
                 "score": float("inf"),
                 "extra": {"nested": True},
             }
@@ -295,7 +296,7 @@ class NonSerializableMetaKnowledge:
             "cache_hit": "yes",
             "grounding_missing": 0,
             "grounding_reason": {"unexpected": "mapping"},
-            "snippet_ids": [Path("meta_s03_1"), {"nested": True}],
+            "snippet_ids": [Path("meta_s02_1"), {"nested": True}],
             "index_path": Path("meta_store/index.json"),
             "grounding_error_type": {"err": "Type"},
         }
@@ -529,17 +530,18 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert isinstance(hint, dict)
     assert hint.get("inferred_step_id")
     assert isinstance(hint.get("requires_visual_confirmation"), bool)
+    assert hint.get("step_ui_targets") == ["fire_test_switch"]
     gates = request.context["gates"]
     assert isinstance(gates, dict)
     assert "S03.completion" in gates
     assert gates["S03.completion"]["status"] in {"allowed", "blocked"}
     assert request.metadata["prompt_hash"]
+    assert request.context["overlay_target_allowlist"] == ["fire_test_switch"]
 
     assert len(executor.calls) == 1
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
-    assert executor.calls[0][0]["target"] == "apu_switch"
-    assert executor.calls[0][0]["element_id"] == _apu_element_id_from_ui_map()
+    assert executor.calls[0][0]["target"] == "fire_test_switch"
 
     kinds = [event.kind for event in events]
     assert "observation" in kinds
@@ -553,9 +555,9 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
     replay_path = tmp_path / "bios_grounding.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
 
-    doc = tmp_path / "grounding.md"
+    doc = tmp_path / "fa18c_startup_master.md"
     doc.write_text(
-        "# S03\nF/A-18C Cold Start MVP subset checklist.\nAPU switch ON and wait for APU READY.\n",
+        "# S02\nF/A-18C Cold Start MVP subset checklist.\nComplete FIRE TEST A and FIRE TEST B before APU start. Use the fire_test_switch.\n",
         encoding="utf-8",
     )
     index_path = tmp_path / "index.json"
@@ -583,11 +585,12 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is False
-    assert req_meta["grounding_snippet_ids"]
+    assert req_meta["grounding_reason"] is None
+    assert req_meta["grounding_snippet_ids"] == ["fa18c_startup_master_0"]
     rag_topk = tutor_request_payload["context"]["rag_topk"]
     assert rag_topk
     assert rag_topk[0]["snippet_id"]
-    assert rag_topk[0]["doc_id"] == "grounding"
+    assert rag_topk[0]["doc_id"] == "fa18c_startup_master"
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
     prompt_build = tutor_response_payload["metadata"]["prompt_build"]
@@ -1037,11 +1040,11 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_reason"] is None
-    assert req_meta["grounding_snippet_ids"] == ["manual_s03_1"]
+    assert req_meta["grounding_snippet_ids"] == ["manual_s02_1"]
     assert req_meta["grounding_index_path"] is None
     assert tutor_request_payload["context"]["grounding_reason"] is None
     assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
-    assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s03_1"
+    assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s02_1"
 
 
 def test_live_loop_degrades_when_knowledge_adapter_raises(tmp_path: Path) -> None:
@@ -1143,6 +1146,7 @@ def test_live_loop_normalizes_query_only_snippets_to_json_safe_scalars(tmp_path:
     assert isinstance(first["snippet"], str)
     assert first["snippet_id"] == "snippet_0"
     assert req_meta["grounding_snippet_ids"] == ["snippet_0"]
+    assert req_meta["grounding_reason"] is None
     json.dumps(tutor_request_payload, ensure_ascii=False)
 
 
@@ -1176,7 +1180,7 @@ def test_live_loop_prefers_retrieve_with_meta_protocol_when_available(tmp_path: 
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_cache_hit"] is True
     assert req_meta["grounding_index_path"] == "meta://store"
-    assert req_meta["grounding_snippet_ids"] == ["meta_s03_1"]
+    assert req_meta["grounding_snippet_ids"] == ["meta_s02_1"]
 
 
 def test_live_loop_normalizes_retrieve_with_meta_payloads_to_json_safe_scalars(tmp_path: Path) -> None:
@@ -1332,16 +1336,57 @@ def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: P
         loop.close()
 
     assert len(executor.calls) == 1
-    assert executor.calls[0] == []
+    assert len(executor.calls[0]) == 1
+    assert executor.calls[0][0]["target"] == "apu_switch"
     tutor_response_payloads = [event.payload for event in events if event.kind == "tutor_response"]
     assert len(tutor_response_payloads) == 1
-    assert tutor_response_payloads[0]["metadata"]["failure_code"] == ALLOWLIST_FAIL
+    assert tutor_response_payloads[0]["metadata"]["failure_code"] == "vision_unavailable"
     response_mapping = tutor_response_payloads[0]["metadata"]["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["battery_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
-    rejected_payloads = [event.payload for event in events if event.kind == "overlay_rejected"]
-    assert len(rejected_payloads) == 1
-    assert rejected_payloads[0]["failure_code"] == ALLOWLIST_FAIL
+    assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_codes"] == [ALLOWLIST_FAIL]
+    assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_code"] == ALLOWLIST_FAIL
+    assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_stage"] == "response_mapping"
+    assert tutor_response_payloads[0]["metadata"]["fallback_overlay_used"] is True
+    assert tutor_response_payloads[0]["metadata"]["fallback_overlay_reason"].startswith("deterministic_step:")
+
+
+def test_resolve_step_overlay_allowlist_treats_tuple_hint_blockers_as_hard() -> None:
+    allowlist = _resolve_step_overlay_allowlist(
+        "S03",
+        step_fallback_profiles={
+            "S03": {
+                "ui_targets": ["apu_switch", "battery_switch"],
+            }
+        },
+        overlay_allowset={"apu_switch", "battery_switch"},
+        default_allowlist=["battery_switch", "apu_switch"],
+        deterministic_hint={
+            "missing_conditions": (),
+            "gate_blockers": ({"ref": "GATES.S03.precondition", "reason": "blocked"},),
+        },
+    )
+
+    assert allowlist == ["apu_switch", "battery_switch"]
+
+
+def test_resolve_step_overlay_allowlist_uses_tuple_recent_ui_targets_for_partial_observability() -> None:
+    allowlist = _resolve_step_overlay_allowlist(
+        "S03",
+        step_fallback_profiles={
+            "S03": {
+                "ui_targets": [],
+            }
+        },
+        overlay_allowset={"apu_switch", "battery_switch"},
+        default_allowlist=["battery_switch", "apu_switch"],
+        deterministic_hint={
+            "observability_status": "partial",
+            "recent_ui_targets": ("apu_switch",),
+        },
+    )
+
+    assert allowlist == ["apu_switch"]
 
 
 def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:
@@ -1413,7 +1458,7 @@ def test_live_loop_emits_overlay_rejected_event_for_evidence_failure(tmp_path: P
                     "help_response": {
                         "diagnosis": {"step_id": "S02", "error_category": "OM"},
                         "next": {"step_id": "S03"},
-                        "overlay": {"targets": ["apu_switch"], "evidence": []},
+                        "overlay": {"targets": ["fire_test_switch"], "evidence": []},
                         "explanations": ["Need more evidence."],
                         "confidence": 0.4,
                     },
@@ -1440,7 +1485,7 @@ def test_live_loop_emits_overlay_rejected_event_for_evidence_failure(tmp_path: P
         loop.close()
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
-    assert tutor_response_payload["metadata"]["failure_code"] == EVIDENCE_FAIL
+    assert tutor_response_payload["metadata"]["failure_code"] == "vision_unavailable"
     rejected_payload = next(event.payload for event in events if event.kind == "overlay_rejected")
     assert rejected_payload["failure_code"] == EVIDENCE_FAIL
     assert rejected_payload["overlay_rejected"] is True
@@ -1514,7 +1559,7 @@ def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys
     assert len(executor.calls) == 0
     out = capsys.readouterr().out
     assert "dry_run_actions" in out
-    assert "apu_switch" in out
+    assert "fire_test_switch" in out
 
 
 def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_path: Path, capsys) -> None:
@@ -1540,7 +1585,7 @@ def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_pa
     assert len(executor.calls) == 1
     out = capsys.readouterr().out
     assert "dry_run_actions" in out
-    assert "apu_switch" in out
+    assert "fire_test_switch" in out
 
 
 def test_replay_receiver_streams_and_only_parses_on_demand(tmp_path: Path) -> None:
@@ -1844,6 +1889,7 @@ def test_load_step_signal_profiles_parses_valid_step_metadata(tmp_path: Path) ->
         "  - id: S01\n"
         "    observability: observable\n"
         "    evidence_requirements: [var, gate]\n"
+        "    ui_targets: [battery_switch, battery_switch]\n"
         "  - id: S02\n"
         "    observability: unknown\n"
         "    evidence_requirements: [visual, rag]\n",
@@ -1854,6 +1900,7 @@ def test_load_step_signal_profiles_parses_valid_step_metadata(tmp_path: Path) ->
     assert profiles["S01"]["observability"] == "observable"
     assert profiles["S01"]["observability_status"] == "observable"
     assert profiles["S01"]["evidence_requirements"] == ["var", "gate"]
+    assert profiles["S01"]["ui_targets"] == ["battery_switch"]
     assert profiles["S01"]["requires_visual_confirmation"] is False
     assert profiles["S02"]["observability"] == "unobservable"
     assert profiles["S02"]["observability_status"] == "unobservable"
@@ -1889,6 +1936,22 @@ def test_load_step_signal_profiles_rejects_invalid_evidence_requirement(tmp_path
     )
 
     with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.evidence_requirements\[2\] must be one of"):
+        _load_step_signal_profiles(pack)
+
+
+def test_load_step_signal_profiles_rejects_invalid_ui_target(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: observable\n"
+        "    ui_targets: [battery_switch, '']\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.ui_targets\[1\] must be non-empty string"):
         _load_step_signal_profiles(pack)
 
 
@@ -1951,6 +2014,75 @@ def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_p
     assert meta["fallback_overlay_used"] is True
     assert isinstance(meta["fallback_overlay_reason"], str)
     assert meta["fallback_overlay_reason"].startswith("deterministic_step:")
+
+
+def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_overlay(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_wrong_future_overlay.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.0, apu_switch=0)])
+
+    class WrongFutureStepModel:
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Turn on APU.",
+                actions=[],
+                explanations=["Turn on APU."],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S03", "error_category": "OM"},
+                        "next": {"step_id": "S03"},
+                        "overlay": {
+                            "targets": ["apu_switch"],
+                            "evidence": [
+                                {
+                                    "target": "apu_switch",
+                                    "type": "delta",
+                                    "ref": "RECENT_UI_TARGETS.apu_switch",
+                                    "quote": "Recent delta shows APU switch activity.",
+                                }
+                            ],
+                        },
+                        "explanations": ["Turn on APU."],
+                        "confidence": 0.82,
+                    },
+                },
+            )
+
+    source = ReplayBiosReceiver(replay_path)
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=WrongFutureStepModel(),
+        action_executor=executor,
+        cooldown_s=5.0,
+        lang="en",
+        event_sink=events.append,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert len(executor.calls) == 1
+    assert executor.calls[0][0]["target"] == "fire_test_switch"
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    meta = tutor_response_payload["metadata"]
+    assert meta["fallback_overlay_used"] is True
+    assert meta["fallback_overlay_reason"] == "deterministic_step:S02"
+    response_mapping = meta["response_mapping"]
+    assert response_mapping["rejected_targets_by_request_allowlist"] == ["apu_switch"]
+    assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
+    assert tutor_response_payload["message"] == "Turn on APU."
+    assert tutor_response_payload["explanations"] == ["Turn on APU."]
+    assert meta["fallback_message"] == "Please operate fire_test_switch first."
+    assert "Please operate fire_test_switch first." in meta["fallback_explanations"]
 
 
 def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> None:

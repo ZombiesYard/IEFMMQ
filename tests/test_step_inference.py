@@ -351,7 +351,14 @@ def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fir
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     result = infer_step_id(
         pack_steps,
-        {"power_available": True, "apu_on": True, "apu_ready": False},
+        {
+            "power_available": True,
+            "battery_on": True,
+            "l_gen_on": True,
+            "r_gen_on": True,
+            "apu_on": True,
+            "apu_ready": False,
+        },
         ["apu_switch"],
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
@@ -359,7 +366,7 @@ def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fir
     )
 
     assert result.inferred_step_id == "S02"
-    assert result.missing_conditions == ()
+    assert "vars.fire_test_complete==true" in result.missing_conditions
 
 
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
@@ -421,6 +428,9 @@ def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_
         pack_steps,
         {
             "power_available": True,
+            "battery_on": True,
+            "l_gen_on": True,
+            "r_gen_on": True,
             "apu_ready": True,
             "engine_crank_right": True,
             "rpm_r": 65,
@@ -433,7 +443,7 @@ def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_
     )
 
     assert result.inferred_step_id == "S02"
-    assert result.missing_conditions == ()
+    assert "vars.fire_test_complete==true" in result.missing_conditions
 
 
 def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Mapping[str, Any]) -> None:
@@ -484,7 +494,7 @@ def test_infer_step_holds_partial_step_without_completion_evidence_despite_later
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S02"
+    assert result.inferred_step_id == "S07"
     assert result.missing_conditions == ()
 
 
@@ -736,6 +746,41 @@ def test_infer_step_reads_nested_payload_vars_before_marking_soft_block() -> Non
     assert "vars.power_available==true" in result.missing_conditions
 
 
+def test_infer_step_prefers_current_observability_hold_over_earlier_soft_candidate() -> None:
+    pack_steps = [
+        {"id": "S01", "observability": "observable", "ui_targets": ["s01_btn"]},
+        {"id": "S02", "observability": "partial", "ui_targets": ["s02_btn"]},
+        {"id": "S03", "observability": "observable", "ui_targets": ["s03_btn"]},
+    ]
+    precondition_gates = {
+        "S01": (
+            {
+                "op": "flag_true",
+                "var": "vars.power_available",
+                "reason_code": "s01_requires_power",
+            },
+        ),
+        "S02": (),
+        "S03": (),
+    }
+    completion_gates = {
+        "S01": (),
+        "S02": (),
+        "S03": (),
+    }
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map={"power_available": "unknown"},
+        recent_ui_targets=[],
+        precondition_gates=precondition_gates,
+        completion_gates=completion_gates,
+    )
+
+    assert result.inferred_step_id == "S02"
+    assert result.missing_conditions == ()
+
+
 def test_infer_step_prefers_nested_payload_vars_shape_when_present() -> None:
     pack_steps = [{"id": "S01"}, {"id": "S02"}]
     precondition_gates = {
@@ -790,7 +835,7 @@ def test_infer_step_qualified_var_path_prioritizes_nested_value_over_conflicting
     )
 
     assert result.inferred_step_id == "S01"
-    assert result.missing_conditions == ()
+    assert result.missing_conditions == ("vars.power_available==true",)
 
 
 def test_infer_step_uses_scenario_profile_specific_gate_overrides(tmp_path: Path) -> None:

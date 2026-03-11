@@ -108,6 +108,10 @@ precondition_gates:
       var: vars.power_available
       reason_code: s03_requires_power_available
       reason: "Power must be available before turning APU ON."
+    - op: flag_true
+      var: vars.fire_test_complete
+      reason_code: s03_requires_fire_test_complete
+      reason: "Fire detection test A/B must be completed before turning APU ON."
   S04:
     - op: flag_true
       var: vars.apu_ready
@@ -115,9 +119,9 @@ precondition_gates:
       reason: "APU READY light must be on before ENG CRANK RIGHT."
   S05:
     - op: flag_true
-      var: vars.engine_crank_right
+      var: vars.engine_crank_right_complete
       reason_code: s05_requires_engine_crank_right
-      reason: "ENG CRANK must be in RIGHT before right throttle idle."
+      reason: "Right engine start must have begun before right throttle idle."
   S06:
     - op: flag_true
       var: vars.rpm_r_gte_60
@@ -247,7 +251,11 @@ completion_gates:
       var: vars.r_gen_on
       reason_code: s01_requires_r_gen_on
       reason: "Right generator must be ON."
-  S02: []
+  S02:
+    - op: flag_true
+      var: vars.fire_test_complete
+      reason_code: s02_requires_fire_test_complete
+      reason: "Fire detection test A/B must be completed before proceeding to APU start."
   S03:
     - op: flag_true
       var: vars.apu_on
@@ -259,9 +267,9 @@ completion_gates:
       reason: "APU READY light must be on."
   S04:
     - op: flag_true
-      var: vars.engine_crank_right
+      var: vars.engine_crank_right_complete
       reason_code: s04_requires_engine_crank_right
-      reason: "ENG CRANK must be in RIGHT."
+      reason: "Right engine start must have begun."
   S05:
     - op: var_gte
       var: vars.rpm_r
@@ -269,12 +277,12 @@ completion_gates:
       reason_code: s05_requires_rpm_r_gte_25
       reason: "Right engine RPM must be at least 25."
     - op: flag_true
-      var: vars.throttle_r_not_off
+      var: vars.throttle_r_idle_complete
       reason_code: s05_requires_throttle_right_idle
       reason: "Right throttle must be moved from OFF toward IDLE."
   S06:
     - op: flag_true
-      var: vars.bleed_air_norm
+      var: vars.bleed_air_cycle_complete
       reason_code: s06_requires_bleed_air_norm
       reason: "BLEED AIR knob must return to NORM after full cycle."
   S07: []

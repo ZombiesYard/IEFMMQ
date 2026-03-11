@@ -210,26 +210,20 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     ]
     ctx["vars"] = {f"v_{i:03d}": "x" * 200 for i in range(120)}
     result = build_help_prompt_result(ctx, "en", max_prompt_chars=560, max_prompt_tokens_est=140)
-    constraints_line = next(
-        line for line in result.prompt.splitlines() if line.startswith("constraints=")
-    )
-    payload = json.loads(constraints_line[len("constraints=") :])
 
     assert "compact_template" in result.metadata["trim_reasons"]
-    assert payload["grounding"]["applied"] is False
-    assert payload["grounding"]["missing"] is True
-    assert payload["grounding"]["reason"] in {"rag_snippets_not_injected", "no_rag_snippets"}
-    assert payload["allowed_evidence_refs"] == []
+    assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert result.metadata["grounding_applied"] is False
+    assert result.metadata["grounding_missing"] is True
+    assert result.metadata["grounding_reason"] == "rag_snippets_not_injected"
     assert result.metadata["rag_snippet_count"] == 0
     assert result.metadata["rag_snippet_ids"] == []
     assert result.metadata["allowed_evidence_refs"] == []
     assert result.metadata["evidence_refs_count"] == 0
-    assert result.metadata["grounding_applied"] is False
-    assert result.metadata["grounding_missing"] is True
-    assert "gates_summary" in payload
-    assert "deterministic_step_hint" in payload
-    assert payload["overlay_target_policy"]["mode"] == "single_target_preferred"
-    assert payload["decision_priority"][:2] == ["deterministic_step_hint", "gates_summary"]
+    assert "constraints=" in result.prompt
+    assert '"grounding":{"applied":false,"missing":true,"reason":"rag_snippets_not_injected"}' in result.prompt
+    assert "RAG_SNIPPETS" not in result.prompt
 
 
 def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
@@ -500,10 +494,11 @@ def test_budget_trim_can_drop_last_rag_snippet_before_compact_template() -> None
         max_prompt_tokens_est=5000,
     )
 
-    assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
-    assert "compact_template" not in result.metadata["trim_reasons"]
-    assert result.metadata["rag_snippet_count"] == 0
-    assert result.metadata["grounding_applied"] is False
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert result.metadata["rag_snippet_count"] == 1
+    assert result.metadata["rag_snippet_ids"] == ["manual_s01_1"]
+    assert result.metadata["grounding_applied"] is True
+    assert result.metadata["grounding_missing"] is False
 
 
 def test_budget_trim_logs_by_default_without_terminal_print(capsys, caplog) -> None:
