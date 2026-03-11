@@ -36,6 +36,7 @@ from live_dcs import (
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
     _path_like_to_uri,
+    _resolve_step_overlay_allowlist,
     _sanitize_policy_error_for_user,
 )
 from simtutor.schemas import validate_instance
@@ -1348,6 +1349,25 @@ def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: P
     assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_stage"] == "response_mapping"
     assert tutor_response_payloads[0]["metadata"]["fallback_overlay_used"] is True
     assert tutor_response_payloads[0]["metadata"]["fallback_overlay_reason"].startswith("deterministic_step:")
+
+
+def test_resolve_step_overlay_allowlist_treats_tuple_hint_blockers_as_hard() -> None:
+    allowlist = _resolve_step_overlay_allowlist(
+        "S03",
+        step_fallback_profiles={
+            "S03": {
+                "ui_targets": ["apu_switch", "battery_switch"],
+            }
+        },
+        overlay_allowset={"apu_switch", "battery_switch"},
+        default_allowlist=["battery_switch", "apu_switch"],
+        deterministic_hint={
+            "missing_conditions": (),
+            "gate_blockers": ({"ref": "GATES.S03.precondition", "reason": "blocked"},),
+        },
+    )
+
+    assert allowlist == ["apu_switch", "battery_switch"]
 
 
 def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:

@@ -1033,6 +1033,29 @@ def test_lookup_step_signal_dedupes_step_ui_targets(monkeypatch) -> None:
     assert signal["step_ui_targets"] == ["apu_switch", "battery_switch"]
 
 
+def test_build_messages_narrows_allowlist_when_tuple_blockers_present() -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="en")
+    req = _request_help()
+    req.context["overlay_target_allowlist"] = ["battery_switch", "apu_switch"]
+    deterministic_hint = {
+        "inferred_step_id": "S03",
+        "missing_conditions": ("vars.fire_test_complete==true",),
+        "gate_blockers": (),
+        "step_ui_targets": ["apu_switch"],
+        "recent_ui_targets": ["apu_switch"],
+    }
+
+    messages, prompt_meta = model._build_messages(
+        Observation(source="mock", procedure_hint="S03"),
+        req,
+        deterministic_hint=deterministic_hint,
+    )
+
+    payload = _extract_prompt_constraints_json(messages[1]["content"])
+    assert payload["allowed_overlay_targets"] == ["apu_switch"]
+    assert prompt_meta["deterministic_step_hint"]["missing_conditions"] == ("vars.fire_test_complete==true",)
+
+
 def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -> None:
     fake = FakeClient(responses=[FakeResponse({}, status_code=429)])
     model = OpenAICompatModel(client=fake, lang="en")

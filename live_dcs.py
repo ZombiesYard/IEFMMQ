@@ -1079,17 +1079,7 @@ def _resolve_step_overlay_allowlist(
     hint = deterministic_hint if isinstance(deterministic_hint, Mapping) else {}
     missing_conditions = hint.get("missing_conditions")
     gate_blockers = hint.get("gate_blockers")
-    has_hard_blocker = (
-        isinstance(missing_conditions, list)
-        and any(isinstance(item, str) and item for item in missing_conditions)
-    ) or (
-        isinstance(gate_blockers, list)
-        and any(
-            (isinstance(item, str) and item)
-            or (isinstance(item, Mapping) and any(isinstance(item.get(key), str) and item.get(key) for key in ("ref", "reason_code", "reason")))
-            for item in gate_blockers
-        )
-    )
+    has_hard_blocker = _hint_has_hard_blocker(missing_conditions, gate_blockers)
     narrowed = [target for target in step_targets if target in overlay_allowset]
     if has_hard_blocker:
         if narrowed:
@@ -1112,6 +1102,30 @@ def _resolve_step_overlay_allowlist(
     if narrowed:
         return narrowed
     return list(default_allowlist)
+
+
+def _hint_items(raw: Any) -> tuple[Any, ...]:
+    if isinstance(raw, (list, tuple)):
+        return tuple(raw)
+    return ()
+
+
+def _hint_has_hard_blocker(missing_conditions: Any, gate_blockers: Any) -> bool:
+    normalized_missing = _hint_items(missing_conditions)
+    if any(isinstance(item, str) and item for item in normalized_missing):
+        return True
+    normalized_blockers = _hint_items(gate_blockers)
+    return any(
+        (isinstance(item, str) and item)
+        or (
+            isinstance(item, Mapping)
+            and any(
+                isinstance(item.get(key), str) and item.get(key)
+                for key in ("ref", "reason_code", "reason")
+            )
+        )
+        for item in normalized_blockers
+    )
 
 
 def _collect_request_evidence_refs(context: Mapping[str, Any]) -> set[str]:
