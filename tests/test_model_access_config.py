@@ -128,6 +128,16 @@ def test_openai_compat_allows_https_remote_base_url() -> None:
     assert cfg.base_url == "https://api.example.com/v1"
 
 
+def test_openai_compat_rejects_base_url_without_hostname() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "https:///v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    with pytest.raises(ModelConfigError, match="must include a hostname"):
+        load_model_access_config(env)
+
+
 def test_cli_model_config_reports_missing_env(monkeypatch, capsys) -> None:
     for key in (
         ENV_MODEL_PROVIDER,

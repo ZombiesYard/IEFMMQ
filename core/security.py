@@ -105,6 +105,10 @@ def validate_model_base_url_security(base_url: str, *, provider: str) -> None:
         raise ModelTransportSecurityError(
             f"{provider} base URL must use http or https: {redact_url_for_log(base_url)}"
         )
+    if not parsed.netloc or not parsed.hostname:
+        raise ModelTransportSecurityError(
+            f"{provider} base URL must include a hostname: {redact_url_for_log(base_url)}"
+        )
     if parsed.scheme == "https":
         return
     if _is_local_hostname(parsed.hostname):
