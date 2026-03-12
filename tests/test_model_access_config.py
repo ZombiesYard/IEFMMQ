@@ -108,6 +108,26 @@ def test_startup_info_redacts_base_url_credentials_query_and_fragment() -> None:
     assert "base_url=https://example.com:8443/v1" in info
 
 
+def test_openai_compat_rejects_insecure_remote_http_base_url() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "http://api.example.com:8000/v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    with pytest.raises(ModelConfigError, match="must use https"):
+        load_model_access_config(env)
+
+
+def test_openai_compat_allows_https_remote_base_url() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "https://api.example.com/v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    cfg = load_model_access_config(env)
+    assert cfg.base_url == "https://api.example.com/v1"
+
+
 def test_cli_model_config_reports_missing_env(monkeypatch, capsys) -> None:
     for key in (
         ENV_MODEL_PROVIDER,

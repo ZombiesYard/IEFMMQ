@@ -28,6 +28,7 @@ from core.help_failure import (
     merge_failure_metadata,
 )
 from core.llm_schema import get_help_response_schema
+from core.security import redact_sensitive_text, sanitize_help_response_for_log, sanitize_public_model_text
 from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
@@ -170,6 +171,10 @@ class BaseHelpModel(ModelPort):
                 status="ok",
                 lang=self.lang,
             )
+            safe_message = sanitize_public_model_text(mapped.message, lang=self.lang)
+            safe_explanations = [
+                sanitize_public_model_text(item, lang=self.lang) for item in mapped.explanations
+            ]
             metadata = dict(mapped.metadata)
             metadata.update(
                 {
@@ -180,7 +185,7 @@ class BaseHelpModel(ModelPort):
                         repair_applied=bool(repair_details.get("repair_applied")),
                     ),
                     "latency_ms": int((perf_counter() - start) * 1000),
-                    "help_response": help_obj,
+                    "help_response": sanitize_help_response_for_log(help_obj, lang=self.lang),
                     "json_repaired": extraction.json_repaired,
                     "json_repair_reasons": list(extraction.repair_reasons),
                     "evidence_guardrail_applied": bool(evidence_guardrail_reasons),
@@ -211,9 +216,9 @@ class BaseHelpModel(ModelPort):
             return TutorResponse(
                 status=mapped.status,
                 in_reply_to=mapped.in_reply_to,
-                message=mapped.message,
+                message=safe_message,
                 actions=list(mapped.actions),
-                explanations=list(mapped.explanations),
+                explanations=safe_explanations,
                 metadata=metadata,
             )
         except Exception as exc:
@@ -224,7 +229,7 @@ class BaseHelpModel(ModelPort):
                 "generation_mode": "fallback",
                 "latency_ms": int((perf_counter() - start) * 1000),
                 "error_type": type(exc).__name__,
-                "error": str(exc),
+                "error": redact_sensitive_text(str(exc)),
                 "prompt_budget_used": prompt_budget_used,
                 "delta_dropped_count": delta_dropped_count,
                 "prompt_build": prompt_meta,

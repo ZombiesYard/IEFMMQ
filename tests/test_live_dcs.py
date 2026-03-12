@@ -598,6 +598,73 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
     assert prompt_build["rag_snippet_ids"] == req_meta["grounding_snippet_ids"]
 
 
+def test_live_loop_redacts_user_message_and_rag_snippet_text_in_request_event(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_request_redaction.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    doc = tmp_path / "manual.md"
+    doc.write_text(
+        "# S02\nConnect to https://api.example.com:8443/v1 with api_key=sk-test before APU start.\n",
+        encoding="utf-8",
+    )
+    index_path = tmp_path / "index.json"
+    build_index([str(doc)], str(index_path))
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_index_path=index_path,
+        rag_top_k=3,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    assert tutor_request_payload["message"] == "[REDACTED_USER_MESSAGE]"
+    assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
+    rag_topk = tutor_request_payload["context"]["rag_topk"]
+    assert rag_topk
+    assert "snippet" not in rag_topk[0]
+    assert rag_topk[0]["snippet_id"] == "manual_0"
+
+
+def test_live_loop_redacts_help_response_quotes_in_response_event(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_response_redaction.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    help_response = tutor_response_payload["metadata"]["help_response"]
+    evidence = help_response["overlay"]["evidence"]
+    assert evidence[0]["quote"] == "[REDACTED_SOURCE_QUOTE]"
+
+
 def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monkeypatch, tmp_path: Path) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
@@ -701,7 +768,7 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
     assert req_meta["grounding_reason"] == "index_missing"
     assert req_meta["grounding_snippet_ids"] == []
     assert tutor_request_payload["context"]["grounding_reason"] == "index_missing"
-    assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
+    assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
     assert tutor_request_payload["context"]["rag_topk"] == []
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
@@ -1043,7 +1110,7 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     assert req_meta["grounding_snippet_ids"] == ["manual_s02_1"]
     assert req_meta["grounding_index_path"] is None
     assert tutor_request_payload["context"]["grounding_reason"] is None
-    assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
+    assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
     assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s02_1"
 
 
@@ -1139,11 +1206,10 @@ def test_live_loop_normalizes_query_only_snippets_to_json_safe_scalars(tmp_path:
     rag_topk = tutor_request_payload["context"]["rag_topk"]
     assert len(rag_topk) == 1
     first = rag_topk[0]
-    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet", "snippet_id", "score"}
+    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet_id", "score"}
     assert isinstance(first["doc_id"], str)
     assert isinstance(first["section"], str)
     assert isinstance(first["page_or_heading"], str)
-    assert isinstance(first["snippet"], str)
     assert first["snippet_id"] == "snippet_0"
     assert req_meta["grounding_snippet_ids"] == ["snippet_0"]
     assert req_meta["grounding_reason"] is None
@@ -1211,12 +1277,11 @@ def test_live_loop_normalizes_retrieve_with_meta_payloads_to_json_safe_scalars(t
     rag_topk = tutor_request_payload["context"]["rag_topk"]
     assert len(rag_topk) == 1
     first = rag_topk[0]
-    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet", "snippet_id", "score"}
+    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet_id", "score"}
     assert first["snippet_id"] == "snippet_0"
     assert isinstance(first["doc_id"], str)
     assert isinstance(first["section"], str)
     assert isinstance(first["page_or_heading"], str)
-    assert isinstance(first["snippet"], str)
     assert isinstance(req_meta["grounding_index_path"], str)
     assert req_meta["grounding_reason_requested"] is None
     assert isinstance(req_meta["grounding_error_type"], str)

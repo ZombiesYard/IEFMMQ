@@ -69,6 +69,12 @@ from core.help_failure import (
     merge_failure_metadata,
     overlay_rejection_payload,
 )
+from core.security import (
+    redact_sensitive_text,
+    sanitize_help_response_for_log,
+    sanitize_public_model_text,
+    validate_model_base_url_security,
+)
 from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
     STEP_OBSERVABILITY_VALUES,
@@ -375,6 +381,115 @@ def _sanitize_policy_error_for_user(
         for variant in _path_text_variants(hint):
             sanitized = sanitized.replace(variant, _basename_from_path_like(variant))
     return sanitized
+
+
+def _summarize_rag_snippets_for_event(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        summarized: dict[str, Any] = {}
+        for key in ("snippet_id", "id", "doc_id", "section", "page_or_heading", "page", "chunk_id", "score"):
+            value = item.get(key)
+            if value is None:
+                continue
+            summarized[key] = value
+        if summarized:
+            out.append(summarized)
+    return out
+
+
+def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    sanitized: dict[str, Any] = {}
+    for key in (
+        "inferred_step_id",
+        "observability",
+        "observability_status",
+        "requires_visual_confirmation",
+        "scenario_profile",
+    ):
+        value = raw.get(key)
+        if value is not None:
+            sanitized[key] = value
+    missing_conditions = raw.get("missing_conditions")
+    if isinstance(missing_conditions, list):
+        sanitized["missing_conditions_count"] = len([item for item in missing_conditions if isinstance(item, str) and item])
+    gate_blockers = raw.get("gate_blockers")
+    if isinstance(gate_blockers, list):
+        sanitized["gate_blocker_count"] = len(gate_blockers)
+    recent_ui_targets = raw.get("recent_ui_targets")
+    if isinstance(recent_ui_targets, list):
+        sanitized["recent_ui_targets"] = [
+            item for item in recent_ui_targets if isinstance(item, str) and item
+        ][:8]
+    step_ui_targets = raw.get("step_ui_targets")
+    if isinstance(step_ui_targets, list):
+        sanitized["step_ui_targets"] = [
+            item for item in step_ui_targets if isinstance(item, str) and item
+        ][:8]
+    return sanitized
+
+
+def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
+    payload = request.to_dict()
+    payload["message"] = "[REDACTED_USER_MESSAGE]" if payload.get("message") else None
+    context = payload.get("context")
+    if not isinstance(context, Mapping):
+        return payload
+
+    sanitized_context = dict(context)
+    if "grounding_query" in sanitized_context:
+        sanitized_context["grounding_query"] = "[REDACTED_GROUNDING_QUERY]"
+    if "rag_topk" in sanitized_context:
+        sanitized_context["rag_topk"] = _summarize_rag_snippets_for_event(sanitized_context.get("rag_topk"))
+    if "deterministic_step_hint" in sanitized_context:
+        sanitized_context["deterministic_step_hint"] = _sanitize_deterministic_hint_for_event(
+            sanitized_context.get("deterministic_step_hint")
+        )
+    if "vision_facts" in sanitized_context:
+        vision_facts = sanitized_context.get("vision_facts")
+        if isinstance(vision_facts, list):
+            sanitized_context["vision_facts"] = [
+                {
+                    "fact_id": item.get("fact_id"),
+                    "status": item.get("status"),
+                    "frame_ids": item.get("frame_ids"),
+                }
+                for item in vision_facts
+                if isinstance(item, Mapping)
+            ]
+        else:
+            sanitized_context["vision_facts"] = []
+    payload["context"] = sanitized_context
+    return payload
+
+
+def _sanitize_response_payload_for_event(response: TutorResponse, *, lang: str) -> dict[str, Any]:
+    payload = response.to_dict()
+    payload["message"] = sanitize_public_model_text(payload.get("message"), lang=lang)
+    explanations = payload.get("explanations")
+    if isinstance(explanations, list):
+        payload["explanations"] = [
+            sanitize_public_model_text(item, lang=lang) for item in explanations if isinstance(item, str)
+        ]
+
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, Mapping):
+        return payload
+
+    sanitized_metadata = dict(metadata)
+    error_value = sanitized_metadata.get("error")
+    if isinstance(error_value, str):
+        sanitized_metadata["error"] = redact_sensitive_text(error_value)
+    help_response = sanitized_metadata.get("help_response")
+    if isinstance(help_response, Mapping):
+        sanitized_metadata["help_response"] = sanitize_help_response_for_log(help_response, lang=lang)
+    payload["metadata"] = sanitized_metadata
+    return payload
 
 
 def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:
@@ -2456,7 +2571,7 @@ class LiveDcsTutorLoop:
         now_wall = time.time()
         self._emit_event(
             kind="tutor_request",
-            payload=request.to_dict(),
+            payload=_sanitize_request_payload_for_event(request),
             related_id=request.request_id,
             t_wall=now_wall,
             metadata={
@@ -2725,7 +2840,7 @@ class LiveDcsTutorLoop:
 
         self._emit_event(
             kind="tutor_response",
-            payload=response.to_dict(),
+            payload=_sanitize_response_payload_for_event(response, lang=self.lang),
             related_id=request.request_id,
             t_wall=time.time(),
             metadata={
@@ -2859,6 +2974,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
     if provider == "openai_compat":
         if not args.model_base_url:
             raise ValueError("--model-base-url is required for openai_compat")
+        validate_model_base_url_security(args.model_base_url, provider=provider)
         return OpenAICompatModel(
             model_name=args.model_name,
             base_url=args.model_base_url,
@@ -2873,6 +2989,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
         )
     if provider == "ollama":
         base_url = args.model_base_url or "http://127.0.0.1:11434"
+        validate_model_base_url_security(base_url, provider=provider)
         return OllamaModel(
             model_name=args.model_name,
             base_url=base_url,

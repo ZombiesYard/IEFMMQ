@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 import math
 import os
 from typing import Mapping
-from urllib.parse import SplitResult, urlsplit, urlunsplit
+
+from core.security import redact_url_for_log, validate_model_base_url_security
 
 
 SUPPORTED_PROVIDERS = ("openai_compat", "stub", "ollama")
@@ -33,37 +34,6 @@ class ModelConfigError(ValueError):
     """Raised when required model access settings are missing or invalid."""
 
 
-def _redact_url_for_log(url: str) -> str:
-    value = url.strip()
-    if not value:
-        return value
-
-    parsed = urlsplit(value)
-    if not parsed.scheme and not parsed.netloc and "@" in value:
-        # Support host forms without scheme, e.g. user:pass@host:port/path.
-        parsed = urlsplit(f"//{value}")
-
-    if not parsed.scheme and not parsed.netloc:
-        return value
-
-    host = parsed.hostname or ""
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
-
-    safe_netloc = host
-    if parsed.port is not None:
-        safe_netloc = f"{safe_netloc}:{parsed.port}" if safe_netloc else ""
-
-    safe_parts = SplitResult(
-        scheme=parsed.scheme,
-        netloc=safe_netloc,
-        path=parsed.path,
-        query="",
-        fragment="",
-    )
-    return urlunsplit(safe_parts)
-
-
 @dataclass(frozen=True)
 class ModelAccessConfig:
     provider: str
@@ -81,7 +51,7 @@ class ModelAccessConfig:
             f"lang={self.lang}",
         ]
         if self.base_url:
-            parts.append(f"base_url={_redact_url_for_log(self.base_url)}")
+            parts.append(f"base_url={redact_url_for_log(self.base_url)}")
         return " ".join(parts)
 
 
@@ -155,6 +125,12 @@ def load_model_access_config(env: Mapping[str, str] | None = None) -> ModelAcces
                 f"Missing required env for provider=openai_compat: {ENV_MODEL_BASE_URL}"
             )
         api_key = _required_env(source, ENV_MODEL_API_KEY)
+
+    if base_url:
+        try:
+            validate_model_base_url_security(base_url, provider=provider)
+        except ValueError as exc:
+            raise ModelConfigError(str(exc)) from exc
 
     return ModelAccessConfig(
         provider=provider,
