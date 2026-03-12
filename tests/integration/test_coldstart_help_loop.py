@@ -141,8 +141,8 @@ def test_coldstart_help_loop_accepts_state_matrix_cases(monkeypatch, tmp_path: P
             assert response_meta["scenario_profile"] == case["scenario_profile"], case["case_id"]
             assert request_meta["help_cycle_id"] == response_meta["help_cycle_id"], case["case_id"]
             assert hint["scenario_profile"] == case["scenario_profile"], case["case_id"]
-            assert isinstance(hint["missing_conditions"], list), case["case_id"]
-            assert isinstance(hint["gate_blockers"], list), case["case_id"]
+            assert isinstance(hint["missing_conditions_count"], int), case["case_id"]
+            assert isinstance(hint["gate_blocker_count"], int), case["case_id"]
             assert isinstance(hint["recent_ui_targets"], list), case["case_id"]
             if case["recent_ui_targets"]:
                 assert set(hint["recent_ui_targets"]).intersection(case["recent_ui_targets"]), case["case_id"]

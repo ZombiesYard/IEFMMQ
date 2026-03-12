@@ -37,6 +37,8 @@ from live_dcs import (
     _normalize_cached_response_metadata,
     _path_like_to_uri,
     _resolve_step_overlay_allowlist,
+    _sanitize_request_payload_for_event,
+    _sanitize_response_payload_for_event,
     _sanitize_policy_error_for_user,
 )
 from simtutor.schemas import validate_instance
@@ -598,6 +600,227 @@ def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: 
     assert prompt_build["rag_snippet_ids"] == req_meta["grounding_snippet_ids"]
 
 
+def test_live_loop_redacts_user_message_and_rag_snippet_text_in_request_event(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_request_redaction.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    doc = tmp_path / "manual.md"
+    doc.write_text(
+        "# S02\nConnect to https://api.example.com:8443/v1 with api_key=sk-test before APU start.\n",
+        encoding="utf-8",
+    )
+    index_path = tmp_path / "index.json"
+    build_index([str(doc)], str(index_path))
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+        knowledge_index_path=index_path,
+        rag_top_k=3,
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    assert tutor_request_payload["message"] == "[REDACTED_USER_MESSAGE]"
+    assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
+    rag_topk = tutor_request_payload["context"]["rag_topk"]
+    assert rag_topk
+    assert "snippet" not in rag_topk[0]
+    assert rag_topk[0]["snippet_id"] == "manual_0"
+
+
+def test_live_loop_redacts_help_response_quotes_in_response_event(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_response_redaction.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        event_sink=events.append,
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    help_response = tutor_response_payload["metadata"]["help_response"]
+    evidence = help_response["overlay"]["evidence"]
+    assert evidence[0]["quote"] == "[REDACTED_SOURCE_QUOTE]"
+
+
+def test_sanitize_request_payload_for_event_preserves_empty_string_message() -> None:
+    request = TutorRequest(message="", metadata={"help_cycle_id": "cycle-1"})
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["message"] == ""
+
+
+def test_sanitize_request_payload_for_event_does_not_call_to_dict(monkeypatch) -> None:
+    request = TutorRequest(message="help", context={"grounding_query": "q"})
+
+    monkeypatch.setattr(TutorRequest, "to_dict", lambda self: (_ for _ in ()).throw(AssertionError("unexpected")))
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["message"] == "[REDACTED_USER_MESSAGE]"
+    assert payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
+
+
+def test_sanitize_request_payload_for_event_summarizes_vision_context() -> None:
+    request = TutorRequest(
+        context={
+            "vision": {
+                "status": "available",
+                "observation_ref": "obs-1",
+                "frame_id": "frame-1",
+                "frame_ids": ["frame-1", "frame-0"],
+                "sync_status": "matched_past",
+                "sync_delta_ms": -50,
+                "selected_frames": [
+                    {
+                        "frame_id": "frame-1",
+                        "image_uri": "file:///tmp/frame-1.png",
+                        "source_image_path": "/tmp/frame-1.png",
+                    }
+                ],
+                "trigger_frame": {
+                    "frame_id": "frame-1",
+                    "image_uri": "file:///tmp/frame-1.png",
+                },
+                "pre_trigger_frame": {
+                    "frame_id": "frame-0",
+                    "source_image_path": "/tmp/frame-0.png",
+                },
+            }
+        }
+    )
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["context"]["vision"] == {
+        "status": "available",
+        "observation_ref": "obs-1",
+        "frame_id": "frame-1",
+        "sync_status": "matched_past",
+        "sync_delta_ms": -50,
+        "frame_ids": ["frame-1", "frame-0"],
+    }
+
+
+def test_sanitize_request_payload_for_event_drops_unallowlisted_context_fields() -> None:
+    request = TutorRequest(
+        context={
+            "scenario_profile": "carrier",
+            "grounding_reason": "index_missing",
+            "grounding_query": "q",
+            "rag_topk": [{"snippet_id": "manual_0", "snippet": "secret"}],
+            "vision_fact_summary": {
+                "status": "available",
+                "seen_fact_ids": ["fact-1"],
+                "source_image_path": "/tmp/frame.png",
+            },
+            "vars": {"api_key": "secret"},
+            "recent_deltas": [{"ui_target": "apu_switch"}],
+            "unexpected_nested": {"token": "secret"},
+        }
+    )
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["context"] == {
+        "scenario_profile": "carrier",
+        "grounding_reason": "index_missing",
+        "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+        "rag_topk": [{"snippet_id": "manual_0"}],
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["fact-1"],
+        },
+    }
+
+
+def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None:
+    response = TutorResponse(
+        metadata={
+            "raw_llm_text": "{\"secret\":true}",
+            "raw_llm_text_attempts": ["{\"secret\":true}"],
+            "help_response": {
+                "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                "next": {"step_id": "S03"},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": ["ok"],
+                "confidence": 0.8,
+            },
+        }
+    )
+
+    payload = _sanitize_response_payload_for_event(response, lang="en")
+
+    assert "raw_llm_text" not in payload["metadata"]
+    assert "raw_llm_text_attempts" not in payload["metadata"]
+
+
+def test_sanitize_response_payload_for_event_summarizes_prompt_build() -> None:
+    response = TutorResponse(
+        metadata={
+            "prompt_build": {
+                "grounding_missing": False,
+                "rag_snippet_ids": ["manual_0"],
+                "allowed_evidence_refs": ["RAG.manual_0"],
+                "EVIDENCE_SOURCES": {
+                    "RAG_SNIPPETS": [{"id": "manual_0", "snippet": "secret token=abc"}],
+                },
+                "full_prompt": "system: api.example.com/v1?token=abc",
+            }
+        }
+    )
+
+    payload = _sanitize_response_payload_for_event(response, lang="en")
+
+    assert payload["metadata"]["prompt_build"] == {
+        "allowed_evidence_refs": ["RAG.manual_0"],
+        "rag_snippet_ids": ["manual_0"],
+        "grounding_missing": False,
+    }
+
+
+def test_sanitize_response_payload_for_event_does_not_call_to_dict(monkeypatch) -> None:
+    response = TutorResponse(
+        message="Visit https://api.example.com/v1/chat.",
+        explanations=["Set token=abc123."],
+        actions=[{"type": "overlay", "target": "apu_switch"}],
+        metadata={"error": "connect api.example.com/v1 failed"},
+    )
+
+    monkeypatch.setattr(TutorResponse, "to_dict", lambda self: (_ for _ in ()).throw(AssertionError("unexpected")))
+
+    payload = _sanitize_response_payload_for_event(response, lang="en")
+
+    assert payload["message"] == "Visit [REDACTED_URL]."
+    assert payload["explanations"] == ["Set token=[REDACTED_SECRET]."]
+    assert payload["actions"] == [{"type": "overlay", "target": "apu_switch"}]
+
+
 def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monkeypatch, tmp_path: Path) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
@@ -701,7 +924,7 @@ def test_live_loop_marks_grounding_missing_when_index_absent(tmp_path: Path) -> 
     assert req_meta["grounding_reason"] == "index_missing"
     assert req_meta["grounding_snippet_ids"] == []
     assert tutor_request_payload["context"]["grounding_reason"] == "index_missing"
-    assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
+    assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
     assert tutor_request_payload["context"]["rag_topk"] == []
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
@@ -1041,9 +1264,10 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_reason"] is None
     assert req_meta["grounding_snippet_ids"] == ["manual_s02_1"]
-    assert req_meta["grounding_index_path"] is None
+    assert "grounding_index_path" not in req_meta
+    assert "grounding_query" not in req_meta
     assert tutor_request_payload["context"]["grounding_reason"] is None
-    assert isinstance(tutor_request_payload["context"]["grounding_query"], str)
+    assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
     assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s02_1"
 
 
@@ -1139,11 +1363,10 @@ def test_live_loop_normalizes_query_only_snippets_to_json_safe_scalars(tmp_path:
     rag_topk = tutor_request_payload["context"]["rag_topk"]
     assert len(rag_topk) == 1
     first = rag_topk[0]
-    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet", "snippet_id", "score"}
+    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet_id", "score"}
     assert isinstance(first["doc_id"], str)
     assert isinstance(first["section"], str)
     assert isinstance(first["page_or_heading"], str)
-    assert isinstance(first["snippet"], str)
     assert first["snippet_id"] == "snippet_0"
     assert req_meta["grounding_snippet_ids"] == ["snippet_0"]
     assert req_meta["grounding_reason"] is None
@@ -1179,7 +1402,7 @@ def test_live_loop_prefers_retrieve_with_meta_protocol_when_available(tmp_path: 
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_cache_hit"] is True
-    assert req_meta["grounding_index_path"] == "meta://store"
+    assert "grounding_index_path" not in req_meta
     assert req_meta["grounding_snippet_ids"] == ["meta_s02_1"]
 
 
@@ -1211,13 +1434,12 @@ def test_live_loop_normalizes_retrieve_with_meta_payloads_to_json_safe_scalars(t
     rag_topk = tutor_request_payload["context"]["rag_topk"]
     assert len(rag_topk) == 1
     first = rag_topk[0]
-    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet", "snippet_id", "score"}
+    assert set(first.keys()) <= {"doc_id", "section", "page_or_heading", "snippet_id", "score"}
     assert first["snippet_id"] == "snippet_0"
     assert isinstance(first["doc_id"], str)
     assert isinstance(first["section"], str)
     assert isinstance(first["page_or_heading"], str)
-    assert isinstance(first["snippet"], str)
-    assert isinstance(req_meta["grounding_index_path"], str)
+    assert "grounding_index_path" not in req_meta
     assert req_meta["grounding_reason_requested"] is None
     assert isinstance(req_meta["grounding_error_type"], str)
     json.dumps(tutor_request_payload, ensure_ascii=False)

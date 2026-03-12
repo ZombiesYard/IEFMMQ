@@ -74,6 +74,17 @@ def test_stub_provider_loads_without_key_and_base_url() -> None:
     assert cfg.base_url is None
 
 
+def test_stub_provider_ignores_leftover_base_url_env() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "stub"
+    env[ENV_MODEL_BASE_URL] = "https:///broken"
+
+    cfg = load_model_access_config(env)
+
+    assert cfg.provider == "stub"
+    assert cfg.base_url is None
+
+
 def test_startup_info_is_non_sensitive() -> None:
     env = _base_env()
     env[ENV_MODEL_PROVIDER] = "openai_compat"
@@ -93,19 +104,58 @@ def test_startup_info_is_non_sensitive() -> None:
     assert "api_key" not in info
 
 
-def test_startup_info_redacts_base_url_credentials_query_and_fragment() -> None:
+def test_startup_info_redacts_base_url_query_and_fragment() -> None:
     env = _base_env()
     env[ENV_MODEL_PROVIDER] = "openai_compat"
-    env[ENV_MODEL_BASE_URL] = "https://user:pass@example.com:8443/v1?token=abc#frag"
+    env[ENV_MODEL_BASE_URL] = "https://example.com:8443/v1?token=abc#frag"
     env[ENV_MODEL_API_KEY] = "sk-local-secret"
 
     cfg = load_model_access_config(env)
     info = cfg.public_startup_info()
 
-    assert "user:pass@" not in info
     assert "token=abc" not in info
     assert "#frag" not in info
     assert "base_url=https://example.com:8443/v1" in info
+
+
+def test_openai_compat_rejects_base_url_with_userinfo_credentials() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "https://user:pass@example.com:8443/v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    with pytest.raises(ModelConfigError, match="must not include userinfo credentials"):
+        load_model_access_config(env)
+
+
+def test_openai_compat_rejects_insecure_remote_http_base_url() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "http://api.example.com:8000/v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    with pytest.raises(ModelConfigError, match="must use https"):
+        load_model_access_config(env)
+
+
+def test_openai_compat_allows_https_remote_base_url() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "https://api.example.com/v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    cfg = load_model_access_config(env)
+    assert cfg.base_url == "https://api.example.com/v1"
+
+
+def test_openai_compat_rejects_base_url_without_hostname() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "openai_compat"
+    env[ENV_MODEL_BASE_URL] = "https:///v1"
+    env[ENV_MODEL_API_KEY] = "sk-local-secret"
+
+    with pytest.raises(ModelConfigError, match="must include a hostname"):
+        load_model_access_config(env)
 
 
 def test_cli_model_config_reports_missing_env(monkeypatch, capsys) -> None:
@@ -150,9 +200,7 @@ def test_cli_model_config_prints_non_sensitive_info(monkeypatch, capsys) -> None
 def test_cli_model_config_redacts_sensitive_base_url_parts(monkeypatch, capsys) -> None:
     monkeypatch.setenv(ENV_MODEL_PROVIDER, "openai_compat")
     monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3-8B-Instruct")
-    monkeypatch.setenv(
-        ENV_MODEL_BASE_URL, "https://alice:secret@api.example.local:8443/v1?api_key=abc#x"
-    )
+    monkeypatch.setenv(ENV_MODEL_BASE_URL, "https://api.example.local:8443/v1?api_key=abc#x")
     monkeypatch.setenv(ENV_MODEL_TIMEOUT_S, "20")
     monkeypatch.setenv(ENV_LANG, "zh")
     monkeypatch.setenv(ENV_MODEL_API_KEY, "sk-super-secret")
@@ -162,10 +210,27 @@ def test_cli_model_config_redacts_sensitive_base_url_parts(monkeypatch, capsys) 
     out = capsys.readouterr().out
 
     assert code == 0
-    assert "alice:secret@" not in out
     assert "api_key=abc" not in out
     assert "#x" not in out
     assert "base_url=https://api.example.local:8443/v1" in out
+
+
+def test_cli_model_config_rejects_base_url_userinfo_credentials(monkeypatch, capsys) -> None:
+    monkeypatch.setenv(ENV_MODEL_PROVIDER, "openai_compat")
+    monkeypatch.setenv(ENV_MODEL_NAME, "Qwen3-8B-Instruct")
+    monkeypatch.setenv(ENV_MODEL_BASE_URL, "https://alice:secret@api.example.local:8443/v1")
+    monkeypatch.setenv(ENV_MODEL_TIMEOUT_S, "20")
+    monkeypatch.setenv(ENV_LANG, "zh")
+    monkeypatch.setenv(ENV_MODEL_API_KEY, "sk-super-secret")
+
+    monkeypatch.setattr(sys, "argv", ["simtutor", "model-config"])
+    code = main()
+    out = capsys.readouterr().out
+
+    assert code == 1
+    assert "must not include userinfo credentials" in out
+    assert "alice:secret@" not in out
+    assert "https://api.example.local:8443/v1" in out
 
 
 def test_model_name_defaults_by_provider_when_env_missing() -> None:
