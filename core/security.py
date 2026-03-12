@@ -96,7 +96,9 @@ def _is_local_hostname(hostname: str | None) -> bool:
         parsed = ipaddress.ip_address(normalized)
     except ValueError:
         return False
-    return bool(parsed.is_loopback or parsed.is_private or parsed.is_link_local)
+    if parsed.is_link_local:
+        return False
+    return bool(parsed.is_loopback or parsed.is_private)
 
 
 def validate_model_base_url_security(base_url: str, *, provider: str) -> None:

@@ -19,6 +19,18 @@ def test_validate_model_base_url_security_allows_http_private_ip_for_split_model
     validate_model_base_url_security("http://10.0.0.42:8000/v1", provider="openai_compat")
 
 
+@pytest.mark.parametrize(
+    "raw_url",
+    [
+        "http://169.254.169.254/latest/meta-data",
+        "http://[fe80::1]/v1",
+    ],
+)
+def test_validate_model_base_url_security_rejects_http_link_local_addresses(raw_url: str) -> None:
+    with pytest.raises(ModelTransportSecurityError, match="must use https"):
+        validate_model_base_url_security(raw_url, provider="openai_compat")
+
+
 @pytest.mark.parametrize("raw_url", ["https://", "https:///v1", "http://", "http:///v1"])
 def test_validate_model_base_url_security_rejects_urls_without_hostname(raw_url: str) -> None:
     with pytest.raises(ModelTransportSecurityError, match="must include a hostname"):
