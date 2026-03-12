@@ -487,21 +487,29 @@ def _sanitize_request_metadata_for_event(raw: Any) -> dict[str, Any]:
     return sanitized
 
 
-def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
-    payload = request.to_dict()
-    raw_message = payload.get("message")
-    if raw_message is None:
-        payload["message"] = None
-    elif raw_message == "":
-        payload["message"] = ""
-    else:
-        payload["message"] = "[REDACTED_USER_MESSAGE]"
-    payload["metadata"] = _sanitize_request_metadata_for_event(payload.get("metadata"))
-    context = payload.get("context")
-    if not isinstance(context, Mapping):
-        return payload
+def _copy_event_field(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, list):
+        return list(value)
+    return value
 
-    sanitized_context = dict(context)
+
+def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
+    raw_message = request.message
+    if raw_message is None:
+        sanitized_message = None
+    elif raw_message == "":
+        sanitized_message = ""
+    else:
+        sanitized_message = "[REDACTED_USER_MESSAGE]"
+
+    sanitized_context: dict[str, Any] = {}
+    context = request.context
+    if isinstance(context, Mapping):
+        sanitized_context = dict(context)
     if "grounding_query" in sanitized_context:
         sanitized_context["grounding_query"] = "[REDACTED_GROUNDING_QUERY]"
     if "rag_topk" in sanitized_context:
@@ -524,24 +532,25 @@ def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]
             ]
         else:
             sanitized_context["vision_facts"] = []
-    payload["context"] = sanitized_context
-    return payload
+    return {
+        "request_id": request.request_id,
+        "timestamp": request.timestamp,
+        "actor": request.actor,
+        "intent": request.intent,
+        "version": request.version,
+        "message": sanitized_message,
+        "observation_ref": request.observation_ref,
+        "context": sanitized_context,
+        "metadata": _sanitize_request_metadata_for_event(request.metadata),
+    }
 
 
 def _sanitize_response_payload_for_event(response: TutorResponse, *, lang: str) -> dict[str, Any]:
-    payload = response.to_dict()
-    payload["message"] = sanitize_public_model_text(payload.get("message"), lang=lang)
-    explanations = payload.get("explanations")
-    if isinstance(explanations, list):
-        payload["explanations"] = [
-            sanitize_public_model_text(item, lang=lang) for item in explanations if isinstance(item, str)
-        ]
-
-    metadata = payload.get("metadata")
-    if not isinstance(metadata, Mapping):
-        return payload
-
-    sanitized_metadata = dict(metadata)
+    sanitized_message = sanitize_public_model_text(response.message, lang=lang)
+    sanitized_explanations = [
+        sanitize_public_model_text(item, lang=lang) for item in response.explanations if isinstance(item, str)
+    ]
+    sanitized_metadata = dict(response.metadata) if isinstance(response.metadata, Mapping) else {}
     for sensitive_key in ("raw_llm_text", "raw_llm_text_attempts"):
         sanitized_metadata.pop(sensitive_key, None)
     error_value = sanitized_metadata.get("error")
@@ -550,8 +559,21 @@ def _sanitize_response_payload_for_event(response: TutorResponse, *, lang: str) 
     help_response = sanitized_metadata.get("help_response")
     if isinstance(help_response, Mapping):
         sanitized_metadata["help_response"] = sanitize_help_response_for_log(help_response, lang=lang)
-    payload["metadata"] = sanitized_metadata
-    return payload
+    sanitized_actions = [
+        dict(action) for action in response.actions if isinstance(action, Mapping)
+    ]
+    return {
+        "response_id": response.response_id,
+        "timestamp": response.timestamp,
+        "actor": response.actor,
+        "status": response.status,
+        "version": response.version,
+        "in_reply_to": response.in_reply_to,
+        "message": sanitized_message,
+        "actions": sanitized_actions,
+        "explanations": sanitized_explanations,
+        "metadata": {key: _copy_event_field(value) for key, value in sanitized_metadata.items()},
+    }
 
 
 def _load_yaml_mapping(path: Path, label: str) -> dict[str, Any]:

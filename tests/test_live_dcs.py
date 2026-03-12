@@ -675,6 +675,17 @@ def test_sanitize_request_payload_for_event_preserves_empty_string_message() -> 
     assert payload["message"] == ""
 
 
+def test_sanitize_request_payload_for_event_does_not_call_to_dict(monkeypatch) -> None:
+    request = TutorRequest(message="help", context={"grounding_query": "q"})
+
+    monkeypatch.setattr(TutorRequest, "to_dict", lambda self: (_ for _ in ()).throw(AssertionError("unexpected")))
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["message"] == "[REDACTED_USER_MESSAGE]"
+    assert payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
+
+
 def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None:
     response = TutorResponse(
         metadata={
@@ -694,6 +705,23 @@ def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None
 
     assert "raw_llm_text" not in payload["metadata"]
     assert "raw_llm_text_attempts" not in payload["metadata"]
+
+
+def test_sanitize_response_payload_for_event_does_not_call_to_dict(monkeypatch) -> None:
+    response = TutorResponse(
+        message="Visit https://api.example.com/v1/chat.",
+        explanations=["Set token=abc123."],
+        actions=[{"type": "overlay", "target": "apu_switch"}],
+        metadata={"error": "connect api.example.com/v1 failed"},
+    )
+
+    monkeypatch.setattr(TutorResponse, "to_dict", lambda self: (_ for _ in ()).throw(AssertionError("unexpected")))
+
+    payload = _sanitize_response_payload_for_event(response, lang="en")
+
+    assert payload["message"] == "Visit [REDACTED_URL]."
+    assert payload["explanations"] == ["Set token=[REDACTED_SECRET]."]
+    assert payload["actions"] == [{"type": "overlay", "target": "apu_switch"}]
 
 
 def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monkeypatch, tmp_path: Path) -> None:
