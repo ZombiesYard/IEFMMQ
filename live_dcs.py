@@ -571,33 +571,52 @@ def _sanitize_prompt_build_for_event(raw: Any) -> dict[str, Any]:
     return sanitized
 
 
-def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
-    raw_message = request.message
-    if raw_message is None:
-        sanitized_message = None
-    elif raw_message == "":
-        sanitized_message = ""
-    else:
-        sanitized_message = "[REDACTED_USER_MESSAGE]"
+def _sanitize_vision_fact_summary_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
 
-    sanitized_context: dict[str, Any] = {}
-    context = request.context
-    if isinstance(context, Mapping):
-        sanitized_context = dict(context)
-    if "grounding_query" in sanitized_context:
-        sanitized_context["grounding_query"] = "[REDACTED_GROUNDING_QUERY]"
-    if "rag_topk" in sanitized_context:
-        sanitized_context["rag_topk"] = _summarize_rag_snippets_for_event(sanitized_context.get("rag_topk"))
-    if "deterministic_step_hint" in sanitized_context:
-        sanitized_context["deterministic_step_hint"] = _sanitize_deterministic_hint_for_event(
-            sanitized_context.get("deterministic_step_hint")
+    sanitized: dict[str, Any] = {}
+    for key in (
+        "status",
+        "frame_ids",
+        "fresh_fact_ids",
+        "seen_fact_ids",
+        "uncertain_fact_ids",
+        "not_seen_fact_ids",
+        "summary_text",
+    ):
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, list):
+            sanitized[key] = list(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
+def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+
+    sanitized: dict[str, Any] = {}
+    for key in ("scenario_profile", "grounding_missing", "grounding_reason", "delta_dropped_count"):
+        if key in raw:
+            sanitized[key] = _copy_event_field(raw.get(key))
+    if "grounding_query" in raw:
+        sanitized["grounding_query"] = "[REDACTED_GROUNDING_QUERY]"
+    if "rag_topk" in raw:
+        sanitized["rag_topk"] = _summarize_rag_snippets_for_event(raw.get("rag_topk"))
+    if "deterministic_step_hint" in raw:
+        sanitized["deterministic_step_hint"] = _sanitize_deterministic_hint_for_event(
+            raw.get("deterministic_step_hint")
         )
-    if "vision" in sanitized_context:
-        sanitized_context["vision"] = _sanitize_vision_context_for_event(sanitized_context.get("vision"))
-    if "vision_facts" in sanitized_context:
-        vision_facts = sanitized_context.get("vision_facts")
+    if "vision" in raw:
+        sanitized["vision"] = _sanitize_vision_context_for_event(raw.get("vision"))
+    if "vision_facts" in raw:
+        vision_facts = raw.get("vision_facts")
         if isinstance(vision_facts, list):
-            sanitized_context["vision_facts"] = [
+            sanitized["vision_facts"] = [
                 {
                     "fact_id": item.get("fact_id"),
                     "status": item.get("status"),
@@ -607,7 +626,22 @@ def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]
                 if isinstance(item, Mapping)
             ]
         else:
-            sanitized_context["vision_facts"] = []
+            sanitized["vision_facts"] = []
+    if "vision_fact_summary" in raw:
+        sanitized["vision_fact_summary"] = _sanitize_vision_fact_summary_for_event(raw.get("vision_fact_summary"))
+    return sanitized
+
+
+def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
+    raw_message = request.message
+    if raw_message is None:
+        sanitized_message = None
+    elif raw_message == "":
+        sanitized_message = ""
+    else:
+        sanitized_message = "[REDACTED_USER_MESSAGE]"
+
+    sanitized_context = _sanitize_request_context_for_event(request.context)
     return {
         "request_id": request.request_id,
         "timestamp": request.timestamp,

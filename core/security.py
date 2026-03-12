@@ -111,6 +111,10 @@ def validate_model_base_url_security(base_url: str, *, provider: str) -> None:
         raise ModelTransportSecurityError(
             f"{provider} base URL must include a hostname: {redact_url_for_log(base_url)}"
         )
+    if parsed.username is not None or parsed.password is not None:
+        raise ModelTransportSecurityError(
+            f"{provider} base URL must not include userinfo credentials: {redact_url_for_log(base_url)}"
+        )
     if parsed.scheme == "https":
         return
     if _is_local_hostname(parsed.hostname):

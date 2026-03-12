@@ -38,6 +38,19 @@ def test_validate_model_base_url_security_rejects_urls_without_hostname(raw_url:
 
 
 @pytest.mark.parametrize(
+    "raw_url",
+    [
+        "https://user:pass@example.com/v1",
+        "https://user@example.com/v1",
+        "http://user:pass@10.0.0.42:8000/v1",
+    ],
+)
+def test_validate_model_base_url_security_rejects_userinfo_credentials(raw_url: str) -> None:
+    with pytest.raises(ModelTransportSecurityError, match="must not include userinfo credentials"):
+        validate_model_base_url_security(raw_url, provider="openai_compat")
+
+
+@pytest.mark.parametrize(
     ("raw", "expected"),
     [
         ("open /tmp before proceeding", "open [REDACTED_PATH] before proceeding"),

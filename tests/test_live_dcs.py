@@ -727,6 +727,38 @@ def test_sanitize_request_payload_for_event_summarizes_vision_context() -> None:
     }
 
 
+def test_sanitize_request_payload_for_event_drops_unallowlisted_context_fields() -> None:
+    request = TutorRequest(
+        context={
+            "scenario_profile": "carrier",
+            "grounding_reason": "index_missing",
+            "grounding_query": "q",
+            "rag_topk": [{"snippet_id": "manual_0", "snippet": "secret"}],
+            "vision_fact_summary": {
+                "status": "available",
+                "seen_fact_ids": ["fact-1"],
+                "source_image_path": "/tmp/frame.png",
+            },
+            "vars": {"api_key": "secret"},
+            "recent_deltas": [{"ui_target": "apu_switch"}],
+            "unexpected_nested": {"token": "secret"},
+        }
+    )
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["context"] == {
+        "scenario_profile": "carrier",
+        "grounding_reason": "index_missing",
+        "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+        "rag_topk": [{"snippet_id": "manual_0"}],
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["fact-1"],
+        },
+    }
+
+
 def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None:
     response = TutorResponse(
         metadata={
