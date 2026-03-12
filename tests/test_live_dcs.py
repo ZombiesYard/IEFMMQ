@@ -1108,7 +1108,8 @@ def test_live_loop_accepts_query_only_knowledge_port(tmp_path: Path) -> None:
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_reason"] is None
     assert req_meta["grounding_snippet_ids"] == ["manual_s02_1"]
-    assert req_meta["grounding_index_path"] is None
+    assert "grounding_index_path" not in req_meta
+    assert "grounding_query" not in req_meta
     assert tutor_request_payload["context"]["grounding_reason"] is None
     assert tutor_request_payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
     assert tutor_request_payload["context"]["rag_topk"][0]["snippet_id"] == "manual_s02_1"
@@ -1245,7 +1246,7 @@ def test_live_loop_prefers_retrieve_with_meta_protocol_when_available(tmp_path: 
     req_meta = tutor_request_payload["metadata"]
     assert req_meta["grounding_missing"] is False
     assert req_meta["grounding_cache_hit"] is True
-    assert req_meta["grounding_index_path"] == "meta://store"
+    assert "grounding_index_path" not in req_meta
     assert req_meta["grounding_snippet_ids"] == ["meta_s02_1"]
 
 
@@ -1282,7 +1283,7 @@ def test_live_loop_normalizes_retrieve_with_meta_payloads_to_json_safe_scalars(t
     assert isinstance(first["doc_id"], str)
     assert isinstance(first["section"], str)
     assert isinstance(first["page_or_heading"], str)
-    assert isinstance(req_meta["grounding_index_path"], str)
+    assert "grounding_index_path" not in req_meta
     assert req_meta["grounding_reason_requested"] is None
     assert isinstance(req_meta["grounding_error_type"], str)
     json.dumps(tutor_request_payload, ensure_ascii=False)

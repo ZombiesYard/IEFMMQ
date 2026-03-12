@@ -434,9 +434,63 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
     return sanitized
 
 
+_SAFE_REQUEST_METADATA_FIELDS: tuple[str, ...] = (
+    "prompt_hash",
+    "prompt_tokens_est",
+    "prompt_trimmed",
+    "grounding_missing",
+    "grounding_reason",
+    "grounding_missing_requested",
+    "grounding_reason_requested",
+    "grounding_error_type",
+    "grounding_snippet_ids",
+    "source_chunk_refs",
+    "grounding_cache_hit",
+    "grounding_policy_id",
+    "grounding_policy_version",
+    "grounding_policy_filtered_out_count",
+    "scenario_profile",
+    "vision_status",
+    "vision_frame_ids",
+    "vision_fact_status",
+    "vision_fact_seen_ids",
+    "help_cycle_id",
+    "generation_mode",
+    "vision_used",
+    "frame_id",
+    "sync_delta_ms",
+    "vision_fact_summary",
+    "fused_step_id",
+    "fused_missing_conditions",
+    "vision_fallback_reason",
+    "layout_id",
+)
+
+
+def _sanitize_request_metadata_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+
+    sanitized: dict[str, Any] = {}
+    for key in _SAFE_REQUEST_METADATA_FIELDS:
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, Mapping):
+            sanitized[key] = dict(value)
+        elif isinstance(value, tuple):
+            sanitized[key] = list(value)
+        elif isinstance(value, list):
+            sanitized[key] = list(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
 def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
     payload = request.to_dict()
     payload["message"] = "[REDACTED_USER_MESSAGE]" if payload.get("message") else None
+    payload["metadata"] = _sanitize_request_metadata_for_event(payload.get("metadata"))
     context = payload.get("context")
     if not isinstance(context, Mapping):
         return payload
