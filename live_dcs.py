@@ -497,6 +497,80 @@ def _copy_event_field(value: Any) -> Any:
     return value
 
 
+def _sanitize_vision_context_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+
+    sanitized: dict[str, Any] = {}
+    for key in (
+        "status",
+        "observation_ref",
+        "observation_seq",
+        "observation_t_wall_s",
+        "observation_t_wall_ms",
+        "trigger_wall_ms",
+        "sync_window_ms",
+        "vision_used",
+        "frame_id",
+        "sync_status",
+        "sync_delta_ms",
+        "frame_stale",
+        "frame_ids",
+        "sync_miss_reason",
+    ):
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, list):
+            sanitized[key] = list(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
+_SAFE_PROMPT_BUILD_FIELDS: tuple[str, ...] = (
+    "max_prompt_chars",
+    "max_prompt_tokens_est",
+    "prompt_chars",
+    "prompt_tokens_est",
+    "prompt_trimmed",
+    "trim_reasons",
+    "delta_summary_top_k",
+    "delta_summary_items",
+    "evidence_refs_count",
+    "allowed_evidence_refs",
+    "preferred_overlay_target",
+    "rag_snippet_count",
+    "rag_snippet_ids",
+    "grounding_applied",
+    "grounding_missing_requested",
+    "grounding_missing",
+    "grounding_reason",
+    "vision_fact_status",
+    "vision_fact_seen_ids",
+)
+
+
+def _sanitize_prompt_build_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+
+    sanitized: dict[str, Any] = {}
+    for key in _SAFE_PROMPT_BUILD_FIELDS:
+        if key not in raw:
+            continue
+        value = raw.get(key)
+        if isinstance(value, Mapping):
+            sanitized[key] = dict(value)
+        elif isinstance(value, tuple):
+            sanitized[key] = list(value)
+        elif isinstance(value, list):
+            sanitized[key] = list(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
 def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
     raw_message = request.message
     if raw_message is None:
@@ -518,6 +592,8 @@ def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]
         sanitized_context["deterministic_step_hint"] = _sanitize_deterministic_hint_for_event(
             sanitized_context.get("deterministic_step_hint")
         )
+    if "vision" in sanitized_context:
+        sanitized_context["vision"] = _sanitize_vision_context_for_event(sanitized_context.get("vision"))
     if "vision_facts" in sanitized_context:
         vision_facts = sanitized_context.get("vision_facts")
         if isinstance(vision_facts, list):
@@ -559,6 +635,9 @@ def _sanitize_response_payload_for_event(response: TutorResponse, *, lang: str) 
     help_response = sanitized_metadata.get("help_response")
     if isinstance(help_response, Mapping):
         sanitized_metadata["help_response"] = sanitize_help_response_for_log(help_response, lang=lang)
+    prompt_build = sanitized_metadata.get("prompt_build")
+    if isinstance(prompt_build, Mapping):
+        sanitized_metadata["prompt_build"] = _sanitize_prompt_build_for_event(prompt_build)
     sanitized_actions = [
         dict(action) for action in response.actions if isinstance(action, Mapping)
     ]

@@ -686,6 +686,47 @@ def test_sanitize_request_payload_for_event_does_not_call_to_dict(monkeypatch) -
     assert payload["context"]["grounding_query"] == "[REDACTED_GROUNDING_QUERY]"
 
 
+def test_sanitize_request_payload_for_event_summarizes_vision_context() -> None:
+    request = TutorRequest(
+        context={
+            "vision": {
+                "status": "available",
+                "observation_ref": "obs-1",
+                "frame_id": "frame-1",
+                "frame_ids": ["frame-1", "frame-0"],
+                "sync_status": "matched_past",
+                "sync_delta_ms": -50,
+                "selected_frames": [
+                    {
+                        "frame_id": "frame-1",
+                        "image_uri": "file:///tmp/frame-1.png",
+                        "source_image_path": "/tmp/frame-1.png",
+                    }
+                ],
+                "trigger_frame": {
+                    "frame_id": "frame-1",
+                    "image_uri": "file:///tmp/frame-1.png",
+                },
+                "pre_trigger_frame": {
+                    "frame_id": "frame-0",
+                    "source_image_path": "/tmp/frame-0.png",
+                },
+            }
+        }
+    )
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["context"]["vision"] == {
+        "status": "available",
+        "observation_ref": "obs-1",
+        "frame_id": "frame-1",
+        "sync_status": "matched_past",
+        "sync_delta_ms": -50,
+        "frame_ids": ["frame-1", "frame-0"],
+    }
+
+
 def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None:
     response = TutorResponse(
         metadata={
@@ -705,6 +746,30 @@ def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None
 
     assert "raw_llm_text" not in payload["metadata"]
     assert "raw_llm_text_attempts" not in payload["metadata"]
+
+
+def test_sanitize_response_payload_for_event_summarizes_prompt_build() -> None:
+    response = TutorResponse(
+        metadata={
+            "prompt_build": {
+                "grounding_missing": False,
+                "rag_snippet_ids": ["manual_0"],
+                "allowed_evidence_refs": ["RAG.manual_0"],
+                "EVIDENCE_SOURCES": {
+                    "RAG_SNIPPETS": [{"id": "manual_0", "snippet": "secret token=abc"}],
+                },
+                "full_prompt": "system: api.example.com/v1?token=abc",
+            }
+        }
+    )
+
+    payload = _sanitize_response_payload_for_event(response, lang="en")
+
+    assert payload["metadata"]["prompt_build"] == {
+        "allowed_evidence_refs": ["RAG.manual_0"],
+        "rag_snippet_ids": ["manual_0"],
+        "grounding_missing": False,
+    }
 
 
 def test_sanitize_response_payload_for_event_does_not_call_to_dict(monkeypatch) -> None:
