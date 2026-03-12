@@ -125,8 +125,12 @@ def load_model_access_config(env: Mapping[str, str] | None = None) -> ModelAcces
                 f"Missing required env for provider=openai_compat: {ENV_MODEL_BASE_URL}"
             )
         api_key = _required_env(source, ENV_MODEL_API_KEY)
+    else:
+        # Stub mode does not use remote model access settings; ignore leftover env
+        # values so unrelated provider config does not break deterministic runs.
+        base_url = None
 
-    if base_url:
+    if provider in {"openai_compat", "ollama"} and base_url:
         try:
             validate_model_base_url_security(base_url, provider=provider)
         except ValueError as exc:

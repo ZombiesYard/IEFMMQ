@@ -74,6 +74,17 @@ def test_stub_provider_loads_without_key_and_base_url() -> None:
     assert cfg.base_url is None
 
 
+def test_stub_provider_ignores_leftover_base_url_env() -> None:
+    env = _base_env()
+    env[ENV_MODEL_PROVIDER] = "stub"
+    env[ENV_MODEL_BASE_URL] = "https:///broken"
+
+    cfg = load_model_access_config(env)
+
+    assert cfg.provider == "stub"
+    assert cfg.base_url is None
+
+
 def test_startup_info_is_non_sensitive() -> None:
     env = _base_env()
     env[ENV_MODEL_PROVIDER] = "openai_compat"
