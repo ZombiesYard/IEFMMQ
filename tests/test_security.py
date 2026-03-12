@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from core.security import ModelTransportSecurityError, redact_sensitive_text, validate_model_base_url_security
+from core.security import (
+    ModelTransportSecurityError,
+    redact_sensitive_text,
+    redact_url_for_log,
+    validate_model_base_url_security,
+)
 
 
 def test_validate_model_base_url_security_rejects_http_dot_local_hostname() -> None:
@@ -48,3 +53,9 @@ def test_redact_sensitive_text_keeps_non_path_slash_phrases() -> None:
 )
 def test_redact_sensitive_text_preserves_trailing_punctuation(raw: str, expected: str) -> None:
     assert redact_sensitive_text(raw) == expected
+
+
+def test_redact_url_for_log_strips_query_and_fragment_for_schemeless_url_like_values() -> None:
+    redacted = redact_url_for_log("api.example.com/v1/chat?token=secret#frag")
+
+    assert redacted == "//api.example.com/v1/chat"

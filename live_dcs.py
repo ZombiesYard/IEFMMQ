@@ -542,6 +542,8 @@ def _sanitize_response_payload_for_event(response: TutorResponse, *, lang: str) 
         return payload
 
     sanitized_metadata = dict(metadata)
+    for sensitive_key in ("raw_llm_text", "raw_llm_text_attempts"):
+        sanitized_metadata.pop(sensitive_key, None)
     error_value = sanitized_metadata.get("error")
     if isinstance(error_value, str):
         sanitized_metadata["error"] = redact_sensitive_text(error_value)

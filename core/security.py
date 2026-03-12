@@ -60,7 +60,7 @@ def redact_url_for_log(url: str) -> str:
         return value
 
     parsed = urlsplit(value)
-    if not parsed.scheme and not parsed.netloc and "@" in value:
+    if not parsed.scheme and not parsed.netloc and any(marker in value for marker in ("@", "?", "#")):
         parsed = urlsplit(f"//{value}")
 
     if not parsed.scheme and not parsed.netloc:

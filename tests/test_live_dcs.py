@@ -38,6 +38,7 @@ from live_dcs import (
     _path_like_to_uri,
     _resolve_step_overlay_allowlist,
     _sanitize_request_payload_for_event,
+    _sanitize_response_payload_for_event,
     _sanitize_policy_error_for_user,
 )
 from simtutor.schemas import validate_instance
@@ -672,6 +673,27 @@ def test_sanitize_request_payload_for_event_preserves_empty_string_message() -> 
     payload = _sanitize_request_payload_for_event(request)
 
     assert payload["message"] == ""
+
+
+def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None:
+    response = TutorResponse(
+        metadata={
+            "raw_llm_text": "{\"secret\":true}",
+            "raw_llm_text_attempts": ["{\"secret\":true}"],
+            "help_response": {
+                "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                "next": {"step_id": "S03"},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": ["ok"],
+                "confidence": 0.8,
+            },
+        }
+    )
+
+    payload = _sanitize_response_payload_for_event(response, lang="en")
+
+    assert "raw_llm_text" not in payload["metadata"]
+    assert "raw_llm_text_attempts" not in payload["metadata"]
 
 
 def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monkeypatch, tmp_path: Path) -> None:
