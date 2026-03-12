@@ -65,6 +65,15 @@ def redact_url_for_log(url: str) -> str:
 
     if not parsed.scheme and not parsed.netloc:
         return value
+    if parsed.scheme and not parsed.netloc:
+        query_idx = value.find("?")
+        fragment_idx = value.find("#")
+        trim_at = len(value)
+        if query_idx != -1:
+            trim_at = min(trim_at, query_idx)
+        if fragment_idx != -1:
+            trim_at = min(trim_at, fragment_idx)
+        return value[:trim_at]
 
     host = parsed.hostname or ""
     if ":" in host and not host.startswith("["):

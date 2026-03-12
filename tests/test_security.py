@@ -90,3 +90,14 @@ def test_redact_url_for_log_strips_query_and_fragment_for_schemeless_url_like_va
     redacted = redact_url_for_log("api.example.com/v1/chat?token=secret#frag")
 
     assert redacted == "//api.example.com/v1/chat"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("https:///v1?token=secret#frag", "https:///v1"),
+        ("http:///v1?api_key=secret", "http:///v1"),
+    ],
+)
+def test_redact_url_for_log_preserves_triple_slash_urls(raw: str, expected: str) -> None:
+    assert redact_url_for_log(raw) == expected
