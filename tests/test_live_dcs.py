@@ -37,6 +37,7 @@ from live_dcs import (
     _normalize_cached_response_metadata,
     _path_like_to_uri,
     _resolve_step_overlay_allowlist,
+    _sanitize_request_payload_for_event,
     _sanitize_policy_error_for_user,
 )
 from simtutor.schemas import validate_instance
@@ -663,6 +664,14 @@ def test_live_loop_redacts_help_response_quotes_in_response_event(tmp_path: Path
     help_response = tutor_response_payload["metadata"]["help_response"]
     evidence = help_response["overlay"]["evidence"]
     assert evidence[0]["quote"] == "[REDACTED_SOURCE_QUOTE]"
+
+
+def test_sanitize_request_payload_for_event_preserves_empty_string_message() -> None:
+    request = TutorRequest(message="", metadata={"help_cycle_id": "cycle-1"})
+
+    payload = _sanitize_request_payload_for_event(request)
+
+    assert payload["message"] == ""
 
 
 def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monkeypatch, tmp_path: Path) -> None:

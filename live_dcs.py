@@ -489,7 +489,13 @@ def _sanitize_request_metadata_for_event(raw: Any) -> dict[str, Any]:
 
 def _sanitize_request_payload_for_event(request: TutorRequest) -> dict[str, Any]:
     payload = request.to_dict()
-    payload["message"] = "[REDACTED_USER_MESSAGE]" if payload.get("message") else None
+    raw_message = payload.get("message")
+    if raw_message is None:
+        payload["message"] = None
+    elif raw_message == "":
+        payload["message"] = ""
+    else:
+        payload["message"] = "[REDACTED_USER_MESSAGE]"
     payload["metadata"] = _sanitize_request_metadata_for_event(payload.get("metadata"))
     context = payload.get("context")
     if not isinstance(context, Mapping):

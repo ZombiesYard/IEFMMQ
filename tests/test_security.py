@@ -35,3 +35,16 @@ def test_redact_sensitive_text_covers_single_segment_paths_and_bare_hosts(
 def test_redact_sensitive_text_keeps_non_path_slash_phrases() -> None:
     redacted = redact_sensitive_text("需要更多信息/请确认 apu_switch")
     assert redacted == "需要更多信息/请确认 apu_switch"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Visit https://api.example.com/v1/chat).", "Visit [REDACTED_URL])."),
+        ("Use api.example.com/v1/chat).", "Use [REDACTED_ENDPOINT])."),
+        ("Set api_key=sk-test-secret.", "Set api_key=[REDACTED_SECRET]."),
+        ("Set token=abc123)", "Set token=[REDACTED_SECRET])"),
+    ],
+)
+def test_redact_sensitive_text_preserves_trailing_punctuation(raw: str, expected: str) -> None:
+    assert redact_sensitive_text(raw) == expected

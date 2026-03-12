@@ -38,10 +38,20 @@ _PROMPT_LEAK_MARKERS = (
     "json_schema",
     "system prompt",
 )
+_TRAILING_PUNCTUATION = ".,;:!?)"
 
 
 class ModelTransportSecurityError(ValueError):
     """Raised when a remote model endpoint does not satisfy transport requirements."""
+
+
+def _replace_match_preserving_trailing_punctuation(match: re.Match[str], marker: str) -> str:
+    raw = match.group(0)
+    suffix = ""
+    while raw and raw[-1] in _TRAILING_PUNCTUATION:
+        suffix = raw[-1] + suffix
+        raw = raw[:-1]
+    return f"{marker}{suffix}"
 
 
 def redact_url_for_log(url: str) -> str:
@@ -107,11 +117,20 @@ def validate_model_base_url_security(base_url: str, *, provider: str) -> None:
 def redact_sensitive_text(value: Any) -> Any:
     if not isinstance(value, str):
         return value
-    redacted = _URL_RE.sub("[REDACTED_URL]", value)
-    redacted = _ENDPOINT_RE.sub("[REDACTED_ENDPOINT]", redacted)
+    redacted = _URL_RE.sub(lambda m: _replace_match_preserving_trailing_punctuation(m, "[REDACTED_URL]"), value)
+    redacted = _ENDPOINT_RE.sub(
+        lambda m: _replace_match_preserving_trailing_punctuation(m, "[REDACTED_ENDPOINT]"),
+        redacted,
+    )
     redacted = _BEARER_RE.sub("Bearer [REDACTED_SECRET]", redacted)
     redacted = _OPENAI_KEY_RE.sub("[REDACTED_SECRET]", redacted)
-    redacted = _SECRET_ASSIGNMENT_RE.sub(lambda m: f"{m.group(1)}=[REDACTED_SECRET]", redacted)
+    redacted = _SECRET_ASSIGNMENT_RE.sub(
+        lambda m: _replace_match_preserving_trailing_punctuation(
+            m,
+            f"{m.group(1)}=[REDACTED_SECRET]",
+        ),
+        redacted,
+    )
     redacted = _ABS_WIN_PATH_RE.sub("[REDACTED_PATH]", redacted)
     redacted = _ABS_POSIX_PATH_RE.sub("[REDACTED_PATH]", redacted)
     return redacted
