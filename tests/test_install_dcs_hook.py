@@ -171,6 +171,14 @@ def test_build_composite_panel_config_supports_custom_overlay_transport(tmp_path
     assert "hilite_id = 9200" in config
 
 
+def test_build_composite_panel_config_converts_wsl_mount_output_root_to_windows_path() -> None:
+    saved_games_dir = Path("/mnt/c/Users/tester/Saved Games/DCS")
+
+    config = build_composite_panel_config(saved_games_dir=saved_games_dir)
+
+    assert "output_root = [[C:\\Users\\tester\\Saved Games\\DCS\\SimTutor\\frames]]" in config
+
+
 def test_install_composite_panel_config_is_idempotent(tmp_path: Path) -> None:
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
 

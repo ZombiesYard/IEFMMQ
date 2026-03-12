@@ -46,6 +46,11 @@ from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
 from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
+from adapters.vision_capture_trigger import (
+    DEFAULT_VISION_CAPTURE_TRIGGER_HOST,
+    DEFAULT_VISION_CAPTURE_TRIGGER_PORT,
+    build_capture_request_payload,
+)
 from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort, build_frames_root
 from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from adapters.vision_sync import (
@@ -1669,6 +1674,38 @@ class CompositeHelpTrigger:
         return False
 
 
+class UdpVisionCaptureNotifier:
+    def __init__(
+        self,
+        *,
+        session_id: str,
+        host: str = DEFAULT_VISION_CAPTURE_TRIGGER_HOST,
+        port: int = DEFAULT_VISION_CAPTURE_TRIGGER_PORT,
+        sock: Any | None = None,
+    ) -> None:
+        normalized_session_id = str(session_id).strip()
+        if not normalized_session_id:
+            raise ValueError("session_id must be a non-empty string")
+        if int(port) < 0:
+            raise ValueError("port must be >= 0")
+        self.session_id = normalized_session_id
+        self.host = host
+        self.port = int(port)
+        self._sock = sock if sock is not None else socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def notify_help(self) -> None:
+        if self.port <= 0:
+            return
+        payload = build_capture_request_payload(session_id=self.session_id, reason="help")
+        self._sock.sendto(payload, (self.host, self.port))
+
+    def close(self) -> None:
+        try:
+            self._sock.close()
+        except OSError:
+            pass
+
+
 class LiveDcsTutorLoop:
     def __init__(
         self,
@@ -3057,6 +3094,7 @@ class LiveDcsTutorLoop:
         auto_help_on_first_frame: bool = False,
         auto_help_every_n_frames: int = 0,
         help_trigger: HelpTriggerLike | None = None,
+        help_capture_notifier: Any | None = None,
         idle_sleep_s: float = 0.01,
     ) -> dict[str, int]:
         if auto_help_every_n_frames < 0:
@@ -3081,10 +3119,14 @@ class LiveDcsTutorLoop:
                 obs_payload = obs.payload if isinstance(obs.payload, Mapping) else {}
                 obs_t_wall = _coerce_float(obs_payload.get("t_wall"))
                 if auto_help_on_first_frame and not first_help_done:
+                    if help_capture_notifier is not None and hasattr(help_capture_notifier, "notify_help"):
+                        help_capture_notifier.notify_help()
                     self.run_help_cycle(trigger_t_wall=obs_t_wall)
                     first_help_done = True
                 if auto_help_every_n_frames > 0:
                     if self._stats.frames % auto_help_every_n_frames == 0:
+                        if help_capture_notifier is not None and hasattr(help_capture_notifier, "notify_help"):
+                            help_capture_notifier.notify_help()
                         self.run_help_cycle(trigger_t_wall=obs_t_wall)
             else:
                 exhausted = bool(getattr(self.source, "is_exhausted", False))
@@ -3093,6 +3135,8 @@ class LiveDcsTutorLoop:
 
             if help_trigger is not None and help_trigger.poll():
                 help_trigger_t_wall = time.time() if self.vision_mode == "live" else None
+                if help_capture_notifier is not None and hasattr(help_capture_notifier, "notify_help"):
+                    help_capture_notifier.notify_help()
                 self.run_help_cycle(trigger_t_wall=help_trigger_t_wall)
 
             if max_frames > 0 and self._stats.frames >= max_frames:
@@ -3285,6 +3329,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=0,
         help="Extra wait budget for live help-trigger frame arrival (0 uses mode default).",
     )
+    parser.add_argument(
+        "--vision-capture-trigger-host",
+        default=DEFAULT_VISION_CAPTURE_TRIGGER_HOST,
+        help="UDP host for notifying the local vision sidecar to capture an immediate help-trigger frame.",
+    )
+    parser.add_argument(
+        "--vision-capture-trigger-port",
+        type=int,
+        default=DEFAULT_VISION_CAPTURE_TRIGGER_PORT,
+        help="UDP port for help-trigger vision capture notifications (0 disables notifier).",
+    )
 
     parser.add_argument("--cooldown-s", type=float, default=4.0, help="Cooldown window for same-state help reuse")
     parser.add_argument("--max-frames", type=int, default=0, help="Max frames to process (0 means unlimited)")
@@ -3409,6 +3464,15 @@ def main() -> int:
         args,
         mode="live",
     )
+    vision_capture_notifier = (
+        UdpVisionCaptureNotifier(
+            session_id=vision_session_id,
+            host=args.vision_capture_trigger_host,
+            port=args.vision_capture_trigger_port,
+        )
+        if vision_session_id and int(args.vision_capture_trigger_port) > 0
+        else None
+    )
 
     with JsonlEventStore(output, mode="w") as store:
         executor = OverlayActionExecutor(
@@ -3479,12 +3543,15 @@ def main() -> int:
                 auto_help_on_first_frame=bool(args.auto_help_once),
                 auto_help_every_n_frames=args.auto_help_every_n_frames,
                 help_trigger=trigger,
+                help_capture_notifier=vision_capture_notifier,
             )
         finally:
             if stdin_trigger is not None:
                 stdin_trigger.close()
             if udp_trigger is not None:
                 udp_trigger.close()
+            if vision_capture_notifier is not None:
+                vision_capture_notifier.close()
             loop.close()
 
     print(f"[LIVE_DCS] wrote events to {output}")
