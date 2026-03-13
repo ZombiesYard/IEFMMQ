@@ -80,6 +80,8 @@ def test_vision_fact_prompt_mentions_ddi_menu_and_in_test_navigation_rules_in_zh
     assert "FCS 按钮本身" in prompt
     assert "FCS-MC" in prompt
     assert "IN TEST" in prompt
+    assert "TAC 页" in prompt
+    assert "SUPT 页" in prompt
 
 
 def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_page() -> None:
@@ -106,6 +108,7 @@ def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_pa
     assert "LEF/TEF/AIL/RUD" in prompt
     assert "SV1/SV2" in prompt
     assert "many X marks remain" in prompt
+    assert "SUPT page" in prompt
 
 
 def test_vision_fact_prompt_treats_bit_failures_as_valid_s08_bit_page_evidence() -> None:

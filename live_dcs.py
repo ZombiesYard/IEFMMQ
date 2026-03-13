@@ -1423,17 +1423,12 @@ def _prefer_navigation_target_from_vision_context(
         if isinstance(item, str) and item
     }
     if "left_ddi_dark" in not_seen:
-        if (
-            "left_ddi_fcs_page_button_visible" in seen
-            or "left_ddi_fcs_page_button_visible" in uncertain
-        ) and "left_mdi_pb15" in allowed:
+        if "left_ddi_fcs_page_button_visible" in seen and "left_mdi_pb15" in allowed:
             return ["left_mdi_pb15"]
-        if (
-            "left_ddi_fcs_option_visible" in seen
-            or "left_ddi_fcs_option_visible" in uncertain
-            or "left_ddi_menu_root_visible" in seen
-        ) and "left_mdi_pb15" in allowed:
+        if "left_ddi_fcs_option_visible" in seen and "left_mdi_pb15" in allowed:
             return ["left_mdi_pb15"]
+        if "left_ddi_menu_root_visible" in seen and "left_mdi_pb18" in allowed:
+            return ["left_mdi_pb18"]
         if (
             "left_ddi_menu_root_visible" in uncertain
             or "left_ddi_menu_root_visible" in not_seen
@@ -1463,8 +1458,8 @@ def _build_visual_action_hint(
         return None
     target = suggested_targets[0]
     reason_by_target = {
-        "left_mdi_pb15": "Right DDI already shows BIT and left DDI offers FCS on PB15; press PB15 to enter the FCS page.",
-        "left_mdi_pb18": "Left DDI is not yet at the menu root; press MENU first, then select FCS.",
+        "left_mdi_pb15": "Right DDI already shows BIT and the left DDI clearly shows the FCS option on PB15; press PB15 to enter the FCS page.",
+        "left_mdi_pb18": "The left DDI is still on TAC/root-menu navigation; press PB18 to move to the SUPT page where the FCS option becomes available.",
         "left_mdi_brightness_selector": "Left DDI page cues are not readable yet; restore left DDI visibility first.",
     }
     return {

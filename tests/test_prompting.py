@@ -658,6 +658,7 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None
     assert "LEF/TEF/AIL/RUD" in result.prompt
     assert "SV1/SV2" in result.prompt
     assert "大量 X/故障填充" in result.prompt
+    assert "先按 PB18 切到 SUPT 页，再找 FCS" in result.prompt
 
 
 def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> None:
@@ -754,6 +755,7 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -
     assert "LEF/TEF/AIL/RUD" in result.prompt
     assert "SV1/SV2" in result.prompt
     assert "many X/fault fills" in result.prompt
+    assert "press PB18 first to reach the SUPT page, then select FCS" in result.prompt
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:

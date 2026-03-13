@@ -2830,7 +2830,7 @@ def test_safe_fallback_overlay_prefers_left_ddi_fcs_button_when_menu_page_visibl
                     {"gate_id": "S08.precondition", "status": "allowed"},
                 ],
                 "vision_fact_summary": {
-                    "seen_fact_ids": ["bit_page_visible", "left_ddi_menu_root_visible"],
+                    "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
                     "not_seen_fact_ids": [
                         "left_ddi_dark",
                         "right_ddi_dark",
@@ -2875,6 +2875,23 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_s08_
     )
 
     assert targets == ["left_mdi_pb15"]
+
+
+def test_prefer_navigation_target_from_vision_context_returns_left_pb18_for_s08_tac_page_before_supt() -> None:
+    targets = _prefer_navigation_target_from_vision_context(
+        inferred_step_id="S08",
+        missing_conditions=["vision_facts.fcs_page_visible==seen"],
+        context={
+            "vision_fact_summary": {
+                "seen_fact_ids": ["bit_page_visible", "left_ddi_menu_root_visible"],
+                "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
+                "uncertain_fact_ids": ["left_ddi_fcs_option_visible", "left_ddi_fcs_page_button_visible"],
+            }
+        },
+        allowed_targets=["left_mdi_pb18", "left_mdi_pb15", "left_mdi_brightness_selector"],
+    )
+
+    assert targets == ["left_mdi_pb18"]
 
 
 def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_explicit_fcs_button_fact() -> None:
