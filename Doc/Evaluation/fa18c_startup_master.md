@@ -4,10 +4,10 @@ generator: tools/regenerate_eval_docs.py
 source_index: Doc/Evaluation/index.json
 policy_id: fa18c_cold_start_whitelist_v1
 policy_version: v2
-version_stamp: 6bbd506dfd81e311
+version_stamp: 6a65d3427f4de2ce
 source_chunks:
 - fa18c_startup_master/fa18c_startup_master_0:1-17
-- fa18c_startup_master/fa18c_startup_master_1:1-28
+- fa18c_startup_master/fa18c_startup_master_1:1-56
 -->
 
 # F/A-18C Cold Start – Master Step List
@@ -67,7 +67,7 @@ Columns:
 
 `S08` and `S18` both involve the DDIs and the FCS/BIT pages, but they are not the same state and must not be merged.
 
-For `S08`, the required right-DII state is the top-level BIT root page. In DCS this is the default page after powering the display, and it normally shows a `BIT FAILURES` line. That page still counts as the BIT page for `S08`. Entering `FCS-MC` is **not** required for `S08`.
+For `S08`, the required right-DDI state is the top-level BIT root page. In DCS this is the default page after powering the display, and it normally shows a `BIT FAILURES` line. That page still counts as the BIT page for `S08`. Entering `FCS-MC` is **not** required for `S08`.
 
 For `S18`, the learner must first start from that same BIT root / `BIT FAILURES` page, press `PB5` to enter the `FCS-MC` BIT page, and only then hold the `FCS BIT` switch and press `PB5` again to trigger the BIT. Simply seeing `FCS-MC`, `PBIT GO`, `FCSA/FCSB`, or a small `GO` cue on the right DDI is not enough to say the FCS BIT is complete.
 
@@ -77,13 +77,13 @@ The left DDI also helps distinguish these phases:
 - During `S08`, because later FCS reset / BIT actions have not been completed yet, the flight-control channel boxes on the left DDI can still contain many `X` marks.
 - Later FCS phases must not be marked complete if those `X` fills are still largely present.
 
-Operationally, this means the tutor / evaluator should treat the following right-DII cues as `S08` completion evidence:
+Operationally, this means the tutor / evaluator should treat the following right-DDI cues as `S08` completion evidence:
 
 - top-level `BIT` page visible
 - `BIT root` page visible
 - `BIT FAILURES` line visible on the root page
 
-And it should treat the following right-DII cues as belonging to the later `S18` FCS BIT flow instead:
+And it should treat the following right-DDI cues as belonging to the later `S18` FCS BIT flow instead:
 
 - `FCS-MC` page visible
 - `IN TEST` visible
