@@ -2412,6 +2412,8 @@ class LiveDcsTutorLoop:
             "gates": gates,
             "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
+            "pack_path": str(self.pack_path),
+            "telemetry_map_path": str(self.telemetry_map_path),
             "candidate_steps": list(self.candidate_steps),
             "overlay_target_allowlist": overlay_target_allowlist,
             "deterministic_step_hint": deterministic_hint,
@@ -3505,6 +3507,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             api_key=args.model_api_key,
             enable_multimodal=model_enable_multimodal,
             allowed_local_image_roots=allowed_local_image_roots,
+            telemetry_map_path=args.telemetry_map,
         )
     if provider == "ollama":
         base_url = args.model_base_url or "http://127.0.0.1:11434"
@@ -3516,6 +3519,7 @@ def _build_model_from_args(args: argparse.Namespace) -> Any:
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
             print_model_io=print_model_io,
+            telemetry_map_path=args.telemetry_map,
         )
     raise ValueError(f"Unsupported model provider: {provider}")
 

@@ -328,6 +328,10 @@ def _resolve_runtime_config(args: argparse.Namespace) -> tuple[SidecarConfig, Pa
     layout_id = str(args.layout_id).strip() if args.layout_id else loaded.layout_id
     capture_width = int(args.capture_width) if args.capture_width is not None else loaded.capture_width
     capture_height = int(args.capture_height) if args.capture_height is not None else loaded.capture_height
+    if capture_width <= 0:
+        raise ValueError("capture_width must be > 0")
+    if capture_height <= 0:
+        raise ValueError("capture_height must be > 0")
     return (
         SidecarConfig(
             output_root=output_root,

@@ -50,12 +50,20 @@ _DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
 }
 
 
-@lru_cache(maxsize=1)
-def _load_default_var_resolver() -> VarResolver | None:
+@lru_cache(maxsize=8)
+def _load_var_resolver_for_path(path_text: str) -> VarResolver | None:
     try:
-        return VarResolver.from_yaml(_DEFAULT_TELEMETRY_MAP_PATH)
+        return VarResolver.from_yaml(Path(path_text))
     except (FileNotFoundError, OSError, VarResolverError):
         return None
+
+
+def _normalize_telemetry_map_path(raw: Any) -> Path | None:
+    if isinstance(raw, Path):
+        return raw.expanduser().resolve()
+    if isinstance(raw, str) and raw.strip():
+        return Path(raw).expanduser().resolve()
+    return None
 
 
 def _dedupe_non_empty_strings(raw: Any) -> list[str]:
@@ -94,6 +102,7 @@ class BaseHelpModel(ModelPort):
         lang: str,
         log_raw_llm_text: bool = False,
         print_model_io: bool = False,
+        telemetry_map_path: str | Path | None = None,
         client: Any | None = None,
     ) -> None:
         self.model_name = model_name
@@ -102,6 +111,7 @@ class BaseHelpModel(ModelPort):
         self.lang = lang
         self.log_raw_llm_text = bool(log_raw_llm_text)
         self.print_model_io = bool(print_model_io)
+        self.telemetry_map_path = _normalize_telemetry_map_path(telemetry_map_path)
 
         if client is None:
             try:
@@ -478,15 +488,20 @@ class BaseHelpModel(ModelPort):
     ) -> Mapping[str, Any]:
         vars_raw = context.get("vars")
         if isinstance(vars_raw, Mapping):
-            return self._resolve_inference_vars(vars_raw)
+            return self._resolve_inference_vars(vars_raw, context=context)
         payload = observation.payload if isinstance(observation.payload, Mapping) else {}
         payload_vars = payload.get("vars")
         if isinstance(payload_vars, Mapping):
-            return self._resolve_inference_vars(payload_vars)
+            return self._resolve_inference_vars(payload_vars, context=context)
         return {}
 
-    def _resolve_inference_vars(self, vars_raw: Mapping[str, Any]) -> Mapping[str, Any]:
-        resolver = _load_default_var_resolver()
+    def _resolve_inference_vars(
+        self,
+        vars_raw: Mapping[str, Any],
+        *,
+        context: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]:
+        resolver = self._select_var_resolver(context)
         if resolver is None:
             return vars_raw
         context = {
@@ -527,6 +542,26 @@ class BaseHelpModel(ModelPort):
             return vars_raw
         merged["vars_source_missing"] = sorted(source_missing)
         return merged
+
+    def _select_var_resolver(self, context: Mapping[str, Any] | None) -> VarResolver | None:
+        resolver_path = self._resolve_active_telemetry_map_path(context)
+        if resolver_path is None:
+            return None
+        return _load_var_resolver_for_path(str(resolver_path))
+
+    def _resolve_active_telemetry_map_path(self, context: Mapping[str, Any] | None) -> Path | None:
+        if isinstance(context, Mapping):
+            context_telemetry_map = _normalize_telemetry_map_path(context.get("telemetry_map_path"))
+            if context_telemetry_map is not None:
+                return context_telemetry_map
+            context_pack_path = _normalize_telemetry_map_path(context.get("pack_path"))
+            if context_pack_path is not None:
+                candidate = context_pack_path.parent / "telemetry_map.yaml"
+                if candidate.is_file():
+                    return candidate.resolve()
+        if self.telemetry_map_path is not None:
+            return self.telemetry_map_path
+        return _DEFAULT_TELEMETRY_MAP_PATH
 
     def _present_missing_conditions(
         self,

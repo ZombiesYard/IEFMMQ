@@ -45,6 +45,7 @@ class OpenAICompatModel(BaseHelpModel):
         enable_multimodal: bool = False,
         allowed_local_image_roots: Sequence[str | Path] | None = None,
         max_local_image_bytes: int | None = None,
+        telemetry_map_path: str | Path | None = None,
         client: object | None = None,
     ) -> None:
         self.api_key = api_key
@@ -67,6 +68,7 @@ class OpenAICompatModel(BaseHelpModel):
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
             print_model_io=print_model_io,
+            telemetry_map_path=telemetry_map_path,
             client=client,
         )
 

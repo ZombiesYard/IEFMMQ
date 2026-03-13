@@ -557,6 +557,8 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert "recent_actions" in request.context
     assert "deterministic_step_hint" in request.context
     assert "gates" in request.context
+    assert request.context["pack_path"].endswith("packs/fa18c_startup/pack.yaml")
+    assert request.context["telemetry_map_path"].endswith("packs/fa18c_startup/telemetry_map.yaml")
     hint = request.context["deterministic_step_hint"]
     assert isinstance(hint, dict)
     assert hint.get("inferred_step_id")

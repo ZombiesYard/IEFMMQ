@@ -215,7 +215,7 @@ def test_sidecar_cli_defaults_to_help_trigger_only_capture() -> None:
     assert args.capture_fps == 0.0
 
 
-def test_resolve_runtime_config_preserves_zero_sized_cli_override(tmp_path: Path) -> None:
+def test_resolve_runtime_config_rejects_zero_sized_cli_override(tmp_path: Path) -> None:
     config_path = tmp_path / "Saved Games" / "DCS" / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
@@ -253,8 +253,9 @@ def test_resolve_runtime_config_preserves_zero_sized_cli_override(tmp_path: Path
         ]
     )
 
-    resolved, resolved_path = _resolve_runtime_config(args)
-
-    assert resolved_path == config_path
-    assert resolved.capture_width == 0
-    assert resolved.capture_height == 0
+    try:
+        _resolve_runtime_config(args)
+    except ValueError as exc:
+        assert str(exc) == "capture_width must be > 0"
+    else:  # pragma: no cover
+        raise AssertionError("expected _resolve_runtime_config() to reject zero-sized capture overrides")
