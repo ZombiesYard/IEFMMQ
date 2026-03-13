@@ -43,6 +43,11 @@ def test_pack_bios_to_ui_covers_cold_start_step_keys() -> None:
             "ufc_comm1_channel_selector_rotate",
             "ufc_comm1_channel_selector_pull",
         ],
+        "UFC_1": ["ufc_key_1"],
+        "UFC_3": ["ufc_key_3"],
+        "UFC_4": ["ufc_key_4"],
+        "UFC_0": ["ufc_key_0"],
+        "UFC_ENT": ["ufc_ent_button"],
         "COMM2_CHANNEL_NUMERIC": [
             "ufc_comm2_channel_selector_rotate",
             "ufc_comm2_channel_selector_pull",

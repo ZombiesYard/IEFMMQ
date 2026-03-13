@@ -56,6 +56,7 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.l_gen_on": ("generator_left_switch",),
     "vars.left_ddi_on": ("left_mdi_brightness_selector",),
     "vars.lights_test_complete": ("lights_test_button",),
+    "vars.comm1_freq_134_000": ("ufc_comm1_channel_selector_pull", "ufc_ent_button"),
     "vars.mpcd_on": ("ampcd_off_brightness_knob",),
     "vars.r_gen_on": ("generator_right_switch",),
     "vars.right_ddi_on": ("right_mdi_brightness_selector",),
@@ -338,6 +339,10 @@ def _build_overlay_target_priority(
         seen.add(value)
         ranked.append(value)
 
+    action_hint = deterministic_step_hint.get("action_hint")
+    if isinstance(action_hint, Mapping):
+        _append_if_allowed(action_hint.get("target"))
+
     visual_action_hint = deterministic_step_hint.get("visual_action_hint")
     if isinstance(visual_action_hint, Mapping):
         _append_if_allowed(visual_action_hint.get("target"))
@@ -502,6 +507,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
     if not isinstance(raw, Mapping):
         return {
             "inferred_step_id": None,
+            "overlay_step_id": None,
             "missing_conditions": [],
             "recent_ui_targets": [],
             "observability": None,
@@ -509,11 +515,14 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             "step_evidence_requirements": [],
             "requires_visual_confirmation": False,
             "scenario_profile": None,
+            "action_hint": None,
             "visual_action_hint": None,
         }
 
     inferred_raw = raw.get("inferred_step_id")
     inferred_step_id = str(_sanitize_scalar(inferred_raw)) if isinstance(inferred_raw, str) and inferred_raw else None
+    overlay_raw = raw.get("overlay_step_id")
+    overlay_step_id = str(_sanitize_scalar(overlay_raw)) if isinstance(overlay_raw, str) and overlay_raw else None
 
     missing_raw = raw.get("missing_conditions")
     missing_conditions: list[str] = []
@@ -584,6 +593,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
 
     return {
         "inferred_step_id": inferred_step_id,
+        "overlay_step_id": overlay_step_id,
         "missing_conditions": missing_conditions,
         "recent_ui_targets": recent_ui_targets,
         "observability": observability,
@@ -591,6 +601,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
         "step_evidence_requirements": step_evidence_requirements,
         "requires_visual_confirmation": requires_visual_confirmation,
         "scenario_profile": scenario_profile,
+        "action_hint": _sanitize_visual_action_hint(raw.get("action_hint")),
         "visual_action_hint": _sanitize_visual_action_hint(raw.get("visual_action_hint")),
     }
 
@@ -859,7 +870,9 @@ def build_help_prompt_result(
             "overlay.evidence 字段顺序必须固定为 target,type,ref,quote,grounding_confidence，且 type 必须与 ref 前缀匹配。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
             "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
+            "若 deterministic_step_hint.action_hint.target 存在，且与当前 vars / missing_conditions 不冲突，应优先把它作为单目标候选。",
             "若 deterministic_step_hint.visual_action_hint.target 存在，且与 vision_fact_summary / allowed_evidence_refs 不冲突，应优先把它作为单目标候选。",
+            "若 deterministic_step_hint.inferred_step_id='S08' 且 deterministic_step_hint.overlay_step_id='S09'，并且 deterministic_step_hint.action_hint.target='ufc_comm1_channel_selector_pull'，说明 S08 已满足、help 应直接引导进入 S09；此时不得继续高亮任何 left_mdi_* 目标，应直接高亮 UFC COMM1 频道选择旋钮。",
             "vision_fact_summary 只能辅助 diagnosis/next/explanations；若使用视觉证据，高亮必须引用 allowed_evidence_refs 中的 VISION_FACTS.* ref，并与实际 frame_id 可追溯。",
             "若 multimodal_input.attached=true 且 vision_fact_summary.status=vision_unavailable，可直接依据已附带图像判断 diagnosis/next 与单目标 overlay；若当前没有 VISION_FACTS.* ref，可改用 gate/rag 作为 evidence，不得仅因“缺少视觉 refs”就拒绝给出可操作目标。",
             "不要把“左 DDI 看见 FCS 按钮/菜单项”误判成“已经进入 FCS 页面”；left_ddi_fcs_option_visible 或 left_ddi_fcs_page_button_visible 只说明下一步应按对应按钮进入 FCS 页面。",
@@ -890,7 +903,9 @@ def build_help_prompt_result(
             "Emit overlay.evidence fields in this exact order: target, type, ref, quote, grounding_confidence, and type must match the ref prefix.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
             "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
+            "If deterministic_step_hint.action_hint.target is present and consistent with current vars / missing_conditions, prefer it as the single overlay candidate.",
             "If deterministic_step_hint.visual_action_hint.target is present and consistent with vision_fact_summary / allowed_evidence_refs, prefer it as the single overlay candidate.",
+            "If deterministic_step_hint.inferred_step_id='S08' while deterministic_step_hint.overlay_step_id='S09' and deterministic_step_hint.action_hint.target='ufc_comm1_channel_selector_pull', treat S08 as already satisfied for help guidance and immediately highlight the UFC COMM1 channel selector; do not keep any left_mdi_* target in this case.",
             "vision_fact_summary may support diagnosis/next/explanations. If you use visual evidence for overlay, cite an allowed VISION_FACTS.* ref that remains traceable to the frame_id.",
             "If multimodal_input.attached=true and vision_fact_summary.status=vision_unavailable, you may still use the attached image for diagnosis/next and a single overlay target. When no VISION_FACTS.* ref is available, support the overlay with the strongest gate/rag ref instead of refusing solely because visual refs are missing.",
             "Do not mistake 'the left DDI shows the FCS button/menu entry' for 'the left DDI is already on the FCS page'. left_ddi_fcs_option_visible or left_ddi_fcs_page_button_visible only means the next action is to press that button and enter the FCS page.",
@@ -1072,6 +1087,9 @@ def build_help_prompt_result(
             "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),
             "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
         }
+        action_hint = deterministic_step_hint.get("action_hint")
+        if isinstance(action_hint, Mapping) and isinstance(action_hint.get("target"), str):
+            compact_hint["action_hint"] = {"target": action_hint.get("target")}
         visual_action_hint = deterministic_step_hint.get("visual_action_hint")
         if isinstance(visual_action_hint, Mapping) and isinstance(visual_action_hint.get("target"), str):
             compact_hint["visual_action_hint"] = {"target": visual_action_hint.get("target")}

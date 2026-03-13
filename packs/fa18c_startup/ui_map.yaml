@@ -120,6 +120,31 @@ cockpit_elements:
     dcs_id: "pnt_124"
     aliases: ["UFC COMM 1 Channel Selector Knob Pull", "COMM1_CHAN"]
     panel_area: "ufc"
+  ufc_key_1:
+    description: "UFC keyboard pushbutton 1"
+    dcs_id: "pnt_111"
+    aliases: ["UFC Keyboard Pushbutton, 1", "UFC_1"]
+    panel_area: "ufc"
+  ufc_key_3:
+    description: "UFC keyboard pushbutton 3"
+    dcs_id: "pnt_113"
+    aliases: ["UFC Keyboard Pushbutton, 3", "UFC_3"]
+    panel_area: "ufc"
+  ufc_key_4:
+    description: "UFC keyboard pushbutton 4"
+    dcs_id: "pnt_114"
+    aliases: ["UFC Keyboard Pushbutton, 4", "UFC_4"]
+    panel_area: "ufc"
+  ufc_key_0:
+    description: "UFC keyboard pushbutton 0"
+    dcs_id: "pnt_120"
+    aliases: ["UFC Keyboard Pushbutton, 0", "UFC_0"]
+    panel_area: "ufc"
+  ufc_ent_button:
+    description: "UFC keyboard pushbutton ENT"
+    dcs_id: "pnt_47_122"
+    aliases: ["UFC Keyboard Pushbutton, ENT", "UFC_ENT"]
+    panel_area: "ufc"
   ufc_comm2_channel_selector_rotate:
     description: "UFC COMM 2 channel selector rotate"
     dcs_id: "pnt_126"

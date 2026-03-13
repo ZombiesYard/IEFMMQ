@@ -76,6 +76,11 @@ ui_targets:
   - right_mdi_pb18
   - ufc_comm1_channel_selector_pull
   - ufc_comm1_channel_selector_rotate
+  - ufc_key_1
+  - ufc_key_3
+  - ufc_key_4
+  - ufc_key_0
+  - ufc_ent_button
   - ufc_comm2_channel_selector_pull
   - ufc_comm2_channel_selector_rotate
   - ins_mode_knob
@@ -294,7 +299,11 @@ completion_gates:
       var: vars.hud_on
       reason_code: s08_requires_hud_on
       reason: "HUD must be powered."
-  S09: []
+  S09:
+    - op: flag_true
+      var: vars.comm1_freq_134_000
+      reason_code: s09_requires_comm1_freq_134_000
+      reason: "COMM1 preset 1 must be programmed to 134.000 MHz."
   S10:
     - op: flag_true
       var: vars.engine_crank_left
@@ -547,14 +556,16 @@ steps:
     preconditions:
       - "Displays powered (S08 complete)."
     completion_conditions:
-      - "COMM1 and COMM2 set to assigned frequencies/presets."
+      - "COMM1 preset 1 frequency programmed to 134.000 MHz."
     ui_targets:
       - ufc_comm1_channel_selector_pull
-      - ufc_comm1_channel_selector_rotate
-      - ufc_comm2_channel_selector_pull
-      - ufc_comm2_channel_selector_rotate
+      - ufc_key_1
+      - ufc_key_3
+      - ufc_key_4
+      - ufc_key_0
+      - ufc_ent_button
     tutor_prompts:
-      - "Use UFC/comm panels to set COMM1 and COMM2 to mission frequencies/presets; verify the radio values from UFC/BIOS readouts."
+      - "For this training flow, program COMM1 preset 1 to 134.000 MHz. Pull the UFC COMM1 channel selector to open preset 1 in the scratchpad, enter 1-3-4-0-0-0 on the UFC keypad, then press ENT to commit the frequency."
 
   - id: S10
     phase: P4

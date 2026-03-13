@@ -28,6 +28,7 @@ from live_dcs import (
     StdinHelpTrigger,
     UdpHelpTrigger,
     _build_observation_source_from_args,
+    _build_procedural_action_hint,
     build_arg_parser,
     _build_vision_fact_extractor_from_model,
     _build_vision_port_from_args,
@@ -39,6 +40,7 @@ from live_dcs import (
     _normalize_cached_response_metadata,
     _path_like_to_uri,
     _prefer_navigation_target_from_vision_context,
+    _resolve_overlay_step_id,
     _resolve_step_overlay_allowlist,
     _sanitize_request_payload_for_event,
     _sanitize_response_payload_for_event,
@@ -2892,6 +2894,99 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_expl
     assert targets == ["left_mdi_pb15"]
 
 
+def test_build_procedural_action_hint_for_s09_starts_with_comm1_pull() -> None:
+    hint = _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={"comm1_freq_134_000": False},
+        allowed_targets=["ufc_comm1_channel_selector_pull", "ufc_key_1", "ufc_ent_button"],
+    )
+
+    assert hint == {
+        "target": "ufc_comm1_channel_selector_pull",
+        "reason": "Pull the UFC COMM1 channel selector to open preset 1 in the scratchpad before entering 134.000.",
+    }
+
+
+def test_build_procedural_action_hint_for_s09_advances_through_ufc_entry_sequence() -> None:
+    allowed = [
+        "ufc_comm1_channel_selector_pull",
+        "ufc_key_1",
+        "ufc_key_3",
+        "ufc_key_4",
+        "ufc_key_0",
+        "ufc_ent_button",
+    ]
+
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "305.000",
+        },
+        allowed_targets=allowed,
+    )["target"] == "ufc_key_1"
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "     .1",
+        },
+        allowed_targets=allowed,
+    )["target"] == "ufc_key_3"
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "    .13",
+        },
+        allowed_targets=allowed,
+    )["target"] == "ufc_key_4"
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "   .134",
+        },
+        allowed_targets=allowed,
+    )["target"] == "ufc_key_0"
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "134.000",
+        },
+        allowed_targets=allowed,
+    )["target"] == "ufc_ent_button"
+
+
+def test_resolve_overlay_step_id_advances_to_next_step_when_current_step_has_no_missing_conditions() -> None:
+    candidate_steps = ["S08", "S09", "S10"]
+    step_order_index = {step_id: idx for idx, step_id in enumerate(candidate_steps)}
+
+    assert _resolve_overlay_step_id(
+        "S08",
+        missing_conditions=[],
+        candidate_steps=candidate_steps,
+        step_order_index=step_order_index,
+    ) == "S09"
+    assert _resolve_overlay_step_id(
+        "S08",
+        missing_conditions=["vision_facts.bit_page_visible==seen"],
+        candidate_steps=candidate_steps,
+        step_order_index=step_order_index,
+    ) == "S08"
+
+
 def test_live_loop_pack_step_without_ui_targets_degrades_to_safe_text(tmp_path: Path) -> None:
     pack_path = tmp_path / "pack_no_step_targets.yaml"
     pack_path.write_text(
@@ -4787,6 +4882,74 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
     ]
     assert response.metadata["final_public_response"]["message"] == response.message
     assert response.metadata["final_public_response"]["explanations"] == [response.message]
+
+
+def test_live_loop_replaces_stale_s08_overlay_with_s09_action_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    replay_path = tmp_path / "bios_s08_to_s09_overlay.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class WrongOverlayModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Step S08 is complete. Proceed to S09.",
+                actions=[],
+                explanations=["Step S08 is complete. Proceed to S09."],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                        "next": {"step_id": "S09"},
+                        "overlay": {
+                            "targets": ["left_mdi_pb15"],
+                            "evidence": [
+                                {
+                                    "target": "left_mdi_pb15",
+                                    "type": "gate",
+                                    "ref": "GATES.S08.completion",
+                                    "quote": "S08 completion allowed.",
+                                    "grounding_confidence": 0.95,
+                                }
+                            ],
+                        },
+                        "explanations": ["Step S08 is complete. Proceed to S09."],
+                        "confidence": 0.95,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S08", missing_conditions=()),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=WrongOverlayModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s08-to-s09-overlay",
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.actions
+    assert response.actions[0]["target"] == "ufc_comm1_channel_selector_pull"
+    assert response.metadata["fallback_overlay_used"] is True
+    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S08"
+    assert response.metadata["response_mapping"]["rejected_targets_by_request_allowlist"] == ["left_mdi_pb15"]
+    assert response.metadata["response_mapping"]["mapping_error"] == "overlay_target_not_in_request_allowlist"
 
 
 def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:

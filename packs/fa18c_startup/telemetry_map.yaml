@@ -84,6 +84,16 @@ vars:
   comm2_freq_value: "derived(num(bios.COMM2_FREQ))"
   comm1_channel_numeric: "derived(num(bios.COMM1_CHANNEL_NUMERIC))"
   comm2_channel_numeric: "derived(num(bios.COMM2_CHANNEL_NUMERIC))"
+  comm1_freq_134_000: "derived(vars.comm1_freq_value == 13400)"
+  ufc_comm1_pull_pressed: "bios.UFC_COMM1_PULL == 1"
+  ufc_key_1_pressed: "bios.UFC_1 == 1"
+  ufc_key_3_pressed: "bios.UFC_3 == 1"
+  ufc_key_4_pressed: "bios.UFC_4 == 1"
+  ufc_key_0_pressed: "bios.UFC_0 == 1"
+  ufc_ent_pressed: "bios.UFC_ENT == 1"
+  ufc_scratchpad_number_display: "bios.UFC_SCRATCHPAD_NUMBER_DISPLAY"
+  ufc_scratchpad_string_1_display: "bios.UFC_SCRATCHPAD_STRING_1_DISPLAY"
+  ufc_scratchpad_string_2_display: "bios.UFC_SCRATCHPAD_STRING_2_DISPLAY"
 
   # S14-S25 extension vars.
   # If a checklist item is currently not observable from trusted telemetry, expose it

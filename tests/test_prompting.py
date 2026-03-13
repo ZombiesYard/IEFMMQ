@@ -463,6 +463,80 @@ def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
     assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "left_mdi_pb15"
 
 
+def test_prompt_prioritizes_action_hint_for_s09_ufc_entry() -> None:
+    ctx = {
+        "candidate_steps": ["S09"],
+        "overlay_target_allowlist": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button",
+        ],
+        "vars": {
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "305.000",
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S09",
+            "missing_conditions": ["vars.comm1_freq_134_000==true"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "delta", "rag"],
+            "action_hint": {
+                "target": "ufc_key_1",
+                "reason": "COMM1 preset entry is open; press 1 next.",
+            },
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["deterministic_step_hint"]["action_hint"]["target"] == "ufc_key_1"
+    assert payload["overlay_target_policy"]["preferred_target"] == "ufc_key_1"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "ufc_key_1"
+
+
+def test_prompt_explicitly_redirects_completed_s08_help_to_s09_comm1_selector() -> None:
+    ctx = {
+        "candidate_steps": ["S08", "S09"],
+        "overlay_target_allowlist": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "left_mdi_pb15",
+        ],
+        "vars": {"comm1_freq_134_000": False},
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "overlay_step_id": "S09",
+            "missing_conditions": [],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "delta", "rag"],
+            "action_hint": {
+                "target": "ufc_comm1_channel_selector_pull",
+                "reason": "S08 is complete; begin S09 by pulling COMM1.",
+            },
+        },
+    }
+
+    prompt = build_help_prompt(ctx, "en")
+    payload = _extract_prompt_constraints_json(prompt)
+
+    assert payload["deterministic_step_hint"]["overlay_step_id"] == "S09"
+    assert payload["deterministic_step_hint"]["action_hint"]["target"] == "ufc_comm1_channel_selector_pull"
+    assert payload["overlay_target_policy"]["preferred_target"] == "ufc_comm1_channel_selector_pull"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "ufc_comm1_channel_selector_pull"
+    assert "immediately highlight the UFC COMM1 channel selector" in prompt
+
+
 def test_prompt_trim_keeps_s08_fcs_navigation_target_ahead_of_noisy_recent_actions() -> None:
     ctx = {
         "candidate_steps": ["S08", "S10", "S11", "S12"],

@@ -69,6 +69,16 @@ EXPECTED_S11_S25_VAR_KEYS = {
     "comm2_freq_value",
     "comm1_channel_numeric",
     "comm2_channel_numeric",
+    "comm1_freq_134_000",
+    "ufc_comm1_pull_pressed",
+    "ufc_key_1_pressed",
+    "ufc_key_3_pressed",
+    "ufc_key_4_pressed",
+    "ufc_key_0_pressed",
+    "ufc_ent_pressed",
+    "ufc_scratchpad_number_display",
+    "ufc_scratchpad_string_1_display",
+    "ufc_scratchpad_string_2_display",
 }
 
 EXPECTED_UNKNOWN_VALUE_KEYS = {
@@ -637,6 +647,37 @@ def test_var_resolver_pack_radio_vars_follow_bios_exports() -> None:
     assert vars_out["comm2_freq_value"] == 12750
     assert vars_out["comm1_channel_numeric"] == 7
     assert vars_out["comm2_channel_numeric"] == 11
+
+
+def test_var_resolver_pack_ufc_comm1_entry_vars_follow_bios_exports() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame = TelemetryFrame(
+        seq=725,
+        t_wall=725.0,
+        source="dcs_bios",
+        bios={
+            "COMM1_FREQ": 13400,
+            "UFC_COMM1_PULL": 1,
+            "UFC_1": 0,
+            "UFC_3": 1,
+            "UFC_4": 0,
+            "UFC_0": 0,
+            "UFC_ENT": 0,
+            "UFC_SCRATCHPAD_NUMBER_DISPLAY": "13      ",
+            "UFC_SCRATCHPAD_STRING_1_DISPLAY": "1-",
+            "UFC_SCRATCHPAD_STRING_2_DISPLAY": "-",
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["comm1_freq_134_000"] is True
+    assert vars_out["ufc_comm1_pull_pressed"] is True
+    assert vars_out["ufc_key_3_pressed"] is True
+    assert vars_out["ufc_scratchpad_number_display"] == "13      "
+    assert vars_out["ufc_scratchpad_string_1_display"] == "1-"
+    assert vars_out["ufc_scratchpad_string_2_display"] == "-"
 
 
 def test_var_resolver_pack_bingo_and_attitude_source_vars_follow_bios_state() -> None:

@@ -434,6 +434,7 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
     sanitized: dict[str, Any] = {}
     for key in (
         "inferred_step_id",
+        "overlay_step_id",
         "observability",
         "observability_status",
         "requires_visual_confirmation",
@@ -463,6 +464,11 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
         target = visual_action_hint.get("target")
         if isinstance(target, str) and target:
             sanitized["visual_action_hint"] = {"target": target}
+    action_hint = raw.get("action_hint")
+    if isinstance(action_hint, Mapping):
+        target = action_hint.get("target")
+        if isinstance(target, str) and target:
+            sanitized["action_hint"] = {"target": target}
     return sanitized
 
 
@@ -1467,6 +1473,81 @@ def _build_visual_action_hint(
     }
 
 
+def _normalize_ufc_scratchpad_text(vars_selected: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    for key in (
+        "ufc_scratchpad_string_1_display",
+        "ufc_scratchpad_string_2_display",
+        "ufc_scratchpad_number_display",
+    ):
+        value = vars_selected.get(key)
+        if isinstance(value, str):
+            parts.append(value)
+    return "".join(parts).replace("。", ".").upper()
+
+
+def _build_procedural_action_hint(
+    *,
+    inferred_step_id: str | None,
+    vars_selected: Mapping[str, Any],
+    allowed_targets: Sequence[str],
+) -> dict[str, Any] | None:
+    if inferred_step_id != "S09":
+        return None
+    if vars_selected.get("comm1_freq_134_000") is True:
+        return None
+
+    allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+    if not allowed:
+        return None
+
+    scratchpad_text = _normalize_ufc_scratchpad_text(vars_selected)
+    compact = scratchpad_text.replace(" ", "")
+    payload = compact[3:] if compact.startswith("1--") else compact
+
+    def _hint(target: str, reason: str) -> dict[str, Any] | None:
+        if target not in allowed:
+            return None
+        return {"target": target, "reason": reason}
+
+    if vars_selected.get("ufc_comm1_pull_pressed") is True and "305.000" not in payload:
+        return _hint("ufc_key_1", "COMM1 preset entry is already open on the UFC scratchpad; start typing 134.000 with key 1.")
+    if payload.endswith("134.000"):
+        return _hint("ufc_ent_button", "The UFC scratchpad already shows 134.000 for COMM1 preset 1; press ENT to commit the frequency.")
+    if payload.endswith("13.400") or payload.endswith("1.340") or payload.endswith(".134") or payload.endswith("1.34"):
+        return _hint("ufc_key_0", "COMM1 preset entry is partway through 134.000; press 0 next.")
+    if payload.endswith(".13"):
+        return _hint("ufc_key_4", "COMM1 preset entry shows 13; press 4 next.")
+    if payload.endswith(".1"):
+        return _hint("ufc_key_3", "COMM1 preset entry shows 1; press 3 next.")
+    if payload.endswith("305.000") or payload.endswith("305000"):
+        return _hint("ufc_key_1", "COMM1 preset 1 is open on the scratchpad with the old 305.000 value; press 1 to begin entering 134.000.")
+    if vars_selected.get("ufc_comm1_pull_pressed") is True:
+        return _hint("ufc_key_1", "COMM1 preset entry has been opened on the UFC scratchpad; press 1 to begin entering 134.000.")
+    return _hint("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector to open preset 1 in the scratchpad before entering 134.000.")
+
+
+def _resolve_overlay_step_id(
+    inferred_step_id: str | None,
+    *,
+    missing_conditions: Sequence[str],
+    candidate_steps: Sequence[str],
+    step_order_index: Mapping[str, int],
+) -> str | None:
+    if not isinstance(inferred_step_id, str) or not inferred_step_id:
+        return None
+    if any(isinstance(item, str) and item for item in missing_conditions):
+        return inferred_step_id
+    current_idx = step_order_index.get(inferred_step_id)
+    if current_idx is None:
+        return inferred_step_id
+    for next_idx in range(current_idx + 1, len(candidate_steps)):
+        next_step_id = candidate_steps[next_idx]
+        if isinstance(next_step_id, str) and next_step_id:
+            return next_step_id
+    return inferred_step_id
+
+
 def _normalize_rule_var_ref(raw: Any) -> str | None:
     if not isinstance(raw, str):
         return None
@@ -2429,8 +2510,15 @@ class LiveDcsTutorLoop:
                 inferred_gate_blockers.append(blocker)
 
         missing_conditions = list(inference.missing_conditions)
+        overlay_step_id = _resolve_overlay_step_id(
+            inference.inferred_step_id,
+            missing_conditions=missing_conditions,
+            candidate_steps=self.candidate_steps,
+            step_order_index=self._step_order_index,
+        )
         deterministic_hint = {
             "inferred_step_id": inference.inferred_step_id,
+            "overlay_step_id": overlay_step_id,
             "missing_conditions": missing_conditions,
             "recent_ui_targets": recent_buttons,
             "gate_blockers": inferred_gate_blockers,
@@ -2459,7 +2547,7 @@ class LiveDcsTutorLoop:
                     deterministic_hint["requires_visual_confirmation"] = requires_visual_confirmation
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
         overlay_target_allowlist = _resolve_step_overlay_allowlist(
-            inference.inferred_step_id,
+            overlay_step_id,
             step_fallback_profiles=self.step_fallback_profiles,
             overlay_allowset=self.overlay_allowset,
             default_allowlist=self.overlay_allowlist,
@@ -2475,6 +2563,13 @@ class LiveDcsTutorLoop:
         )
         if isinstance(visual_action_hint, Mapping):
             deterministic_hint["visual_action_hint"] = dict(visual_action_hint)
+        action_hint = _build_procedural_action_hint(
+            inferred_step_id=overlay_step_id,
+            vars_selected=vars_selected,
+            allowed_targets=overlay_target_allowlist,
+        )
+        if isinstance(action_hint, Mapping):
+            deterministic_hint["action_hint"] = dict(action_hint)
 
         context = {
             "vars": vars_selected,
@@ -2893,6 +2988,11 @@ class LiveDcsTutorLoop:
             observability = hint.get("observability")
         if observability != "observable":
             return False
+        action_hint = hint.get("action_hint")
+        if isinstance(action_hint, Mapping):
+            action_target = action_hint.get("target")
+            if isinstance(action_target, str) and action_target:
+                return True
         missing_conditions = hint.get("missing_conditions")
         return isinstance(missing_conditions, list) and any(
             isinstance(item, str) and item for item in missing_conditions
@@ -2982,14 +3082,17 @@ class LiveDcsTutorLoop:
         inferred_step_id = hint.get("inferred_step_id")
         if not isinstance(inferred_step_id, str) or not inferred_step_id:
             return None, "missing_inferred_step_id"
+        overlay_step_id = hint.get("overlay_step_id")
+        if not isinstance(overlay_step_id, str) or not overlay_step_id:
+            overlay_step_id = inferred_step_id
 
-        step_fallback_profile = self.step_fallback_profiles.get(inferred_step_id)
+        step_fallback_profile = self.step_fallback_profiles.get(overlay_step_id)
         if not isinstance(step_fallback_profile, Mapping):
-            return None, f"unsupported_step:{inferred_step_id}"
+            return None, f"unsupported_step:{overlay_step_id}"
         fallback_targets_raw = step_fallback_profile.get("ui_targets")
         fallback_targets = _normalize_step_ui_targets(fallback_targets_raw)
         if not fallback_targets:
-            return None, f"unsupported_step:{inferred_step_id}"
+            return None, f"unsupported_step:{overlay_step_id}"
         declared_fallback_target = fallback_targets[0]
         missing_conditions_raw = hint.get("missing_conditions")
         missing_conditions = [
@@ -2998,6 +3101,14 @@ class LiveDcsTutorLoop:
 
         request_allowlist = context.get("overlay_target_allowlist")
         candidate_targets = list(fallback_targets)
+        action_hint = hint.get("action_hint")
+        if isinstance(action_hint, Mapping):
+            action_target = action_hint.get("target")
+            if isinstance(action_target, str) and action_target in candidate_targets:
+                candidate_targets = [
+                    action_target,
+                    *[target for target in candidate_targets if target != action_target],
+                ]
         navigation_targets = _prefer_navigation_target_from_vision_context(
             inferred_step_id=inferred_step_id,
             missing_conditions=missing_conditions,
@@ -3037,6 +3148,9 @@ class LiveDcsTutorLoop:
                     candidate_refs.append(ref)
         candidate_refs.append(f"GATES.{inferred_step_id}.completion")
         candidate_refs.append(f"GATES.{inferred_step_id}.precondition")
+        if overlay_step_id != inferred_step_id:
+            candidate_refs.append(f"GATES.{overlay_step_id}.completion")
+            candidate_refs.append(f"GATES.{overlay_step_id}.precondition")
         gate_var_refs = step_fallback_profile.get("gate_var_refs")
         if isinstance(gate_var_refs, list):
             for ref in gate_var_refs:
