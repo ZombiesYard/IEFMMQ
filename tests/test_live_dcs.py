@@ -2911,6 +2911,224 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_expl
     assert targets == ["left_mdi_pb15"]
 
 
+def test_visual_action_hint_overlay_override_rewrites_s08_tac_guidance_to_pb18(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_visual_action_hint_override_s08.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S08.completion", "status": "allowed"},
+                    {"gate_id": "S08.precondition", "status": "allowed"},
+                ],
+                "vision_fact_summary": {
+                    "status": "available",
+                    "seen_fact_ids": ["bit_page_visible", "left_ddi_menu_root_visible"],
+                    "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
+                    "uncertain_fact_ids": [
+                        "left_ddi_fcs_option_visible",
+                        "left_ddi_fcs_page_button_visible",
+                    ],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                    "visual_action_hint": {
+                        "target": "left_mdi_pb18",
+                        "reason": "Press PB18 first to reach SUPT.",
+                    },
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message=(
+                "The Left DDI is currently on the TAC (Tactical) page, not the required "
+                "FCS (Flight Control System) page for Step S08. Press PB15 to enter FCS."
+            ),
+            actions=[
+                {
+                    "kind": "highlight",
+                    "target": "left_mdi_pb15",
+                    "element_id": "pnt_68",
+                    "duration_ms": 2500,
+                }
+            ],
+            explanations=[
+                "The Left DDI is currently on the TAC (Tactical) page, not the required FCS page. Press PB15 next."
+            ],
+            metadata={},
+        )
+
+        override_used, override_reason = loop._apply_action_hint_overlay_override(response, request)
+
+        assert override_used is True
+        assert override_reason == "deterministic_step:S08"
+        assert response.actions
+        assert response.actions[0]["target"] == "left_mdi_pb18"
+        assert "Press PB18 first to switch to the SUPT page" in response.message
+        assert response.explanations == [response.message]
+        assert response.metadata["action_hint_overlay_override_kind"] == "visual_action_hint"
+        assert response.metadata["visual_action_hint_override_used"] is True
+        assert response.metadata["visual_action_hint_override_target"] == "left_mdi_pb18"
+        assert response.metadata["action_hint_overlay_override_original_targets"] == ["left_mdi_pb15"]
+    finally:
+        loop.close()
+
+
+def test_manual_throttle_guidance_rewrites_s11_throttle_reference_to_keyboard_text(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_manual_throttle_guidance_s11.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S11.completion", "status": "blocked"},
+                    {"gate_id": "S11.precondition", "status": "allowed"},
+                ],
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S11",
+                    "overlay_step_id": "S11",
+                    "missing_conditions": ["vars.throttle_l_not_off==true"],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate"],
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="Move the left throttle out of OFF.",
+            actions=[
+                {
+                    "kind": "highlight",
+                    "target": "throttle_quadrant_reference",
+                    "element_id": "pnt_504",
+                    "duration_ms": 2500,
+                }
+            ],
+            explanations=["Move the left throttle to IDLE."],
+            metadata={},
+        )
+
+        rewritten, reason = loop._rewrite_manual_throttle_guidance_response(response, request)
+
+        assert rewritten is True
+        assert reason == "manual_throttle_keyboard_guidance"
+        assert response.actions == []
+        assert "Right Alt+Home" in response.message
+        assert "throttle_quadrant_reference" not in response.message
+        assert response.explanations == [response.message]
+        assert response.metadata["manual_throttle_guidance_rewritten"] is True
+        assert response.metadata["manual_throttle_guidance_step_id"] == "S11"
+    finally:
+        loop.close()
+
+
+def test_action_hint_overlay_override_rewrites_s18_fcsmc_step_to_fcs_bit_switch(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s18_fcsmc_action_hint_override.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S18.completion", "status": "allowed"},
+                    {"gate_id": "S18.precondition", "status": "allowed"},
+                ],
+                "vision_fact_summary": {
+                    "status": "uncertain",
+                    "seen_fact_ids": ["fcs_page_visible", "right_ddi_fcsmc_page_visible"],
+                    "not_seen_fact_ids": ["bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"],
+                    "uncertain_fact_ids": ["fcs_bit_result_visible"],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S18",
+                    "overlay_step_id": "S18",
+                    "missing_conditions": ["vision_facts.fcs_bit_result_visible==seen"],
+                    "gate_blockers": [],
+                    "observability_status": "partial",
+                    "requires_visual_confirmation": True,
+                    "step_evidence_requirements": ["delta", "gate", "visual"],
+                    "action_hint": {
+                        "target": "fcs_bit_switch",
+                        "reason": "Hold the FCS BIT switch up while pressing PB5.",
+                    },
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="Return to the BIT root page first.",
+            actions=[
+                {
+                    "kind": "highlight",
+                    "target": "right_mdi_pb18",
+                    "element_id": "pnt_96",
+                    "duration_ms": 2500,
+                }
+            ],
+            explanations=["Press PB18 to return to the BIT root page."],
+            metadata={},
+        )
+
+        override_used, override_reason = loop._apply_action_hint_overlay_override(response, request)
+
+        assert override_used is True
+        assert override_reason == "deterministic_step:S18"
+        assert response.actions
+        assert response.actions[0]["target"] == "fcs_bit_switch"
+        assert "Hold the FCS BIT switch up" in response.message
+        assert "PB5" in response.message
+        assert response.metadata["action_hint_overlay_override_used"] is True
+        assert response.metadata["action_hint_overlay_override_target"] == "fcs_bit_switch"
+        assert response.metadata["action_hint_overlay_override_kind"] == "action_hint"
+    finally:
+        loop.close()
+
+
 def test_build_procedural_action_hint_for_s09_starts_with_comm1_pull() -> None:
     hint = _build_procedural_action_hint(
         inferred_step_id="S09",
@@ -3028,8 +3246,17 @@ def test_build_procedural_action_hint_for_s18_prefers_right_ddi_pb5() -> None:
         vars_selected={"fcs_bit_switch_up": True},
         allowed_targets=allowed,
     ) == {
-        "target": "right_mdi_pb5",
-        "reason": "The FCS BIT switch is already held up; press Right DDI PB5 to start or continue the FCS-MC BIT.",
+        "target": "fcs_bit_switch",
+        "reason": "Keep holding the FCS BIT switch up while you press Right DDI PB5 to start or continue the FCS-MC BIT.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S18",
+        vars_selected={"fcs_bit_switch_up": False},
+        allowed_targets=allowed,
+        vision_fact_summary={"seen_fact_ids": ["right_ddi_fcsmc_page_visible"]},
+    ) == {
+        "target": "fcs_bit_switch",
+        "reason": "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
     }
 
 
@@ -3038,7 +3265,7 @@ def test_build_procedural_action_hint_for_s19_advances_after_probe_extends() -> 
 
     assert _build_procedural_action_hint(
         inferred_step_id="S19",
-        vars_selected={"probe_extended": False},
+        vars_selected={"probe_extended": False, "probe_cycle_complete": False},
         allowed_targets=allowed,
     ) == {
         "target": "refuel_probe_switch",
@@ -3046,12 +3273,71 @@ def test_build_procedural_action_hint_for_s19_advances_after_probe_extends() -> 
     }
     assert _build_procedural_action_hint(
         inferred_step_id="S19",
-        vars_selected={"probe_extended": True},
+        vars_selected={"probe_extended": False, "probe_cycle_complete": True},
         allowed_targets=allowed,
     ) == {
         "target": "launch_bar_switch",
-        "reason": "The refueling probe is already extended; continue the four-down checklist with the launch bar switch.",
+        "reason": "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
     }
+
+
+def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar() -> None:
+    response = TutorResponse(
+        message="Extend the refuel probe.",
+        explanations=["Extend the refuel probe."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "refuel_probe_switch",
+                "element_id": "pnt_341",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S20"},
+            "diagnosis": {"step_id": "S19", "error_category": "OM"},
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": ["refuel_probe_switch", "launch_bar_switch"],
+            "gates": [
+                {"gate_id": "S19.completion", "status": "allowed"},
+                {"gate_id": "S19.precondition", "status": "allowed"},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S19",
+                "overlay_step_id": "S19",
+                "requires_visual_confirmation": False,
+                "step_evidence_requirements": ["gate", "rag", "delta"],
+                "action_hint": {"target": "launch_bar_switch"},
+            },
+            "rag_topk": [],
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        request.context["overlay_target_allowlist"] = list(loop.overlay_allowlist)
+
+        used, reason = loop._apply_action_hint_overlay_override(response, request)
+
+        assert used is True
+        assert reason == "deterministic_step:S19"
+        assert response.actions[0]["target"] == "launch_bar_switch"
+        assert response.metadata["action_hint_overlay_override_target"] == "launch_bar_switch"
+        assert "发射杆开关" in response.message
+    finally:
+        loop.close()
 
 
 def test_resolve_overlay_step_id_does_not_advance_partial_visual_hold_steps() -> None:

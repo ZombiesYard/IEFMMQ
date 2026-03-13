@@ -277,6 +277,7 @@ def test_var_resolver_marks_probe_extended_from_switch_or_external_position() ->
     vars_switch = resolver.resolve(switch_extended)
     assert vars_switch["probe_switch_value"] == 0
     assert vars_switch["probe_extended"] is True
+    assert vars_switch["probe_cycle_complete"] is True
 
     physically_extended = TelemetryFrame(
         seq=2,
@@ -288,6 +289,7 @@ def test_var_resolver_marks_probe_extended_from_switch_or_external_position() ->
     assert vars_physical["probe_switch_value"] == 1
     assert vars_physical["ext_refuel_probe_value"] == 65535
     assert vars_physical["probe_extended"] is True
+    assert vars_physical["probe_cycle_complete"] is True
 
     retracted = TelemetryFrame(
         seq=3,
@@ -297,6 +299,7 @@ def test_var_resolver_marks_probe_extended_from_switch_or_external_position() ->
     )
     vars_retracted = resolver.resolve(retracted)
     assert vars_retracted["probe_extended"] is False
+    assert vars_retracted["probe_cycle_complete"] is False
 
 
 def test_var_resolver_pack_battery_on_requires_switch_value_2() -> None:

@@ -410,6 +410,12 @@ def infer_step_id(
             continue
 
         if completion_evidence.has_visual_requirements and not completion_evidence.visual_satisfied:
+            if _should_skip_visual_hold_due_to_later_stage_context(
+                step_id,
+                completion_evidence=completion_evidence,
+                vision_fact_snapshot=vision_fact_snapshot,
+            ):
+                continue
             return _result(step_id, completion_evidence.missing_conditions)
 
         if _should_hold_by_observability(profile, completion_rules):
@@ -832,18 +838,73 @@ def _vision_binding_missing_conditions(
     out: list[str] = []
     for fact_id in required_all_of:
         fact = vision_fact_snapshot.get(fact_id)
-        if isinstance(fact, Mapping) and fact.get("state") == "seen":
+        if _vision_fact_counts_as_seen(step_id, fact_id, fact):
             continue
         out.append(f"vision_facts.{fact_id}==seen")
     if required_any_of:
         if not any(
-            isinstance(vision_fact_snapshot.get(fact_id), Mapping)
-            and vision_fact_snapshot.get(fact_id, {}).get("state") == "seen"
+            _vision_fact_counts_as_seen(step_id, fact_id, vision_fact_snapshot.get(fact_id))
             for fact_id in required_any_of
         ):
             disjunction = " or ".join(f"vision_facts.{fact_id}==seen" for fact_id in required_any_of)
             out.append(disjunction)
     return tuple(out)
+
+
+def _should_skip_visual_hold_due_to_later_stage_context(
+    step_id: str,
+    *,
+    completion_evidence: _StepCompletionEvidence,
+    vision_fact_snapshot: Mapping[str, Mapping[str, Any]],
+) -> bool:
+    if step_id != "S08":
+        return False
+    if not completion_evidence.missing_conditions:
+        return False
+    if not any(
+        "bit_page_visible" in item or "bit_root_page_visible" in item or "bit_page_failure_visible" in item
+        for item in completion_evidence.missing_conditions
+    ):
+        return False
+    return any(
+        _vision_fact_state_is_seen(vision_fact_snapshot.get(fact_id))
+        for fact_id in (
+            "right_ddi_fcsmc_page_visible",
+            "right_ddi_in_test_visible",
+            "fcs_bit_interaction_seen",
+            "fcs_bit_result_visible",
+        )
+    )
+
+
+def _vision_fact_counts_as_seen(
+    step_id: str,
+    fact_id: str,
+    fact: Mapping[str, Any] | None,
+) -> bool:
+    if not _vision_fact_state_is_seen(fact):
+        return False
+    if step_id == "S18" and fact_id == "fcs_bit_result_visible":
+        return _is_s18_final_go_result_fact(fact)
+    return True
+
+
+def _vision_fact_state_is_seen(fact: Mapping[str, Any] | None) -> bool:
+    return isinstance(fact, Mapping) and fact.get("state") == "seen"
+
+
+def _is_s18_final_go_result_fact(fact: Mapping[str, Any]) -> bool:
+    evidence_note = fact.get("evidence_note")
+    if not isinstance(evidence_note, str) or not evidence_note.strip():
+        return False
+    note_lower = evidence_note.lower()
+    if "pbit go" in note_lower:
+        return False
+    if "in test" in note_lower:
+        return False
+    if "not rdy" in note_lower or "not ready" in note_lower:
+        return False
+    return "fcsa" in note_lower and "fcsb" in note_lower and "go" in note_lower
 
 
 def _is_soft_block_from_rule(

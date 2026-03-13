@@ -140,7 +140,56 @@ def test_enrich_bios_observation_includes_probe_state_for_s19_progression() -> N
     assert enriched.payload["vars"]["probe_switch_value"] == 1
     assert enriched.payload["vars"]["ext_refuel_probe_value"] == 65535
     assert enriched.payload["vars"]["probe_extended"] is True
+    assert enriched.payload["vars"]["probe_cycle_complete"] is True
     assert enriched.payload["vars"]["launch_bar_switch_value"] == 1
+
+
+def test_enrich_bios_observation_latches_probe_cycle_complete_after_extension() -> None:
+    extend_obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 45,
+            "t_wall": 200.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "PROBE_SW": 1,
+                "EXT_REFUEL_PROBE": 65535,
+            },
+            "delta": {"EXT_REFUEL_PROBE": 65535},
+        },
+        metadata={"seq": 45, "gap": 0, "delta_count": 1, "from_addr": "127.0.0.1:5000"},
+    )
+    retract_obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 46,
+            "t_wall": 201.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "PROBE_SW": 1,
+                "EXT_REFUEL_PROBE": 0,
+            },
+            "delta": {"EXT_REFUEL_PROBE": 0},
+        },
+        metadata={"seq": 46, "gap": 0, "delta_count": 1, "from_addr": "127.0.0.1:5000"},
+    )
+
+    extend_enriched = enrich_bios_observation(
+        extend_obs,
+        _resolver(),
+        mapper=_mapper(),
+        delta_stream_id="probe-cycle",
+    )
+    retract_enriched = enrich_bios_observation(
+        retract_obs,
+        _resolver(),
+        mapper=_mapper(),
+        delta_stream_id="probe-cycle",
+    )
+
+    assert extend_enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert retract_enriched.payload["vars"]["probe_extended"] is False
+    assert retract_enriched.payload["vars"]["probe_cycle_complete"] is True
 
 
 def test_enrich_bios_observation_supports_tag_hook_and_debug_cache() -> None:

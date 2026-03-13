@@ -95,6 +95,7 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "probe_switch_value",
     "ext_refuel_probe_value",
     "probe_extended",
+    "probe_cycle_complete",
     "pitot_heat_on",
     "launch_bar_switch_value",
     "hook_handle_value",
@@ -117,6 +118,7 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "lights_test_complete",
     "fcs_reset_complete",
     "takeoff_trim_set",
+    "probe_cycle_complete",
 )
 _COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
 _COMPLETION_LATCHES_LOADED = False
@@ -322,6 +324,7 @@ def _apply_momentary_completion_latches(
         "lights_test_complete": bool(resolved_vars.get("lights_test_active")),
         "fcs_reset_complete": bool(resolved_vars.get("fcs_reset_pressed")),
         "takeoff_trim_set": bool(resolved_vars.get("takeoff_trim_pressed")),
+        "probe_cycle_complete": bool(resolved_vars.get("probe_extended")),
     }
     raw_missing = resolved_vars.get("vars_source_missing")
     missing_sources = {

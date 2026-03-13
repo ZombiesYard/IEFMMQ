@@ -1486,6 +1486,7 @@ def _build_procedural_action_hint(
     inferred_step_id: str | None,
     vars_selected: Mapping[str, Any],
     allowed_targets: Sequence[str],
+    vision_fact_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if inferred_step_id == "S19":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
@@ -1497,14 +1498,14 @@ def _build_procedural_action_hint(
                 return None
             return {"target": target, "reason": reason}
 
-        if vars_selected.get("probe_extended") is not True:
+        if vars_selected.get("probe_cycle_complete") is not True:
             return _hint(
                 "refuel_probe_switch",
                 "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
             )
         return _hint(
             "launch_bar_switch",
-            "The refueling probe is already extended; continue the four-down checklist with the launch bar switch.",
+            "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
         )
 
     if inferred_step_id == "S14":
@@ -1527,16 +1528,27 @@ def _build_procedural_action_hint(
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
+        seen_fact_ids = {
+            item for item in (vision_fact_summary or {}).get("seen_fact_ids", [])
+            if isinstance(item, str) and item
+        } if isinstance(vision_fact_summary, Mapping) else set()
 
         def _hint(target: str, reason: str) -> dict[str, Any] | None:
             if target not in allowed:
                 return None
             return {"target": target, "reason": reason}
 
+        if "fcs_bit_result_visible" in seen_fact_ids:
+            return None
+        if "right_ddi_fcsmc_page_visible" in seen_fact_ids:
+            return _hint(
+                "fcs_bit_switch",
+                "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
+            )
         if vars_selected.get("fcs_bit_switch_up") is True:
             return _hint(
-                "right_mdi_pb5",
-                "The FCS BIT switch is already held up; press Right DDI PB5 to start or continue the FCS-MC BIT.",
+                "fcs_bit_switch",
+                "Keep holding the FCS BIT switch up while you press Right DDI PB5 to start or continue the FCS-MC BIT.",
             )
         return _hint(
             "right_mdi_pb5",
@@ -2640,6 +2652,7 @@ class LiveDcsTutorLoop:
             inferred_step_id=overlay_step_id,
             vars_selected=vars_selected,
             allowed_targets=overlay_target_allowlist,
+            vision_fact_summary=vision_fact_context.get("vision_fact_summary", {}),
         )
         if isinstance(action_hint, Mapping):
             deterministic_hint["action_hint"] = dict(action_hint)
@@ -3104,25 +3117,50 @@ class LiveDcsTutorLoop:
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
             return False, "missing_deterministic_hint"
-        if bool(hint.get("requires_visual_confirmation")) is not True:
-            return False, "visual_confirmation_not_required"
+        action_target = None
+        override_kind = None
         vision_fact_summary = context.get("vision_fact_summary")
         vision_fact_status = None
+        seen_fact_ids: set[str] = set()
         if isinstance(vision_fact_summary, Mapping):
             raw_status = vision_fact_summary.get("status")
             if isinstance(raw_status, str) and raw_status:
                 vision_fact_status = raw_status
-        if isinstance(vision_fact_status, str) and vision_fact_status not in {
-            "vision_unavailable",
-            "extractor_failed",
-        }:
-            return False, "vision_facts_present"
-        action_hint = hint.get("action_hint")
-        if not isinstance(action_hint, Mapping):
-            return False, "missing_action_hint"
-        action_target = action_hint.get("target")
+            seen_fact_ids = {
+                item for item in vision_fact_summary.get("seen_fact_ids", [])
+                if isinstance(item, str) and item
+            }
+        inferred_step_id = hint.get("inferred_step_id")
+        if bool(hint.get("requires_visual_confirmation")) is True:
+            action_hint = hint.get("action_hint")
+            if isinstance(action_hint, Mapping):
+                hinted_target = action_hint.get("target")
+                if isinstance(hinted_target, str) and hinted_target:
+                    if isinstance(vision_fact_status, str) and vision_fact_status in {
+                        "vision_unavailable",
+                        "extractor_failed",
+                    }:
+                        action_target = hinted_target
+                        override_kind = "action_hint"
+                    elif inferred_step_id == "S18" and "right_ddi_fcsmc_page_visible" in seen_fact_ids:
+                        action_target = hinted_target
+                        override_kind = "action_hint"
+        elif inferred_step_id == "S19":
+            action_hint = hint.get("action_hint")
+            if isinstance(action_hint, Mapping):
+                hinted_target = action_hint.get("target")
+                if isinstance(hinted_target, str) and hinted_target:
+                    action_target = hinted_target
+                    override_kind = "action_hint"
+        if action_target is None:
+            visual_action_hint = hint.get("visual_action_hint")
+            if isinstance(visual_action_hint, Mapping):
+                hinted_target = visual_action_hint.get("target")
+                if isinstance(hinted_target, str) and hinted_target:
+                    action_target = hinted_target
+                    override_kind = "visual_action_hint"
         if not isinstance(action_target, str) or not action_target:
-            return False, "missing_action_target"
+            return False, "missing_override_target"
 
         current_targets = [
             target
@@ -3141,15 +3179,162 @@ class LiveDcsTutorLoop:
             [dict(action) for action in response.actions if isinstance(action, Mapping)]
         )
         response.metadata["action_hint_overlay_override_original_targets"] = list(current_targets)
+        response.metadata["action_hint_overlay_override_kind"] = override_kind
 
         override_used, override_reason = self._apply_safe_fallback_overlay(response, request)
         if not override_used:
             return False, f"override_failed:{override_reason}"
 
+        if (
+            inferred_step_id == "S08"
+            and override_kind == "visual_action_hint"
+            and action_target == "left_mdi_pb18"
+        ):
+            original_message = response.message
+            original_explanations = list(response.explanations)
+            if self.lang == "zh":
+                rewritten = (
+                    "当前左 DDI 仍在 TAC 页面，还不是 S08 所需的 FCS 页面。"
+                    "请先按 PB18 切到 SUPT 页面，待 FCS 选项出现后再进入 FCS 页面。"
+                )
+            else:
+                rewritten = (
+                    "The Left DDI is currently on the TAC (Tactical) page, not the required "
+                    "FCS (Flight Control System) page for Step S08. Press PB18 first to switch "
+                    "to the SUPT page, then select FCS once the option is visible."
+                )
+            response.message = rewritten
+            response.explanations = [rewritten]
+            if original_message != rewritten:
+                response.metadata["visual_action_hint_override_original_message"] = original_message
+            if original_explanations and original_explanations != [rewritten]:
+                response.metadata["visual_action_hint_override_original_explanations"] = original_explanations
+            response.metadata["visual_action_hint_override_used"] = True
+            response.metadata["visual_action_hint_override_target"] = action_target
+        elif (
+            inferred_step_id == "S18"
+            and override_kind == "action_hint"
+            and action_target == "fcs_bit_switch"
+            and "right_ddi_fcsmc_page_visible" in seen_fact_ids
+        ):
+            original_message = response.message
+            original_explanations = list(response.explanations)
+            if self.lang == "zh":
+                rewritten = (
+                    "当前右 DDI 已在 FCS-MC 页面。下一步请按住 FCS BIT 开关（Y），"
+                    "同时按右 DDI 的 PB5 以启动 FCS BIT 自检。"
+                )
+            else:
+                rewritten = (
+                    "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up (Y) "
+                    "while pressing Right DDI PB5 to start the FCS BIT."
+                )
+            response.message = rewritten
+            response.explanations = [rewritten]
+            if original_message != rewritten:
+                response.metadata["action_hint_overlay_override_original_message"] = original_message
+            if original_explanations and original_explanations != [rewritten]:
+                response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
+        elif (
+            inferred_step_id == "S19"
+            and override_kind == "action_hint"
+            and action_target == "launch_bar_switch"
+        ):
+            original_message = response.message
+            original_explanations = list(response.explanations)
+            if self.lang == "zh":
+                rewritten = "加油管在本次启动中已经完成伸出检查。下一步请继续四落检查，操作发射杆开关。"
+            else:
+                rewritten = (
+                    "The refueling probe has already been cycled during this startup. "
+                    "Continue the four-down checklist with the launch bar switch next."
+                )
+            response.message = rewritten
+            response.explanations = [rewritten]
+            if original_message != rewritten:
+                response.metadata["action_hint_overlay_override_original_message"] = original_message
+            if original_explanations and original_explanations != [rewritten]:
+                response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
+
         response.metadata["action_hint_overlay_override_used"] = True
         response.metadata["action_hint_overlay_override_target"] = action_target
         response.metadata["action_hint_overlay_override_reason"] = override_reason
         return True, override_reason
+
+    def _rewrite_manual_throttle_guidance_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        if not response.actions:
+            return False, "missing_actions"
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False, "missing_deterministic_hint"
+        inferred_step_id = hint.get("inferred_step_id")
+        if inferred_step_id not in {"S05", "S11"}:
+            return False, "not_manual_throttle_step"
+
+        current_targets = [
+            target
+            for target in (
+                action.get("target") if isinstance(action, Mapping) else None
+                for action in response.actions
+            )
+            if isinstance(target, str) and target
+        ]
+        if current_targets != ["throttle_quadrant_reference"]:
+            return False, "target_not_throttle_reference"
+
+        missing_conditions = hint.get("missing_conditions")
+        missing_set = {
+            item for item in missing_conditions
+            if isinstance(item, str) and item
+        } if isinstance(missing_conditions, list) else set()
+        if inferred_step_id == "S05" and "vars.throttle_r_not_off==true" not in missing_set:
+            return False, "missing_condition_not_right_throttle"
+        if inferred_step_id == "S11" and "vars.throttle_l_not_off==true" not in missing_set:
+            return False, "missing_condition_not_left_throttle"
+
+        original_message = response.message
+        original_explanations = list(response.explanations)
+        original_actions = copy.deepcopy([dict(action) for action in response.actions if isinstance(action, Mapping)])
+
+        if inferred_step_id == "S11":
+            if self.lang == "zh":
+                rewritten = (
+                    "当前处于 S11（左发油门推进到 IDLE）阶段。左油门杆还没有移出 OFF 卡位。"
+                    "该动作不在当前 overlay 布局内，请按 Right Alt+Home 将左油门杆推至 IDLE 位置。"
+                )
+            else:
+                rewritten = (
+                    "You are on S11 (move the left throttle to IDLE). The left throttle is still in the OFF detent. "
+                    "This control is outside the current overlay layout; press Right Alt+Home to move the left throttle to IDLE."
+                )
+        else:
+            if self.lang == "zh":
+                rewritten = (
+                    "当前处于 S05（右发油门推进到 IDLE）阶段。右油门杆还没有移出 OFF 卡位。"
+                    "该动作不在当前 overlay 布局内，请按 Right Shift+Home 将右油门杆推至 IDLE 位置。"
+                )
+            else:
+                rewritten = (
+                    "You are on S05 (move the right throttle to IDLE). The right throttle is still in the OFF detent. "
+                    "This control is outside the current overlay layout; press Right Shift+Home to move the right throttle to IDLE."
+                )
+
+        response.actions = []
+        response.message = rewritten
+        response.explanations = [rewritten]
+        response.metadata["manual_throttle_guidance_rewritten"] = True
+        response.metadata["manual_throttle_guidance_step_id"] = inferred_step_id
+        response.metadata["manual_throttle_guidance_original_actions"] = original_actions
+        if original_message != rewritten:
+            response.metadata["manual_throttle_guidance_original_message"] = original_message
+        if original_explanations and original_explanations != [rewritten]:
+            response.metadata["manual_throttle_guidance_original_explanations"] = original_explanations
+        return True, "manual_throttle_keyboard_guidance"
 
     def _map_response_actions(
         self,
@@ -3563,6 +3748,93 @@ class LiveDcsTutorLoop:
             response.metadata["s18_visual_completion_overlay_reason"] = reason
         return True, reason if used else "rewrite_only"
 
+    def _rewrite_s18_structured_fact_completion_to_s19(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False, "missing_deterministic_hint"
+        if hint.get("inferred_step_id") != "S18":
+            return False, "not_s18"
+
+        vision_fact_summary = context.get("vision_fact_summary")
+        if not isinstance(vision_fact_summary, Mapping):
+            return False, "missing_vision_fact_summary"
+        seen_fact_ids = {
+            item for item in vision_fact_summary.get("seen_fact_ids", [])
+            if isinstance(item, str) and item
+        }
+        if "fcs_bit_result_visible" not in seen_fact_ids:
+            return False, "missing_fcs_bit_result_visible"
+        vision_facts = context.get("vision_facts")
+        matching_fact = None
+        if isinstance(vision_facts, list):
+            for fact in vision_facts:
+                if not isinstance(fact, Mapping):
+                    continue
+                if fact.get("fact_id") != "fcs_bit_result_visible":
+                    continue
+                state = fact.get("state")
+                if state not in {"seen", "fresh"}:
+                    continue
+                matching_fact = fact
+                break
+        if not isinstance(matching_fact, Mapping):
+            return False, "missing_structured_result_fact"
+        evidence_note = matching_fact.get("evidence_note")
+        if not isinstance(evidence_note, str) or not evidence_note:
+            return False, "missing_structured_result_evidence_note"
+        note_lower = evidence_note.lower()
+        if "pbit go" in note_lower:
+            return False, "intermediate_pbit_go_only"
+        if not ("fcsa" in note_lower and "fcsb" in note_lower and "go" in note_lower):
+            return False, "missing_final_go_channels"
+
+        original_message = response.message
+        original_explanations = list(response.explanations)
+        original_next = dict(response.metadata["next"]) if isinstance(response.metadata.get("next"), Mapping) else None
+        original_diagnosis = (
+            dict(response.metadata["diagnosis"]) if isinstance(response.metadata.get("diagnosis"), Mapping) else None
+        )
+        original_actions = [dict(action) for action in response.actions if isinstance(action, Mapping)]
+
+        if self.lang == "zh":
+            rewritten = "当前可视页面已显示 FCS BIT 最终 GO 结果，可视为 S18 已完成。请继续执行 S19。"
+        else:
+            rewritten = "The visible FCS BIT page shows the final GO result, so treat S18 as complete and continue with S19."
+
+        response.message = rewritten
+        response.explanations = [rewritten]
+        response.actions = []
+        response.metadata["s18_visual_completion_rewritten"] = True
+        response.metadata["s18_visual_completion_from_structured_facts"] = True
+        response.metadata["s18_visual_completion_original_message"] = original_message
+        if original_explanations:
+            response.metadata["s18_visual_completion_original_explanations"] = original_explanations
+        if original_next is not None:
+            response.metadata["s18_visual_completion_original_next"] = original_next
+        if original_diagnosis is not None:
+            response.metadata["s18_visual_completion_original_diagnosis"] = original_diagnosis
+        if original_actions:
+            response.metadata["s18_visual_completion_original_actions"] = copy.deepcopy(original_actions)
+
+        response.metadata["next"] = {"step_id": "S19"}
+        response.metadata["diagnosis"] = {"step_id": "S19", "error_category": "OM"}
+        used, reason = self._apply_safe_fallback_overlay(
+            response,
+            request,
+            override_inferred_step_id="S19",
+            override_overlay_step_id="S19",
+            ignore_request_allowlist=True,
+        )
+        if used:
+            response.metadata["s18_visual_completion_overlay_advanced"] = True
+            response.metadata["s18_visual_completion_overlay_reason"] = reason
+        return True, reason if used else "rewrite_only"
+
     def _new_response_from_cached(
         self,
         cached_response: TutorResponse,
@@ -3813,13 +4085,22 @@ class LiveDcsTutorLoop:
                 response.metadata["response_mapping"] = mapped_meta
             self._normalize_observable_text_only_response(response, request)
             self._rewrite_conflicting_step_completion_response(response, request)
+            s18_structured_completion_advanced, s18_structured_completion_reason = (
+                self._rewrite_s18_structured_fact_completion_to_s19(response, request)
+            )
 
             fallback_overlay_used = False
             fallback_overlay_reason = "not_needed"
-            s18_completion_advanced, s18_completion_reason = self._rewrite_s18_visual_completion_to_s19(
-                response,
-                request,
-            )
+            s18_completion_advanced = False
+            s18_completion_reason = "not_needed"
+            if not s18_structured_completion_advanced:
+                s18_completion_advanced, s18_completion_reason = self._rewrite_s18_visual_completion_to_s19(
+                    response,
+                    request,
+                )
+            else:
+                s18_completion_advanced = True
+                s18_completion_reason = s18_structured_completion_reason
             if s18_completion_advanced:
                 fallback_overlay_used = True
                 fallback_overlay_reason = s18_completion_reason
@@ -3840,6 +4121,13 @@ class LiveDcsTutorLoop:
                     response,
                     request,
                 )
+            manual_throttle_rewritten, manual_throttle_reason = self._rewrite_manual_throttle_guidance_response(
+                response,
+                request,
+            )
+            if manual_throttle_rewritten:
+                fallback_overlay_used = False
+                fallback_overlay_reason = manual_throttle_reason
 
             if mapped_meta:
                 mapping_failure_codes = classify_mapping_failure(mapped_meta)

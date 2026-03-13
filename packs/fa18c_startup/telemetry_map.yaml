@@ -129,6 +129,7 @@ vars:
   # pnt_341 clickable order is EXTEND/RETRACT/EMERG EXTD => 0/1/2. The external
   # probe position argument also rises toward 65535 when physically extended.
   probe_extended: "derived(vars.probe_switch_value == 0 or vars.ext_refuel_probe_value >= 60000)"
+  probe_cycle_complete: "derived(vars.probe_extended)"
   launch_bar_switch_value: "derived(num(bios.LAUNCH_BAR_SW))"
   hook_handle_value: "derived(num(bios.HOOK_LEVER))"
   pitot_heat_on: "bios.PITOT_HEAT_SW > 0"
