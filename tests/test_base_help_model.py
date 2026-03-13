@@ -57,3 +57,17 @@ def test_resolve_active_telemetry_map_path_falls_back_to_pack_sibling(tmp_path: 
     resolved_path = model._resolve_active_telemetry_map_path({"pack_path": str(pack_path)})
 
     assert resolved_path == telemetry_map_path.resolve()
+
+
+def test_expand_presented_missing_condition_keeps_derived_condition_when_all_fallbacks_are_true() -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="en")
+
+    expanded = model._expand_presented_missing_condition(
+        "vars.apu_start_support_complete==true",
+        {
+            "apu_ready": True,
+            "engine_crank_right_complete": True,
+        },
+    )
+
+    assert expanded == ("vars.apu_start_support_complete==true",)

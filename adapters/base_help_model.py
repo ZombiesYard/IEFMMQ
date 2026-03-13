@@ -601,7 +601,7 @@ class BaseHelpModel(ModelPort):
             unresolved.append(fallback_condition)
         if unresolved:
             return (unresolved[0],)
-        return fallback_conditions[:1]
+        return (condition,)
 
     @staticmethod
     def _extract_condition_var_key(condition: str) -> str | None:
