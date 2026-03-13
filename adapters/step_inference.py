@@ -812,13 +812,25 @@ def _vision_binding_missing_conditions(
     vision_fact_snapshot: Mapping[str, Mapping[str, Any]],
     config: Mapping[str, Any],
 ) -> tuple[str, ...]:
-    required = config.get("step_bindings", {}).get(step_id, ())
+    binding = config.get("step_bindings", {}).get(step_id, {})
+    if not isinstance(binding, Mapping):
+        return ()
+    required_all_of = binding.get("all_of", ())
+    required_any_of = binding.get("any_of", ())
     out: list[str] = []
-    for fact_id in required:
+    for fact_id in required_all_of:
         fact = vision_fact_snapshot.get(fact_id)
         if isinstance(fact, Mapping) and fact.get("state") == "seen":
             continue
         out.append(f"vision_facts.{fact_id}==seen")
+    if required_any_of:
+        if not any(
+            isinstance(vision_fact_snapshot.get(fact_id), Mapping)
+            and vision_fact_snapshot.get(fact_id, {}).get("state") == "seen"
+            for fact_id in required_any_of
+        ):
+            disjunction = " or ".join(f"vision_facts.{fact_id}==seen" for fact_id in required_any_of)
+            out.append(disjunction)
     return tuple(out)
 
 

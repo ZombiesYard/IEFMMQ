@@ -65,6 +65,22 @@ facts:
     steps:
       - S08
       - S18
+  - fact_id: bit_root_page_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S08
+      - S18
+  - fact_id: bit_page_failure_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S08
+      - S18
   - fact_id: right_ddi_fcsmc_page_visible
     sticky: false
     expires_after_ms: 2000
@@ -132,7 +148,10 @@ step_bindings:
   S08:
     all_of:
       - fcs_page_visible
+    any_of:
       - bit_page_visible
+      - bit_root_page_visible
+      - bit_page_failure_visible
   S15:
     all_of:
       - fcs_reset_seen

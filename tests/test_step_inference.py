@@ -480,6 +480,31 @@ def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Ma
     assert advanced.inferred_step_id != "S08"
 
 
+def test_infer_step_holds_s08_when_only_fcsmc_result_page_is_seen(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map,
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "right_ddi_fcsmc_page_visible", "state": "seen"},
+            {"fact_id": "fcs_bit_result_visible", "state": "seen"},
+        ],
+    )
+
+    assert blocked.inferred_step_id == "S08"
+    assert any("bit_page_visible" in item or "bit_root_page_visible" in item or "bit_page_failure_visible" in item for item in blocked.missing_conditions)
+
+
 def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:

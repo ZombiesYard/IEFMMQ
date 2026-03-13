@@ -56,6 +56,8 @@ def test_vision_fact_observation_schema_accepts_all_fact_ids() -> None:
                 "left_ddi_fcs_page_button_visible",
                 "fcs_page_visible",
                 "bit_page_visible",
+                "bit_root_page_visible",
+                "bit_page_failure_visible",
                 "right_ddi_fcsmc_page_visible",
                 "right_ddi_fcs_option_visible",
                 "right_ddi_in_test_visible",

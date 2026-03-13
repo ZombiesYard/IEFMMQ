@@ -384,3 +384,20 @@ def test_facts_satisfy_step_binding_respects_explicit_empty_config() -> None:
     }
 
     assert facts_satisfy_step_binding(snapshot, step_id="S08", config={}) is False
+
+
+def test_facts_satisfy_step_binding_supports_any_of_right_ddi_equivalents() -> None:
+    snapshot = {
+        "fcs_page_visible": {"fact_id": "fcs_page_visible", "state": "seen"},
+        "bit_page_failure_visible": {"fact_id": "bit_page_failure_visible", "state": "seen"},
+    }
+    config = {
+        "step_bindings": {
+            "S08": {
+                "all_of": ("fcs_page_visible",),
+                "any_of": ("bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"),
+            }
+        }
+    }
+
+    assert facts_satisfy_step_binding(snapshot, step_id="S08", config=config) is True

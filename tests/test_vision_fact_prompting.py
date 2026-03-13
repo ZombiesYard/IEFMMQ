@@ -81,3 +81,14 @@ def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_pa
     assert "LEF/TEF/AIL/RUD" in prompt
     assert "SV1/SV2" in prompt
     assert "many X marks remain" in prompt
+
+
+def test_vision_fact_prompt_treats_bit_failures_as_valid_s08_bit_page_evidence() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="en",
+        config=load_vision_facts_config(),
+    )
+
+    assert "BIT FAILURES line. The BIT FAILURES page is the BIT root page itself" in prompt
+    assert '"any_of":["bit_page_visible","bit_root_page_visible","bit_page_failure_visible"]' in prompt

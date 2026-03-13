@@ -22,6 +22,8 @@ VISION_FACT_IDS: tuple[str, ...] = (
     "left_ddi_fcs_page_button_visible",
     "fcs_page_visible",
     "bit_page_visible",
+    "bit_root_page_visible",
+    "bit_page_failure_visible",
     "right_ddi_fcsmc_page_visible",
     "right_ddi_fcs_option_visible",
     "right_ddi_in_test_visible",
@@ -200,7 +202,7 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
     bindings_raw = raw.get("step_bindings", {})
     if not isinstance(bindings_raw, Mapping):
         raise ValueError("vision facts config step_bindings must be a mapping")
-    step_bindings: dict[str, tuple[str, ...]] = {}
+    step_bindings: dict[str, dict[str, tuple[str, ...]]] = {}
     for step_id, binding in bindings_raw.items():
         if not isinstance(step_id, str) or not step_id:
             raise ValueError("vision facts config step_bindings keys must be non-empty strings")
@@ -209,12 +211,24 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         all_of = binding.get("all_of")
         if not isinstance(all_of, list) or not all_of:
             raise ValueError(f"vision step binding for {step_id} requires non-empty all_of")
-        normalized = []
+        normalized_all_of = []
         for fact_id in all_of:
             if not isinstance(fact_id, str) or fact_id not in facts_by_id:
                 raise ValueError(f"vision step binding for {step_id} references unsupported fact {fact_id!r}")
-            normalized.append(fact_id)
-        step_bindings[step_id] = tuple(normalized)
+            normalized_all_of.append(fact_id)
+        any_of = binding.get("any_of")
+        normalized_any_of: list[str] = []
+        if any_of is not None:
+            if not isinstance(any_of, list) or not any_of:
+                raise ValueError(f"vision step binding for {step_id} any_of must be a non-empty list")
+            for fact_id in any_of:
+                if not isinstance(fact_id, str) or fact_id not in facts_by_id:
+                    raise ValueError(f"vision step binding for {step_id} references unsupported fact {fact_id!r}")
+                normalized_any_of.append(fact_id)
+        step_bindings[step_id] = {
+            "all_of": tuple(normalized_all_of),
+            "any_of": tuple(normalized_any_of),
+        }
 
     return {
         "schema_version": schema_version,
@@ -370,15 +384,23 @@ def facts_satisfy_step_binding(
 ) -> bool:
     current_config = config if config is not None else load_vision_facts_config()
     step_bindings = current_config.get("step_bindings", {})
-    required = step_bindings.get(step_id)
-    if not required:
+    binding = step_bindings.get(step_id)
+    if not isinstance(binding, Mapping):
         return False
     if not isinstance(snapshot, Mapping):
         return False
-    for fact_id in required:
+    required_all_of = binding.get("all_of", ())
+    required_any_of = binding.get("any_of", ())
+    for fact_id in required_all_of:
         fact = snapshot.get(fact_id)
         if not isinstance(fact, Mapping) or fact.get("state") != "seen":
             return False
+    if required_any_of:
+        for fact_id in required_any_of:
+            fact = snapshot.get(fact_id)
+            if isinstance(fact, Mapping) and fact.get("state") == "seen":
+                return True
+        return False
     return True
 
 
