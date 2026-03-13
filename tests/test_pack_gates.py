@@ -66,7 +66,7 @@ def test_evaluate_pack_gates_allows_s12_precondition_when_left_engine_ready() ->
 def test_evaluate_pack_gates_reports_blocked_reason_code_for_s13_completion() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(radar_on=False)],
+        observations=[_obs_with_vars(radar_mode_opr=False)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -74,14 +74,14 @@ def test_evaluate_pack_gates_reports_blocked_reason_code_for_s13_completion() ->
 
     assert s13_comp["status"] == "blocked"
     assert s13_comp["allowed"] is False
-    assert s13_comp["reason_code"] == "s13_requires_radar_on"
+    assert s13_comp["reason_code"] == "s13_requires_radar_mode_opr"
     assert isinstance(s13_comp["reason"], str) and s13_comp["reason"]
 
 
 def test_evaluate_pack_gates_allows_s13_completion_when_radar_on() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(radar_on=True)],
+        observations=[_obs_with_vars(radar_mode_opr=True)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -96,7 +96,7 @@ def test_evaluate_pack_gates_allows_s13_completion_when_radar_on() -> None:
 def test_evaluate_pack_gates_reports_blocked_reason_code_for_s04_precondition() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(apu_ready=False)],
+        observations=[_obs_with_vars(apu_start_support_complete=False)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -104,7 +104,7 @@ def test_evaluate_pack_gates_reports_blocked_reason_code_for_s04_precondition() 
 
     assert s04_pre["status"] == "blocked"
     assert s04_pre["allowed"] is False
-    assert s04_pre["reason_code"] == "s04_requires_apu_ready"
+    assert s04_pre["reason_code"] == "s04_requires_apu_start_support_complete"
     assert isinstance(s04_pre["reason"], str) and s04_pre["reason"]
 
 
@@ -139,7 +139,7 @@ def test_evaluate_pack_gates_allows_s02_completion_without_rules() -> None:
 def test_evaluate_pack_gates_allows_s04_precondition_when_apu_ready_true() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(apu_ready=True)],
+        observations=[_obs_with_vars(apu_start_support_complete=True)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -232,7 +232,7 @@ def test_evaluate_pack_gates_profile_changes_s12_and_s23_gate_results() -> None:
     obs = _obs_with_vars(
         rpm_l_gte_60=True,
         throttle_l_not_off=True,
-        ins_mode=1,
+        ins_mode=2,
         radar_altimeter_bug_value=200,
     )
 

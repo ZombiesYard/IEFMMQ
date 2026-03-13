@@ -152,8 +152,6 @@ step_bindings:
       - bit_page_visible
       - bit_root_page_visible
       - bit_page_failure_visible
-  S15:
-    all_of: []
   S17:
     all_of:
       - takeoff_trim_seen

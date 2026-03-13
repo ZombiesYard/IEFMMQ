@@ -828,6 +828,25 @@ def test_enrich_bios_observation_clears_persisted_momentary_latches_on_cold_star
     assert enriched.payload["vars"]["fcs_reset_complete"] is False
     assert enriched.payload["vars"]["takeoff_trim_set"] is False
 
+
+def test_save_completion_latches_skips_non_regular_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch_path = tmp_path / "completion_latches.json"
+    latch_path.mkdir()
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", latch_path)
+    monkeypatch.setattr(
+        telemetry_pipeline,
+        "_COMPLETION_LATCHES",
+        OrderedDict({"sess-1": {"fcs_reset_complete": True}}),
+    )
+
+    telemetry_pipeline._save_completion_latches_to_disk()
+
+    assert latch_path.is_dir()
+    assert not any(latch_path.iterdir())
+
 def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_raw() -> None:
     obs = Observation(
         source="dcs_bios",

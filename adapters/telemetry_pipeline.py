@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 import tempfile
 import threading
 from collections import OrderedDict
@@ -117,7 +119,6 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "takeoff_trim_set",
 )
 _COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
-_COMPLETION_LATCHES_PATH = Path(tempfile.gettempdir()) / "simtutor_completion_latches_v1.json"
 _COMPLETION_LATCHES_LOADED = False
 _MAX_COMPLETION_LATCH_STREAMS = 256
 _SHARED_DELTA_SANITIZER_LOCKS: WeakKeyDictionary[DeltaSanitizer, threading.Lock] = WeakKeyDictionary()
@@ -129,12 +130,39 @@ _COMPLETION_LATCHES_LOCK = threading.Lock()
 _SHARED_DELTA_SANITIZER_LOCKS_LOCK = threading.Lock()
 
 
+def _default_completion_latches_path() -> Path:
+    appdata = os.environ.get("APPDATA")
+    if isinstance(appdata, str) and appdata.strip():
+        return Path(appdata).expanduser() / "SimTutor" / "completion_latches_v1.json"
+    xdg_state_home = os.environ.get("XDG_STATE_HOME")
+    if isinstance(xdg_state_home, str) and xdg_state_home.strip():
+        return Path(xdg_state_home).expanduser() / "simtutor" / "completion_latches_v1.json"
+    return Path.home() / ".simtutor" / "state" / "completion_latches_v1.json"
+
+
+_COMPLETION_LATCHES_PATH = _default_completion_latches_path()
+
+
+def _is_regular_file(path: Path) -> bool:
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+    return stat.S_ISREG(mode)
+
+
 def _load_completion_latches_from_disk() -> None:
     global _COMPLETION_LATCHES_LOADED, _COMPLETION_LATCHES
     if _COMPLETION_LATCHES_LOADED:
         return
     loaded: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
     try:
+        if _COMPLETION_LATCHES_PATH.exists() and not _is_regular_file(_COMPLETION_LATCHES_PATH):
+            _COMPLETION_LATCHES = loaded
+            _COMPLETION_LATCHES_LOADED = True
+            return
         raw = json.loads(_COMPLETION_LATCHES_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raw = None
@@ -167,13 +195,30 @@ def _save_completion_latches_to_disk() -> None:
         for stream_id, state in _COMPLETION_LATCHES.items()
         if isinstance(stream_id, str) and stream_id and isinstance(state, Mapping)
     }
+    temp_path: Path | None = None
     try:
+        if _COMPLETION_LATCHES_PATH.exists() and not _is_regular_file(_COMPLETION_LATCHES_PATH):
+            return
         _COMPLETION_LATCHES_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _COMPLETION_LATCHES_PATH.write_text(
-            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+        with tempfile.NamedTemporaryFile(
+            mode="w",
             encoding="utf-8",
-        )
+            dir=_COMPLETION_LATCHES_PATH.parent,
+            prefix=".completion_latches_",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+            handle.flush()
+            os.fsync(handle.fileno())
+            temp_path = Path(handle.name)
+        os.replace(temp_path, _COMPLETION_LATCHES_PATH)
     except OSError:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         return
 
 

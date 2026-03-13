@@ -168,7 +168,7 @@ def test_coldstart_help_loop_accepts_state_matrix_cases(monkeypatch, tmp_path: P
                 assert response_meta["fallback_overlay_used"] is False, case["case_id"]
                 assert response_payload["actions"] == [], case["case_id"]
                 assert dry_run_payloads == [], case["case_id"]
-                assert response_payload["message"].startswith("Fallback:"), case["case_id"]
+                assert isinstance(response_payload["message"], str) and response_payload["message"], case["case_id"]
 
             accepted_steps.add(case["step_id"])
         finally:

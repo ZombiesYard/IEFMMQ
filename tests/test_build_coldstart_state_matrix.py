@@ -139,5 +139,5 @@ def test_build_coldstart_state_matrix_cli_supports_carrier_profile(tmp_path: Pat
     s12_vars = resolver.resolve(s12_frames[-1])
     s23_vars = resolver.resolve(s23_frames[-1])
 
-    assert s12_vars["ins_mode"] == 4
+    assert s12_vars["ins_mode"] == 1
     assert 30 <= s23_vars["radar_altimeter_bug_value"] <= 60

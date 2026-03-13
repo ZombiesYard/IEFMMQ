@@ -939,4 +939,5 @@ def test_var_resolver_pack_composite_vars_propagate_source_missing() -> None:
     assert "left_engine_nominal_start_params" in vars_out["vars_source_missing"]
     assert "left_engine_idle_ready" in vars_out["vars_source_missing"]
     assert "core_avionics_online" in vars_out["vars_source_missing"]
-    assert "obogs_ready" in vars_out["vars_source_missing"]
+    assert "obogs_switch_on" in vars_out["vars_source_missing"]
+    assert "obogs_flow_on" in vars_out["vars_source_missing"]

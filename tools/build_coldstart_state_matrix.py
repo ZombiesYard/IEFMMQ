@@ -159,6 +159,10 @@ def _set_standby_attitude_uncaged(bios: dict[str, Any], desired: Any) -> None:
     bios["SAI_ATT_WARNING_FLAG"] = 0 if _bool_like(desired) else 1
 
 
+def _set_comm1_freq_134_000(bios: dict[str, Any], desired: Any) -> None:
+    bios["COMM1_FREQ"] = 13400 if _bool_like(desired) else 30500
+
+
 _VAR_BINDINGS: dict[str, _VarBinding] = {
     "apu_on": _set_enum("APU_CONTROL_SW", true_value=1, false_value=0),
     "apu_ready": _set_enum("APU_READY_LT", true_value=1, false_value=0),
@@ -170,10 +174,13 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "bleed_air_norm": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
     "bleed_air_cycle_complete": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
     "bingo_fuel_set": _VarBinding(primary_bios_key="IFEI_BINGO", setter=_set_bingo_fuel_set),
+    "comm1_freq_134_000": _VarBinding(primary_bios_key="COMM1_FREQ", setter=_set_comm1_freq_134_000),
     "engine_crank_left": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
+    "engine_crank_left_complete": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
     "engine_crank_right": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "engine_crank_right_complete": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
+    "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
     "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=1, false_value=0),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
@@ -188,6 +195,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "power_available": _VarBinding(primary_bios_key="BATTERY_SW", setter=_set_power_available),
     "r_gen_on": _set_enum("R_GEN_SW", true_value=1, false_value=0),
     "radar_altimeter_bug_value": _set_numeric("RADALT_MIN_HEIGHT_PTR"),
+    "radar_mode_opr": _set_enum("RADAR_SW", true_value=2, false_value=0),
     "radar_on": _set_enum("RADAR_SW", true_value=2, false_value=0),
     "right_ddi_on": _set_enum("RIGHT_DDI_BRT_CTL", true_value=1, false_value=0),
     "right_engine_nominal_start_params": _VarBinding(
