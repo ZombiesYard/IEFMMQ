@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 from ctypes import wintypes
+from typing import Callable
 
 WH_KEYBOARD_LL = 13
 WH_MOUSE_LL = 14
@@ -139,11 +140,13 @@ class WindowsGlobalHelpTrigger:
         hotkey: str,
         modifiers: str = "",
         cooldown_ms: int = DEFAULT_GLOBAL_HELP_COOLDOWN_MS,
+        emit_hook: Callable[[], None] | None = None,
     ) -> None:
         self.trigger_kind, self.trigger_code = _parse_hotkey(hotkey)
         self.required_modifiers = _modifier_mask(modifiers)
         self.hotkey_label = f"{modifiers}+{hotkey}" if modifiers else hotkey
         self.cooldown_s = max(0.0, float(cooldown_ms) / 1000.0)
+        self.emit_hook = emit_hook
         self._last_sent = 0.0
         self._queue: queue.SimpleQueue[None] = queue.SimpleQueue()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -157,6 +160,7 @@ class WindowsGlobalHelpTrigger:
         self._mouse_hook = None
         self._keyboard_proc = None
         self._mouse_proc = None
+        self._last_callback_error_at = 0.0
 
     def start(self) -> None:
         if sys.platform != "win32":
@@ -238,7 +242,20 @@ class WindowsGlobalHelpTrigger:
         if self.cooldown_s > 0 and (now - self._last_sent) < self.cooldown_s:
             return
         self._last_sent = now
+        if self.emit_hook is not None:
+            self.emit_hook()
+            return
         self._queue.put(None)
+
+    def _report_callback_error(self, hook_name: str, exc: Exception) -> None:
+        now = time.monotonic()
+        if (now - self._last_callback_error_at) < 5.0:
+            return
+        self._last_callback_error_at = now
+        print(
+            f"[GLOBAL_HELP_TRIGGER] {hook_name} hook callback failed: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
 
     def _keyboard_callback(self, code: int, wparam: int, lparam: int) -> int:
         try:
@@ -247,8 +264,8 @@ class WindowsGlobalHelpTrigger:
                 if not (event.flags & LLKHF_INJECTED) and int(event.vkCode) == self.trigger_code:
                     if _modifier_state_mask() == self.required_modifiers:
                         self._emit_help()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._report_callback_error("keyboard", exc)
         return _USER32.CallNextHookEx(None, code, wparam, lparam)
 
     def _mouse_callback(self, code: int, wparam: int, lparam: int) -> int:
@@ -258,6 +275,6 @@ class WindowsGlobalHelpTrigger:
                 button = (int(event.mouseData) >> 16) & 0xFFFF
                 if button == self.trigger_code and _modifier_state_mask() == self.required_modifiers:
                     self._emit_help()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._report_callback_error("mouse", exc)
         return _USER32.CallNextHookEx(None, code, wparam, lparam)

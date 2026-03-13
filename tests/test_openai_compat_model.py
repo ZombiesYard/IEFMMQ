@@ -1131,8 +1131,8 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S03" in (res.message or "")
-    assert "vars.apu_on==true" in (res.message or "")
+    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S05" in (res.message or "")
+    assert "vars.throttle_r_idle_complete==true" in (res.message or "")
 
 
 def test_explain_error_zh_fallback_without_inferred_step(monkeypatch) -> None:
@@ -1246,7 +1246,7 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S03. Please satisfy: vars.apu_on==true."
+    assert res.message == "You are likely stuck at S05. Please satisfy: vars.throttle_r_idle_complete==true."
 
 
 def test_explain_error_en_fallback_without_inferred_step(monkeypatch) -> None:

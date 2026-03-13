@@ -5,6 +5,8 @@ Shared base implementation for HelpResponse-capable model adapters.
 from __future__ import annotations
 
 import json
+from functools import lru_cache
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Mapping
 
@@ -34,8 +36,27 @@ from core.security import redact_sensitive_text, sanitize_help_response_for_log,
 from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
+from core.vars import VarResolver, VarResolverError, _find_missing_refs, _safe_eval
 from jsonschema.exceptions import ValidationError
 from ports.model_port import ModelPort
+
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEFAULT_TELEMETRY_MAP_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "telemetry_map.yaml"
+_DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "vars.apu_start_support_complete==true": (
+        "vars.apu_ready==true",
+        "vars.engine_crank_right_complete==true",
+    ),
+}
+
+
+@lru_cache(maxsize=1)
+def _load_default_var_resolver() -> VarResolver | None:
+    try:
+        return VarResolver.from_yaml(_DEFAULT_TELEMETRY_MAP_PATH)
+    except (FileNotFoundError, OSError, VarResolverError):
+        return None
 
 
 def _dedupe_non_empty_strings(raw: Any) -> list[str]:
@@ -115,12 +136,20 @@ class BaseHelpModel(ModelPort):
             missing_conditions=(),
         )
         recent_ui_targets: list[str] = []
+        inference_vars: Mapping[str, Any] = {}
         deterministic_inference_error: str | None = None
         try:
-            deterministic_inference, recent_ui_targets = self._compute_deterministic_inference(observation, request)
+            deterministic_inference, recent_ui_targets, inference_vars = self._compute_deterministic_inference(
+                observation,
+                request,
+            )
         except Exception as exc:
             deterministic_inference_error = f"{type(exc).__name__}: {exc}"
-        deterministic_hint = self._serialize_deterministic_hint(deterministic_inference, recent_ui_targets)
+        deterministic_hint = self._serialize_deterministic_hint(
+            deterministic_inference,
+            recent_ui_targets,
+            inference_vars,
+        )
         prompt_meta: dict[str, Any] = {}
         delta_dropped_count = self._extract_delta_dropped_count(request)
         prompt_budget_used = 0
@@ -243,7 +272,10 @@ class BaseHelpModel(ModelPort):
                 metadata=metadata,
             )
         except Exception as exc:
-            fallback_message = self._build_deterministic_fallback_message(deterministic_inference)
+            fallback_message = self._build_deterministic_fallback_message(
+                deterministic_inference,
+                inference_vars,
+            )
             error_metadata = {
                 "provider": self.provider,
                 "model": self.model_name,
@@ -415,7 +447,7 @@ class BaseHelpModel(ModelPort):
         self,
         observation: Observation,
         request: TutorRequest | None,
-    ) -> tuple[StepInferenceResult, list[str]]:
+    ) -> tuple[StepInferenceResult, list[str], Mapping[str, Any]]:
         context = request.context if request and isinstance(request.context, dict) else {}
         inference_vars = self._pick_inference_vars(observation, context)
         recent_ui_targets = extract_recent_ui_targets(context)
@@ -438,7 +470,7 @@ class BaseHelpModel(ModelPort):
                 inferred_step_id=observation.procedure_hint,
                 missing_conditions=tuple(inference.missing_conditions),
             )
-        return inference, recent_ui_targets
+        return inference, recent_ui_targets, inference_vars
 
     def _pick_inference_vars(
         self,
@@ -447,12 +479,105 @@ class BaseHelpModel(ModelPort):
     ) -> Mapping[str, Any]:
         vars_raw = context.get("vars")
         if isinstance(vars_raw, Mapping):
-            return vars_raw
+            return self._resolve_inference_vars(vars_raw)
         payload = observation.payload if isinstance(observation.payload, Mapping) else {}
         payload_vars = payload.get("vars")
         if isinstance(payload_vars, Mapping):
-            return payload_vars
+            return self._resolve_inference_vars(payload_vars)
         return {}
+
+    def _resolve_inference_vars(self, vars_raw: Mapping[str, Any]) -> Mapping[str, Any]:
+        resolver = _load_default_var_resolver()
+        if resolver is None:
+            return vars_raw
+        context = {
+            "bios": {},
+            "lo": {},
+            "cockpit_args": {},
+            "vars": dict(vars_raw),
+        }
+        merged = dict(vars_raw)
+        source_missing = {
+            item
+            for item in vars_raw.get("vars_source_missing", [])
+            if isinstance(item, str) and item
+        } if isinstance(vars_raw.get("vars_source_missing"), list) else set()
+        try:
+            for key, expr in resolver.rules.items():
+                if not isinstance(key, str) or not key or key in merged or key == "vars_source_missing":
+                    continue
+                if expr is None:
+                    merged[key] = None
+                    source_missing.add(key)
+                    context["vars"] = merged
+                    continue
+                if not isinstance(expr, str):
+                    merged[key] = expr
+                    context["vars"] = merged
+                    continue
+                expr_text = expr.strip()
+                if expr_text.startswith("derived(") and expr_text.endswith(")"):
+                    expr_text = expr_text[len("derived(") : -1].strip()
+                missing_refs = _find_missing_refs(expr_text, context)
+                value = _safe_eval(expr_text, context)
+                merged[key] = value
+                context["vars"] = merged
+                if value is None or missing_refs:
+                    source_missing.add(key)
+        except VarResolverError:
+            return vars_raw
+        provided_keys = {key for key in vars_raw.keys() if isinstance(key, str) and key}
+        merged["vars_source_missing"] = sorted(item for item in source_missing if item not in provided_keys)
+        return merged
+
+    def _present_missing_conditions(
+        self,
+        missing_conditions: list[str] | tuple[str, ...],
+        inference_vars: Mapping[str, Any],
+    ) -> list[str]:
+        presented: list[str] = []
+        seen: set[str] = set()
+        for condition in missing_conditions:
+            if not isinstance(condition, str) or not condition:
+                continue
+            replacements = self._expand_presented_missing_condition(condition, inference_vars)
+            for item in replacements:
+                if item in seen:
+                    continue
+                seen.add(item)
+                presented.append(item)
+        return presented
+
+    def _expand_presented_missing_condition(
+        self,
+        condition: str,
+        inference_vars: Mapping[str, Any],
+    ) -> tuple[str, ...]:
+        fallback_conditions = _DERIVED_CONDITION_FALLBACKS.get(condition)
+        if not fallback_conditions:
+            return (condition,)
+        unresolved: list[str] = []
+        for fallback_condition in fallback_conditions:
+            key = self._extract_condition_var_key(fallback_condition)
+            if key is None:
+                unresolved.append(fallback_condition)
+                continue
+            value = inference_vars.get(key)
+            if value is True:
+                continue
+            unresolved.append(fallback_condition)
+        if unresolved:
+            return (unresolved[0],)
+        return fallback_conditions[:1]
+
+    @staticmethod
+    def _extract_condition_var_key(condition: str) -> str | None:
+        prefix = "vars."
+        suffix = "==true"
+        if not condition.startswith(prefix) or not condition.endswith(suffix):
+            return None
+        key = condition[len(prefix) : -len(suffix)]
+        return key or None
 
     def _prioritize_inferred_step(self, candidate_steps: list[Any], inferred_step_id: str | None) -> list[str]:
         normalized: list[str] = [step for step in candidate_steps if isinstance(step, str) and step]
@@ -464,13 +589,14 @@ class BaseHelpModel(ModelPort):
         self,
         inference: StepInferenceResult | None,
         recent_ui_targets: list[str],
+        inference_vars: Mapping[str, Any],
     ) -> dict[str, Any]:
         if inference is None:
             inferred_step_id = None
             missing_conditions: list[str] = []
         else:
             inferred_step_id = inference.inferred_step_id
-            missing_conditions = list(inference.missing_conditions)
+            missing_conditions = self._present_missing_conditions(inference.missing_conditions, inference_vars)
         hint = {
             "inferred_step_id": inferred_step_id,
             "missing_conditions": missing_conditions,
@@ -502,9 +628,14 @@ class BaseHelpModel(ModelPort):
             }
         return {}
 
-    def _build_deterministic_fallback_message(self, inference: StepInferenceResult | None) -> str:
+    def _build_deterministic_fallback_message(
+        self,
+        inference: StepInferenceResult | None,
+        inference_vars: Mapping[str, Any],
+    ) -> str:
         inferred_step_id = inference.inferred_step_id if inference else None
-        missing_conditions = list(inference.missing_conditions) if inference else []
+        raw_missing_conditions = list(inference.missing_conditions) if inference else []
+        missing_conditions = self._present_missing_conditions(raw_missing_conditions, inference_vars)
         if self.lang == "zh":
             if inferred_step_id and missing_conditions:
                 return f"你大概率卡在 {inferred_step_id}，下一步请先满足：{'; '.join(missing_conditions)}。"
@@ -723,7 +854,7 @@ class BaseHelpModel(ModelPort):
         self,
         raw_text: str,
         *,
-        request: TutorRequest,
+        request: TutorRequest | None,
         deterministic_hint: Mapping[str, Any],
     ) -> tuple[dict[str, Any], Any, dict[str, Any]] | None:
         try:
@@ -754,7 +885,7 @@ class BaseHelpModel(ModelPort):
         self,
         help_obj: dict[str, Any],
         *,
-        request: TutorRequest,
+        request: TutorRequest | None,
         deterministic_hint: Mapping[str, Any],
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         repaired = dict(help_obj)

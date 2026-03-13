@@ -3135,6 +3135,44 @@ def test_live_dcs_cli_parses_windows_global_help_trigger_args() -> None:
     assert args.global_help_cooldown_ms == 800
 
 
+def test_run_help_cycle_ignores_nan_trigger_wall_and_uses_observation_time() -> None:
+    class _SingleObservationSource:
+        def close(self) -> None:
+            return
+
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=_SingleObservationSource(),
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-nan-trigger",
+        vision_mode="replay",
+    )
+    try:
+        loop._ingest_observation(
+            Observation(
+                source="mock",
+                payload={
+                    "seq": 1,
+                    "t_wall": 10.0,
+                    "vars": {
+                        "battery_on": True,
+                        "l_gen_on": True,
+                        "r_gen_on": True,
+                    },
+                },
+            )
+        )
+        response, _report = loop.run_help_cycle(trigger_t_wall=float("nan"))
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert len(model.calls) == 1
+    request = model.calls[0]["request"]
+    assert request.context["vision"]["trigger_wall_ms"] == 10000
+
+
 def test_live_loop_preserves_pending_help_until_first_observation() -> None:
     observation = Observation(source="dcs_bios_raw", payload=_bios_frame(1, 10.0, apu_switch=0))
     source = _DelayedObservationSource(observation)

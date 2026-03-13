@@ -3013,7 +3013,7 @@ class LiveDcsTutorLoop:
         if obs is None:
             return None, None
 
-        resolved_trigger_t_wall = trigger_t_wall
+        resolved_trigger_t_wall = _coerce_finite_float(trigger_t_wall)
         if resolved_trigger_t_wall is None:
             payload = obs.payload if isinstance(obs.payload, Mapping) else {}
             resolved_trigger_t_wall = _coerce_finite_float(payload.get("t_wall"))
