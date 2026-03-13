@@ -52,5 +52,32 @@ def test_vision_fact_prompt_mentions_ddi_menu_and_in_test_navigation_rules_in_zh
 
     assert "PB18" in prompt
     assert "根菜单/顶层菜单页" in prompt
+    assert "FCS 按钮本身" in prompt
     assert "FCS-MC" in prompt
     assert "IN TEST" in prompt
+
+
+def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_page() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="zh",
+        config=load_vision_facts_config(),
+    )
+
+    assert "并不等于 fcs_page_visible" in prompt
+    assert "LEF/TEF/AIL/RUD" in prompt
+    assert "SV1/SV2" in prompt
+    assert "大量 X" in prompt
+
+
+def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_page_in_en() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="en",
+        config=load_vision_facts_config(),
+    )
+
+    assert "does not imply fcs_page_visible" in prompt
+    assert "LEF/TEF/AIL/RUD" in prompt
+    assert "SV1/SV2" in prompt
+    assert "many X marks remain" in prompt

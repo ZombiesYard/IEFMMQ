@@ -458,6 +458,11 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
         sanitized["step_ui_targets"] = [
             item for item in step_ui_targets if isinstance(item, str) and item
         ][:8]
+    visual_action_hint = raw.get("visual_action_hint")
+    if isinstance(visual_action_hint, Mapping):
+        target = visual_action_hint.get("target")
+        if isinstance(target, str) and target:
+            sanitized["visual_action_hint"] = {"target": target}
     return sanitized
 
 
@@ -696,6 +701,26 @@ def _sanitize_response_payload_for_event(response: TutorResponse, *, lang: str) 
     help_response = sanitized_metadata.get("help_response")
     if isinstance(help_response, Mapping):
         sanitized_metadata["help_response"] = sanitize_help_response_for_log(help_response, lang=lang)
+    model_raw_help_response = sanitized_metadata.get("model_raw_help_response")
+    if isinstance(model_raw_help_response, Mapping):
+        sanitized_metadata["model_raw_help_response"] = sanitize_help_response_for_log(
+            model_raw_help_response,
+            lang=lang,
+        )
+    final_public_response = sanitized_metadata.get("final_public_response")
+    if isinstance(final_public_response, Mapping):
+        sanitized_final_public_response = dict(final_public_response)
+        message = sanitized_final_public_response.get("message")
+        if isinstance(message, str):
+            sanitized_final_public_response["message"] = sanitize_public_model_text(message, lang=lang)
+        explanations = sanitized_final_public_response.get("explanations")
+        if isinstance(explanations, list):
+            sanitized_final_public_response["explanations"] = [
+                sanitize_public_model_text(item, lang=lang)
+                for item in explanations
+                if isinstance(item, str)
+            ]
+        sanitized_metadata["final_public_response"] = sanitized_final_public_response
     prompt_build = sanitized_metadata.get("prompt_build")
     if isinstance(prompt_build, Mapping):
         sanitized_metadata["prompt_build"] = _sanitize_prompt_build_for_event(prompt_build)
@@ -1393,6 +1418,11 @@ def _prefer_navigation_target_from_vision_context(
     }
     if "left_ddi_dark" in not_seen:
         if (
+            "left_ddi_fcs_page_button_visible" in seen
+            or "left_ddi_fcs_page_button_visible" in uncertain
+        ) and "left_mdi_pb15" in allowed:
+            return ["left_mdi_pb15"]
+        if (
             "left_ddi_fcs_option_visible" in seen
             or "left_ddi_fcs_option_visible" in uncertain
             or "left_ddi_menu_root_visible" in seen
@@ -1406,6 +1436,35 @@ def _prefer_navigation_target_from_vision_context(
     if "left_mdi_brightness_selector" in allowed:
         return ["left_mdi_brightness_selector"]
     return []
+
+
+def _build_visual_action_hint(
+    *,
+    inferred_step_id: str | None,
+    missing_conditions: Sequence[str],
+    context: Mapping[str, Any],
+    allowed_targets: Sequence[str],
+) -> dict[str, Any] | None:
+    if not isinstance(inferred_step_id, str) or not inferred_step_id:
+        return None
+    suggested_targets = _prefer_navigation_target_from_vision_context(
+        inferred_step_id=inferred_step_id,
+        missing_conditions=missing_conditions,
+        context=context,
+        allowed_targets=allowed_targets,
+    )
+    if not suggested_targets:
+        return None
+    target = suggested_targets[0]
+    reason_by_target = {
+        "left_mdi_pb15": "Right DDI already shows BIT and left DDI offers FCS on PB15; press PB15 to enter the FCS page.",
+        "left_mdi_pb18": "Left DDI is not yet at the menu root; press MENU first, then select FCS.",
+        "left_mdi_brightness_selector": "Left DDI page cues are not readable yet; restore left DDI visibility first.",
+    }
+    return {
+        "target": target,
+        "reason": reason_by_target.get(target, f"Visual state suggests operating {target} next."),
+    }
 
 
 def _normalize_rule_var_ref(raw: Any) -> str | None:
@@ -2406,6 +2465,16 @@ class LiveDcsTutorLoop:
             default_allowlist=self.overlay_allowlist,
             deterministic_hint=deterministic_hint,
         )
+        visual_action_hint = _build_visual_action_hint(
+            inferred_step_id=inference.inferred_step_id,
+            missing_conditions=missing_conditions,
+            context={
+                "vision_fact_summary": vision_fact_context.get("vision_fact_summary", {}),
+            },
+            allowed_targets=overlay_target_allowlist,
+        )
+        if isinstance(visual_action_hint, Mapping):
+            deterministic_hint["visual_action_hint"] = dict(visual_action_hint)
 
         context = {
             "vars": vars_selected,
@@ -2623,6 +2692,39 @@ class LiveDcsTutorLoop:
             return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
         return "Fallback: unable to infer current blocked step."
 
+    def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
+        metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+        raw_help_response = metadata.get("help_response")
+        if isinstance(raw_help_response, Mapping):
+            response.metadata["model_raw_help_response"] = copy.deepcopy(dict(raw_help_response))
+            raw_explanations = raw_help_response.get("explanations")
+            if isinstance(raw_explanations, list):
+                response.metadata["model_raw_explanations"] = [
+                    item for item in raw_explanations if isinstance(item, str)
+                ]
+            raw_next = raw_help_response.get("next")
+            if isinstance(raw_next, Mapping):
+                response.metadata["model_raw_next"] = dict(raw_next)
+            raw_diagnosis = raw_help_response.get("diagnosis")
+            if isinstance(raw_diagnosis, Mapping):
+                response.metadata["model_raw_diagnosis"] = dict(raw_diagnosis)
+
+        final_public_response: dict[str, Any] = {
+            "message": response.message,
+            "explanations": [item for item in response.explanations if isinstance(item, str)],
+        }
+        next_payload = response.metadata.get("next")
+        if isinstance(next_payload, Mapping):
+            final_public_response["next"] = dict(next_payload)
+        diagnosis_payload = response.metadata.get("diagnosis")
+        if isinstance(diagnosis_payload, Mapping):
+            final_public_response["diagnosis"] = dict(diagnosis_payload)
+        if response.actions:
+            final_public_response["actions"] = [
+                dict(action) for action in response.actions if isinstance(action, Mapping)
+            ]
+        response.metadata["final_public_response"] = final_public_response
+
     def _normalize_observable_text_only_response(
         self,
         response: TutorResponse,
@@ -2667,6 +2769,103 @@ class LiveDcsTutorLoop:
         response.message = normalized
         response.explanations = [normalized]
         response.metadata["observable_text_rewritten"] = True
+
+    def _rewrite_conflicting_step_completion_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> bool:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False
+        inferred_step_id = hint.get("inferred_step_id")
+        if not isinstance(inferred_step_id, str) or not inferred_step_id:
+            return False
+        missing_conditions = hint.get("missing_conditions")
+        normalized_missing = [
+            item for item in missing_conditions if isinstance(item, str) and item
+        ] if isinstance(missing_conditions, list) else []
+        if not normalized_missing:
+            return False
+
+        model_next_step_id = _extract_model_next_step_id(response.metadata)
+        text_parts = [response.message, *response.explanations]
+        combined = " ".join(part for part in text_parts if isinstance(part, str) and part).lower()
+        completion_markers = (
+            "is complete",
+            "step is complete",
+            "indicating s08 is complete",
+            "已完成",
+            "已经完成",
+            "当前步骤已完成",
+        )
+        has_completion_claim = any(marker in combined for marker in completion_markers)
+        if model_next_step_id == inferred_step_id and not has_completion_claim:
+            return False
+
+        original_message = response.message
+        original_explanations = list(response.explanations)
+        original_next = None
+        if isinstance(response.metadata.get("next"), Mapping):
+            original_next = dict(response.metadata["next"])
+
+        action_target = None
+        if response.actions:
+            first_action = response.actions[0]
+            if isinstance(first_action, Mapping):
+                raw_target = first_action.get("target")
+                if isinstance(raw_target, str) and raw_target:
+                    action_target = raw_target
+
+        missing_set = set(normalized_missing)
+        if (
+            inferred_step_id == "S08"
+            and "vision_facts.fcs_page_visible==seen" in missing_set
+            and "vision_facts.bit_page_visible==seen" in missing_set
+            and action_target == "left_mdi_pb15"
+        ):
+            if self.lang == "zh":
+                rewritten = (
+                    "当前仍在 S08。左 DDI 现在只是显示 FCS 按钮，"
+                    "还没有真正进入 FCS 页面；请先按左 DDI 的 PB15 进入 FCS 页面。"
+                )
+            else:
+                rewritten = (
+                    "You are still on S08. The left DDI is only showing the FCS button, "
+                    "but it has not entered the FCS page yet; press Left DDI PB15 to enter the FCS page first."
+                )
+        elif self.lang == "zh":
+            rewritten = f"当前 {inferred_step_id} 尚未完成，请先满足：{'; '.join(normalized_missing)}。"
+            if isinstance(action_target, str) and action_target:
+                rewritten = f"当前 {inferred_step_id} 尚未完成。请先操作 {action_target}，再满足：{'; '.join(normalized_missing)}。"
+        else:
+            rewritten = (
+                f"{inferred_step_id} is not complete yet. "
+                f"Please satisfy: {'; '.join(normalized_missing)}."
+            )
+            if isinstance(action_target, str) and action_target:
+                rewritten = (
+                    f"{inferred_step_id} is not complete yet. "
+                    f"Please operate {action_target} first, then satisfy: {'; '.join(normalized_missing)}."
+                )
+
+        response.message = rewritten
+        response.explanations = [rewritten]
+        if isinstance(response.metadata.get("next"), Mapping):
+            response.metadata["next"] = dict(response.metadata["next"])
+            response.metadata["next"]["step_id"] = inferred_step_id
+        if isinstance(response.metadata.get("diagnosis"), Mapping):
+            response.metadata["diagnosis"] = dict(response.metadata["diagnosis"])
+            response.metadata["diagnosis"]["step_id"] = inferred_step_id
+        response.metadata["completion_conflict_rewritten"] = True
+        if original_message != rewritten:
+            response.metadata["completion_conflict_original_message"] = original_message
+        if original_explanations and original_explanations != [rewritten]:
+            response.metadata["completion_conflict_original_explanations"] = original_explanations
+        if original_next is not None:
+            response.metadata["completion_conflict_original_next"] = original_next
+        return True
 
     def _should_use_deterministic_overlay_fallback(
         self,
@@ -3215,6 +3414,7 @@ class LiveDcsTutorLoop:
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
             self._normalize_observable_text_only_response(response, request)
+            self._rewrite_conflicting_step_completion_response(response, request)
 
             fallback_overlay_used = False
             fallback_overlay_reason = "not_needed"
@@ -3244,6 +3444,7 @@ class LiveDcsTutorLoop:
 
             response.metadata["fallback_overlay_used"] = fallback_overlay_used
             response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
+            self._annotate_response_audit_metadata(response)
             _normalize_cached_response_metadata(response.metadata)
             response_audit_fields = _build_help_cycle_audit_fields(
                 request=request,
@@ -3288,6 +3489,7 @@ class LiveDcsTutorLoop:
             requires_visual_confirmation = hint.get("requires_visual_confirmation")
             if isinstance(requires_visual_confirmation, bool):
                 response.metadata["requires_visual_confirmation"] = requires_visual_confirmation
+        self._annotate_response_audit_metadata(response)
         response.metadata["scenario_profile"] = self.scenario_profile
         if response.metadata.get("vision_fallback_reason") == VISION_TEXT_FALLBACK:
             self._stats.vision_text_fallback_count += 1

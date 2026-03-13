@@ -29,6 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_PROMPT_CHARS = 9000
 MAX_PROMPT_TOKENS_EST = 2400
+PROMPT_HARD_CAP_MULTIPLIER = 2.0
 MAX_DELTA_SUMMARY_ITEMS = 20
 MAX_RECENT_ACTIONS_SIGNAL_ITEMS = 8
 MAX_MISSING_CONDITIONS_SIGNAL_ITEMS = 8
@@ -60,6 +61,13 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.right_ddi_on": ("right_mdi_brightness_selector",),
     "vars.rpm_r": ("eng_crank_switch", "throttle_quadrant_reference"),
     "vars.throttle_r_idle_complete": ("throttle_quadrant_reference",),
+}
+_VISION_MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
+    "vision_facts.fcs_page_visible": (
+        "left_mdi_pb15",
+        "left_mdi_pb18",
+        "left_mdi_brightness_selector",
+    ),
 }
 
 
@@ -143,6 +151,15 @@ def _estimate_tokens(text: str) -> int:
     if not text:
         return 0
     return (len(text) + 3) // 4
+
+
+def _derive_hard_prompt_budget(*, advisory_chars: int, advisory_tokens_est: int) -> tuple[int, int]:
+    hard_chars = max(int(advisory_chars * PROMPT_HARD_CAP_MULTIPLIER), advisory_chars + 1)
+    hard_tokens_est = max(
+        int(advisory_tokens_est * PROMPT_HARD_CAP_MULTIPLIER),
+        advisory_tokens_est + 1,
+    )
+    return hard_chars, hard_tokens_est
 
 
 def _build_delta_summary(context: Mapping[str, Any], top_k: int = MAX_DELTA_SUMMARY_ITEMS) -> dict[str, Any]:
@@ -321,6 +338,10 @@ def _build_overlay_target_priority(
         seen.add(value)
         ranked.append(value)
 
+    visual_action_hint = deterministic_step_hint.get("visual_action_hint")
+    if isinstance(visual_action_hint, Mapping):
+        _append_if_allowed(visual_action_hint.get("target"))
+
     missing_conditions = deterministic_step_hint.get("missing_conditions")
     if isinstance(missing_conditions, list):
         for item in missing_conditions:
@@ -328,6 +349,14 @@ def _build_overlay_target_priority(
                 continue
             matched = re.match(r"^(vars\.[A-Za-z0-9_]+)\s*(?:==|!=|>=|<=|>|<)", item.strip())
             if matched is None:
+                vision_matched = re.match(
+                    r"^(vision_facts\.[A-Za-z0-9_]+)\s*(?:==|!=|>=|<=|>|<)",
+                    item.strip(),
+                )
+                if vision_matched is None:
+                    continue
+                for target in _VISION_MISSING_CONDITION_TARGET_HINTS.get(vision_matched.group(1), ()):
+                    _append_if_allowed(target)
                 continue
             for target in _MISSING_CONDITION_TARGET_HINTS.get(matched.group(1), ()):
                 _append_if_allowed(target)
@@ -480,6 +509,7 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
             "step_evidence_requirements": [],
             "requires_visual_confirmation": False,
             "scenario_profile": None,
+            "visual_action_hint": None,
         }
 
     inferred_raw = raw.get("inferred_step_id")
@@ -561,7 +591,21 @@ def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]
         "step_evidence_requirements": step_evidence_requirements,
         "requires_visual_confirmation": requires_visual_confirmation,
         "scenario_profile": scenario_profile,
+        "visual_action_hint": _sanitize_visual_action_hint(raw.get("visual_action_hint")),
     }
+
+
+def _sanitize_visual_action_hint(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, Mapping):
+        return None
+    target = raw.get("target")
+    if not isinstance(target, str) or not target:
+        return None
+    sanitized = {"target": str(_sanitize_scalar(target))}
+    reason = raw.get("reason")
+    if isinstance(reason, str) and reason:
+        sanitized["reason"] = str(_sanitize_scalar(reason))
+    return sanitized
 
 
 def _extract_priority_var_keys_from_hint(deterministic_step_hint: Mapping[str, Any]) -> list[str]:
@@ -723,6 +767,18 @@ def _build_vision_fact_summary_payload(context: Mapping[str, Any]) -> dict[str, 
     return payload
 
 
+def _build_multimodal_input_payload(context: Mapping[str, Any]) -> dict[str, Any]:
+    vision = context.get("vision")
+    if not isinstance(vision, Mapping):
+        return {"attached": False}
+    frame_ids = [item for item in vision.get("frame_ids", []) if isinstance(item, str) and item]
+    attached = bool(vision.get("vision_used")) or bool(frame_ids)
+    payload: dict[str, Any] = {"attached": attached}
+    if frame_ids:
+        payload["frame_ids"] = frame_ids[:2]
+    return payload
+
+
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -777,6 +833,7 @@ def build_help_prompt_result(
     )
     uncertainty_policy = _build_uncertainty_policy(deterministic_step_hint)
     vision_fact_summary = _build_vision_fact_summary_payload(context)
+    multimodal_input = _build_multimodal_input_payload(context)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
         scenario_profile_raw
@@ -802,7 +859,12 @@ def build_help_prompt_result(
             "overlay.evidence 字段顺序必须固定为 target,type,ref,quote,grounding_confidence，且 type 必须与 ref 前缀匹配。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
             "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
+            "若 deterministic_step_hint.visual_action_hint.target 存在，且与 vision_fact_summary / allowed_evidence_refs 不冲突，应优先把它作为单目标候选。",
             "vision_fact_summary 只能辅助 diagnosis/next/explanations；若使用视觉证据，高亮必须引用 allowed_evidence_refs 中的 VISION_FACTS.* ref，并与实际 frame_id 可追溯。",
+            "若 multimodal_input.attached=true 且 vision_fact_summary.status=vision_unavailable，可直接依据已附带图像判断 diagnosis/next 与单目标 overlay；若当前没有 VISION_FACTS.* ref，可改用 gate/rag 作为 evidence，不得仅因“缺少视觉 refs”就拒绝给出可操作目标。",
+            "不要把“左 DDI 看见 FCS 按钮/菜单项”误判成“已经进入 FCS 页面”；left_ddi_fcs_option_visible 或 left_ddi_fcs_page_button_visible 只说明下一步应按对应按钮进入 FCS 页面。",
+            "只有当左 DDI 真正显示 FCS 页面主体时，才能把 vision_facts.fcs_page_visible 当成已满足；这类主体特征应包括 LEF/TEF/AIL/RUD 等控制面名称与姿态/上下方向提示、飞控通道格子/网格、SV1/SV2 等通道区域。若这些主体特征看不到，就不能说 FCS 页面已显示，也不能说 S08 已完成。",
+            "对于 FCS RESET：在未 reset 或 reset 未完成时，FCS 页面里的 SV1/SV2 等飞控通道格子通常仍有大量 X/故障填充；只有这些 X 大部分已经清空，才可视为 fcs_reset_seen 或 reset 后状态成立。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
             "若 deterministic_step_hint.requires_visual_confirmation=false 且 deterministic_step_hint.observability_status=observable，不得把“视觉不可用”或“缺乏变量证据”当作主要理由；应优先依据 gates_summary、current_vars_selected 与 missing_conditions 解释当前缺失条件。",
@@ -828,7 +890,12 @@ def build_help_prompt_result(
             "Emit overlay.evidence fields in this exact order: target, type, ref, quote, grounding_confidence, and type must match the ref prefix.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
             "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
+            "If deterministic_step_hint.visual_action_hint.target is present and consistent with vision_fact_summary / allowed_evidence_refs, prefer it as the single overlay candidate.",
             "vision_fact_summary may support diagnosis/next/explanations. If you use visual evidence for overlay, cite an allowed VISION_FACTS.* ref that remains traceable to the frame_id.",
+            "If multimodal_input.attached=true and vision_fact_summary.status=vision_unavailable, you may still use the attached image for diagnosis/next and a single overlay target. When no VISION_FACTS.* ref is available, support the overlay with the strongest gate/rag ref instead of refusing solely because visual refs are missing.",
+            "Do not mistake 'the left DDI shows the FCS button/menu entry' for 'the left DDI is already on the FCS page'. left_ddi_fcs_option_visible or left_ddi_fcs_page_button_visible only means the next action is to press that button and enter the FCS page.",
+            "Treat vision_facts.fcs_page_visible as satisfied only when the left DDI clearly shows the actual FCS page body. Strong anchors include LEF/TEF/AIL/RUD control-surface labels with orientation cues, the flight-control channel boxes/grid, and SV1/SV2 channel areas. If those body cues are absent, do not claim the FCS page is visible and do not claim S08 is complete.",
+            "For FCS RESET, before reset or while reset is incomplete, the FCS page often still shows many X/fault fills across SV1/SV2 or other flight-control channel boxes. Only when those X marks are mostly cleared may you treat fcs_reset_seen or the post-reset state as satisfied.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
             "If deterministic_step_hint.requires_visual_confirmation=false and deterministic_step_hint.observability_status=observable, do not use 'vision unavailable' or 'missing variable evidence' as the main reason; explain the missing condition from gates_summary, current_vars_selected, and missing_conditions instead.",
@@ -839,6 +906,12 @@ def build_help_prompt_result(
         ]
 
     trim_reasons: list[str] = []
+    advisory_prompt_chars = max(1, int(max_prompt_chars))
+    advisory_prompt_tokens_est = max(1, int(max_prompt_tokens_est))
+    hard_prompt_chars, hard_prompt_tokens_est = _derive_hard_prompt_budget(
+        advisory_chars=advisory_prompt_chars,
+        advisory_tokens_est=advisory_prompt_tokens_est,
+    )
 
     allowed_refs: list[str] = []
     current_overlay_target_policy = _build_overlay_target_policy([])
@@ -921,6 +994,7 @@ def build_help_prompt_result(
             "recent_actions_signal": recent_actions_signal,
             "deterministic_step_hint": deterministic_step_hint,
             "vision_fact_summary": vision_fact_summary,
+            "multimodal_input": multimodal_input,
             "overlay_target_policy": current_overlay_target_policy,
             "overlay_evidence_contract": current_overlay_evidence_contract,
             "uncertainty_policy": uncertainty_policy,
@@ -937,7 +1011,7 @@ def build_help_prompt_result(
         return prompt_text, len(prompt_text), _estimate_tokens(prompt_text)
 
     prompt, chars, tokens = _render_and_measure()
-    while chars > max_prompt_chars or tokens > max_prompt_tokens_est:
+    while chars > hard_prompt_chars or tokens > hard_prompt_tokens_est:
         changed = False
         if recent_deltas_summary["items"]:
             recent_deltas_summary["items"] = recent_deltas_summary["items"][:-1]
@@ -975,7 +1049,7 @@ def build_help_prompt_result(
     final_rag_snippets = list(rag_snippets)
     final_allowed_refs = list(allowed_refs)
 
-    if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
+    if chars > hard_prompt_chars or tokens > hard_prompt_tokens_est:
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
@@ -998,6 +1072,9 @@ def build_help_prompt_result(
             "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),
             "requires_visual_confirmation": bool(deterministic_step_hint.get("requires_visual_confirmation")),
         }
+        visual_action_hint = deterministic_step_hint.get("visual_action_hint")
+        if isinstance(visual_action_hint, Mapping) and isinstance(visual_action_hint.get("target"), str):
+            compact_hint["visual_action_hint"] = {"target": visual_action_hint.get("target")}
         final_rag_snippets = list(final_rag_snippets[:1])
         final_allowed_refs = [
             ref
@@ -1023,6 +1100,7 @@ def build_help_prompt_result(
                 ],
                 "gates_summary": gates_summary,
                 "deterministic_step_hint": compact_hint,
+                "multimodal_input": {"attached": bool(multimodal_input.get("attached"))},
                 "overlay_target_policy": {
                     "mode": current_overlay_target_policy["mode"],
                     "preferred_target": current_overlay_target_policy.get("preferred_target"),
@@ -1052,7 +1130,7 @@ def build_help_prompt_result(
             return compact_prompt, len(compact_prompt), _estimate_tokens(compact_prompt)
 
         prompt, chars, tokens = _render_compact_prompt(final_rag_snippets, final_allowed_refs)
-        if (chars > max_prompt_chars or tokens > max_prompt_tokens_est) and final_rag_snippets:
+        if (chars > hard_prompt_chars or tokens > hard_prompt_tokens_est) and final_rag_snippets:
             final_rag_snippets = []
             final_allowed_refs = []
             if "trimmed_rag_snippets" not in trim_reasons:
@@ -1061,18 +1139,30 @@ def build_help_prompt_result(
         if "compact_template" not in trim_reasons:
             trim_reasons.append("compact_template")
 
-    if chars > max_prompt_chars or tokens > max_prompt_tokens_est:
-        hard_cap_chars = min(max_prompt_chars, max_prompt_tokens_est * 4)
+    if chars > hard_prompt_chars or tokens > hard_prompt_tokens_est:
+        hard_cap_chars = min(hard_prompt_chars, hard_prompt_tokens_est * 4)
         prompt = prompt[:hard_cap_chars]
         chars = len(prompt)
         tokens = _estimate_tokens(prompt)
         if "hard_truncate" not in trim_reasons:
             trim_reasons.append("hard_truncate")
 
+    budget_status = "within_advisory"
+    if chars > advisory_prompt_chars or tokens > advisory_prompt_tokens_est:
+        budget_status = "over_advisory"
+    if trim_reasons:
+        budget_status = "trimmed_to_hard_cap" if "hard_truncate" in trim_reasons else "compacted"
+
     if trim_reasons:
         _record_trim_event(
             "Prompt trimmed to fit budget: "
-            f"reasons={trim_reasons}, chars={chars}/{max_prompt_chars}, tokens_est={tokens}/{max_prompt_tokens_est}"
+            f"reasons={trim_reasons}, chars={chars}/{hard_prompt_chars}, tokens_est={tokens}/{hard_prompt_tokens_est}"
+        )
+    elif budget_status == "over_advisory":
+        _LOGGER.info(
+            "Prompt exceeded advisory budget without trimming: "
+            f"chars={chars}/{advisory_prompt_chars}, tokens_est={tokens}/{advisory_prompt_tokens_est}, "
+            f"hard_chars={hard_prompt_chars}, hard_tokens_est={hard_prompt_tokens_est}"
         )
 
     grounding_payload = _build_grounding_payload(
@@ -1084,8 +1174,13 @@ def build_help_prompt_result(
     meta = {
         "max_prompt_chars": max_prompt_chars,
         "max_prompt_tokens_est": max_prompt_tokens_est,
+        "advisory_prompt_chars": advisory_prompt_chars,
+        "advisory_prompt_tokens_est": advisory_prompt_tokens_est,
+        "hard_prompt_chars": hard_prompt_chars,
+        "hard_prompt_tokens_est": hard_prompt_tokens_est,
         "prompt_chars": chars,
         "prompt_tokens_est": tokens,
+        "prompt_budget_status": budget_status,
         "prompt_trimmed": bool(trim_reasons),
         "trim_reasons": trim_reasons,
         "delta_summary_top_k": recent_deltas_summary["top_k"],
@@ -1105,6 +1200,7 @@ def build_help_prompt_result(
         "grounding_reason": grounding_payload["reason"],
         "vision_fact_status": vision_fact_summary["status"],
         "vision_fact_seen_ids": list(vision_fact_summary.get("seen_fact_ids", [])),
+        "multimodal_input_attached": bool(multimodal_input.get("attached")),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
 

@@ -40,6 +40,14 @@ facts:
     steps:
       - S08
       - S15
+  - fact_id: left_ddi_fcs_page_button_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - left_ddi
+    steps:
+      - S08
+      - S15
   - fact_id: fcs_page_visible
     sticky: false
     expires_after_ms: 2000

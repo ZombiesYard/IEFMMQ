@@ -38,6 +38,7 @@ from live_dcs import (
     _load_step_signal_profiles,
     _normalize_cached_response_metadata,
     _path_like_to_uri,
+    _prefer_navigation_target_from_vision_context,
     _resolve_step_overlay_allowlist,
     _sanitize_request_payload_for_event,
     _sanitize_response_payload_for_event,
@@ -828,6 +829,18 @@ def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None
                 "explanations": ["ok"],
                 "confidence": 0.8,
             },
+            "model_raw_help_response": {
+                "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                "next": {"step_id": "S03"},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": ["raw token=abc123"],
+                "confidence": 0.8,
+            },
+            "final_public_response": {
+                "message": "Visit https://api.example.com/v1/chat.",
+                "explanations": ["Set token=abc123."],
+                "next": {"step_id": "S02"},
+            },
         }
     )
 
@@ -835,6 +848,9 @@ def test_sanitize_response_payload_for_event_drops_raw_llm_text_fields() -> None
 
     assert "raw_llm_text" not in payload["metadata"]
     assert "raw_llm_text_attempts" not in payload["metadata"]
+    assert payload["metadata"]["model_raw_help_response"]["explanations"] == ["raw token=[REDACTED_SECRET]"]
+    assert payload["metadata"]["final_public_response"]["message"] == "Visit [REDACTED_URL]."
+    assert payload["metadata"]["final_public_response"]["explanations"] == ["Set token=[REDACTED_SECRET]."]
 
 
 def test_sanitize_response_payload_for_event_summarizes_prompt_build() -> None:
@@ -2449,10 +2465,12 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
     response_mapping = meta["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["eng_crank_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
-    assert tutor_response_payload["message"] == "Move ENG CRANK RIGHT."
-    assert tutor_response_payload["explanations"] == ["Move ENG CRANK RIGHT."]
+    assert tutor_response_payload["message"] == "S03 is not complete yet. Please satisfy: vars.apu_start_support_complete==true."
+    assert tutor_response_payload["explanations"] == [tutor_response_payload["message"]]
     assert meta["fallback_message"] == "Please operate apu_switch first."
     assert "Please operate apu_switch first." in meta["fallback_explanations"]
+    assert meta["model_raw_help_response"]["next"]["step_id"] == "S04"
+    assert meta["final_public_response"]["message"] == tutor_response_payload["message"]
 
 
 def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> None:
@@ -2838,6 +2856,40 @@ def test_safe_fallback_overlay_prefers_left_ddi_fcs_button_when_menu_page_visibl
         assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_pb15"]
     finally:
         loop.close()
+
+
+def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_s08_menu_fcs_state() -> None:
+    targets = _prefer_navigation_target_from_vision_context(
+        inferred_step_id="S08",
+        missing_conditions=["vision_facts.fcs_page_visible==seen"],
+        context={
+            "vision_fact_summary": {
+                "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
+                "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
+                "uncertain_fact_ids": [],
+            }
+        },
+        allowed_targets=["left_mdi_pb18", "left_mdi_pb15", "left_mdi_brightness_selector"],
+    )
+
+    assert targets == ["left_mdi_pb15"]
+
+
+def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_explicit_fcs_button_fact() -> None:
+    targets = _prefer_navigation_target_from_vision_context(
+        inferred_step_id="S08",
+        missing_conditions=["vision_facts.fcs_page_visible==seen"],
+        context={
+            "vision_fact_summary": {
+                "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_page_button_visible"],
+                "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
+                "uncertain_fact_ids": [],
+            }
+        },
+        allowed_targets=["left_mdi_pb18", "left_mdi_pb15", "left_mdi_brightness_selector"],
+    )
+
+    assert targets == ["left_mdi_pb15"]
 
 
 def test_live_loop_pack_step_without_ui_targets_degrades_to_safe_text(tmp_path: Path) -> None:
@@ -4579,6 +4631,162 @@ def test_live_loop_marks_vision_conflict_unresolved_when_model_disagrees_with_fu
     assert response.metadata["vision_fallback_reason"] == "vision_conflict_unresolved"
     assert response.metadata["failure_code"] == "vision_conflict_unresolved"
     assert "vision_conflict_unresolved" in response.metadata["failure_codes"]
+
+
+def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigation_target(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_false_s08_complete.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-s08-rewrite"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000124",
+                    capture_wall_ms=10000,
+                    frame_seq=124,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000124.png"),
+                )
+            ]
+
+    class MenuStateVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="left_ddi_menu_root_visible",
+                                state="seen",
+                                source_frame_id="10000_000124",
+                                confidence=0.99,
+                                expires_after_ms=2000,
+                                evidence_note="Left DDI root menu visible.",
+                            ),
+                            VisionFact(
+                                fact_id="left_ddi_fcs_page_button_visible",
+                                state="seen",
+                                source_frame_id="10000_000124",
+                                confidence=0.99,
+                                expires_after_ms=2000,
+                                evidence_note="Left DDI PB15 FCS button visible.",
+                            ),
+                            VisionFact(
+                                fact_id="fcs_page_visible",
+                                state="not_seen",
+                                source_frame_id="10000_000124",
+                                confidence=1.0,
+                                expires_after_ms=2000,
+                                evidence_note="Left DDI is not yet on the FCS page.",
+                            ),
+                            VisionFact(
+                                fact_id="bit_page_visible",
+                                state="not_seen",
+                                source_frame_id="10000_000124",
+                                confidence=1.0,
+                                expires_after_ms=2000,
+                                evidence_note="Right DDI is not on the top BIT page.",
+                            ),
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    class FalseCompletionModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Displays are powered on with FCS page visible on Left DDI and BIT failures on Right DDI, indicating S08 is complete. Proceed to configure communications (S09).",
+                actions=[],
+                explanations=[
+                    "Displays are powered on with FCS page visible on Left DDI and BIT failures on Right DDI, indicating S08 is complete. Proceed to configure communications (S09)."
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                        "next": {"step_id": "S09"},
+                        "overlay": {
+                            "targets": ["left_mdi_pb15"],
+                            "evidence": [
+                                {
+                                    "target": "left_mdi_pb15",
+                                    "type": "rag",
+                                    "ref": "RAG_SNIPPETS.fa18c_coldstart_quiz_8",
+                                    "quote": "Select the FCS page on the left DDI.",
+                                    "grounding_confidence": 0.9,
+                                }
+                            ],
+                        },
+                        "explanations": [
+                            "Displays are powered on with FCS page visible on Left DDI and BIT failures on Right DDI, indicating S08 is complete. Proceed to configure communications (S09)."
+                        ],
+                        "confidence": 0.95,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=FalseCompletionModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s08-rewrite",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-s08-rewrite",
+        vision_mode="replay",
+        vision_fact_extractor=MenuStateVisionFactExtractor(),
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.actions
+    assert response.message != (
+        "Displays are powered on with FCS page visible on Left DDI and BIT failures on Right DDI, indicating S08 is complete. Proceed to configure communications (S09)."
+    )
+    assert response.explanations == [response.message]
+    assert response.metadata["completion_conflict_rewritten"] is True
+    assert response.metadata["model_raw_help_response"]["next"]["step_id"] == "S09"
+    assert response.metadata["model_raw_explanations"] == [
+        "Displays are powered on with FCS page visible on Left DDI and BIT failures on Right DDI, indicating S08 is complete. Proceed to configure communications (S09)."
+    ]
+    assert response.metadata["final_public_response"]["message"] == response.message
+    assert response.metadata["final_public_response"]["explanations"] == [response.message]
 
 
 def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:

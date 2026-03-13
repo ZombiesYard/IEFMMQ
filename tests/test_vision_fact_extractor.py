@@ -411,3 +411,42 @@ def test_vision_fact_extractor_uses_configured_fact_subset_without_keyerror(tmp_
     call = fake.calls[0]
     response_schema = call["json"]["response_format"]["json_schema"]["schema"]
     assert response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"] == ["fcs_page_visible"]
+
+
+def test_vision_fact_extractor_schema_includes_left_ddi_fcs_page_button_visible(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "left_ddi_fcs_page_button_visible",
+                            "state": "seen",
+                            "source_frame_id": "1772872445010_000123",
+                            "confidence": 0.97,
+                            "evidence_note": "Left DDI clearly shows the FCS button label at PB15.",
+                        }
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
+    assert facts_by_id["left_ddi_fcs_page_button_visible"].state == "seen"
+    call = fake.calls[0]
+    response_schema = call["json"]["response_format"]["json_schema"]["schema"]
+    assert "left_ddi_fcs_page_button_visible" in response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"]

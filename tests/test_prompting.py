@@ -274,19 +274,15 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     result = build_help_prompt_result(ctx, "en", max_prompt_chars=560, max_prompt_tokens_est=140)
 
     assert "compact_template" in result.metadata["trim_reasons"]
-    assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
-    assert result.metadata["grounding_applied"] is False
-    assert result.metadata["grounding_missing"] is True
-    assert result.metadata["grounding_reason"] == "rag_snippets_not_injected"
-    assert result.metadata["rag_snippet_count"] == 0
-    assert result.metadata["rag_snippet_ids"] == []
-    assert result.metadata["allowed_evidence_refs"] == []
-    assert result.metadata["evidence_refs_count"] == 0
+    assert result.metadata["grounding_applied"] is True
+    assert result.metadata["grounding_missing"] is False
+    assert result.metadata["rag_snippet_count"] == 1
+    assert result.metadata["rag_snippet_ids"] == ["manual_s03_1"]
+    assert result.metadata["evidence_refs_count"] >= 1
     assert "constraints=" in result.prompt
-    assert '"grounding":{"applied":false,"missing":true,"reason":"rag_snippets_not_injected"}' in result.prompt
+    assert '"grounding":{"applied":true,"missing":false' in result.prompt
     if "hard_truncate" not in result.metadata["trim_reasons"]:
         assert 'Output shape={"diagnosis":{"step_id":"...","error_category":"..."}' in result.prompt
-    assert "RAG_SNIPPETS" not in result.prompt
 
 
 def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
@@ -301,7 +297,7 @@ def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> No
         },
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=620, max_prompt_tokens_est=170)
 
     assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
 
@@ -365,7 +361,7 @@ def test_prompt_trim_keeps_high_priority_generator_target_first() -> None:
         },
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=620, max_prompt_tokens_est=170)
 
     assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
 
@@ -408,6 +404,220 @@ def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
 
     assert payload["overlay_target_policy"]["preferred_target"] == "hud_symbology_brightness_knob"
     assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "hud_symbology_brightness_knob"
+
+
+def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": [
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "left_mdi_brightness_selector",
+        ],
+        "vars": {
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": True,
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
+            "not_seen_fact_ids": ["fcs_page_visible"],
+        },
+        "vision_facts": [
+            {
+                "fact_id": "bit_page_visible",
+                "state": "seen",
+                "source_frame_id": "1772872445010_000123",
+                "confidence": 0.98,
+                "evidence_note": "BIT page title is visible on the right DDI.",
+            },
+            {
+                "fact_id": "left_ddi_fcs_option_visible",
+                "state": "seen",
+                "source_frame_id": "1772872445010_000123",
+                "confidence": 0.97,
+                "evidence_note": "Left DDI menu shows FCS selectable on PB15.",
+            },
+        ],
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["visual", "gate"],
+            "visual_action_hint": {
+                "target": "left_mdi_pb15",
+                "reason": "BIT is already visible and FCS is selectable on PB15.",
+            },
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["deterministic_step_hint"]["visual_action_hint"]["target"] == "left_mdi_pb15"
+    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_pb15"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "left_mdi_pb15"
+
+
+def test_prompt_trim_keeps_s08_fcs_navigation_target_ahead_of_noisy_recent_actions() -> None:
+    ctx = {
+        "candidate_steps": ["S08", "S10", "S11", "S12"],
+        "overlay_target_allowlist": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "right_mdi_pb18",
+            "right_mdi_pb5",
+        ],
+        "vars": {f"v_{i:02d}": "x" * 180 for i in range(40)},
+        "recent_deltas": [],
+        "recent_actions": {
+            "current_button": "parking_brake_handle",
+            "recent_buttons": [
+                "parking_brake_handle",
+                "flap_switch",
+                "launch_bar_switch",
+                "standby_attitude_cage_knob",
+                "ifei_down_button",
+                "ifei_up_button",
+                "hud_symbology_brightness_knob",
+                "right_mdi_brightness_selector",
+            ],
+        },
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [
+                "parking_brake_handle",
+                "flap_switch",
+                "launch_bar_switch",
+                "standby_attitude_cage_knob",
+                "ifei_down_button",
+                "ifei_up_button",
+                "hud_symbology_brightness_knob",
+                "right_mdi_brightness_selector",
+            ],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "gate", "delta"],
+        },
+        "vision_fact_summary": {"status": "vision_unavailable"},
+    }
+
+    result = build_help_prompt_result(ctx, "zh", max_prompt_chars=860, max_prompt_tokens_est=220)
+
+    assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert payload["allowed_overlay_targets"] == ["left_mdi_pb15"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_pb15"
+    assert payload["multimodal_input"]["attached"] is True
+
+
+def test_prompt_explicitly_allows_multimodal_guidance_without_vision_fact_refs() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "vision_fact_summary": {"status": "vision_unavailable"},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "zh")
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert payload["multimodal_input"]["attached"] is True
+    assert "可直接依据已附带图像判断 diagnosis/next 与单目标 overlay" in result.prompt
+
+
+def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["left_ddi_fcs_page_button_visible"],
+            "not_seen_fact_ids": ["fcs_page_visible"],
+        },
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+            "visual_action_hint": {
+                "target": "left_mdi_pb15",
+                "reason": "Press PB15 to enter the FCS page.",
+            },
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "zh")
+
+    assert "不要把“左 DDI 看见 FCS 按钮/菜单项”误判成“已经进入 FCS 页面”" in result.prompt
+    assert "LEF/TEF/AIL/RUD" in result.prompt
+    assert "SV1/SV2" in result.prompt
+    assert "大量 X/故障填充" in result.prompt
+
+
+def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["left_ddi_fcs_page_button_visible"],
+            "not_seen_fact_ids": ["fcs_page_visible"],
+        },
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+            "visual_action_hint": {
+                "target": "left_mdi_pb15",
+                "reason": "Press PB15 to enter the FCS page.",
+            },
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "en")
+
+    assert "Do not mistake 'the left DDI shows the FCS button/menu entry'" in result.prompt
+    assert "LEF/TEF/AIL/RUD" in result.prompt
+    assert "SV1/SV2" in result.prompt
+    assert "many X/fault fills" in result.prompt
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
@@ -531,8 +741,28 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
     assert result.metadata["prompt_trimmed"] is True
     assert result.metadata["trim_reasons"]
     assert len(result.prompt) <= 900
-    assert result.metadata["prompt_tokens_est"] <= 180
+    assert result.metadata["prompt_tokens_est"] <= result.metadata["hard_prompt_tokens_est"]
+    assert result.metadata["prompt_budget_status"] in {"compacted", "trimmed_to_hard_cap"}
     assert isinstance(result.metadata["allowed_evidence_refs"], list)
+
+
+def test_budget_over_advisory_does_not_force_trim() -> None:
+    ctx = {
+        "candidate_steps": ["S01"],
+        "overlay_target_allowlist": ["battery_switch", "apu_switch"],
+        "vars": {},
+        "recent_deltas": [],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=5000, max_prompt_tokens_est=1300)
+
+    assert result.metadata["prompt_trimmed"] is False
+    assert result.metadata["prompt_budget_status"] == "over_advisory"
+    assert result.metadata["prompt_chars"] > result.metadata["advisory_prompt_chars"] or (
+        result.metadata["prompt_tokens_est"] > result.metadata["advisory_prompt_tokens_est"]
+    )
+    assert result.metadata["hard_prompt_chars"] >= result.metadata["advisory_prompt_chars"]
+    assert result.metadata["hard_prompt_tokens_est"] >= result.metadata["advisory_prompt_tokens_est"]
 
 
 def test_budget_trim_prioritizes_vars_before_rag_snippets() -> None:
@@ -585,8 +815,8 @@ def test_budget_trim_can_drop_last_rag_snippet_before_compact_template() -> None
     result = build_help_prompt_result(
         ctx,
         "en",
-        max_prompt_chars=len(base_result.prompt) + 40,
-        max_prompt_tokens_est=5000,
+        max_prompt_chars=700,
+        max_prompt_tokens_est=160,
     )
 
     assert "compact_template" in result.metadata["trim_reasons"]

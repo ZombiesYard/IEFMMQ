@@ -53,6 +53,7 @@ def test_vision_fact_observation_schema_accepts_all_fact_ids() -> None:
                 "ampcd_dark",
                 "left_ddi_menu_root_visible",
                 "left_ddi_fcs_option_visible",
+                "left_ddi_fcs_page_button_visible",
                 "fcs_page_visible",
                 "bit_page_visible",
                 "right_ddi_fcsmc_page_visible",
