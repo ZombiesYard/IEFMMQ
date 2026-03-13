@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
 from weakref import WeakKeyDictionary
 
@@ -29,6 +31,7 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "engine_crank_right",
     "engine_crank_left",
     "engine_crank_right_complete",
+    "engine_crank_left_complete",
     "bleed_air_norm",
     "bleed_air_cycle_complete",
     "left_ddi_on",
@@ -78,13 +81,21 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "ufc_scratchpad_number_display",
     "ufc_scratchpad_string_1_display",
     "ufc_scratchpad_string_2_display",
+    "obogs_switch_on",
+    "obogs_flow_on",
     "obogs_ready",
     "fcs_reset_pressed",
+    "fcs_reset_complete",
     "flap_auto",
     "takeoff_trim_pressed",
     "takeoff_trim_set",
     "fcs_bit_switch_up",
+    "probe_switch_value",
+    "ext_refuel_probe_value",
+    "probe_extended",
     "pitot_heat_on",
+    "launch_bar_switch_value",
+    "hook_handle_value",
     "parking_brake_released",
     "bingo_fuel_set",
     "standby_altimeter_set",
@@ -99,8 +110,15 @@ _DEFAULT_DELTA_POLICY: DeltaPolicy | None = None
 _DEFAULT_DELTA_SANITIZER: DeltaSanitizer | None = None
 _POLICY_SCOPED_SANITIZERS: OrderedDict[tuple[DeltaPolicy, str], DeltaSanitizer] = OrderedDict()
 _MAX_POLICY_SCOPED_SANITIZERS = 256
-_MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = ("fire_test_complete", "lights_test_complete")
+_MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
+    "fire_test_complete",
+    "lights_test_complete",
+    "fcs_reset_complete",
+    "takeoff_trim_set",
+)
 _COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
+_COMPLETION_LATCHES_PATH = Path(tempfile.gettempdir()) / "simtutor_completion_latches_v1.json"
+_COMPLETION_LATCHES_LOADED = False
 _MAX_COMPLETION_LATCH_STREAMS = 256
 _SHARED_DELTA_SANITIZER_LOCKS: WeakKeyDictionary[DeltaSanitizer, threading.Lock] = WeakKeyDictionary()
 _DEFAULT_DELTA_STREAM_ID = "__default__"
@@ -109,6 +127,54 @@ _DEFAULT_DELTA_SANITIZER_LOCK = threading.Lock()
 _POLICY_SCOPED_SANITIZERS_LOCK = threading.Lock()
 _COMPLETION_LATCHES_LOCK = threading.Lock()
 _SHARED_DELTA_SANITIZER_LOCKS_LOCK = threading.Lock()
+
+
+def _load_completion_latches_from_disk() -> None:
+    global _COMPLETION_LATCHES_LOADED, _COMPLETION_LATCHES
+    if _COMPLETION_LATCHES_LOADED:
+        return
+    loaded: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
+    try:
+        raw = json.loads(_COMPLETION_LATCHES_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raw = None
+    except (OSError, json.JSONDecodeError):
+        raw = None
+    if isinstance(raw, Mapping):
+        for stream_id, state in raw.items():
+            if not isinstance(stream_id, str) or not stream_id.strip() or not isinstance(state, Mapping):
+                continue
+            normalized_state: dict[str, bool | float] = {}
+            for key in _MOMENTARY_COMPLETION_KEYS:
+                value = state.get(key)
+                if isinstance(value, bool):
+                    normalized_state[key] = value
+                elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                    normalized_state[key] = float(value)
+            if normalized_state:
+                loaded[stream_id] = normalized_state
+    _COMPLETION_LATCHES = loaded
+    _COMPLETION_LATCHES_LOADED = True
+
+
+def _save_completion_latches_to_disk() -> None:
+    payload = {
+        stream_id: {
+            key: value
+            for key, value in state.items()
+            if key in _MOMENTARY_COMPLETION_KEYS and isinstance(value, (bool, int, float))
+        }
+        for stream_id, state in _COMPLETION_LATCHES.items()
+        if isinstance(stream_id, str) and stream_id and isinstance(state, Mapping)
+    }
+    try:
+        _COMPLETION_LATCHES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _COMPLETION_LATCHES_PATH.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+    except OSError:
+        return
 
 
 @dataclass
@@ -209,6 +275,8 @@ def _apply_momentary_completion_latches(
     trigger_sources = {
         "fire_test_complete": bool(resolved_vars.get("fire_test_active")),
         "lights_test_complete": bool(resolved_vars.get("lights_test_active")),
+        "fcs_reset_complete": bool(resolved_vars.get("fcs_reset_pressed")),
+        "takeoff_trim_set": bool(resolved_vars.get("takeoff_trim_pressed")),
     }
     raw_missing = resolved_vars.get("vars_source_missing")
     missing_sources = {
@@ -219,13 +287,19 @@ def _apply_momentary_completion_latches(
     )
 
     with _COMPLETION_LATCHES_LOCK:
-        state = dict(_COMPLETION_LATCHES.get(normalized_stream_id, {}))
+        _load_completion_latches_from_disk()
+        previous_state = dict(_COMPLETION_LATCHES.get(normalized_stream_id, {}))
+        state = dict(previous_state)
+        state_changed = False
         if reset_session_completion:
             state.clear()
+            state_changed = True
         for key in _MOMENTARY_COMPLETION_KEYS:
             stored = state.get(key)
             if trigger_sources.get(key):
-                state[key] = True
+                if state.get(key) is not True:
+                    state[key] = True
+                    state_changed = True
                 out[key] = True
                 continue
             if stored is True:
@@ -233,16 +307,26 @@ def _apply_momentary_completion_latches(
             elif isinstance(stored, (int, float)) and stored >= now_s:
                 out[key] = True
             else:
-                state.pop(key, None)
+                if key in state:
+                    state.pop(key, None)
+                    state_changed = True
 
         if state:
             _COMPLETION_LATCHES[normalized_stream_id] = state
             _COMPLETION_LATCHES.move_to_end(normalized_stream_id)
+            if previous_state != state:
+                state_changed = True
         else:
-            _COMPLETION_LATCHES.pop(normalized_stream_id, None)
+            if normalized_stream_id in _COMPLETION_LATCHES:
+                _COMPLETION_LATCHES.pop(normalized_stream_id, None)
+                state_changed = True
 
         while len(_COMPLETION_LATCHES) > max(1, int(_MAX_COMPLETION_LATCH_STREAMS)):
             _COMPLETION_LATCHES.popitem(last=False)
+            state_changed = True
+
+        if state_changed:
+            _save_completion_latches_to_disk()
 
     raw_missing = out.get("vars_source_missing")
     if isinstance(raw_missing, list):

@@ -660,6 +660,68 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None
     assert "大量 X/故障填充" in result.prompt
 
 
+def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> None:
+    ctx = {
+        "candidate_steps": ["S18"],
+        "overlay_target_allowlist": ["fcs_bit_switch", "right_mdi_pb5"],
+        "vars": {"fcs_bit_switch_up": True},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773420347380_000049"],
+        },
+        "vision_fact_summary": {"status": "vision_unavailable"},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S18",
+            "overlay_step_id": "S18",
+            "observability_status": "partial",
+            "requires_visual_confirmation": True,
+            "step_evidence_requirements": ["delta", "gate", "visual"],
+            "action_hint": {"target": "right_mdi_pb5"},
+        },
+    }
+
+    zh_result = build_help_prompt_result(ctx, "zh")
+    en_result = build_help_prompt_result(ctx, "en")
+
+    assert "若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC" in zh_result.prompt
+    assert "若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步" in zh_result.prompt
+    assert "若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO" in zh_result.prompt
+    assert "FCSA/FCSB PBIT GO 不等于最终 GO" in zh_result.prompt
+    assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段" in zh_result.prompt
+
+    assert "if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC" in en_result.prompt
+    assert "only after the right DDI has entered the FCS-MC page but before the BIT has started" in en_result.prompt
+    assert "if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO" in en_result.prompt
+    assert "FCSA/FCSB PBIT GO is not the same as the final GO result" in en_result.prompt
+    assert "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on" in en_result.prompt
+
+
+def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
+    ctx = {
+        "candidate_steps": ["S18"],
+        "overlay_target_allowlist": ["right_mdi_pb5"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {"vision_used": True, "frame_ids": ["1773420856368_000057"]},
+        "vision_fact_summary": {"status": "vision_unavailable"},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S18",
+            "overlay_step_id": "S18",
+            "observability_status": "partial",
+            "requires_visual_confirmation": True,
+            "action_hint": {"target": "right_mdi_pb5"},
+        },
+    }
+
+    zh_result = build_help_prompt_result(ctx, "zh")
+    en_result = build_help_prompt_result(ctx, "en")
+
+    assert "若右 DDI 能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 已成立" in zh_result.prompt
+    assert "If the right DDI clearly shows both FCSA=GO and FCSB=GO at the same time" in en_result.prompt
+    assert "clearly reading both FCSA=GO and FCSB=GO is sufficient final-GO evidence" in en_result.prompt
+
+
 def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:
     ctx = {
         "candidate_steps": ["S08"],

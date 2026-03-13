@@ -118,9 +118,9 @@ precondition_gates:
       reason: "Power must be available before turning APU ON."
   S04:
     - op: flag_true
-      var: vars.apu_ready
-      reason_code: s04_requires_apu_ready
-      reason: "APU READY light must be on before ENG CRANK RIGHT."
+      var: vars.apu_start_support_complete
+      reason_code: s04_requires_apu_start_support_complete
+      reason: "APU start support must have been established before ENG CRANK RIGHT."
   S05:
     - op: flag_true
       var: vars.engine_crank_right_complete
@@ -157,9 +157,9 @@ precondition_gates:
       reason: "Right engine start parameters must be in green range before ENG CRANK LEFT."
   S11:
     - op: flag_true
-      var: vars.engine_crank_left
-      reason_code: s11_requires_engine_crank_left
-      reason: "ENG CRANK must be in LEFT before left throttle idle."
+      var: vars.engine_crank_left_complete
+      reason_code: s11_requires_engine_crank_left_complete
+      reason: "Left engine start must have begun before left throttle idle."
     - op: var_gte
       var: vars.rpm_l
       value: 25
@@ -182,9 +182,9 @@ precondition_gates:
       reason: "INS mode must be set to GND/CV before radar operation."
   S14:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s14_requires_radar_on
-      reason: "Radar should be online before life-support flow setup."
+      var: vars.radar_mode_opr
+      reason_code: s14_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before life-support flow setup."
   S15:
     - op: flag_true
       var: vars.left_ddi_on
@@ -207,39 +207,39 @@ precondition_gates:
       reason: "Right DDI must be powered before FCS BIT sequence."
   S19:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s19_requires_radar_on
-      reason: "Core avionics should be online before four-down checks."
+      var: vars.radar_mode_opr
+      reason_code: s19_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before four-down checks."
   S20:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s20_requires_radar_on
-      reason: "Core avionics should be online before parking-brake release."
+      var: vars.radar_mode_opr
+      reason_code: s20_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before parking-brake release."
   S21:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s21_requires_radar_on
-      reason: "Core avionics should be online before BINGO setup."
+      var: vars.radar_mode_opr
+      reason_code: s21_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before BINGO setup."
   S22:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s22_requires_radar_on
-      reason: "Core avionics should be online before standby altimeter setup."
+      var: vars.radar_mode_opr
+      reason_code: s22_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before standby altimeter setup."
   S23:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s23_requires_radar_on
-      reason: "Core avionics should be online before radar altimeter bug setup."
+      var: vars.radar_mode_opr
+      reason_code: s23_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before radar altimeter bug setup."
   S24:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s24_requires_radar_on
-      reason: "Core avionics should be online before standby attitude uncage."
+      var: vars.radar_mode_opr
+      reason_code: s24_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before standby attitude uncage."
   S25:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s25_requires_radar_on
-      reason: "Core avionics should be online before attitude source AUTO selection."
+      var: vars.radar_mode_opr
+      reason_code: s25_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before attitude source AUTO selection."
 
 completion_gates:
   S01:
@@ -306,9 +306,9 @@ completion_gates:
       reason: "COMM1 preset 1 must be programmed to 134.000 MHz."
   S10:
     - op: flag_true
-      var: vars.engine_crank_left
-      reason_code: s10_requires_engine_crank_left
-      reason: "ENG CRANK must be moved to LEFT."
+      var: vars.engine_crank_left_complete
+      reason_code: s10_requires_engine_crank_left_complete
+      reason: "Left engine start must have begun."
   S11:
     - op: var_gte
       var: vars.rpm_l
@@ -322,21 +322,25 @@ completion_gates:
   S12:
     - op: arg_in_range
       var: vars.ins_mode
-      min: 1
-      max: 1
+      min: 2
+      max: 2
       reason_code: s12_requires_ins_mode_gnd
       reason: "INS mode must be set to GND for airfield startup."
   S13:
     - op: flag_true
-      var: vars.radar_on
-      reason_code: s13_requires_radar_on
+      var: vars.radar_mode_opr
+      reason_code: s13_requires_radar_mode_opr
       reason: "Radar knob must be set to OPR."
   S14:
     - op: flag_true
       var: vars.obogs_ready
       reason_code: s14_requires_obogs_ready
       reason: "OBOGS control and FLOW must both be ON."
-  S15: []
+  S15:
+    - op: flag_true
+      var: vars.fcs_reset_complete
+      reason_code: s15_requires_fcs_reset_complete
+      reason: "FCS RESET must be pressed and acknowledged before moving on."
   S16:
     - op: flag_true
       var: vars.flap_auto
@@ -384,8 +388,8 @@ profile_overrides:
       S12:
         - op: arg_in_range
           var: vars.ins_mode
-          min: 4
-          max: 4
+          min: 1
+          max: 1
           reason_code: s12_requires_ins_mode_cv
           reason: "INS mode must be set to CV for carrier startup."
       S23:
@@ -654,6 +658,7 @@ steps:
     phase: P5
     critical: true
     observability: partial
+    requires_visual_confirmation: true
     evidence_requirements:
       - delta
       - gate
@@ -706,6 +711,7 @@ steps:
     phase: P5
     critical: true
     observability: partial
+    requires_visual_confirmation: true
     evidence_requirements:
       - delta
       - gate

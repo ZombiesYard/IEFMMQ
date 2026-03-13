@@ -1492,6 +1492,62 @@ def _build_procedural_action_hint(
     vars_selected: Mapping[str, Any],
     allowed_targets: Sequence[str],
 ) -> dict[str, Any] | None:
+    if inferred_step_id == "S19":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("probe_extended") is not True:
+            return _hint(
+                "refuel_probe_switch",
+                "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
+            )
+        return _hint(
+            "launch_bar_switch",
+            "The refueling probe is already extended; continue the four-down checklist with the launch bar switch.",
+        )
+
+    if inferred_step_id == "S14":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("obogs_switch_on") is not True:
+            return _hint("obogs_control_switch", "OBOGS control is not yet ON; switch OBOGS on first.")
+        if vars_selected.get("obogs_flow_on") is not True:
+            return _hint("obogs_flow_knob", "OBOGS control is already ON, but FLOW is not yet ON; set the OXY FLOW knob next.")
+        return None
+
+    if inferred_step_id == "S18":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("fcs_bit_switch_up") is True:
+            return _hint(
+                "right_mdi_pb5",
+                "The FCS BIT switch is already held up; press Right DDI PB5 to start or continue the FCS-MC BIT.",
+            )
+        return _hint(
+            "right_mdi_pb5",
+            "On the right DDI BIT FAILURES page, press PB5 to enter the FCS-MC BIT page before holding the FCS BIT switch.",
+        )
+
     if inferred_step_id != "S09":
         return None
     if vars_selected.get("comm1_freq_134_000") is True:
@@ -1533,9 +1589,15 @@ def _resolve_overlay_step_id(
     missing_conditions: Sequence[str],
     candidate_steps: Sequence[str],
     step_order_index: Mapping[str, int],
+    observability_status: str | None = None,
+    requires_visual_confirmation: bool = False,
 ) -> str | None:
     if not isinstance(inferred_step_id, str) or not inferred_step_id:
         return None
+    if requires_visual_confirmation:
+        return inferred_step_id
+    if isinstance(observability_status, str) and observability_status in {"partial", "unobservable"}:
+        return inferred_step_id
     if any(isinstance(item, str) and item for item in missing_conditions):
         return inferred_step_id
     current_idx = step_order_index.get(inferred_step_id)
@@ -2510,11 +2572,29 @@ class LiveDcsTutorLoop:
                 inferred_gate_blockers.append(blocker)
 
         missing_conditions = list(inference.missing_conditions)
+        step_signal_profile = None
+        if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
+            raw_step_signal_profile = self.step_signal_profiles.get(inference.inferred_step_id)
+            if isinstance(raw_step_signal_profile, Mapping):
+                step_signal_profile = raw_step_signal_profile
+        observability_status = None
+        requires_visual_confirmation = False
+        if isinstance(step_signal_profile, Mapping):
+            raw_observability = step_signal_profile.get("observability_status")
+            if not isinstance(raw_observability, str) or not raw_observability:
+                raw_observability = step_signal_profile.get("observability")
+            if isinstance(raw_observability, str) and raw_observability:
+                observability_status = raw_observability
+            raw_requires_visual = step_signal_profile.get("requires_visual_confirmation")
+            if isinstance(raw_requires_visual, bool):
+                requires_visual_confirmation = raw_requires_visual
         overlay_step_id = _resolve_overlay_step_id(
             inference.inferred_step_id,
             missing_conditions=missing_conditions,
             candidate_steps=self.candidate_steps,
             step_order_index=self._step_order_index,
+            observability_status=observability_status,
+            requires_visual_confirmation=requires_visual_confirmation,
         )
         deterministic_hint = {
             "inferred_step_id": inference.inferred_step_id,
@@ -2525,9 +2605,7 @@ class LiveDcsTutorLoop:
             "scenario_profile": self.scenario_profile,
             "vision_fact_status": vision_fact_context.get("status"),
         }
-        if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
-            step_signal_profile = self.step_signal_profiles.get(inference.inferred_step_id)
-            if isinstance(step_signal_profile, Mapping):
+        if isinstance(step_signal_profile, Mapping):
                 observability = step_signal_profile.get("observability")
                 if isinstance(observability, str) and observability:
                     deterministic_hint["observability"] = observability
@@ -2904,6 +2982,7 @@ class LiveDcsTutorLoop:
         original_next = None
         if isinstance(response.metadata.get("next"), Mapping):
             original_next = dict(response.metadata["next"])
+        original_actions = list(response.actions)
 
         action_target = None
         if response.actions:
@@ -2953,6 +3032,9 @@ class LiveDcsTutorLoop:
         if isinstance(response.metadata.get("diagnosis"), Mapping):
             response.metadata["diagnosis"] = dict(response.metadata["diagnosis"])
             response.metadata["diagnosis"]["step_id"] = inferred_step_id
+        if response.actions:
+            response.actions = []
+            response.metadata["completion_conflict_overlay_cleared"] = True
         response.metadata["completion_conflict_rewritten"] = True
         if original_message != rewritten:
             response.metadata["completion_conflict_original_message"] = original_message
@@ -2960,6 +3042,8 @@ class LiveDcsTutorLoop:
             response.metadata["completion_conflict_original_explanations"] = original_explanations
         if original_next is not None:
             response.metadata["completion_conflict_original_next"] = original_next
+        if original_actions:
+            response.metadata["completion_conflict_original_actions"] = copy.deepcopy(original_actions)
         return True
 
     def _should_use_deterministic_overlay_fallback(
@@ -2982,7 +3066,21 @@ class LiveDcsTutorLoop:
         if not isinstance(hint, Mapping):
             return False
         if bool(hint.get("requires_visual_confirmation")):
-            return False
+            action_hint = hint.get("action_hint")
+            if not isinstance(action_hint, Mapping):
+                return False
+            action_target = action_hint.get("target")
+            if not isinstance(action_target, str) or not action_target:
+                return False
+            vision_fact_summary = context.get("vision_fact_summary")
+            vision_fact_status = None
+            if isinstance(vision_fact_summary, Mapping):
+                raw_status = vision_fact_summary.get("status")
+                if isinstance(raw_status, str) and raw_status:
+                    vision_fact_status = raw_status
+            if vision_fact_status != "vision_unavailable":
+                return False
+            return True
         observability = hint.get("observability_status")
         if not isinstance(observability, str) or not observability:
             observability = hint.get("observability")
@@ -2997,6 +3095,66 @@ class LiveDcsTutorLoop:
         return isinstance(missing_conditions, list) and any(
             isinstance(item, str) and item for item in missing_conditions
         )
+
+    def _apply_action_hint_overlay_override(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        if not response.actions:
+            return False, "missing_actions"
+        if bool(response.metadata.get("s18_visual_completion_rewritten")):
+            return False, "step_rewritten_to_s19"
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False, "missing_deterministic_hint"
+        if bool(hint.get("requires_visual_confirmation")) is not True:
+            return False, "visual_confirmation_not_required"
+        vision_fact_summary = context.get("vision_fact_summary")
+        vision_fact_status = None
+        if isinstance(vision_fact_summary, Mapping):
+            raw_status = vision_fact_summary.get("status")
+            if isinstance(raw_status, str) and raw_status:
+                vision_fact_status = raw_status
+        if isinstance(vision_fact_status, str) and vision_fact_status not in {
+            "vision_unavailable",
+            "extractor_failed",
+        }:
+            return False, "vision_facts_present"
+        action_hint = hint.get("action_hint")
+        if not isinstance(action_hint, Mapping):
+            return False, "missing_action_hint"
+        action_target = action_hint.get("target")
+        if not isinstance(action_target, str) or not action_target:
+            return False, "missing_action_target"
+
+        current_targets = [
+            target
+            for target in (
+                action.get("target") if isinstance(action, Mapping) else None
+                for action in response.actions
+            )
+            if isinstance(target, str) and target
+        ]
+        if not current_targets:
+            return False, "missing_action_targets"
+        if current_targets == [action_target]:
+            return False, "already_aligned"
+
+        response.metadata["action_hint_overlay_override_original_actions"] = copy.deepcopy(
+            [dict(action) for action in response.actions if isinstance(action, Mapping)]
+        )
+        response.metadata["action_hint_overlay_override_original_targets"] = list(current_targets)
+
+        override_used, override_reason = self._apply_safe_fallback_overlay(response, request)
+        if not override_used:
+            return False, f"override_failed:{override_reason}"
+
+        response.metadata["action_hint_overlay_override_used"] = True
+        response.metadata["action_hint_overlay_override_target"] = action_target
+        response.metadata["action_hint_overlay_override_reason"] = override_reason
+        return True, override_reason
 
     def _map_response_actions(
         self,
@@ -3073,16 +3231,24 @@ class LiveDcsTutorLoop:
     def _build_safe_fallback_overlay_help_obj(
         self,
         request: TutorRequest,
+        *,
+        override_inferred_step_id: str | None = None,
+        override_overlay_step_id: str | None = None,
+        ignore_request_allowlist: bool = False,
     ) -> tuple[dict[str, Any] | None, str]:
         context = request.context if isinstance(request.context, Mapping) else {}
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
             return None, "missing_deterministic_hint"
 
-        inferred_step_id = hint.get("inferred_step_id")
+        inferred_step_id = override_inferred_step_id
+        if not isinstance(inferred_step_id, str) or not inferred_step_id:
+            inferred_step_id = hint.get("inferred_step_id")
         if not isinstance(inferred_step_id, str) or not inferred_step_id:
             return None, "missing_inferred_step_id"
-        overlay_step_id = hint.get("overlay_step_id")
+        overlay_step_id = override_overlay_step_id
+        if not isinstance(overlay_step_id, str) or not overlay_step_id:
+            overlay_step_id = hint.get("overlay_step_id")
         if not isinstance(overlay_step_id, str) or not overlay_step_id:
             overlay_step_id = inferred_step_id
 
@@ -3126,7 +3292,7 @@ class LiveDcsTutorLoop:
         )
         if hinted_targets:
             candidate_targets = [*hinted_targets, *[target for target in candidate_targets if target not in set(hinted_targets)]]
-        if isinstance(request_allowlist, list):
+        if (not ignore_request_allowlist) and isinstance(request_allowlist, list):
             allowset = {item for item in request_allowlist if isinstance(item, str) and item}
             if allowset:
                 candidate_targets = [target for target in candidate_targets if target in allowset]
@@ -3168,6 +3334,12 @@ class LiveDcsTutorLoop:
 
         allowed_refs = _collect_request_evidence_refs(context)
         step_evidence_requirements = hint.get("step_evidence_requirements")
+        if isinstance(override_inferred_step_id, str) and override_inferred_step_id:
+            override_profile = self.step_signal_profiles.get(override_inferred_step_id)
+            if isinstance(override_profile, Mapping):
+                override_requirements = override_profile.get("evidence_requirements")
+                if isinstance(override_requirements, list):
+                    step_evidence_requirements = override_requirements
         allowed_evidence_types: set[str] | None = None
         if isinstance(step_evidence_requirements, list):
             allowed_evidence_types = set()
@@ -3245,8 +3417,17 @@ class LiveDcsTutorLoop:
         self,
         response: TutorResponse,
         request: TutorRequest,
+        *,
+        override_inferred_step_id: str | None = None,
+        override_overlay_step_id: str | None = None,
+        ignore_request_allowlist: bool = False,
     ) -> tuple[bool, str]:
-        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(request)
+        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
+            request,
+            override_inferred_step_id=override_inferred_step_id,
+            override_overlay_step_id=override_overlay_step_id,
+            ignore_request_allowlist=ignore_request_allowlist,
+        )
         if not isinstance(fallback_help_obj, Mapping):
             return False, fallback_reason
 
@@ -3278,6 +3459,114 @@ class LiveDcsTutorLoop:
         elif mapped.explanations and original_explanations and list(mapped.explanations) != original_explanations:
             response.metadata["fallback_explanations"] = list(mapped.explanations)
         return True, fallback_reason
+
+    def _rewrite_s18_visual_completion_to_s19(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False, "missing_deterministic_hint"
+        inferred_step_id = hint.get("inferred_step_id")
+        if inferred_step_id != "S18":
+            return False, "not_s18"
+        if bool(hint.get("requires_visual_confirmation")) is not True:
+            return False, "visual_confirmation_not_required"
+        vision_fact_summary = context.get("vision_fact_summary")
+        vision_fact_status = None
+        if isinstance(vision_fact_summary, Mapping):
+            raw_status = vision_fact_summary.get("status")
+            if isinstance(raw_status, str) and raw_status:
+                vision_fact_status = raw_status
+        if vision_fact_status != "vision_unavailable":
+            return False, "vision_available"
+
+        text_parts = [response.message, *response.explanations]
+        combined = " ".join(part for part in text_parts if isinstance(part, str) and part).lower()
+        has_final_go_phrase = any(
+            marker in combined
+            for marker in (
+                "reporting go",
+                "reporting 'go'",
+                'reporting "go"',
+                "go result",
+                "go results",
+                "all channels reporting go",
+                "all channels reporting 'go'",
+                "all systems reporting go",
+                "all systems reporting 'go'",
+            )
+        )
+        mentions_final_go_channels = (
+            "mc1" in combined
+            and "mc2" in combined
+            and "fcsa" in combined
+            and "fcsb" in combined
+            and "go" in combined
+        )
+        mentions_intermediate_only = (
+            re.search(r"\bpbit go\b", combined) is not None
+            or re.search(r"(?<!built-)in test\b", combined) is not None
+            or re.search(r"\bnot rdy\b", combined) is not None
+            or re.search(r"\bnot ready\b", combined) is not None
+        )
+        has_go_reporting = (has_final_go_phrase or mentions_final_go_channels) and not mentions_intermediate_only
+        has_bit_complete = (
+            "successfully completed" in combined
+            or "bit has completed successfully" in combined
+            or "bit has been successfully completed" in combined
+            or "next step is to proceed" in combined
+            or "continue with s19" in combined
+            or "startup sequence" in combined
+            or "exit this maintenance page" in combined
+            or "initial bit root phase" in combined
+            or "fcs-mc page with 'go' results" in combined
+        )
+        if not (has_go_reporting and has_bit_complete):
+            return False, "no_s18_completion_claim"
+
+        original_message = response.message
+        original_explanations = list(response.explanations)
+        original_next = dict(response.metadata["next"]) if isinstance(response.metadata.get("next"), Mapping) else None
+        original_diagnosis = (
+            dict(response.metadata["diagnosis"]) if isinstance(response.metadata.get("diagnosis"), Mapping) else None
+        )
+        original_actions = [dict(action) for action in response.actions if isinstance(action, Mapping)]
+
+        if self.lang == "zh":
+            rewritten = "当前可视页面已显示 FCS BIT 最终 GO 结果，可视为 S18 已完成。请继续执行 S19。"
+        else:
+            rewritten = "The visible FCS BIT page shows the final GO result, so treat S18 as complete and continue with S19."
+
+        response.message = rewritten
+        response.explanations = [rewritten]
+        response.actions = []
+        response.metadata["s18_visual_completion_rewritten"] = True
+        response.metadata["s18_visual_completion_original_message"] = original_message
+        if original_explanations:
+            response.metadata["s18_visual_completion_original_explanations"] = original_explanations
+        if original_next is not None:
+            response.metadata["s18_visual_completion_original_next"] = original_next
+        if original_diagnosis is not None:
+            response.metadata["s18_visual_completion_original_diagnosis"] = original_diagnosis
+        if original_actions:
+            response.metadata["s18_visual_completion_original_actions"] = copy.deepcopy(original_actions)
+
+        response.metadata["next"] = {"step_id": "S19"}
+        response.metadata["diagnosis"] = {"step_id": "S19", "error_category": "OM"}
+        used, reason = self._apply_safe_fallback_overlay(
+            response,
+            request,
+            override_inferred_step_id="S19",
+            override_overlay_step_id="S19",
+            ignore_request_allowlist=True,
+        )
+        if used:
+            response.metadata["s18_visual_completion_overlay_advanced"] = True
+            response.metadata["s18_visual_completion_overlay_reason"] = reason
+        return True, reason if used else "rewrite_only"
 
     def _new_response_from_cached(
         self,
@@ -3532,12 +3821,26 @@ class LiveDcsTutorLoop:
 
             fallback_overlay_used = False
             fallback_overlay_reason = "not_needed"
+            s18_completion_advanced, s18_completion_reason = self._rewrite_s18_visual_completion_to_s19(
+                response,
+                request,
+            )
+            if s18_completion_advanced:
+                fallback_overlay_used = True
+                fallback_overlay_reason = s18_completion_reason
+            action_hint_override_used, action_hint_override_reason = self._apply_action_hint_overlay_override(
+                response,
+                request,
+            )
+            if action_hint_override_used and not s18_completion_advanced:
+                fallback_overlay_used = True
+                fallback_overlay_reason = action_hint_override_reason
             should_apply_safe_fallback = self._should_use_deterministic_overlay_fallback(
                 response,
                 request,
                 mapped_meta,
             )
-            if should_apply_safe_fallback:
+            if should_apply_safe_fallback and not action_hint_override_used and not s18_completion_advanced:
                 fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
                     response,
                     request,

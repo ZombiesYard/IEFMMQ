@@ -2969,6 +2969,85 @@ def test_build_procedural_action_hint_for_s09_advances_through_ufc_entry_sequenc
     )["target"] == "ufc_ent_button"
 
 
+def test_build_procedural_action_hint_for_s14_prefers_obogs_control_before_flow() -> None:
+    allowed = ["obogs_control_switch", "obogs_flow_knob"]
+
+    assert _build_procedural_action_hint(
+        inferred_step_id="S14",
+        vars_selected={"obogs_switch_on": False, "obogs_flow_on": True},
+        allowed_targets=allowed,
+    ) == {
+        "target": "obogs_control_switch",
+        "reason": "OBOGS control is not yet ON; switch OBOGS on first.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S14",
+        vars_selected={"obogs_switch_on": True, "obogs_flow_on": False},
+        allowed_targets=allowed,
+    ) == {
+        "target": "obogs_flow_knob",
+        "reason": "OBOGS control is already ON, but FLOW is not yet ON; set the OXY FLOW knob next.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S14",
+        vars_selected={"obogs_switch_on": True, "obogs_flow_on": True},
+        allowed_targets=allowed,
+    ) is None
+
+
+def test_build_procedural_action_hint_for_s18_prefers_right_ddi_pb5() -> None:
+    allowed = ["fcs_bit_switch", "right_mdi_pb18", "right_mdi_pb5"]
+
+    assert _build_procedural_action_hint(
+        inferred_step_id="S18",
+        vars_selected={"fcs_bit_switch_up": False},
+        allowed_targets=allowed,
+    ) == {
+        "target": "right_mdi_pb5",
+        "reason": "On the right DDI BIT FAILURES page, press PB5 to enter the FCS-MC BIT page before holding the FCS BIT switch.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S18",
+        vars_selected={"fcs_bit_switch_up": True},
+        allowed_targets=allowed,
+    ) == {
+        "target": "right_mdi_pb5",
+        "reason": "The FCS BIT switch is already held up; press Right DDI PB5 to start or continue the FCS-MC BIT.",
+    }
+
+
+def test_build_procedural_action_hint_for_s19_advances_after_probe_extends() -> None:
+    allowed = ["refuel_probe_switch", "launch_bar_switch", "pitot_heater_switch"]
+
+    assert _build_procedural_action_hint(
+        inferred_step_id="S19",
+        vars_selected={"probe_extended": False},
+        allowed_targets=allowed,
+    ) == {
+        "target": "refuel_probe_switch",
+        "reason": "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S19",
+        vars_selected={"probe_extended": True},
+        allowed_targets=allowed,
+    ) == {
+        "target": "launch_bar_switch",
+        "reason": "The refueling probe is already extended; continue the four-down checklist with the launch bar switch.",
+    }
+
+
+def test_resolve_overlay_step_id_does_not_advance_partial_visual_hold_steps() -> None:
+    assert _resolve_overlay_step_id(
+        "S18",
+        missing_conditions=[],
+        candidate_steps=["S18", "S19"],
+        step_order_index={"S18": 0, "S19": 1},
+        observability_status="partial",
+        requires_visual_confirmation=True,
+    ) == "S18"
+
+
 def test_resolve_overlay_step_id_advances_to_next_step_when_current_step_has_no_missing_conditions() -> None:
     candidate_steps = ["S08", "S09", "S10"]
     step_order_index = {step_id: idx for idx, step_id in enumerate(candidate_steps)}
@@ -4950,6 +5029,367 @@ def test_live_loop_replaces_stale_s08_overlay_with_s09_action_hint(tmp_path: Pat
     assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S08"
     assert response.metadata["response_mapping"]["rejected_targets_by_request_allowlist"] == ["left_mdi_pb15"]
     assert response.metadata["response_mapping"]["mapping_error"] == "overlay_target_not_in_request_allowlist"
+
+
+def test_live_loop_overrides_s18_root_menu_overlay_with_action_hint_when_vision_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s18_action_hint_override.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class WrongS18OverlayModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Hold FCS BIT and continue BIT.",
+                actions=[],
+                explanations=[
+                    "The FCS BIT switch is currently UP and the next action is to continue the BIT sequence."
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S18", "error_category": "CO"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {
+                            "targets": ["fcs_bit_switch"],
+                            "evidence": [
+                                {
+                                    "target": "fcs_bit_switch",
+                                    "type": "gate",
+                                    "ref": "GATES.S18.completion",
+                                    "quote": "Continue the BIT sequence from the current switch state.",
+                                    "grounding_confidence": 0.83,
+                                }
+                            ],
+                        },
+                        "explanations": [
+                            "The FCS BIT switch is currently UP and the next action is to continue the BIT sequence."
+                        ],
+                        "confidence": 0.83,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S18", missing_conditions=()),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=WrongS18OverlayModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s18-action-hint-override",
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.actions
+    assert response.actions[0]["target"] == "right_mdi_pb5"
+    assert response.metadata["fallback_overlay_used"] is True
+    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S18"
+    assert response.metadata["action_hint_overlay_override_used"] is True
+    assert response.metadata["action_hint_overlay_override_target"] == "right_mdi_pb5"
+    assert response.metadata["action_hint_overlay_override_original_targets"] == ["fcs_bit_switch"]
+    assert response.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
+
+
+def test_live_loop_clears_conflicting_overlay_before_fallback_rebuilds_current_step_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_conflicting_overlay_rewritten.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class ConflictingOverlayModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Set INS to GND.",
+                actions=[],
+                explanations=[
+                    "INS is still OFF; set it to GND for S12.",
+                    "Although visual evidence is unavailable, focus on the INS mode next.",
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S12", "error_category": "CO"},
+                        "next": {"step_id": "S12"},
+                        "overlay": {
+                            "targets": ["eng_crank_switch"],
+                            "evidence": [
+                                {
+                                    "target": "eng_crank_switch",
+                                    "type": "var",
+                                    "ref": "VARS.ins_mode",
+                                    "quote": "INS mode is OFF.",
+                                    "grounding_confidence": 0.95,
+                                }
+                            ],
+                        },
+                        "explanations": [
+                            "INS is still OFF; set it to GND for S12.",
+                            "Although visual evidence is unavailable, focus on the INS mode next.",
+                        ],
+                        "confidence": 0.85,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(
+            inferred_step_id="S10",
+            missing_conditions=("vars.engine_crank_left_complete==true",),
+        ),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=ConflictingOverlayModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-conflicting-overlay-rewritten",
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.metadata["completion_conflict_rewritten"] is True
+    assert response.metadata["completion_conflict_overlay_cleared"] is True
+    assert response.metadata["completion_conflict_original_actions"][0]["target"] == "eng_crank_switch"
+    assert response.metadata["fallback_overlay_used"] is True
+    assert response.actions
+    assert response.actions[0]["target"] == "eng_crank_switch"
+    assert response.message == "S10 is not complete yet. Please operate eng_crank_switch first, then satisfy: vars.engine_crank_left_complete==true."
+    assert response.metadata["final_public_response"]["actions"][0]["target"] == "eng_crank_switch"
+
+
+def test_live_loop_advances_s18_to_s19_when_model_claims_final_go_under_vision_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s18_final_go_advances_s19.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class S18FinalGoModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Need more information/please confirm: right_mdi_pb5",
+                actions=[],
+                explanations=[
+                    "Need more information/please confirm: right_mdi_pb5",
+                    "The Right DDI shows the FCS-MC page with all systems reporting 'GO', indicating that the Built-In Test (BIT) has been successfully completed. The next step is to proceed with the startup sequence.",
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {"targets": [], "evidence": []},
+                        "explanations": [
+                            "Need more information/please confirm: right_mdi_pb5",
+                            "The Right DDI shows the FCS-MC page with all systems reporting 'GO', indicating that the Built-In Test (BIT) has been successfully completed. The next step is to proceed with the startup sequence.",
+                        ],
+                        "confidence": 0.95,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S18", missing_conditions=()),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=S18FinalGoModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s18-final-go-advance",
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.metadata["s18_visual_completion_rewritten"] is True
+    assert response.metadata["next"]["step_id"] == "S19"
+    assert response.metadata["diagnosis"]["step_id"] == "S19"
+    assert response.actions
+    assert response.actions[0]["target"] == "refuel_probe_switch"
+    assert response.metadata["fallback_overlay_used"] is True
+    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S19"
+    assert response.metadata["final_public_response"]["actions"][0]["target"] == "refuel_probe_switch"
+    assert response.metadata.get("action_hint_overlay_override_used") is not True
+
+
+def test_live_loop_advances_s18_to_s19_when_model_reports_mc1_mc2_fcsa_fcsb_go_and_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s18_exit_page_after_final_go.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class S18ExitPageModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Need more information/please confirm: right_mdi_pb5",
+                actions=[],
+                explanations=[
+                    "Need more information/please confirm: right_mdi_pb5",
+                    "The Right DDI shows the FCS-MC page with all systems (MC1, MC2, FCSA, FCSB) reporting 'GO'. This indicates that the Built-In Test (BIT) has been successfully completed. The next step is to exit this maintenance page by pressing PB5 (EXIT) to return to the main BIT failures page or previous menu.",
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {"targets": [], "evidence": []},
+                        "explanations": [
+                            "Need more information/please confirm: right_mdi_pb5",
+                            "The Right DDI shows the FCS-MC page with all systems (MC1, MC2, FCSA, FCSB) reporting 'GO'. This indicates that the Built-In Test (BIT) has been successfully completed. The next step is to exit this maintenance page by pressing PB5 (EXIT) to return to the main BIT failures page or previous menu.",
+                        ],
+                        "confidence": 0.95,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S18", missing_conditions=()),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=S18ExitPageModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s18-exit-page-advance",
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.metadata["s18_visual_completion_rewritten"] is True
+    assert response.metadata["next"]["step_id"] == "S19"
+    assert response.actions
+    assert response.actions[0]["target"] == "refuel_probe_switch"
+    assert response.metadata.get("action_hint_overlay_override_used") is not True
+
+
+def test_live_loop_advances_s18_to_s19_when_model_mentions_go_results_but_wrongly_repeats_pb5(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s18_go_results_but_wrongly_repeats_pb5.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class S18GoResultsButWrongPb5Model:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="Need more information/please confirm: right_mdi_pb5",
+                actions=[],
+                explanations=[
+                    "Need more information/please confirm: right_mdi_pb5",
+                    "The Right DDI shows the FCS-MC page with 'GO' results for MC1, MC2, FCSA, and FCSB. This indicates that the initial BIT root phase (pressing PB5 to enter FCS-MC) has been completed. The next step in the S18 procedure is to initiate the specific FCS BIT test by holding the FCS BIT switch and pressing PB5 again.",
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {"targets": [], "evidence": []},
+                        "explanations": [
+                            "Need more information/please confirm: right_mdi_pb5",
+                            "The Right DDI shows the FCS-MC page with 'GO' results for MC1, MC2, FCSA, and FCSB. This indicates that the initial BIT root phase (pressing PB5 to enter FCS-MC) has been completed. The next step in the S18 procedure is to initiate the specific FCS BIT test by holding the FCS BIT switch and pressing PB5 again.",
+                        ],
+                        "confidence": 0.95,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S18", missing_conditions=()),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=S18GoResultsButWrongPb5Model(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s18-go-results-wrong-pb5",
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.metadata["s18_visual_completion_rewritten"] is True
+    assert response.metadata["next"]["step_id"] == "S19"
+    assert response.metadata["diagnosis"]["step_id"] == "S19"
+    assert response.actions
+    assert response.actions[0]["target"] == "refuel_probe_switch"
+    assert response.metadata["fallback_overlay_used"] is True
+    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S19"
+    assert response.metadata["final_public_response"]["actions"][0]["target"] == "refuel_probe_switch"
 
 
 def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:

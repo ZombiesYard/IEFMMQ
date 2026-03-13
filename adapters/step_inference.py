@@ -42,6 +42,7 @@ class _StepProfile:
     step_id: str
     observability: str | None
     ui_targets: tuple[str, ...]
+    requires_visual_confirmation: bool
 
 
 @dataclass(frozen=True)
@@ -458,7 +459,15 @@ def _ordered_step_profiles(pack_steps: Sequence[Mapping[str, Any]]) -> list[_Ste
             for item in ui_targets_raw:
                 if isinstance(item, str) and item:
                     ui_targets.append(item)
-        out.append(_StepProfile(step_id=step_id, observability=observability, ui_targets=tuple(ui_targets)))
+        requires_visual_confirmation = bool(step.get("requires_visual_confirmation"))
+        out.append(
+            _StepProfile(
+                step_id=step_id,
+                observability=observability,
+                ui_targets=tuple(ui_targets),
+                requires_visual_confirmation=requires_visual_confirmation,
+            )
+        )
     return out
 
 
@@ -787,6 +796,9 @@ def _can_advance_past_hold_step(
 ) -> bool:
     if completion_evidence.has_explicit_evidence:
         return _step_completion_evidence_satisfied(completion_evidence, comp_gate=comp_gate)
+    current = step_profiles[idx]
+    if current.requires_visual_confirmation:
+        return False
     return _has_current_step_interaction_evidence(step_profiles, idx=idx, recent_set=recent_set)
 
 

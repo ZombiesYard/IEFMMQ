@@ -6,7 +6,7 @@ vars:
   ext_pwr_on: "bios.EXT_PWR_SW == 1"
   l_gen_on: "bios.L_GEN_SW == 1"
   r_gen_on: "bios.R_GEN_SW == 1"
-  power_available: "derived((vars.battery_on or vars.ext_pwr_on) and vars.l_gen_on and vars.r_gen_on)"
+  power_available: "derived(vars.battery_on or vars.ext_pwr_on or vars.l_gen_on or vars.r_gen_on)"
 
   # APU
   apu_on: "bios.APU_CONTROL_SW == 1"
@@ -27,8 +27,9 @@ vars:
   throttle_l_not_off: "derived(num(bios.INT_THROTTLE_LEFT) > 0)"
   temp_r: "derived(num(bios.IFEI_TEMP_R))"
   temp_l: "derived(num(bios.IFEI_TEMP_L))"
-  ff_r: "derived(num(bios.IFEI_FF_R))"
-  ff_l: "derived(num(bios.IFEI_FF_L))"
+  # IFEI fuel-flow windows are labeled x100, so a displayed value like 7 means 700 PPH.
+  ff_r: "derived(num(bios.IFEI_FF_R) * 100)"
+  ff_l: "derived(num(bios.IFEI_FF_L) * 100)"
   oil_r: "derived(num(bios.IFEI_OIL_PRESS_R))"
   oil_l: "derived(num(bios.IFEI_OIL_PRESS_L))"
   noz_r: "derived((num(bios.EXT_NOZZLE_POS_R) * 100) / 65535)"
@@ -55,6 +56,7 @@ vars:
   right_engine_nominal_start_params: "derived(vars.rpm_r_in_range and vars.temp_r_in_range and vars.ff_r_in_range and vars.oil_r_in_range and vars.noz_r_in_range)"
   left_engine_nominal_start_params: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70 and vars.temp_l >= 190 and vars.temp_l <= 590 and vars.ff_l >= 420 and vars.ff_l <= 900 and vars.oil_l >= 45 and vars.oil_l <= 110 and vars.noz_l >= 73 and vars.noz_l <= 84)"
   left_engine_idle_ready: "derived(vars.rpm_l >= 25 and num(bios.INT_THROTTLE_LEFT) > 0)"
+  engine_crank_left_complete: "derived(vars.engine_crank_left or vars.rpm_l_gte_25 or vars.rpm_l_gte_60 or vars.left_engine_idle_ready)"
 
   # Displays / avionics
   left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
@@ -74,11 +76,15 @@ vars:
   # Like FIRE TEST, the lights test is momentary. Completion is latched in
   # telemetry_pipeline once switch/annunciator evidence is observed.
   lights_test_complete: "derived(vars.lights_test_active)"
+  # INS_SW follows clickable order from pnt_443:
+  # 0=OFF, 1=CV, 2=GND, 3=NAV, 4=IFA, 5=GYRO, 6=GB, 7=TEST.
   ins_mode: "bios.INS_SW"
   ins_mode_set: "derived(vars.ins_mode >= 1)"
-  ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 4)"
+  ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 2)"
+  # RADAR_SW follows clickable order from pnt_440 base switch:
+  # 0=OFF, 1=STBY, 2=OPR. EMERG is a separate pull action, not the base position.
   radar_mode_value: "derived(num(bios.RADAR_SW))"
-  radar_mode_opr: "derived(vars.radar_mode_value >= 2)"
+  radar_mode_opr: "derived(vars.radar_mode_value == 2)"
   radar_on: "bios.RADAR_SW > 0"
   comm1_freq_value: "derived(num(bios.COMM1_FREQ))"
   comm2_freq_value: "derived(num(bios.COMM2_FREQ))"
@@ -100,9 +106,10 @@ vars:
   # as explicit "unknown" (instead of false) so gating/inference can degrade safely.
   obogs_switch_on: "bios.OBOGS_SW == 1"
   obogs_flow_on: "bios.OXY_FLOW > 0"
-  obogs_ready: "derived(bios.OBOGS_SW == 1 and bios.OXY_FLOW > 0)"
+  obogs_ready: "derived(vars.obogs_switch_on and vars.obogs_flow_on)"
 
   fcs_reset_pressed: "bios.FCS_RESET_BTN == 1"
+  fcs_reset_complete: "derived(vars.fcs_reset_pressed)"
   fcs_page_reviewed: "'unknown'"
 
   flap_mode_value: "derived(num(bios.FLAP_SW))"
@@ -118,6 +125,10 @@ vars:
   fcs_bit_complete: "'unknown'"
 
   probe_switch_value: "derived(num(bios.PROBE_SW))"
+  ext_refuel_probe_value: "derived(num(bios.EXT_REFUEL_PROBE))"
+  # pnt_341 clickable order is EXTEND/RETRACT/EMERG EXTD => 0/1/2. The external
+  # probe position argument also rises toward 65535 when physically extended.
+  probe_extended: "derived(vars.probe_switch_value == 0 or vars.ext_refuel_probe_value >= 60000)"
   launch_bar_switch_value: "derived(num(bios.LAUNCH_BAR_SW))"
   hook_handle_value: "derived(num(bios.HOOK_LEVER))"
   pitot_heat_on: "bios.PITOT_HEAT_SW > 0"

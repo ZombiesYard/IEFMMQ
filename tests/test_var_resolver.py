@@ -31,6 +31,7 @@ EXPECTED_S11_S25_VAR_KEYS = {
     "obogs_flow_on",
     "obogs_ready",
     "fcs_reset_pressed",
+    "fcs_reset_complete",
     "fcs_page_reviewed",
     "flap_mode_value",
     "flap_auto",
@@ -264,6 +265,40 @@ def test_var_resolver_pack_map_resolves_from_dcs_bios_frame_once() -> None:
         assert (vars_out[key] is None) == (key in vars_out["vars_source_missing"])
 
 
+def test_var_resolver_marks_probe_extended_from_switch_or_external_position() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    switch_extended = TelemetryFrame(
+        seq=1,
+        t_wall=1.0,
+        source="dcs_bios",
+        bios={"PROBE_SW": 0, "EXT_REFUEL_PROBE": 0},
+    )
+    vars_switch = resolver.resolve(switch_extended)
+    assert vars_switch["probe_switch_value"] == 0
+    assert vars_switch["probe_extended"] is True
+
+    physically_extended = TelemetryFrame(
+        seq=2,
+        t_wall=2.0,
+        source="dcs_bios",
+        bios={"PROBE_SW": 1, "EXT_REFUEL_PROBE": 65535},
+    )
+    vars_physical = resolver.resolve(physically_extended)
+    assert vars_physical["probe_switch_value"] == 1
+    assert vars_physical["ext_refuel_probe_value"] == 65535
+    assert vars_physical["probe_extended"] is True
+
+    retracted = TelemetryFrame(
+        seq=3,
+        t_wall=3.0,
+        source="dcs_bios",
+        bios={"PROBE_SW": 1, "EXT_REFUEL_PROBE": 0},
+    )
+    vars_retracted = resolver.resolve(retracted)
+    assert vars_retracted["probe_extended"] is False
+
+
 def test_var_resolver_pack_battery_on_requires_switch_value_2() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
     frame_on = TelemetryFrame(
@@ -453,7 +488,7 @@ def test_var_resolver_pack_s11_s25_vars_are_present_and_unknown_is_explicit() ->
             "IFEI_OIL_PRESS_L": "70",
             "EXT_NOZZLE_POS_L": 50000,
             "INT_THROTTLE_LEFT": 1,
-            "INS_SW": 4,
+            "INS_SW": 2,
             "RADAR_SW": 2,
             "OBOGS_SW": 1,
             "OXY_FLOW": 65535,
@@ -476,6 +511,71 @@ def test_var_resolver_pack_s11_s25_vars_are_present_and_unknown_is_explicit() ->
     assert vars_out["radar_altimeter_bug_set"] is True
     assert vars_out["standby_attitude_uncaged"] is True
     assert vars_out["attitude_source_auto"] is True
+    assert vars_out["ins_mode"] == 2
+    assert vars_out["ins_mode_set"] is True
+    assert vars_out["ins_mode_cv_or_gnd"] is True
+
+
+def test_var_resolver_pack_ins_mode_matches_clickabledata_positions() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    off_frame = TelemetryFrame(seq=701, t_wall=701.0, source="dcs_bios", bios={"INS_SW": 0})
+    cv_frame = TelemetryFrame(seq=702, t_wall=702.0, source="dcs_bios", bios={"INS_SW": 1})
+    gnd_frame = TelemetryFrame(seq=703, t_wall=703.0, source="dcs_bios", bios={"INS_SW": 2})
+
+    off_vars = resolver.resolve(off_frame)
+    cv_vars = resolver.resolve(cv_frame)
+    gnd_vars = resolver.resolve(gnd_frame)
+
+    assert off_vars["ins_mode"] == 0
+    assert off_vars["ins_mode_set"] is False
+    assert off_vars["ins_mode_cv_or_gnd"] is False
+    assert cv_vars["ins_mode"] == 1
+    assert cv_vars["ins_mode_set"] is True
+    assert cv_vars["ins_mode_cv_or_gnd"] is True
+    assert gnd_vars["ins_mode"] == 2
+    assert gnd_vars["ins_mode_set"] is True
+    assert gnd_vars["ins_mode_cv_or_gnd"] is True
+
+
+def test_var_resolver_pack_radar_mode_matches_clickabledata_positions() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    off_frame = TelemetryFrame(seq=704, t_wall=704.0, source="dcs_bios", bios={"RADAR_SW": 0})
+    stby_frame = TelemetryFrame(seq=705, t_wall=705.0, source="dcs_bios", bios={"RADAR_SW": 1})
+    opr_frame = TelemetryFrame(seq=706, t_wall=706.0, source="dcs_bios", bios={"RADAR_SW": 2})
+
+    off_vars = resolver.resolve(off_frame)
+    stby_vars = resolver.resolve(stby_frame)
+    opr_vars = resolver.resolve(opr_frame)
+
+    assert off_vars["radar_mode_value"] == 0
+    assert off_vars["radar_on"] is False
+    assert off_vars["radar_mode_opr"] is False
+    assert stby_vars["radar_mode_value"] == 1
+    assert stby_vars["radar_on"] is True
+    assert stby_vars["radar_mode_opr"] is False
+    assert opr_vars["radar_mode_value"] == 2
+    assert opr_vars["radar_on"] is True
+    assert opr_vars["radar_mode_opr"] is True
+
+
+def test_var_resolver_pack_obogs_switch_matches_clickabledata_positions() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    on_frame = TelemetryFrame(seq=707, t_wall=707.0, source="dcs_bios", bios={"OBOGS_SW": 1, "OXY_FLOW": 65535})
+    off_frame = TelemetryFrame(seq=708, t_wall=708.0, source="dcs_bios", bios={"OBOGS_SW": 0, "OXY_FLOW": 65535})
+
+    on_vars = resolver.resolve(on_frame)
+    off_vars = resolver.resolve(off_frame)
+
+    assert on_vars["obogs_switch_on"] is True
+    assert on_vars["obogs_flow_on"] is True
+    assert on_vars["obogs_ready"] is True
+    assert off_vars["obogs_switch_on"] is False
+    assert off_vars["obogs_flow_on"] is True
+    assert off_vars["obogs_ready"] is False
+    assert on_vars["fcs_reset_complete"] is False
 
 
 def test_var_resolver_pack_takeoff_trim_set_tracks_button_press() -> None:
@@ -626,6 +726,56 @@ def test_var_resolver_pack_right_engine_idle_completion_requires_right_side_evid
     assert vars_out["rpm_r_gte_25"] is True
     assert vars_out["throttle_r_not_off"] is False
     assert vars_out["throttle_r_idle_complete"] is False
+
+
+def test_var_resolver_pack_ifei_fuel_flow_scales_display_by_100_for_nominal_window() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame = TelemetryFrame(
+        seq=727,
+        t_wall=727.0,
+        source="dcs_bios",
+        bios={
+            "IFEI_RPM_R": "64",
+            "IFEI_TEMP_R": "319",
+            "IFEI_FF_R": "7",
+            "IFEI_OIL_PRESS_R": "60",
+            "EXT_NOZZLE_POS_R": 50010,
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["ff_r"] == 700
+    assert vars_out["ff_r_in_range"] is True
+    assert vars_out["right_engine_nominal_start_params"] is True
+
+
+def test_var_resolver_pack_power_and_left_engine_start_completion_follow_operational_signals() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame = TelemetryFrame(
+        seq=728,
+        t_wall=728.0,
+        source="dcs_bios",
+        bios={
+            "BATTERY_SW": 1,
+            "EXT_PWR_SW": 1,
+            "L_GEN_SW": 0,
+            "R_GEN_SW": 0,
+            "ENGINE_CRANK_SW": 1,
+            "IFEI_RPM_L": "64",
+            "INT_THROTTLE_LEFT": 12345,
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["power_available"] is True
+    assert vars_out["engine_crank_left"] is False
+    assert vars_out["engine_crank_left_complete"] is True
+    assert vars_out["left_engine_idle_ready"] is True
+    assert "engine_crank_left_complete" not in vars_out["vars_source_missing"]
 
 
 def test_var_resolver_pack_radio_vars_follow_bios_exports() -> None:
