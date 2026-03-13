@@ -63,3 +63,40 @@ def test_help_trigger_hook_reuses_shared_windows_trigger(monkeypatch) -> None:
     assert captured["trigger_stop_called"] is True
     assert captured["trigger_closed"] is True
     assert captured["socket_closed"] is True
+
+
+def test_send_help_logs_and_continues_on_socket_oserror(monkeypatch, capsys) -> None:
+    class FailingSocket:
+        def sendto(self, payload: bytes, addr: tuple[str, int]) -> None:
+            raise OSError("network down")
+
+        def close(self) -> None:
+            return
+
+    monkeypatch.setattr(send_help_hotkey.socket, "socket", lambda *args, **kwargs: FailingSocket())
+    monkeypatch.setattr(
+        send_help_hotkey,
+        "WindowsGlobalHelpTrigger",
+        lambda **kwargs: type(
+            "FakeTrigger",
+            (),
+            {
+                "hotkey_label": "Ctrl+X1",
+                "request_stop": lambda self: None,
+                "close": lambda self: None,
+                "start": lambda self: None,
+            },
+        )(),
+    )
+    runner = send_help_hotkey.HelpTriggerHook(
+        host="127.0.0.1",
+        port=7792,
+        hotkey="X1",
+        modifiers="Ctrl",
+        cooldown_ms=650,
+    )
+
+    runner._send_help()
+
+    captured = capsys.readouterr()
+    assert "send failed to 127.0.0.1:7792" in captured.out

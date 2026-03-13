@@ -75,7 +75,11 @@ class HelpTriggerHook:
             signal.signal(signal.SIGTERM, _sigint_handler)
 
     def _send_help(self) -> None:
-        self._sock.sendto(self._payload, (self.host, self.port))
+        try:
+            self._sock.sendto(self._payload, (self.host, self.port))
+        except OSError as exc:
+            print(f"[HOTKEY] send failed to {self.host}:{self.port}: {type(exc).__name__}: {exc}")
+            return
         print(f"[HOTKEY] sent help to {self.host}:{self.port}")
 
 

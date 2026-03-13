@@ -3371,16 +3371,17 @@ class LiveDcsTutorLoop:
                 self._stats.frames += 1
                 obs_payload = obs.payload if isinstance(obs.payload, Mapping) else {}
                 obs_t_wall = _coerce_float(obs_payload.get("t_wall"))
+                help_action_t_wall = time.time() if self.vision_mode == "live" else obs_t_wall
                 if auto_help_on_first_frame and not first_help_done:
                     if help_capture_notifier is not None and hasattr(help_capture_notifier, "notify_help"):
                         help_capture_notifier.notify_help()
-                    self.run_help_cycle(trigger_t_wall=obs_t_wall)
+                    self.run_help_cycle(trigger_t_wall=help_action_t_wall)
                     first_help_done = True
                 if auto_help_every_n_frames > 0:
                     if self._stats.frames % auto_help_every_n_frames == 0:
                         if help_capture_notifier is not None and hasattr(help_capture_notifier, "notify_help"):
                             help_capture_notifier.notify_help()
-                        self.run_help_cycle(trigger_t_wall=obs_t_wall)
+                        self.run_help_cycle(trigger_t_wall=help_action_t_wall)
             else:
                 exhausted = bool(getattr(self.source, "is_exhausted", False))
                 if exhausted:

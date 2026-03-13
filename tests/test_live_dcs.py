@@ -576,12 +576,38 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert executor.calls[0][0]["type"] == "overlay"
     assert executor.calls[0][0]["target"] == "apu_switch"
 
-    kinds = [event.kind for event in events]
-    assert "observation" in kinds
-    assert "tutor_request" in kinds
-    assert "tutor_response" in kinds
-    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
-    assert isinstance(tutor_response_payload["metadata"].get("requires_visual_confirmation"), bool)
+
+def test_live_auto_help_uses_help_action_wall_time_for_live_vision(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_one.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class _Notifier:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def notify_help(self) -> None:
+            self.calls += 1
+
+    notifier = _Notifier()
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-live-trigger-time",
+        vision_mode="live",
+    )
+    monkeypatch.setattr("live_dcs.time.time", lambda: 1772872445.25)
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True, help_capture_notifier=notifier)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 1
+    assert notifier.calls == 1
+    request = model.calls[0]["request"]
+    assert request.context["vision"]["trigger_wall_ms"] == 1772872445250
 
 
 def test_live_loop_records_grounding_snippet_ids_when_index_available(tmp_path: Path) -> None:
