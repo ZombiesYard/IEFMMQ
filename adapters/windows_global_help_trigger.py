@@ -205,7 +205,13 @@ class WindowsGlobalHelpTrigger:
         self._ready.set()
         msg = wintypes.MSG()
         try:
-            while not self._stop_requested and _USER32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+            while not self._stop_requested:
+                result = int(_USER32.GetMessageW(ctypes.byref(msg), None, 0, 0))
+                if result == -1:
+                    error = ctypes.get_last_error()
+                    raise OSError(f"GetMessageW failed (GetLastError={error})")
+                if result == 0:
+                    break
                 if int(msg.message) == WM_QUIT:
                     break
                 _USER32.TranslateMessage(ctypes.byref(msg))

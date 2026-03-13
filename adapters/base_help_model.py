@@ -526,8 +526,7 @@ class BaseHelpModel(ModelPort):
                     source_missing.add(key)
         except VarResolverError:
             return vars_raw
-        provided_keys = {key for key in vars_raw.keys() if isinstance(key, str) and key}
-        merged["vars_source_missing"] = sorted(item for item in source_missing if item not in provided_keys)
+        merged["vars_source_missing"] = sorted(source_missing)
         return merged
 
     def _present_missing_conditions(

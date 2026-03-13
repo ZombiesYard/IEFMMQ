@@ -326,8 +326,8 @@ def _resolve_runtime_config(args: argparse.Namespace) -> tuple[SidecarConfig, Pa
     output_root = Path(args.output_root).expanduser() if args.output_root else loaded.output_root
     channel = str(args.channel).strip() if args.channel else loaded.channel
     layout_id = str(args.layout_id).strip() if args.layout_id else loaded.layout_id
-    capture_width = int(args.capture_width) if args.capture_width else loaded.capture_width
-    capture_height = int(args.capture_height) if args.capture_height else loaded.capture_height
+    capture_width = int(args.capture_width) if args.capture_width is not None else loaded.capture_width
+    capture_height = int(args.capture_height) if args.capture_height is not None else loaded.capture_height
     return (
         SidecarConfig(
             output_root=output_root,

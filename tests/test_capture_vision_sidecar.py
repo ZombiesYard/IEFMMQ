@@ -12,6 +12,7 @@ from tools.capture_vision_sidecar import (
     UdpCaptureRequestListener,
     VisionCaptureSidecar,
     VisionFrameSidecarWriter,
+    _resolve_runtime_config,
     build_arg_parser,
     load_sidecar_config,
 )
@@ -197,3 +198,48 @@ def test_sidecar_cli_defaults_to_help_trigger_only_capture() -> None:
     args = parser.parse_args(["--saved-games-dir", "C:\\Saved Games\\DCS", "--session-id", "sess-live"])
 
     assert args.capture_fps == 0.0
+
+
+def test_resolve_runtime_config_preserves_zero_sized_cli_override(tmp_path: Path) -> None:
+    config_path = tmp_path / "Saved Games" / "DCS" / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "\n".join(
+            [
+                "return {",
+                "  vision = {",
+                '    layout_id = "fa18c_composite_panel_v2",',
+                '    channel = "composite_panel",',
+                f"    output_root = [[{tmp_path / 'Saved Games' / 'DCS' / 'SimTutor' / 'frames'}]],",
+                "    capture_resolution = {",
+                "      width = 3440,",
+                "      height = 1440,",
+                "    },",
+                "  },",
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--saved-games-dir",
+            str(tmp_path / "Saved Games" / "DCS"),
+            "--session-id",
+            "sess-live",
+            "--config-path",
+            str(config_path),
+            "--capture-width",
+            "0",
+            "--capture-height",
+            "0",
+        ]
+    )
+
+    resolved, resolved_path = _resolve_runtime_config(args)
+
+    assert resolved_path == config_path
+    assert resolved.capture_width == 0
+    assert resolved.capture_height == 0
