@@ -101,7 +101,6 @@ def render_vlm_ready_frame(
     label_padding_y = max(6, cropped.height // 160)
     label_font = _load_font(max(18, cropped.height // 32))
     label_specs: list[dict[str, Any]] = []
-    max_label_height = 0
     for region in solved["regions"]:
         region_id = str(region["region_id"])
         label_text = str(region["display_name_en"])
@@ -112,7 +111,6 @@ def render_vlm_ready_frame(
         label_bbox = ImageDraw.Draw(Image.new("RGB", (1, 1))).textbbox((0, 0), label_text, font=label_font)
         label_width = (label_bbox[2] - label_bbox[0]) + label_padding_x * 2
         label_height = (label_bbox[3] - label_bbox[1]) + label_padding_y * 2
-        max_label_height = max(max_label_height, label_height)
         label_specs.append(
             {
                 "region_id": region_id,

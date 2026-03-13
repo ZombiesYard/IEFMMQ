@@ -1799,7 +1799,13 @@ class UdpVisionCaptureNotifier:
         if self.port <= 0:
             return
         payload = build_capture_request_payload(session_id=self.session_id, reason="help")
-        self._sock.sendto(payload, (self.host, self.port))
+        try:
+            self._sock.sendto(payload, (self.host, self.port))
+        except OSError as exc:
+            print(
+                f"[VISION_CAPTURE] notify_help send failed for {self.host}:{self.port}: "
+                f"{type(exc).__name__}: {exc}"
+            )
 
     def close(self) -> None:
         try:

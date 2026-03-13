@@ -4,7 +4,6 @@ Shared base implementation for HelpResponse-capable model adapters.
 
 from __future__ import annotations
 
-import json
 from functools import lru_cache
 from pathlib import Path
 from time import perf_counter

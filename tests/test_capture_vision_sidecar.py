@@ -108,6 +108,21 @@ def test_udp_vision_capture_notifier_sends_help_request() -> None:
     }
 
 
+def test_udp_vision_capture_notifier_ignores_send_oserror(capsys) -> None:
+    class FailingSocket(DummyDatagramSocket):
+        def sendto(self, payload: bytes, addr: tuple[str, int]) -> None:
+            raise OSError("network down")
+
+    notifier = UdpVisionCaptureNotifier(session_id="sess-live", host="127.0.0.1", port=7795, sock=FailingSocket())
+    try:
+        notifier.notify_help()
+    finally:
+        notifier.close()
+
+    captured = capsys.readouterr()
+    assert "notify_help send failed" in captured.out
+
+
 def test_vision_frame_sidecar_writer_writes_png_and_manifest(tmp_path: Path) -> None:
     writer = VisionFrameSidecarWriter(
         output_root=tmp_path / "Saved Games" / "DCS" / "SimTutor" / "frames",

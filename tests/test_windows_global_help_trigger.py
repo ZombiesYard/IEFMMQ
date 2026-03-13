@@ -48,3 +48,40 @@ def test_run_loop_raises_when_getmessagew_returns_error(monkeypatch) -> None:
 
     with pytest.raises(OSError, match="GetMessageW failed"):
         trigger._run_loop()
+
+
+def test_close_warns_when_hook_thread_does_not_stop(monkeypatch) -> None:
+    trigger = WindowsGlobalHelpTrigger(hotkey="F8")
+    trigger._started = True
+
+    class DummyThread:
+        def __init__(self) -> None:
+            self.join_calls: list[float] = []
+
+        def is_alive(self) -> bool:
+            return True
+
+        def join(self, timeout: float | None = None) -> None:
+            self.join_calls.append(timeout if timeout is not None else -1.0)
+
+    class DummyEvent:
+        def __init__(self) -> None:
+            self.wait_calls: list[float] = []
+
+        def wait(self, timeout: float | None = None) -> bool:
+            self.wait_calls.append(timeout if timeout is not None else -1.0)
+            return False
+
+    thread = DummyThread()
+    event = DummyEvent()
+    trigger._thread = thread
+    trigger._closed = event
+    monkeypatch.setattr(trigger, "request_stop", lambda: None)
+    calls: list[str] = []
+    monkeypatch.setattr("builtins.print", lambda *args, **kwargs: calls.append(str(args[0])))
+
+    trigger.close()
+
+    assert event.wait_calls == [1.0]
+    assert thread.join_calls == [1.0]
+    assert any("shutdown timed out" in call for call in calls)

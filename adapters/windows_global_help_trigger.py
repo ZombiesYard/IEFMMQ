@@ -184,8 +184,16 @@ class WindowsGlobalHelpTrigger:
 
     def close(self) -> None:
         self.request_stop()
+        if not self._started:
+            return
+        self._closed.wait(timeout=1.0)
         if self._thread.is_alive():
             self._thread.join(timeout=1.0)
+        if self._thread.is_alive():
+            print(
+                f"[GLOBAL_HELP_TRIGGER] shutdown timed out for {self.hotkey_label}",
+                file=sys.stderr,
+            )
 
     def request_stop(self) -> None:
         self._stop_requested = True
