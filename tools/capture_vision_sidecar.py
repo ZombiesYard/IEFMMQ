@@ -25,7 +25,7 @@ from adapters.vision_capture_trigger import (
 from adapters.vision_frames import DEFAULT_FRAME_MANIFEST_NAME, build_frame_filename, build_frame_id
 from simtutor.schemas import validate_instance
 
-DEFAULT_CAPTURE_FPS = 1.0
+DEFAULT_CAPTURE_FPS = 0.0
 
 
 @dataclass(frozen=True)
@@ -234,7 +234,8 @@ class VisionCaptureSidecar:
     ) -> None:
         self.writer = writer
         self.request_listener = request_listener
-        self.capture_interval_s = 1.0 / max(float(capture_fps), 0.01)
+        normalized_capture_fps = float(capture_fps)
+        self.capture_interval_s = None if normalized_capture_fps <= 0 else 1.0 / normalized_capture_fps
         self.monotonic = monotonic
         self.sleep = sleep
 
@@ -254,7 +255,7 @@ class VisionCaptureSidecar:
         interval_captures = 0
         last_frame_id: str | None = None
         start = self.monotonic()
-        next_interval_capture = start
+        next_interval_capture = start if self.capture_interval_s is not None else None
 
         while True:
             now = self.monotonic()
@@ -265,7 +266,7 @@ class VisionCaptureSidecar:
             reason: str | None = None
             if request is not None:
                 reason = str(request.get("reason") or "help")
-            elif now >= next_interval_capture:
+            elif next_interval_capture is not None and now >= next_interval_capture:
                 reason = "interval"
 
             if reason is not None:
@@ -276,7 +277,8 @@ class VisionCaptureSidecar:
                     interval_captures += 1
                 else:
                     help_trigger_captures += 1
-                next_interval_capture = self.monotonic() + self.capture_interval_s
+                if self.capture_interval_s is not None:
+                    next_interval_capture = self.monotonic() + self.capture_interval_s
                 if max_frames > 0 and frames_written >= max_frames:
                     break
                 continue
@@ -303,7 +305,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--layout-id", default=None, help="Optional override for vision.layout_id.")
     parser.add_argument("--capture-width", type=int, default=None, help="Optional override for capture_resolution.width.")
     parser.add_argument("--capture-height", type=int, default=None, help="Optional override for capture_resolution.height.")
-    parser.add_argument("--capture-fps", type=float, default=DEFAULT_CAPTURE_FPS, help="Continuous low-fps capture rate (default 1.0).")
+    parser.add_argument(
+        "--capture-fps",
+        type=float,
+        default=DEFAULT_CAPTURE_FPS,
+        help="Continuous low-fps capture rate; use 0 for help-trigger captures only.",
+    )
     parser.add_argument("--duration", type=float, default=0.0, help="Optional run duration in seconds.")
     parser.add_argument("--max-frames", type=int, default=0, help="Optional max frame count before exit.")
     parser.add_argument("--trigger-host", default=DEFAULT_VISION_CAPTURE_TRIGGER_HOST, help="UDP host for help-trigger capture requests.")

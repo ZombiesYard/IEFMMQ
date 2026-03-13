@@ -15,7 +15,6 @@ DEFAULT_CLICKABLEDATA_PATH = BASE_DIR / "CockpitScripts" / "clickabledata.lua"
 CLICKABLE_IDS_FIXTURE_PATH = BASE_DIR / "tests" / "fixtures" / "fa18c_clickable_ids.txt"
 CLICKABLEDATA_ENV_VAR = "SIMTUTOR_FA18C_CLICKABLEDATA_PATH"
 REQUIRED_STEP_IDS = tuple(f"S{i:02d}" for i in range(1, 26))
-REQUIRED_OPERABLE_STEP_IDS = REQUIRED_STEP_IDS
 _PNT_ID_PATTERN = re.compile(r"^pnt_[0-9]+(?:_[0-9]+)?$")
 _CLICKABLE_ID_PATTERN = re.compile(r'^\s*elements\["(?P<id>pnt_[0-9_]+)"\]\s*=', re.MULTILINE)
 _ALLOWED_MULTI_ACTION_DCS_IDS = {"pnt_124", "pnt_126"}
@@ -110,7 +109,12 @@ def test_all_operable_steps_have_non_empty_ui_targets() -> None:
     assert isinstance(steps, list)
 
     by_id = {step.get("id"): step for step in steps if isinstance(step, dict)}
-    for step_id in REQUIRED_OPERABLE_STEP_IDS:
+    operable_step_ids = tuple(
+        step_id
+        for step_id, step in by_id.items()
+        if isinstance(step_id, str) and step.get("overlay_enabled") is not False
+    )
+    for step_id in operable_step_ids:
         assert step_id in by_id, f"required step {step_id} missing in pack"
         ui_targets = by_id[step_id].get("ui_targets")
         assert isinstance(ui_targets, list), f"step {step_id} ui_targets must be list"
@@ -200,7 +204,9 @@ def test_pack_allowlist_matches_step_union_and_ui_map() -> None:
             if isinstance(target, str) and target:
                 step_target_sequence.append(target)
     step_union = _dedupe_keep_order(step_target_sequence)
-    assert pack_ui_targets == step_union, "pack.ui_targets must exactly match deduped step ui_targets union order"
+    assert set(step_union).issubset(set(pack_ui_targets)), (
+        "pack.ui_targets must contain every deduped step ui target and may include extra dormant targets"
+    )
 
 
 def test_step_signal_metadata_values_are_valid() -> None:

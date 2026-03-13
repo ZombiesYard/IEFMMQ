@@ -63,7 +63,6 @@ ui_targets:
   - fire_test_switch
   - apu_switch
   - eng_crank_switch
-  - throttle_quadrant_reference
   - bleed_air_knob
   - lights_test_button
   - left_mdi_brightness_selector
@@ -71,7 +70,10 @@ ui_targets:
   - ampcd_off_brightness_knob
   - hud_symbology_brightness_knob
   - left_mdi_pb5
+  - left_mdi_pb15
+  - left_mdi_pb18
   - right_mdi_pb5
+  - right_mdi_pb18
   - ufc_comm1_channel_selector_pull
   - ufc_comm1_channel_selector_rotate
   - ufc_comm2_channel_selector_pull
@@ -85,6 +87,7 @@ ui_targets:
   - takeoff_trim_button
   - fcs_bit_switch
   - refuel_probe_switch
+  - throttle_quadrant_reference
   - launch_bar_switch
   - arresting_hook_handle
   - pitot_heater_switch
@@ -108,10 +111,6 @@ precondition_gates:
       var: vars.power_available
       reason_code: s03_requires_power_available
       reason: "Power must be available before turning APU ON."
-    - op: flag_true
-      var: vars.fire_test_complete
-      reason_code: s03_requires_fire_test_complete
-      reason: "Fire detection test A/B must be completed before turning APU ON."
   S04:
     - op: flag_true
       var: vars.apu_ready
@@ -251,20 +250,12 @@ completion_gates:
       var: vars.r_gen_on
       reason_code: s01_requires_r_gen_on
       reason: "Right generator must be ON."
-  S02:
-    - op: flag_true
-      var: vars.fire_test_complete
-      reason_code: s02_requires_fire_test_complete
-      reason: "Fire detection test A/B must be completed before proceeding to APU start."
+  S02: []
   S03:
     - op: flag_true
-      var: vars.apu_on
-      reason_code: s03_requires_apu_on
-      reason: "APU switch must be ON."
-    - op: flag_true
-      var: vars.apu_ready
-      reason_code: s03_requires_apu_ready
-      reason: "APU READY light must be on."
+      var: vars.apu_start_support_complete
+      reason_code: s03_requires_apu_start_support_complete
+      reason: "APU support must be established before moving on (APU READY seen or right-engine start begun)."
   S04:
     - op: flag_true
       var: vars.engine_crank_right_complete
@@ -331,14 +322,34 @@ completion_gates:
       var: vars.radar_on
       reason_code: s13_requires_radar_on
       reason: "Radar knob must be set to OPR."
-  S14: []
+  S14:
+    - op: flag_true
+      var: vars.obogs_ready
+      reason_code: s14_requires_obogs_ready
+      reason: "OBOGS control and FLOW must both be ON."
   S15: []
-  S16: []
-  S17: []
+  S16:
+    - op: flag_true
+      var: vars.flap_auto
+      reason_code: s16_requires_flap_auto
+      reason: "Flap switch must be set to AUTO."
+  S17:
+    - op: flag_true
+      var: vars.takeoff_trim_set
+      reason_code: s17_requires_takeoff_trim_pressed
+      reason: "TAKEOFF TRIM button must be pressed."
   S18: []
   S19: []
-  S20: []
-  S21: []
+  S20:
+    - op: flag_true
+      var: vars.parking_brake_released
+      reason_code: s20_requires_parking_brake_released
+      reason: "Parking brake must be released."
+  S21:
+    - op: flag_true
+      var: vars.bingo_fuel_set
+      reason_code: s21_requires_bingo_fuel_set
+      reason: "BINGO fuel must be set on the IFEI."
   S22: []
   S23:
     - op: arg_in_range
@@ -347,8 +358,16 @@ completion_gates:
       max: 220
       reason_code: s23_requires_radalt_bug_airfield_200
       reason: "Radar altimeter bug should be near 200 ft for airfield startup."
-  S24: []
-  S25: []
+  S24:
+    - op: flag_true
+      var: vars.standby_attitude_uncaged
+      reason_code: s24_requires_standby_attitude_uncaged
+      reason: "Standby attitude indicator must be uncaged."
+  S25:
+    - op: flag_true
+      var: vars.attitude_source_auto
+      reason_code: s25_requires_attitude_source_auto
+      reason: "Attitude source selector must be set to AUTO."
 
 profile_overrides:
   carrier:
@@ -391,20 +410,20 @@ steps:
   - id: S02
     phase: P1
     critical: true
-    observability: partial
+    observability: observable
+    overlay_enabled: false
     evidence_requirements:
+      - var
       - delta
       - gate
-      - visual
     preconditions:
       - "Aircraft powered (BATTERY ON, generators ON)."
     completion_conditions:
       - "Fire test A completed with correct aural/visual indications."
       - "Fire test B completed after ~10s pause."
-    ui_targets:
-      - fire_test_switch
+    ui_targets: []
     tutor_prompts:
-      - "Hold FIRE TEST switch to A until tones finish, wait 10s, then repeat for B; visually confirm full annunciation."
+      - "Fire test is currently skipped in the live tutor flow; continue with APU start once aircraft power is stable."
 
   - id: S03
     phase: P1
@@ -444,20 +463,19 @@ steps:
   - id: S05
     phase: P2
     critical: true
-    observability: partial
+    observability: observable
+    overlay_enabled: false
     evidence_requirements:
       - var
       - gate
-      - visual
     preconditions:
       - "Right engine RPM rising from S04."
     completion_conditions:
       - "Right throttle at IDLE."
       - "Throttle moved when RPM >=25%."
-    ui_targets:
-      - throttle_quadrant_reference
+    ui_targets: []
     tutor_prompts:
-      - "Monitor IFEI; when right RPM passes 25%, lift and move right throttle to IDLE, then visually confirm detent release."
+      - "Monitor IFEI; when right RPM passes 25%, lift and move right throttle to IDLE."
 
   - id: S06
     phase: P2
@@ -479,19 +497,19 @@ steps:
   - id: S07
     phase: P2
     critical: false
-    observability: partial
+    observability: observable
+    overlay_enabled: false
     evidence_requirements:
+      - var
       - delta
       - gate
-      - visual
     preconditions:
       - "Right engine stabilized; electrical power available."
     completion_conditions:
       - "Light test executed with all annunciators verified."
-    ui_targets:
-      - lights_test_button
+    ui_targets: []
     tutor_prompts:
-      - "Press the lights test; confirm caution, warning, and advisory lamps illuminate and visually verify indications."
+      - "Lights test is currently skipped in the live tutor flow; proceed to display power-up once the right engine is stabilized."
 
   - id: S08
     phase: P3
@@ -511,19 +529,21 @@ steps:
       - right_mdi_brightness_selector
       - ampcd_off_brightness_knob
       - hud_symbology_brightness_knob
-      - left_mdi_pb5
+      - left_mdi_pb18
+      - left_mdi_pb15
+      - right_mdi_pb18
       - right_mdi_pb5
     tutor_prompts:
-      - "Power DDIs/MPCD/HUD; set left DDI to FCS and right DDI to BIT."
+      - "Power DDIs/MPCD/HUD. If a display is dark, use its brightness selector first. On the left DDI, if the FCS page is not already visible, use PB18 MENU until the root menu page appears, then press PB15 FCS. On the right DDI, recover BIT with PB18 MENU if needed; the correct top BIT page is the one showing the BIT headings, and PB5 enters FCS-MC from there."
 
   - id: S09
     phase: P3
     critical: false
-    observability: partial
+    observability: observable
     evidence_requirements:
+      - var
       - delta
       - rag
-      - visual
     preconditions:
       - "Displays powered (S08 complete)."
     completion_conditions:
@@ -534,7 +554,7 @@ steps:
       - ufc_comm2_channel_selector_pull
       - ufc_comm2_channel_selector_rotate
     tutor_prompts:
-      - "Use UFC/comm panels to set COMM1 and COMM2 to mission frequencies and visually confirm channel readouts."
+      - "Use UFC/comm panels to set COMM1 and COMM2 to mission frequencies/presets; verify the radio values from UFC/BIOS readouts."
 
   - id: S10
     phase: P4
@@ -556,20 +576,19 @@ steps:
   - id: S11
     phase: P4
     critical: true
-    observability: partial
+    observability: observable
+    overlay_enabled: false
     evidence_requirements:
       - var
       - gate
-      - visual
     preconditions:
       - "ENG CRANK already in LEFT and left engine spool-up underway."
       - "Left RPM reaches at least 25%."
     completion_conditions:
       - "Left throttle moved from OFF to IDLE when RPM >=25%."
-    ui_targets:
-      - throttle_quadrant_reference
+    ui_targets: []
     tutor_prompts:
-      - "Monitor left RPM; once >=25%, advance left throttle OFF to IDLE and visually confirm detent release."
+      - "Monitor left RPM; once >=25%, advance left throttle OFF to IDLE."
 
   - id: S12
     phase: P4
@@ -578,7 +597,6 @@ steps:
     evidence_requirements:
       - var
       - gate
-      - visual
     preconditions:
       - "Left engine RPM >60% and left throttle not in OFF."
     completion_conditions:
@@ -586,7 +604,7 @@ steps:
     ui_targets:
       - ins_mode_knob
     tutor_prompts:
-      - "When left engine RPM exceeds 60%, set INS knob to GND or CV for alignment; verify mode selection."
+      - "When left engine RPM exceeds 60%, set INS knob to GND or CV for alignment."
 
   - id: S13
     phase: P4
@@ -595,7 +613,6 @@ steps:
     evidence_requirements:
       - var
       - gate
-      - visual
     preconditions:
       - "INS mode configured for alignment."
     completion_conditions:
@@ -603,15 +620,14 @@ steps:
     ui_targets:
       - radar_mode_knob
     tutor_prompts:
-      - "After INS mode is set, rotate radar knob to OPR and verify radar comes online."
+      - "After INS mode is set, rotate radar knob to OPR."
 
   - id: S14
     phase: P4
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "Radar and core avionics are online."
@@ -621,7 +637,7 @@ steps:
       - obogs_control_switch
       - obogs_flow_knob
     tutor_prompts:
-      - "Set OBOGS and FLOW to ON; this step currently needs visual confirmation or checklist cross-check."
+      - "Set OBOGS and FLOW to ON."
 
   - id: S15
     phase: P5
@@ -638,17 +654,17 @@ steps:
       - "FCS page brought up and reviewed for faults."
     ui_targets:
       - fcs_reset_button
-      - left_mdi_pb5
+      - left_mdi_pb18
+      - left_mdi_pb15
     tutor_prompts:
-      - "Manually press FCS RESET, then use left DDI PB5 to bring up/review the FCS page; PB5 highlight is for monitoring only and final status needs visual confirmation."
+      - "If the left DDI is not already on the FCS page, use PB18 MENU to cycle back to the root menu and press PB15 FCS. Then press FCS RESET and review the left DDI FCS page to confirm the fault/X marks clear."
 
   - id: S16
     phase: P5
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "FCS checks reviewed and displays stable."
@@ -657,15 +673,14 @@ steps:
     ui_targets:
       - flap_switch
     tutor_prompts:
-      - "Set flap switch to AUTO and visually verify switch position."
+      - "Set flap switch to AUTO."
 
   - id: S17
     phase: P5
     critical: true
-    observability: unobservable
+    observability: partial
     evidence_requirements:
-      - visual
-      - rag
+      - delta
       - gate
     preconditions:
       - "Flap mode set and left display powered."
@@ -674,7 +689,7 @@ steps:
     ui_targets:
       - takeoff_trim_button
     tutor_prompts:
-      - "Press TAKEOFF TRIM and visually confirm trim indication."
+      - "Press TAKEOFF TRIM."
 
   - id: S18
     phase: P5
@@ -690,16 +705,17 @@ steps:
       - "FCS BIT interaction performed and result reviewed."
     ui_targets:
       - fcs_bit_switch
+      - right_mdi_pb18
       - right_mdi_pb5
     tutor_prompts:
-      - "Hold FCS BIT switch and press FCS OSB together; visual confirmation of BIT result is required."
+      - "On the right DDI, recover to the BIT flow with PB18 MENU if needed. From the BIT top page, press PB5 FCS-MC. When the FCS-MC page is showing the FCS option on PB5, hold the right-wall FCS BIT switch and press PB5 FCS together until the page shows IN TEST."
 
   - id: S19
     phase: P5
     critical: true
-    observability: unobservable
+    observability: partial
     evidence_requirements:
-      - visual
+      - delta
       - rag
       - gate
     preconditions:
@@ -714,15 +730,14 @@ steps:
       - pitot_heater_switch
       - flap_switch
     tutor_prompts:
-      - "Execute the full four-down checklist and visually verify each item because telemetry coverage is limited."
+      - "Execute the full four-down checklist; telemetry can observe several switch states, but the full sequence still needs confirmation."
 
   - id: S20
     phase: P6
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "Four-down checks completed and taxi prep ongoing."
@@ -731,15 +746,14 @@ steps:
     ui_targets:
       - parking_brake_handle
     tutor_prompts:
-      - "Release parking brake when taxi checklist is complete; verify brake state visually."
+      - "Release parking brake when taxi checklist is complete."
 
   - id: S21
     phase: P6
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "Pre-taxi instrument configuration in progress."
@@ -749,14 +763,14 @@ steps:
       - ifei_up_button
       - ifei_down_button
     tutor_prompts:
-      - "Set BINGO fuel on IFEI and visually confirm the target value."
+      - "Set BINGO fuel on the IFEI to the mission target."
 
   - id: S22
     phase: P6
     critical: true
-    observability: unobservable
+    observability: partial
     evidence_requirements:
-      - visual
+      - delta
       - rag
       - gate
     preconditions:
@@ -766,15 +780,14 @@ steps:
     ui_targets:
       - standby_altimeter_pressure_knob
     tutor_prompts:
-      - "Adjust standby barometric altimeter to field elevation/QNH and verify visually."
+      - "Adjust the standby barometric altimeter to the local field elevation/QNH reference."
 
   - id: S23
     phase: P6
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "Standby barometric altimeter configured."
@@ -783,15 +796,14 @@ steps:
     ui_targets:
       - radar_altimeter_bug_knob
     tutor_prompts:
-      - "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier); visual confirmation is required."
+      - "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier)."
 
   - id: S24
     phase: P6
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "Altimeter checks complete and standby instruments powered."
@@ -800,15 +812,14 @@ steps:
     ui_targets:
       - standby_attitude_cage_knob
     tutor_prompts:
-      - "Uncage the standby attitude indicator and visually confirm normal movement."
+      - "Uncage the standby attitude indicator."
 
   - id: S25
     phase: P6
     critical: true
-    observability: unobservable
+    observability: observable
     evidence_requirements:
-      - visual
-      - rag
+      - var
       - gate
     preconditions:
       - "Standby attitude indicator uncaged."
@@ -817,4 +828,4 @@ steps:
     ui_targets:
       - attitude_source_selector
     tutor_prompts:
-      - "Set attitude source selector to AUTO and visually verify final pre-taxi configuration."
+      - "Set attitude source selector to AUTO."

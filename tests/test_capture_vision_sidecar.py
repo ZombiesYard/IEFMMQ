@@ -12,6 +12,7 @@ from tools.capture_vision_sidecar import (
     UdpCaptureRequestListener,
     VisionCaptureSidecar,
     VisionFrameSidecarWriter,
+    build_arg_parser,
     load_sidecar_config,
 )
 
@@ -163,3 +164,36 @@ def test_udp_capture_listener_and_sidecar_help_capture(tmp_path: Path) -> None:
     assert stats.help_trigger_captures == 1
     assert stats.interval_captures == 0
     assert stats.last_frame_id == "1772872445010_000000"
+
+
+def test_sidecar_capture_fps_zero_disables_interval_capture(tmp_path: Path) -> None:
+    writer = VisionFrameSidecarWriter(
+        output_root=tmp_path / "Saved Games" / "DCS" / "SimTutor" / "frames",
+        session_id="sess-live",
+        channel="composite_panel",
+        layout_id="fa18c_composite_panel_v2",
+        capture_callable=lambda: Image.new("RGB", (320, 180), color=(0, 0, 0)),
+        clock=lambda: 1772872445.010,
+    )
+    sidecar = VisionCaptureSidecar(
+        writer=writer,
+        request_listener=None,
+        capture_fps=0.0,
+        sleep=lambda _seconds: None,
+    )
+
+    stats = sidecar.run(duration_s=0.05, max_frames=0)
+
+    assert stats.frames_written == 0
+    assert stats.help_trigger_captures == 0
+    assert stats.interval_captures == 0
+    assert stats.last_frame_id is None
+    assert writer.manifest_path.exists() is False
+
+
+def test_sidecar_cli_defaults_to_help_trigger_only_capture() -> None:
+    parser = build_arg_parser()
+
+    args = parser.parse_args(["--saved-games-dir", "C:\\Saved Games\\DCS", "--session-id", "sess-live"])
+
+    assert args.capture_fps == 0.0

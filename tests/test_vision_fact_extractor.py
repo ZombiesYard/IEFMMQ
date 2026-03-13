@@ -111,6 +111,31 @@ def test_vision_fact_extractor_builds_two_image_request_and_parses_positive_fact
     assert call["json"]["response_format"]["json_schema"]["name"] == "VisionFactResponse"
 
 
+def test_vision_fact_extractor_dashscope_qwen35_uses_json_object_and_omits_max_tokens(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(responses=[FakeResponse(_chat_payload([]), status_code=200)])
+    extractor = VisionFactExtractor(
+        client=fake,
+        model_name="qwen3.5-27b",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode",
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.status == "uncertain"
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["response_format"] == {"type": "json_object"}
+    assert "max_tokens" not in request_payload
+    assert request_payload["enable_thinking"] is False
+    assert "chat_template_kwargs" not in request_payload
+
+
 def test_vision_fact_extractor_returns_uncertain_when_model_is_unsure(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)

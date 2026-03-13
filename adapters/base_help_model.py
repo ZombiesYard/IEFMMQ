@@ -4,10 +4,12 @@ Shared base implementation for HelpResponse-capable model adapters.
 
 from __future__ import annotations
 
+import json
 from time import perf_counter
 from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_diagnostics
+from adapters.json_extract import parse_first_json
 from adapters.prompting import build_help_prompt_result
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import (
@@ -27,11 +29,12 @@ from core.help_failure import (
     exception_failure_stage,
     merge_failure_metadata,
 )
-from core.llm_schema import get_help_response_schema
+from core.llm_schema import get_help_response_schema, validate_help_response
 from core.security import redact_sensitive_text, sanitize_help_response_for_log, sanitize_public_model_text
 from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
+from jsonschema.exceptions import ValidationError
 from ports.model_port import ModelPort
 
 
@@ -148,21 +151,39 @@ class BaseHelpModel(ModelPort):
             try:
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             except Exception as first_parse_exc:
-                retry_count = 1
-                retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
-                retry_messages = self._build_retry_messages(messages, first_parse_exc)
-                if self.print_model_io:
-                    self._print_model_io_block(
-                        "PROMPT",
-                        self._render_debug_messages(retry_messages),
-                        request=request,
-                        attempt=2,
-                    )
-                raw_text = self._chat_with_failure_classification(retry_messages)
-                self._print_model_io_block("REPLY", raw_text, request=request, attempt=2)
-                if self.log_raw_llm_text:
-                    raw_text_attempts.append(raw_text)
-                help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
+                contextual_repair = self._attempt_contextual_schema_repair(
+                    raw_text,
+                    request=request,
+                    deterministic_hint=deterministic_hint,
+                )
+                if contextual_repair is not None:
+                    help_obj, extraction, repair_details = contextual_repair
+                else:
+                    retry_count = 1
+                    retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
+                    retry_messages = self._build_retry_messages(messages, first_parse_exc)
+                    if self.print_model_io:
+                        self._print_model_io_block(
+                            "PROMPT",
+                            self._render_debug_messages(retry_messages),
+                            request=request,
+                            attempt=2,
+                        )
+                    raw_text = self._chat_with_failure_classification(retry_messages)
+                    self._print_model_io_block("REPLY", raw_text, request=request, attempt=2)
+                    if self.log_raw_llm_text:
+                        raw_text_attempts.append(raw_text)
+                    try:
+                        help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
+                    except Exception as retry_parse_exc:
+                        contextual_repair = self._attempt_contextual_schema_repair(
+                            raw_text,
+                            request=request,
+                            deterministic_hint=deterministic_hint,
+                        )
+                        if contextual_repair is None:
+                            raise retry_parse_exc
+                        help_obj, extraction, repair_details = contextual_repair
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
             mapped = map_help_response_to_tutor_response(
@@ -645,12 +666,14 @@ class BaseHelpModel(ModelPort):
             retry_hint = (
                 "上一次输出未通过结构化校验。"
                 "请仅输出一个合法 JSON 对象，严格遵循 schema 与枚举，不要输出任何解释文本。"
+                "顶层必须包含 diagnosis、next、overlay、explanations、confidence 五个字段。"
                 f"上一轮错误：{error_text}"
             )
         else:
             retry_hint = (
                 "Previous output failed structured validation. "
                 "Return exactly one valid JSON object that strictly follows schema/enums, with no prose. "
+                "The top-level object must include diagnosis, next, overlay, explanations, and confidence. "
                 f"Previous error: {error_text}"
             )
         retry_messages = [dict(msg) for msg in messages]
@@ -695,6 +718,146 @@ class BaseHelpModel(ModelPort):
             "dropped_unrepairable_evidence": 0,
             "details": [],
         }
+
+    def _attempt_contextual_schema_repair(
+        self,
+        raw_text: str,
+        *,
+        request: TutorRequest,
+        deterministic_hint: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], Any, dict[str, Any]] | None:
+        try:
+            help_obj, extraction = parse_first_json(raw_text)
+        except Exception:
+            return None
+        if not isinstance(help_obj, dict):
+            return None
+        repaired_obj, details = self._repair_missing_help_fields_from_context(
+            help_obj,
+            request=request,
+            deterministic_hint=deterministic_hint,
+        )
+        if not details:
+            return None
+        try:
+            validate_help_response(repaired_obj)
+        except ValidationError:
+            return None
+        return repaired_obj, extraction, {
+            "repair_applied": True,
+            "repaired_evidence_types": 0,
+            "dropped_unrepairable_evidence": 0,
+            "details": details,
+        }
+
+    def _repair_missing_help_fields_from_context(
+        self,
+        help_obj: dict[str, Any],
+        *,
+        request: TutorRequest,
+        deterministic_hint: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        repaired = dict(help_obj)
+        details: list[dict[str, Any]] = []
+        inferred_step_id = self._pick_repair_step_id(repaired, deterministic_hint)
+        missing_conditions = _dedupe_non_empty_strings(deterministic_hint.get("missing_conditions"))
+
+        diagnosis = repaired.get("diagnosis")
+        if not isinstance(diagnosis, Mapping):
+            if inferred_step_id:
+                repaired["diagnosis"] = {"step_id": inferred_step_id, "error_category": "OM"}
+                details.append({"field": "diagnosis", "action": "filled_from_deterministic_hint"})
+        else:
+            diagnosis_mut = dict(diagnosis)
+            changed = False
+            if not isinstance(diagnosis_mut.get("step_id"), str) or not diagnosis_mut.get("step_id"):
+                if inferred_step_id:
+                    diagnosis_mut["step_id"] = inferred_step_id
+                    changed = True
+                    details.append({"field": "diagnosis.step_id", "action": "filled_from_deterministic_hint"})
+            if not isinstance(diagnosis_mut.get("error_category"), str) or not diagnosis_mut.get("error_category"):
+                diagnosis_mut["error_category"] = "OM"
+                changed = True
+                details.append({"field": "diagnosis.error_category", "action": "filled_default"})
+            if changed:
+                repaired["diagnosis"] = diagnosis_mut
+
+        next_block = repaired.get("next")
+        next_step_id = inferred_step_id
+        if isinstance(repaired.get("diagnosis"), Mapping):
+            diag_step_id = repaired["diagnosis"].get("step_id")
+            if isinstance(diag_step_id, str) and diag_step_id:
+                next_step_id = diag_step_id
+        if not isinstance(next_block, Mapping):
+            if next_step_id:
+                repaired["next"] = {"step_id": next_step_id}
+                details.append({"field": "next", "action": "filled_from_diagnosis"})
+        else:
+            next_mut = dict(next_block)
+            if not isinstance(next_mut.get("step_id"), str) or not next_mut.get("step_id"):
+                if next_step_id:
+                    next_mut["step_id"] = next_step_id
+                    repaired["next"] = next_mut
+                    details.append({"field": "next.step_id", "action": "filled_from_diagnosis"})
+
+        overlay = repaired.get("overlay")
+        if not isinstance(overlay, Mapping):
+            repaired["overlay"] = {"targets": [], "evidence": []}
+            details.append({"field": "overlay", "action": "filled_empty"})
+        else:
+            overlay_mut = dict(overlay)
+            changed = False
+            if not isinstance(overlay_mut.get("targets"), list):
+                overlay_mut["targets"] = []
+                changed = True
+                details.append({"field": "overlay.targets", "action": "filled_empty"})
+            if not isinstance(overlay_mut.get("evidence"), list):
+                overlay_mut["evidence"] = []
+                changed = True
+                details.append({"field": "overlay.evidence", "action": "filled_empty"})
+            if changed:
+                repaired["overlay"] = overlay_mut
+
+        explanations = repaired.get("explanations")
+        if not isinstance(explanations, list) or not any(isinstance(item, str) and item.strip() for item in explanations):
+            repaired["explanations"] = [self._default_repair_explanation(inferred_step_id, missing_conditions)]
+            details.append({"field": "explanations", "action": "filled_default"})
+
+        confidence = repaired.get("confidence")
+        if not isinstance(confidence, (int, float)):
+            repaired["confidence"] = 0.51
+            details.append({"field": "confidence", "action": "filled_default"})
+
+        return repaired, details
+
+    def _pick_repair_step_id(self, help_obj: Mapping[str, Any], deterministic_hint: Mapping[str, Any]) -> str | None:
+        diagnosis = help_obj.get("diagnosis")
+        if isinstance(diagnosis, Mapping):
+            step_id = diagnosis.get("step_id")
+            if isinstance(step_id, str) and step_id:
+                return step_id
+        next_block = help_obj.get("next")
+        if isinstance(next_block, Mapping):
+            step_id = next_block.get("step_id")
+            if isinstance(step_id, str) and step_id:
+                return step_id
+        hint_step_id = deterministic_hint.get("inferred_step_id")
+        if isinstance(hint_step_id, str) and hint_step_id:
+            return hint_step_id
+        return None
+
+    def _default_repair_explanation(self, step_id: str | None, missing_conditions: list[str]) -> str:
+        if self.lang == "zh":
+            if step_id and missing_conditions:
+                return f"当前大概率卡在 {step_id}，请先满足：{'; '.join(missing_conditions)}。"
+            if step_id:
+                return f"当前大概率卡在 {step_id}，请确认该步骤状态。"
+            return "请确认当前步骤状态。"
+        if step_id and missing_conditions:
+            return f"You are likely blocked at {step_id}. Satisfy: {'; '.join(missing_conditions)}."
+        if step_id:
+            return f"You are likely blocked at {step_id}. Confirm that step state."
+        return "Confirm the current step state."
 
     def _reset_runtime_metadata(self) -> None:
         return None

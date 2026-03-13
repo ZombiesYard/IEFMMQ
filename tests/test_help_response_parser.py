@@ -70,6 +70,19 @@ def test_parse_help_response_repairs_invalid_evidence_type_from_ref_prefix() -> 
     assert repair_meta["dropped_unrepairable_evidence"] == 0
 
 
+def test_parse_help_response_repairs_visual_evidence_type_from_vision_fact_ref() -> None:
+    help_obj = _help_obj_ok()
+    help_obj["overlay"]["evidence"][0]["type"] = "status"
+    help_obj["overlay"]["evidence"][0]["ref"] = "VISION_FACTS.fcs_page_visible@1772872445010_000123"
+    raw = json.dumps(help_obj, ensure_ascii=False)
+
+    parsed, _extract, repair_meta = parse_help_response_with_diagnostics(raw)
+
+    assert parsed["overlay"]["evidence"][0]["type"] == "visual"
+    assert repair_meta["repair_applied"] is True
+    assert repair_meta["repaired_evidence_types"] == 1
+
+
 def test_parse_help_response_drops_unrepairable_evidence_and_still_rejects_invalid_overlay() -> None:
     help_obj = _help_obj_ok()
     help_obj["overlay"]["evidence"][0]["type"] = "status"

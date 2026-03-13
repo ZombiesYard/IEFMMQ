@@ -32,7 +32,7 @@ def compute_requires_visual_confirmation(
 ) -> bool:
     requirements = set(step_evidence_requirements or [])
     status = normalize_observability_status(observability)
-    return bool(status in {"partial", "unobservable"} or "visual" in requirements)
+    return bool(status == "unobservable" or "visual" in requirements)
 
 
 __all__ = [

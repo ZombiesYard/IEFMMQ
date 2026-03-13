@@ -17,6 +17,7 @@ from core.types_v2 import VisionFact, VisionFactObservation, VisionObservation
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from adapters.openai_compat_model import OpenAICompatModel
+from adapters.step_inference import StepInferenceResult
 from adapters.source_chunk_refs import build_source_chunk_ref
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL
 from core.types import Observation, TutorRequest, TutorResponse
@@ -26,6 +27,7 @@ from live_dcs import (
     ReplayBiosReceiver,
     StdinHelpTrigger,
     UdpHelpTrigger,
+    _build_observation_source_from_args,
     build_arg_parser,
     _build_vision_fact_extractor_from_model,
     _build_vision_port_from_args,
@@ -109,6 +111,33 @@ class FailingModel:
 
     def explain_error(self, observation: Observation, request=None) -> TutorResponse:
         raise RuntimeError("model unavailable")
+
+
+class _TriggerOnce:
+    def __init__(self) -> None:
+        self._fired = False
+
+    def poll(self) -> bool:
+        if self._fired:
+            return False
+        self._fired = True
+        return True
+
+
+class _DelayedObservationSource:
+    def __init__(self, observation: Observation) -> None:
+        self._observation = observation
+        self._calls = 0
+        self.is_exhausted = False
+
+    def get_observation(self) -> Observation | None:
+        self._calls += 1
+        if self._calls == 1:
+            return None
+        if self._calls == 2:
+            return self._observation
+        self.is_exhausted = True
+        return None
 
 
 class SequencedGenerationModeModel:
@@ -532,18 +561,18 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert isinstance(hint, dict)
     assert hint.get("inferred_step_id")
     assert isinstance(hint.get("requires_visual_confirmation"), bool)
-    assert hint.get("step_ui_targets") == ["fire_test_switch"]
+    assert hint.get("step_ui_targets") == ["apu_switch"]
     gates = request.context["gates"]
     assert isinstance(gates, dict)
     assert "S03.completion" in gates
     assert gates["S03.completion"]["status"] in {"allowed", "blocked"}
     assert request.metadata["prompt_hash"]
-    assert request.context["overlay_target_allowlist"] == ["fire_test_switch"]
+    assert request.context["overlay_target_allowlist"] == ["apu_switch"]
 
     assert len(executor.calls) == 1
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
-    assert executor.calls[0][0]["target"] == "fire_test_switch"
+    assert executor.calls[0][0]["target"] == "apu_switch"
 
     kinds = [event.kind for event in events]
     assert "observation" in kinds
@@ -1611,6 +1640,26 @@ def test_resolve_step_overlay_allowlist_uses_tuple_recent_ui_targets_for_partial
     assert allowlist == ["apu_switch"]
 
 
+def test_resolve_step_overlay_allowlist_returns_empty_for_overlay_disabled_step() -> None:
+    allowlist = _resolve_step_overlay_allowlist(
+        "S05",
+        step_fallback_profiles={
+            "S05": {
+                "ui_targets": [],
+                "overlay_enabled": False,
+            }
+        },
+        overlay_allowset={"apu_switch", "battery_switch"},
+        default_allowlist=["battery_switch", "apu_switch"],
+        deterministic_hint={
+            "observability_status": "observable",
+            "recent_ui_targets": ("apu_switch",),
+        },
+    )
+
+    assert allowlist == []
+
+
 def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_allowlist_partial_filter.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
@@ -1678,9 +1727,9 @@ def test_live_loop_emits_overlay_rejected_event_for_evidence_failure(tmp_path: P
                 metadata={
                     "provider": "mock_qwen",
                     "help_response": {
-                        "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                        "diagnosis": {"step_id": "S03", "error_category": "OM"},
                         "next": {"step_id": "S03"},
-                        "overlay": {"targets": ["fire_test_switch"], "evidence": []},
+                        "overlay": {"targets": ["apu_switch"], "evidence": []},
                         "explanations": ["Need more evidence."],
                         "confidence": 0.4,
                     },
@@ -1781,7 +1830,7 @@ def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys
     assert len(executor.calls) == 0
     out = capsys.readouterr().out
     assert "dry_run_actions" in out
-    assert "fire_test_switch" in out
+    assert "apu_switch" in out
 
 
 def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_path: Path, capsys) -> None:
@@ -1807,7 +1856,7 @@ def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_pa
     assert len(executor.calls) == 1
     out = capsys.readouterr().out
     assert "dry_run_actions" in out
-    assert "fire_test_switch" in out
+    assert "apu_switch" in out
 
 
 def test_replay_receiver_streams_and_only_parses_on_demand(tmp_path: Path) -> None:
@@ -2130,6 +2179,77 @@ def test_load_step_signal_profiles_parses_valid_step_metadata(tmp_path: Path) ->
     assert profiles["S02"]["requires_visual_confirmation"] is True
 
 
+def test_real_fa18c_pack_marks_s05_as_bios_observable() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    pack_path = repo_root / "packs" / "fa18c_startup" / "pack.yaml"
+
+    profiles = _load_step_signal_profiles(pack_path)
+
+    assert profiles["S05"]["observability"] == "observable"
+    assert profiles["S05"]["observability_status"] == "observable"
+    assert profiles["S05"]["evidence_requirements"] == ["var", "gate"]
+    assert profiles["S05"]["ui_targets"] == []
+    assert profiles["S05"]["overlay_enabled"] is False
+    assert profiles["S05"]["requires_visual_confirmation"] is False
+
+
+def test_real_fa18c_pack_marks_non_display_steps_as_bios_observable() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    pack_path = repo_root / "packs" / "fa18c_startup" / "pack.yaml"
+
+    profiles = _load_step_signal_profiles(pack_path)
+
+    for step_id in ("S11", "S12", "S13", "S14", "S16", "S20", "S21", "S23", "S24", "S25"):
+        assert profiles[step_id]["observability"] == "observable"
+        assert profiles[step_id]["observability_status"] == "observable"
+        assert profiles[step_id]["requires_visual_confirmation"] is False
+
+    assert profiles["S11"]["ui_targets"] == []
+    assert profiles["S11"]["overlay_enabled"] is False
+    assert profiles["S15"]["requires_visual_confirmation"] is True
+    assert profiles["S18"]["requires_visual_confirmation"] is True
+    assert profiles["S08"]["ui_targets"] == [
+        "left_mdi_brightness_selector",
+        "right_mdi_brightness_selector",
+        "ampcd_off_brightness_knob",
+        "hud_symbology_brightness_knob",
+        "left_mdi_pb18",
+        "left_mdi_pb15",
+        "right_mdi_pb18",
+        "right_mdi_pb5",
+    ]
+    assert profiles["S15"]["ui_targets"] == ["fcs_reset_button", "left_mdi_pb18", "left_mdi_pb15"]
+    assert profiles["S18"]["ui_targets"] == ["fcs_bit_switch", "right_mdi_pb18", "right_mdi_pb5"]
+
+
+def test_real_fa18c_pack_marks_non_display_partial_steps_as_non_visual() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    pack_path = repo_root / "packs" / "fa18c_startup" / "pack.yaml"
+
+    profiles = _load_step_signal_profiles(pack_path)
+
+    for step_id in ("S17", "S19", "S22"):
+        assert profiles[step_id]["observability"] == "partial"
+        assert profiles[step_id]["observability_status"] == "partial"
+        assert profiles[step_id]["requires_visual_confirmation"] is False
+
+    for step_id in ("S02", "S07"):
+        assert profiles[step_id]["observability"] == "observable"
+        assert profiles[step_id]["observability_status"] == "observable"
+        assert profiles[step_id]["requires_visual_confirmation"] is False
+
+    assert profiles["S02"]["evidence_requirements"] == ["var", "delta", "gate"]
+    assert profiles["S02"]["ui_targets"] == []
+    assert profiles["S02"]["overlay_enabled"] is False
+    assert profiles["S07"]["evidence_requirements"] == ["var", "delta", "gate"]
+    assert profiles["S07"]["ui_targets"] == []
+    assert profiles["S07"]["overlay_enabled"] is False
+    assert profiles["S09"]["observability"] == "observable"
+    assert profiles["S09"]["observability_status"] == "observable"
+    assert profiles["S09"]["requires_visual_confirmation"] is False
+    assert profiles["S09"]["evidence_requirements"] == ["var", "delta", "rag"]
+
+
 def test_load_step_signal_profiles_rejects_invalid_observability(tmp_path: Path) -> None:
     pack = tmp_path / "pack.yaml"
     pack.write_text(
@@ -2201,7 +2321,7 @@ def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> Non
     assert len(executor.calls) == 1
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
-    assert executor.calls[0][0]["target"] == "fire_test_switch"
+    assert executor.calls[0][0]["target"] == "apu_switch"
 
 
 def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_path: Path) -> None:
@@ -2229,7 +2349,7 @@ def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_p
     assert len(executor.calls[0]) == 1
     action = executor.calls[0][0]
     assert action["type"] == "overlay"
-    assert action["target"] == "fire_test_switch"
+    assert action["target"] == "apu_switch"
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
     meta = tutor_response_payload["metadata"]
@@ -2250,26 +2370,26 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
             return TutorResponse(
                 status="ok",
                 in_reply_to=request.request_id if request else None,
-                message="Turn on APU.",
+                message="Move ENG CRANK RIGHT.",
                 actions=[],
-                explanations=["Turn on APU."],
+                explanations=["Move ENG CRANK RIGHT."],
                 metadata={
                     "provider": "mock_qwen",
                     "help_response": {
-                        "diagnosis": {"step_id": "S03", "error_category": "OM"},
-                        "next": {"step_id": "S03"},
+                        "diagnosis": {"step_id": "S04", "error_category": "OM"},
+                        "next": {"step_id": "S04"},
                         "overlay": {
-                            "targets": ["apu_switch"],
+                            "targets": ["eng_crank_switch"],
                             "evidence": [
                                 {
-                                    "target": "apu_switch",
+                                    "target": "eng_crank_switch",
                                     "type": "delta",
-                                    "ref": "RECENT_UI_TARGETS.apu_switch",
-                                    "quote": "Recent delta shows APU switch activity.",
+                                    "ref": "RECENT_UI_TARGETS.eng_crank_switch",
+                                    "quote": "Recent delta shows ENG CRANK switch activity.",
                                 }
                             ],
                         },
-                        "explanations": ["Turn on APU."],
+                        "explanations": ["Move ENG CRANK RIGHT."],
                         "confidence": 0.82,
                     },
                 },
@@ -2292,19 +2412,19 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
         loop.close()
 
     assert len(executor.calls) == 1
-    assert executor.calls[0][0]["target"] == "fire_test_switch"
+    assert executor.calls[0][0]["target"] == "apu_switch"
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
     meta = tutor_response_payload["metadata"]
     assert meta["fallback_overlay_used"] is True
-    assert meta["fallback_overlay_reason"] == "deterministic_step:S02"
+    assert meta["fallback_overlay_reason"] == "deterministic_step:S03"
     response_mapping = meta["response_mapping"]
-    assert response_mapping["rejected_targets_by_request_allowlist"] == ["apu_switch"]
+    assert response_mapping["rejected_targets_by_request_allowlist"] == ["eng_crank_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
-    assert tutor_response_payload["message"] == "Turn on APU."
-    assert tutor_response_payload["explanations"] == ["Turn on APU."]
-    assert meta["fallback_message"] == "Please operate fire_test_switch first."
-    assert "Please operate fire_test_switch first." in meta["fallback_explanations"]
+    assert tutor_response_payload["message"] == "Move ENG CRANK RIGHT."
+    assert tutor_response_payload["explanations"] == ["Move ENG CRANK RIGHT."]
+    assert meta["fallback_message"] == "Please operate apu_switch first."
+    assert "Please operate apu_switch first." in meta["fallback_explanations"]
 
 
 def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> None:
@@ -2409,6 +2529,285 @@ def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> Non
                 assert overlay["targets"][0] in step_targets
             else:
                 assert fallback_help_obj is None, step_id
+    finally:
+        loop.close()
+
+
+def test_safe_fallback_overlay_prefers_hud_target_for_s08_hud_missing(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_pack_driven_fallback_s08.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {
+                    "left_ddi_on": True,
+                    "right_ddi_on": True,
+                    "mpcd_on": True,
+                    "hud_on": False,
+                },
+                "gates": {
+                    "S08.completion": {
+                        "status": "blocked",
+                        "reason_code": "s08_requires_hud_on",
+                        "reason": "HUD must be powered.",
+                    }
+                },
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "missing_conditions": ["vars.hud_on==true"],
+                    "gate_blockers": [{"ref": "GATES.S08.completion", "reason": "HUD must be powered."}],
+                    "recent_ui_targets": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+            },
+        )
+
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+
+        assert fallback_reason == "deterministic_step:S08"
+        assert isinstance(fallback_help_obj, dict)
+        assert fallback_help_obj["overlay"]["targets"] == ["hud_symbology_brightness_knob"]
+    finally:
+        loop.close()
+
+
+def test_normalize_observable_text_only_response_rewrites_bad_visual_excuse(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_observable_text_rewrite.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S05",
+                    "missing_conditions": ["vars.rpm_r>=25"],
+                    "observability_status": "observable",
+                    "requires_visual_confirmation": False,
+                }
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="当前步骤为 S05。由于缺乏变量证据且视觉不可用，无法确认具体操作目标。",
+            actions=[],
+            explanations=["由于缺乏变量证据且视觉不可用，无法确认具体操作目标。"],
+            metadata={},
+        )
+
+        loop._normalize_observable_text_only_response(response, request)
+
+        assert response.metadata["observable_text_rewritten"] is True
+        assert response.message == "降级提示：你大概率卡在 S05，请先满足：vars.rpm_r>=25。"
+        assert response.explanations == ["降级提示：你大概率卡在 S05，请先满足：vars.rpm_r>=25。"]
+    finally:
+        loop.close()
+
+
+def test_normalize_observable_text_only_response_rewrites_visual_analysis_unavailable(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_observable_visual_analysis_text_rewrite.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+                    "observability_status": "observable",
+                    "requires_visual_confirmation": False,
+                }
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="虽然视觉分析不可用，但根据任务流程提示，系统推断您应处于此阶段。",
+            actions=[],
+            explanations=["虽然视觉分析不可用，但根据任务流程提示，系统推断您应处于此阶段。"],
+            metadata={},
+        )
+
+        loop._normalize_observable_text_only_response(response, request)
+
+        assert response.metadata["observable_text_rewritten"] is True
+        assert response.message == "降级提示：你大概率卡在 S08，请先满足：vision_facts.fcs_page_visible==seen。"
+    finally:
+        loop.close()
+
+
+def test_should_use_deterministic_overlay_fallback_for_observable_text_only_step(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_overlay_fallback_observable.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "missing_conditions": ["vars.hud_on==true"],
+                    "observability_status": "observable",
+                    "requires_visual_confirmation": False,
+                }
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="HUD is not powered yet.",
+            actions=[],
+            explanations=["HUD is not powered yet."],
+            metadata={},
+        )
+
+        assert loop._should_use_deterministic_overlay_fallback(response, request, {}) is True
+    finally:
+        loop.close()
+
+
+def test_safe_fallback_overlay_prefers_left_ddi_menu_navigation_for_s08_fcs_page_missing(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_pack_driven_fallback_s08_fcs_page.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S08.completion", "status": "allowed"},
+                    {"gate_id": "S08.precondition", "status": "allowed"},
+                ],
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["bit_page_visible"],
+                    "not_seen_fact_ids": [
+                        "left_ddi_dark",
+                        "right_ddi_dark",
+                        "ampcd_dark",
+                        "left_ddi_fcs_option_visible",
+                        "fcs_page_visible",
+                    ],
+                    "uncertain_fact_ids": ["left_ddi_menu_root_visible"],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+                    "gate_blockers": [],
+                    "recent_ui_targets": ["lights_test_button"],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+                "rag_topk": [],
+            },
+        )
+
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+
+        assert fallback_reason == "deterministic_step:S08"
+        assert isinstance(fallback_help_obj, dict)
+        assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_pb18"]
+    finally:
+        loop.close()
+
+
+def test_safe_fallback_overlay_prefers_left_ddi_fcs_button_when_menu_page_visible(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_pack_driven_fallback_s08_fcs_button.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S08.completion", "status": "allowed"},
+                    {"gate_id": "S08.precondition", "status": "allowed"},
+                ],
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["bit_page_visible", "left_ddi_menu_root_visible"],
+                    "not_seen_fact_ids": [
+                        "left_ddi_dark",
+                        "right_ddi_dark",
+                        "ampcd_dark",
+                        "fcs_page_visible",
+                    ],
+                    "uncertain_fact_ids": [],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+                    "gate_blockers": [],
+                    "recent_ui_targets": ["lights_test_button"],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+                "rag_topk": [],
+            },
+        )
+
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+
+        assert fallback_reason == "deterministic_step:S08"
+        assert isinstance(fallback_help_obj, dict)
+        assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_pb15"]
     finally:
         loop.close()
 
@@ -2719,6 +3118,128 @@ def test_live_dcs_cli_scenario_profile_defaults_airfield_and_accepts_carrier() -
     assert args.scenario_profile == "carrier"
 
 
+def test_live_dcs_cli_parses_windows_global_help_trigger_args() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--global-help-hotkey",
+            "X1",
+            "--global-help-modifiers",
+            "Ctrl+Shift",
+            "--global-help-cooldown-ms",
+            "800",
+        ]
+    )
+    assert args.global_help_hotkey == "X1"
+    assert args.global_help_modifiers == "Ctrl+Shift"
+    assert args.global_help_cooldown_ms == 800
+
+
+def test_live_loop_preserves_pending_help_until_first_observation() -> None:
+    observation = Observation(source="dcs_bios_raw", payload=_bios_frame(1, 10.0, apu_switch=0))
+    source = _DelayedObservationSource(observation)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-pending-help",
+    )
+    try:
+        stats = loop.run(max_frames=1, help_trigger=_TriggerOnce(), idle_sleep_s=0.0)
+    finally:
+        loop.close()
+
+    assert stats["frames"] == 1
+    assert len(model.calls) == 1
+
+
+def test_live_loop_stabilizes_inference_without_power_reset(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_sticky_inference.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-sticky-inference",
+    )
+    try:
+        later = loop._stabilize_live_inference(
+            StepInferenceResult(inferred_step_id="S08", missing_conditions=("vars.hud_on==true",)),
+            {"battery_on": True, "power_available": True},
+        )
+        regressed = loop._stabilize_live_inference(
+            StepInferenceResult(inferred_step_id="S03", missing_conditions=("vars.apu_start_support_complete==true",)),
+            {"battery_on": True, "power_available": True},
+        )
+        reset = loop._stabilize_live_inference(
+            StepInferenceResult(inferred_step_id="S01", missing_conditions=("vars.battery_on==true",)),
+            {"battery_on": False, "power_available": False},
+        )
+    finally:
+        loop.close()
+
+    assert later.inferred_step_id == "S08"
+    assert regressed.inferred_step_id == "S08"
+    assert regressed.missing_conditions == ("vars.hud_on==true",)
+    assert reset.inferred_step_id == "S01"
+
+
+def test_live_dcs_cli_parses_raw_bios_source_args() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--bios-source",
+            "raw",
+            "--raw-bios-aircraft",
+            "FA-18C_hornet",
+            "--raw-bios-port",
+            "5010",
+        ]
+    )
+    assert args.bios_source == "raw"
+    assert args.raw_bios_aircraft == "FA-18C_hornet"
+    assert args.raw_bios_port == 5010
+
+
+def test_build_observation_source_from_args_uses_raw_receiver(monkeypatch: pytest.MonkeyPatch) -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--bios-source",
+            "raw",
+            "--raw-bios-aircraft",
+            "FA-18C_hornet",
+            "--raw-bios-host",
+            "239.255.50.10",
+            "--raw-bios-port",
+            "5010",
+        ]
+    )
+    captured: dict[str, Any] = {}
+
+    class FakeRawReceiver:
+        def __init__(self, **kwargs) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr("live_dcs.DcsBiosRawReceiver", FakeRawReceiver)
+
+    source = _build_observation_source_from_args(args)
+
+    assert isinstance(source, FakeRawReceiver)
+    assert captured["host"] == "239.255.50.10"
+    assert captured["port"] == 5010
+    assert captured["aircraft"] == "FA-18C_hornet"
+
+
+def test_build_observation_source_from_args_requires_aircraft_for_raw() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(["--bios-source", "raw"])
+
+    with pytest.raises(ValueError, match="--raw-bios-aircraft"):
+        _build_observation_source_from_args(args)
+
+
 def test_live_loop_request_context_and_metadata_include_scenario_profile(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_scenario_profile.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
@@ -2885,17 +3406,17 @@ def test_live_loop_help_cycle_includes_selected_vision_frames_in_request_and_eve
     assert vision["observation_ref"] == request.observation_ref
     assert vision["observation_t_wall_ms"] == 10000
     assert vision["trigger_wall_ms"] == 1772872445000
-    assert vision["frame_id"] == "1772872445010_000123"
-    assert vision["sync_status"] == "matched_future_fallback"
-    assert vision["sync_delta_ms"] == 10
-    assert vision["frame_stale"] is False
-    assert vision["frame_ids"] == ["1772872445010_000123"]
-    assert vision["pre_trigger_frame"] is None
+    assert vision["frame_id"] == "1772872444950_000122"
+    assert vision["sync_status"] == "matched_past"
+    assert vision["sync_delta_ms"] == -50
+    assert vision["frame_stale"] is True
+    assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert vision["pre_trigger_frame"]["frame_id"] == "1772872444950_000122"
     assert vision["trigger_frame"]["frame_id"] == "1772872445010_000123"
     tutor_request = next(event for event in events if event["kind"] == "tutor_request")
     tutor_response = next(event for event in events if event["kind"] == "tutor_response")
-    assert tutor_request["vision_refs"] == ["1772872445010_000123"]
-    assert tutor_response["vision_refs"] == ["1772872445010_000123"]
+    assert tutor_request["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert tutor_response["vision_refs"] == ["1772872444950_000122", "1772872445010_000123"]
 
 
 def test_live_loop_emits_vision_observation_events_with_attachments(tmp_path: Path) -> None:
@@ -3105,7 +3626,7 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
     class StaticVisionFactExtractor:
         def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
             assert session_id == "sess-live"
-            assert vision["frame_ids"] == ["1772872445010_000123"]
+            assert vision["frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
             return type(
                 "Result",
                 (),

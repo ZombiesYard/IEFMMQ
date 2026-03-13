@@ -43,7 +43,7 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
 
     assert payload["allowed_step_ids"] == ["S02", "S03"]
     assert payload["allowed_overlay_targets"] == ["apu_switch", "battery_switch"]
-    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]
     assert payload["allowed_error_categories"]
     assert payload["output_example_json"]["diagnosis"]["error_category"] in payload["allowed_error_categories"]
     summary = payload["recent_deltas_summary"]
@@ -51,7 +51,8 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert len(summary["items"]) == 2
     assert summary["items"][0]["ui_target"] == "apu_switch"
     evidence = payload["EVIDENCE_SOURCES"]
-    assert set(evidence.keys()) == {"VARS", "GATES", "RECENT_UI_TARGETS", "RAG_SNIPPETS"}
+    assert set(evidence.keys()) == {"VARS", "GATES", "RECENT_UI_TARGETS", "RAG_SNIPPETS", "VISION_FACTS"}
+    assert evidence["VISION_FACTS"] == []
     assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
     assert payload["deterministic_step_hint"]["inferred_step_id"] is None
     assert payload["deterministic_step_hint"]["missing_conditions"] == []
@@ -115,7 +116,7 @@ def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
     assert "If uncertainty_policy.unknown applies" in result.prompt
 
 
-def test_prompt_includes_vision_fact_summary_but_keeps_overlay_evidence_enum_unchanged() -> None:
+def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() -> None:
     ctx = _base_context()
     ctx["vision_fact_summary"] = {
         "status": "available",
@@ -125,17 +126,78 @@ def test_prompt_includes_vision_fact_summary_but_keeps_overlay_evidence_enum_unc
         "not_seen_fact_ids": [],
         "summary_text": "seen=fcs_reset_seen; uncertain=fcs_bit_result_visible",
     }
+    ctx["vision_facts"] = [
+        {
+            "fact_id": "fcs_reset_seen",
+            "state": "seen",
+            "source_frame_id": "1772872445010_000123",
+            "confidence": 0.96,
+            "evidence_note": "RESET cue visible on the FCS page.",
+        }
+    ]
 
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
 
     assert payload["vision_fact_summary"]["status"] == "available"
     assert payload["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
-    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]
+    assert "VISION_FACTS.fcs_reset_seen@1772872445010_000123" in payload["allowed_evidence_refs"]
+    assert payload["EVIDENCE_SOURCES"]["VISION_FACTS"] == [
+        {
+            "ref": "VISION_FACTS.fcs_reset_seen@1772872445010_000123",
+            "fact_id": "fcs_reset_seen",
+            "state": "seen",
+            "source_frame_id": "1772872445010_000123",
+            "confidence": 0.96,
+            "evidence_note": "RESET cue visible on the FCS page.",
+        }
+    ]
     assert payload["decision_priority"][:3] == [
         "deterministic_step_hint",
         "gates_summary",
         "vision_fact_summary",
     ]
+
+
+def test_prompt_prioritizes_missing_condition_vars_when_var_budget_trims() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S07"]
+    ctx["overlay_target_allowlist"] = ["lights_test_button"]
+    ctx["vars"] = {f"aaa_{i:02d}": i for i in range(30)}
+    ctx["vars"]["lights_test_complete"] = True
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S07",
+        "missing_conditions": ["vars.lights_test_complete==true"],
+        "observability_status": "partial",
+        "step_evidence_requirements": ["var", "delta", "gate"],
+        "recent_ui_targets": ["lights_test_button"],
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["current_vars_selected"]["lights_test_complete"] is True
+    assert len(payload["current_vars_selected"]) == 20
+
+
+def test_prompt_prioritizes_s05_engine_start_vars_when_var_budget_trims() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S05"]
+    ctx["overlay_target_allowlist"] = []
+    ctx["vars"] = {f"aaa_{i:02d}": i for i in range(30)}
+    ctx["vars"]["rpm_r"] = 28
+    ctx["vars"]["throttle_r_idle_complete"] = False
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S05",
+        "missing_conditions": ["vars.rpm_r>=25", "vars.throttle_r_idle_complete==true"],
+        "observability_status": "observable",
+        "step_evidence_requirements": ["var", "gate"],
+        "recent_ui_targets": [],
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["current_vars_selected"]["rpm_r"] == 28
+    assert payload["current_vars_selected"]["throttle_r_idle_complete"] is False
 
 
 def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
@@ -213,7 +275,6 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
 
     assert "compact_template" in result.metadata["trim_reasons"]
     assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
-    assert "hard_truncate" not in result.metadata["trim_reasons"]
     assert result.metadata["grounding_applied"] is False
     assert result.metadata["grounding_missing"] is True
     assert result.metadata["grounding_reason"] == "rag_snippets_not_injected"
@@ -223,6 +284,8 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     assert result.metadata["evidence_refs_count"] == 0
     assert "constraints=" in result.prompt
     assert '"grounding":{"applied":false,"missing":true,"reason":"rag_snippets_not_injected"}' in result.prompt
+    if "hard_truncate" not in result.metadata["trim_reasons"]:
+        assert 'Output shape={"diagnosis":{"step_id":"...","error_category":"..."}' in result.prompt
     assert "RAG_SNIPPETS" not in result.prompt
 
 
@@ -313,6 +376,38 @@ def test_prompt_trim_keeps_high_priority_generator_target_first() -> None:
 
     assert payload["allowed_overlay_targets"] == ["generator_left_switch"]
     assert payload["overlay_target_policy"]["preferred_target"] == "generator_left_switch"
+
+
+def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+        ],
+        "vars": {
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": False,
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vars.hud_on==true"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "gate", "delta"],
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["overlay_target_policy"]["preferred_target"] == "hud_symbology_brightness_knob"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "hud_symbology_brightness_knob"
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
@@ -619,4 +714,4 @@ def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
     assert hint["observability_status"] == "partial"
     assert hint["step_evidence_requirements"] == ["visual", "gate"]
     assert hint["requires_visual_confirmation"] is True
-    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]

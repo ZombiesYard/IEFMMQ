@@ -100,22 +100,47 @@ def render_vlm_ready_frame(
     label_padding_x = max(10, cropped.width // 70)
     label_padding_y = max(6, cropped.height // 160)
     label_font = _load_font(max(18, cropped.height // 32))
-    canvas = Image.new("RGB", (cropped.width + margin * 2, cropped.height + margin * 2), _CANVAS_BACKGROUND)
-    canvas.paste(cropped, (margin, margin))
-    draw = ImageDraw.Draw(canvas)
-
-    region_metadata: list[dict[str, Any]] = []
+    label_specs: list[dict[str, Any]] = []
+    max_label_height = 0
     for region in solved["regions"]:
-        local_x = margin + int(region["x"]) - int(strip_rect["x"])
-        local_y = margin + int(region["y"]) - int(strip_rect["y"])
-        local_w = int(region["width"])
-        local_h = int(region["height"])
         region_id = str(region["region_id"])
         label_text = str(region["display_name_en"])
         accent = _REGION_ACCENTS.get(region_id)
         label_background = _LABEL_BACKGROUNDS.get(region_id)
         if accent is None or label_background is None:
             raise ValueError(f"unsupported vision layout region_id for VLM artifact rendering: {region_id!r}")
+        label_bbox = ImageDraw.Draw(Image.new("RGB", (1, 1))).textbbox((0, 0), label_text, font=label_font)
+        label_width = (label_bbox[2] - label_bbox[0]) + label_padding_x * 2
+        label_height = (label_bbox[3] - label_bbox[1]) + label_padding_y * 2
+        max_label_height = max(max_label_height, label_height)
+        label_specs.append(
+            {
+                "region_id": region_id,
+                "label_text": label_text,
+                "accent": accent,
+                "label_background": label_background,
+                "label_width": label_width,
+                "label_height": label_height,
+            }
+        )
+
+    right_padding = max(margin * 2, max((int(spec["label_width"]) for spec in label_specs), default=0) + margin * 2)
+    canvas = Image.new("RGB", (cropped.width + margin * 2 + right_padding, cropped.height + margin * 2), _CANVAS_BACKGROUND)
+    canvas.paste(cropped, (margin, margin))
+    draw = ImageDraw.Draw(canvas)
+
+    region_metadata: list[dict[str, Any]] = []
+    for region, label_spec in zip(solved["regions"], label_specs):
+        local_x = margin + int(region["x"]) - int(strip_rect["x"])
+        local_y = margin + int(region["y"]) - int(strip_rect["y"])
+        local_w = int(region["width"])
+        local_h = int(region["height"])
+        region_id = str(label_spec["region_id"])
+        label_text = str(label_spec["label_text"])
+        accent = str(label_spec["accent"])
+        label_background = str(label_spec["label_background"])
+        label_width = int(label_spec["label_width"])
+        label_height = int(label_spec["label_height"])
 
         draw.rounded_rectangle(
             (
@@ -129,11 +154,17 @@ def render_vlm_ready_frame(
             width=border_width,
         )
 
-        label_bbox = draw.textbbox((0, 0), label_text, font=label_font)
-        label_width = (label_bbox[2] - label_bbox[0]) + label_padding_x * 2
-        label_height = (label_bbox[3] - label_bbox[1]) + label_padding_y * 2
-        label_x = local_x + border_width * 2
-        label_y = local_y + border_width * 2
+        label_x = min(
+            local_x + local_w + border_width * 3,
+            canvas.width - margin - label_width,
+        )
+        label_y = max(
+            margin,
+            min(
+                local_y + (local_h // 2) - (label_height // 2),
+                canvas.height - margin - label_height,
+            ),
+        )
         draw.rounded_rectangle(
             (
                 label_x,

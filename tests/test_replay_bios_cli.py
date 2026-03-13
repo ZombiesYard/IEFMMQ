@@ -172,6 +172,7 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
             return 1
 
         def start(self) -> None:
+            self._pending = True
             return
 
         def poll(self) -> bool:
@@ -210,17 +211,7 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
         ],
     )
 
-    def _send_help() -> None:
-        deadline = time.time() + 2.0
-        while not trigger_instances and time.time() < deadline:
-            time.sleep(0.01)
-        assert trigger_instances
-        trigger_instances[0]._pending = True
-
-    sender = threading.Thread(target=_send_help, daemon=True)
-    sender.start()
     code = main()
-    sender.join(timeout=1.0)
 
     assert code == 0
     events = JsonlEventStore.load(output_path)

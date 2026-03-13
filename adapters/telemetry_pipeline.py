@@ -24,6 +24,7 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "power_available",
     "apu_on",
     "apu_ready",
+    "apu_start_support_complete",
     "ins_mode",
     "engine_crank_right",
     "engine_crank_left",
@@ -60,15 +61,24 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "right_engine_nominal_start_params",
     "fire_test_active",
     "fire_test_complete",
+    "lights_test_active",
+    "annunciator_panel_activity",
+    "lights_test_complete",
+    "comm1_freq_value",
+    "comm2_freq_value",
+    "comm1_channel_numeric",
+    "comm2_channel_numeric",
     "obogs_ready",
     "fcs_reset_pressed",
     "flap_auto",
     "takeoff_trim_pressed",
+    "takeoff_trim_set",
     "fcs_bit_switch_up",
     "pitot_heat_on",
     "parking_brake_released",
     "bingo_fuel_set",
     "standby_altimeter_set",
+    "radar_altimeter_bug_value",
     "radar_altimeter_bug_set",
     "standby_attitude_uncaged",
     "attitude_source_auto",
@@ -79,11 +89,15 @@ _DEFAULT_DELTA_POLICY: DeltaPolicy | None = None
 _DEFAULT_DELTA_SANITIZER: DeltaSanitizer | None = None
 _POLICY_SCOPED_SANITIZERS: OrderedDict[tuple[DeltaPolicy, str], DeltaSanitizer] = OrderedDict()
 _MAX_POLICY_SCOPED_SANITIZERS = 256
+_MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = ("fire_test_complete", "lights_test_complete")
+_COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
+_MAX_COMPLETION_LATCH_STREAMS = 256
 _SHARED_DELTA_SANITIZER_LOCKS: WeakKeyDictionary[DeltaSanitizer, threading.Lock] = WeakKeyDictionary()
 _DEFAULT_DELTA_STREAM_ID = "__default__"
 _DEFAULT_DELTA_POLICY_LOCK = threading.Lock()
 _DEFAULT_DELTA_SANITIZER_LOCK = threading.Lock()
 _POLICY_SCOPED_SANITIZERS_LOCK = threading.Lock()
+_COMPLETION_LATCHES_LOCK = threading.Lock()
 _SHARED_DELTA_SANITIZER_LOCKS_LOCK = threading.Lock()
 
 
@@ -168,6 +182,71 @@ def _resolve_delta_stream_id(obs: Observation, explicit_stream_id: str | None) -
             if normalized:
                 return normalized
     return _DEFAULT_DELTA_STREAM_ID
+
+
+def _apply_momentary_completion_latches(
+    resolved_vars: Mapping[str, Any],
+    *,
+    stream_id: str,
+    t_wall: float | None,
+) -> dict[str, Any]:
+    out = dict(resolved_vars)
+    if t_wall is None:
+        return out
+
+    normalized_stream_id = _normalize_delta_stream_id(stream_id)
+    now_s = float(t_wall)
+    trigger_sources = {
+        "fire_test_complete": bool(resolved_vars.get("fire_test_active")),
+        "lights_test_complete": bool(resolved_vars.get("lights_test_active")),
+    }
+    raw_missing = resolved_vars.get("vars_source_missing")
+    missing_sources = {
+        item for item in raw_missing if isinstance(item, str) and item
+    } if isinstance(raw_missing, list) else set()
+    reset_session_completion = (
+        "battery_on" not in missing_sources and resolved_vars.get("battery_on") is False
+    )
+
+    with _COMPLETION_LATCHES_LOCK:
+        state = dict(_COMPLETION_LATCHES.get(normalized_stream_id, {}))
+        if reset_session_completion:
+            state.clear()
+        for key in _MOMENTARY_COMPLETION_KEYS:
+            stored = state.get(key)
+            if trigger_sources.get(key):
+                state[key] = True
+                out[key] = True
+                continue
+            if stored is True:
+                out[key] = True
+            elif isinstance(stored, (int, float)) and stored >= now_s:
+                out[key] = True
+            else:
+                state.pop(key, None)
+
+        if state:
+            _COMPLETION_LATCHES[normalized_stream_id] = state
+            _COMPLETION_LATCHES.move_to_end(normalized_stream_id)
+        else:
+            _COMPLETION_LATCHES.pop(normalized_stream_id, None)
+
+        while len(_COMPLETION_LATCHES) > max(1, int(_MAX_COMPLETION_LATCH_STREAMS)):
+            _COMPLETION_LATCHES.popitem(last=False)
+
+    raw_missing = out.get("vars_source_missing")
+    if isinstance(raw_missing, list):
+        missing_keys = [item for item in raw_missing if isinstance(item, str) and item]
+        if missing_keys:
+            latched_true = {
+                key
+                for key in _MOMENTARY_COMPLETION_KEYS
+                if bool(out.get(key))
+            }
+            if latched_true:
+                out["vars_source_missing"] = [key for key in missing_keys if key not in latched_true]
+
+    return out
 
 
 def _as_int(value: Any) -> int | None:
@@ -315,9 +394,6 @@ def enrich_bios_observation(
     bios_map = bios if isinstance(bios, Mapping) else {}
     delta_map = delta if isinstance(delta, Mapping) else {}
 
-    resolved_vars = resolver.resolve(payload)
-    selected_vars = _select_vars(resolved_vars, selected_var_keys)
-
     resolved_stream_id = _resolve_delta_stream_id(obs, delta_stream_id)
     policy, sanitizer, sanitizer_lock = _resolve_delta_policy_and_sanitizer(
         delta_policy=delta_policy,
@@ -328,6 +404,12 @@ def enrich_bios_observation(
 
     seq = _as_int(payload.get("seq"))
     t_wall = _as_float(payload.get("t_wall"))
+    resolved_vars = _apply_momentary_completion_latches(
+        resolver.resolve(payload),
+        stream_id=resolved_stream_id,
+        t_wall=t_wall,
+    )
+    selected_vars = _select_vars(resolved_vars, selected_var_keys)
     with sanitizer_lock:
         sanitized = sanitizer.sanitize_delta(delta_map, t_wall=t_wall, seq=seq)
     per_obs_summary = aggregate_delta_window([sanitized], policy=policy, mapper=mapper)

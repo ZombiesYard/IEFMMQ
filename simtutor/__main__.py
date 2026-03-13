@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import sys
 import time
 from typing import Any, Iterable, Tuple
 
@@ -381,6 +382,17 @@ def main() -> int:
 
     sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
 
+    from live_dcs import build_arg_parser as _build_live_dcs_arg_parser
+
+    live_dcs_parent = _build_live_dcs_arg_parser()
+    live_dcs_parent.prog = "simtutor live-dcs"
+    sub.add_parser(
+        "live-dcs",
+        parents=[live_dcs_parent],
+        add_help=False,
+        help="Run live DCS tutor loop against telemetry/vision sidecars",
+    )
+
     rep_bios = sub.add_parser("replay-bios", help="Replay DCS-BIOS JSONL through live tutor pipeline")
     rep_bios.add_argument("--input", required=True, help="Path to dcs_bios_raw.jsonl")
     rep_bios.add_argument("--speed", type=float, default=1.0, help="Replay speed (1.0 realtime, 0 max speed)")
@@ -603,6 +615,14 @@ def main() -> int:
             return 1
         print(f"[MODEL_CONFIG] {cfg.public_startup_info()}")
         return 0
+    if args.command == "live-dcs":
+        from live_dcs import main as _live_dcs_main
+
+        try:
+            return _live_dcs_main(sys.argv[2:])
+        except Exception as exc:
+            print(f"[LIVE_DCS] error: {exc}")
+            return 1
     if args.command == "replay-bios":
         try:
             return _run_replay_bios(args)

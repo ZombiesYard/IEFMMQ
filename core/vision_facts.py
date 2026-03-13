@@ -14,8 +14,16 @@ import yaml
 from core.types_v2 import VisionFactObservation
 
 VISION_FACT_IDS: tuple[str, ...] = (
+    "left_ddi_dark",
+    "right_ddi_dark",
+    "ampcd_dark",
+    "left_ddi_menu_root_visible",
+    "left_ddi_fcs_option_visible",
     "fcs_page_visible",
     "bit_page_visible",
+    "right_ddi_fcsmc_page_visible",
+    "right_ddi_fcs_option_visible",
+    "right_ddi_in_test_visible",
     "fcs_reset_seen",
     "fcs_bit_interaction_seen",
     "fcs_bit_result_visible",

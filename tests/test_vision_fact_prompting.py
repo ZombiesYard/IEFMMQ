@@ -41,3 +41,16 @@ def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
 
     assert '"facts":[]' in prompt
     assert '"step_bindings":{}' in prompt
+
+
+def test_vision_fact_prompt_mentions_ddi_menu_and_in_test_navigation_rules_in_zh() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="zh",
+        config=load_vision_facts_config(),
+    )
+
+    assert "PB18" in prompt
+    assert "根菜单/顶层菜单页" in prompt
+    assert "FCS-MC" in prompt
+    assert "IN TEST" in prompt

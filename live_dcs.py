@@ -7,6 +7,7 @@ import json
 import math
 import os
 import queue
+import re
 import socket
 import threading
 import time
@@ -21,7 +22,7 @@ import yaml
 
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
-from adapters.dcs_bios.receiver import DcsBiosReceiver
+from adapters.dcs_bios.receiver import DcsBiosRawReceiver, DcsBiosReceiver
 from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
 from adapters.knowledge_source_policy import KnowledgeSourcePolicy, KnowledgeSourcePolicyError
 from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
@@ -44,7 +45,7 @@ from adapters.recent_actions import (
 )
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
-from adapters.step_inference import infer_step_id, load_pack_steps
+from adapters.step_inference import StepInferenceResult, infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
 from adapters.vision_capture_trigger import (
     DEFAULT_VISION_CAPTURE_TRIGGER_HOST,
@@ -60,6 +61,7 @@ from adapters.vision_sync import (
     BufferedVisionSession,
     HelpCycleVisionSelection,
 )
+from adapters.windows_global_help_trigger import DEFAULT_GLOBAL_HELP_COOLDOWN_MS, WindowsGlobalHelpTrigger
 from core.constants import ENV_COLD_START_PRODUCTION
 from core.env_bool import parse_env_bool
 from core.event_store import JsonlEventStore
@@ -87,6 +89,26 @@ from core.step_signal_metadata import (
     normalize_observability_status,
 )
 from core.step_hint import hint_has_hard_blocker
+
+_MISSING_CONDITION_VAR_RE = re.compile(r"(?:payload\.)?vars\.([A-Za-z0-9_]+)")
+_MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
+    "battery_on": ("battery_switch",),
+    "bleed_air_cycle_complete": ("bleed_air_knob",),
+    "bleed_air_norm": ("bleed_air_knob",),
+    "engine_crank_left": ("eng_crank_switch",),
+    "engine_crank_right": ("eng_crank_switch",),
+    "engine_crank_right_complete": ("eng_crank_switch",),
+    "fire_test_complete": ("fire_test_switch",),
+    "hud_on": ("hud_symbology_brightness_knob",),
+    "left_ddi_on": ("left_mdi_brightness_selector",),
+    "lights_test_complete": ("lights_test_button",),
+    "mpcd_on": ("ampcd_off_brightness_knob",),
+    "r_gen_on": ("generator_right_switch",),
+    "right_ddi_on": ("right_mdi_brightness_selector",),
+    "rpm_r": ("eng_crank_switch", "throttle_quadrant_reference"),
+    "rpm_r_gte_25": ("eng_crank_switch", "throttle_quadrant_reference"),
+    "throttle_r_idle_complete": ("throttle_quadrant_reference",),
+}
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vision_facts import (
     VisionFactsConfigError,
@@ -784,6 +806,12 @@ def _load_step_signal_profiles(pack_path: Path) -> dict[str, dict[str, Any]]:
                 ui_targets.append(target)
             profile["ui_targets"] = ui_targets
 
+        overlay_enabled_raw = step.get("overlay_enabled")
+        if overlay_enabled_raw is not None:
+            if not isinstance(overlay_enabled_raw, bool):
+                raise ValueError(f"pack.steps[{step_idx}].overlay_enabled must be a bool: {pack_path}")
+            profile["overlay_enabled"] = overlay_enabled_raw
+
         if profile:
             observability_value = profile.get("observability")
             evidence_requirements_value = profile.get("evidence_requirements", [])
@@ -1309,6 +1337,77 @@ def _normalize_step_ui_targets(raw: Any) -> list[str]:
     return out
 
 
+def _missing_condition_target_hints(
+    missing_conditions: Any,
+    *,
+    allowed_targets: Sequence[str],
+) -> list[str]:
+    if not isinstance(missing_conditions, (list, tuple)):
+        return []
+    allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+    if not allowed:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in missing_conditions:
+        if not isinstance(item, str) or not item:
+            continue
+        matched = _MISSING_CONDITION_VAR_RE.search(item)
+        if matched is None:
+            continue
+        var_name = matched.group(1)
+        for target in _MISSING_CONDITION_TARGET_HINTS.get(var_name, ()):
+            if target not in allowed or target in seen:
+                continue
+            seen.add(target)
+            out.append(target)
+    return out
+
+
+def _prefer_navigation_target_from_vision_context(
+    *,
+    inferred_step_id: str,
+    missing_conditions: Sequence[str],
+    context: Mapping[str, Any],
+    allowed_targets: Sequence[str],
+) -> list[str]:
+    allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+    if inferred_step_id != "S08" or not allowed:
+        return []
+    if "vision_facts.fcs_page_visible==seen" not in missing_conditions:
+        return []
+    summary = context.get("vision_fact_summary")
+    if not isinstance(summary, Mapping):
+        return []
+    seen = {
+        item for item in summary.get("seen_fact_ids", [])
+        if isinstance(item, str) and item
+    }
+    uncertain = {
+        item for item in summary.get("uncertain_fact_ids", [])
+        if isinstance(item, str) and item
+    }
+    not_seen = {
+        item for item in summary.get("not_seen_fact_ids", [])
+        if isinstance(item, str) and item
+    }
+    if "left_ddi_dark" in not_seen:
+        if (
+            "left_ddi_fcs_option_visible" in seen
+            or "left_ddi_fcs_option_visible" in uncertain
+            or "left_ddi_menu_root_visible" in seen
+        ) and "left_mdi_pb15" in allowed:
+            return ["left_mdi_pb15"]
+        if (
+            "left_ddi_menu_root_visible" in uncertain
+            or "left_ddi_menu_root_visible" in not_seen
+        ) and "left_mdi_pb18" in allowed:
+            return ["left_mdi_pb18"]
+    if "left_mdi_brightness_selector" in allowed:
+        return ["left_mdi_brightness_selector"]
+    return []
+
+
 def _normalize_rule_var_ref(raw: Any) -> str | None:
     if not isinstance(raw, str):
         return None
@@ -1359,8 +1458,8 @@ def _build_step_fallback_profiles(
     *,
     precondition_gates: Mapping[str, Any],
     completion_gates: Mapping[str, Any],
-) -> dict[str, dict[str, list[str]]]:
-    profiles: dict[str, dict[str, list[str]]] = {}
+) -> dict[str, dict[str, Any]]:
+    profiles: dict[str, dict[str, Any]] = {}
     for step in pack_steps:
         if not isinstance(step, Mapping):
             continue
@@ -1376,6 +1475,7 @@ def _build_step_fallback_profiles(
         profiles[step_id] = {
             "ui_targets": ui_targets,
             "gate_var_refs": gate_var_refs,
+            "overlay_enabled": bool(step.get("overlay_enabled", True)),
         }
     return profiles
 
@@ -1393,6 +1493,8 @@ def _resolve_step_overlay_allowlist(
     profile = step_fallback_profiles.get(inferred_step_id)
     if not isinstance(profile, Mapping):
         return list(default_allowlist)
+    if profile.get("overlay_enabled") is False:
+        return []
     step_targets = _normalize_step_ui_targets(profile.get("ui_targets"))
     hint = deterministic_hint if isinstance(deterministic_hint, Mapping) else {}
     missing_conditions = hint.get("missing_conditions")
@@ -1849,6 +1951,12 @@ class LiveDcsTutorLoop:
         self._latest_enriched_obs: Observation | None = None
         self._help_cache: HelpCacheEntry | None = None
         self._vision_fact_snapshot: dict[str, dict[str, Any]] = {}
+        self._step_order_index = {
+            step_id: idx for idx, step_id in enumerate(self.candidate_steps) if isinstance(step_id, str) and step_id
+        }
+        self._sticky_inference_step_id: str | None = None
+        self._sticky_inference_missing_conditions: tuple[str, ...] = ()
+        self._pending_help_trigger_t_wall: float | None = None
         self._stats = LiveLoopStats()
 
     @property
@@ -2233,6 +2341,7 @@ class LiveDcsTutorLoop:
             pack_path=self.pack_path,
             vision_facts=vision_fact_context.get("vision_facts"),
         )
+        inference = self._stabilize_live_inference(inference, vars_selected)
         gates = _select_gates_for_context(
             all_gates,
             inferred_step_id=inference.inferred_step_id,
@@ -2380,6 +2489,41 @@ class LiveDcsTutorLoop:
         state_key = _stable_hash_json(state_signature)
         return req, prompt_result.metadata, state_key
 
+    def _should_reset_sticky_inference(self, vars_selected: Mapping[str, Any]) -> bool:
+        battery_on = vars_selected.get("battery_on")
+        power_available = vars_selected.get("power_available")
+        if isinstance(battery_on, bool) and not battery_on:
+            return True
+        if isinstance(power_available, bool) and not power_available:
+            return True
+        return False
+
+    def _stabilize_live_inference(
+        self,
+        inference: StepInferenceResult,
+        vars_selected: Mapping[str, Any],
+    ) -> StepInferenceResult:
+        if self._should_reset_sticky_inference(vars_selected):
+            self._sticky_inference_step_id = None
+            self._sticky_inference_missing_conditions = ()
+            return inference
+        current_step_id = inference.inferred_step_id
+        if not isinstance(current_step_id, str) or not current_step_id:
+            return inference
+        current_idx = self._step_order_index.get(current_step_id)
+        sticky_step_id = self._sticky_inference_step_id
+        sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
+        if current_idx is None:
+            return inference
+        if sticky_idx is None or current_idx >= sticky_idx:
+            self._sticky_inference_step_id = current_step_id
+            self._sticky_inference_missing_conditions = tuple(inference.missing_conditions)
+            return inference
+        return StepInferenceResult(
+            inferred_step_id=sticky_step_id,
+            missing_conditions=self._sticky_inference_missing_conditions,
+        )
+
     def _extract_vision_fact_context(
         self,
         *,
@@ -2470,6 +2614,82 @@ class LiveDcsTutorLoop:
         if inferred_step_id:
             return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
         return "Fallback: unable to infer current blocked step."
+
+    def _normalize_observable_text_only_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> None:
+        if response.actions or response.status != "ok":
+            return
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return
+        if bool(hint.get("requires_visual_confirmation")):
+            return
+        observability = hint.get("observability_status")
+        if not isinstance(observability, str) or not observability:
+            observability = hint.get("observability")
+        if observability != "observable":
+            return
+
+        text_parts = [response.message, *response.explanations]
+        combined = " ".join(part for part in text_parts if isinstance(part, str) and part).lower()
+        if not combined:
+            return
+        bad_reasons = (
+            "视觉不可用",
+            "视觉分析不可用",
+            "缺乏变量证据",
+            "变量证据",
+            "vision unavailable",
+            "visual analysis unavailable",
+            "missing variable evidence",
+        )
+        if not any(marker in combined for marker in bad_reasons):
+            return
+
+        inferred_step_id = hint.get("inferred_step_id") if isinstance(hint.get("inferred_step_id"), str) else None
+        missing_conditions = hint.get("missing_conditions")
+        normalized_missing = [
+            item for item in missing_conditions if isinstance(item, str) and item
+        ] if isinstance(missing_conditions, list) else []
+        normalized = self._fallback_message(inferred_step_id, normalized_missing)
+        response.message = normalized
+        response.explanations = [normalized]
+        response.metadata["observable_text_rewritten"] = True
+
+    def _should_use_deterministic_overlay_fallback(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+        mapped_meta: Mapping[str, Any] | None,
+    ) -> bool:
+        if response.actions:
+            return False
+        if response.status == "error":
+            return True
+        if isinstance(mapped_meta, Mapping) and (
+            mapped_meta.get("overlay_rejected")
+            or mapped_meta.get("rejected_targets_by_request_allowlist")
+        ):
+            return True
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False
+        if bool(hint.get("requires_visual_confirmation")):
+            return False
+        observability = hint.get("observability_status")
+        if not isinstance(observability, str) or not observability:
+            observability = hint.get("observability")
+        if observability != "observable":
+            return False
+        missing_conditions = hint.get("missing_conditions")
+        return isinstance(missing_conditions, list) and any(
+            isinstance(item, str) and item for item in missing_conditions
+        )
 
     def _map_response_actions(
         self,
@@ -2564,9 +2784,30 @@ class LiveDcsTutorLoop:
         if not fallback_targets:
             return None, f"unsupported_step:{inferred_step_id}"
         declared_fallback_target = fallback_targets[0]
+        missing_conditions_raw = hint.get("missing_conditions")
+        missing_conditions = [
+            item for item in missing_conditions_raw if isinstance(item, str) and item
+        ] if isinstance(missing_conditions_raw, list) else []
 
         request_allowlist = context.get("overlay_target_allowlist")
         candidate_targets = list(fallback_targets)
+        navigation_targets = _prefer_navigation_target_from_vision_context(
+            inferred_step_id=inferred_step_id,
+            missing_conditions=missing_conditions,
+            context=context,
+            allowed_targets=candidate_targets,
+        )
+        if navigation_targets:
+            candidate_targets = [
+                *navigation_targets,
+                *[target for target in candidate_targets if target not in set(navigation_targets)],
+            ]
+        hinted_targets = _missing_condition_target_hints(
+            missing_conditions,
+            allowed_targets=candidate_targets,
+        )
+        if hinted_targets:
+            candidate_targets = [*hinted_targets, *[target for target in candidate_targets if target not in set(hinted_targets)]]
         if isinstance(request_allowlist, list):
             allowset = {item for item in request_allowlist if isinstance(item, str) and item}
             if allowset:
@@ -2965,15 +3206,15 @@ class LiveDcsTutorLoop:
             response.actions = mapped_actions
             if mapped_meta:
                 response.metadata["response_mapping"] = mapped_meta
+            self._normalize_observable_text_only_response(response, request)
 
             fallback_overlay_used = False
             fallback_overlay_reason = "not_needed"
-            should_apply_safe_fallback = response.status == "error" and not response.actions
-            if not should_apply_safe_fallback and not response.actions and mapped_meta:
-                should_apply_safe_fallback = bool(
-                    mapped_meta.get("overlay_rejected")
-                    or mapped_meta.get("rejected_targets_by_request_allowlist")
-                )
+            should_apply_safe_fallback = self._should_use_deterministic_overlay_fallback(
+                response,
+                request,
+                mapped_meta,
+            )
             if should_apply_safe_fallback:
                 fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
                     response,
@@ -3112,6 +3353,10 @@ class LiveDcsTutorLoop:
             if duration_s > 0 and (time.time() - start) >= duration_s:
                 break
 
+            if help_trigger is not None:
+                while help_trigger.poll():
+                    self._pending_help_trigger_t_wall = time.time() if self.vision_mode == "live" else float("nan")
+
             obs = self.source.get_observation()
             if obs is not None:
                 self._ingest_observation(obs)
@@ -3133,8 +3378,9 @@ class LiveDcsTutorLoop:
                 if exhausted:
                     break
 
-            if help_trigger is not None and help_trigger.poll():
-                help_trigger_t_wall = time.time() if self.vision_mode == "live" else None
+            if self._pending_help_trigger_t_wall is not None and self._latest_enriched_obs is not None:
+                help_trigger_t_wall = self._pending_help_trigger_t_wall
+                self._pending_help_trigger_t_wall = None
                 if help_capture_notifier is not None and hasattr(help_capture_notifier, "notify_help"):
                     help_capture_notifier.notify_help()
                 self.run_help_cycle(trigger_t_wall=help_trigger_t_wall)
@@ -3151,6 +3397,32 @@ class LiveDcsTutorLoop:
 def _new_default_log_path() -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return Path("logs") / f"live_dcs_{ts}.jsonl"
+
+
+def _build_observation_source_from_args(args: argparse.Namespace) -> ObservationSource:
+    if args.replay_bios:
+        return ReplayBiosReceiver(args.replay_bios, speed=args.speed)
+
+    bios_source = str(getattr(args, "bios_source", "decoded")).strip().lower()
+    if bios_source == "raw":
+        aircraft = str(getattr(args, "raw_bios_aircraft", "") or "").strip()
+        if not aircraft:
+            raise ValueError("--raw-bios-aircraft is required when --bios-source raw")
+        return DcsBiosRawReceiver(
+            host=args.raw_bios_host,
+            port=args.raw_bios_port,
+            timeout=args.timeout,
+            merge_full_state=bool(args.merge_full_state),
+            control_reference_dir=args.raw_bios_control_dir,
+            aircraft=aircraft,
+        )
+
+    return DcsBiosReceiver(
+        host=args.host,
+        port=args.port,
+        timeout=args.timeout,
+        merge_full_state=bool(args.merge_full_state),
+    )
 
 
 def _build_vision_port_from_args(
@@ -3248,6 +3520,33 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="0.0.0.0", help="DCS-BIOS UDP bind host (default 0.0.0.0)")
     parser.add_argument("--port", type=int, default=7790, help="DCS-BIOS UDP bind port (default 7790)")
     parser.add_argument("--timeout", type=float, default=0.2, help="Receiver socket timeout seconds")
+    parser.add_argument(
+        "--bios-source",
+        choices=["decoded", "raw"],
+        default="decoded",
+        help="Live BIOS source type: decoded JSON UDP stream or raw DCS-BIOS export stream.",
+    )
+    parser.add_argument(
+        "--raw-bios-host",
+        default="239.255.50.10",
+        help="DCS-BIOS raw export host when --bios-source raw (default 239.255.50.10)",
+    )
+    parser.add_argument(
+        "--raw-bios-port",
+        type=int,
+        default=5010,
+        help="DCS-BIOS raw export port when --bios-source raw (default 5010)",
+    )
+    parser.add_argument(
+        "--raw-bios-aircraft",
+        default="",
+        help="Aircraft name for DCS-BIOS raw decoding, e.g. FA-18C_hornet.",
+    )
+    parser.add_argument(
+        "--raw-bios-control-dir",
+        default="DCS/Scripts/DCS-BIOS/doc/json",
+        help="Control reference directory for DCS-BIOS raw decoding.",
+    )
     merge_group = parser.add_mutually_exclusive_group()
     merge_group.add_argument(
         "--merge-full-state",
@@ -3356,6 +3655,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="UDP port for help trigger listener (0 disables UDP help trigger)",
     )
     parser.add_argument(
+        "--global-help-hotkey",
+        default="",
+        help="Windows global help trigger key: ESC, F1-F24, X1/MOUSE4, X2/MOUSE5 (empty disables).",
+    )
+    parser.add_argument(
+        "--global-help-modifiers",
+        default="",
+        help="Optional Windows global help modifiers joined by +, e.g. Ctrl+Shift.",
+    )
+    parser.add_argument(
+        "--global-help-cooldown-ms",
+        type=parse_non_negative_int_arg,
+        default=DEFAULT_GLOBAL_HELP_COOLDOWN_MS,
+        help="Debounce window for the Windows global help trigger in milliseconds.",
+    )
+    parser.add_argument(
         "--help-udp-timeout",
         type=float,
         default=0.2,
@@ -3442,22 +3757,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = build_arg_parser().parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_arg_parser().parse_args(list(argv) if argv is not None else None)
 
     output = Path(args.output) if args.output else _new_default_log_path()
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    source: ObservationSource
-    if args.replay_bios:
-        source = ReplayBiosReceiver(args.replay_bios, speed=args.speed)
-    else:
-        source = DcsBiosReceiver(
-            host=args.host,
-            port=args.port,
-            timeout=args.timeout,
-            merge_full_state=bool(args.merge_full_state),
-        )
+    source = _build_observation_source_from_args(args)
 
     model = _build_model_from_args(args)
     vision_port, vision_session_id, vision_sync_window_ms, vision_trigger_wait_ms = _build_vision_port_from_args(
@@ -3517,6 +3823,15 @@ def main() -> int:
             if args.help_udp_port > 0
             else None
         )
+        global_trigger = (
+            WindowsGlobalHelpTrigger(
+                hotkey=args.global_help_hotkey,
+                modifiers=args.global_help_modifiers,
+                cooldown_ms=args.global_help_cooldown_ms,
+            )
+            if str(args.global_help_hotkey).strip()
+            else None
+        )
         trigger_list: list[HelpTriggerLike] = []
         if stdin_trigger is not None:
             stdin_trigger.start()
@@ -3529,6 +3844,10 @@ def main() -> int:
                 f"[LIVE_DCS] udp trigger enabled: send 'help' to "
                 f"{args.help_udp_host}:{udp_trigger.bound_port}"
             )
+        if global_trigger is not None:
+            global_trigger.start()
+            trigger_list.append(global_trigger)
+            print(f"[LIVE_DCS] windows global trigger enabled: {global_trigger.hotkey_label}")
         trigger: HelpTriggerLike | None
         if len(trigger_list) == 1:
             trigger = trigger_list[0]
@@ -3550,6 +3869,8 @@ def main() -> int:
                 stdin_trigger.close()
             if udp_trigger is not None:
                 udp_trigger.close()
+            if global_trigger is not None:
+                global_trigger.close()
             if vision_capture_notifier is not None:
                 vision_capture_notifier.close()
             loop.close()

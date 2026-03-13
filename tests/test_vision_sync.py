@@ -297,12 +297,15 @@ def test_buffered_vision_session_waits_for_future_fallback_in_live_mode(monkeypa
     finally:
         session.close()
 
-    assert selection.status == "available"
+    assert selection.status == "partial"
     assert selection.frame_id == "1772872445010_000123"
+    assert selection.pre_trigger_frame is None
+    assert selection.trigger_frame is not None
+    assert selection.sync_miss_reason == "missing_pre_trigger_frame"
     assert sleeps
 
 
-def test_buffered_vision_session_live_mode_rejects_past_only_frame(monkeypatch) -> None:
+def test_buffered_vision_session_live_mode_accepts_past_only_frame_as_partial(monkeypatch) -> None:
     class SequencedVisionPort:
         def start(self, session_id: str) -> None:
             assert session_id == "sess-live"
@@ -328,9 +331,12 @@ def test_buffered_vision_session_live_mode_rejects_past_only_frame(monkeypatch) 
     finally:
         session.close()
 
-    assert selection.status == "vision_unavailable"
-    assert selection.frame_id is None
-    assert selection.sync_status is None
+    assert selection.status == "partial"
+    assert selection.frame_id == "1772872444950_000122"
+    assert selection.sync_status == "matched_past"
+    assert selection.pre_trigger_frame is not None
+    assert selection.trigger_frame is None
+    assert selection.sync_miss_reason == "missing_trigger_frame"
     assert sleeps == []
 
 

@@ -344,7 +344,7 @@ def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(
             assert expected_condition in result.missing_conditions
 
 
-def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fire_test_evidence(
+def test_infer_step_skips_s02_when_apu_signals_appear_without_fire_test_evidence(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -365,8 +365,8 @@ def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fir
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S02"
-    assert "vars.fire_test_complete==true" in result.missing_conditions
+    assert result.inferred_step_id == "S03"
+    assert "vars.apu_start_support_complete==true" in result.missing_conditions
 
 
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
@@ -419,7 +419,7 @@ def test_infer_step_accepts_mapping_recent_ui_targets(synthetic_pack_ctx: Mappin
     assert "vars.battery_on==true" in result.missing_conditions
 
 
-def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_ready(
+def test_infer_step_skips_s02_even_when_later_engine_signals_are_ready(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -432,7 +432,9 @@ def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_
             "l_gen_on": True,
             "r_gen_on": True,
             "apu_ready": True,
+            "apu_start_support_complete": True,
             "engine_crank_right": True,
+            "engine_crank_right_complete": True,
             "rpm_r": 65,
             "bleed_air_norm": True,
         },
@@ -442,8 +444,8 @@ def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S02"
-    assert "vars.fire_test_complete==true" in result.missing_conditions
+    assert result.inferred_step_id == "S05"
+    assert "vars.throttle_r_idle_complete==true" in result.missing_conditions
 
 
 def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Mapping[str, Any]) -> None:
@@ -478,7 +480,7 @@ def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Ma
     assert advanced.inferred_step_id != "S08"
 
 
-def test_infer_step_holds_partial_step_without_completion_evidence_despite_later_strong_signals(
+def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -492,10 +494,13 @@ def test_infer_step_holds_partial_step_without_completion_evidence_despite_later
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
         pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "bit_page_visible", "state": "seen"},
+        ],
     )
 
-    assert result.inferred_step_id == "S07"
-    assert result.missing_conditions == ()
+    assert result.inferred_step_id != "S09"
 
 
 def test_infer_step_uses_sticky_fcs_reset_fact_to_advance_past_s15(real_pack_ctx: Mapping[str, Any]) -> None:
@@ -633,13 +638,12 @@ def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx:
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             *prior_vision_facts,
-            {"fact_id": "fcs_bit_interaction_seen", "state": "seen"},
-            {"fact_id": "fcs_bit_result_visible", "state": "seen"},
+            {"fact_id": "right_ddi_in_test_visible", "state": "seen"},
         ],
     )
 
     assert blocked.inferred_step_id == "S18"
-    assert "vision_facts.fcs_bit_interaction_seen==seen" in blocked.missing_conditions
+    assert "vision_facts.right_ddi_in_test_visible==seen" in blocked.missing_conditions
     assert advanced.inferred_step_id != "S18"
 
 

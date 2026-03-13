@@ -29,6 +29,15 @@ def _request_with_evidence_context() -> TutorRequest:
         context={
             "vars": {"battery_on": True, "apu_on": False},
             "gates": [{"gate_id": "power_available", "status": "pass"}],
+            "vision_facts": [
+                {
+                    "fact_id": "fcs_page_visible",
+                    "state": "seen",
+                    "source_frame_id": "1772872445010_000123",
+                    "confidence": 0.96,
+                    "evidence_note": "FCS page title and channel boxes are visible.",
+                }
+            ],
             "recent_deltas": [
                 {"ui_target": "apu_switch", "bios_key": "APU_CONTROL_SW"},
                 {"ui_target": "battery_switch", "bios_key": "BATTERY_SW"},
@@ -517,7 +526,7 @@ def test_mapping_rejects_overlay_when_targets_without_evidence() -> None:
     assert payload["actions"] == []
     assert payload["metadata"]["overlay_rejected"] is True
     assert "missing_overlay_evidence" in payload["metadata"]["overlay_rejected_reasons"]
-    assert payload["metadata"]["allowed_evidence_ref_count"] == 8
+    assert payload["metadata"]["allowed_evidence_ref_count"] == 9
 
 
 def test_mapping_rejects_overlay_when_evidence_ref_unknown() -> None:
@@ -553,6 +562,29 @@ def test_mapping_accepts_delta_key_evidence_from_recent_deltas_k_field() -> None
     assert payload["actions"] != []
     assert payload["actions"][0]["target"] == "apu_switch"
     assert payload["actions"][0]["evidence_refs"] == ["DELTA_KEYS.APU_CONTROL_SW"]
+    assert payload["metadata"].get("overlay_rejected") is not True
+
+
+def test_mapping_accepts_visual_evidence_from_request_context() -> None:
+    help_obj = {
+        "overlay": {
+            "targets": ["apu_switch"],
+            "evidence": [
+                _evidence(
+                    "apu_switch",
+                    kind="visual",
+                    ref="VISION_FACTS.fcs_page_visible@1772872445010_000123",
+                )
+            ],
+        },
+        "explanations": ["Visual cue confirms the page state."],
+    }
+    res = map_help_response_to_tutor_response(help_obj, request=_request_with_evidence_context())
+    payload = res.to_dict()
+
+    assert payload["actions"] != []
+    assert payload["actions"][0]["target"] == "apu_switch"
+    assert payload["actions"][0]["evidence_refs"] == ["VISION_FACTS.fcs_page_visible@1772872445010_000123"]
     assert payload["metadata"].get("overlay_rejected") is not True
 
 

@@ -1,6 +1,45 @@
 schema_version: v1
 layout_id: fa18c_composite_panel_v2
 facts:
+  - fact_id: left_ddi_dark
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - left_ddi
+    steps:
+      - S08
+      - S15
+  - fact_id: right_ddi_dark
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S08
+      - S18
+  - fact_id: ampcd_dark
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - ampcd
+    steps:
+      - S08
+  - fact_id: left_ddi_menu_root_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - left_ddi
+    steps:
+      - S08
+      - S15
+  - fact_id: left_ddi_fcs_option_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - left_ddi
+    steps:
+      - S08
+      - S15
   - fact_id: fcs_page_visible
     sticky: false
     expires_after_ms: 2000
@@ -17,6 +56,27 @@ facts:
       - right_ddi
     steps:
       - S08
+      - S18
+  - fact_id: right_ddi_fcsmc_page_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S18
+  - fact_id: right_ddi_fcs_option_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S18
+  - fact_id: right_ddi_in_test_visible
+    sticky: true
+    expires_after_ms: 600000
+    intended_regions:
+      - right_ddi
+    steps:
       - S18
   - fact_id: fcs_reset_seen
     sticky: true
@@ -74,5 +134,4 @@ step_bindings:
       - takeoff_trim_seen
   S18:
     all_of:
-      - fcs_bit_interaction_seen
-      - fcs_bit_result_visible
+      - right_ddi_in_test_visible

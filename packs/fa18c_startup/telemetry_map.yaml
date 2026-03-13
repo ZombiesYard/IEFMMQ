@@ -39,8 +39,9 @@ vars:
   rpm_r_gte_60: "derived(vars.rpm_r >= 60)"
   rpm_l_gte_25: "derived(vars.rpm_l >= 25)"
   rpm_l_gte_60: "derived(vars.rpm_l >= 60)"
-  engine_crank_right_complete: "derived(vars.engine_crank_right or vars.rpm_r_gte_25 or vars.rpm_r_gte_60 or vars.engine_crank_left or vars.rpm_l_gte_60)"
-  throttle_r_idle_complete: "derived(vars.throttle_r_not_off or vars.rpm_r_gte_25 or vars.rpm_r_gte_60 or vars.engine_crank_left or vars.rpm_l_gte_60)"
+  engine_crank_right_complete: "derived(vars.engine_crank_right or vars.rpm_r_gte_25 or vars.rpm_r_gte_60)"
+  apu_start_support_complete: "derived(vars.apu_ready or vars.engine_crank_right_complete)"
+  throttle_r_idle_complete: "derived(vars.throttle_r_not_off or vars.ff_r > 0 or vars.temp_r >= 190 or vars.oil_r >= 45 or vars.noz_r > 0)"
   rpm_r_in_range: "derived(vars.rpm_r >= 63 and vars.rpm_r <= 70)"
   rpm_l_in_range: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70)"
   temp_r_in_range: "derived(vars.temp_r >= 190 and vars.temp_r <= 590)"
@@ -65,16 +66,24 @@ vars:
 
   # Key switches / sensor panel
   fire_test_active: "bios.FIRE_TEST_SW == 1"
-  # FIRE_TEST_SW is spring-loaded and often absent from replay/live captures once the
-  # learner has already moved past S02. Keep completion inference anchored to stable
-  # downstream vars so late-stage help does not regress back to FIRE TEST.
-  fire_test_complete: "derived(vars.fire_test_active or vars.apu_on or vars.apu_ready or vars.engine_crank_right or vars.engine_crank_left or vars.rpm_r_gte_60 or vars.rpm_l_gte_60)"
+  # FIRE_TEST_SW is spring-loaded. Completion is latched in telemetry_pipeline once
+  # the active state is observed, so the var rule should only reflect direct evidence.
+  fire_test_complete: "derived(vars.fire_test_active)"
+  lights_test_active: "bios.LIGHTS_TEST_SW == 1"
+  annunciator_panel_activity: "derived(bios.MASTER_CAUTION_LT == 1 or bios.LH_ADV_L_BLEED == 1 or bios.LH_ADV_R_BLEED == 1 or bios.LH_ADV_SPD_BRK == 1 or bios.LH_ADV_STBY == 1 or bios.LH_ADV_GO == 1 or bios.LH_ADV_NO_GO == 1 or bios.LH_ADV_REC == 1 or bios.LH_ADV_XMIT == 1 or bios.RH_ADV_RCDR_ON == 1 or bios.RH_ADV_DISP == 1 or bios.RH_ADV_SAM == 1 or bios.RH_ADV_AI == 1 or bios.RH_ADV_AAA == 1 or bios.RH_ADV_CW == 1)"
+  # Like FIRE TEST, the lights test is momentary. Completion is latched in
+  # telemetry_pipeline once switch/annunciator evidence is observed.
+  lights_test_complete: "derived(vars.lights_test_active)"
   ins_mode: "bios.INS_SW"
   ins_mode_set: "derived(vars.ins_mode >= 1)"
   ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 4)"
   radar_mode_value: "derived(num(bios.RADAR_SW))"
   radar_mode_opr: "derived(vars.radar_mode_value >= 2)"
   radar_on: "bios.RADAR_SW > 0"
+  comm1_freq_value: "derived(num(bios.COMM1_FREQ))"
+  comm2_freq_value: "derived(num(bios.COMM2_FREQ))"
+  comm1_channel_numeric: "derived(num(bios.COMM1_CHANNEL_NUMERIC))"
+  comm2_channel_numeric: "derived(num(bios.COMM2_CHANNEL_NUMERIC))"
 
   # S14-S25 extension vars.
   # If a checklist item is currently not observable from trusted telemetry, expose it
@@ -93,7 +102,7 @@ vars:
   flap_configured: "derived(vars.flap_mode_value == 0 or vars.flap_mode_value == 1)"
 
   takeoff_trim_pressed: "bios.TO_TRIM_BTN == 1"
-  takeoff_trim_set: "'unknown'"
+  takeoff_trim_set: "derived(vars.takeoff_trim_pressed)"
 
   fcs_bit_switch_up: "bios.FCS_BIT_SW == 1"
   fcs_bit_complete: "'unknown'"
@@ -110,7 +119,7 @@ vars:
 
   ifei_up_pressed: "bios.IFEI_UP_BTN == 1"
   ifei_down_pressed: "bios.IFEI_DWN_BTN == 1"
-  bingo_fuel_set: "'unknown'"
+  bingo_fuel_set: "derived(num(bios.IFEI_BINGO) > 0)"
 
   standby_pressure_set_0: "derived(num(bios.STBY_PRESS_SET_0))"
   standby_pressure_set_1: "derived(num(bios.STBY_PRESS_SET_1))"
@@ -118,10 +127,11 @@ vars:
   standby_altimeter_set: "'unknown'"
 
   radar_altimeter_bug_value: "derived(num(bios.RADALT_MIN_HEIGHT_PTR))"
-  radar_altimeter_bug_set: "'unknown'"
+  radar_altimeter_bug_set: "derived(vars.radar_altimeter_bug_value > 0)"
 
   sai_cage_value: "derived(num(bios.SAI_CAGE))"
-  standby_attitude_uncaged: "'unknown'"
+  standby_attitude_uncaged: "bios.SAI_ATT_WARNING_FLAG == 0"
 
   hud_att_source_value: "derived(num(bios.HUD_ATT_SW))"
-  attitude_source_auto: "'unknown'"
+  # DCS-BIOS defines HUD_ATT_SW as INS/AUTO/STBY (0/1/2).
+  attitude_source_auto: "derived(vars.hud_att_source_value == 1)"

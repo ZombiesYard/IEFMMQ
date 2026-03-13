@@ -149,6 +149,39 @@ def test_explain_error_records_raw_llm_text_when_enabled() -> None:
     assert attempts[0] == res.metadata["raw_llm_text"]
 
 
+def test_explain_error_repairs_missing_required_top_level_fields_from_context() -> None:
+    help_obj = _help_obj_ok()
+    del help_obj["diagnosis"]
+    del help_obj["confidence"]
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    assert res.metadata["generation_mode"] == "repair"
+    assert res.metadata["repair_applied"] is True
+    assert res.metadata["retry_count"] == 0
+    repaired = res.metadata["help_response"]
+    validate_help_response(repaired)
+    assert repaired["confidence"] == 0.51
+    assert repaired["diagnosis"]["step_id"] == repaired["next"]["step_id"]
+    repaired_fields = {item["field"] for item in res.metadata["repair_details"]["details"]}
+    assert "diagnosis" in repaired_fields
+    assert "confidence" in repaired_fields
+    assert len(fake.calls) == 1
+
+
+def test_retry_hint_mentions_required_top_level_fields() -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="zh")
+    messages = [{"role": "user", "content": "ping"}]
+
+    retry_messages = model._build_retry_messages(messages, ValueError("missing confidence"))
+
+    assert retry_messages[-1]["role"] == "user"
+    assert "diagnosis、next、overlay、explanations、confidence" in retry_messages[-1]["content"]
+
+
 def test_explain_error_print_model_io_outputs_prompt_and_unicode_reply(capsys) -> None:
     help_obj = _help_obj_ok()
     help_obj["explanations"] = ["请先打开 APU。"]
@@ -448,6 +481,25 @@ def test_openai_compat_qwen35_disables_thinking_and_caps_output_tokens() -> None
     assert request_payload["chat_template_kwargs"] == {"enable_thinking": False}
 
 
+def test_openai_compat_dashscope_qwen35_uses_json_object_and_omits_max_tokens() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="qwen3.5-27b",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode",
+    )
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["response_format"] == {"type": "json_object"}
+    assert "max_tokens" not in request_payload
+    assert request_payload["enable_thinking"] is False
+    assert "chat_template_kwargs" not in request_payload
+
+
 def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_available(tmp_path: Path) -> None:
     primary_image = tmp_path / "trigger_frame.png"
     primary_image.write_bytes(b"primary-frame")
@@ -488,6 +540,35 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
     assert "Primary visual frame: 1772872444950_000122" in content[2]["text"]
     assert "Trigger frame: 1772872445010_000123" in content[2]["text"]
+
+
+def test_openai_compat_dashscope_qwen35_multimodal_uses_json_object_and_omits_max_tokens(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="qwen3.5-27b",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode",
+        lang="zh",
+        enable_multimodal=True,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["response_format"] == {"type": "json_object"}
+    assert "max_tokens" not in request_payload
+    assert request_payload["enable_thinking"] is False
+    assert "chat_template_kwargs" not in request_payload
+    content = request_payload["messages"][1]["content"]
+    assert isinstance(content, list)
+    assert [item["type"] for item in content] == ["image_url", "text"]
 
 
 def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -> None:
@@ -924,6 +1005,25 @@ def test_openai_compat_respects_explicit_max_tokens_for_qwen35_fallback_retry() 
     assert "response_format" not in fake.calls[1]["json"]
 
 
+def test_openai_compat_dashscope_qwen35_ignores_explicit_max_tokens_when_structured_output_enabled() -> None:
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="qwen3.5-27b",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode",
+        max_tokens=128,
+    )
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), _request_help())
+
+    assert res.status == "ok"
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["response_format"] == {"type": "json_object"}
+    assert "max_tokens" not in request_payload
+    assert request_payload["enable_thinking"] is False
+
+
 def test_openai_compat_retries_without_chat_template_kwargs_when_server_rejects_it() -> None:
     valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
     fake = FakeClient(
@@ -1005,11 +1105,11 @@ def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
 
     assert res.status == "error"
-    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S02" in (res.message or "")
-    assert "vars.fire_test_complete==true" in (res.message or "")
+    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S03" in (res.message or "")
+    assert "vars.apu_ready==true" in (res.message or "")
     hint = res.metadata["deterministic_step_hint"]
-    assert hint["inferred_step_id"] == "S02"
-    assert hint["missing_conditions"] == ["vars.fire_test_complete==true"]
+    assert hint["inferred_step_id"] == "S03"
+    assert hint["missing_conditions"] == ["vars.apu_ready==true"]
 
 
 def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions() -> None:
@@ -1031,8 +1131,8 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S02" in (res.message or "")
-    assert "vars.fire_test_complete==true" in (res.message or "")
+    assert "\u4f60\u5927\u6982\u7387\u5361\u5728 S03" in (res.message or "")
+    assert "vars.apu_on==true" in (res.message or "")
 
 
 def test_explain_error_zh_fallback_without_inferred_step(monkeypatch) -> None:
@@ -1124,7 +1224,7 @@ def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S02. Please satisfy: vars.fire_test_complete==true."
+    assert res.message == "You are likely stuck at S03. Please satisfy: vars.apu_ready==true."
 
 
 def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions() -> None:
@@ -1146,7 +1246,7 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
     res = model.explain_error(Observation(source="mock"), req)
 
     assert res.status == "error"
-    assert res.message == "You are likely stuck at S02. Please satisfy: vars.fire_test_complete==true."
+    assert res.message == "You are likely stuck at S03. Please satisfy: vars.apu_on==true."
 
 
 def test_explain_error_en_fallback_without_inferred_step(monkeypatch) -> None:

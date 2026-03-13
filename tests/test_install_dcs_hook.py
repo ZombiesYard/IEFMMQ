@@ -7,6 +7,7 @@ import pytest
 from tools.install_dcs_hook import (
     MONITOR_SETUP_BASENAME,
     SIMTUTOR_EXPORT_SNIPPET,
+    _format_lua_path,
     build_composite_panel_config,
     install_scripting_files,
     install_composite_panel_config,
@@ -139,7 +140,7 @@ def test_build_composite_panel_config_enables_vlm_frame_and_frames_root(tmp_path
     assert f'monitor_setup = "{MONITOR_SETUP_BASENAME}"' in config
     assert 'layout_id = "fa18c_composite_panel_v2"' in config
     assert 'channel = "composite_panel"' in config
-    assert str((saved_games_dir / "SimTutor" / "frames").resolve()) in config
+    assert _format_lua_path((saved_games_dir / "SimTutor" / "frames").resolve()) in config
     assert 'command_host = "127.0.0.1"' in config
     assert "command_port = 7781" in config
     assert 'ack_host = "127.0.0.1"' in config

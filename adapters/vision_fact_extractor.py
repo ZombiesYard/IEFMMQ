@@ -289,20 +289,16 @@ class VisionFactExtractor:
             payload = {
                 "model": self.model_name,
                 "messages": copy_messages_for_payload(messages),
-                "temperature": 0,
-                "max_tokens": self._DEFAULT_QWEN35_VLM_MAX_TOKENS,
             }
-            if include_request_overrides:
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
-            if include_json_schema:
-                payload["response_format"] = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "VisionFactResponse",
-                        "strict": True,
-                        "schema": _vision_fact_response_schema(fact_ids=self._fact_ids),
-                    },
-                }
+            payload.update(
+                self._build_generation_payload(
+                    include_json_schema=include_json_schema,
+                    include_request_overrides=include_request_overrides,
+                )
+            )
+            response_format = self._build_response_format_payload(include_json_schema=include_json_schema)
+            if response_format is not None:
+                payload["response_format"] = response_format
             response = self._client.post(
                 f"{self.base_url}/v1/chat/completions",
                 json=payload,
@@ -336,6 +332,48 @@ class VisionFactExtractor:
         if not isinstance(message, Mapping) or not isinstance(message.get("content"), str):
             raise ValueError("OpenAI-compatible response missing choices[0].message.content")
         return str(message["content"])
+
+    def _build_generation_payload(
+        self,
+        *,
+        include_json_schema: bool,
+        include_request_overrides: bool,
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {"temperature": 0}
+        effective_max_tokens = self._effective_max_tokens(structured_output_enabled=include_json_schema)
+        if effective_max_tokens is not None:
+            payload["max_tokens"] = effective_max_tokens
+        if include_request_overrides:
+            payload.update(self._build_request_overrides())
+        return payload
+
+    def _effective_max_tokens(self, *, structured_output_enabled: bool) -> int | None:
+        if structured_output_enabled and self._is_dashscope_compatible():
+            return None
+        if self._is_qwen35_model():
+            return self._DEFAULT_QWEN35_VLM_MAX_TOKENS
+        return None
+
+    def _build_request_overrides(self) -> dict[str, object]:
+        if not self._should_disable_thinking():
+            return {}
+        if self._is_dashscope_compatible():
+            return {"enable_thinking": False}
+        return {"chat_template_kwargs": {"enable_thinking": False}}
+
+    def _build_response_format_payload(self, *, include_json_schema: bool) -> dict[str, object] | None:
+        if not include_json_schema:
+            return None
+        if self._should_use_json_object_response_format():
+            return {"type": "json_object"}
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "VisionFactResponse",
+                "strict": True,
+                "schema": _vision_fact_response_schema(fact_ids=self._fact_ids),
+            },
+        }
 
     def _parse_response(
         self,
@@ -410,6 +448,19 @@ class VisionFactExtractor:
                 "coerced_source_frame_fact_ids": coerced_source_frame_fact_ids,
             },
         )
+
+    def _should_disable_thinking(self) -> bool:
+        return self._is_qwen35_model()
+
+    def _is_qwen35_model(self) -> bool:
+        return "qwen3.5" in self.model_name.lower()
+
+    def _is_dashscope_compatible(self) -> bool:
+        normalized = self.base_url.lower()
+        return "dashscope.aliyuncs.com/compatible-mode" in normalized or "dashscope-intl.aliyuncs.com/compatible-mode" in normalized
+
+    def _should_use_json_object_response_format(self) -> bool:
+        return self._is_dashscope_compatible() and self._is_qwen35_model()
 
 
 __all__ = ["VisionFactExtractionResult", "VisionFactExtractor"]
