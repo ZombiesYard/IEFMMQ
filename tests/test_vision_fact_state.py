@@ -310,6 +310,36 @@ def test_load_vision_facts_config_wraps_yaml_error_in_config_error(tmp_path: Pat
         load_vision_facts_config(path)
 
 
+def test_load_vision_facts_config_rejects_empty_all_of_binding(tmp_path: Path) -> None:
+    path = tmp_path / "vision_facts.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "v1",
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {
+                    "S15": {
+                        "all_of": [],
+                    }
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires non-empty all_of"):
+        load_vision_facts_config(path)
+
+
 def test_load_vision_facts_config_rejects_string_intended_regions(tmp_path: Path) -> None:
     path = tmp_path / "vision_facts.yaml"
     path.write_text(
@@ -384,3 +414,20 @@ def test_facts_satisfy_step_binding_respects_explicit_empty_config() -> None:
     }
 
     assert facts_satisfy_step_binding(snapshot, step_id="S08", config={}) is False
+
+
+def test_facts_satisfy_step_binding_supports_any_of_right_ddi_equivalents() -> None:
+    snapshot = {
+        "fcs_page_visible": {"fact_id": "fcs_page_visible", "state": "seen"},
+        "bit_page_failure_visible": {"fact_id": "bit_page_failure_visible", "state": "seen"},
+    }
+    config = {
+        "step_bindings": {
+            "S08": {
+                "all_of": ("fcs_page_visible",),
+                "any_of": ("bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"),
+            }
+        }
+    }
+
+    assert facts_satisfy_step_binding(snapshot, step_id="S08", config=config) is True

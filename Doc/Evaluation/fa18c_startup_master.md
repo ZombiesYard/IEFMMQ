@@ -4,10 +4,10 @@ generator: tools/regenerate_eval_docs.py
 source_index: Doc/Evaluation/index.json
 policy_id: fa18c_cold_start_whitelist_v1
 policy_version: v2
-version_stamp: 6bbd506dfd81e311
+version_stamp: 6a65d3427f4de2ce
 source_chunks:
 - fa18c_startup_master/fa18c_startup_master_0:1-17
-- fa18c_startup_master/fa18c_startup_master_1:1-28
+- fa18c_startup_master/fa18c_startup_master_1:1-56
 -->
 
 # F/A-18C Cold Start – Master Step List
@@ -42,8 +42,8 @@ Columns:
 | S05 | P2 – Right engine start | Move the right throttle from OFF to IDLE when the right engine is above 25% rpm (as shown on IFEI). | When right engine RPM passes 25%, advance the right throttle from OFF to IDLE. | Throttles / IFEI |
 | S06 | P2 – Right engine start | Once right engine RPM is over 60%, rotate the BLEED AIR knob 360° clockwise, from NORM to NORM. | After the right engine stabilizes above 60% RPM, rotate the BLEED AIR knob through a full clockwise turn to confirm operation. | Right console |
 | S07 | P2 – Right engine start | Test the CAUTION, WARNING and ADVISORY lights test. | Run the caution/warning/advisory lights test and verify all annunciators illuminate correctly. | Right console |
-| S08 | P3 – Displays & comms | Turn on the power to both DDIs, MPCD and HUD. Select the FCS page on the left DDI and the BIT page on the right DDI. | Power up both DDIs, MPCD and HUD, then show FCS on the left DDI and BIT on the right DDI. | Center instrument panel |
-| S09 | P3 – Displays & comms | Set COMM 1 and COMM 2 radios as required for the mission. | Set COMM1 and COMM2 radios to the preset frequencies used in the training mission. | UFC / comm panels |
+| S08 | P3 – Displays & comms | Turn on the power to both DDIs, MPCD and HUD. Select the FCS page on the left DDI and leave the right DDI on the default top-level BIT root page (the page that shows the BIT FAILURES line after power-up). | Power up both DDIs, MPCD and HUD, show FCS on the left DDI, and confirm the right DDI is still on the BIT root page with the BIT FAILURES line visible. | Center instrument panel |
+| S09 | P3 – Displays & comms | Program COMM 1 preset 1 to 134.000 MHz using the UFC. | Pull the UFC COMM1 selector, enter 134.000 for preset 1, and press ENT to commit it. | UFC / comm panels |
 | S10 | P4 – Left engine & core systems | Move the ENG CRANK switch to the left after confirming that the right engine has an rpm between 63 and 70%, a TEMP between 190° and 590°, Fuel Flow between 420 and 900 PPH, a nozzle position between 73 and 84%, and an OIL pressure between 45 and 110 psi. | Verify right engine parameters are in normal ranges, then set the engine crank switch to LEFT for left engine start. | Left console / IFEI |
 | S11 | P4 – Left engine & core systems | Move the left throttle from OFF to IDLE when left engine has reached at least 25% rpm. | When left engine RPM passes 25%, advance the left throttle from OFF to IDLE. | Throttles / IFEI |
 | S12 | P4 – Left engine & core systems | Once the left engine has an RPM greater than 60%, rotate the INS knob to GND (ground) or CV (carrier), depending on your parking location. | After the left engine stabilizes above 60% RPM, set the INS knob to GND (airfield) or CV (carrier) to start alignment. | Right console |
@@ -52,7 +52,7 @@ Columns:
 | S15 | P5 – FCS & flight controls | Press the FCS RESET button and monitor FCS DDI page. | Press FCS RESET and watch the FCS page for any faults. | Left console / left DDI |
 | S16 | P5 – FCS & flight controls | Set the Flap switch to AUTO. | Set the flap switch to AUTO for normal takeoff configuration. | Left quarter panel |
 | S17 | P5 – FCS & flight controls | Press Takeoff Trim button. | Press the TAKEOFF TRIM button to set stabilator trim for takeoff. | Left console |
-| S18 | P5 – FCS & flight controls | While holding up the FCS BIT switch on the right wall, press the FCS OSB on the BIT / FCS page at the same time. | Run the FCS BIT: hold the FCS BIT switch and press the FCS option on the BIT/FCS page simultaneously. | Right console / right DDI |
+| S18 | P5 – FCS & flight controls | From the BIT FAILURES / BIT root page on the right DDI, press PB5 to enter the FCS-MC BIT page. Then hold the FCS BIT switch up on the right wall and press PB5 again at the same time to start the FCS BIT. | First enter the FCS-MC BIT page from the BIT root page, then hold the FCS BIT switch and press PB5 simultaneously to start the self-test. | Right console / right DDI |
 | S19 | P5 – FCS & flight controls | Four down test. Cycle/test the refueling probe, speed brake, launch bar, arrestor hook, pitot heat, and set flaps to HALF. | Perform the “four down” checks: cycle refueling probe, speed brake, launch bar, arrestor hook, pitot heat, and set flaps to HALF. | Multiple (consoles, throttles, quarter panels) |
 | S20 | P6 – Pre-taxi instruments & final checks | Left mouse click on the hand brake to release it. | Release the parking brake when ready to taxi. | Left console (parking brake) |
 | S21 | P6 – Pre-taxi instruments & final checks | Set your BINGO fuel level (minimum fuel to return home) by pressing the up and down arrows on the IFEI. | Set the BINGO fuel on the IFEI to the mission’s minimum return fuel. | IFEI |
@@ -60,3 +60,31 @@ Columns:
 | S23 | P6 – Pre-taxi instruments & final checks | Set the Radar Altimeter to 200 feet for an airfield takeoff or 40 feet from the carrier. | Set the radar altimeter bug (low altitude warning) to 200 ft (airfield) or 40 ft (carrier). | Right quarter panel |
 | S24 | P6 – Pre-taxi instruments & final checks | Uncage the standby Attitude Indicator. | Uncage the standby attitude indicator so it can display correct pitch/roll. | Right instrument panel |
 | S25 | P6 – Pre-taxi instruments & final checks | Set the Attitude Source to AUTO. | Set the attitude source selector to AUTO to use the normal attitude reference. | Center instrument panel |
+
+---
+
+## S08 vs S18 Clarification
+
+`S08` and `S18` both involve the DDIs and the FCS/BIT pages, but they are not the same state and must not be merged.
+
+For `S08`, the required right-DDI state is the top-level BIT root page. In DCS this is the default page after powering the display, and it normally shows a `BIT FAILURES` line. That page still counts as the BIT page for `S08`. Entering `FCS-MC` is **not** required for `S08`.
+
+For `S18`, the learner must first start from that same BIT root / `BIT FAILURES` page, press `PB5` to enter the `FCS-MC` BIT page, and only then hold the `FCS BIT` switch and press `PB5` again to trigger the BIT. Simply seeing `FCS-MC`, `PBIT GO`, `FCSA/FCSB`, or a small `GO` cue on the right DDI is not enough to say the FCS BIT is complete.
+
+The left DDI also helps distinguish these phases:
+
+- In `S08`, the left DDI must already be on the real `FCS` page.
+- During `S08`, because later FCS reset / BIT actions have not been completed yet, the flight-control channel boxes on the left DDI can still contain many `X` marks.
+- Later FCS phases must not be marked complete if those `X` fills are still largely present.
+
+Operationally, this means the tutor / evaluator should treat the following right-DDI cues as `S08` completion evidence:
+
+- top-level `BIT` page visible
+- `BIT root` page visible
+- `BIT FAILURES` line visible on the root page
+
+And it should treat the following right-DDI cues as belonging to the later `S18` FCS BIT flow instead:
+
+- `FCS-MC` page visible
+- `IN TEST` visible
+- FCS BIT result page details visible

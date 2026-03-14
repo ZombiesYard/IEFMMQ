@@ -125,24 +125,77 @@ def _set_right_engine_nominal_start_params(bios: dict[str, Any], desired: Any) -
     bios["EXT_NOZZLE_POS_R"] = 10000
 
 
+def _set_apu_start_support_complete(bios: dict[str, Any], desired: Any) -> None:
+    if _bool_like(desired):
+        bios["APU_READY_LT"] = 1
+        return
+    bios["APU_READY_LT"] = 0
+    bios["ENGINE_CRANK_SW"] = 1
+    bios["IFEI_RPM_R"] = 0
+
+
+def _set_obogs_ready(bios: dict[str, Any], desired: Any) -> None:
+    if _bool_like(desired):
+        bios["OBOGS_SW"] = 1
+        bios["OXY_FLOW"] = 1
+        return
+    bios["OBOGS_SW"] = 0
+    bios["OXY_FLOW"] = 0
+
+
+def _set_flap_auto(bios: dict[str, Any], desired: Any) -> None:
+    bios["FLAP_SW"] = 0 if _bool_like(desired) else 1
+
+
+def _set_parking_brake_released(bios: dict[str, Any], desired: Any) -> None:
+    bios["EMERGENCY_PARKING_BRAKE_PULL"] = 0 if _bool_like(desired) else 1
+
+
+def _set_bingo_fuel_set(bios: dict[str, Any], desired: Any) -> None:
+    bios["IFEI_BINGO"] = "1000" if _bool_like(desired) else "     "
+
+
+def _set_standby_attitude_uncaged(bios: dict[str, Any], desired: Any) -> None:
+    bios["SAI_ATT_WARNING_FLAG"] = 0 if _bool_like(desired) else 1
+
+
+def _set_comm1_freq_134_000(bios: dict[str, Any], desired: Any) -> None:
+    bios["COMM1_FREQ"] = 13400 if _bool_like(desired) else 30500
+
+
 _VAR_BINDINGS: dict[str, _VarBinding] = {
     "apu_on": _set_enum("APU_CONTROL_SW", true_value=1, false_value=0),
     "apu_ready": _set_enum("APU_READY_LT", true_value=1, false_value=0),
+    "apu_start_support_complete": _VarBinding(
+        primary_bios_key="APU_READY_LT",
+        setter=_set_apu_start_support_complete,
+    ),
     "battery_on": _set_enum("BATTERY_SW", true_value=2, false_value=1),
     "bleed_air_norm": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
     "bleed_air_cycle_complete": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
+    "bingo_fuel_set": _VarBinding(primary_bios_key="IFEI_BINGO", setter=_set_bingo_fuel_set),
+    "comm1_freq_134_000": _VarBinding(primary_bios_key="COMM1_FREQ", setter=_set_comm1_freq_134_000),
     "engine_crank_left": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
+    "engine_crank_left_complete": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
     "engine_crank_right": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "engine_crank_right_complete": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
+    "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
+    "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
     "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=1, false_value=0),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
     "l_gen_on": _set_enum("L_GEN_SW", true_value=1, false_value=0),
     "left_ddi_on": _set_enum("LEFT_DDI_BRT_CTL", true_value=1, false_value=0),
     "mpcd_on": _set_enum("AMPCD_BRT_CTL", true_value=1, false_value=0),
+    "obogs_ready": _VarBinding(primary_bios_key="OBOGS_SW", setter=_set_obogs_ready),
+    "parking_brake_released": _VarBinding(
+        primary_bios_key="EMERGENCY_PARKING_BRAKE_PULL",
+        setter=_set_parking_brake_released,
+    ),
     "power_available": _VarBinding(primary_bios_key="BATTERY_SW", setter=_set_power_available),
     "r_gen_on": _set_enum("R_GEN_SW", true_value=1, false_value=0),
     "radar_altimeter_bug_value": _set_numeric("RADALT_MIN_HEIGHT_PTR"),
+    "radar_mode_opr": _set_enum("RADAR_SW", true_value=2, false_value=0),
     "radar_on": _set_enum("RADAR_SW", true_value=2, false_value=0),
     "right_ddi_on": _set_enum("RIGHT_DDI_BRT_CTL", true_value=1, false_value=0),
     "right_engine_nominal_start_params": _VarBinding(
@@ -153,9 +206,15 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "rpm_l_gte_60": _set_threshold_numeric("IFEI_RPM_L", pass_value=65, fail_value=59),
     "rpm_r": _set_numeric("IFEI_RPM_R"),
     "rpm_r_gte_60": _set_threshold_numeric("IFEI_RPM_R", pass_value=65, fail_value=59),
+    "standby_attitude_uncaged": _VarBinding(
+        primary_bios_key="SAI_ATT_WARNING_FLAG",
+        setter=_set_standby_attitude_uncaged,
+    ),
+    "attitude_source_auto": _set_enum("HUD_ATT_SW", true_value=1, false_value=0),
     "throttle_l_not_off": _set_enum("INT_THROTTLE_LEFT", true_value=1, false_value=0),
     "throttle_r_not_off": _set_enum("INT_THROTTLE_RIGHT", true_value=1, false_value=0),
     "throttle_r_idle_complete": _set_enum("INT_THROTTLE_RIGHT", true_value=1, false_value=0),
+    "takeoff_trim_set": _set_enum("TO_TRIM_BTN", true_value=1, false_value=0),
 }
 
 

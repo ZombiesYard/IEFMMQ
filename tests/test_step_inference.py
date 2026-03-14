@@ -344,7 +344,7 @@ def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(
             assert expected_condition in result.missing_conditions
 
 
-def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fire_test_evidence(
+def test_infer_step_skips_s02_when_apu_signals_appear_without_fire_test_evidence(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -365,8 +365,8 @@ def test_infer_step_conservatively_holds_s02_when_apu_signals_appear_without_fir
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S02"
-    assert "vars.fire_test_complete==true" in result.missing_conditions
+    assert result.inferred_step_id == "S03"
+    assert "vars.apu_start_support_complete==true" in result.missing_conditions
 
 
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
@@ -419,7 +419,7 @@ def test_infer_step_accepts_mapping_recent_ui_targets(synthetic_pack_ctx: Mappin
     assert "vars.battery_on==true" in result.missing_conditions
 
 
-def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_ready(
+def test_infer_step_skips_s02_even_when_later_engine_signals_are_ready(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -432,7 +432,9 @@ def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_
             "l_gen_on": True,
             "r_gen_on": True,
             "apu_ready": True,
+            "apu_start_support_complete": True,
             "engine_crank_right": True,
+            "engine_crank_right_complete": True,
             "rpm_r": 65,
             "bleed_air_norm": True,
         },
@@ -442,8 +444,142 @@ def test_infer_step_conservatively_holds_s02_even_when_later_engine_signals_are_
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S02"
-    assert "vars.fire_test_complete==true" in result.missing_conditions
+    assert result.inferred_step_id == "S05"
+    assert "vars.throttle_r_idle_complete==true" in result.missing_conditions
+
+
+def test_infer_step_does_not_regress_to_s04_after_apu_auto_shutdown(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    result = infer_step_id(
+        pack_steps,
+        {
+            "battery_on": True,
+            "ext_pwr_on": True,
+            "l_gen_on": True,
+            "r_gen_on": True,
+            "power_available": True,
+            "apu_on": False,
+            "apu_ready": False,
+            "apu_start_support_complete": True,
+            "engine_crank_right_complete": True,
+            "bleed_air_cycle_complete": True,
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": True,
+            "comm1_freq_134_000": True,
+            "rpm_r": 64,
+            "rpm_l": 64,
+            "rpm_r_gte_25": True,
+            "rpm_r_gte_60": True,
+            "rpm_l_gte_25": True,
+            "rpm_l_gte_60": True,
+            "right_engine_nominal_start_params": True,
+            "left_engine_nominal_start_params": True,
+            "left_engine_idle_ready": True,
+            "throttle_r_not_off": True,
+            "throttle_l_not_off": True,
+            "throttle_r_idle_complete": True,
+        },
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    assert result.inferred_step_id != "S04"
+    assert "vars.apu_ready==true" not in result.missing_conditions
+
+
+def test_infer_step_does_not_regress_to_s01_when_power_switch_sources_are_missing_but_later_evidence_exists(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    result = infer_step_id(
+        pack_steps,
+        {
+            "battery_on": False,
+            "ext_pwr_on": True,
+            "l_gen_on": False,
+            "r_gen_on": False,
+            "power_available": True,
+            "apu_ready": False,
+            "apu_start_support_complete": True,
+            "engine_crank_right_complete": True,
+            "rpm_r": 64,
+            "rpm_l": 64,
+            "rpm_r_gte_60": True,
+            "rpm_l_gte_60": True,
+            "right_engine_nominal_start_params": True,
+            "left_engine_idle_ready": True,
+            "throttle_l_not_off": True,
+            "comm1_freq_134_000": True,
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": True,
+            "vars_source_missing": ["battery_on", "l_gen_on", "r_gen_on"],
+        },
+        ["obogs_control_switch"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    assert result.inferred_step_id != "S01"
+    assert "vars.battery_on==true" not in result.missing_conditions
+
+
+def test_infer_step_does_not_hold_s10_after_left_engine_is_stable_and_crank_switch_returns_center(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    result = infer_step_id(
+        pack_steps,
+        {
+            "battery_on": True,
+            "ext_pwr_on": True,
+            "l_gen_on": True,
+            "r_gen_on": True,
+            "power_available": True,
+            "apu_on": False,
+            "apu_ready": False,
+            "apu_start_support_complete": True,
+            "engine_crank_right_complete": True,
+            "engine_crank_left": False,
+            "engine_crank_left_complete": True,
+            "bleed_air_cycle_complete": True,
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": True,
+            "comm1_freq_134_000": True,
+            "rpm_r": 64,
+            "rpm_l": 64,
+            "rpm_r_gte_25": True,
+            "rpm_r_gte_60": True,
+            "rpm_l_gte_25": True,
+            "rpm_l_gte_60": True,
+            "right_engine_nominal_start_params": True,
+            "left_engine_nominal_start_params": True,
+            "left_engine_idle_ready": True,
+            "throttle_r_not_off": True,
+            "throttle_l_not_off": True,
+            "throttle_r_idle_complete": True,
+        },
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    assert result.inferred_step_id != "S10"
+    assert "vars.engine_crank_left==true" not in result.missing_conditions
 
 
 def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Mapping[str, Any]) -> None:
@@ -478,7 +614,64 @@ def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Ma
     assert advanced.inferred_step_id != "S08"
 
 
-def test_infer_step_holds_partial_step_without_completion_evidence_despite_later_strong_signals(
+def test_infer_step_holds_s18_when_only_fcsmc_pbit_result_page_is_seen(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map,
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "right_ddi_fcsmc_page_visible", "state": "seen"},
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA PBIT GO and FCSB PBIT GO.",
+            },
+        ],
+    )
+
+    assert blocked.inferred_step_id == "S18"
+    assert blocked.missing_conditions == ("vision_facts.fcs_bit_result_visible==seen",)
+
+
+def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "right_ddi_fcsmc_page_visible", "state": "seen"},
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+            },
+        ],
+    )
+
+    assert result.inferred_step_id == "S19"
+
+
+def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -492,17 +685,21 @@ def test_infer_step_holds_partial_step_without_completion_evidence_despite_later
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
         pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "bit_page_visible", "state": "seen"},
+        ],
     )
 
-    assert result.inferred_step_id == "S07"
-    assert result.missing_conditions == ()
+    assert result.inferred_step_id != "S09"
 
 
-def test_infer_step_uses_sticky_fcs_reset_fact_to_advance_past_s15(real_pack_ctx: Mapping[str, Any]) -> None:
+def test_infer_step_uses_fcs_reset_completion_gate_to_advance_past_s15(real_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     _vars_map, recent_ui_targets, _ = _build_step_blocking_scenario("S15", real_pack_ctx)
     vars_map = dict(real_pack_ctx["baseline_vars"])
+    vars_map["fcs_reset_complete"] = False
     prior_vision_facts = [
         {"fact_id": "fcs_page_visible", "state": "seen"},
         {"fact_id": "bit_page_visible", "state": "seen"},
@@ -519,16 +716,16 @@ def test_infer_step_uses_sticky_fcs_reset_fact_to_advance_past_s15(real_pack_ctx
     )
     advanced = infer_step_id(
         pack_steps,
-        vars_map,
+        {**vars_map, "fcs_reset_complete": True},
         recent_ui_targets,
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
         pack_path=REAL_PACK_PATH,
-        vision_facts=[*prior_vision_facts, {"fact_id": "fcs_reset_seen", "state": "seen"}],
+        vision_facts=prior_vision_facts,
     )
 
     assert blocked.inferred_step_id == "S15"
-    assert "vision_facts.fcs_reset_seen==seen" in blocked.missing_conditions
+    assert "vars.fcs_reset_complete==true" in blocked.missing_conditions
     assert advanced.inferred_step_id != "S15"
 
 
@@ -603,7 +800,7 @@ def test_infer_step_pack_specific_visual_completion_requires_all_required_facts(
     assert advanced.inferred_step_id == "S16"
 
 
-def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx: Mapping[str, Any]) -> None:
+def test_infer_step_does_not_advance_past_s18_from_in_test_page_alone(real_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     _vars_map, recent_ui_targets, _ = _build_step_blocking_scenario("S18", real_pack_ctx)
@@ -622,9 +819,48 @@ def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx:
         precondition_gates=pack_gates["precondition_gates"],
         completion_gates=pack_gates["completion_gates"],
         pack_path=REAL_PACK_PATH,
-        vision_facts=prior_vision_facts,
+        vision_facts=[
+            *prior_vision_facts,
+            {"fact_id": "right_ddi_in_test_visible", "state": "seen"},
+        ],
     )
-    advanced = infer_step_id(
+
+    assert blocked.inferred_step_id == "S18"
+
+
+def test_infer_step_does_not_advance_past_s18_from_switch_interaction_alone(real_pack_ctx: Mapping[str, Any]) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets=["fcs_bit_switch"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "bit_page_visible", "state": "seen"},
+            {"fact_id": "fcs_reset_seen", "state": "seen"},
+            {"fact_id": "takeoff_trim_seen", "state": "seen"},
+        ],
+    )
+
+    assert result.inferred_step_id == "S18"
+
+
+def test_infer_step_advances_past_s17_without_takeoff_trim_visual_fact_when_trim_is_latched(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map, recent_ui_targets, _ = _build_step_blocking_scenario("S18", real_pack_ctx)
+    vars_map["takeoff_trim_set"] = True
+    vars_map["takeoff_trim_pressed"] = False
+
+    result = infer_step_id(
         pack_steps,
         vars_map,
         recent_ui_targets,
@@ -632,15 +868,14 @@ def test_infer_step_uses_sticky_fcs_bit_facts_to_advance_past_s18(real_pack_ctx:
         completion_gates=pack_gates["completion_gates"],
         pack_path=REAL_PACK_PATH,
         vision_facts=[
-            *prior_vision_facts,
-            {"fact_id": "fcs_bit_interaction_seen", "state": "seen"},
-            {"fact_id": "fcs_bit_result_visible", "state": "seen"},
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "bit_page_visible", "state": "seen"},
+            {"fact_id": "fcs_reset_seen", "state": "seen"},
         ],
     )
 
-    assert blocked.inferred_step_id == "S18"
-    assert "vision_facts.fcs_bit_interaction_seen==seen" in blocked.missing_conditions
-    assert advanced.inferred_step_id != "S18"
+    assert result.inferred_step_id == "S18"
+    assert "vision_facts.takeoff_trim_seen==seen" not in result.missing_conditions
 
 
 def test_infer_step_uses_pack_specific_vision_fact_bindings(tmp_path: Path) -> None:
@@ -930,6 +1165,34 @@ def test_infer_step_falls_back_to_default_profile_when_scenario_profile_invalid(
 
     assert invalid.inferred_step_id == "S01"
     assert invalid == airfield
+
+
+def test_load_pack_gate_config_uses_clickabledata_ins_positions_for_airfield_and_carrier() -> None:
+    airfield_gates = load_pack_gate_config(REAL_PACK_PATH, scenario_profile="airfield")
+    carrier_gates = load_pack_gate_config(REAL_PACK_PATH, scenario_profile="carrier")
+    airfield_rules = airfield_gates["completion_gates"]["S12"]
+    carrier_rules = carrier_gates["completion_gates"]["S12"]
+
+    assert airfield_rules[0]["var"] == "vars.ins_mode"
+    assert airfield_rules[0]["min"] == 2
+    assert airfield_rules[0]["max"] == 2
+    assert carrier_rules[0]["var"] == "vars.ins_mode"
+    assert carrier_rules[0]["min"] == 1
+    assert carrier_rules[0]["max"] == 1
+
+
+def test_load_pack_gate_config_requires_radar_mode_opr_for_s13_and_later_steps() -> None:
+    pack_gates = load_pack_gate_config(REAL_PACK_PATH, scenario_profile="airfield")
+
+    assert pack_gates["completion_gates"]["S13"][0]["var"] == "vars.radar_mode_opr"
+    for step_id in ("S14", "S19", "S20", "S21", "S22", "S23", "S24", "S25"):
+        assert pack_gates["precondition_gates"][step_id][0]["var"] == "vars.radar_mode_opr"
+
+
+def test_load_pack_gate_config_uses_fcs_reset_complete_for_s15() -> None:
+    pack_gates = load_pack_gate_config(REAL_PACK_PATH, scenario_profile="airfield")
+
+    assert pack_gates["completion_gates"]["S15"][0]["var"] == "vars.fcs_reset_complete"
 
 
 def test_extract_recent_ui_targets_prefers_direct_recent_ui_targets() -> None:

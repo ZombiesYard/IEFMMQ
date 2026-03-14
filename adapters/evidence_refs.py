@@ -11,6 +11,7 @@ from typing import Any, Mapping
 EVIDENCE_PREFIX_TO_TYPE: tuple[tuple[str, str], ...] = (
     ("VARS.", "var"),
     ("GATES.", "gate"),
+    ("VISION_FACTS.", "visual"),
     ("RAG_SNIPPETS.", "rag"),
     ("RECENT_UI_TARGETS.", "delta"),
     ("DELTA_KEYS.", "delta"),
@@ -101,6 +102,20 @@ def collect_evidence_refs_from_context(context: Mapping[str, Any] | None) -> set
             snippet_id = item.get("snippet_id") or item.get("id")
             if isinstance(snippet_id, str) and snippet_id:
                 refs.add(f"RAG_SNIPPETS.{snippet_id}")
+
+    vision_facts = context.get("vision_facts")
+    if isinstance(vision_facts, list):
+        for item in vision_facts:
+            if not isinstance(item, Mapping):
+                continue
+            fact_id = item.get("fact_id")
+            if not isinstance(fact_id, str) or not fact_id:
+                continue
+            source_frame_id = item.get("source_frame_id")
+            if isinstance(source_frame_id, str) and source_frame_id:
+                refs.add(f"VISION_FACTS.{fact_id}@{source_frame_id}")
+            else:
+                refs.add(f"VISION_FACTS.{fact_id}")
 
     return refs
 

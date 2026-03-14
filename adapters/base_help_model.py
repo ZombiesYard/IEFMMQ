@@ -4,10 +4,13 @@ Shared base implementation for HelpResponse-capable model adapters.
 
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_diagnostics
+from adapters.json_extract import parse_first_json
 from adapters.prompting import build_help_prompt_result
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import (
@@ -27,12 +30,40 @@ from core.help_failure import (
     exception_failure_stage,
     merge_failure_metadata,
 )
-from core.llm_schema import get_help_response_schema
+from core.llm_schema import get_help_response_schema, validate_help_response
 from core.security import redact_sensitive_text, sanitize_help_response_for_log, sanitize_public_model_text
 from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
+from core.vars import VarResolver, VarResolverError, _find_missing_refs, _safe_eval
+from jsonschema.exceptions import ValidationError
 from ports.model_port import ModelPort
+
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEFAULT_TELEMETRY_MAP_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "telemetry_map.yaml"
+_DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "vars.apu_start_support_complete==true": (
+        "vars.apu_ready==true",
+        "vars.engine_crank_right_complete==true",
+    ),
+}
+
+
+@lru_cache(maxsize=8)
+def _load_var_resolver_for_path(path_text: str) -> VarResolver | None:
+    try:
+        return VarResolver.from_yaml(Path(path_text))
+    except (FileNotFoundError, OSError, VarResolverError):
+        return None
+
+
+def _normalize_telemetry_map_path(raw: Any) -> Path | None:
+    if isinstance(raw, Path):
+        return raw.expanduser().resolve()
+    if isinstance(raw, str) and raw.strip():
+        return Path(raw).expanduser().resolve()
+    return None
 
 
 def _dedupe_non_empty_strings(raw: Any) -> list[str]:
@@ -71,6 +102,7 @@ class BaseHelpModel(ModelPort):
         lang: str,
         log_raw_llm_text: bool = False,
         print_model_io: bool = False,
+        telemetry_map_path: str | Path | None = None,
         client: Any | None = None,
     ) -> None:
         self.model_name = model_name
@@ -79,6 +111,7 @@ class BaseHelpModel(ModelPort):
         self.lang = lang
         self.log_raw_llm_text = bool(log_raw_llm_text)
         self.print_model_io = bool(print_model_io)
+        self.telemetry_map_path = _normalize_telemetry_map_path(telemetry_map_path)
 
         if client is None:
             try:
@@ -112,12 +145,20 @@ class BaseHelpModel(ModelPort):
             missing_conditions=(),
         )
         recent_ui_targets: list[str] = []
+        inference_vars: Mapping[str, Any] = {}
         deterministic_inference_error: str | None = None
         try:
-            deterministic_inference, recent_ui_targets = self._compute_deterministic_inference(observation, request)
+            deterministic_inference, recent_ui_targets, inference_vars = self._compute_deterministic_inference(
+                observation,
+                request,
+            )
         except Exception as exc:
             deterministic_inference_error = f"{type(exc).__name__}: {exc}"
-        deterministic_hint = self._serialize_deterministic_hint(deterministic_inference, recent_ui_targets)
+        deterministic_hint = self._serialize_deterministic_hint(
+            deterministic_inference,
+            recent_ui_targets,
+            inference_vars,
+        )
         prompt_meta: dict[str, Any] = {}
         delta_dropped_count = self._extract_delta_dropped_count(request)
         prompt_budget_used = 0
@@ -148,21 +189,39 @@ class BaseHelpModel(ModelPort):
             try:
                 help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
             except Exception as first_parse_exc:
-                retry_count = 1
-                retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
-                retry_messages = self._build_retry_messages(messages, first_parse_exc)
-                if self.print_model_io:
-                    self._print_model_io_block(
-                        "PROMPT",
-                        self._render_debug_messages(retry_messages),
-                        request=request,
-                        attempt=2,
-                    )
-                raw_text = self._chat_with_failure_classification(retry_messages)
-                self._print_model_io_block("REPLY", raw_text, request=request, attempt=2)
-                if self.log_raw_llm_text:
-                    raw_text_attempts.append(raw_text)
-                help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
+                contextual_repair = self._attempt_contextual_schema_repair(
+                    raw_text,
+                    request=request,
+                    deterministic_hint=deterministic_hint,
+                )
+                if contextual_repair is not None:
+                    help_obj, extraction, repair_details = contextual_repair
+                else:
+                    retry_count = 1
+                    retry_reason = f"{type(first_parse_exc).__name__}: {first_parse_exc}"
+                    retry_messages = self._build_retry_messages(messages, first_parse_exc)
+                    if self.print_model_io:
+                        self._print_model_io_block(
+                            "PROMPT",
+                            self._render_debug_messages(retry_messages),
+                            request=request,
+                            attempt=2,
+                        )
+                    raw_text = self._chat_with_failure_classification(retry_messages)
+                    self._print_model_io_block("REPLY", raw_text, request=request, attempt=2)
+                    if self.log_raw_llm_text:
+                        raw_text_attempts.append(raw_text)
+                    try:
+                        help_obj, extraction, repair_details = parse_help_response_with_diagnostics(raw_text)
+                    except Exception as retry_parse_exc:
+                        contextual_repair = self._attempt_contextual_schema_repair(
+                            raw_text,
+                            request=request,
+                            deterministic_hint=deterministic_hint,
+                        )
+                        if contextual_repair is None:
+                            raise retry_parse_exc
+                        help_obj, extraction, repair_details = contextual_repair
             self._validate_context_bounds(help_obj, request)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
             mapped = map_help_response_to_tutor_response(
@@ -222,7 +281,10 @@ class BaseHelpModel(ModelPort):
                 metadata=metadata,
             )
         except Exception as exc:
-            fallback_message = self._build_deterministic_fallback_message(deterministic_inference)
+            fallback_message = self._build_deterministic_fallback_message(
+                deterministic_inference,
+                inference_vars,
+            )
             error_metadata = {
                 "provider": self.provider,
                 "model": self.model_name,
@@ -394,7 +456,7 @@ class BaseHelpModel(ModelPort):
         self,
         observation: Observation,
         request: TutorRequest | None,
-    ) -> tuple[StepInferenceResult, list[str]]:
+    ) -> tuple[StepInferenceResult, list[str], Mapping[str, Any]]:
         context = request.context if request and isinstance(request.context, dict) else {}
         inference_vars = self._pick_inference_vars(observation, context)
         recent_ui_targets = extract_recent_ui_targets(context)
@@ -417,7 +479,7 @@ class BaseHelpModel(ModelPort):
                 inferred_step_id=observation.procedure_hint,
                 missing_conditions=tuple(inference.missing_conditions),
             )
-        return inference, recent_ui_targets
+        return inference, recent_ui_targets, inference_vars
 
     def _pick_inference_vars(
         self,
@@ -426,12 +488,129 @@ class BaseHelpModel(ModelPort):
     ) -> Mapping[str, Any]:
         vars_raw = context.get("vars")
         if isinstance(vars_raw, Mapping):
-            return vars_raw
+            return self._resolve_inference_vars(vars_raw, context=context)
         payload = observation.payload if isinstance(observation.payload, Mapping) else {}
         payload_vars = payload.get("vars")
         if isinstance(payload_vars, Mapping):
-            return payload_vars
+            return self._resolve_inference_vars(payload_vars, context=context)
         return {}
+
+    def _resolve_inference_vars(
+        self,
+        vars_raw: Mapping[str, Any],
+        *,
+        context: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]:
+        resolver = self._select_var_resolver(context)
+        if resolver is None:
+            return vars_raw
+        context = {
+            "bios": {},
+            "lo": {},
+            "cockpit_args": {},
+            "vars": dict(vars_raw),
+        }
+        merged = dict(vars_raw)
+        source_missing = {
+            item
+            for item in vars_raw.get("vars_source_missing", [])
+            if isinstance(item, str) and item
+        } if isinstance(vars_raw.get("vars_source_missing"), list) else set()
+        try:
+            for key, expr in resolver.rules.items():
+                if not isinstance(key, str) or not key or key in merged or key == "vars_source_missing":
+                    continue
+                if expr is None:
+                    merged[key] = None
+                    source_missing.add(key)
+                    context["vars"] = merged
+                    continue
+                if not isinstance(expr, str):
+                    merged[key] = expr
+                    context["vars"] = merged
+                    continue
+                expr_text = expr.strip()
+                if expr_text.startswith("derived(") and expr_text.endswith(")"):
+                    expr_text = expr_text[len("derived(") : -1].strip()
+                missing_refs = _find_missing_refs(expr_text, context)
+                value = _safe_eval(expr_text, context)
+                merged[key] = value
+                context["vars"] = merged
+                if value is None or missing_refs:
+                    source_missing.add(key)
+        except VarResolverError:
+            return vars_raw
+        merged["vars_source_missing"] = sorted(source_missing)
+        return merged
+
+    def _select_var_resolver(self, context: Mapping[str, Any] | None) -> VarResolver | None:
+        resolver_path = self._resolve_active_telemetry_map_path(context)
+        if resolver_path is None:
+            return None
+        return _load_var_resolver_for_path(str(resolver_path))
+
+    def _resolve_active_telemetry_map_path(self, context: Mapping[str, Any] | None) -> Path | None:
+        if isinstance(context, Mapping):
+            context_telemetry_map = _normalize_telemetry_map_path(context.get("telemetry_map_path"))
+            if context_telemetry_map is not None:
+                return context_telemetry_map
+            context_pack_path = _normalize_telemetry_map_path(context.get("pack_path"))
+            if context_pack_path is not None:
+                candidate = context_pack_path.parent / "telemetry_map.yaml"
+                if candidate.is_file():
+                    return candidate.resolve()
+        if self.telemetry_map_path is not None:
+            return self.telemetry_map_path
+        return _DEFAULT_TELEMETRY_MAP_PATH
+
+    def _present_missing_conditions(
+        self,
+        missing_conditions: list[str] | tuple[str, ...],
+        inference_vars: Mapping[str, Any],
+    ) -> list[str]:
+        presented: list[str] = []
+        seen: set[str] = set()
+        for condition in missing_conditions:
+            if not isinstance(condition, str) or not condition:
+                continue
+            replacements = self._expand_presented_missing_condition(condition, inference_vars)
+            for item in replacements:
+                if item in seen:
+                    continue
+                seen.add(item)
+                presented.append(item)
+        return presented
+
+    def _expand_presented_missing_condition(
+        self,
+        condition: str,
+        inference_vars: Mapping[str, Any],
+    ) -> tuple[str, ...]:
+        fallback_conditions = _DERIVED_CONDITION_FALLBACKS.get(condition)
+        if not fallback_conditions:
+            return (condition,)
+        unresolved: list[str] = []
+        for fallback_condition in fallback_conditions:
+            key = self._extract_condition_var_key(fallback_condition)
+            if key is None:
+                unresolved.append(fallback_condition)
+                continue
+            value = inference_vars.get(key)
+            if value is True:
+                continue
+            unresolved.append(fallback_condition)
+        if unresolved:
+            return (unresolved[0],)
+        return (condition,)
+
+    @staticmethod
+    def _extract_condition_var_key(condition: str) -> str | None:
+        prefix = "vars."
+        suffix = "==true"
+        if not condition.startswith(prefix) or not condition.endswith(suffix):
+            return None
+        key = condition[len(prefix) : -len(suffix)]
+        return key or None
 
     def _prioritize_inferred_step(self, candidate_steps: list[Any], inferred_step_id: str | None) -> list[str]:
         normalized: list[str] = [step for step in candidate_steps if isinstance(step, str) and step]
@@ -443,13 +622,14 @@ class BaseHelpModel(ModelPort):
         self,
         inference: StepInferenceResult | None,
         recent_ui_targets: list[str],
+        inference_vars: Mapping[str, Any],
     ) -> dict[str, Any]:
         if inference is None:
             inferred_step_id = None
             missing_conditions: list[str] = []
         else:
             inferred_step_id = inference.inferred_step_id
-            missing_conditions = list(inference.missing_conditions)
+            missing_conditions = self._present_missing_conditions(inference.missing_conditions, inference_vars)
         hint = {
             "inferred_step_id": inferred_step_id,
             "missing_conditions": missing_conditions,
@@ -481,9 +661,14 @@ class BaseHelpModel(ModelPort):
             }
         return {}
 
-    def _build_deterministic_fallback_message(self, inference: StepInferenceResult | None) -> str:
+    def _build_deterministic_fallback_message(
+        self,
+        inference: StepInferenceResult | None,
+        inference_vars: Mapping[str, Any],
+    ) -> str:
         inferred_step_id = inference.inferred_step_id if inference else None
-        missing_conditions = list(inference.missing_conditions) if inference else []
+        raw_missing_conditions = list(inference.missing_conditions) if inference else []
+        missing_conditions = self._present_missing_conditions(raw_missing_conditions, inference_vars)
         if self.lang == "zh":
             if inferred_step_id and missing_conditions:
                 return f"你大概率卡在 {inferred_step_id}，下一步请先满足：{'; '.join(missing_conditions)}。"
@@ -645,12 +830,14 @@ class BaseHelpModel(ModelPort):
             retry_hint = (
                 "上一次输出未通过结构化校验。"
                 "请仅输出一个合法 JSON 对象，严格遵循 schema 与枚举，不要输出任何解释文本。"
+                "顶层必须包含 diagnosis、next、overlay、explanations、confidence 五个字段。"
                 f"上一轮错误：{error_text}"
             )
         else:
             retry_hint = (
                 "Previous output failed structured validation. "
                 "Return exactly one valid JSON object that strictly follows schema/enums, with no prose. "
+                "The top-level object must include diagnosis, next, overlay, explanations, and confidence. "
                 f"Previous error: {error_text}"
             )
         retry_messages = [dict(msg) for msg in messages]
@@ -695,6 +882,146 @@ class BaseHelpModel(ModelPort):
             "dropped_unrepairable_evidence": 0,
             "details": [],
         }
+
+    def _attempt_contextual_schema_repair(
+        self,
+        raw_text: str,
+        *,
+        request: TutorRequest | None,
+        deterministic_hint: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], Any, dict[str, Any]] | None:
+        try:
+            help_obj, extraction = parse_first_json(raw_text)
+        except Exception:
+            return None
+        if not isinstance(help_obj, dict):
+            return None
+        repaired_obj, details = self._repair_missing_help_fields_from_context(
+            help_obj,
+            request=request,
+            deterministic_hint=deterministic_hint,
+        )
+        if not details:
+            return None
+        try:
+            validate_help_response(repaired_obj)
+        except ValidationError:
+            return None
+        return repaired_obj, extraction, {
+            "repair_applied": True,
+            "repaired_evidence_types": 0,
+            "dropped_unrepairable_evidence": 0,
+            "details": details,
+        }
+
+    def _repair_missing_help_fields_from_context(
+        self,
+        help_obj: dict[str, Any],
+        *,
+        request: TutorRequest | None,
+        deterministic_hint: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        repaired = dict(help_obj)
+        details: list[dict[str, Any]] = []
+        inferred_step_id = self._pick_repair_step_id(repaired, deterministic_hint)
+        missing_conditions = _dedupe_non_empty_strings(deterministic_hint.get("missing_conditions"))
+
+        diagnosis = repaired.get("diagnosis")
+        if not isinstance(diagnosis, Mapping):
+            if inferred_step_id:
+                repaired["diagnosis"] = {"step_id": inferred_step_id, "error_category": "OM"}
+                details.append({"field": "diagnosis", "action": "filled_from_deterministic_hint"})
+        else:
+            diagnosis_mut = dict(diagnosis)
+            changed = False
+            if not isinstance(diagnosis_mut.get("step_id"), str) or not diagnosis_mut.get("step_id"):
+                if inferred_step_id:
+                    diagnosis_mut["step_id"] = inferred_step_id
+                    changed = True
+                    details.append({"field": "diagnosis.step_id", "action": "filled_from_deterministic_hint"})
+            if not isinstance(diagnosis_mut.get("error_category"), str) or not diagnosis_mut.get("error_category"):
+                diagnosis_mut["error_category"] = "OM"
+                changed = True
+                details.append({"field": "diagnosis.error_category", "action": "filled_default"})
+            if changed:
+                repaired["diagnosis"] = diagnosis_mut
+
+        next_block = repaired.get("next")
+        next_step_id = inferred_step_id
+        if isinstance(repaired.get("diagnosis"), Mapping):
+            diag_step_id = repaired["diagnosis"].get("step_id")
+            if isinstance(diag_step_id, str) and diag_step_id:
+                next_step_id = diag_step_id
+        if not isinstance(next_block, Mapping):
+            if next_step_id:
+                repaired["next"] = {"step_id": next_step_id}
+                details.append({"field": "next", "action": "filled_from_diagnosis"})
+        else:
+            next_mut = dict(next_block)
+            if not isinstance(next_mut.get("step_id"), str) or not next_mut.get("step_id"):
+                if next_step_id:
+                    next_mut["step_id"] = next_step_id
+                    repaired["next"] = next_mut
+                    details.append({"field": "next.step_id", "action": "filled_from_diagnosis"})
+
+        overlay = repaired.get("overlay")
+        if not isinstance(overlay, Mapping):
+            repaired["overlay"] = {"targets": [], "evidence": []}
+            details.append({"field": "overlay", "action": "filled_empty"})
+        else:
+            overlay_mut = dict(overlay)
+            changed = False
+            if not isinstance(overlay_mut.get("targets"), list):
+                overlay_mut["targets"] = []
+                changed = True
+                details.append({"field": "overlay.targets", "action": "filled_empty"})
+            if not isinstance(overlay_mut.get("evidence"), list):
+                overlay_mut["evidence"] = []
+                changed = True
+                details.append({"field": "overlay.evidence", "action": "filled_empty"})
+            if changed:
+                repaired["overlay"] = overlay_mut
+
+        explanations = repaired.get("explanations")
+        if not isinstance(explanations, list) or not any(isinstance(item, str) and item.strip() for item in explanations):
+            repaired["explanations"] = [self._default_repair_explanation(inferred_step_id, missing_conditions)]
+            details.append({"field": "explanations", "action": "filled_default"})
+
+        confidence = repaired.get("confidence")
+        if not isinstance(confidence, (int, float)):
+            repaired["confidence"] = 0.51
+            details.append({"field": "confidence", "action": "filled_default"})
+
+        return repaired, details
+
+    def _pick_repair_step_id(self, help_obj: Mapping[str, Any], deterministic_hint: Mapping[str, Any]) -> str | None:
+        diagnosis = help_obj.get("diagnosis")
+        if isinstance(diagnosis, Mapping):
+            step_id = diagnosis.get("step_id")
+            if isinstance(step_id, str) and step_id:
+                return step_id
+        next_block = help_obj.get("next")
+        if isinstance(next_block, Mapping):
+            step_id = next_block.get("step_id")
+            if isinstance(step_id, str) and step_id:
+                return step_id
+        hint_step_id = deterministic_hint.get("inferred_step_id")
+        if isinstance(hint_step_id, str) and hint_step_id:
+            return hint_step_id
+        return None
+
+    def _default_repair_explanation(self, step_id: str | None, missing_conditions: list[str]) -> str:
+        if self.lang == "zh":
+            if step_id and missing_conditions:
+                return f"当前大概率卡在 {step_id}，请先满足：{'; '.join(missing_conditions)}。"
+            if step_id:
+                return f"当前大概率卡在 {step_id}，请确认该步骤状态。"
+            return "请确认当前步骤状态。"
+        if step_id and missing_conditions:
+            return f"You are likely blocked at {step_id}. Satisfy: {'; '.join(missing_conditions)}."
+        if step_id:
+            return f"You are likely blocked at {step_id}. Confirm that step state."
+        return "Confirm the current step state."
 
     def _reset_runtime_metadata(self) -> None:
         return None

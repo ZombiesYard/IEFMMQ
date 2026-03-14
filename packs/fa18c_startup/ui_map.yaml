@@ -41,9 +41,9 @@ cockpit_elements:
     aliases: ["Engine Crank Switch", "ENGINE_CRANK_SW"]
     panel_area: "left_console_engine_start"
   throttle_quadrant_reference:
-    description: "Throttle quadrant reference (nearest clickable anchor)"
+    description: "Throttle quadrant activity reference (approximate, telemetry/debug only)"
     dcs_id: "pnt_504"
-    aliases: ["Throttles Friction Adjusting Lever"]
+    aliases: ["Throttle Quadrant Activity Reference", "Throttles Friction Adjusting Lever"]
     panel_area: "throttle_quadrant"
   bleed_air_knob:
     description: "BLEED AIR knob"
@@ -80,10 +80,25 @@ cockpit_elements:
     dcs_id: "pnt_58"
     aliases: ["Left MDI PB 5"]
     panel_area: "left_instrument_panel"
+  left_mdi_pb15:
+    description: "Left MDI PB 15"
+    dcs_id: "pnt_68"
+    aliases: ["Left MDI PB 15", "Left DDI PB 15"]
+    panel_area: "left_instrument_panel"
+  left_mdi_pb18:
+    description: "Left MDI PB 18 / MENU"
+    dcs_id: "pnt_72"
+    aliases: ["Left MDI PB 18", "Left DDI PB 18", "Left DDI MENU"]
+    panel_area: "left_instrument_panel"
   right_mdi_pb5:
     description: "Right MDI PB 5"
     dcs_id: "pnt_83"
     aliases: ["Right MDI PB 5"]
+    panel_area: "right_instrument_panel"
+  right_mdi_pb18:
+    description: "Right MDI PB 18 / MENU"
+    dcs_id: "pnt_96"
+    aliases: ["Right MDI PB 18", "Right DDI PB 18", "Right DDI MENU"]
     panel_area: "right_instrument_panel"
   fcs_reset_button:
     description: "FCS RESET button"
@@ -104,6 +119,31 @@ cockpit_elements:
     description: "UFC COMM 1 channel selector pull"
     dcs_id: "pnt_124"
     aliases: ["UFC COMM 1 Channel Selector Knob Pull", "COMM1_CHAN"]
+    panel_area: "ufc"
+  ufc_key_1:
+    description: "UFC keyboard pushbutton 1"
+    dcs_id: "pnt_111"
+    aliases: ["UFC Keyboard Pushbutton, 1", "UFC_1"]
+    panel_area: "ufc"
+  ufc_key_3:
+    description: "UFC keyboard pushbutton 3"
+    dcs_id: "pnt_113"
+    aliases: ["UFC Keyboard Pushbutton, 3", "UFC_3"]
+    panel_area: "ufc"
+  ufc_key_4:
+    description: "UFC keyboard pushbutton 4"
+    dcs_id: "pnt_114"
+    aliases: ["UFC Keyboard Pushbutton, 4", "UFC_4"]
+    panel_area: "ufc"
+  ufc_key_0:
+    description: "UFC keyboard pushbutton 0"
+    dcs_id: "pnt_120"
+    aliases: ["UFC Keyboard Pushbutton, 0", "UFC_0"]
+    panel_area: "ufc"
+  ufc_ent_button:
+    description: "UFC keyboard pushbutton ENT"
+    dcs_id: "pnt_47_122"
+    aliases: ["UFC Keyboard Pushbutton, ENT", "UFC_ENT"]
     panel_area: "ufc"
   ufc_comm2_channel_selector_rotate:
     description: "UFC COMM 2 channel selector rotate"

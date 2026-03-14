@@ -43,7 +43,7 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
 
     assert payload["allowed_step_ids"] == ["S02", "S03"]
     assert payload["allowed_overlay_targets"] == ["apu_switch", "battery_switch"]
-    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]
     assert payload["allowed_error_categories"]
     assert payload["output_example_json"]["diagnosis"]["error_category"] in payload["allowed_error_categories"]
     summary = payload["recent_deltas_summary"]
@@ -51,7 +51,8 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert len(summary["items"]) == 2
     assert summary["items"][0]["ui_target"] == "apu_switch"
     evidence = payload["EVIDENCE_SOURCES"]
-    assert set(evidence.keys()) == {"VARS", "GATES", "RECENT_UI_TARGETS", "RAG_SNIPPETS"}
+    assert set(evidence.keys()) == {"VARS", "GATES", "RECENT_UI_TARGETS", "RAG_SNIPPETS", "VISION_FACTS"}
+    assert evidence["VISION_FACTS"] == []
     assert "RECENT_UI_TARGETS.apu_switch" in payload["allowed_evidence_refs"]
     assert payload["deterministic_step_hint"]["inferred_step_id"] is None
     assert payload["deterministic_step_hint"]["missing_conditions"] == []
@@ -115,7 +116,7 @@ def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
     assert "If uncertainty_policy.unknown applies" in result.prompt
 
 
-def test_prompt_includes_vision_fact_summary_but_keeps_overlay_evidence_enum_unchanged() -> None:
+def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() -> None:
     ctx = _base_context()
     ctx["vision_fact_summary"] = {
         "status": "available",
@@ -125,17 +126,78 @@ def test_prompt_includes_vision_fact_summary_but_keeps_overlay_evidence_enum_unc
         "not_seen_fact_ids": [],
         "summary_text": "seen=fcs_reset_seen; uncertain=fcs_bit_result_visible",
     }
+    ctx["vision_facts"] = [
+        {
+            "fact_id": "fcs_reset_seen",
+            "state": "seen",
+            "source_frame_id": "1772872445010_000123",
+            "confidence": 0.96,
+            "evidence_note": "RESET cue visible on the FCS page.",
+        }
+    ]
 
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
 
     assert payload["vision_fact_summary"]["status"] == "available"
     assert payload["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
-    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]
+    assert "VISION_FACTS.fcs_reset_seen@1772872445010_000123" in payload["allowed_evidence_refs"]
+    assert payload["EVIDENCE_SOURCES"]["VISION_FACTS"] == [
+        {
+            "ref": "VISION_FACTS.fcs_reset_seen@1772872445010_000123",
+            "fact_id": "fcs_reset_seen",
+            "state": "seen",
+            "source_frame_id": "1772872445010_000123",
+            "confidence": 0.96,
+            "evidence_note": "RESET cue visible on the FCS page.",
+        }
+    ]
     assert payload["decision_priority"][:3] == [
         "deterministic_step_hint",
         "gates_summary",
         "vision_fact_summary",
     ]
+
+
+def test_prompt_prioritizes_missing_condition_vars_when_var_budget_trims() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S07"]
+    ctx["overlay_target_allowlist"] = ["lights_test_button"]
+    ctx["vars"] = {f"aaa_{i:02d}": i for i in range(30)}
+    ctx["vars"]["lights_test_complete"] = True
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S07",
+        "missing_conditions": ["vars.lights_test_complete==true"],
+        "observability_status": "partial",
+        "step_evidence_requirements": ["var", "delta", "gate"],
+        "recent_ui_targets": ["lights_test_button"],
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["current_vars_selected"]["lights_test_complete"] is True
+    assert len(payload["current_vars_selected"]) == 20
+
+
+def test_prompt_prioritizes_s05_engine_start_vars_when_var_budget_trims() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S05"]
+    ctx["overlay_target_allowlist"] = []
+    ctx["vars"] = {f"aaa_{i:02d}": i for i in range(30)}
+    ctx["vars"]["rpm_r"] = 28
+    ctx["vars"]["throttle_r_idle_complete"] = False
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S05",
+        "missing_conditions": ["vars.rpm_r>=25", "vars.throttle_r_idle_complete==true"],
+        "observability_status": "observable",
+        "step_evidence_requirements": ["var", "gate"],
+        "recent_ui_targets": [],
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["current_vars_selected"]["rpm_r"] == 28
+    assert payload["current_vars_selected"]["throttle_r_idle_complete"] is False
 
 
 def test_prompt_includes_rag_snippets_with_source_fields_and_metadata() -> None:
@@ -212,18 +274,15 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     result = build_help_prompt_result(ctx, "en", max_prompt_chars=560, max_prompt_tokens_est=140)
 
     assert "compact_template" in result.metadata["trim_reasons"]
-    assert "trimmed_rag_snippets" in result.metadata["trim_reasons"]
-    assert "hard_truncate" not in result.metadata["trim_reasons"]
-    assert result.metadata["grounding_applied"] is False
-    assert result.metadata["grounding_missing"] is True
-    assert result.metadata["grounding_reason"] == "rag_snippets_not_injected"
-    assert result.metadata["rag_snippet_count"] == 0
-    assert result.metadata["rag_snippet_ids"] == []
-    assert result.metadata["allowed_evidence_refs"] == []
-    assert result.metadata["evidence_refs_count"] == 0
+    assert result.metadata["grounding_applied"] is True
+    assert result.metadata["grounding_missing"] is False
+    assert result.metadata["rag_snippet_count"] == 1
+    assert result.metadata["rag_snippet_ids"] == ["manual_s03_1"]
+    assert result.metadata["evidence_refs_count"] >= 1
     assert "constraints=" in result.prompt
-    assert '"grounding":{"applied":false,"missing":true,"reason":"rag_snippets_not_injected"}' in result.prompt
-    assert "RAG_SNIPPETS" not in result.prompt
+    assert '"grounding":{"applied":true,"missing":false' in result.prompt
+    if "hard_truncate" not in result.metadata["trim_reasons"]:
+        assert 'Output shape={"diagnosis":{"step_id":"...","error_category":"..."}' in result.prompt
 
 
 def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
@@ -238,7 +297,7 @@ def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> No
         },
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=620, max_prompt_tokens_est=170)
 
     assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
 
@@ -302,7 +361,7 @@ def test_prompt_trim_keeps_high_priority_generator_target_first() -> None:
         },
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=540, max_prompt_tokens_est=140)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=620, max_prompt_tokens_est=170)
 
     assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
 
@@ -313,6 +372,390 @@ def test_prompt_trim_keeps_high_priority_generator_target_first() -> None:
 
     assert payload["allowed_overlay_targets"] == ["generator_left_switch"]
     assert payload["overlay_target_policy"]["preferred_target"] == "generator_left_switch"
+
+
+def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+        ],
+        "vars": {
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": False,
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vars.hud_on==true"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "gate", "delta"],
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["overlay_target_policy"]["preferred_target"] == "hud_symbology_brightness_knob"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "hud_symbology_brightness_knob"
+
+
+def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": [
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "left_mdi_brightness_selector",
+        ],
+        "vars": {
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": True,
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
+            "not_seen_fact_ids": ["fcs_page_visible"],
+        },
+        "vision_facts": [
+            {
+                "fact_id": "bit_page_visible",
+                "state": "seen",
+                "source_frame_id": "1772872445010_000123",
+                "confidence": 0.98,
+                "evidence_note": "BIT page title is visible on the right DDI.",
+            },
+            {
+                "fact_id": "left_ddi_fcs_option_visible",
+                "state": "seen",
+                "source_frame_id": "1772872445010_000123",
+                "confidence": 0.97,
+                "evidence_note": "Left DDI menu shows FCS selectable on PB15.",
+            },
+        ],
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["visual", "gate"],
+            "visual_action_hint": {
+                "target": "left_mdi_pb15",
+                "reason": "BIT is already visible and FCS is selectable on PB15.",
+            },
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["deterministic_step_hint"]["visual_action_hint"]["target"] == "left_mdi_pb15"
+    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_pb15"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "left_mdi_pb15"
+
+
+def test_prompt_prioritizes_action_hint_for_s09_ufc_entry() -> None:
+    ctx = {
+        "candidate_steps": ["S09"],
+        "overlay_target_allowlist": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button",
+        ],
+        "vars": {
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "305.000",
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S09",
+            "missing_conditions": ["vars.comm1_freq_134_000==true"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "delta", "rag"],
+            "action_hint": {
+                "target": "ufc_key_1",
+                "reason": "COMM1 preset entry is open; press 1 next.",
+            },
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["deterministic_step_hint"]["action_hint"]["target"] == "ufc_key_1"
+    assert payload["overlay_target_policy"]["preferred_target"] == "ufc_key_1"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "ufc_key_1"
+
+
+def test_prompt_explicitly_redirects_completed_s08_help_to_s09_comm1_selector() -> None:
+    ctx = {
+        "candidate_steps": ["S08", "S09"],
+        "overlay_target_allowlist": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "left_mdi_pb15",
+        ],
+        "vars": {"comm1_freq_134_000": False},
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "overlay_step_id": "S09",
+            "missing_conditions": [],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "delta", "rag"],
+            "action_hint": {
+                "target": "ufc_comm1_channel_selector_pull",
+                "reason": "S08 is complete; begin S09 by pulling COMM1.",
+            },
+        },
+    }
+
+    prompt = build_help_prompt(ctx, "en")
+    payload = _extract_prompt_constraints_json(prompt)
+
+    assert payload["deterministic_step_hint"]["overlay_step_id"] == "S09"
+    assert payload["deterministic_step_hint"]["action_hint"]["target"] == "ufc_comm1_channel_selector_pull"
+    assert payload["overlay_target_policy"]["preferred_target"] == "ufc_comm1_channel_selector_pull"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "ufc_comm1_channel_selector_pull"
+    assert "immediately highlight the UFC COMM1 channel selector" in prompt
+
+
+def test_prompt_trim_keeps_s08_fcs_navigation_target_ahead_of_noisy_recent_actions() -> None:
+    ctx = {
+        "candidate_steps": ["S08", "S10", "S11", "S12"],
+        "overlay_target_allowlist": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "right_mdi_pb18",
+            "right_mdi_pb5",
+        ],
+        "vars": {f"v_{i:02d}": "x" * 180 for i in range(40)},
+        "recent_deltas": [],
+        "recent_actions": {
+            "current_button": "parking_brake_handle",
+            "recent_buttons": [
+                "parking_brake_handle",
+                "flap_switch",
+                "launch_bar_switch",
+                "standby_attitude_cage_knob",
+                "ifei_down_button",
+                "ifei_up_button",
+                "hud_symbology_brightness_knob",
+                "right_mdi_brightness_selector",
+            ],
+        },
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [
+                "parking_brake_handle",
+                "flap_switch",
+                "launch_bar_switch",
+                "standby_attitude_cage_knob",
+                "ifei_down_button",
+                "ifei_up_button",
+                "hud_symbology_brightness_knob",
+                "right_mdi_brightness_selector",
+            ],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "gate", "delta"],
+        },
+        "vision_fact_summary": {"status": "vision_unavailable"},
+    }
+
+    result = build_help_prompt_result(ctx, "zh", max_prompt_chars=860, max_prompt_tokens_est=220)
+
+    assert "trimmed_overlay_enum" in result.metadata["trim_reasons"]
+    constraints_line = next(
+        line for line in result.prompt.splitlines() if line.startswith("constraints=")
+    )
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert payload["allowed_overlay_targets"] == ["left_mdi_pb15"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_pb15"
+    assert payload["multimodal_input"]["attached"] is True
+
+
+def test_prompt_explicitly_allows_multimodal_guidance_without_vision_fact_refs() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "vision_fact_summary": {"status": "vision_unavailable"},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "zh")
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert payload["multimodal_input"]["attached"] is True
+    assert "可直接依据已附带图像判断 diagnosis/next 与单目标 overlay" in result.prompt
+
+
+def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["left_ddi_fcs_page_button_visible"],
+            "not_seen_fact_ids": ["fcs_page_visible"],
+        },
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+            "visual_action_hint": {
+                "target": "left_mdi_pb15",
+                "reason": "Press PB15 to enter the FCS page.",
+            },
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "zh")
+
+    assert "不要把“左 DDI 看见 FCS 按钮/菜单项”误判成“已经进入 FCS 页面”" in result.prompt
+    assert "LEF/TEF/AIL/RUD" in result.prompt
+    assert "SV1/SV2" in result.prompt
+    assert "大量 X/故障填充" in result.prompt
+    assert "先按 PB18 切到 SUPT 页，再找 FCS" in result.prompt
+
+
+def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> None:
+    ctx = {
+        "candidate_steps": ["S18"],
+        "overlay_target_allowlist": ["fcs_bit_switch", "right_mdi_pb5"],
+        "vars": {"fcs_bit_switch_up": True},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773420347380_000049"],
+        },
+        "vision_fact_summary": {"status": "vision_unavailable"},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S18",
+            "overlay_step_id": "S18",
+            "observability_status": "partial",
+            "requires_visual_confirmation": True,
+            "step_evidence_requirements": ["delta", "gate", "visual"],
+            "action_hint": {"target": "right_mdi_pb5"},
+        },
+    }
+
+    zh_result = build_help_prompt_result(ctx, "zh")
+    en_result = build_help_prompt_result(ctx, "en")
+
+    assert "若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC" in zh_result.prompt
+    assert "若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步" in zh_result.prompt
+    assert "若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO" in zh_result.prompt
+    assert "FCSA/FCSB PBIT GO 不等于最终 GO" in zh_result.prompt
+    assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段" in zh_result.prompt
+
+    assert "if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC" in en_result.prompt
+    assert "only after the right DDI has entered the FCS-MC page but before the BIT has started" in en_result.prompt
+    assert "if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO" in en_result.prompt
+    assert "FCSA/FCSB PBIT GO is not the same as the final GO result" in en_result.prompt
+    assert "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on" in en_result.prompt
+
+
+def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
+    ctx = {
+        "candidate_steps": ["S18"],
+        "overlay_target_allowlist": ["right_mdi_pb5"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {"vision_used": True, "frame_ids": ["1773420856368_000057"]},
+        "vision_fact_summary": {"status": "vision_unavailable"},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S18",
+            "overlay_step_id": "S18",
+            "observability_status": "partial",
+            "requires_visual_confirmation": True,
+            "action_hint": {"target": "right_mdi_pb5"},
+        },
+    }
+
+    zh_result = build_help_prompt_result(ctx, "zh")
+    en_result = build_help_prompt_result(ctx, "en")
+
+    assert "若右 DDI 能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 已成立" in zh_result.prompt
+    assert "If the right DDI clearly shows both FCSA=GO and FCSB=GO at the same time" in en_result.prompt
+    assert "clearly reading both FCSA=GO and FCSB=GO is sufficient final-GO evidence" in en_result.prompt
+
+
+def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
+        "vars": {},
+        "recent_deltas": [],
+        "vision": {
+            "vision_used": True,
+            "frame_ids": ["1773401766789_000003"],
+        },
+        "vision_fact_summary": {
+            "status": "available",
+            "seen_fact_ids": ["left_ddi_fcs_page_button_visible"],
+            "not_seen_fact_ids": ["fcs_page_visible"],
+        },
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "recent_ui_targets": [],
+            "visual_action_hint": {
+                "target": "left_mdi_pb15",
+                "reason": "Press PB15 to enter the FCS page.",
+            },
+        },
+    }
+
+    result = build_help_prompt_result(ctx, "en")
+
+    assert "Do not mistake 'the left DDI shows the FCS button/menu entry'" in result.prompt
+    assert "LEF/TEF/AIL/RUD" in result.prompt
+    assert "SV1/SV2" in result.prompt
+    assert "many X/fault fills" in result.prompt
+    assert "press PB18 first to reach the SUPT page, then select FCS" in result.prompt
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
@@ -436,8 +879,28 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
     assert result.metadata["prompt_trimmed"] is True
     assert result.metadata["trim_reasons"]
     assert len(result.prompt) <= 900
-    assert result.metadata["prompt_tokens_est"] <= 180
+    assert result.metadata["prompt_tokens_est"] <= result.metadata["hard_prompt_tokens_est"]
+    assert result.metadata["prompt_budget_status"] in {"compacted", "trimmed_to_hard_cap"}
     assert isinstance(result.metadata["allowed_evidence_refs"], list)
+
+
+def test_budget_over_advisory_does_not_force_trim() -> None:
+    ctx = {
+        "candidate_steps": ["S01"],
+        "overlay_target_allowlist": ["battery_switch", "apu_switch"],
+        "vars": {},
+        "recent_deltas": [],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=5000, max_prompt_tokens_est=1300)
+
+    assert result.metadata["prompt_trimmed"] is False
+    assert result.metadata["prompt_budget_status"] == "over_advisory"
+    assert result.metadata["prompt_chars"] > result.metadata["advisory_prompt_chars"] or (
+        result.metadata["prompt_tokens_est"] > result.metadata["advisory_prompt_tokens_est"]
+    )
+    assert result.metadata["hard_prompt_chars"] >= result.metadata["advisory_prompt_chars"]
+    assert result.metadata["hard_prompt_tokens_est"] >= result.metadata["advisory_prompt_tokens_est"]
 
 
 def test_budget_trim_prioritizes_vars_before_rag_snippets() -> None:
@@ -490,8 +953,8 @@ def test_budget_trim_can_drop_last_rag_snippet_before_compact_template() -> None
     result = build_help_prompt_result(
         ctx,
         "en",
-        max_prompt_chars=len(base_result.prompt) + 40,
-        max_prompt_tokens_est=5000,
+        max_prompt_chars=700,
+        max_prompt_tokens_est=160,
     )
 
     assert "compact_template" in result.metadata["trim_reasons"]
@@ -619,4 +1082,4 @@ def test_prompt_deterministic_step_hint_keeps_step_signal_metadata() -> None:
     assert hint["observability_status"] == "partial"
     assert hint["step_evidence_requirements"] == ["visual", "gate"]
     assert hint["requires_visual_confirmation"] is True
-    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta"]
+    assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]

@@ -11,8 +11,8 @@ their DCS-BIOS source keys, and operating-range assumptions used by SimTutor.
 | `rpm_l` | `IFEI_RPM_L` | `num(...)` | Left engine RPM percent (0-110) |
 | `temp_r` | `IFEI_TEMP_R` | `num(...)` | Right engine temp degC (0-1200) |
 | `temp_l` | `IFEI_TEMP_L` | `num(...)` | Left engine temp degC (0-1200) |
-| `ff_r` | `IFEI_FF_R` | `num(...)` | Right fuel flow PPH (0-5000) |
-| `ff_l` | `IFEI_FF_L` | `num(...)` | Left fuel flow PPH (0-5000) |
+| `ff_r` | `IFEI_FF_R` | `num(...) * 100` | Right fuel flow PPH (IFEI shows x100, so display `7` => `700` PPH) |
+| `ff_l` | `IFEI_FF_L` | `num(...) * 100` | Left fuel flow PPH (IFEI shows x100, so display `7` => `700` PPH) |
 | `oil_r` | `IFEI_OIL_PRESS_R` | `num(...)` | Right oil pressure psi (0-200) |
 | `oil_l` | `IFEI_OIL_PRESS_L` | `num(...)` | Left oil pressure psi (0-200) |
 | `noz_r` | `EXT_NOZZLE_POS_R` | `(num(...) * 100) / 65535` | Right nozzle percent (0-100) |

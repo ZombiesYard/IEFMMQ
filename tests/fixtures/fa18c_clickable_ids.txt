@@ -1,7 +1,10 @@
 pnt_51
 pnt_58
+pnt_68
+pnt_72
 pnt_76
 pnt_83
+pnt_96
 pnt_124
 pnt_126
 pnt_141

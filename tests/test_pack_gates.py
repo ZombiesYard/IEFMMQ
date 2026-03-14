@@ -66,7 +66,7 @@ def test_evaluate_pack_gates_allows_s12_precondition_when_left_engine_ready() ->
 def test_evaluate_pack_gates_reports_blocked_reason_code_for_s13_completion() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(radar_on=False)],
+        observations=[_obs_with_vars(radar_mode_opr=False)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -74,14 +74,14 @@ def test_evaluate_pack_gates_reports_blocked_reason_code_for_s13_completion() ->
 
     assert s13_comp["status"] == "blocked"
     assert s13_comp["allowed"] is False
-    assert s13_comp["reason_code"] == "s13_requires_radar_on"
+    assert s13_comp["reason_code"] == "s13_requires_radar_mode_opr"
     assert isinstance(s13_comp["reason"], str) and s13_comp["reason"]
 
 
 def test_evaluate_pack_gates_allows_s13_completion_when_radar_on() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(radar_on=True)],
+        observations=[_obs_with_vars(radar_mode_opr=True)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -96,7 +96,7 @@ def test_evaluate_pack_gates_allows_s13_completion_when_radar_on() -> None:
 def test_evaluate_pack_gates_reports_blocked_reason_code_for_s04_precondition() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(apu_ready=False)],
+        observations=[_obs_with_vars(apu_start_support_complete=False)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -104,11 +104,11 @@ def test_evaluate_pack_gates_reports_blocked_reason_code_for_s04_precondition() 
 
     assert s04_pre["status"] == "blocked"
     assert s04_pre["allowed"] is False
-    assert s04_pre["reason_code"] == "s04_requires_apu_ready"
+    assert s04_pre["reason_code"] == "s04_requires_apu_start_support_complete"
     assert isinstance(s04_pre["reason"], str) and s04_pre["reason"]
 
 
-def test_evaluate_pack_gates_blocks_s03_precondition_until_fire_test_is_complete() -> None:
+def test_evaluate_pack_gates_allows_s03_precondition_without_fire_test_gate() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
         observations=[_obs_with_vars(power_available=True, fire_test_complete="unknown")],
@@ -117,12 +117,12 @@ def test_evaluate_pack_gates_blocks_s03_precondition_until_fire_test_is_complete
     )
 
     s03_pre = gates["S03.precondition"]
-    assert s03_pre["status"] == "blocked"
-    assert s03_pre["allowed"] is False
-    assert s03_pre["reason_code"] == "s03_requires_fire_test_complete"
+    assert s03_pre["status"] == "allowed"
+    assert s03_pre["allowed"] is True
+    assert s03_pre["reason_code"] == "ok"
 
 
-def test_evaluate_pack_gates_blocks_s02_completion_until_fire_test_is_complete() -> None:
+def test_evaluate_pack_gates_allows_s02_completion_without_rules() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
         observations=[_obs_with_vars(fire_test_complete=False)],
@@ -131,15 +131,15 @@ def test_evaluate_pack_gates_blocks_s02_completion_until_fire_test_is_complete()
     )
 
     s02_comp = gates["S02.completion"]
-    assert s02_comp["status"] == "blocked"
-    assert s02_comp["allowed"] is False
-    assert s02_comp["reason_code"] == "s02_requires_fire_test_complete"
+    assert s02_comp["status"] == "allowed"
+    assert s02_comp["allowed"] is True
+    assert s02_comp["reason_code"] == "no_rules"
 
 
 def test_evaluate_pack_gates_allows_s04_precondition_when_apu_ready_true() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(apu_ready=True)],
+        observations=[_obs_with_vars(apu_start_support_complete=True)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -232,7 +232,7 @@ def test_evaluate_pack_gates_profile_changes_s12_and_s23_gate_results() -> None:
     obs = _obs_with_vars(
         rpm_l_gte_60=True,
         throttle_l_not_off=True,
-        ins_mode=1,
+        ins_mode=2,
         radar_altimeter_bug_value=200,
     )
 
@@ -253,6 +253,89 @@ def test_evaluate_pack_gates_profile_changes_s12_and_s23_gate_results() -> None:
     assert carrier_gates["S12.completion"]["reason_code"] == "s12_requires_ins_mode_cv"
     assert carrier_gates["S23.completion"]["status"] == "blocked"
     assert carrier_gates["S23.completion"]["reason_code"] == "s23_requires_radalt_bug_carrier_40"
+
+
+def test_evaluate_pack_gates_allows_bios_observable_steps_s14_s16_s20_s21_s24_s25() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[
+            _obs_with_vars(
+                obogs_ready=True,
+                flap_auto=True,
+                parking_brake_released=True,
+                bingo_fuel_set=True,
+                standby_attitude_uncaged=True,
+                attitude_source_auto=True,
+            )
+        ],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+
+    for gate_id in ("S14.completion", "S16.completion", "S20.completion", "S21.completion", "S24.completion", "S25.completion"):
+        assert gates[gate_id]["status"] == "allowed"
+        assert gates[gate_id]["allowed"] is True
+
+
+def test_evaluate_pack_gates_blocks_bios_observable_steps_when_bios_state_missing() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[
+            _obs_with_vars(
+                obogs_ready=False,
+                flap_auto=False,
+                parking_brake_released=False,
+                bingo_fuel_set=False,
+                standby_attitude_uncaged=False,
+                attitude_source_auto=False,
+            )
+        ],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+
+    assert gates["S14.completion"]["reason_code"] == "s14_requires_obogs_ready"
+    assert gates["S16.completion"]["reason_code"] == "s16_requires_flap_auto"
+    assert gates["S20.completion"]["reason_code"] == "s20_requires_parking_brake_released"
+    assert gates["S21.completion"]["reason_code"] == "s21_requires_bingo_fuel_set"
+    assert gates["S24.completion"]["reason_code"] == "s24_requires_standby_attitude_uncaged"
+    assert gates["S25.completion"]["reason_code"] == "s25_requires_attitude_source_auto"
+
+
+def test_evaluate_pack_gates_uses_takeoff_trim_button_press_for_s17() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(takeoff_trim_set=True)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    assert gates["S17.completion"]["status"] == "allowed"
+
+    blocked = evaluate_pack_gates(
+        observations=[_obs_with_vars(takeoff_trim_set=False)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    assert blocked["S17.completion"]["reason_code"] == "s17_requires_takeoff_trim_pressed"
+
+
+def test_evaluate_pack_gates_allows_s07_completion_without_rules() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    allowed = evaluate_pack_gates(
+        observations=[_obs_with_vars(lights_test_complete=True)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    assert allowed["S07.completion"]["status"] == "allowed"
+    assert allowed["S07.completion"]["reason_code"] == "no_rules"
+
+    blocked = evaluate_pack_gates(
+        observations=[_obs_with_vars(lights_test_complete=False)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+    assert blocked["S07.completion"]["status"] == "allowed"
+    assert blocked["S07.completion"]["reason_code"] == "no_rules"
 
 
 def test_scenario_profile_changes_prompt_gate_hints() -> None:
