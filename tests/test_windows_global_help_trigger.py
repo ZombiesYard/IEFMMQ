@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import ctypes
+
 import pytest
 
-from adapters.windows_global_help_trigger import WindowsGlobalHelpTrigger
+from adapters import windows_global_help_trigger
+from adapters.windows_global_help_trigger import WM_XBUTTONDOWN, WindowsGlobalHelpTrigger
 
 
 def test_report_callback_error_is_rate_limited(monkeypatch) -> None:
@@ -137,3 +140,34 @@ def test_request_stop_retries_post_thread_message_when_queue_not_ready(monkeypat
 
     assert calls == [99, 99, 99]
     assert sleeps == [0.01, 0.01]
+
+
+def test_mouse_callback_ignores_injected_xbutton_events(monkeypatch) -> None:
+    trigger = WindowsGlobalHelpTrigger(hotkey="X1")
+    trigger.trigger_kind = "mouse"
+    trigger.trigger_code = 0x0001
+    trigger.required_modifiers = 0
+    emitted: list[str] = []
+    monkeypatch.setattr(trigger, "_emit_help", lambda: emitted.append("help"))
+    monkeypatch.setattr("adapters.windows_global_help_trigger._modifier_state_mask", lambda: 0)
+
+    class DummyUser32:
+        def CallNextHookEx(self, *args, **kwargs):
+            return 0
+
+    monkeypatch.setattr("adapters.windows_global_help_trigger._USER32", DummyUser32())
+    event = type("DummyMouseEvent", (), {"mouseData": 0x0001 << 16, "flags": 0x00000001})()
+
+    class DummyPointer:
+        def __init__(self, contents):
+            self.contents = contents
+
+    monkeypatch.setattr(
+        windows_global_help_trigger.ctypes,
+        "cast",
+        lambda value, pointer_type: DummyPointer(event),
+    )
+
+    trigger._mouse_callback(0, WM_XBUTTONDOWN, ctypes.c_void_p(0))
+
+    assert emitted == []

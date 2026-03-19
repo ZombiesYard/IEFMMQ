@@ -25,6 +25,7 @@ VK_ESCAPE = 0x1B
 XBUTTON1 = 0x0001
 XBUTTON2 = 0x0002
 PM_NOREMOVE = 0x0000
+LLMHF_INJECTED = 0x00000001
 LLKHF_INJECTED = 0x00000010
 DEFAULT_GLOBAL_HELP_COOLDOWN_MS = 400
 
@@ -306,8 +307,9 @@ class WindowsGlobalHelpTrigger:
             if code == HC_ACTION and self.trigger_kind == "mouse" and wparam == WM_XBUTTONDOWN:
                 event = ctypes.cast(lparam, ctypes.POINTER(MSLLHOOKSTRUCT)).contents
                 button = (int(event.mouseData) >> 16) & 0xFFFF
-                if button == self.trigger_code and _modifier_state_mask() == self.required_modifiers:
-                    self._emit_help()
+                if not (event.flags & LLMHF_INJECTED) and button == self.trigger_code:
+                    if _modifier_state_mask() == self.required_modifiers:
+                        self._emit_help()
         except Exception as exc:
             self._report_callback_error("mouse", exc)
         return _USER32.CallNextHookEx(None, code, wparam, lparam)

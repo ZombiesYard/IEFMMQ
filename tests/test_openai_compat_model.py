@@ -13,6 +13,8 @@ from tests._fakes import (
     _request_help,
 )
 
+REAL_PACK_PATH = Path(__file__).resolve().parent.parent / "packs" / "fa18c_startup" / "pack.yaml"
+
 
 def _attach_vision_context(
     request,
@@ -1127,6 +1129,7 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
         "bleed_air_norm": True,
     }
     req.context["recent_ui_targets"] = ["bleed_air_knob", "eng_crank_switch"]
+    req.context["pack_path"] = str(REAL_PACK_PATH)
 
     res = model.explain_error(Observation(source="mock"), req)
 
@@ -1242,6 +1245,7 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
         "bleed_air_norm": True,
     }
     req.context["recent_ui_targets"] = ["bleed_air_knob", "eng_crank_switch"]
+    req.context["pack_path"] = str(REAL_PACK_PATH)
 
     res = model.explain_error(Observation(source="mock"), req)
 
