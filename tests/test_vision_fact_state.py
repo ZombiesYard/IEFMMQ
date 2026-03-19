@@ -10,6 +10,7 @@ from core.vision_facts import (
     VisionFactsConfigError,
     build_vision_fact_summary,
     default_vision_facts_path,
+    extract_vision_fact_snapshot,
     facts_satisfy_step_binding,
     load_vision_facts_config,
     merge_vision_fact_observation,
@@ -100,6 +101,32 @@ def test_merge_vision_fact_observation_updates_nonsticky_visibility() -> None:
 
     assert snapshot["fcs_page_visible"]["state"] == "not_seen"
     assert snapshot["fcs_page_visible"]["source_frame_id"] == "1772872447010_000124"
+
+
+def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfills_from_note() -> None:
+    snapshot = merge_vision_fact_observation(
+        {},
+        VisionFactObservation(
+            session_id="sess-live",
+            trigger_wall_ms=1772872445000,
+            frame_ids=["1772872445010_000123"],
+            facts=[
+                VisionFact(
+                    fact_id="fcs_bit_result_visible",
+                    state="seen",
+                    source_frame_id="1772872445010_000123",
+                    confidence=0.95,
+                    expires_after_ms=600000,
+                    evidence_note="Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                    result_kind="bad-value",
+                )
+            ],
+        ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
+        now_wall_ms=1772872445000,
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
 
 
 def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
@@ -310,6 +337,69 @@ def test_load_vision_facts_config_wraps_yaml_error_in_config_error(tmp_path: Pat
         load_vision_facts_config(path)
 
 
+def test_load_vision_facts_config_rejects_empty_all_of_binding(tmp_path: Path) -> None:
+    path = tmp_path / "vision_facts.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "v1",
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {
+                    "S15": {
+                        "all_of": [],
+                    }
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="requires non-empty all_of"):
+        load_vision_facts_config(path)
+
+
+def test_load_vision_facts_config_allows_explicit_empty_any_of_binding(tmp_path: Path) -> None:
+    path = tmp_path / "vision_facts.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "v1",
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {
+                    "S15": {
+                        "all_of": ["fcs_page_visible"],
+                        "any_of": [],
+                    }
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_vision_facts_config(path)
+
+    assert config["step_bindings"]["S15"]["all_of"] == ("fcs_page_visible",)
+    assert config["step_bindings"]["S15"]["any_of"] == ()
+
+
 def test_load_vision_facts_config_rejects_string_intended_regions(tmp_path: Path) -> None:
     path = tmp_path / "vision_facts.yaml"
     path.write_text(
@@ -384,3 +474,92 @@ def test_facts_satisfy_step_binding_respects_explicit_empty_config() -> None:
     }
 
     assert facts_satisfy_step_binding(snapshot, step_id="S08", config={}) is False
+
+
+def test_facts_satisfy_step_binding_supports_any_of_right_ddi_equivalents() -> None:
+    snapshot = {
+        "fcs_page_visible": {"fact_id": "fcs_page_visible", "state": "seen"},
+        "bit_page_failure_visible": {"fact_id": "bit_page_failure_visible", "state": "seen"},
+    }
+    config = {
+        "step_bindings": {
+            "S08": {
+                "all_of": ("fcs_page_visible",),
+                "any_of": ("bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"),
+            }
+        }
+    }
+
+    assert facts_satisfy_step_binding(snapshot, step_id="S08", config=config) is True
+
+
+def test_extract_vision_fact_snapshot_backfills_structured_s18_result_kind() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+
+
+def test_extract_vision_fact_snapshot_does_not_treat_no_go_as_final_go() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI shows FCSA NO GO and FCSB NO GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
+
+
+def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_from_note() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "result_kind": "bad-value",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+
+
+def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_cannot_backfill() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "left_ddi_fcs_page_button_visible",
+                "state": "seen",
+                "result_kind": "bad-value",
+                "evidence_note": "FCS label visible on the left DDI menu.",
+            }
+        ]
+    )
+
+    assert "result_kind" not in snapshot["left_ddi_fcs_page_button_visible"]
+
+
+def test_extract_vision_fact_snapshot_strips_invalid_result_kind_without_evidence_note() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "result_kind": "bad-value",
+            }
+        ]
+    )
+
+    assert "result_kind" not in snapshot["fcs_bit_result_visible"]

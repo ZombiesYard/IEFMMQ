@@ -4,7 +4,7 @@ generator: tools/regenerate_eval_docs.py
 source_index: Doc/Evaluation/index.json
 policy_id: fa18c_cold_start_whitelist_v1
 policy_version: v2
-version_stamp: 6bbd506dfd81e311
+version_stamp: 6a65d3427f4de2ce
 source_chunks:
 - fa18c_nasatlx_vr/fa18c_nasatlx_vr_0:1-14
 - fa18c_nasatlx_vr/fa18c_nasatlx_vr_1:1-13

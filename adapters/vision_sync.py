@@ -345,7 +345,7 @@ class BufferedVisionSession:
             else max(2000, self.sync_window_ms * 4 + self.trigger_wait_ms)
         )
         self.live_mode = bool(live_mode)
-        self.selection_policy = selection_policy or ("trigger_only" if self.live_mode else "window")
+        self.selection_policy = selection_policy or "window"
         if self.selection_policy not in _SELECTION_POLICIES:
             raise ValueError(f"unsupported vision selection_policy: {self.selection_policy!r}")
         self.observation_sink = observation_sink

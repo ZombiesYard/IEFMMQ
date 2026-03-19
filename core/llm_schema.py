@@ -147,7 +147,7 @@ def build_help_response_schema(
         "required": ["target", "type", "ref", "quote", "grounding_confidence"],
         "properties": {
             "target": {"type": "string", "enum": list(overlay_targets)},
-            "type": {"type": "string", "enum": ["var", "gate", "rag", "delta"]},
+            "type": {"type": "string", "enum": ["var", "gate", "rag", "delta", "visual"]},
             "ref": {"type": "string", "minLength": 1},
             "quote": {"type": "string", "minLength": 1, "maxLength": 120},
             "grounding_confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},

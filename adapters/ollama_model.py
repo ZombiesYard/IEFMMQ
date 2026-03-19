@@ -4,6 +4,7 @@ Ollama-backed ModelPort adapter for HelpResponse generation.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping
 
 from adapters.base_help_model import BaseHelpModel
@@ -20,6 +21,7 @@ class OllamaModel(BaseHelpModel):
         lang: str = "zh",
         log_raw_llm_text: bool = False,
         print_model_io: bool = False,
+        telemetry_map_path: str | Path | None = None,
         client: object | None = None,
     ) -> None:
         super().__init__(
@@ -29,6 +31,7 @@ class OllamaModel(BaseHelpModel):
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
             print_model_io=print_model_io,
+            telemetry_map_path=telemetry_map_path,
             client=client,
         )
 

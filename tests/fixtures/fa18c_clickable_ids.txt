@@ -1,9 +1,17 @@
 pnt_51
 pnt_58
+pnt_68
+pnt_72
 pnt_76
 pnt_83
+pnt_96
+pnt_111
+pnt_113
+pnt_114
+pnt_120
 pnt_124
 pnt_126
+pnt_47_122
 pnt_141
 pnt_148
 pnt_170

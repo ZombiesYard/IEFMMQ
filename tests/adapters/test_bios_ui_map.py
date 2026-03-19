@@ -35,11 +35,19 @@ def test_pack_bios_to_ui_covers_cold_start_step_keys() -> None:
     expected: dict[str, list[str]] = {
         "LIGHTS_TEST_SW": ["lights_test_button"],
         "LEFT_DDI_PB_05": ["left_mdi_pb5"],
+        "LEFT_DDI_PB_15": ["left_mdi_pb15"],
+        "LEFT_DDI_PB_18": ["left_mdi_pb18"],
         "RIGHT_DDI_PB_05": ["right_mdi_pb5"],
+        "RIGHT_DDI_PB_18": ["right_mdi_pb18"],
         "COMM1_CHANNEL_NUMERIC": [
             "ufc_comm1_channel_selector_rotate",
             "ufc_comm1_channel_selector_pull",
         ],
+        "UFC_1": ["ufc_key_1"],
+        "UFC_3": ["ufc_key_3"],
+        "UFC_4": ["ufc_key_4"],
+        "UFC_0": ["ufc_key_0"],
+        "UFC_ENT": ["ufc_ent_button"],
         "COMM2_CHANNEL_NUMERIC": [
             "ufc_comm2_channel_selector_rotate",
             "ufc_comm2_channel_selector_pull",
@@ -76,6 +84,8 @@ def test_pack_bios_to_ui_maps_replay_style_keys_without_regression() -> None:
     delta = {
         "LEFT_MDI_PB_5": 1,  # legacy key spelling
         "LEFT_DDI_PB_05": 1,  # current replay key spelling
+        "LEFT_DDI_PB_15": 1,
+        "LEFT_DDI_PB_18": 1,
         "FCS_RESET_BTN": 1,
         "COMM1_CHANNEL_NUMERIC": 3,
         "COMM2_CHAN": 11,
@@ -86,6 +96,8 @@ def test_pack_bios_to_ui_maps_replay_style_keys_without_regression() -> None:
 
     assert mapper.map_delta(delta) == [
         "left_mdi_pb5",
+        "left_mdi_pb15",
+        "left_mdi_pb18",
         "fcs_reset_button",
         "ufc_comm1_channel_selector_rotate",
         "ufc_comm1_channel_selector_pull",

@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
@@ -14,8 +15,19 @@ import yaml
 from core.types_v2 import VisionFactObservation
 
 VISION_FACT_IDS: tuple[str, ...] = (
+    "left_ddi_dark",
+    "right_ddi_dark",
+    "ampcd_dark",
+    "left_ddi_menu_root_visible",
+    "left_ddi_fcs_option_visible",
+    "left_ddi_fcs_page_button_visible",
     "fcs_page_visible",
     "bit_page_visible",
+    "bit_root_page_visible",
+    "bit_page_failure_visible",
+    "right_ddi_fcsmc_page_visible",
+    "right_ddi_fcs_option_visible",
+    "right_ddi_in_test_visible",
     "fcs_reset_seen",
     "fcs_bit_interaction_seen",
     "fcs_bit_result_visible",
@@ -26,6 +38,10 @@ VISION_FACT_IDS: tuple[str, ...] = (
 VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"})
 _SUPPORTED_SCHEMA_VERSIONS = {"v1"}
 _STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
+_S18_RESULT_KINDS = frozenset({"final_go", "intermediate_go", "in_test", "not_ready", "other"})
+_S18_GO_NEGATIVE_RE = re.compile(r"\bno\s+go\b", re.IGNORECASE)
+_S18_FCSA_GO_RE = re.compile(r"\bfcsa\b\s*[:=]?\s*go\b", re.IGNORECASE)
+_S18_FCSB_GO_RE = re.compile(r"\bfcsb\b\s*[:=]?\s*go\b", re.IGNORECASE)
 
 
 class VisionFactsConfigError(ValueError):
@@ -191,7 +207,7 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
     bindings_raw = raw.get("step_bindings", {})
     if not isinstance(bindings_raw, Mapping):
         raise ValueError("vision facts config step_bindings must be a mapping")
-    step_bindings: dict[str, tuple[str, ...]] = {}
+    step_bindings: dict[str, dict[str, tuple[str, ...]]] = {}
     for step_id, binding in bindings_raw.items():
         if not isinstance(step_id, str) or not step_id:
             raise ValueError("vision facts config step_bindings keys must be non-empty strings")
@@ -200,12 +216,24 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         all_of = binding.get("all_of")
         if not isinstance(all_of, list) or not all_of:
             raise ValueError(f"vision step binding for {step_id} requires non-empty all_of")
-        normalized = []
+        normalized_all_of = []
         for fact_id in all_of:
             if not isinstance(fact_id, str) or fact_id not in facts_by_id:
                 raise ValueError(f"vision step binding for {step_id} references unsupported fact {fact_id!r}")
-            normalized.append(fact_id)
-        step_bindings[step_id] = tuple(normalized)
+            normalized_all_of.append(fact_id)
+        any_of = binding.get("any_of")
+        normalized_any_of: list[str] = []
+        if any_of is not None:
+            if not isinstance(any_of, list):
+                raise ValueError(f"vision step binding for {step_id} any_of must be a list")
+            for fact_id in any_of:
+                if not isinstance(fact_id, str) or fact_id not in facts_by_id:
+                    raise ValueError(f"vision step binding for {step_id} references unsupported fact {fact_id!r}")
+                normalized_any_of.append(fact_id)
+        step_bindings[step_id] = {
+            "all_of": tuple(normalized_all_of),
+            "any_of": tuple(normalized_any_of),
+        }
 
     return {
         "schema_version": schema_version,
@@ -232,6 +260,33 @@ def normalize_fact_state(raw_state: Any) -> str:
     if isinstance(raw_state, str) and raw_state in VISION_FACT_STATES:
         return raw_state
     return "uncertain"
+
+
+def _normalize_result_kind(
+    fact_id: str,
+    raw_result_kind: Any,
+    evidence_note: str,
+) -> str | None:
+    if isinstance(raw_result_kind, str):
+        normalized = raw_result_kind.strip().lower()
+        if normalized in _S18_RESULT_KINDS:
+            return normalized
+    if fact_id != "fcs_bit_result_visible":
+        return None
+    note_lower = evidence_note.lower()
+    if not note_lower:
+        return None
+    if "in test" in note_lower:
+        return "in_test"
+    if "not rdy" in note_lower or "not ready" in note_lower:
+        return "not_ready"
+    if "pbit go" in note_lower:
+        return "intermediate_go"
+    if _S18_GO_NEGATIVE_RE.search(evidence_note):
+        return "other"
+    if _S18_FCSA_GO_RE.search(evidence_note) and _S18_FCSB_GO_RE.search(evidence_note):
+        return "final_go"
+    return "other"
 
 
 def normalize_vision_fact(
@@ -278,6 +333,9 @@ def normalize_vision_fact(
         "observed_at_wall_ms": observed_at_wall_ms,
         "sticky": bool(spec["sticky"]),
     }
+    result_kind = _normalize_result_kind(fact_id, raw_fact.get("result_kind"), normalized["evidence_note"])
+    if result_kind is not None:
+        normalized["result_kind"] = result_kind
     if normalized["observed_at_wall_ms"] is not None:
         normalized["expires_at_wall_ms"] = normalized["observed_at_wall_ms"] + normalized["expires_after_ms"]
     else:
@@ -361,15 +419,23 @@ def facts_satisfy_step_binding(
 ) -> bool:
     current_config = config if config is not None else load_vision_facts_config()
     step_bindings = current_config.get("step_bindings", {})
-    required = step_bindings.get(step_id)
-    if not required:
+    binding = step_bindings.get(step_id)
+    if not isinstance(binding, Mapping):
         return False
     if not isinstance(snapshot, Mapping):
         return False
-    for fact_id in required:
+    required_all_of = binding.get("all_of", ())
+    required_any_of = binding.get("any_of", ())
+    for fact_id in required_all_of:
         fact = snapshot.get(fact_id)
         if not isinstance(fact, Mapping) or fact.get("state") != "seen":
             return False
+    if required_any_of:
+        for fact_id in required_any_of:
+            fact = snapshot.get(fact_id)
+            if isinstance(fact, Mapping) and fact.get("state") == "seen":
+                return True
+        return False
     return True
 
 
@@ -428,7 +494,19 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
             continue
         fact_id = item.get("fact_id")
         if isinstance(fact_id, str) and fact_id in VISION_FACT_IDS:
-            out[fact_id] = dict(item)
+            normalized_item = dict(item)
+            evidence_note = normalized_item.get("evidence_note")
+            evidence_note_text = evidence_note.strip() if isinstance(evidence_note, str) else ""
+            result_kind = _normalize_result_kind(
+                fact_id,
+                normalized_item.get("result_kind"),
+                evidence_note_text,
+            )
+            if result_kind is not None:
+                normalized_item["result_kind"] = result_kind
+            else:
+                normalized_item.pop("result_kind", None)
+            out[fact_id] = normalized_item
     return out
 
 

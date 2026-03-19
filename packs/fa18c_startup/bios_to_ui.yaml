@@ -25,8 +25,14 @@ mappings:
   # S08
   LEFT_DDI_PB_05:
     - left_mdi_pb5
+  LEFT_DDI_PB_15:
+    - left_mdi_pb15
+  LEFT_DDI_PB_18:
+    - left_mdi_pb18
   RIGHT_DDI_PB_05:
     - right_mdi_pb5
+  RIGHT_DDI_PB_18:
+    - right_mdi_pb18
   INS_SW:
     - ins_mode_knob
   RADAR_SW:
@@ -43,6 +49,12 @@ mappings:
     - right_mdi_pb5
   LEFT_MDI_PB_5:
     - left_mdi_pb5
+  LEFT_MDI_PB_15:
+    - left_mdi_pb15
+  LEFT_MDI_PB_18:
+    - left_mdi_pb18
+  RIGHT_MDI_PB_18:
+    - right_mdi_pb18
 
   # S09
   COMM1_CHAN:
@@ -59,6 +71,16 @@ mappings:
       - ufc_comm1_channel_selector_pull
   UFC_COMM1_PULL:
     - ufc_comm1_channel_selector_pull
+  UFC_1:
+    - ufc_key_1
+  UFC_3:
+    - ufc_key_3
+  UFC_4:
+    - ufc_key_4
+  UFC_0:
+    - ufc_key_0
+  UFC_ENT:
+    - ufc_ent_button
   COMM2_CHAN:
     targets:
       - ufc_comm2_channel_selector_rotate

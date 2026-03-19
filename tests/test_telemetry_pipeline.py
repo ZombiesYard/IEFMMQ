@@ -74,8 +74,9 @@ def test_enrich_bios_observation_compacts_payload_and_keeps_metadata() -> None:
     assert enriched.payload["t_wall"] == 123.45
     assert enriched.payload["vars"]["rpm_r"] == 64
     assert enriched.payload["vars"]["rpm_r_gte_25"] is True
-    assert enriched.payload["vars"]["fire_test_complete"] is True
+    assert enriched.payload["vars"]["fire_test_complete"] is False
     assert enriched.payload["vars"]["engine_crank_right_complete"] is True
+    assert enriched.payload["vars"]["apu_start_support_complete"] is True
     assert enriched.payload["vars"]["throttle_r_idle_complete"] is True
     assert enriched.payload["delta_summary"]["delta_count"] == 4
     assert "battery_switch" in enriched.payload["recent_ui_targets"]
@@ -87,6 +88,108 @@ def test_enrich_bios_observation_compacts_payload_and_keeps_metadata() -> None:
     assert "bios_hash" not in enriched.metadata
 
     json.dumps(enriched.to_dict(), ensure_ascii=False)
+
+
+def test_enrich_bios_observation_includes_pack_gate_vars_used_by_live_inference() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 43,
+            "t_wall": 124.45,
+            "bios": {
+                "BATTERY_SW": 2,
+                "EXT_PWR_SW": 1,
+                "L_GEN_SW": 1,
+                "R_GEN_SW": 1,
+                "APU_READY_LT": 1,
+                "ENGINE_CRANK_SW": 1,
+                "RADALT_MIN_HEIGHT_PTR": 12000,
+            },
+            "delta": {"BATTERY_SW": 2, "APU_READY_LT": 1},
+        },
+        metadata={"seq": 43, "gap": 0, "delta_count": 2, "from_addr": "127.0.0.1:5000"},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+
+    assert enriched.payload["vars"]["apu_start_support_complete"] is True
+    assert enriched.payload["vars"]["radar_altimeter_bug_value"] == 12000
+
+
+def test_enrich_bios_observation_includes_probe_state_for_s19_progression() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 44,
+            "t_wall": 125.45,
+            "bios": {
+                "BATTERY_SW": 2,
+                "L_GEN_SW": 1,
+                "R_GEN_SW": 1,
+                "PROBE_SW": 1,
+                "EXT_REFUEL_PROBE": 65535,
+                "LAUNCH_BAR_SW": 1,
+            },
+            "delta": {"PROBE_SW": 1, "EXT_REFUEL_PROBE": 65535},
+        },
+        metadata={"seq": 44, "gap": 0, "delta_count": 2, "from_addr": "127.0.0.1:5000"},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+
+    assert enriched.payload["vars"]["probe_switch_value"] == 1
+    assert enriched.payload["vars"]["ext_refuel_probe_value"] == 65535
+    assert enriched.payload["vars"]["probe_extended"] is True
+    assert enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert enriched.payload["vars"]["launch_bar_switch_value"] == 1
+
+
+def test_enrich_bios_observation_latches_probe_cycle_complete_after_extension() -> None:
+    extend_obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 45,
+            "t_wall": 200.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "PROBE_SW": 1,
+                "EXT_REFUEL_PROBE": 65535,
+            },
+            "delta": {"EXT_REFUEL_PROBE": 65535},
+        },
+        metadata={"seq": 45, "gap": 0, "delta_count": 1, "from_addr": "127.0.0.1:5000"},
+    )
+    retract_obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 46,
+            "t_wall": 201.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "PROBE_SW": 1,
+                "EXT_REFUEL_PROBE": 0,
+            },
+            "delta": {"EXT_REFUEL_PROBE": 0},
+        },
+        metadata={"seq": 46, "gap": 0, "delta_count": 1, "from_addr": "127.0.0.1:5000"},
+    )
+
+    extend_enriched = enrich_bios_observation(
+        extend_obs,
+        _resolver(),
+        mapper=_mapper(),
+        delta_stream_id="probe-cycle",
+    )
+    retract_enriched = enrich_bios_observation(
+        retract_obs,
+        _resolver(),
+        mapper=_mapper(),
+        delta_stream_id="probe-cycle",
+    )
+
+    assert extend_enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert retract_enriched.payload["vars"]["probe_extended"] is False
+    assert retract_enriched.payload["vars"]["probe_cycle_complete"] is True
 
 
 def test_enrich_bios_observation_supports_tag_hook_and_debug_cache() -> None:
@@ -412,6 +515,7 @@ def test_enrich_bios_observation_delta_stream_id_overrides_metadata_scope(monkey
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_POLICY", None)
     monkeypatch.setattr(telemetry_pipeline, "_DEFAULT_DELTA_SANITIZER", None)
     monkeypatch.setattr(telemetry_pipeline, "_POLICY_SCOPED_SANITIZERS", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
     monkeypatch.setattr(telemetry_pipeline, "_SHARED_DELTA_SANITIZER_LOCKS", {})
 
     obs = Observation(
@@ -441,6 +545,391 @@ def test_enrich_bios_observation_delta_stream_id_overrides_metadata_scope(monkey
     assert first.payload["delta_summary"]["delta_count"] == 1
     assert second.payload["delta_summary"]["delta_count"] == 1
 
+
+def test_enrich_bios_observation_latches_momentary_lights_test_completion_within_stream(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    active = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 501,
+            "t_wall": 10.0,
+            "bios": {
+                "LIGHTS_TEST_SW": 1,
+                "MASTER_CAUTION_LT": 1,
+            },
+            "delta": {"LIGHTS_TEST_SW": 1},
+        },
+        metadata={"session_id": "sess-lights"},
+    )
+    released = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 502,
+            "t_wall": 12.0,
+            "bios": {
+                "LIGHTS_TEST_SW": 0,
+                "MASTER_CAUTION_LT": 0,
+            },
+            "delta": {"LIGHTS_TEST_SW": 0},
+        },
+        metadata={"session_id": "sess-lights"},
+    )
+
+    first = enrich_bios_observation(active, _resolver(), mapper=_mapper())
+    second = enrich_bios_observation(released, _resolver(), mapper=_mapper())
+
+    assert first.payload["vars"]["lights_test_active"] is True
+    assert first.payload["vars"]["lights_test_complete"] is True
+    assert "lights_test_complete" not in first.payload["vars"]["vars_source_missing"]
+    assert second.payload["vars"]["lights_test_active"] is False
+    assert second.payload["vars"]["annunciator_panel_activity"] is False
+    assert second.payload["vars"]["lights_test_complete"] is True
+    assert "lights_test_complete" not in second.payload["vars"]["vars_source_missing"]
+
+
+def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_and_scoped(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    active = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 511,
+            "t_wall": 20.0,
+            "bios": {"FIRE_TEST_SW": 0},
+            "delta": {"FIRE_TEST_SW": 0},
+        },
+        metadata={"session_id": "sess-fire-a"},
+    )
+    other_stream = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 512,
+            "t_wall": 21.0,
+            "bios": {"FIRE_TEST_SW": 1},
+            "delta": {"FIRE_TEST_SW": 1},
+        },
+        metadata={"session_id": "sess-fire-b"},
+    )
+    expired = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 513,
+            "t_wall": 40.5,
+            "bios": {"FIRE_TEST_SW": 1},
+            "delta": {"FIRE_TEST_SW": 1},
+        },
+        metadata={"session_id": "sess-fire-a"},
+    )
+    power_reset = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 514,
+            "t_wall": 41.0,
+            "bios": {"BATTERY_SW": 0, "FIRE_TEST_SW": 1},
+            "delta": {"BATTERY_SW": 0},
+        },
+        metadata={"session_id": "sess-fire-a"},
+    )
+
+    first = enrich_bios_observation(active, _resolver(), mapper=_mapper())
+    isolated = enrich_bios_observation(other_stream, _resolver(), mapper=_mapper())
+    sticky_result = enrich_bios_observation(expired, _resolver(), mapper=_mapper())
+    reset_result = enrich_bios_observation(power_reset, _resolver(), mapper=_mapper())
+
+    assert first.payload["vars"]["fire_test_active"] is True
+    assert first.payload["vars"]["fire_test_complete"] is True
+    assert isolated.payload["vars"]["fire_test_complete"] is False
+    assert sticky_result.payload["vars"]["fire_test_active"] is False
+    assert sticky_result.payload["vars"]["fire_test_complete"] is True
+    assert reset_result.payload["vars"]["fire_test_complete"] is False
+
+
+def test_enrich_bios_observation_latched_fire_test_clears_source_missing(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    active = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 514,
+            "t_wall": 50.0,
+            "bios": {"FIRE_TEST_SW": 2},
+            "delta": {"FIRE_TEST_SW": 2},
+        },
+        metadata={"session_id": "sess-fire-latch"},
+    )
+    released = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 515,
+            "t_wall": 51.0,
+            "bios": {"FIRE_TEST_SW": 1},
+            "delta": {"FIRE_TEST_SW": 1},
+        },
+        metadata={"session_id": "sess-fire-latch"},
+    )
+
+    enrich_bios_observation(active, _resolver(), mapper=_mapper())
+    released_result = enrich_bios_observation(released, _resolver(), mapper=_mapper())
+
+    assert released_result.payload["vars"]["fire_test_complete"] is True
+    assert "fire_test_complete" not in released_result.payload["vars"]["vars_source_missing"]
+
+
+def test_enrich_bios_observation_keeps_engine_crank_left_complete_in_selected_vars() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 516,
+            "t_wall": 52.0,
+            "bios": {
+                "BATTERY_SW": 2,
+                "EXT_PWR_SW": 1,
+                "L_GEN_SW": 1,
+                "R_GEN_SW": 1,
+                "ENGINE_CRANK_SW": 1,
+                "IFEI_RPM_L": "64",
+                "INT_THROTTLE_LEFT": 12345,
+            },
+            "delta": {"ENGINE_CRANK_SW": 1, "IFEI_RPM_L": "64"},
+        },
+        metadata={"session_id": "sess-left-engine-complete"},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+
+    vars_out = enriched.payload["vars"]
+    assert vars_out["left_engine_idle_ready"] is True
+    assert vars_out["engine_crank_left_complete"] is True
+    assert "engine_crank_left_complete" not in vars_out["vars_source_missing"]
+
+
+def test_enrich_bios_observation_keeps_obogs_subconditions_in_selected_vars() -> None:
+    obs = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 517,
+            "t_wall": 53.0,
+            "bios": {
+                "OBOGS_SW": 1,
+                "OXY_FLOW": 65535,
+            },
+            "delta": {"OBOGS_SW": 1, "OXY_FLOW": 65535},
+        },
+        metadata={"session_id": "sess-obogs"},
+    )
+
+    enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
+
+    vars_out = enriched.payload["vars"]
+    assert vars_out["obogs_switch_on"] is True
+    assert vars_out["obogs_flow_on"] is True
+    assert vars_out["obogs_ready"] is True
+    assert "obogs_switch_on" not in vars_out["vars_source_missing"]
+    assert "obogs_flow_on" not in vars_out["vars_source_missing"]
+
+
+def test_enrich_bios_observation_latches_fcs_reset_complete_after_button_release(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    pressed = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 518,
+            "t_wall": 54.0,
+            "bios": {"FCS_RESET_BTN": 1},
+            "delta": {"FCS_RESET_BTN": 1},
+        },
+        metadata={"session_id": "sess-fcs-reset"},
+    )
+    released = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 519,
+            "t_wall": 55.0,
+            "bios": {"FCS_RESET_BTN": 0},
+            "delta": {"FCS_RESET_BTN": 0},
+        },
+        metadata={"session_id": "sess-fcs-reset"},
+    )
+
+    first = enrich_bios_observation(pressed, _resolver(), mapper=_mapper())
+    second = enrich_bios_observation(released, _resolver(), mapper=_mapper())
+
+    assert first.payload["vars"]["fcs_reset_pressed"] is True
+    assert first.payload["vars"]["fcs_reset_complete"] is True
+    assert second.payload["vars"]["fcs_reset_pressed"] is False
+    assert second.payload["vars"]["fcs_reset_complete"] is True
+    assert "fcs_reset_complete" not in second.payload["vars"]["vars_source_missing"]
+
+
+def test_enrich_bios_observation_latches_takeoff_trim_set_after_button_release(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    pressed = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 520,
+            "t_wall": 56.0,
+            "bios": {"TO_TRIM_BTN": 1},
+            "delta": {"TO_TRIM_BTN": 1},
+        },
+        metadata={"session_id": "sess-to-trim"},
+    )
+    released = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 521,
+            "t_wall": 57.0,
+            "bios": {"TO_TRIM_BTN": 0},
+            "delta": {"TO_TRIM_BTN": 0},
+        },
+        metadata={"session_id": "sess-to-trim"},
+    )
+
+    first = enrich_bios_observation(pressed, _resolver(), mapper=_mapper())
+    second = enrich_bios_observation(released, _resolver(), mapper=_mapper())
+
+    assert first.payload["vars"]["takeoff_trim_pressed"] is True
+    assert first.payload["vars"]["takeoff_trim_set"] is True
+    assert second.payload["vars"]["takeoff_trim_pressed"] is False
+    assert second.payload["vars"]["takeoff_trim_set"] is True
+    assert "takeoff_trim_set" not in second.payload["vars"]["vars_source_missing"]
+
+
+def test_enrich_bios_observation_restores_momentary_latches_across_process_restart(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch_path = tmp_path / "completion_latches.json"
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", latch_path)
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    pressed = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 530,
+            "t_wall": 58.0,
+            "bios": {"FCS_RESET_BTN": 1, "TO_TRIM_BTN": 1, "BATTERY_SW": 2},
+            "delta": {"FCS_RESET_BTN": 1, "TO_TRIM_BTN": 1, "BATTERY_SW": 2},
+        },
+        metadata={"session_id": "sess-persisted-completions"},
+    )
+    restored = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 531,
+            "t_wall": 59.0,
+            "bios": {"FCS_RESET_BTN": 0, "TO_TRIM_BTN": 0, "BATTERY_SW": 2},
+            "delta": {"BATTERY_SW": 2},
+        },
+        metadata={"session_id": "sess-persisted-completions"},
+    )
+
+    first = enrich_bios_observation(pressed, _resolver(), mapper=_mapper())
+    assert first.payload["vars"]["fcs_reset_complete"] is True
+    assert first.payload["vars"]["takeoff_trim_set"] is True
+    assert latch_path.exists()
+
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", False)
+
+    second = enrich_bios_observation(restored, _resolver(), mapper=_mapper())
+    assert second.payload["vars"]["fcs_reset_pressed"] is False
+    assert second.payload["vars"]["takeoff_trim_pressed"] is False
+    assert second.payload["vars"]["fcs_reset_complete"] is True
+    assert second.payload["vars"]["takeoff_trim_set"] is True
+
+
+def test_enrich_bios_observation_clears_persisted_momentary_latches_on_cold_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch_path = tmp_path / "completion_latches.json"
+    latch_path.write_text(
+        json.dumps(
+            {
+                "sess-cold-start-clear": {
+                    "fcs_reset_complete": True,
+                    "takeoff_trim_set": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", latch_path)
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", False)
+
+    cold_start = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 532,
+            "t_wall": 60.0,
+            "bios": {"BATTERY_SW": 1, "FCS_RESET_BTN": 0, "TO_TRIM_BTN": 0},
+            "delta": {"BATTERY_SW": 1},
+        },
+        metadata={"session_id": "sess-cold-start-clear"},
+    )
+
+    enriched = enrich_bios_observation(cold_start, _resolver(), mapper=_mapper())
+    assert enriched.payload["vars"]["battery_on"] is False
+    assert enriched.payload["vars"]["fcs_reset_complete"] is False
+    assert enriched.payload["vars"]["takeoff_trim_set"] is False
+
+
+def test_save_completion_latches_skips_non_regular_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch_path = tmp_path / "completion_latches.json"
+    latch_path.mkdir()
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", latch_path)
+    monkeypatch.setattr(
+        telemetry_pipeline,
+        "_COMPLETION_LATCHES",
+        OrderedDict({"sess-1": {"fcs_reset_complete": True}}),
+    )
+
+    telemetry_pipeline._save_completion_latches_to_disk()
+
+    assert latch_path.is_dir()
+    assert not any(latch_path.iterdir())
+
+
+def test_enrich_bios_observation_saves_completion_latches_outside_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    lock_states: list[bool] = []
+
+    def _fake_save(payload=None) -> None:
+        lock_states.append(telemetry_pipeline._COMPLETION_LATCHES_LOCK.locked())
+
+    monkeypatch.setattr(telemetry_pipeline, "_save_completion_latches_to_disk", _fake_save)
+
+    pressed = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 533,
+            "t_wall": 61.0,
+            "bios": {"FCS_RESET_BTN": 1},
+            "delta": {"FCS_RESET_BTN": 1},
+        },
+        metadata={"session_id": "sess-save-outside-lock"},
+    )
+
+    enrich_bios_observation(pressed, _resolver(), mapper=_mapper())
+
+    assert lock_states == [False]
 
 def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_raw() -> None:
     obs = Observation(

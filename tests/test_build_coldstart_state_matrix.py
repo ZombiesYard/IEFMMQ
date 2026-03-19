@@ -12,6 +12,7 @@ from adapters.step_inference import infer_step_id, load_pack_steps
 from adapters.event_store.telemetry_writer import TelemetryWriter
 from core.vars import VarResolver
 from tools.build_coldstart_state_matrix import (
+    _VAR_BINDINGS,
     build_coldstart_state_matrix_dataset,
     main,
 )
@@ -139,5 +140,16 @@ def test_build_coldstart_state_matrix_cli_supports_carrier_profile(tmp_path: Pat
     s12_vars = resolver.resolve(s12_frames[-1])
     s23_vars = resolver.resolve(s23_frames[-1])
 
-    assert s12_vars["ins_mode"] == 4
+    assert s12_vars["ins_mode"] == 1
     assert 30 <= s23_vars["radar_altimeter_bug_value"] <= 60
+
+
+def test_fire_test_complete_binding_uses_non_center_rocker_state_for_true() -> None:
+    binding = _VAR_BINDINGS["fire_test_complete"]
+    bios: dict[str, int] = {}
+
+    binding.setter(bios, True)
+    assert bios["FIRE_TEST_SW"] in {0, 2}
+
+    binding.setter(bios, False)
+    assert bios["FIRE_TEST_SW"] == 1

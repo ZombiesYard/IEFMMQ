@@ -84,6 +84,7 @@ class VisionFact:
     confidence: float = 0.0
     expires_after_ms: int = 0
     evidence_note: str = ""
+    result_kind: Optional[str] = None
     observed_at_wall_ms: Optional[int] = None
     sticky: Optional[bool] = None
 

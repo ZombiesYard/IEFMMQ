@@ -6,7 +6,10 @@ vars:
   ext_pwr_on: "bios.EXT_PWR_SW == 1"
   l_gen_on: "bios.L_GEN_SW == 1"
   r_gen_on: "bios.R_GEN_SW == 1"
-  power_available: "derived((vars.battery_on or vars.ext_pwr_on) and vars.l_gen_on and vars.r_gen_on)"
+  # Keep power_available anchored to actual electrical power sources. Generator
+  # switch positions are tracked separately as evidence, but they do not by
+  # themselves mean the jet is already electrically powered.
+  power_available: "derived(vars.battery_on or vars.ext_pwr_on)"
 
   # APU
   apu_on: "bios.APU_CONTROL_SW == 1"
@@ -27,8 +30,9 @@ vars:
   throttle_l_not_off: "derived(num(bios.INT_THROTTLE_LEFT) > 0)"
   temp_r: "derived(num(bios.IFEI_TEMP_R))"
   temp_l: "derived(num(bios.IFEI_TEMP_L))"
-  ff_r: "derived(num(bios.IFEI_FF_R))"
-  ff_l: "derived(num(bios.IFEI_FF_L))"
+  # IFEI fuel-flow windows are labeled x100, so a displayed value like 7 means 700 PPH.
+  ff_r: "derived(num(bios.IFEI_FF_R) * 100)"
+  ff_l: "derived(num(bios.IFEI_FF_L) * 100)"
   oil_r: "derived(num(bios.IFEI_OIL_PRESS_R))"
   oil_l: "derived(num(bios.IFEI_OIL_PRESS_L))"
   noz_r: "derived((num(bios.EXT_NOZZLE_POS_R) * 100) / 65535)"
@@ -39,8 +43,9 @@ vars:
   rpm_r_gte_60: "derived(vars.rpm_r >= 60)"
   rpm_l_gte_25: "derived(vars.rpm_l >= 25)"
   rpm_l_gte_60: "derived(vars.rpm_l >= 60)"
-  engine_crank_right_complete: "derived(vars.engine_crank_right or vars.rpm_r_gte_25 or vars.rpm_r_gte_60 or vars.engine_crank_left or vars.rpm_l_gte_60)"
-  throttle_r_idle_complete: "derived(vars.throttle_r_not_off or vars.rpm_r_gte_25 or vars.rpm_r_gte_60 or vars.engine_crank_left or vars.rpm_l_gte_60)"
+  engine_crank_right_complete: "derived(vars.engine_crank_right or vars.rpm_r_gte_25 or vars.rpm_r_gte_60)"
+  apu_start_support_complete: "derived(vars.apu_ready or vars.engine_crank_right_complete)"
+  throttle_r_idle_complete: "derived(vars.throttle_r_not_off or vars.ff_r > 0 or vars.temp_r >= 190 or vars.oil_r >= 45 or vars.noz_r > 0)"
   rpm_r_in_range: "derived(vars.rpm_r >= 63 and vars.rpm_r <= 70)"
   rpm_l_in_range: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70)"
   temp_r_in_range: "derived(vars.temp_r >= 190 and vars.temp_r <= 590)"
@@ -54,6 +59,7 @@ vars:
   right_engine_nominal_start_params: "derived(vars.rpm_r_in_range and vars.temp_r_in_range and vars.ff_r_in_range and vars.oil_r_in_range and vars.noz_r_in_range)"
   left_engine_nominal_start_params: "derived(vars.rpm_l >= 63 and vars.rpm_l <= 70 and vars.temp_l >= 190 and vars.temp_l <= 590 and vars.ff_l >= 420 and vars.ff_l <= 900 and vars.oil_l >= 45 and vars.oil_l <= 110 and vars.noz_l >= 73 and vars.noz_l <= 84)"
   left_engine_idle_ready: "derived(vars.rpm_l >= 25 and num(bios.INT_THROTTLE_LEFT) > 0)"
+  engine_crank_left_complete: "derived(vars.engine_crank_left or vars.rpm_l_gte_25 or vars.rpm_l_gte_60 or vars.left_engine_idle_ready)"
 
   # Displays / avionics
   left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
@@ -64,26 +70,54 @@ vars:
   core_avionics_online: "derived(bios.LEFT_DDI_BRT_CTL > 0 and bios.RIGHT_DDI_BRT_CTL > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
 
   # Key switches / sensor panel
-  fire_test_active: "bios.FIRE_TEST_SW == 1"
-  # FIRE_TEST_SW is spring-loaded and often absent from replay/live captures once the
-  # learner has already moved past S02. Keep completion inference anchored to stable
-  # downstream vars so late-stage help does not regress back to FIRE TEST.
-  fire_test_complete: "derived(vars.fire_test_active or vars.apu_on or vars.apu_ready or vars.engine_crank_right or vars.engine_crank_left or vars.rpm_r_gte_60 or vars.rpm_l_gte_60)"
+  # DCS-BIOS exports rocker selectors as 0/1/2 where 1 is centered and 0/2 are the
+  # two held directions. FIRE TEST is therefore active whenever it leaves center.
+  fire_test_active: "derived(num(bios.FIRE_TEST_SW) != 1)"
+  # FIRE_TEST_SW is a spring-loaded two-way rocker. Completion is latched in
+  # telemetry_pipeline using the same direct-observation pattern as FCS RESET:
+  # once either held side is seen in-session, completion remains true until the
+  # session is cold-start reset.
+  fire_test_complete: "derived(vars.fire_test_active)"
+  lights_test_active: "bios.LIGHTS_TEST_SW == 1"
+  annunciator_panel_activity: "derived(bios.MASTER_CAUTION_LT == 1 or bios.LH_ADV_L_BLEED == 1 or bios.LH_ADV_R_BLEED == 1 or bios.LH_ADV_SPD_BRK == 1 or bios.LH_ADV_STBY == 1 or bios.LH_ADV_GO == 1 or bios.LH_ADV_NO_GO == 1 or bios.LH_ADV_REC == 1 or bios.LH_ADV_XMIT == 1 or bios.RH_ADV_RCDR_ON == 1 or bios.RH_ADV_DISP == 1 or bios.RH_ADV_SAM == 1 or bios.RH_ADV_AI == 1 or bios.RH_ADV_AAA == 1 or bios.RH_ADV_CW == 1)"
+  # Like FIRE TEST, the lights test now follows the same direct-observation latch
+  # pattern as FCS RESET: seeing the pressed state once marks completion for the
+  # session, while annunciator activity remains auxiliary evidence only.
+  lights_test_complete: "derived(vars.lights_test_active)"
+  # INS_SW follows clickable order from pnt_443:
+  # 0=OFF, 1=CV, 2=GND, 3=NAV, 4=IFA, 5=GYRO, 6=GB, 7=TEST.
   ins_mode: "bios.INS_SW"
   ins_mode_set: "derived(vars.ins_mode >= 1)"
-  ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 4)"
+  ins_mode_cv_or_gnd: "derived(vars.ins_mode == 1 or vars.ins_mode == 2)"
+  # RADAR_SW follows clickable order from pnt_440 base switch:
+  # 0=OFF, 1=STBY, 2=OPR. EMERG is a separate pull action, not the base position.
   radar_mode_value: "derived(num(bios.RADAR_SW))"
-  radar_mode_opr: "derived(vars.radar_mode_value >= 2)"
+  radar_mode_opr: "derived(vars.radar_mode_value == 2)"
   radar_on: "bios.RADAR_SW > 0"
+  comm1_freq_value: "derived(num(bios.COMM1_FREQ))"
+  comm2_freq_value: "derived(num(bios.COMM2_FREQ))"
+  comm1_channel_numeric: "derived(num(bios.COMM1_CHANNEL_NUMERIC))"
+  comm2_channel_numeric: "derived(num(bios.COMM2_CHANNEL_NUMERIC))"
+  comm1_freq_134_000: "derived(vars.comm1_freq_value == 13400)"
+  ufc_comm1_pull_pressed: "bios.UFC_COMM1_PULL == 1"
+  ufc_key_1_pressed: "bios.UFC_1 == 1"
+  ufc_key_3_pressed: "bios.UFC_3 == 1"
+  ufc_key_4_pressed: "bios.UFC_4 == 1"
+  ufc_key_0_pressed: "bios.UFC_0 == 1"
+  ufc_ent_pressed: "bios.UFC_ENT == 1"
+  ufc_scratchpad_number_display: "bios.UFC_SCRATCHPAD_NUMBER_DISPLAY"
+  ufc_scratchpad_string_1_display: "bios.UFC_SCRATCHPAD_STRING_1_DISPLAY"
+  ufc_scratchpad_string_2_display: "bios.UFC_SCRATCHPAD_STRING_2_DISPLAY"
 
   # S14-S25 extension vars.
   # If a checklist item is currently not observable from trusted telemetry, expose it
   # as explicit "unknown" (instead of false) so gating/inference can degrade safely.
   obogs_switch_on: "bios.OBOGS_SW == 1"
   obogs_flow_on: "bios.OXY_FLOW > 0"
-  obogs_ready: "derived(bios.OBOGS_SW == 1 and bios.OXY_FLOW > 0)"
+  obogs_ready: "derived(vars.obogs_switch_on and vars.obogs_flow_on)"
 
   fcs_reset_pressed: "bios.FCS_RESET_BTN == 1"
+  fcs_reset_complete: "derived(vars.fcs_reset_pressed)"
   fcs_page_reviewed: "'unknown'"
 
   flap_mode_value: "derived(num(bios.FLAP_SW))"
@@ -93,12 +127,17 @@ vars:
   flap_configured: "derived(vars.flap_mode_value == 0 or vars.flap_mode_value == 1)"
 
   takeoff_trim_pressed: "bios.TO_TRIM_BTN == 1"
-  takeoff_trim_set: "'unknown'"
+  takeoff_trim_set: "derived(vars.takeoff_trim_pressed)"
 
   fcs_bit_switch_up: "bios.FCS_BIT_SW == 1"
   fcs_bit_complete: "'unknown'"
 
   probe_switch_value: "derived(num(bios.PROBE_SW))"
+  ext_refuel_probe_value: "derived(num(bios.EXT_REFUEL_PROBE))"
+  # pnt_341 clickable order is EXTEND/RETRACT/EMERG EXTD => 0/1/2. The external
+  # probe position argument also rises toward 65535 when physically extended.
+  probe_extended: "derived(vars.probe_switch_value == 0 or vars.ext_refuel_probe_value >= 60000)"
+  probe_cycle_complete: "derived(vars.probe_extended)"
   launch_bar_switch_value: "derived(num(bios.LAUNCH_BAR_SW))"
   hook_handle_value: "derived(num(bios.HOOK_LEVER))"
   pitot_heat_on: "bios.PITOT_HEAT_SW > 0"
@@ -110,7 +149,7 @@ vars:
 
   ifei_up_pressed: "bios.IFEI_UP_BTN == 1"
   ifei_down_pressed: "bios.IFEI_DWN_BTN == 1"
-  bingo_fuel_set: "'unknown'"
+  bingo_fuel_set: "derived(num(bios.IFEI_BINGO) > 0)"
 
   standby_pressure_set_0: "derived(num(bios.STBY_PRESS_SET_0))"
   standby_pressure_set_1: "derived(num(bios.STBY_PRESS_SET_1))"
@@ -118,10 +157,11 @@ vars:
   standby_altimeter_set: "'unknown'"
 
   radar_altimeter_bug_value: "derived(num(bios.RADALT_MIN_HEIGHT_PTR))"
-  radar_altimeter_bug_set: "'unknown'"
+  radar_altimeter_bug_set: "derived(vars.radar_altimeter_bug_value > 0)"
 
   sai_cage_value: "derived(num(bios.SAI_CAGE))"
-  standby_attitude_uncaged: "'unknown'"
+  standby_attitude_uncaged: "bios.SAI_ATT_WARNING_FLAG == 0"
 
   hud_att_source_value: "derived(num(bios.HUD_ATT_SW))"
-  attitude_source_auto: "'unknown'"
+  # DCS-BIOS defines HUD_ATT_SW as INS/AUTO/STBY (0/1/2).
+  attitude_source_auto: "derived(vars.hud_att_source_value == 1)"

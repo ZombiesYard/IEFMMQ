@@ -105,6 +105,17 @@ python live_dcs.py \
   --output logs/live_dcs.jsonl
 ```
 
+Run the local vision sidecar on the DCS host so live help can trigger an
+immediate composite-panel screenshot. By default this sidecar is help-trigger
+only; add `--capture-fps 1` or `--capture-fps 2` when you also want a continuous
+low-fps frame stream growing in the background:
+
+```bash
+python tools/capture_vision_sidecar.py \
+  --saved-games-dir "C:\\Users\\you\\Saved Games\\DCS" \
+  --session-id sess-live
+```
+
 `live_dcs.py` no longer assumes continuous low-fps frame recording. In live mode, BIOS
 streaming remains continuous, while vision is treated as help-triggered capture: SimTutor
 waits for the post-help frame written into the configured sidecar directory. Use
@@ -569,6 +580,8 @@ Parameters:
 | `--vision-layout-id` | No | Expected manifest layout id; default `fa18c_composite_panel_v2` |
 | `--vision-sync-window-ms` | No | Frame selection window in milliseconds; `0` uses live default `250` |
 | `--vision-trigger-wait-ms` | No | Live help-trigger extra wait budget in milliseconds; `0` uses live default `250` |
+| `--vision-capture-trigger-host` | No | UDP host for notifying the local vision sidecar to capture an immediate help-trigger frame |
+| `--vision-capture-trigger-port` | No | UDP port for help-trigger vision capture notifications; `0` disables the notifier |
 | `--cooldown-s` | No | Same-state help reuse cooldown; default `4.0` |
 | `--max-frames` | No | Maximum frames to process; `0` means unlimited |
 | `--duration` | No | Run duration in seconds; `0` means unlimited |

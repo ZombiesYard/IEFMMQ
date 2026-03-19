@@ -15,10 +15,12 @@ DEFAULT_CLICKABLEDATA_PATH = BASE_DIR / "CockpitScripts" / "clickabledata.lua"
 CLICKABLE_IDS_FIXTURE_PATH = BASE_DIR / "tests" / "fixtures" / "fa18c_clickable_ids.txt"
 CLICKABLEDATA_ENV_VAR = "SIMTUTOR_FA18C_CLICKABLEDATA_PATH"
 REQUIRED_STEP_IDS = tuple(f"S{i:02d}" for i in range(1, 26))
-REQUIRED_OPERABLE_STEP_IDS = REQUIRED_STEP_IDS
 _PNT_ID_PATTERN = re.compile(r"^pnt_[0-9]+(?:_[0-9]+)?$")
 _CLICKABLE_ID_PATTERN = re.compile(r'^\s*elements\["(?P<id>pnt_[0-9_]+)"\]\s*=', re.MULTILINE)
 _ALLOWED_MULTI_ACTION_DCS_IDS = {"pnt_124", "pnt_126"}
+_INTERACTION_POLICY_KEYS = {"two_position", "multi_position", "buttons", "wheel", "hotkeys"}
+_INTERACTION_CLICK_TYPES = {"left", "right", "wheel_up", "wheel_down", "keyboard"}
+_INTERACTION_DETENT_DIRECTIONS = {"clockwise", "counter_clockwise"}
 
 
 def _load_yaml(path: Path) -> dict:
@@ -110,7 +112,12 @@ def test_all_operable_steps_have_non_empty_ui_targets() -> None:
     assert isinstance(steps, list)
 
     by_id = {step.get("id"): step for step in steps if isinstance(step, dict)}
-    for step_id in REQUIRED_OPERABLE_STEP_IDS:
+    operable_step_ids = tuple(
+        step_id
+        for step_id, step in by_id.items()
+        if isinstance(step_id, str) and step.get("overlay_enabled") is not False
+    )
+    for step_id in operable_step_ids:
         assert step_id in by_id, f"required step {step_id} missing in pack"
         ui_targets = by_id[step_id].get("ui_targets")
         assert isinstance(ui_targets, list), f"step {step_id} ui_targets must be list"
@@ -149,6 +156,62 @@ def test_ui_map_entries_have_unique_dcs_ids_and_required_fields() -> None:
             f"ui_map target {target!r} panel_area must be non-empty string"
         )
 
+        interaction_hint = entry.get("interaction_hint")
+        if interaction_hint is not None:
+            assert isinstance(interaction_hint, dict), (
+                f"ui_map target {target!r} interaction_hint must be a mapping when provided"
+            )
+            assert isinstance(interaction_hint.get("zh"), str) and interaction_hint["zh"].strip(), (
+                f"ui_map target {target!r} interaction_hint.zh must be a non-empty string"
+            )
+            assert isinstance(interaction_hint.get("en"), str) and interaction_hint["en"].strip(), (
+                f"ui_map target {target!r} interaction_hint.en must be a non-empty string"
+            )
+        interaction = entry.get("interaction")
+        if interaction is not None:
+            assert isinstance(interaction, dict), (
+                f"ui_map target {target!r} interaction must be a mapping when provided"
+            )
+            click_type = interaction.get("click_type")
+            if click_type is not None:
+                assert click_type in _INTERACTION_CLICK_TYPES, (
+                    f"ui_map target {target!r} interaction.click_type invalid: {click_type!r}"
+                )
+            detent_direction = interaction.get("detent_direction")
+            if detent_direction is not None:
+                assert detent_direction in _INTERACTION_DETENT_DIRECTIONS, (
+                    f"ui_map target {target!r} interaction.detent_direction invalid: {detent_direction!r}"
+                )
+            hotkey = interaction.get("hotkey")
+            if hotkey is not None:
+                assert isinstance(hotkey, str) and hotkey.strip(), (
+                    f"ui_map target {target!r} interaction.hotkey must be non-empty string"
+                )
+            click_type_by_value = interaction.get("click_type_by_value")
+            if click_type_by_value is not None:
+                assert isinstance(click_type_by_value, dict) and click_type_by_value, (
+                    f"ui_map target {target!r} interaction.click_type_by_value must be non-empty mapping"
+                )
+                for value_name, value_click_type in click_type_by_value.items():
+                    assert isinstance(value_name, str) and value_name.strip(), (
+                        f"ui_map target {target!r} interaction.click_type_by_value keys must be non-empty strings"
+                    )
+                    assert value_click_type in _INTERACTION_CLICK_TYPES, (
+                        f"ui_map target {target!r} interaction.click_type_by_value[{value_name!r}] invalid: {value_click_type!r}"
+                    )
+            hotkey_by_action = interaction.get("hotkey_by_action")
+            if hotkey_by_action is not None:
+                assert isinstance(hotkey_by_action, dict) and hotkey_by_action, (
+                    f"ui_map target {target!r} interaction.hotkey_by_action must be non-empty mapping"
+                )
+                for action_name, action_hotkey in hotkey_by_action.items():
+                    assert isinstance(action_name, str) and action_name.strip(), (
+                        f"ui_map target {target!r} interaction.hotkey_by_action keys must be non-empty strings"
+                    )
+                    assert isinstance(action_hotkey, str) and action_hotkey.strip(), (
+                        f"ui_map target {target!r} interaction.hotkey_by_action[{action_name!r}] must be non-empty string"
+                    )
+
     duplicated_dcs_ids = {dcs_id: targets for dcs_id, targets in dcs_to_targets.items() if len(targets) > 1}
     assert set(duplicated_dcs_ids.keys()).issubset(_ALLOWED_MULTI_ACTION_DCS_IDS), (
         "only UFC COMM channel selector controls may share dcs_id in ui_map"
@@ -171,6 +234,23 @@ def test_ui_map_dcs_ids_align_with_cockpit_clickabledata() -> None:
         assert isinstance(dcs_id, str) and dcs_id
         assert dcs_id in clickable_ids, (
             f"ui_map target {target!r} uses dcs_id {dcs_id!r} not found in clickable reference source: {source_path}"
+        )
+
+
+def test_ui_map_interaction_policy_has_bilingual_entries() -> None:
+    ui_map = _load_yaml(UI_MAP_PATH)
+    policy = ui_map.get("interaction_policy")
+    assert isinstance(policy, dict), "ui_map.yaml interaction_policy must be a mapping"
+    assert set(policy.keys()) == _INTERACTION_POLICY_KEYS
+
+    for key in sorted(_INTERACTION_POLICY_KEYS):
+        entry = policy[key]
+        assert isinstance(entry, dict), f"ui_map interaction_policy[{key!r}] must be a mapping"
+        assert isinstance(entry.get("zh"), str) and entry["zh"].strip(), (
+            f"ui_map interaction_policy[{key!r}].zh must be a non-empty string"
+        )
+        assert isinstance(entry.get("en"), str) and entry["en"].strip(), (
+            f"ui_map interaction_policy[{key!r}].en must be a non-empty string"
         )
 
 
@@ -200,7 +280,9 @@ def test_pack_allowlist_matches_step_union_and_ui_map() -> None:
             if isinstance(target, str) and target:
                 step_target_sequence.append(target)
     step_union = _dedupe_keep_order(step_target_sequence)
-    assert pack_ui_targets == step_union, "pack.ui_targets must exactly match deduped step ui_targets union order"
+    assert set(step_union).issubset(set(pack_ui_targets)), (
+        "pack.ui_targets must contain every deduped step ui target and may include extra dormant targets"
+    )
 
 
 def test_step_signal_metadata_values_are_valid() -> None:

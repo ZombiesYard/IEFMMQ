@@ -45,6 +45,7 @@ class OpenAICompatModel(BaseHelpModel):
         enable_multimodal: bool = False,
         allowed_local_image_roots: Sequence[str | Path] | None = None,
         max_local_image_bytes: int | None = None,
+        telemetry_map_path: str | Path | None = None,
         client: object | None = None,
     ) -> None:
         self.api_key = api_key
@@ -67,6 +68,7 @@ class OpenAICompatModel(BaseHelpModel):
             lang=lang,
             log_raw_llm_text=log_raw_llm_text,
             print_model_io=print_model_io,
+            telemetry_map_path=telemetry_map_path,
             client=client,
         )
 
@@ -244,29 +246,28 @@ class OpenAICompatModel(BaseHelpModel):
             "model": self.model_name,
             "messages": self._copy_messages_for_payload(messages),
             **self._build_generation_payload(
+                include_json_schema=include_json_schema,
                 include_request_overrides=include_request_overrides,
                 has_vision=has_vision,
             ),
         }
-        if include_json_schema:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "HelpResponse",
-                    "strict": True,
-                    "schema": self._help_response_schema,
-                },
-            }
+        response_format = self._build_response_format_payload(include_json_schema=include_json_schema)
+        if response_format is not None:
+            payload["response_format"] = response_format
         return payload
 
     def _build_generation_payload(
         self,
         *,
+        include_json_schema: bool,
         include_request_overrides: bool,
         has_vision: bool,
     ) -> dict[str, object]:
         payload: dict[str, object] = {"temperature": 0}
-        effective_max_tokens = self._effective_max_tokens(has_vision=has_vision)
+        effective_max_tokens = self._effective_max_tokens(
+            has_vision=has_vision,
+            structured_output_enabled=include_json_schema,
+        )
         if effective_max_tokens is not None:
             payload["max_tokens"] = effective_max_tokens
         if include_request_overrides:
@@ -275,10 +276,14 @@ class OpenAICompatModel(BaseHelpModel):
 
     def _build_request_overrides(self) -> dict[str, object]:
         if self._should_disable_thinking():
+            if self._is_dashscope_compatible():
+                return {"enable_thinking": False}
             return {"chat_template_kwargs": {"enable_thinking": False}}
         return {}
 
-    def _effective_max_tokens(self, *, has_vision: bool) -> int | None:
+    def _effective_max_tokens(self, *, has_vision: bool, structured_output_enabled: bool) -> int | None:
+        if structured_output_enabled and self._is_dashscope_compatible():
+            return None
         if self.max_tokens is not None:
             return self.max_tokens
         if self._is_qwen35_model():
@@ -286,6 +291,20 @@ class OpenAICompatModel(BaseHelpModel):
                 return self._DEFAULT_QWEN35_VLM_MAX_TOKENS
             return self._DEFAULT_QWEN35_MAX_TOKENS
         return None
+
+    def _build_response_format_payload(self, *, include_json_schema: bool) -> dict[str, object] | None:
+        if not include_json_schema:
+            return None
+        if self._should_use_json_object_response_format():
+            return {"type": "json_object"}
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "HelpResponse",
+                "strict": True,
+                "schema": self._help_response_schema,
+            },
+        }
 
     def _build_multimodal_spec(self, request: Any) -> dict[str, Any]:
         context = request.context if request is not None and isinstance(getattr(request, "context", None), Mapping) else {}
@@ -493,6 +512,13 @@ class OpenAICompatModel(BaseHelpModel):
 
     def _is_qwen35_model(self) -> bool:
         return "qwen3.5" in self.model_name.lower()
+
+    def _is_dashscope_compatible(self) -> bool:
+        normalized = self.base_url.lower()
+        return "dashscope.aliyuncs.com/compatible-mode" in normalized or "dashscope-intl.aliyuncs.com/compatible-mode" in normalized
+
+    def _should_use_json_object_response_format(self) -> bool:
+        return self._is_dashscope_compatible() and self._is_qwen35_model()
 
     def _is_json_schema_unsupported_400(self, response: Any) -> bool:
         return is_json_schema_unsupported_400(response)

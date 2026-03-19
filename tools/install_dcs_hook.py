@@ -109,6 +109,20 @@ def _vision_frames_root(saved_games_dir: Path) -> Path:
     return saved_games_dir / "SimTutor" / "frames"
 
 
+def _format_lua_path(path: Path) -> str:
+    resolved = path.expanduser().resolve()
+    parts = resolved.parts
+    # This installer targets DCS on Windows. When run from WSL, convert `/mnt/<drive>/...`
+    # mounts into Windows drive paths so the generated Lua config remains readable by DCS.
+    # For native Windows paths, `str(resolved)` is already correct. We intentionally keep
+    # the plain-path fallback for local tests that use temporary POSIX directories.
+    if len(parts) >= 3 and parts[1] == "mnt" and len(parts[2]) == 1 and parts[2].isalpha():
+        drive = parts[2].upper()
+        suffix = "\\".join(parts[3:])
+        return f"{drive}:\\{suffix}" if suffix else f"{drive}:\\"
+    return str(resolved)
+
+
 def build_composite_panel_config(
     *,
     saved_games_dir: Path,
@@ -127,6 +141,7 @@ def build_composite_panel_config(
     overlay_hilite_id: int = 9101,
 ) -> str:
     effective_frames_root = (frames_root or _vision_frames_root(saved_games_dir)).expanduser().resolve()
+    lua_frames_root = _format_lua_path(effective_frames_root)
     background = tuple(int(value) for value in background_rgb)
     if len(background) != 3 or any(value < 0 or value > 255 for value in background):
         raise ValueError("background_rgb must contain exactly three integers between 0 and 255")
@@ -175,7 +190,7 @@ def build_composite_panel_config(
         "        enabled = true,",
         f'        layout_id = "{layout_id}",',
         f'        channel = "{channel}",',
-        f"        output_root = {_lua_string(str(effective_frames_root))},",
+        f"        output_root = {_lua_string(lua_frames_root)},",
         f'        manifest_name = "{DEFAULT_FRAME_MANIFEST_NAME}",',
         f'        monitor_setup = "{monitor_setup_name}",',
         f"        background_rgb = {{{background[0]}, {background[1]}, {background[2]}}},",

@@ -119,6 +119,7 @@ def test_render_vlm_ready_frame_crops_main_view_and_draws_region_guides(
     assert metadata["source_size"] == {"width": width, "height": height}
     assert metadata["artifact_size"]["width"] == processed_size[0]
     assert metadata["crop_rect"]["width"] < width
+    assert metadata["artifact_size"]["width"] > metadata["crop_rect"]["width"] + 40
 
 
 def test_render_vlm_ready_frame_rejects_unknown_region_id(tmp_path: Path) -> None:
