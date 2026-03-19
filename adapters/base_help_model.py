@@ -4,7 +4,7 @@ Shared base implementation for HelpResponse-capable model adapters.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from collections import OrderedDict
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Mapping
@@ -48,14 +48,24 @@ _DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
         "vars.engine_crank_right_complete==true",
     ),
 }
+_VAR_RESOLVER_CACHE: OrderedDict[str, VarResolver] = OrderedDict()
+_MAX_VAR_RESOLVER_CACHE = 8
 
 
-@lru_cache(maxsize=8)
 def _load_var_resolver_for_path(path_text: str) -> VarResolver | None:
+    cached = _VAR_RESOLVER_CACHE.get(path_text)
+    if cached is not None:
+        _VAR_RESOLVER_CACHE.move_to_end(path_text)
+        return cached
     try:
-        return VarResolver.from_yaml(Path(path_text))
+        resolver = VarResolver.from_yaml(Path(path_text))
     except (FileNotFoundError, OSError, VarResolverError):
         return None
+    _VAR_RESOLVER_CACHE[path_text] = resolver
+    _VAR_RESOLVER_CACHE.move_to_end(path_text)
+    while len(_VAR_RESOLVER_CACHE) > max(1, int(_MAX_VAR_RESOLVER_CACHE)):
+        _VAR_RESOLVER_CACHE.popitem(last=False)
+    return resolver
 
 
 def _normalize_telemetry_map_path(raw: Any) -> Path | None:

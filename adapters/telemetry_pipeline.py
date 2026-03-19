@@ -194,16 +194,25 @@ def _load_completion_latches_from_disk() -> None:
     _COMPLETION_LATCHES_LOADED = True
 
 
-def _save_completion_latches_to_disk() -> None:
+def _serialize_completion_latches_payload(
+    states: Mapping[str, Mapping[str, bool | float] | dict[str, bool | float]],
+) -> dict[str, dict[str, bool | float]]:
     payload = {
         stream_id: {
             key: value
             for key, value in state.items()
             if key in _MOMENTARY_COMPLETION_KEYS and isinstance(value, (bool, int, float))
         }
-        for stream_id, state in _COMPLETION_LATCHES.items()
+        for stream_id, state in states.items()
         if isinstance(stream_id, str) and stream_id and isinstance(state, Mapping)
     }
+    return payload
+
+
+def _save_completion_latches_to_disk(
+    payload: Mapping[str, Mapping[str, bool | float] | dict[str, bool | float]] | None = None,
+) -> None:
+    serialized = _serialize_completion_latches_payload(_COMPLETION_LATCHES if payload is None else payload)
     temp_path: Path | None = None
     try:
         if _COMPLETION_LATCHES_PATH.exists() and not _is_regular_file(_COMPLETION_LATCHES_PATH):
@@ -217,7 +226,7 @@ def _save_completion_latches_to_disk() -> None:
             suffix=".tmp",
             delete=False,
         ) as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+            handle.write(json.dumps(serialized, ensure_ascii=False, sort_keys=True))
             handle.flush()
             os.fsync(handle.fileno())
             temp_path = Path(handle.name)
@@ -338,6 +347,7 @@ def _apply_momentary_completion_latches(
         "battery_on" not in missing_sources and resolved_vars.get("battery_on") is False
     )
 
+    save_payload: dict[str, dict[str, bool | float]] | None = None
     with _COMPLETION_LATCHES_LOCK:
         _load_completion_latches_from_disk()
         previous_state = dict(_COMPLETION_LATCHES.get(normalized_stream_id, {}))
@@ -378,7 +388,10 @@ def _apply_momentary_completion_latches(
             state_changed = True
 
         if state_changed:
-            _save_completion_latches_to_disk()
+            save_payload = _serialize_completion_latches_payload(_COMPLETION_LATCHES)
+
+    if save_payload is not None:
+        _save_completion_latches_to_disk(save_payload)
 
     raw_missing = out.get("vars_source_missing")
     if isinstance(raw_missing, list):

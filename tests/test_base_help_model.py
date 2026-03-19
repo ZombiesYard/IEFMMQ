@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from adapters import base_help_model
 from adapters.openai_compat_model import OpenAICompatModel
 from tests._fakes import FakeClient
 
@@ -57,6 +58,18 @@ def test_resolve_active_telemetry_map_path_falls_back_to_pack_sibling(tmp_path: 
     resolved_path = model._resolve_active_telemetry_map_path({"pack_path": str(pack_path)})
 
     assert resolved_path == telemetry_map_path.resolve()
+
+
+def test_load_var_resolver_for_path_does_not_cache_failures(tmp_path: Path) -> None:
+    base_help_model._VAR_RESOLVER_CACHE.clear()
+    telemetry_map_path = tmp_path / "telemetry_map.yaml"
+
+    assert base_help_model._load_var_resolver_for_path(str(telemetry_map_path)) is None
+
+    telemetry_map_path.write_text("vars: {}\n", encoding="utf-8")
+
+    resolver = base_help_model._load_var_resolver_for_path(str(telemetry_map_path))
+    assert resolver is not None
 
 
 def test_expand_presented_missing_condition_keeps_derived_condition_when_all_fallbacks_are_true() -> None:

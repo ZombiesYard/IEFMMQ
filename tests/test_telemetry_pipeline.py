@@ -902,6 +902,35 @@ def test_save_completion_latches_skips_non_regular_path(
     assert latch_path.is_dir()
     assert not any(latch_path.iterdir())
 
+
+def test_enrich_bios_observation_saves_completion_latches_outside_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    lock_states: list[bool] = []
+
+    def _fake_save(payload=None) -> None:
+        lock_states.append(telemetry_pipeline._COMPLETION_LATCHES_LOCK.locked())
+
+    monkeypatch.setattr(telemetry_pipeline, "_save_completion_latches_to_disk", _fake_save)
+
+    pressed = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 533,
+            "t_wall": 61.0,
+            "bios": {"FCS_RESET_BTN": 1},
+            "delta": {"FCS_RESET_BTN": 1},
+        },
+        metadata={"session_id": "sess-save-outside-lock"},
+    )
+
+    enrich_bios_observation(pressed, _resolver(), mapper=_mapper())
+
+    assert lock_states == [False]
+
 def test_enrich_bios_observation_missing_delta_count_aligns_to_kept_and_records_raw() -> None:
     obs = Observation(
         source="dcs_bios",

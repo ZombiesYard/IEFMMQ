@@ -112,6 +112,10 @@ def _vision_frames_root(saved_games_dir: Path) -> Path:
 def _format_lua_path(path: Path) -> str:
     resolved = path.expanduser().resolve()
     parts = resolved.parts
+    # This installer targets DCS on Windows. When run from WSL, convert `/mnt/<drive>/...`
+    # mounts into Windows drive paths so the generated Lua config remains readable by DCS.
+    # For native Windows paths, `str(resolved)` is already correct. We intentionally keep
+    # the plain-path fallback for local tests that use temporary POSIX directories.
     if len(parts) >= 4 and parts[1] == "mnt" and len(parts[2]) == 1 and parts[2].isalpha():
         drive = parts[2].upper()
         suffix = "\\".join(parts[3:])
