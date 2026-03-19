@@ -100,3 +100,44 @@ def test_send_help_logs_and_continues_on_socket_oserror(monkeypatch, capsys) -> 
 
     captured = capsys.readouterr()
     assert "send failed to 127.0.0.1:7792" in captured.out
+
+
+def test_help_trigger_hook_run_closes_resources_when_start_fails(monkeypatch) -> None:
+    captured: dict[str, bool] = {}
+
+    class FakeSocket:
+        def close(self) -> None:
+            captured["socket_closed"] = True
+
+    class FailingTrigger:
+        hotkey_label = "X1"
+
+        def start(self) -> None:
+            raise RuntimeError("hook install failed")
+
+        def request_stop(self) -> None:
+            return
+
+        def close(self) -> None:
+            captured["trigger_closed"] = True
+
+    monkeypatch.setattr(send_help_hotkey.socket, "socket", lambda *args, **kwargs: FakeSocket())
+    monkeypatch.setattr(send_help_hotkey, "WindowsGlobalHelpTrigger", lambda **kwargs: FailingTrigger())
+
+    runner = send_help_hotkey.HelpTriggerHook(
+        host="127.0.0.1",
+        port=7792,
+        hotkey="X1",
+        modifiers="",
+        cooldown_ms=650,
+    )
+
+    try:
+        runner.run()
+    except RuntimeError as exc:
+        assert str(exc) == "hook install failed"
+    else:
+        raise AssertionError("runner.run() should propagate trigger start failure")
+
+    assert captured["trigger_closed"] is True
+    assert captured["socket_closed"] is True

@@ -46,10 +46,10 @@ class HelpTriggerHook:
 
     def run(self) -> int:
         self._install_signal_handlers()
-        self._trigger.start()
-        print(f"[HOTKEY] listening on global trigger {self._trigger.hotkey_label} -> udp {self.host}:{self.port}")
-        print("[HOTKEY] press Ctrl+C to exit")
         try:
+            self._trigger.start()
+            print(f"[HOTKEY] listening on global trigger {self._trigger.hotkey_label} -> udp {self.host}:{self.port}")
+            print("[HOTKEY] press Ctrl+C to exit")
             while not self._stop_requested:
                 time.sleep(0.05)
         except KeyboardInterrupt:

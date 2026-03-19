@@ -535,3 +535,17 @@ def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_canno
     )
 
     assert "result_kind" not in snapshot["left_ddi_fcs_page_button_visible"]
+
+
+def test_extract_vision_fact_snapshot_strips_invalid_result_kind_without_evidence_note() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "result_kind": "bad-value",
+            }
+        ]
+    )
+
+    assert "result_kind" not in snapshot["fcs_bit_result_visible"]
