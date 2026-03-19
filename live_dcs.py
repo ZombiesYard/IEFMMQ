@@ -569,6 +569,7 @@ def _sanitize_vision_context_for_event(raw: Any) -> dict[str, Any]:
 
 
 _SAFE_PROMPT_BUILD_FIELDS: tuple[str, ...] = (
+    "max_overlay_targets",
     "max_prompt_chars",
     "max_prompt_tokens_est",
     "prompt_chars",
@@ -2684,7 +2685,11 @@ class LiveDcsTutorLoop:
             "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
         }
 
-        prompt_result = build_help_prompt_result(context, self.lang)
+        prompt_result = build_help_prompt_result(
+            context,
+            self.lang,
+            max_overlay_targets=self.max_overlay_targets,
+        )
         prompt_hash = hashlib.sha256(prompt_result.prompt.encode("utf-8")).hexdigest()
         prompt_grounding_missing = bool(prompt_result.metadata.get("grounding_missing"))
         prompt_grounding_reason = prompt_result.metadata.get("grounding_reason")
@@ -3369,6 +3374,8 @@ class LiveDcsTutorLoop:
             return list(response.actions), {}
 
         filtered_help_obj: Mapping[str, Any] = help_obj
+        s18_backfill_applied = False
+        s18_backfill_reason = None
         rejected_by_request_allowlist: list[str] = []
         request_allowlist_raw = request.context.get("overlay_target_allowlist")
         if isinstance(request_allowlist_raw, list):
@@ -3405,6 +3412,11 @@ class LiveDcsTutorLoop:
                         filtered_help_obj = dict(help_obj)
                         filtered_help_obj["overlay"] = filtered_overlay
 
+        filtered_help_obj, s18_backfill_applied, s18_backfill_reason = self._backfill_s18_dual_overlay_targets(
+            filtered_help_obj,
+            request,
+        )
+
         mapped = map_help_response_to_tutor_response(
             filtered_help_obj,
             request=request,
@@ -3424,11 +3436,92 @@ class LiveDcsTutorLoop:
             merged_errors.append("overlay_target_not_in_request_allowlist")
             mapped_meta["mapping_errors"] = _dedupe_strings(merged_errors)
             mapped_meta.setdefault("mapping_error", "overlay_target_not_in_request_allowlist")
+        if s18_backfill_applied:
+            mapped_meta["s18_dual_overlay_backfill_applied"] = True
+            mapped_meta["s18_dual_overlay_backfill_reason"] = s18_backfill_reason
         if not response.message and mapped.message:
             response.message = mapped.message
         if (not response.explanations) and mapped.explanations:
             response.explanations = list(mapped.explanations)
         return list(mapped.actions), mapped_meta
+
+    def _backfill_s18_dual_overlay_targets(
+        self,
+        help_obj: Mapping[str, Any],
+        request: TutorRequest,
+    ) -> tuple[Mapping[str, Any], bool, str | None]:
+        if self.max_overlay_targets <= 1:
+            return help_obj, False, "single_target_mode"
+
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return help_obj, False, "missing_deterministic_hint"
+        if hint.get("inferred_step_id") != "S18":
+            return help_obj, False, "not_s18"
+
+        overlay = help_obj.get("overlay")
+        if not isinstance(overlay, Mapping):
+            return help_obj, False, "missing_overlay"
+        raw_targets = overlay.get("targets")
+        if not isinstance(raw_targets, list):
+            return help_obj, False, "missing_overlay_targets"
+
+        targets = [item for item in raw_targets if isinstance(item, str) and item]
+        if "fcs_bit_switch" not in targets:
+            return help_obj, False, "fcs_bit_not_targeted"
+        if "right_mdi_pb5" in targets:
+            return help_obj, False, "already_has_pb5"
+
+        request_allowlist_raw = context.get("overlay_target_allowlist")
+        if isinstance(request_allowlist_raw, list):
+            request_allowlist = {item for item in request_allowlist_raw if isinstance(item, str) and item}
+            if request_allowlist and "right_mdi_pb5" not in request_allowlist:
+                return help_obj, False, "pb5_not_in_request_allowlist"
+
+        vision_fact_summary = context.get("vision_fact_summary")
+        seen_fact_ids: set[str] = set()
+        if isinstance(vision_fact_summary, Mapping):
+            seen_fact_ids = {
+                item
+                for item in vision_fact_summary.get("seen_fact_ids", [])
+                if isinstance(item, str) and item
+            }
+        if "right_ddi_fcsmc_page_visible" not in seen_fact_ids:
+            return help_obj, False, "fcsmc_not_visually_confirmed"
+
+        evidence_raw = overlay.get("evidence")
+        if not isinstance(evidence_raw, list):
+            return help_obj, False, "missing_overlay_evidence"
+
+        template_item: Mapping[str, Any] | None = None
+        for item in evidence_raw:
+            if not isinstance(item, Mapping):
+                continue
+            if item.get("target") != "fcs_bit_switch":
+                continue
+            ref = item.get("ref")
+            if isinstance(ref, str) and ref.startswith("VISION_FACTS.right_ddi_fcsmc_page_visible"):
+                template_item = item
+                break
+        if template_item is None:
+            return help_obj, False, "missing_fcsmc_visual_evidence"
+
+        backfilled_targets = _dedupe_strings([*targets, "right_mdi_pb5"])[: self.max_overlay_targets]
+        if "right_mdi_pb5" not in backfilled_targets:
+            return help_obj, False, "backfill_trimmed_by_limit"
+
+        backfilled_evidence: list[Any] = list(evidence_raw)
+        backfilled_pb5_evidence = dict(template_item)
+        backfilled_pb5_evidence["target"] = "right_mdi_pb5"
+        backfilled_evidence.append(backfilled_pb5_evidence)
+
+        updated_overlay = dict(overlay)
+        updated_overlay["targets"] = backfilled_targets
+        updated_overlay["evidence"] = backfilled_evidence
+        updated_help_obj = dict(help_obj)
+        updated_help_obj["overlay"] = updated_overlay
+        return updated_help_obj, True, "s18_fcsmc_fcs_bit_implies_pb5"
 
     def _build_safe_fallback_overlay_help_obj(
         self,

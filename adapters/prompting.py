@@ -1063,6 +1063,12 @@ def _build_multimodal_input_payload(context: Mapping[str, Any]) -> dict[str, Any
 
 
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
+    targets_shape = '["..."]'
+    overlay_policy = payload.get("overlay_target_policy")
+    if isinstance(overlay_policy, Mapping):
+        max_targets = overlay_policy.get("max_targets")
+        if isinstance(max_targets, int) and max_targets > 1:
+            targets_shape = '["...","..."]'
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
         f"{header}\n"
@@ -1072,7 +1078,7 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
         "Output must follow this schema shape exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
-        '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
+        f'"overlay":{{"targets":{targets_shape},"evidence":[{{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}}]}},'
         '"explanations":["..."],'
         '"confidence":0.0}'
     )
@@ -1168,8 +1174,9 @@ def build_help_prompt_result(
             (
                 "S18 分阶段判断时必须遵守：若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步；当前系统是单目标模式，因此这一步应优先高亮 fcs_bit_switch，并在 explanation 中明确同时按 PB5。"
                 if effective_max_overlay_targets <= 1
-                else "S18 分阶段判断时必须遵守：若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步；若当前系统允许多目标，可同时返回 fcs_bit_switch 与 right_mdi_pb5。"
+                else "S18 分阶段判断时必须遵守：若已经进入 FCS-MC 页面但还未开始测试，且当前系统允许多目标，则 overlay.targets 必须同时返回 fcs_bit_switch 与 right_mdi_pb5，不能只返回其中一个。"
             ),
+            "S18 的“按住 FCS BIT 开关并按 PB5”仅用于启动 BIT，不得指导用户在整个测试过程中持续按住 FCS BIT 开关；若需要描述操作，应表述为“按住开关并同时按 PB5 以启动测试，看到测试开始后即可松开”，不得写“持续按住直到测试完成”。",
             "S18 分阶段判断时必须遵守：若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO 或其他明显测试进行中/中间结果，说明测试已经开始；即使此时 VARS.fcs_bit_switch_up=false，也不能仅凭该变量退回去要求重新按住开关。",
             "S18 分阶段判断时必须遵守：只有当右 DDI 明确显示最终 GO 结果时，才能说 S18 完成并推进到下一步；FCSA/FCSB PBIT GO 不等于最终 GO，但若能同时明确读到 FCSA=GO 与 FCSB=GO，则可视为最终 GO。",
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段；必须把它与右 DDI 当前页面状态一起解释。若页面状态不可确认，也不能把 root 页面、FCS-MC 页面、测试进行中、测试完成互相混淆。",
@@ -1226,8 +1233,9 @@ def build_help_prompt_result(
             (
                 "When reasoning about S18, obey this stage split: only after the right DDI has entered the FCS-MC page but before the BIT has started should you describe the action as 'hold FCS BIT and press PB5'. The current system is single-target only, so prefer highlighting fcs_bit_switch and state explicitly that PB5 must be pressed at the same time."
                 if effective_max_overlay_targets <= 1
-                else "When reasoning about S18, obey this stage split: only after the right DDI has entered the FCS-MC page but before the BIT has started should you describe the action as 'hold FCS BIT and press PB5'. When multi-target overlay is allowed, you may return both fcs_bit_switch and right_mdi_pb5 together."
+                else "When reasoning about S18, obey this stage split: only after the right DDI has entered the FCS-MC page but before the BIT has started, and multi-target overlay is allowed, overlay.targets must include both fcs_bit_switch and right_mdi_pb5 together; do not return only one of them."
             ),
+            "For S18, 'hold FCS BIT and press PB5' is only the BIT start action. Do not instruct the user to keep holding the FCS BIT switch for the entire test. If you describe the action, say to hold the switch while pressing PB5 to start the test, then release it once the BIT has started; never say 'hold it until the test completes'.",
             "When reasoning about S18, obey this stage split: if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO, or another obvious test-in-progress/intermediate state, the BIT has already started. Even if VARS.fcs_bit_switch_up=false at that moment, do not regress to telling the user to hold the switch again based on that variable alone.",
             "When reasoning about S18, obey this stage split: only a clear final GO result means S18 is complete and may advance. FCSA/FCSB PBIT GO is not the same as the final GO result, but clearly reading both FCSA=GO and FCSB=GO is sufficient final-GO evidence.",
             "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on. Combine it with the right-DDI page state; if the page state is uncertain, do not confuse the BIT root page, the FCS-MC page, the in-test state, and the completed final-GO state.",
@@ -1294,26 +1302,36 @@ def build_help_prompt_result(
             ui_map_path=ui_map_path,
         )
         next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
-        example_refs = [allowed_refs[0]] if allowed_refs else []
-        example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
-        example_targets = [example_target] if example_refs and example_target else []
-        example_ref = example_refs[0] if example_refs else None
-        example_evidence_type = (
-            infer_evidence_type_from_ref(example_ref) if isinstance(example_ref, str) else None
-        ) or overlay_evidence_type_enum[0]
-        example_overlay_evidence = (
-            [
-                {
-                    "target": example_targets[0],
-                    "type": example_evidence_type,
-                    "ref": example_ref,
-                    "quote": _example_quote_for_evidence_type(example_evidence_type, lang),
-                    "grounding_confidence": 0.9,
-                }
-            ]
-            if example_refs and example_targets
-            else []
-        )
+        example_targets: list[str] = []
+        priority_candidates = current_overlay_target_policy.get("candidate_targets_in_priority_order")
+        if isinstance(priority_candidates, list):
+            for item in priority_candidates:
+                if isinstance(item, str) and item and item not in example_targets:
+                    example_targets.append(item)
+                if len(example_targets) >= max(1, min(effective_max_overlay_targets, 2)):
+                    break
+        if not example_targets:
+            example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
+            if isinstance(example_target, str) and example_target:
+                example_targets.append(example_target)
+        if not allowed_refs:
+            example_targets = []
+        example_overlay_evidence: list[dict[str, Any]] = []
+        if example_targets:
+            for index, target in enumerate(example_targets):
+                example_ref = allowed_refs[min(index, len(allowed_refs) - 1)]
+                example_evidence_type = (
+                    infer_evidence_type_from_ref(example_ref) if isinstance(example_ref, str) else None
+                ) or overlay_evidence_type_enum[0]
+                example_overlay_evidence.append(
+                    {
+                        "target": target,
+                        "type": example_evidence_type,
+                        "ref": example_ref,
+                        "quote": _example_quote_for_evidence_type(example_evidence_type, lang),
+                        "grounding_confidence": 0.9,
+                    }
+                )
         example_obj = {
             "diagnosis": {"step_id": candidate_steps[0], "error_category": category_enum[0]},
             "next": {"step_id": next_step},
@@ -1404,10 +1422,11 @@ def build_help_prompt_result(
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
+        compact_targets_example = '["..."]' if effective_max_overlay_targets <= 1 else '["...","..."]'
         compact_schema_line = (
             'Output shape={"diagnosis":{"step_id":"...","error_category":"..."},'
             '"next":{"step_id":"..."},'
-            '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
+            f'"overlay":{{"targets":{compact_targets_example},"evidence":[{{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}}]}},'
             '"explanations":["..."],'
             '"confidence":0.0}'
         )
@@ -1415,7 +1434,7 @@ def build_help_prompt_result(
             compact_schema_line = (
                 '输出形状={"diagnosis":{"step_id":"...","error_category":"..."},'
                 '"next":{"step_id":"..."},'
-                '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
+                f'"overlay":{{"targets":{compact_targets_example},"evidence":[{{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}}]}},'
                 '"explanations":["..."],'
                 '"confidence":0.0}'
             )
@@ -1526,6 +1545,7 @@ def build_help_prompt_result(
     )
 
     meta = {
+        "max_overlay_targets": effective_max_overlay_targets,
         "max_prompt_chars": max_prompt_chars,
         "max_prompt_tokens_est": max_prompt_tokens_est,
         "advisory_prompt_chars": advisory_prompt_chars,

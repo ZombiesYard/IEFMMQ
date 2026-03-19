@@ -295,6 +295,28 @@ def _make_multi_target_overlay_executor(
     )
 
 
+def _make_multi_target_overlay_executor_with_auto_clear(
+    monkeypatch,
+    events: list[dict[str, Any]],
+    *,
+    session_id: str,
+) -> OverlayActionExecutor:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sink = lambda event: events.append(event.to_dict())
+    return OverlayActionExecutor(
+        sender=DcsOverlaySender(
+            auto_clear=True,
+            ack_enabled=False,
+            session_id=session_id,
+            event_sink=sink,
+        ),
+        session_id=session_id,
+        event_sink=sink,
+        max_targets=2,
+    )
+
+
 class QueryOnlyKnowledge:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -5636,6 +5658,84 @@ def test_map_response_actions_accepts_fake_llm_multi_target_help_response_when_e
     assert mapping_meta["allowed_evidence_ref_count"] >= 1
 
 
+def test_map_response_actions_backfills_s18_pb5_when_fcs_bit_is_highlighted_on_fcsmc_page(
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_s18_backfill_pb5.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s18-backfill-pb5",
+        lang="en",
+        max_overlay_targets=2,
+    )
+    request = TutorRequest(
+        intent="help",
+        message="Need help with the FCS BIT sequence.",
+        context={
+            "vars": {"right_ddi_on": True, "fcs_bit_switch_up": False},
+            "gates": {"S18.completion": {"status": "blocked"}},
+            "overlay_target_allowlist": ["fcs_bit_switch", "right_mdi_pb5"],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S18",
+                "overlay_step_id": "S18",
+                "requires_visual_confirmation": True,
+                "action_hint": {"target": "fcs_bit_switch"},
+            },
+            "vision_fact_summary": {
+                "status": "uncertain",
+                "seen_fact_ids": ["right_ddi_fcsmc_page_visible"],
+            },
+            "vision_facts": [
+                {
+                    "fact_id": "right_ddi_fcsmc_page_visible",
+                    "source_frame_id": "1773956832104_000021",
+                }
+            ],
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        metadata={
+            "provider": "fake_llm",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                "next": {"step_id": "S18"},
+                "overlay": {
+                    "targets": ["fcs_bit_switch"],
+                    "evidence": [
+                        {
+                            "target": "fcs_bit_switch",
+                            "type": "visual",
+                            "ref": "VISION_FACTS.right_ddi_fcsmc_page_visible@1773956832104_000021",
+                            "quote": "Right DDI explicitly displays the title 'FCS-MC' with MC1, MC2, FCSA, FCSB status lines.",
+                            "grounding_confidence": 1.0,
+                        }
+                    ],
+                },
+                "explanations": ["Hold FCS BIT and press PB5 together."],
+                "confidence": 0.91,
+            },
+        },
+    )
+
+    try:
+        actions, mapping_meta = loop._map_response_actions(response, request)
+    finally:
+        loop.close()
+
+    assert [action["target"] for action in actions] == ["fcs_bit_switch", "right_mdi_pb5"]
+    assert [action["element_id"] for action in actions] == ["pnt_470", "pnt_83"]
+    assert mapping_meta["s18_dual_overlay_backfill_applied"] is True
+    assert mapping_meta["s18_dual_overlay_backfill_reason"] == "s18_fcsmc_fcs_bit_implies_pb5"
+
+
 def test_live_loop_executes_fake_llm_multi_target_overlay_when_enabled(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -5692,10 +5792,156 @@ def test_live_loop_executes_fake_llm_multi_target_overlay_when_enabled(
         loop.close()
 
     assert response is not None
+    assert response.metadata["prompt_build"]["max_overlay_targets"] == 2
     assert [action["target"] for action in response.actions] == ["fcs_bit_switch", "right_mdi_pb5"]
     assert [item["target"] for item in report["executed"]] == ["fcs_bit_switch", "right_mdi_pb5"]
     overlay_requested = [event for event in events if event.get("kind") == "overlay_requested"]
     assert [event["payload"]["target"] for event in overlay_requested] == ["pnt_470", "pnt_83"]
+
+
+def test_live_loop_backfills_s18_pb5_without_clearing_first_target_mid_batch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s18_dummy_single_target_json.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            {
+                "schema_version": "v2",
+                "seq": 1,
+                "t_wall": 10.0,
+                "aircraft": "FA-18C_hornet",
+                "bios": {
+                    "BATTERY_SW": 2,
+                    "L_GEN_SW": 1,
+                    "R_GEN_SW": 1,
+                    "RIGHT_DDI_BRT_CTL": 0.5,
+                },
+                "delta": {
+                    "RIGHT_DDI_PB_05": 1,
+                },
+            }
+        ],
+    )
+
+    class DummySingleTargetS18JsonModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="当前右 DDI 显示 FCS-MC 页面，表明已准备好进行 FCS BIT 测试。",
+                actions=[],
+                explanations=[
+                    "当前右 DDI 显示 FCS-MC 页面，表明已准备好进行 FCS BIT 测试。下一步需要按住 FCS BIT 开关（向上），同时用左键点击右 DDI 上的 PB5 按钮以启动自检。",
+                    "注意：只需在启动瞬间按住开关并按 PB5，看到测试开始（如出现 IN TEST 或 PBIT GO）后即可松开开关，无需持续按住直到测试完成。",
+                ],
+                metadata={
+                    "provider": "dummy_llm",
+                    "generation_mode": "model",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S18", "error_category": "CO"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {
+                            "targets": ["fcs_bit_switch"],
+                            "evidence": [
+                                {
+                                    "target": "fcs_bit_switch",
+                                    "type": "visual",
+                                    "ref": "VISION_FACTS.right_ddi_fcsmc_page_visible@1773957437530_000024",
+                                    "quote": "Right DDI is on the FCS-MC sub-page, not the BIT root page.",
+                                    "grounding_confidence": 1.0,
+                                }
+                            ],
+                        },
+                        "explanations": [
+                            "当前右 DDI 显示 FCS-MC 页面，表明已准备好进行 FCS BIT 测试。下一步需要按住 FCS BIT 开关（向上），同时用左键点击右 DDI 上的 PB5 按钮以启动自检。",
+                            "注意：只需在启动瞬间按住开关并按 PB5，看到测试开始（如出现 IN TEST 或 PBIT GO）后即可松开开关，无需持续按住直到测试完成。",
+                        ],
+                        "confidence": 0.9,
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    events: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S18", missing_conditions=()),
+    )
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=DummySingleTargetS18JsonModel(),
+        action_executor=_make_multi_target_overlay_executor_with_auto_clear(
+            monkeypatch,
+            events,
+            session_id="sess-live-s18-dummy-json",
+        ),
+        session_id="sess-live-s18-dummy-json",
+        lang="zh",
+        max_overlay_targets=2,
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        loop._build_request = lambda *args, **kwargs: (
+            TutorRequest(
+                request_id=kwargs.get("request_id_override") or "dummy-s18-request",
+                intent="help",
+                message="help",
+                observation_ref=obs.observation_id,
+                context={
+                    "vars": {"right_ddi_on": True, "fcs_bit_switch_up": False},
+                    "gates": {"S18.completion": {"status": "blocked"}},
+                    "overlay_target_allowlist": ["fcs_bit_switch", "right_mdi_pb5"],
+                    "deterministic_step_hint": {
+                        "inferred_step_id": "S18",
+                        "overlay_step_id": "S18",
+                        "requires_visual_confirmation": True,
+                        "action_hint": {"target": "fcs_bit_switch"},
+                        "step_ui_targets": ["fcs_bit_switch", "right_mdi_pb5"],
+                    },
+                    "vision": {
+                        "vision_used": True,
+                        "frame_ids": ["1773957437530_000024"],
+                    },
+                    "vision_fact_summary": {
+                        "status": "uncertain",
+                        "seen_fact_ids": ["right_ddi_fcsmc_page_visible"],
+                        "frame_ids": ["1773957437530_000024"],
+                    },
+                    "vision_facts": [
+                        {
+                            "fact_id": "right_ddi_fcsmc_page_visible",
+                            "state": "seen",
+                            "source_frame_id": "1773957437530_000024",
+                            "confidence": 1.0,
+                            "evidence_note": "Right DDI is on the FCS-MC sub-page, not the BIT root page.",
+                        }
+                    ],
+                },
+                metadata={},
+            ),
+            {"max_overlay_targets": 2},
+            "dummy-s18-state",
+        )
+        response, report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert [action["target"] for action in response.actions] == ["fcs_bit_switch", "right_mdi_pb5"]
+    assert response.metadata["response_mapping"]["s18_dual_overlay_backfill_applied"] is True
+    assert [item["target"] for item in report["executed"]] == ["fcs_bit_switch", "right_mdi_pb5"]
+    overlay_requested = [event for event in events if event.get("kind") == "overlay_requested"]
+    assert [(event["payload"]["action"], event["payload"]["target"]) for event in overlay_requested] == [
+        ("highlight", "pnt_470"),
+        ("highlight", "pnt_83"),
+    ]
 
 
 def test_live_loop_clears_conflicting_overlay_before_fallback_rebuilds_current_step_target(

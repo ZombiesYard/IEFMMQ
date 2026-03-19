@@ -88,6 +88,21 @@ def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:
     assert "DELTA_KEYS." not in contract["type_ref_prefixes"]["delta"]
 
 
+def test_prompt_metadata_records_max_overlay_targets() -> None:
+    result = build_help_prompt_result(_base_context(), "en", max_overlay_targets=2)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert result.metadata["max_overlay_targets"] == 2
+    assert payload["overlay_target_policy"]["max_targets"] == 2
+    assert payload["overlay_target_policy"]["mode"] == "multi_target_allowed"
+    assert len(payload["output_example_json"]["overlay"]["targets"]) == 2
+    assert payload["output_example_json"]["overlay"]["targets"] == ["apu_switch", "battery_switch"]
+    assert [item["target"] for item in payload["output_example_json"]["overlay"]["evidence"]] == [
+        "apu_switch",
+        "battery_switch",
+    ]
+
+
 def test_prompt_includes_explicit_interaction_policy_and_target_hints() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S05"]
@@ -862,20 +877,24 @@ def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> 
         },
     }
 
-    zh_result = build_help_prompt_result(ctx, "zh")
-    en_result = build_help_prompt_result(ctx, "en")
+    zh_result = build_help_prompt_result(ctx, "zh", max_overlay_targets=2)
+    en_result = build_help_prompt_result(ctx, "en", max_overlay_targets=2)
 
     assert "若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC" in zh_result.prompt
-    assert "若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步" in zh_result.prompt
+    assert "若已经进入 FCS-MC 页面但还未开始测试，且当前系统允许多目标" in zh_result.prompt
     assert "若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO" in zh_result.prompt
     assert "FCSA/FCSB PBIT GO 不等于最终 GO" in zh_result.prompt
     assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段" in zh_result.prompt
+    assert "overlay.targets 必须同时返回 fcs_bit_switch 与 right_mdi_pb5，不能只返回其中一个" in zh_result.prompt
+    assert "不得写“持续按住直到测试完成”" in zh_result.prompt
 
     assert "if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC" in en_result.prompt
-    assert "only after the right DDI has entered the FCS-MC page but before the BIT has started" in en_result.prompt
+    assert "only after the right DDI has entered the FCS-MC page but before the BIT has started, and multi-target overlay is allowed" in en_result.prompt
     assert "if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO" in en_result.prompt
     assert "FCSA/FCSB PBIT GO is not the same as the final GO result" in en_result.prompt
     assert "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on" in en_result.prompt
+    assert "overlay.targets must include both fcs_bit_switch and right_mdi_pb5 together" in en_result.prompt
+    assert "never say 'hold it until the test completes'" in en_result.prompt
 
 
 def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
@@ -1007,6 +1026,18 @@ def test_prompt_contains_strict_json_output_constraints() -> None:
     assert '"diagnosis":{"step_id":"...","error_category":"..."}' in prompt
     assert (
         '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...",'
+        '"ref":"...","quote":"...","grounding_confidence":0.0}]}'
+    ) in prompt
+
+
+def test_prompt_contains_multi_target_output_shape_when_enabled() -> None:
+    prompt = build_help_prompt_result(_base_context(), "en", max_overlay_targets=2).prompt
+    payload = _extract_prompt_constraints_json(prompt)
+
+    assert payload["output_example_json"]["overlay"]["targets"] == ["apu_switch", "battery_switch"]
+    assert len(payload["output_example_json"]["overlay"]["evidence"]) == 2
+    assert (
+        '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...",'
         '"ref":"...","quote":"...","grounding_confidence":0.0}]}'
     ) in prompt
 

@@ -147,6 +147,7 @@ def test_build_composite_panel_config_enables_vlm_frame_and_frames_root(tmp_path
     assert "ack_port = 7782" in config
     assert "auto_clear = true" in config
     assert "hilite_id = 9101" in config
+    assert "hilite_ids = {9101, 9102}" in config
     assert "width = 4480" in config
     assert "height = 1440" in config
 
@@ -170,6 +171,7 @@ def test_build_composite_panel_config_supports_custom_overlay_transport(tmp_path
     assert "ack_port = 9002" in config
     assert "auto_clear = false" in config
     assert "hilite_id = 9200" in config
+    assert "hilite_ids = {9200, 9201}" in config
 
 
 def test_build_composite_panel_config_converts_wsl_mount_output_root_to_windows_path() -> None:

@@ -196,6 +196,56 @@ def test_executor_executes_multiple_overlay_targets_when_enabled(monkeypatch) ->
     assert report.dropped == []
 
 
+def test_executor_with_auto_clear_preserves_multi_target_batch_and_clears_both_on_next_cycle(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=True, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender, max_targets=2)
+
+    first_report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "fcs_bit_switch",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.fcs_bit_switch"],
+            },
+            {
+                "type": "overlay",
+                "target": "right_mdi_pb5",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.right_mdi_pb5"],
+            },
+        ]
+    )
+
+    first_cmds = [decode_overlay_command(item[0]) for item in dummy.sent]
+    assert [(cmd["action"], cmd["target"]) for cmd in first_cmds] == [
+        ("highlight", "pnt_470"),
+        ("highlight", "pnt_83"),
+    ]
+    assert [item["target"] for item in first_report.executed] == ["fcs_bit_switch", "right_mdi_pb5"]
+
+    second_report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "apu_switch",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.apu_switch"],
+            }
+        ]
+    )
+
+    all_cmds = [decode_overlay_command(item[0]) for item in dummy.sent]
+    assert [(cmd["action"], cmd["target"]) for cmd in all_cmds[2:]] == [
+        ("clear", "pnt_470"),
+        ("clear", "pnt_83"),
+        ("highlight", "pnt_375"),
+    ]
+    assert [item["target"] for item in second_report.executed] == ["apu_switch"]
+
+
 def test_executor_rejects_overlay_target_not_in_allowlist(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)

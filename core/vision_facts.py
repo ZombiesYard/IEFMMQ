@@ -289,6 +289,22 @@ def _normalize_result_kind(
     return "other"
 
 
+def _coerce_s18_result_fact_state(
+    *,
+    fact_id: str,
+    state: str,
+    result_kind: str | None,
+    confidence: float,
+) -> tuple[str, float]:
+    if fact_id != "fcs_bit_result_visible" or state != "seen":
+        return state, confidence
+    if result_kind == "final_go":
+        return state, confidence
+    if result_kind in {"intermediate_go", "in_test", "not_ready"}:
+        return "not_seen", min(confidence, 0.25)
+    return "uncertain", min(confidence, 0.5)
+
+
 def normalize_vision_fact(
     raw_fact: Mapping[str, Any],
     *,
@@ -336,6 +352,14 @@ def normalize_vision_fact(
     result_kind = _normalize_result_kind(fact_id, raw_fact.get("result_kind"), normalized["evidence_note"])
     if result_kind is not None:
         normalized["result_kind"] = result_kind
+    coerced_state, coerced_confidence = _coerce_s18_result_fact_state(
+        fact_id=fact_id,
+        state=str(normalized["state"]),
+        result_kind=result_kind,
+        confidence=float(normalized["confidence"]),
+    )
+    normalized["state"] = coerced_state
+    normalized["confidence"] = coerced_confidence
     if normalized["observed_at_wall_ms"] is not None:
         normalized["expires_at_wall_ms"] = normalized["observed_at_wall_ms"] + normalized["expires_after_ms"]
     else:

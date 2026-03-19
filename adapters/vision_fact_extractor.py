@@ -372,7 +372,7 @@ class VisionFactExtractor:
         include_json_schema: bool,
         include_request_overrides: bool,
     ) -> dict[str, object]:
-        payload: dict[str, object] = {"temperature": 0}
+        payload: dict[str, object] = {"temperature": 0, "top_p": 0.1}
         effective_max_tokens = self._effective_max_tokens(structured_output_enabled=include_json_schema)
         if effective_max_tokens is not None:
             payload["max_tokens"] = effective_max_tokens

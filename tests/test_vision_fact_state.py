@@ -129,6 +129,60 @@ def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfil
     assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
 
 
+def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen() -> None:
+    snapshot = merge_vision_fact_observation(
+        {},
+        VisionFactObservation(
+            session_id="sess-live",
+            trigger_wall_ms=1772872445000,
+            frame_ids=["1772872445010_000123"],
+            facts=[
+                VisionFact(
+                    fact_id="fcs_bit_result_visible",
+                    state="seen",
+                    source_frame_id="1772872445010_000123",
+                    confidence=1.0,
+                    expires_after_ms=600000,
+                    evidence_note="Right DDI FCS-MC page shows PBIT GO for FCSA and FCSB.",
+                )
+            ],
+        ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
+        now_wall_ms=1772872445000,
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "intermediate_go"
+    assert snapshot["fcs_bit_result_visible"]["state"] == "not_seen"
+    assert snapshot["fcs_bit_result_visible"]["confidence"] == 0.25
+
+
+def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_seen() -> None:
+    snapshot = merge_vision_fact_observation(
+        {},
+        VisionFactObservation(
+            session_id="sess-live",
+            trigger_wall_ms=1772872445000,
+            frame_ids=["1772872445010_000123"],
+            facts=[
+                VisionFact(
+                    fact_id="fcs_bit_result_visible",
+                    state="seen",
+                    source_frame_id="1772872445010_000123",
+                    confidence=1.0,
+                    expires_after_ms=600000,
+                    evidence_note="Right DDI FCS-MC page shows GO status for MC1, MC2, FCSA, and FCSB, indicating completed BIT results.",
+                )
+            ],
+        ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
+        now_wall_ms=1772872445000,
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
+    assert snapshot["fcs_bit_result_visible"]["state"] == "uncertain"
+    assert snapshot["fcs_bit_result_visible"]["confidence"] == 0.5
+
+
 def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
     snapshot = merge_vision_fact_observation(
         {},
