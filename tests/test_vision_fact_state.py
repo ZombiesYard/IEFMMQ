@@ -103,6 +103,32 @@ def test_merge_vision_fact_observation_updates_nonsticky_visibility() -> None:
     assert snapshot["fcs_page_visible"]["source_frame_id"] == "1772872447010_000124"
 
 
+def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfills_from_note() -> None:
+    snapshot = merge_vision_fact_observation(
+        {},
+        VisionFactObservation(
+            session_id="sess-live",
+            trigger_wall_ms=1772872445000,
+            frame_ids=["1772872445010_000123"],
+            facts=[
+                VisionFact(
+                    fact_id="fcs_bit_result_visible",
+                    state="seen",
+                    source_frame_id="1772872445010_000123",
+                    confidence=0.95,
+                    expires_after_ms=600000,
+                    evidence_note="Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                    result_kind="bad-value",
+                )
+            ],
+        ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
+        now_wall_ms=1772872445000,
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+
+
 def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
     snapshot = merge_vision_fact_observation(
         {},

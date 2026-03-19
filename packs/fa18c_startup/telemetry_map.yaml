@@ -6,7 +6,10 @@ vars:
   ext_pwr_on: "bios.EXT_PWR_SW == 1"
   l_gen_on: "bios.L_GEN_SW == 1"
   r_gen_on: "bios.R_GEN_SW == 1"
-  power_available: "derived(vars.battery_on or vars.ext_pwr_on or vars.l_gen_on or vars.r_gen_on)"
+  # Keep power_available anchored to actual electrical power sources. Generator
+  # switch positions are tracked separately as evidence, but they do not by
+  # themselves mean the jet is already electrically powered.
+  power_available: "derived(vars.battery_on or vars.ext_pwr_on)"
 
   # APU
   apu_on: "bios.APU_CONTROL_SW == 1"

@@ -800,6 +800,30 @@ def test_var_resolver_pack_power_and_left_engine_start_completion_follow_operati
     assert "engine_crank_left_complete" not in vars_out["vars_source_missing"]
 
 
+def test_var_resolver_pack_power_available_does_not_treat_generator_switches_as_power_source() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    frame = TelemetryFrame(
+        seq=729,
+        t_wall=729.0,
+        source="dcs_bios",
+        bios={
+            "BATTERY_SW": 1,
+            "EXT_PWR_SW": 0,
+            "L_GEN_SW": 1,
+            "R_GEN_SW": 1,
+        },
+    )
+
+    vars_out = resolver.resolve(frame)
+
+    assert vars_out["battery_on"] is False
+    assert vars_out["ext_pwr_on"] is False
+    assert vars_out["l_gen_on"] is True
+    assert vars_out["r_gen_on"] is True
+    assert vars_out["power_available"] is False
+
+
 def test_var_resolver_pack_radio_vars_follow_bios_exports() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
 

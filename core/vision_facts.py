@@ -267,8 +267,6 @@ def _normalize_result_kind(
         normalized = raw_result_kind.strip().lower()
         if normalized in _S18_RESULT_KINDS:
             return normalized
-        if normalized:
-            raise ValueError(f"vision fact {fact_id} result_kind is unsupported: {raw_result_kind!r}")
     if fact_id != "fcs_bit_result_visible":
         return None
     note_lower = evidence_note.lower()
