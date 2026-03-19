@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import sys
 
 
@@ -50,3 +51,26 @@ def test_simtutor_live_dcs_subcommand_reports_exception_type_to_stderr(
     assert result == 1
     assert captured.out == ""
     assert "[LIVE_DCS] RuntimeError: boom" in captured.err
+
+
+def test_simtutor_cli_startup_does_not_import_live_dcs_for_non_live_subcommands(
+    monkeypatch,
+    capsys,
+) -> None:
+    from simtutor import __main__ as simtutor_main
+
+    original_import = builtins.__import__
+
+    def _guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "live_dcs":
+            raise AssertionError("live_dcs should not be imported during generic CLI startup")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _guarded_import)
+    monkeypatch.setattr(sys, "argv", ["simtutor"])
+
+    result = simtutor_main.main()
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert "live-dcs" in captured.out

@@ -382,14 +382,8 @@ def main() -> int:
 
     sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
 
-    from live_dcs import build_arg_parser as _build_live_dcs_arg_parser
-
-    live_dcs_parent = _build_live_dcs_arg_parser()
-    live_dcs_parent.prog = "simtutor live-dcs"
     sub.add_parser(
         "live-dcs",
-        parents=[live_dcs_parent],
-        add_help=False,
         help="Run live DCS tutor loop against telemetry/vision sidecars",
     )
 
@@ -556,7 +550,9 @@ def main() -> int:
     rep_eval.add_argument("--report", default=None, help="Optional explicit report JSON path")
     _add_model_args(rep_eval, default_provider="oracle", provider_choices=["oracle", "stub", "openai_compat", "ollama"])
 
-    args = parser.parse_args()
+    args, unknown_args = parser.parse_known_args()
+    if args.command != "live-dcs" and unknown_args:
+        parser.error(f"unrecognized arguments: {' '.join(unknown_args)}")
     if args.command == "validate":
         return validate(args.files, args.schema)
     if args.command == "run":
@@ -617,9 +613,8 @@ def main() -> int:
         return 0
     if args.command == "live-dcs":
         from live_dcs import main as _live_dcs_main
-	
         try:
-            return _live_dcs_main(sys.argv[2:])
+            return _live_dcs_main(list(unknown_args))
         except Exception as exc:
             print(f"[LIVE_DCS] {type(exc).__name__}: {exc}", file=sys.stderr)
             return 1
