@@ -68,13 +68,15 @@ vars:
 
   # Key switches / sensor panel
   fire_test_active: "bios.FIRE_TEST_SW == 1"
-  # FIRE_TEST_SW is spring-loaded. Completion is latched in telemetry_pipeline once
-  # the active state is observed, so the var rule should only reflect direct evidence.
+  # FIRE_TEST_SW is spring-loaded. Completion is latched in telemetry_pipeline using
+  # the same direct-observation pattern as FCS RESET: once the active state is seen
+  # in-session, completion remains true until the session is cold-start reset.
   fire_test_complete: "derived(vars.fire_test_active)"
   lights_test_active: "bios.LIGHTS_TEST_SW == 1"
   annunciator_panel_activity: "derived(bios.MASTER_CAUTION_LT == 1 or bios.LH_ADV_L_BLEED == 1 or bios.LH_ADV_R_BLEED == 1 or bios.LH_ADV_SPD_BRK == 1 or bios.LH_ADV_STBY == 1 or bios.LH_ADV_GO == 1 or bios.LH_ADV_NO_GO == 1 or bios.LH_ADV_REC == 1 or bios.LH_ADV_XMIT == 1 or bios.RH_ADV_RCDR_ON == 1 or bios.RH_ADV_DISP == 1 or bios.RH_ADV_SAM == 1 or bios.RH_ADV_AI == 1 or bios.RH_ADV_AAA == 1 or bios.RH_ADV_CW == 1)"
-  # Like FIRE TEST, the lights test is momentary. Completion is latched in
-  # telemetry_pipeline once switch/annunciator evidence is observed.
+  # Like FIRE TEST, the lights test now follows the same direct-observation latch
+  # pattern as FCS RESET: seeing the pressed state once marks completion for the
+  # session, while annunciator activity remains auxiliary evidence only.
   lights_test_complete: "derived(vars.lights_test_active)"
   # INS_SW follows clickable order from pnt_443:
   # 0=OFF, 1=CV, 2=GND, 3=NAV, 4=IFA, 5=GYRO, 6=GB, 7=TEST.

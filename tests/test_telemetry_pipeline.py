@@ -548,6 +548,7 @@ def test_enrich_bios_observation_delta_stream_id_overrides_metadata_scope(monkey
 
 def test_enrich_bios_observation_latches_momentary_lights_test_completion_within_stream(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
 
     active = Observation(
         source="dcs_bios",
@@ -579,6 +580,7 @@ def test_enrich_bios_observation_latches_momentary_lights_test_completion_within
     first = enrich_bios_observation(active, _resolver(), mapper=_mapper())
     second = enrich_bios_observation(released, _resolver(), mapper=_mapper())
 
+    assert first.payload["vars"]["lights_test_active"] is True
     assert first.payload["vars"]["lights_test_complete"] is True
     assert "lights_test_complete" not in first.payload["vars"]["vars_source_missing"]
     assert second.payload["vars"]["lights_test_active"] is False
@@ -589,6 +591,7 @@ def test_enrich_bios_observation_latches_momentary_lights_test_completion_within
 
 def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_and_scoped(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
 
     active = Observation(
         source="dcs_bios",
@@ -631,11 +634,13 @@ def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_
         metadata={"session_id": "sess-fire-a"},
     )
 
-    enrich_bios_observation(active, _resolver(), mapper=_mapper())
+    first = enrich_bios_observation(active, _resolver(), mapper=_mapper())
     isolated = enrich_bios_observation(other_stream, _resolver(), mapper=_mapper())
     sticky_result = enrich_bios_observation(expired, _resolver(), mapper=_mapper())
     reset_result = enrich_bios_observation(power_reset, _resolver(), mapper=_mapper())
 
+    assert first.payload["vars"]["fire_test_active"] is True
+    assert first.payload["vars"]["fire_test_complete"] is True
     assert isolated.payload["vars"]["fire_test_complete"] is False
     assert sticky_result.payload["vars"]["fire_test_active"] is False
     assert sticky_result.payload["vars"]["fire_test_complete"] is True
@@ -644,6 +649,7 @@ def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_
 
 def test_enrich_bios_observation_latched_fire_test_clears_source_missing(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
 
     active = Observation(
         source="dcs_bios",

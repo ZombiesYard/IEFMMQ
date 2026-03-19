@@ -120,6 +120,13 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "takeoff_trim_set",
     "probe_cycle_complete",
 )
+_MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
+    "fire_test_complete": "fire_test_active",
+    "lights_test_complete": "lights_test_active",
+    "fcs_reset_complete": "fcs_reset_pressed",
+    "takeoff_trim_set": "takeoff_trim_pressed",
+    "probe_cycle_complete": "probe_extended",
+}
 _COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
 _COMPLETION_LATCHES_LOADED = False
 _MAX_COMPLETION_LATCH_STREAMS = 256
@@ -320,11 +327,8 @@ def _apply_momentary_completion_latches(
     normalized_stream_id = _normalize_delta_stream_id(stream_id)
     now_s = float(t_wall)
     trigger_sources = {
-        "fire_test_complete": bool(resolved_vars.get("fire_test_active")),
-        "lights_test_complete": bool(resolved_vars.get("lights_test_active")),
-        "fcs_reset_complete": bool(resolved_vars.get("fcs_reset_pressed")),
-        "takeoff_trim_set": bool(resolved_vars.get("takeoff_trim_pressed")),
-        "probe_cycle_complete": bool(resolved_vars.get("probe_extended")),
+        completion_key: bool(resolved_vars.get(trigger_var))
+        for completion_key, trigger_var in _MOMENTARY_COMPLETION_TRIGGER_VARS.items()
     }
     raw_missing = resolved_vars.get("vars_source_missing")
     missing_sources = {
