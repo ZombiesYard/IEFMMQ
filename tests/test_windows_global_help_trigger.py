@@ -29,6 +29,9 @@ def test_run_loop_raises_when_getmessagew_returns_error(monkeypatch) -> None:
     trigger = WindowsGlobalHelpTrigger(hotkey="F8")
 
     class DummyUser32:
+        def PeekMessageW(self, *args, **kwargs):
+            return 0
+
         def GetMessageW(self, *args, **kwargs):
             return -1
 
@@ -38,6 +41,7 @@ def test_run_loop_raises_when_getmessagew_returns_error(monkeypatch) -> None:
 
     monkeypatch.setattr("adapters.windows_global_help_trigger._USER32", DummyUser32())
     monkeypatch.setattr("adapters.windows_global_help_trigger._KERNEL32", DummyKernel32())
+    monkeypatch.setattr("adapters.windows_global_help_trigger.sys.platform", "win32")
     monkeypatch.setattr(trigger, "_install_hooks", lambda: None)
     monkeypatch.setattr(trigger, "_uninstall_hooks", lambda: None)
     monkeypatch.setattr(
@@ -85,3 +89,51 @@ def test_close_warns_when_hook_thread_does_not_stop(monkeypatch) -> None:
     assert event.wait_calls == [1.0]
     assert thread.join_calls == [1.0]
     assert any("shutdown timed out" in call for call in calls)
+
+
+def test_run_loop_primes_message_queue_before_setting_ready(monkeypatch) -> None:
+    trigger = WindowsGlobalHelpTrigger(hotkey="F8")
+    calls: list[str] = []
+
+    class DummyUser32:
+        def PeekMessageW(self, *args, **kwargs):
+            calls.append("peek")
+            return 0
+
+        def GetMessageW(self, *args, **kwargs):
+            calls.append("get")
+            return 0
+
+    class DummyKernel32:
+        def GetCurrentThreadId(self):
+            return 77
+
+    monkeypatch.setattr("adapters.windows_global_help_trigger._USER32", DummyUser32())
+    monkeypatch.setattr("adapters.windows_global_help_trigger._KERNEL32", DummyKernel32())
+    monkeypatch.setattr(trigger, "_install_hooks", lambda: calls.append("install"))
+    monkeypatch.setattr(trigger, "_uninstall_hooks", lambda: calls.append("uninstall"))
+
+    trigger._run_loop()
+
+    assert calls[:3] == ["install", "peek", "get"]
+
+
+def test_request_stop_retries_post_thread_message_when_queue_not_ready(monkeypatch) -> None:
+    trigger = WindowsGlobalHelpTrigger(hotkey="F8")
+    trigger._loop_thread_id = 99
+    calls: list[int] = []
+
+    class DummyUser32:
+        def PostThreadMessageW(self, thread_id, message, wparam, lparam):
+            calls.append(thread_id)
+            return 1 if len(calls) == 3 else 0
+
+    monkeypatch.setattr("adapters.windows_global_help_trigger._USER32", DummyUser32())
+    monkeypatch.setattr("adapters.windows_global_help_trigger.sys.platform", "win32")
+    sleeps: list[float] = []
+    monkeypatch.setattr("adapters.windows_global_help_trigger.time.sleep", lambda value: sleeps.append(float(value)))
+
+    trigger.request_stop()
+
+    assert calls == [99, 99, 99]
+    assert sleeps == [0.01, 0.01]

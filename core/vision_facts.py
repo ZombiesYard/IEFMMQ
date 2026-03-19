@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
@@ -38,6 +39,9 @@ VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"}
 _SUPPORTED_SCHEMA_VERSIONS = {"v1"}
 _STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
 _S18_RESULT_KINDS = frozenset({"final_go", "intermediate_go", "in_test", "not_ready", "other"})
+_S18_GO_NEGATIVE_RE = re.compile(r"\bno\s+go\b", re.IGNORECASE)
+_S18_FCSA_GO_RE = re.compile(r"\bfcsa\b\s*[:=]?\s*go\b", re.IGNORECASE)
+_S18_FCSB_GO_RE = re.compile(r"\bfcsb\b\s*[:=]?\s*go\b", re.IGNORECASE)
 
 
 class VisionFactsConfigError(ValueError):
@@ -278,7 +282,9 @@ def _normalize_result_kind(
         return "not_ready"
     if "pbit go" in note_lower:
         return "intermediate_go"
-    if "fcsa" in note_lower and "fcsb" in note_lower and "go" in note_lower:
+    if _S18_GO_NEGATIVE_RE.search(evidence_note):
+        return "other"
+    if _S18_FCSA_GO_RE.search(evidence_note) and _S18_FCSB_GO_RE.search(evidence_note):
         return "final_go"
     return "other"
 

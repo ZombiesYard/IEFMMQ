@@ -24,6 +24,7 @@ VK_F1 = 0x70
 VK_ESCAPE = 0x1B
 XBUTTON1 = 0x0001
 XBUTTON2 = 0x0002
+PM_NOREMOVE = 0x0000
 LLKHF_INJECTED = 0x00000010
 DEFAULT_GLOBAL_HELP_COOLDOWN_MS = 400
 
@@ -71,6 +72,14 @@ if sys.platform == "win32":
     _USER32.DispatchMessageW.restype = wintypes.LPARAM
     _USER32.PostThreadMessageW.argtypes = (wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
     _USER32.PostThreadMessageW.restype = wintypes.BOOL
+    _USER32.PeekMessageW.argtypes = (
+        ctypes.POINTER(wintypes.MSG),
+        wintypes.HWND,
+        wintypes.UINT,
+        wintypes.UINT,
+        wintypes.UINT,
+    )
+    _USER32.PeekMessageW.restype = wintypes.BOOL
     _USER32.GetAsyncKeyState.argtypes = (ctypes.c_int,)
     _USER32.GetAsyncKeyState.restype = ctypes.c_short
     _KERNEL32.GetModuleHandleW.argtypes = (wintypes.LPCWSTR,)
@@ -198,12 +207,16 @@ class WindowsGlobalHelpTrigger:
     def request_stop(self) -> None:
         self._stop_requested = True
         if sys.platform == "win32" and self._loop_thread_id and _USER32 is not None:
-            _USER32.PostThreadMessageW(self._loop_thread_id, WM_QUIT, 0, 0)
+            for _ in range(10):
+                if _USER32.PostThreadMessageW(self._loop_thread_id, WM_QUIT, 0, 0):
+                    break
+                time.sleep(0.01)
 
     def _run_loop(self) -> None:
         try:
             self._loop_thread_id = int(_KERNEL32.GetCurrentThreadId())
             self._install_hooks()
+            self._ensure_message_queue()
         except Exception as exc:
             self._startup_error = exc
             self._ready.set()
@@ -227,6 +240,12 @@ class WindowsGlobalHelpTrigger:
         finally:
             self._uninstall_hooks()
             self._closed.set()
+
+    def _ensure_message_queue(self) -> None:
+        if _USER32 is None:
+            return
+        msg = wintypes.MSG()
+        _USER32.PeekMessageW(ctypes.byref(msg), None, 0, 0, PM_NOREMOVE)
 
     def _install_hooks(self) -> None:
         module = _KERNEL32.GetModuleHandleW(None)

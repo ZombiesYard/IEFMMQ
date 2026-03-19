@@ -507,6 +507,20 @@ def test_extract_vision_fact_snapshot_backfills_structured_s18_result_kind() -> 
     assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
 
 
+def test_extract_vision_fact_snapshot_does_not_treat_no_go_as_final_go() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI shows FCSA NO GO and FCSB NO GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
+
+
 def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_from_note() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
