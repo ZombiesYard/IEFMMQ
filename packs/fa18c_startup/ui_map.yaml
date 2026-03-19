@@ -8,6 +8,22 @@ metadata:
     Full cold-start overlay targets for S01-S25. dcs_id values align to
     clickable element ids (pnt_*). aliases/panel_area provide stable semantic
     labels for prompt/debug/UI consumption.
+interaction_policy:
+  two_position:
+    zh: "2 位开关要明确说左键还是右键。"
+    en: "For 2-position switches, say left-click or right-click explicitly."
+  multi_position:
+    zh: "3 位以上开关/旋钮默认右键逆时针到下一挡；多挡位要说明次数。"
+    en: "For 3+ detents, default to right-click for one counter-clockwise step; state the click count if needed."
+  buttons:
+    zh: "按钮要明确说左键或右键，不要只说点击。"
+    en: "For buttons, say left-click or right-click explicitly."
+  wheel:
+    zh: "亮度增加默认说鼠标滚轮向上。"
+    en: "For brightness increase, default to mouse-wheel up."
+  hotkeys:
+    zh: "需要键盘操作时直接给热键。"
+    en: "Use exact hotkeys when the action is keyboard-driven."
 
 cockpit_elements:
   battery_switch:
@@ -15,6 +31,11 @@ cockpit_elements:
     dcs_id: "pnt_404"
     aliases: ["Battery Switch", "BATTERY_SW"]
     panel_area: "right_console_electrical"
+    interaction:
+      click_type: "right"
+    interaction_hint:
+      zh: "BATT 到 ON：右键。"
+      en: "Set BATT switch to ON with a right-click."
   generator_left_switch:
     description: "Left generator switch NORM/OFF"
     dcs_id: "pnt_402"
@@ -35,21 +56,47 @@ cockpit_elements:
     dcs_id: "pnt_375"
     aliases: ["APU Control Switch", "APU_CONTROL_SW"]
     panel_area: "left_console_engine_start"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "APU 到 ON：左键。"
+      en: "Set APU to ON with a left-click."
   eng_crank_switch:
     description: "Engine crank switch (LEFT/RIGHT/NORM)"
     dcs_id: "pnt_377"
     aliases: ["Engine Crank Switch", "ENGINE_CRANK_SW"]
     panel_area: "left_console_engine_start"
+    interaction:
+      click_type_by_value:
+        L: "left"
+        R: "right"
+    interaction_hint:
+      zh: "Engine Crank：到 R 右键，到 L 左键。"
+      en: "Engine Crank: right-click for R, left-click for L."
   throttle_quadrant_reference:
     description: "Throttle quadrant activity reference (approximate, telemetry/debug only)"
     dcs_id: "pnt_504"
     aliases: ["Throttle Quadrant Activity Reference", "Throttles Friction Adjusting Lever"]
     panel_area: "throttle_quadrant"
+    interaction:
+      click_type: "keyboard"
+      hotkey_by_action:
+        right_idle: "Right Shift+Home"
+        left_idle: "Right Alt+Home"
+    interaction_hint:
+      zh: "油门到 IDLE：右油门 Right Shift+Home，左油门 Right Alt+Home。"
+      en: "Throttle to IDLE: right throttle Right Shift+Home, left throttle Right Alt+Home."
   bleed_air_knob:
     description: "BLEED AIR knob"
     dcs_id: "pnt_411"
     aliases: ["Bleed Air Knob", "BLEED_AIR_KNOB"]
     panel_area: "right_console_environmental"
+    interaction:
+      click_type: "right"
+      detent_direction: "counter_clockwise"
+    interaction_hint:
+      zh: "Bleed Air：右键一次逆时针一挡；360 度检查右键四次。"
+      en: "Bleed Air: each right-click is one CCW detent; the 360 check is four right-clicks."
   lights_test_button:
     description: "Lights Test Switch TEST/OFF"
     dcs_id: "pnt_416"
@@ -60,46 +107,93 @@ cockpit_elements:
     dcs_id: "pnt_51"
     aliases: ["Left MDI Brightness Selector", "LEFT_DDI_BRT_CTL"]
     panel_area: "left_instrument_panel"
+    interaction:
+      click_type: "right"
+      detent_direction: "counter_clockwise"
+    interaction_hint:
+      zh: "左 MDI 亮度：右键到下一挡。"
+      en: "Left MDI brightness: right-click to the next detent."
   right_mdi_brightness_selector:
     description: "Right MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_76"
     aliases: ["Right MDI Brightness Selector", "RIGHT_DDI_BRT_CTL"]
     panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "right"
+      detent_direction: "counter_clockwise"
+    interaction_hint:
+      zh: "右 MDI 亮度：右键到下一挡。"
+      en: "Right MDI brightness: right-click to the next detent."
   ampcd_off_brightness_knob:
     description: "AMPCD Off/Brightness Control Knob"
     dcs_id: "pnt_203"
     aliases: ["AMPCD Off/Brightness Control Knob", "AMPCD_BRT_CTL"]
     panel_area: "center_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "AMPCD 亮度增加/点亮：滚轮向上。"
+      en: "Increase or turn on AMPCD with mouse-wheel up."
   hud_symbology_brightness_knob:
     description: "HUD Symbology Brightness Control Knob"
     dcs_id: "pnt_141"
     aliases: ["HUD Symbology Brightness Control Knob", "HUD_SYM_BRT"]
     panel_area: "hud_control_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "HUD 亮度增加：滚轮向上。"
+      en: "Increase HUD brightness with mouse-wheel up."
   left_mdi_pb5:
     description: "Left MDI PB 5"
     dcs_id: "pnt_58"
     aliases: ["Left MDI PB 5"]
     panel_area: "left_instrument_panel"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "DDI/AMPCD 的 PB 按钮都用左键点击。"
+      en: "Use left-click for DDI/AMPCD pushbuttons."
   left_mdi_pb15:
     description: "Left MDI PB 15"
     dcs_id: "pnt_68"
     aliases: ["Left MDI PB 15", "Left DDI PB 15"]
     panel_area: "left_instrument_panel"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "DDI/AMPCD 的 PB 按钮都用左键点击。"
+      en: "Use left-click for DDI/AMPCD pushbuttons."
   left_mdi_pb18:
     description: "Left MDI PB 18 / MENU"
     dcs_id: "pnt_72"
     aliases: ["Left MDI PB 18", "Left DDI PB 18", "Left DDI MENU"]
     panel_area: "left_instrument_panel"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "DDI/AMPCD 的 PB 按钮都用左键点击。"
+      en: "Use left-click for DDI/AMPCD pushbuttons."
   right_mdi_pb5:
     description: "Right MDI PB 5"
     dcs_id: "pnt_83"
     aliases: ["Right MDI PB 5"]
     panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "DDI/AMPCD 的 PB 按钮都用左键点击。"
+      en: "Use left-click for DDI/AMPCD pushbuttons."
   right_mdi_pb18:
     description: "Right MDI PB 18 / MENU"
     dcs_id: "pnt_96"
     aliases: ["Right MDI PB 18", "Right DDI PB 18", "Right DDI MENU"]
     panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "DDI/AMPCD 的 PB 按钮都用左键点击。"
+      en: "Use left-click for DDI/AMPCD pushbuttons."
   fcs_reset_button:
     description: "FCS RESET button"
     dcs_id: "pnt_349"
@@ -120,6 +214,11 @@ cockpit_elements:
     dcs_id: "pnt_124"
     aliases: ["UFC COMM 1 Channel Selector Knob Pull", "COMM1_CHAN"]
     panel_area: "ufc"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "UFC COMM1 拉出：左键。"
+      en: "Pull UFC COMM1 with a left-click."
   ufc_key_1:
     description: "UFC keyboard pushbutton 1"
     dcs_id: "pnt_111"
@@ -160,11 +259,23 @@ cockpit_elements:
     dcs_id: "pnt_443"
     aliases: ["INS Switch", "INS_SW"]
     panel_area: "sensor_panel_right_console"
+    interaction:
+      click_type: "right"
+      detent_direction: "counter_clockwise"
+    interaction_hint:
+      zh: "INS：右键到下一挡。"
+      en: "INS: right-click to the next detent."
   radar_mode_knob:
     description: "Radar mode switch"
     dcs_id: "pnt_440"
     aliases: ["RADAR Switch", "RADAR_SW"]
     panel_area: "sensor_panel_right_console"
+    interaction:
+      click_type: "right"
+      detent_direction: "counter_clockwise"
+    interaction_hint:
+      zh: "RADAR：右键到下一挡。"
+      en: "RADAR: right-click to the next detent."
   obogs_control_switch:
     description: "OBOGS control switch"
     dcs_id: "pnt_365"
@@ -190,6 +301,12 @@ cockpit_elements:
     dcs_id: "pnt_341"
     aliases: ["Probe Control Switch"]
     panel_area: "left_console_fuel"
+    interaction:
+      click_type: "right"
+      detent_direction: "counter_clockwise"
+    interaction_hint:
+      zh: "受油管：右键到下一挡；EXTEND 直接说右键。"
+      en: "Refuel probe: right-click to the next detent; for EXTEND, say right-click."
   launch_bar_switch:
     description: "Launch bar control switch EXTEND/RETRACT"
     dcs_id: "pnt_233"

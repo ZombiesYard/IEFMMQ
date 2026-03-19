@@ -9,8 +9,11 @@ import logging
 import math
 import os
 import re
+from functools import lru_cache
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Mapping
+import yaml
 
 from adapters.evidence_refs import EVIDENCE_TYPE_PREFIXES, infer_evidence_type_from_ref
 from adapters.pack_gates import SUPPORTED_SCENARIO_PROFILES
@@ -29,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_PROMPT_CHARS = 9000
 MAX_PROMPT_TOKENS_EST = 2400
-PROMPT_HARD_CAP_MULTIPLIER = 2.25
+PROMPT_HARD_CAP_MULTIPLIER = 2.5
 MAX_DELTA_SUMMARY_ITEMS = 20
 MAX_RECENT_ACTIONS_SIGNAL_ITEMS = 8
 MAX_MISSING_CONDITIONS_SIGNAL_ITEMS = 8
@@ -70,6 +73,209 @@ _VISION_MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
         "left_mdi_brightness_selector",
     ),
 }
+_DEFAULT_INTERACTION_POLICY_TEXT = {
+    "zh": {
+        "two_position": "2 位开关要明确说左键还是右键。",
+        "multi_position": "3 位以上开关/旋钮默认右键逆时针到下一挡；多挡位要说明次数。",
+        "buttons": "按钮要明确说左键或右键，不要只说点击。",
+        "wheel": "亮度增加默认说鼠标滚轮向上。",
+        "hotkeys": "需要键盘操作时直接给热键。",
+    },
+    "en": {
+        "two_position": "For 2-position switches, say left-click or right-click explicitly.",
+        "multi_position": "For 3+ detents, default to right-click for one counter-clockwise step; state the click count if needed.",
+        "buttons": "For buttons, say left-click or right-click explicitly.",
+        "wheel": "For brightness increase, default to mouse-wheel up.",
+        "hotkeys": "Use exact hotkeys when the action is keyboard-driven.",
+    },
+}
+_DEFAULT_TARGET_INTERACTION_HINTS = {
+    "battery_switch": {
+        "interaction": {"click_type": "right"},
+        "zh": "BATT 到 ON：右键。",
+        "en": "Set BATT switch to ON with a right-click.",
+    },
+    "apu_switch": {
+        "interaction": {"click_type": "left"},
+        "zh": "APU 到 ON：左键。",
+        "en": "Set APU to ON with a left-click.",
+    },
+    "eng_crank_switch": {
+        "interaction": {"click_type_by_value": {"L": "left", "R": "right"}},
+        "zh": "Engine Crank：到 R 右键，到 L 左键。",
+        "en": "Engine Crank: right-click for R, left-click for L.",
+    },
+    "throttle_quadrant_reference": {
+        "interaction": {
+            "click_type": "keyboard",
+            "hotkey_by_action": {
+                "right_idle": "Right Shift+Home",
+                "left_idle": "Right Alt+Home",
+            },
+        },
+        "zh": "油门到 IDLE：右油门 Right Shift+Home，左油门 Right Alt+Home。",
+        "en": "Throttle to IDLE: right throttle Right Shift+Home, left throttle Right Alt+Home.",
+    },
+    "bleed_air_knob": {
+        "interaction": {"click_type": "right", "detent_direction": "counter_clockwise"},
+        "zh": "Bleed Air：右键一次逆时针一挡；360 度检查右键四次。",
+        "en": "Bleed Air: each right-click is one CCW detent; the 360 check is four right-clicks.",
+    },
+    "left_mdi_brightness_selector": {
+        "interaction": {"click_type": "right", "detent_direction": "counter_clockwise"},
+        "zh": "左 MDI 亮度：右键到下一挡。",
+        "en": "Left MDI brightness: right-click to the next detent.",
+    },
+    "right_mdi_brightness_selector": {
+        "interaction": {"click_type": "right", "detent_direction": "counter_clockwise"},
+        "zh": "右 MDI 亮度：右键到下一挡。",
+        "en": "Right MDI brightness: right-click to the next detent.",
+    },
+    "hud_symbology_brightness_knob": {
+        "interaction": {"click_type": "wheel_up"},
+        "zh": "HUD 亮度增加：滚轮向上。",
+        "en": "Increase HUD brightness with mouse-wheel up.",
+    },
+    "ampcd_off_brightness_knob": {
+        "interaction": {"click_type": "wheel_up"},
+        "zh": "AMPCD 亮度增加/点亮：滚轮向上。",
+        "en": "Increase or turn on AMPCD with mouse-wheel up.",
+    },
+    "ufc_comm1_channel_selector_pull": {
+        "interaction": {"click_type": "left"},
+        "zh": "UFC COMM1 拉出：左键。",
+        "en": "Pull UFC COMM1 with a left-click.",
+    },
+    "ins_mode_knob": {
+        "interaction": {"click_type": "right", "detent_direction": "counter_clockwise"},
+        "zh": "INS：右键到下一挡。",
+        "en": "INS: right-click to the next detent.",
+    },
+    "radar_mode_knob": {
+        "interaction": {"click_type": "right", "detent_direction": "counter_clockwise"},
+        "zh": "RADAR：右键到下一挡。",
+        "en": "RADAR: right-click to the next detent.",
+    },
+    "left_mdi_pb5": {
+        "interaction": {"click_type": "left"},
+        "zh": "DDI/AMPCD 的 PB 按钮都用左键点击。",
+        "en": "Use left-click for DDI/AMPCD pushbuttons.",
+    },
+    "left_mdi_pb15": {
+        "interaction": {"click_type": "left"},
+        "zh": "DDI/AMPCD 的 PB 按钮都用左键点击。",
+        "en": "Use left-click for DDI/AMPCD pushbuttons.",
+    },
+    "left_mdi_pb18": {
+        "interaction": {"click_type": "left"},
+        "zh": "DDI/AMPCD 的 PB 按钮都用左键点击。",
+        "en": "Use left-click for DDI/AMPCD pushbuttons.",
+    },
+    "right_mdi_pb5": {
+        "interaction": {"click_type": "left"},
+        "zh": "DDI/AMPCD 的 PB 按钮都用左键点击。",
+        "en": "Use left-click for DDI/AMPCD pushbuttons.",
+    },
+    "right_mdi_pb18": {
+        "interaction": {"click_type": "left"},
+        "zh": "DDI/AMPCD 的 PB 按钮都用左键点击。",
+        "en": "Use left-click for DDI/AMPCD pushbuttons.",
+    },
+    "refuel_probe_switch": {
+        "interaction": {"click_type": "right", "detent_direction": "counter_clockwise"},
+        "zh": "受油管：右键到下一挡；EXTEND 直接说右键。",
+        "en": "Refuel probe: right-click to the next detent; for EXTEND, say right-click.",
+    },
+}
+
+
+def _default_ui_map_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "packs" / "fa18c_startup" / "ui_map.yaml"
+
+
+@lru_cache(maxsize=8)
+def _load_ui_map_interaction_config(
+    ui_map_path: str,
+    mtime_ns: int,
+    size_bytes: int,
+) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, Any]]]:
+    del mtime_ns, size_bytes
+    path = Path(ui_map_path)
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("ui_map root must be a mapping")
+
+    policy_raw = raw.get("interaction_policy")
+    policy: dict[str, dict[str, str]] = {}
+    if isinstance(policy_raw, Mapping):
+        for key, value in policy_raw.items():
+            if not isinstance(key, str) or not isinstance(value, Mapping):
+                continue
+            zh = value.get("zh")
+            en = value.get("en")
+            if isinstance(zh, str) and zh.strip() and isinstance(en, str) and en.strip():
+                policy[key] = {"zh": zh.strip(), "en": en.strip()}
+
+    cockpit_elements = raw.get("cockpit_elements")
+    hints: dict[str, dict[str, Any]] = {}
+    if isinstance(cockpit_elements, Mapping):
+        for target, entry in cockpit_elements.items():
+            if not isinstance(target, str) or not isinstance(entry, Mapping):
+                continue
+            hint_raw = entry.get("interaction_hint")
+            interaction_raw = entry.get("interaction")
+            target_entry: dict[str, Any] = {}
+            if isinstance(hint_raw, Mapping):
+                zh = hint_raw.get("zh")
+                en = hint_raw.get("en")
+                if isinstance(zh, str) and zh.strip() and isinstance(en, str) and en.strip():
+                    target_entry["zh"] = zh.strip()
+                    target_entry["en"] = en.strip()
+            if isinstance(interaction_raw, Mapping):
+                interaction: dict[str, Any] = {}
+                click_type = interaction_raw.get("click_type")
+                if isinstance(click_type, str) and click_type.strip():
+                    interaction["click_type"] = click_type.strip()
+                detent_direction = interaction_raw.get("detent_direction")
+                if isinstance(detent_direction, str) and detent_direction.strip():
+                    interaction["detent_direction"] = detent_direction.strip()
+                hotkey = interaction_raw.get("hotkey")
+                if isinstance(hotkey, str) and hotkey.strip():
+                    interaction["hotkey"] = hotkey.strip()
+                click_type_by_value = interaction_raw.get("click_type_by_value")
+                if isinstance(click_type_by_value, Mapping):
+                    normalized_click_map = {
+                        str(name): str(value).strip()
+                        for name, value in click_type_by_value.items()
+                        if isinstance(name, str) and name and isinstance(value, str) and value.strip()
+                    }
+                    if normalized_click_map:
+                        interaction["click_type_by_value"] = normalized_click_map
+                hotkey_by_action = interaction_raw.get("hotkey_by_action")
+                if isinstance(hotkey_by_action, Mapping):
+                    normalized_hotkey_map = {
+                        str(name): str(value).strip()
+                        for name, value in hotkey_by_action.items()
+                        if isinstance(name, str) and name and isinstance(value, str) and value.strip()
+                    }
+                    if normalized_hotkey_map:
+                        interaction["hotkey_by_action"] = normalized_hotkey_map
+                if interaction:
+                    target_entry["interaction"] = interaction
+            if target_entry:
+                hints[target] = target_entry
+    return policy, hints
+
+
+def _get_ui_map_interaction_config(
+    ui_map_path: str | Path | None = None,
+) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, Any]]]:
+    resolved = (Path(ui_map_path) if ui_map_path else _default_ui_map_path()).resolve()
+    try:
+        stat = resolved.stat()
+        return _load_ui_map_interaction_config(str(resolved), stat.st_mtime_ns, stat.st_size)
+    except (FileNotFoundError, OSError, ValueError, yaml.YAMLError):
+        return {}, {}
 
 
 @dataclass(frozen=True)
@@ -398,6 +604,70 @@ def _build_overlay_target_policy(priority_targets: list[str]) -> dict[str, Any]:
         "preferred_target": priority_targets[0] if priority_targets else None,
         "candidate_targets_in_priority_order": list(priority_targets),
     }
+
+
+def _build_interaction_policy(lang: str, *, ui_map_path: str | Path | None = None) -> dict[str, str]:
+    key = "zh" if lang == "zh" else "en"
+    fallback = _DEFAULT_INTERACTION_POLICY_TEXT[key]
+    ui_policy, _ = _get_ui_map_interaction_config(ui_map_path)
+    return {name: ui_policy.get(name, {}).get(key, text) for name, text in fallback.items()}
+
+
+def _build_target_interaction_hints(
+    *,
+    lang: str,
+    priority_targets: list[str],
+    ui_map_path: str | Path | None = None,
+) -> list[dict[str, str]]:
+    ordered_targets: list[str] = []
+    seen: set[str] = set()
+    key = "zh" if lang == "zh" else "en"
+    _, ui_hints = _get_ui_map_interaction_config(ui_map_path)
+
+    def _append_target(raw: Any) -> None:
+        if not isinstance(raw, str) or not raw or raw in seen:
+            return
+        if raw not in ui_hints and raw not in _DEFAULT_TARGET_INTERACTION_HINTS:
+            return
+        seen.add(raw)
+        ordered_targets.append(raw)
+
+    for target in priority_targets[:3]:
+        _append_target(target)
+
+    out: list[dict[str, Any]] = []
+    for target in ordered_targets:
+        fallback_spec = _DEFAULT_TARGET_INTERACTION_HINTS.get(target, {})
+        ui_spec = ui_hints.get(target, {})
+        spec: dict[str, Any] = dict(fallback_spec)
+        spec.update(ui_spec)
+        fallback_interaction = fallback_spec.get("interaction")
+        ui_interaction = ui_spec.get("interaction")
+        if isinstance(fallback_interaction, Mapping) or isinstance(ui_interaction, Mapping):
+            merged_interaction: dict[str, Any] = {}
+            if isinstance(fallback_interaction, Mapping):
+                merged_interaction.update(fallback_interaction)
+            if isinstance(ui_interaction, Mapping):
+                merged_interaction.update(ui_interaction)
+            spec["interaction"] = merged_interaction
+        item: dict[str, Any] = {
+            "target": target,
+            "instruction": str(spec.get(key, "")),
+        }
+        interaction = spec.get("interaction")
+        if isinstance(interaction, Mapping):
+            if isinstance(interaction.get("click_type"), str):
+                item["click_type"] = interaction["click_type"]
+            if isinstance(interaction.get("detent_direction"), str):
+                item["detent_direction"] = interaction["detent_direction"]
+            if isinstance(interaction.get("hotkey"), str):
+                item["hotkey"] = interaction["hotkey"]
+            if isinstance(interaction.get("click_type_by_value"), Mapping):
+                item["click_type_by_value"] = dict(interaction["click_type_by_value"])
+            if isinstance(interaction.get("hotkey_by_action"), Mapping):
+                item["hotkey_by_action"] = dict(interaction["hotkey_by_action"])
+        out.append(item)
+    return out
 
 
 def _reprioritize_overlay_targets(
@@ -819,6 +1089,7 @@ def build_help_prompt_result(
     max_prompt_chars: int = MAX_PROMPT_CHARS,
     max_prompt_tokens_est: int = MAX_PROMPT_TOKENS_EST,
 ) -> PromptBuildResult:
+    ui_map_path = context.get("ui_map_path")
     schema = get_help_response_schema()
     step_enum = list(schema["properties"]["next"]["properties"]["step_id"]["enum"])
     target_enum = list(schema["properties"]["overlay"]["properties"]["targets"]["items"]["enum"])
@@ -872,6 +1143,7 @@ def build_help_prompt_result(
             "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
             "若 deterministic_step_hint.action_hint.target 存在，且与当前 vars / missing_conditions 不冲突，应优先把它作为单目标候选。",
             "若 deterministic_step_hint.visual_action_hint.target 存在，且与 vision_fact_summary / allowed_evidence_refs 不冲突，应优先把它作为单目标候选。",
+            "凡是指导用户操作控件时，必须明确写出具体交互方式：左键、右键、鼠标滚轮方向，或键盘热键；不要只说“点击/拨到/打开”。优先使用 interaction_policy 与 target_interaction_hints 中的明确提示。",
             "若 deterministic_step_hint.inferred_step_id='S08' 且 deterministic_step_hint.overlay_step_id='S09'，并且 deterministic_step_hint.action_hint.target='ufc_comm1_channel_selector_pull'，说明 S08 已满足、help 应直接引导进入 S09；此时不得继续高亮任何 left_mdi_* 目标，应直接高亮 UFC COMM1 频道选择旋钮。",
             "vision_fact_summary 只能辅助 diagnosis/next/explanations；若使用视觉证据，高亮必须引用 allowed_evidence_refs 中的 VISION_FACTS.* ref，并与实际 frame_id 可追溯。",
             "若 multimodal_input.attached=true 且 vision_fact_summary.status=vision_unavailable，可直接依据已附带图像判断 diagnosis/next 与单目标 overlay；若当前没有 VISION_FACTS.* ref，可改用 gate/rag 作为 evidence，不得仅因“缺少视觉 refs”就拒绝给出可操作目标。",
@@ -915,6 +1187,7 @@ def build_help_prompt_result(
             "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
             "If deterministic_step_hint.action_hint.target is present and consistent with current vars / missing_conditions, prefer it as the single overlay candidate.",
             "If deterministic_step_hint.visual_action_hint.target is present and consistent with vision_fact_summary / allowed_evidence_refs, prefer it as the single overlay candidate.",
+            "Whenever you tell the user how to operate a control, explicitly name the exact interaction: left-click, right-click, mouse-wheel direction, or keyboard hotkey. Do not say only 'click/toggle/set'. Prefer the explicit guidance in interaction_policy and target_interaction_hints.",
             "If deterministic_step_hint.inferred_step_id='S08' while deterministic_step_hint.overlay_step_id='S09' and deterministic_step_hint.action_hint.target='ufc_comm1_channel_selector_pull', treat S08 as already satisfied for help guidance and immediately highlight the UFC COMM1 channel selector; do not keep any left_mdi_* target in this case.",
             "vision_fact_summary may support diagnosis/next/explanations. If you use visual evidence for overlay, cite an allowed VISION_FACTS.* ref that remains traceable to the frame_id.",
             "If multimodal_input.attached=true and vision_fact_summary.status=vision_unavailable, you may still use the attached image for diagnosis/next and a single overlay target. When no VISION_FACTS.* ref is available, support the overlay with the strongest gate/rag ref instead of refusing solely because visual refs are missing.",
@@ -979,6 +1252,12 @@ def build_help_prompt_result(
         )
         current_overlay_target_policy = _build_overlay_target_policy(overlay_target_priority)
         current_overlay_evidence_contract = _build_overlay_evidence_contract(allowed_refs)
+        interaction_policy = _build_interaction_policy(lang, ui_map_path=ui_map_path)
+        target_interaction_hints = _build_target_interaction_hints(
+            lang=lang,
+            priority_targets=overlay_target_priority,
+            ui_map_path=ui_map_path,
+        )
         next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
         example_refs = [allowed_refs[0]] if allowed_refs else []
         example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
@@ -1032,6 +1311,8 @@ def build_help_prompt_result(
             "multimodal_input": multimodal_input,
             "overlay_target_policy": current_overlay_target_policy,
             "overlay_evidence_contract": current_overlay_evidence_contract,
+            "interaction_policy": interaction_policy,
+            "target_interaction_hints": target_interaction_hints,
             "uncertainty_policy": uncertainty_policy,
             "grounding": _build_grounding_payload(
                 context,

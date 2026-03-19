@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from adapters.evidence_refs import infer_evidence_type_from_ref
 from adapters.prompting import (
@@ -85,6 +86,158 @@ def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:
     assert contract["type_ref_prefixes"]["gate"] == ["GATES."]
     assert contract["type_ref_prefixes"]["delta"] == ["RECENT_UI_TARGETS."]
     assert "DELTA_KEYS." not in contract["type_ref_prefixes"]["delta"]
+
+
+def test_prompt_includes_explicit_interaction_policy_and_target_hints() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S05"]
+    ctx["overlay_target_allowlist"] = [
+        "eng_crank_switch",
+        "throttle_quadrant_reference",
+        "battery_switch",
+    ]
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["interaction_policy"]["two_position"] == (
+        "For 2-position switches, say left-click or right-click explicitly."
+    )
+    assert payload["interaction_policy"]["wheel"] == "For brightness increase, default to mouse-wheel up."
+    hints = {item["target"]: item for item in payload["target_interaction_hints"]}
+    assert hints["eng_crank_switch"]["instruction"] == "Engine Crank: right-click for R, left-click for L."
+    assert hints["eng_crank_switch"]["click_type_by_value"] == {"L": "left", "R": "right"}
+    assert hints["throttle_quadrant_reference"]["instruction"] == (
+        "Throttle to IDLE: right throttle Right Shift+Home, left throttle Right Alt+Home."
+    )
+    assert hints["throttle_quadrant_reference"]["click_type"] == "keyboard"
+    assert hints["throttle_quadrant_reference"]["hotkey_by_action"] == {
+        "right_idle": "Right Shift+Home",
+        "left_idle": "Right Alt+Home",
+    }
+    assert hints["battery_switch"]["instruction"] == "Set BATT switch to ON with a right-click."
+    assert hints["battery_switch"]["click_type"] == "right"
+
+
+def test_prompt_reads_interaction_policy_and_hints_from_ui_map(tmp_path: Path) -> None:
+    ui_map_path = tmp_path / "ui_map.yaml"
+    ui_map_path.write_text(
+        """
+version: v1
+interaction_policy:
+  two_position:
+    zh: "两位开关测试中文"
+    en: "custom two-position rule"
+  multi_position:
+    zh: "多位开关测试中文"
+    en: "custom multi-position rule"
+  buttons:
+    zh: "按钮测试中文"
+    en: "custom button rule"
+  wheel:
+    zh: "滚轮测试中文"
+    en: "custom wheel rule"
+  hotkeys:
+    zh: "热键测试中文"
+    en: "custom hotkey rule"
+cockpit_elements:
+  battery_switch:
+    description: "Battery"
+    dcs_id: "pnt_404"
+    aliases: ["Battery"]
+    panel_area: "test"
+    interaction_hint:
+      zh: "自定义电瓶中文"
+      en: "custom battery hint"
+  apu_switch:
+    description: "APU"
+    dcs_id: "pnt_375"
+    aliases: ["APU"]
+    panel_area: "test"
+default_overlay:
+  style: "highlight"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    ctx = _base_context()
+    ctx["ui_map_path"] = str(ui_map_path)
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    assert payload["interaction_policy"]["two_position"] == "custom two-position rule"
+    assert payload["interaction_policy"]["wheel"] == "custom wheel rule"
+    hints = {item["target"]: item for item in payload["target_interaction_hints"]}
+    assert hints["battery_switch"]["instruction"] == "custom battery hint"
+    assert hints["battery_switch"]["click_type"] == "right"
+    assert hints["apu_switch"]["instruction"] == "Set APU to ON with a left-click."
+
+
+def test_prompt_reads_structured_interaction_metadata_from_ui_map(tmp_path: Path) -> None:
+    ui_map_path = tmp_path / "ui_map.yaml"
+    ui_map_path.write_text(
+        """
+version: v1
+interaction_policy:
+  two_position:
+    zh: "两位"
+    en: "two"
+  multi_position:
+    zh: "多位"
+    en: "multi"
+  buttons:
+    zh: "按钮"
+    en: "buttons"
+  wheel:
+    zh: "滚轮"
+    en: "wheel"
+  hotkeys:
+    zh: "热键"
+    en: "hotkeys"
+cockpit_elements:
+  eng_crank_switch:
+    description: "Crank"
+    dcs_id: "pnt_377"
+    aliases: ["Crank"]
+    panel_area: "test"
+    interaction:
+      click_type_by_value:
+        L: "left"
+        R: "right"
+    interaction_hint:
+      zh: "曲柄"
+      en: "custom crank hint"
+  throttle_quadrant_reference:
+    description: "Throttle"
+    dcs_id: "pnt_504"
+    aliases: ["Throttle"]
+    panel_area: "test"
+    interaction:
+      click_type: "keyboard"
+      hotkey_by_action:
+        left_idle: "Alt+Home"
+        right_idle: "Shift+Home"
+    interaction_hint:
+      zh: "油门"
+      en: "custom throttle hint"
+default_overlay:
+  style: "highlight"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    ctx = _base_context()
+    ctx["ui_map_path"] = str(ui_map_path)
+    ctx["overlay_target_allowlist"] = ["eng_crank_switch", "throttle_quadrant_reference"]
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    hints = {item["target"]: item for item in payload["target_interaction_hints"]}
+    assert hints["eng_crank_switch"]["instruction"] == "custom crank hint"
+    assert hints["eng_crank_switch"]["click_type_by_value"] == {"L": "left", "R": "right"}
+    assert hints["throttle_quadrant_reference"]["instruction"] == "custom throttle hint"
+    assert hints["throttle_quadrant_reference"]["click_type"] == "keyboard"
+    assert hints["throttle_quadrant_reference"]["hotkey_by_action"] == {
+        "left_idle": "Alt+Home",
+        "right_idle": "Shift+Home",
+    }
 
 
 def test_prompt_makes_unknown_and_partial_constraints_explicit() -> None:
