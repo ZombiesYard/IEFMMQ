@@ -181,7 +181,9 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "engine_crank_right_complete": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
     "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
-    "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=1, false_value=0),
+    # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered
+    # and either held side (0/2) counts as active/complete evidence.
+    "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
     "l_gen_on": _set_enum("L_GEN_SW", true_value=1, false_value=0),
