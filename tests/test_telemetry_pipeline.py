@@ -598,8 +598,8 @@ def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_
         payload={
             "seq": 511,
             "t_wall": 20.0,
-            "bios": {"FIRE_TEST_SW": 1},
-            "delta": {"FIRE_TEST_SW": 1},
+            "bios": {"FIRE_TEST_SW": 0},
+            "delta": {"FIRE_TEST_SW": 0},
         },
         metadata={"session_id": "sess-fire-a"},
     )
@@ -608,8 +608,8 @@ def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_
         payload={
             "seq": 512,
             "t_wall": 21.0,
-            "bios": {"FIRE_TEST_SW": 0},
-            "delta": {"FIRE_TEST_SW": 0},
+            "bios": {"FIRE_TEST_SW": 1},
+            "delta": {"FIRE_TEST_SW": 1},
         },
         metadata={"session_id": "sess-fire-b"},
     )
@@ -618,8 +618,8 @@ def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_
         payload={
             "seq": 513,
             "t_wall": 40.5,
-            "bios": {"FIRE_TEST_SW": 0},
-            "delta": {"FIRE_TEST_SW": 0},
+            "bios": {"FIRE_TEST_SW": 1},
+            "delta": {"FIRE_TEST_SW": 1},
         },
         metadata={"session_id": "sess-fire-a"},
     )
@@ -628,7 +628,7 @@ def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_
         payload={
             "seq": 514,
             "t_wall": 41.0,
-            "bios": {"BATTERY_SW": 0, "FIRE_TEST_SW": 0},
+            "bios": {"BATTERY_SW": 0, "FIRE_TEST_SW": 1},
             "delta": {"BATTERY_SW": 0},
         },
         metadata={"session_id": "sess-fire-a"},
@@ -656,8 +656,8 @@ def test_enrich_bios_observation_latched_fire_test_clears_source_missing(monkeyp
         payload={
             "seq": 514,
             "t_wall": 50.0,
-            "bios": {"FIRE_TEST_SW": 1},
-            "delta": {"FIRE_TEST_SW": 1},
+            "bios": {"FIRE_TEST_SW": 2},
+            "delta": {"FIRE_TEST_SW": 2},
         },
         metadata={"session_id": "sess-fire-latch"},
     )
@@ -666,8 +666,8 @@ def test_enrich_bios_observation_latched_fire_test_clears_source_missing(monkeyp
         payload={
             "seq": 515,
             "t_wall": 51.0,
-            "bios": {"FIRE_TEST_SW": 0},
-            "delta": {"FIRE_TEST_SW": 0},
+            "bios": {"FIRE_TEST_SW": 1},
+            "delta": {"FIRE_TEST_SW": 1},
         },
         metadata={"session_id": "sess-fire-latch"},
     )

@@ -420,6 +420,25 @@ def test_var_resolver_pack_fire_test_complete_does_not_accept_engine_start_progr
     assert "fire_test_complete" not in vars_out["vars_source_missing"]
 
 
+def test_var_resolver_pack_fire_test_active_is_true_for_both_rocker_directions() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    test_a_frame = TelemetryFrame(seq=252, t_wall=252.0, source="dcs_bios", bios={"FIRE_TEST_SW": 0})
+    centered_frame = TelemetryFrame(seq=253, t_wall=253.0, source="dcs_bios", bios={"FIRE_TEST_SW": 1})
+    test_b_frame = TelemetryFrame(seq=254, t_wall=254.0, source="dcs_bios", bios={"FIRE_TEST_SW": 2})
+
+    test_a_vars = resolver.resolve(test_a_frame)
+    centered_vars = resolver.resolve(centered_frame)
+    test_b_vars = resolver.resolve(test_b_frame)
+
+    assert test_a_vars["fire_test_active"] is True
+    assert test_a_vars["fire_test_complete"] is True
+    assert centered_vars["fire_test_active"] is False
+    assert centered_vars["fire_test_complete"] is False
+    assert test_b_vars["fire_test_active"] is True
+    assert test_b_vars["fire_test_complete"] is True
+
+
 def test_var_resolver_pack_throttle_not_off_flags_track_internal_throttle_axes() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
 

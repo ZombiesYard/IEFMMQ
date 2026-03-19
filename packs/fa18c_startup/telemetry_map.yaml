@@ -67,10 +67,13 @@ vars:
   core_avionics_online: "derived(bios.LEFT_DDI_BRT_CTL > 0 and bios.RIGHT_DDI_BRT_CTL > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
 
   # Key switches / sensor panel
-  fire_test_active: "bios.FIRE_TEST_SW == 1"
-  # FIRE_TEST_SW is spring-loaded. Completion is latched in telemetry_pipeline using
-  # the same direct-observation pattern as FCS RESET: once the active state is seen
-  # in-session, completion remains true until the session is cold-start reset.
+  # DCS-BIOS exports rocker selectors as 0/1/2 where 1 is centered and 0/2 are the
+  # two held directions. FIRE TEST is therefore active whenever it leaves center.
+  fire_test_active: "derived(num(bios.FIRE_TEST_SW) != 1)"
+  # FIRE_TEST_SW is a spring-loaded two-way rocker. Completion is latched in
+  # telemetry_pipeline using the same direct-observation pattern as FCS RESET:
+  # once either held side is seen in-session, completion remains true until the
+  # session is cold-start reset.
   fire_test_complete: "derived(vars.fire_test_active)"
   lights_test_active: "bios.LIGHTS_TEST_SW == 1"
   annunciator_panel_activity: "derived(bios.MASTER_CAUTION_LT == 1 or bios.LH_ADV_L_BLEED == 1 or bios.LH_ADV_R_BLEED == 1 or bios.LH_ADV_SPD_BRK == 1 or bios.LH_ADV_STBY == 1 or bios.LH_ADV_GO == 1 or bios.LH_ADV_NO_GO == 1 or bios.LH_ADV_REC == 1 or bios.LH_ADV_XMIT == 1 or bios.RH_ADV_RCDR_ON == 1 or bios.RH_ADV_DISP == 1 or bios.RH_ADV_SAM == 1 or bios.RH_ADV_AI == 1 or bios.RH_ADV_AAA == 1 or bios.RH_ADV_CW == 1)"
