@@ -60,6 +60,14 @@ def test_resolve_active_telemetry_map_path_falls_back_to_pack_sibling(tmp_path: 
     assert resolved_path == telemetry_map_path.resolve()
 
 
+def test_resolve_active_telemetry_map_path_returns_none_without_explicit_or_pack_context() -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="en")
+
+    resolved_path = model._resolve_active_telemetry_map_path({})
+
+    assert resolved_path is None
+
+
 def test_load_var_resolver_for_path_does_not_cache_failures(tmp_path: Path) -> None:
     base_help_model._VAR_RESOLVER_CACHE.clear()
     telemetry_map_path = tmp_path / "telemetry_map.yaml"
@@ -70,6 +78,19 @@ def test_load_var_resolver_for_path_does_not_cache_failures(tmp_path: Path) -> N
 
     resolver = base_help_model._load_var_resolver_for_path(str(telemetry_map_path))
     assert resolver is not None
+
+
+def test_resolve_inference_vars_does_not_expand_derived_vars_without_active_resolver() -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="en")
+
+    resolved = model._resolve_inference_vars(
+        {
+            "switch_on": True,
+            "power_on": True,
+        }
+    )
+
+    assert "custom_ready" not in resolved
 
 
 def test_expand_presented_missing_condition_keeps_derived_condition_when_all_fallbacks_are_true() -> None:

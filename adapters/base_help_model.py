@@ -35,13 +35,12 @@ from core.security import redact_sensitive_text, sanitize_help_response_for_log,
 from core.step_hint import hint_has_hard_blocker
 from core.step_signal_metadata import compute_requires_visual_confirmation, normalize_observability_status
 from core.types import Observation, TutorRequest, TutorResponse
-from core.vars import VarResolver, VarResolverError, _find_missing_refs, _safe_eval
+from core.vars import VarResolver, VarResolverError, evaluate_expression_with_missing_refs
 from jsonschema.exceptions import ValidationError
 from ports.model_port import ModelPort
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_TELEMETRY_MAP_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "telemetry_map.yaml"
 _DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
     "vars.apu_start_support_complete==true": (
         "vars.apu_ready==true",
@@ -542,8 +541,7 @@ class BaseHelpModel(ModelPort):
                 expr_text = expr.strip()
                 if expr_text.startswith("derived(") and expr_text.endswith(")"):
                     expr_text = expr_text[len("derived(") : -1].strip()
-                missing_refs = _find_missing_refs(expr_text, context)
-                value = _safe_eval(expr_text, context)
+                value, missing_refs = evaluate_expression_with_missing_refs(expr_text, context)
                 merged[key] = value
                 context["vars"] = merged
                 if value is None or missing_refs:
@@ -571,7 +569,7 @@ class BaseHelpModel(ModelPort):
                     return candidate.resolve()
         if self.telemetry_map_path is not None:
             return self.telemetry_map_path
-        return _DEFAULT_TELEMETRY_MAP_PATH
+        return None
 
     def _present_missing_conditions(
         self,

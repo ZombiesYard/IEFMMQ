@@ -235,6 +235,12 @@ def _safe_eval(expr: str, ctx: Mapping[str, Any]) -> Any:
         raise VarResolverError(f"Failed to evaluate expression: {expr}") from exc
 
 
+def evaluate_expression_with_missing_refs(expr: str, ctx: Mapping[str, Any]) -> tuple[Any, list[str]]:
+    missing_refs = _find_missing_refs(expr, ctx)
+    value = _safe_eval(expr, ctx)
+    return value, missing_refs
+
+
 @dataclass
 class VarResolver:
     rules: Dict[str, Any]
