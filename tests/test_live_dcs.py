@@ -1153,7 +1153,7 @@ def test_live_loop_applies_policy_filter_in_cold_start_production_mode(tmp_path:
     assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
     assert req_meta["grounding_policy_version"] == "v2"
     assert req_meta["grounding_policy_filtered_out_count"] == 1
-    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-28"]
+    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-56"]
 
 
 def test_live_loop_applies_policy_filter_when_policy_path_provided_without_cold_start(tmp_path: Path) -> None:
@@ -1189,7 +1189,7 @@ def test_live_loop_applies_policy_filter_when_policy_path_provided_without_cold_
     assert req_meta["grounding_policy_id"] == "fa18c_cold_start_whitelist_v1"
     assert req_meta["grounding_policy_version"] == "v2"
     assert req_meta["grounding_policy_filtered_out_count"] == 1
-    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-28"]
+    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-56"]
 
 
 def test_live_loop_marks_policy_filtered_all_as_grounding_missing_and_logs_chunk_refs(tmp_path: Path) -> None:
@@ -1255,7 +1255,7 @@ def test_live_loop_prefers_chunk_id_when_building_source_chunk_refs_for_policy_f
 
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     req_meta = tutor_request_payload["metadata"]
-    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-28"]
+    assert req_meta["source_chunk_refs"] == ["fa18c_startup_master/fa18c_startup_master_1:1-56"]
 
 
 def test_build_source_chunk_ref_falls_back_to_chunk_without_line_range() -> None:
