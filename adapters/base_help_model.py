@@ -4,6 +4,7 @@ Shared base implementation for HelpResponse-capable model adapters.
 
 from __future__ import annotations
 
+import copy
 from collections import OrderedDict
 from pathlib import Path
 from time import perf_counter
@@ -49,6 +50,14 @@ _DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
 }
 _VAR_RESOLVER_CACHE: OrderedDict[str, VarResolver] = OrderedDict()
 _MAX_VAR_RESOLVER_CACHE = 8
+_VISUAL_FACT_REF_ALIASES: dict[str, str] = {
+    "right_ddi_bit_failures_page_visible": "bit_page_failure_visible",
+    "right_ddi_bit_failure_page_visible": "bit_page_failure_visible",
+    "bit_failures_page_visible": "bit_page_failure_visible",
+    "bit_failure_page_visible": "bit_page_failure_visible",
+    "right_ddi_bit_root_page_visible": "bit_root_page_visible",
+    "right_ddi_bit_page_visible": "bit_page_visible",
+}
 
 
 def _load_var_resolver_for_path(path_text: str) -> VarResolver | None:
@@ -100,6 +109,66 @@ def _generation_mode_from_repair_state(
     return "model"
 
 
+def _repair_visual_evidence_ref(
+    ref: str,
+    *,
+    allowed_ref_set: set[str],
+) -> tuple[str, dict[str, Any] | None]:
+    if not ref.startswith("VISION_FACTS."):
+        return ref, None
+
+    raw_body = ref[len("VISION_FACTS.") :]
+    fact_id = raw_body
+    frame_id: str | None = None
+    if "@" in raw_body:
+        fact_id, frame_id = raw_body.split("@", 1)
+
+    canonical_fact_id = _VISUAL_FACT_REF_ALIASES.get(fact_id, fact_id)
+    direct_ref = f"VISION_FACTS.{canonical_fact_id}"
+    framed_ref = f"{direct_ref}@{frame_id}" if isinstance(frame_id, str) and frame_id else None
+
+    if framed_ref and framed_ref in allowed_ref_set:
+        if framed_ref == ref:
+            return ref, None
+        return framed_ref, {
+            "from_ref": ref,
+            "to_ref": framed_ref,
+            "reason": "canonicalize_visual_fact_ref",
+        }
+    if direct_ref in allowed_ref_set:
+        if direct_ref == ref:
+            return ref, None
+        return direct_ref, {
+            "from_ref": ref,
+            "to_ref": direct_ref,
+            "reason": "canonicalize_visual_fact_ref",
+        }
+
+    framed_candidates = sorted(
+        candidate
+        for candidate in allowed_ref_set
+        if candidate.startswith(f"{direct_ref}@")
+    )
+    if frame_id is None and len(framed_candidates) == 1:
+        candidate = framed_candidates[0]
+        if candidate != ref:
+            return candidate, {
+                "from_ref": ref,
+                "to_ref": candidate,
+                "reason": "attach_single_visible_frame_id",
+            }
+
+    if canonical_fact_id != fact_id:
+        repaired_ref = direct_ref if frame_id is None else f"{direct_ref}@{frame_id}"
+        if repaired_ref != ref:
+            return repaired_ref, {
+                "from_ref": ref,
+                "to_ref": repaired_ref,
+                "reason": "canonicalize_visual_fact_ref_unverified",
+            }
+    return ref, None
+
+
 class BaseHelpModel(ModelPort):
     provider: str = "unknown"
 
@@ -109,6 +178,7 @@ class BaseHelpModel(ModelPort):
         base_url: str,
         timeout_s: float,
         lang: str,
+        max_overlay_targets: int = 1,
         log_raw_llm_text: bool = False,
         print_model_io: bool = False,
         telemetry_map_path: str | Path | None = None,
@@ -118,6 +188,7 @@ class BaseHelpModel(ModelPort):
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self.lang = lang
+        self.max_overlay_targets = max(0, int(max_overlay_targets))
         self.log_raw_llm_text = bool(log_raw_llm_text)
         self.print_model_io = bool(print_model_io)
         self.telemetry_map_path = _normalize_telemetry_map_path(telemetry_map_path)
@@ -232,11 +303,14 @@ class BaseHelpModel(ModelPort):
                             raise retry_parse_exc
                         help_obj, extraction, repair_details = contextual_repair
             self._validate_context_bounds(help_obj, request)
+            pre_guardrail_help_obj = copy.deepcopy(help_obj)
+            evidence_ref_repair = self._repair_overlay_evidence_refs(help_obj, prompt_meta)
             evidence_guardrail_reasons = self._enforce_evidence_guardrail(help_obj, prompt_meta)
             mapped = map_help_response_to_tutor_response(
                 help_obj,
                 request=request,
                 status="ok",
+                max_overlay_targets=self.max_overlay_targets,
                 lang=self.lang,
             )
             safe_message = sanitize_public_model_text(mapped.message, lang=self.lang)
@@ -253,9 +327,11 @@ class BaseHelpModel(ModelPort):
                         repair_applied=bool(repair_details.get("repair_applied")),
                     ),
                     "latency_ms": int((perf_counter() - start) * 1000),
+                    "help_response_pre_guardrail": sanitize_help_response_for_log(pre_guardrail_help_obj, lang=self.lang),
                     "help_response": sanitize_help_response_for_log(help_obj, lang=self.lang),
                     "json_repaired": extraction.json_repaired,
                     "json_repair_reasons": list(extraction.repair_reasons),
+                    "evidence_ref_repair": evidence_ref_repair,
                     "evidence_guardrail_applied": bool(evidence_guardrail_reasons),
                     "evidence_guardrail_reasons": evidence_guardrail_reasons,
                     "prompt_budget_used": prompt_budget_used,
@@ -393,6 +469,9 @@ class BaseHelpModel(ModelPort):
             "recent_actions": context.get("recent_actions"),
             "gates": context.get("gates"),
             "rag_topk": context.get("rag_topk"),
+            "vision": context.get("vision"),
+            "vision_facts": context.get("vision_facts"),
+            "vision_fact_summary": context.get("vision_fact_summary"),
             "observation": {
                 "procedure_hint": observation.procedure_hint,
                 "source": observation.source,
@@ -400,7 +479,11 @@ class BaseHelpModel(ModelPort):
             "error_category_enum": schema_categories,
             "deterministic_step_hint": hint_payload,
         }
-        prompt_result = build_help_prompt_result(prompt_context, self.lang)
+        prompt_result = build_help_prompt_result(
+            prompt_context,
+            self.lang,
+            max_overlay_targets=self.max_overlay_targets,
+        )
         prompt_meta = dict(prompt_result.metadata)
         prompt_meta["deterministic_step_hint"] = hint_payload
         return (
@@ -800,6 +883,51 @@ class BaseHelpModel(ModelPort):
         else:
             help_obj["explanations"] = [clarification]
         return reasons
+
+    def _repair_overlay_evidence_refs(
+        self,
+        help_obj: dict[str, Any],
+        prompt_meta: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        overlay = help_obj.get("overlay")
+        if not isinstance(overlay, dict):
+            return {"repair_applied": False, "details": []}
+
+        evidence_raw = overlay.get("evidence")
+        if not isinstance(evidence_raw, list):
+            return {"repair_applied": False, "details": []}
+
+        allowed_refs = prompt_meta.get("allowed_evidence_refs")
+        allowed_ref_set = (
+            {ref for ref in allowed_refs if isinstance(ref, str) and ref}
+            if isinstance(allowed_refs, list)
+            else set()
+        )
+        if not allowed_ref_set:
+            return {"repair_applied": False, "details": []}
+
+        repaired = False
+        details: list[dict[str, Any]] = []
+        rewritten_evidence: list[Any] = []
+        for item in evidence_raw:
+            if not isinstance(item, Mapping):
+                rewritten_evidence.append(item)
+                continue
+            normalized = dict(item)
+            ref = normalized.get("ref")
+            evidence_type = normalized.get("type")
+            if isinstance(ref, str) and evidence_type == "visual":
+                repaired_ref, detail = _repair_visual_evidence_ref(ref, allowed_ref_set=allowed_ref_set)
+                if repaired_ref != ref:
+                    normalized["ref"] = repaired_ref
+                    repaired = True
+                if detail is not None:
+                    details.append(detail)
+            rewritten_evidence.append(normalized)
+
+        if repaired:
+            overlay["evidence"] = rewritten_evidence
+        return {"repair_applied": repaired, "details": details}
 
     def _build_clarification_message(self, details: list[str]) -> str:
         if self.lang == "zh":

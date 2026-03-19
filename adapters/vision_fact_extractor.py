@@ -4,6 +4,7 @@ VLM-backed structured vision-fact extraction.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -82,6 +83,8 @@ class VisionFactExtractor:
         lang: str = "zh",
         client: object | None = None,
         enable_multimodal: bool = True,
+        log_raw_llm_text: bool = False,
+        print_model_io: bool = False,
         config_path: str | None = None,
         pack_path: str | Path | None = None,
     ) -> None:
@@ -91,6 +94,8 @@ class VisionFactExtractor:
         self.api_key = api_key
         self.lang = lang if lang in {"zh", "en"} else "zh"
         self.enable_multimodal = bool(enable_multimodal)
+        self.log_raw_llm_text = bool(log_raw_llm_text)
+        self.print_model_io = bool(print_model_io)
         self.allowed_local_image_roots = normalize_allowed_local_image_roots(allowed_local_image_roots)
         self.max_local_image_bytes = (
             int(max_local_image_bytes)
@@ -128,6 +133,8 @@ class VisionFactExtractor:
         session_id: str | None,
         trigger_wall_ms: int,
     ) -> VisionFactExtractionResult:
+        request_id = vision.get("request_id") if isinstance(vision.get("request_id"), str) else None
+        help_cycle_id = vision.get("help_cycle_id") if isinstance(vision.get("help_cycle_id"), str) else None
         candidate_frames = self._candidate_frames(vision)
         candidate_frame_ids = [
             str(frame["frame_id"])
@@ -179,8 +186,30 @@ class VisionFactExtractor:
                 ],
             },
         ]
+        if self.print_model_io:
+            self._print_model_io_block(
+                "VISION_FACT_PROMPT",
+                self._render_debug_messages(messages),
+                session_id=session_id,
+                request_id=request_id,
+                help_cycle_id=help_cycle_id,
+                trigger_wall_ms=trigger_wall_ms,
+                frame_ids=frame_ids,
+                attempt=1,
+            )
+        raw_text = ""
         try:
             raw_text = self._chat(messages)
+            self._print_model_io_block(
+                "VISION_FACT_REPLY",
+                raw_text,
+                session_id=session_id,
+                request_id=request_id,
+                help_cycle_id=help_cycle_id,
+                trigger_wall_ms=trigger_wall_ms,
+                frame_ids=frame_ids,
+                attempt=1,
+            )
             observation = self._parse_response(
                 raw_text,
                 frame_ids=frame_ids,
@@ -196,6 +225,7 @@ class VisionFactExtractor:
                     "multimodal_failure_reason": f"{type(exc).__name__}: {exc}",
                     "multimodal_failed_frame_ids": list(built["failed_frame_ids"]),
                     "multimodal_frame_failures": dict(built["frame_failures"]),
+                    "raw_llm_text": raw_text if self.log_raw_llm_text and raw_text else "",
                 },
             )
 
@@ -214,6 +244,8 @@ class VisionFactExtractor:
             **dict(observation.metadata),
             "vision_fact_summary": summary,
         }
+        if self.log_raw_llm_text:
+            observation.metadata["raw_llm_text"] = raw_text
         return VisionFactExtractionResult(
             status=result_status,
             observation=observation,
@@ -222,6 +254,7 @@ class VisionFactExtractor:
                 "multimodal_failed_frame_ids": list(built["failed_frame_ids"]),
                 "multimodal_frame_failures": dict(built["frame_failures"]),
                 "vision_fact_summary": summary,
+                "raw_llm_text": raw_text if self.log_raw_llm_text else "",
             },
         )
 
@@ -461,6 +494,71 @@ class VisionFactExtractor:
 
     def _should_use_json_object_response_format(self) -> bool:
         return self._is_dashscope_compatible() and self._is_qwen35_model()
+
+    def _print_model_io_block(
+        self,
+        kind: str,
+        text: str,
+        *,
+        session_id: str | None,
+        request_id: str | None,
+        help_cycle_id: str | None,
+        trigger_wall_ms: int | None,
+        frame_ids: Sequence[str] | None,
+        attempt: int,
+    ) -> None:
+        if not self.print_model_io:
+            return
+        header = f"[MODEL_IO][{kind}]"
+        if isinstance(session_id, str) and session_id:
+            header += f"[session_id={session_id}]"
+        if isinstance(request_id, str) and request_id:
+            header += f"[request_id={request_id}]"
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            header += f"[help_cycle_id={help_cycle_id}]"
+        if isinstance(trigger_wall_ms, int) and trigger_wall_ms >= 0:
+            header += f"[trigger_wall_ms={trigger_wall_ms}]"
+        normalized_frame_ids = [
+            item for item in (frame_ids or [])
+            if isinstance(item, str) and item
+        ]
+        if normalized_frame_ids:
+            header += f"[frame_ids={','.join(normalized_frame_ids)}]"
+        header += f"[attempt={attempt}]"
+        print(header)
+        print(text)
+        print(f"{header}[END]")
+
+    @staticmethod
+    def _render_debug_messages(messages: list[dict[str, Any]]) -> str:
+        rendered: list[str] = []
+        for message in messages:
+            role = message.get("role")
+            role_text = role if isinstance(role, str) and role else "unknown"
+            rendered.append(f"[{role_text}]")
+            content = message.get("content")
+            if isinstance(content, str):
+                rendered.append(content)
+                continue
+            if isinstance(content, list):
+                image_count = 0
+                for item in content:
+                    if not isinstance(item, Mapping):
+                        rendered.append(str(item))
+                        continue
+                    item_type = item.get("type")
+                    if item_type == "text" and isinstance(item.get("text"), str):
+                        rendered.append(str(item["text"]))
+                        continue
+                    if item_type == "image_url":
+                        image_count += 1
+                        continue
+                    rendered.append(json.dumps(dict(item), ensure_ascii=False, sort_keys=True))
+                if image_count > 0:
+                    rendered.append(f"[multimodal_images={image_count}]")
+                continue
+            rendered.append(str(content))
+        return "\n".join(rendered)
 
 
 __all__ = ["VisionFactExtractionResult", "VisionFactExtractor"]

@@ -165,6 +165,37 @@ def test_executor_accepts_overlay_with_evidence_required_and_refs(monkeypatch) -
     assert report.rejected == []
 
 
+def test_executor_executes_multiple_overlay_targets_when_enabled(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=False, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender, max_targets=2)
+
+    report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "fcs_bit_switch",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.fcs_bit_switch"],
+            },
+            {
+                "type": "overlay",
+                "target": "right_mdi_pb5",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.right_mdi_pb5"],
+            },
+        ]
+    )
+
+    assert len(dummy.sent) == 2
+    cmds = [decode_overlay_command(item[0]) for item in dummy.sent]
+    assert [cmd["target"] for cmd in cmds] == ["pnt_470", "pnt_83"]
+    assert [item["target"] for item in report.executed] == ["fcs_bit_switch", "right_mdi_pb5"]
+    assert report.rejected == []
+    assert report.dropped == []
+
+
 def test_executor_rejects_overlay_target_not_in_allowlist(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)

@@ -160,6 +160,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
             with OverlayActionExecutor(
                 ui_map_path=args.ui_map,
                 pack_path=args.pack,
+                max_targets=max(0, int(args.max_overlay_targets)),
                 dry_run=bool(args.dry_run_overlay),
                 session_id=args.session_id,
                 event_sink=store.append,
@@ -187,6 +188,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     vision_mode="replay",
                     vision_sync_window_ms=vision_sync_window_ms,
                     vision_trigger_wait_ms=vision_trigger_wait_ms,
+                    max_overlay_targets=max(0, int(args.max_overlay_targets)),
                 )
 
                 stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
@@ -405,6 +407,12 @@ def main() -> int:
     )
     rep_bios.add_argument("--knowledge-index", default="Doc/Evaluation/index.json", help="Grounding index.json path")
     rep_bios.add_argument("--rag-top-k", type=int, default=5, help="Grounding snippet top-k")
+    rep_bios.add_argument(
+        "--max-overlay-targets",
+        type=int,
+        default=1,
+        help="Maximum number of overlay targets allowed per help cycle (default 1)",
+    )
     replay_cold_start_default = parse_env_bool(ENV_COLD_START_PRODUCTION, default=False)
     replay_cold_start_group = rep_bios.add_mutually_exclusive_group()
     replay_cold_start_group.add_argument(

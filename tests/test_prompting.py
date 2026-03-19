@@ -312,6 +312,33 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
     ]
 
 
+def test_prompt_requires_exact_visual_fact_refs_and_forbids_alias_names() -> None:
+    ctx = _base_context()
+    ctx["vision_fact_summary"] = {
+        "status": "available",
+        "frame_ids": ["1773950407644_000006"],
+        "seen_fact_ids": ["bit_page_failure_visible"],
+        "uncertain_fact_ids": [],
+        "not_seen_fact_ids": [],
+        "summary_text": "seen=bit_page_failure_visible",
+    }
+    ctx["vision_facts"] = [
+        {
+            "fact_id": "bit_page_failure_visible",
+            "state": "seen",
+            "source_frame_id": "1773950407644_000006",
+            "confidence": 0.99,
+            "evidence_note": "BIT FAILURES line is clearly visible on the right DDI.",
+        }
+    ]
+
+    result = build_help_prompt_result(ctx, "en")
+
+    assert "must exactly match a full entry from allowed_evidence_refs" in result.prompt
+    assert "bit_page_failure_visible" in result.prompt
+    assert "right_ddi_bit_failures_page_visible" in result.prompt
+
+
 def test_prompt_prioritizes_missing_condition_vars_when_var_budget_trims() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S07"]

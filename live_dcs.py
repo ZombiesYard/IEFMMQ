@@ -323,6 +323,8 @@ def _build_vision_fact_extractor_from_model(
             allowed_local_image_roots=[str(path) for path in model.allowed_local_image_roots],
             max_local_image_bytes=model.max_local_image_bytes,
             lang=lang,
+            log_raw_llm_text=getattr(model, "log_raw_llm_text", False),
+            print_model_io=getattr(model, "print_model_io", False),
             pack_path=pack_path,
         )
     except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
@@ -2053,6 +2055,7 @@ class LiveDcsTutorLoop:
         vision_sync_window_ms: int | None = None,
         vision_trigger_wait_ms: int | None = None,
         vision_fact_extractor: Any | None = None,
+        max_overlay_targets: int = 1,
     ) -> None:
         self.source = source
         self.model = model
@@ -2064,6 +2067,7 @@ class LiveDcsTutorLoop:
         self.event_sink = event_sink
         self.dry_run_overlay = dry_run_overlay
         self.vision_mode = _normalize_vision_mode(vision_mode)
+        self.max_overlay_targets = max(0, int(max_overlay_targets))
 
         self.pack_path = Path(pack_path) if pack_path else _default_pack_path()
         self.ui_map_path = Path(ui_map_path) if ui_map_path else _default_ui_map_path()
@@ -2523,6 +2527,7 @@ class LiveDcsTutorLoop:
         *,
         vision_selection: HelpCycleVisionSelection,
         vision_fact_context: Mapping[str, Any],
+        request_id_override: str | None = None,
     ) -> tuple[TutorRequest, dict[str, Any], str]:
         payload = obs.payload if isinstance(obs.payload, Mapping) else {}
         vars_map = payload.get("vars")
@@ -2684,6 +2689,11 @@ class LiveDcsTutorLoop:
         prompt_grounding_missing = bool(prompt_result.metadata.get("grounding_missing"))
         prompt_grounding_reason = prompt_result.metadata.get("grounding_reason")
         req = TutorRequest(
+            request_id=(
+                request_id_override
+                if isinstance(request_id_override, str) and request_id_override
+                else str(uuid4())
+            ),
             actor="learner",
             intent="help",
             message="help",
@@ -2786,6 +2796,7 @@ class LiveDcsTutorLoop:
         self,
         *,
         vision_selection: HelpCycleVisionSelection,
+        help_cycle_id: str | None = None,
     ) -> dict[str, Any]:
         trigger_wall_ms = int(vision_selection.trigger_wall_ms)
         self._vision_fact_snapshot = prune_expired_facts(
@@ -2805,8 +2816,12 @@ class LiveDcsTutorLoop:
                 "metadata": {"reason": "vision_fact_extractor_unconfigured"},
             }
 
+        vision_payload = vision_selection.to_dict()
+        if isinstance(help_cycle_id, str) and help_cycle_id:
+            vision_payload["help_cycle_id"] = help_cycle_id
+            vision_payload["request_id"] = help_cycle_id
         result = self.vision_fact_extractor.extract(
-            vision_selection.to_dict(),
+            vision_payload,
             session_id=self.vision_session_id,
             trigger_wall_ms=trigger_wall_ms,
         )
@@ -3172,6 +3187,13 @@ class LiveDcsTutorLoop:
         ]
         if not current_targets:
             return False, "missing_action_targets"
+        if (
+            self.max_overlay_targets > 1
+            and inferred_step_id == "S18"
+            and action_target in current_targets
+            and set(current_targets).issubset({"fcs_bit_switch", "right_mdi_pb5"})
+        ):
+            return False, "already_aligned_multi_target_s18"
         if current_targets == [action_target]:
             return False, "already_aligned"
 
@@ -3387,7 +3409,7 @@ class LiveDcsTutorLoop:
             filtered_help_obj,
             request=request,
             status=response.status,
-            max_overlay_targets=1,
+            max_overlay_targets=self.max_overlay_targets,
             ui_map_path=self.ui_map_path,
             lang=self.lang,
         )
@@ -3615,7 +3637,7 @@ class LiveDcsTutorLoop:
             fallback_help_obj,
             request=request,
             status=response.status,
-            max_overlay_targets=1,
+            max_overlay_targets=self.max_overlay_targets,
             ui_map_path=self.ui_map_path,
             lang=self.lang,
         )
@@ -3692,6 +3714,19 @@ class LiveDcsTutorLoop:
             or re.search(r"\bnot rdy\b", combined) is not None
             or re.search(r"\bnot ready\b", combined) is not None
         )
+        indicates_more_s18_actions = any(
+            marker in combined
+            for marker in (
+                "hold the fcs bit switch",
+                "holding the fcs bit switch",
+                "press pb5 again",
+                "pressing pb5 again",
+                "initiate the specific fcs bit test",
+                "initiate the fcs bit test",
+                "start the fcs bit",
+                "begin the fcs bit",
+            )
+        )
         has_go_reporting = (has_final_go_phrase or mentions_final_go_channels) and not mentions_intermediate_only
         has_bit_complete = (
             "successfully completed" in combined
@@ -3704,6 +3739,8 @@ class LiveDcsTutorLoop:
             or "initial bit root phase" in combined
             or "fcs-mc page with 'go' results" in combined
         )
+        if indicates_more_s18_actions:
+            return False, "still_mentions_pending_s18_actions"
         if not (has_go_reporting and has_bit_complete):
             return False, "no_s18_completion_claim"
 
@@ -3784,14 +3821,19 @@ class LiveDcsTutorLoop:
                 break
         if not isinstance(matching_fact, Mapping):
             return False, "missing_structured_result_fact"
+        if matching_fact.get("result_kind") != "final_go":
+            return False, "structured_result_not_final_go"
         evidence_note = matching_fact.get("evidence_note")
         if not isinstance(evidence_note, str) or not evidence_note:
             return False, "missing_structured_result_evidence_note"
         note_lower = evidence_note.lower()
         if "pbit go" in note_lower:
             return False, "intermediate_pbit_go_only"
-        if not ("fcsa" in note_lower and "fcsb" in note_lower and "go" in note_lower):
-            return False, "missing_final_go_channels"
+        required_channels = ("mc1", "mc2", "fcsa", "fcsb")
+        if not all(channel in note_lower for channel in required_channels) or "go" not in note_lower:
+            return False, "missing_full_final_go_channel_set"
+        if "no go" in note_lower or "not rdy" in note_lower or "not ready" in note_lower or "in test" in note_lower:
+            return False, "structured_result_contains_nonfinal_markers"
 
         original_message = response.message
         original_explanations = list(response.explanations)
@@ -3901,11 +3943,16 @@ class LiveDcsTutorLoop:
             observation=obs,
             trigger_t_wall=resolved_trigger_t_wall,
         )
-        vision_fact_context = self._extract_vision_fact_context(vision_selection=vision_selection)
+        help_cycle_id = str(uuid4())
+        vision_fact_context = self._extract_vision_fact_context(
+            vision_selection=vision_selection,
+            help_cycle_id=help_cycle_id,
+        )
         request, prompt_meta, state_key = self._build_request(
             obs,
             vision_selection=vision_selection,
             vision_fact_context=vision_fact_context,
+            request_id_override=help_cycle_id,
         )
         help_cycle_id = request.request_id
         request.metadata = dict(request.metadata)
@@ -4490,6 +4537,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=5,
         help="Grounding snippet top-k for prompt injection (default 5)",
     )
+    parser.add_argument(
+        "--max-overlay-targets",
+        type=int,
+        default=1,
+        help="Maximum number of overlay targets allowed per help cycle (default 1)",
+    )
     cold_start_default = parse_env_bool(ENV_COLD_START_PRODUCTION, default=False)
     cold_start_group = parser.add_mutually_exclusive_group()
     cold_start_group.add_argument(
@@ -4697,6 +4750,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         executor = OverlayActionExecutor(
             ui_map_path=args.ui_map,
             pack_path=args.pack,
+            max_targets=max(0, int(args.max_overlay_targets)),
             dry_run=bool(args.dry_run_overlay),
             session_id=args.session_id,
             event_sink=store.append,
@@ -4724,6 +4778,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             vision_mode="live",
             vision_sync_window_ms=vision_sync_window_ms,
             vision_trigger_wait_ms=vision_trigger_wait_ms,
+            max_overlay_targets=max(0, int(args.max_overlay_targets)),
         )
 
         stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
