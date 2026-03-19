@@ -180,6 +180,10 @@ def test_build_composite_panel_config_converts_wsl_mount_output_root_to_windows_
     assert "output_root = [[C:\\Users\\tester\\Saved Games\\DCS\\SimTutor\\frames]]" in config
 
 
+def test_format_lua_path_converts_wsl_mount_root_to_windows_drive_root() -> None:
+    assert _format_lua_path(Path("/mnt/c")) == "C:\\"
+
+
 def test_install_composite_panel_config_is_idempotent(tmp_path: Path) -> None:
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
 

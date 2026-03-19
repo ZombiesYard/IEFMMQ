@@ -116,7 +116,7 @@ def _format_lua_path(path: Path) -> str:
     # mounts into Windows drive paths so the generated Lua config remains readable by DCS.
     # For native Windows paths, `str(resolved)` is already correct. We intentionally keep
     # the plain-path fallback for local tests that use temporary POSIX directories.
-    if len(parts) >= 4 and parts[1] == "mnt" and len(parts[2]) == 1 and parts[2].isalpha():
+    if len(parts) >= 3 and parts[1] == "mnt" and len(parts[2]) == 1 and parts[2].isalpha():
         drive = parts[2].upper()
         suffix = "\\".join(parts[3:])
         return f"{drive}:\\{suffix}" if suffix else f"{drive}:\\"
