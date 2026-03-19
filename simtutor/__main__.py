@@ -617,11 +617,11 @@ def main() -> int:
         return 0
     if args.command == "live-dcs":
         from live_dcs import main as _live_dcs_main
-
+	
         try:
             return _live_dcs_main(sys.argv[2:])
         except Exception as exc:
-            print(f"[LIVE_DCS] error: {exc}")
+            print(f"[LIVE_DCS] {type(exc).__name__}: {exc}", file=sys.stderr)
             return 1
     if args.command == "replay-bios":
         try:

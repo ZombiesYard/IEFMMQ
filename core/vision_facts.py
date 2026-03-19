@@ -37,6 +37,7 @@ VISION_FACT_IDS: tuple[str, ...] = (
 VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"})
 _SUPPORTED_SCHEMA_VERSIONS = {"v1"}
 _STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
+_S18_RESULT_KINDS = frozenset({"final_go", "intermediate_go", "in_test", "not_ready", "other"})
 
 
 class VisionFactsConfigError(ValueError):
@@ -219,8 +220,8 @@ def _normalize_vision_facts_config(raw: Mapping[str, Any]) -> dict[str, Any]:
         any_of = binding.get("any_of")
         normalized_any_of: list[str] = []
         if any_of is not None:
-            if not isinstance(any_of, list) or not any_of:
-                raise ValueError(f"vision step binding for {step_id} any_of must be a non-empty list")
+            if not isinstance(any_of, list):
+                raise ValueError(f"vision step binding for {step_id} any_of must be a list")
             for fact_id in any_of:
                 if not isinstance(fact_id, str) or fact_id not in facts_by_id:
                     raise ValueError(f"vision step binding for {step_id} references unsupported fact {fact_id!r}")
@@ -255,6 +256,31 @@ def normalize_fact_state(raw_state: Any) -> str:
     if isinstance(raw_state, str) and raw_state in VISION_FACT_STATES:
         return raw_state
     return "uncertain"
+
+
+def _normalize_result_kind(
+    fact_id: str,
+    raw_result_kind: Any,
+    evidence_note: str,
+) -> str | None:
+    if isinstance(raw_result_kind, str):
+        normalized = raw_result_kind.strip().lower()
+        if normalized in _S18_RESULT_KINDS:
+            return normalized
+        if normalized:
+            raise ValueError(f"vision fact {fact_id} result_kind is unsupported: {raw_result_kind!r}")
+    if fact_id != "fcs_bit_result_visible":
+        return None
+    note_lower = evidence_note.lower()
+    if "in test" in note_lower:
+        return "in_test"
+    if "not rdy" in note_lower or "not ready" in note_lower:
+        return "not_ready"
+    if "pbit go" in note_lower:
+        return "intermediate_go"
+    if "fcsa" in note_lower and "fcsb" in note_lower and "go" in note_lower:
+        return "final_go"
+    return "other"
 
 
 def normalize_vision_fact(
@@ -301,6 +327,9 @@ def normalize_vision_fact(
         "observed_at_wall_ms": observed_at_wall_ms,
         "sticky": bool(spec["sticky"]),
     }
+    result_kind = _normalize_result_kind(fact_id, raw_fact.get("result_kind"), normalized["evidence_note"])
+    if result_kind is not None:
+        normalized["result_kind"] = result_kind
     if normalized["observed_at_wall_ms"] is not None:
         normalized["expires_at_wall_ms"] = normalized["observed_at_wall_ms"] + normalized["expires_after_ms"]
     else:
@@ -459,7 +488,13 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
             continue
         fact_id = item.get("fact_id")
         if isinstance(fact_id, str) and fact_id in VISION_FACT_IDS:
-            out[fact_id] = dict(item)
+            normalized_item = dict(item)
+            evidence_note = normalized_item.get("evidence_note")
+            if isinstance(evidence_note, str) and evidence_note.strip():
+                result_kind = _normalize_result_kind(fact_id, normalized_item.get("result_kind"), evidence_note.strip())
+                if result_kind is not None:
+                    normalized_item["result_kind"] = result_kind
+            out[fact_id] = normalized_item
     return out
 
 

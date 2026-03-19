@@ -33,6 +33,27 @@ def test_vision_fact_observation_schema_accepts_uncertain_fact() -> None:
     validate_instance(payload, "vision_fact_observation")
 
 
+def test_vision_fact_observation_schema_accepts_structured_result_kind() -> None:
+    payload = VisionFactObservation(
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+        frame_ids=["1772872445010_000123"],
+        facts=[
+            VisionFact(
+                fact_id="fcs_bit_result_visible",
+                state="seen",
+                source_frame_id="1772872445010_000123",
+                confidence=0.88,
+                expires_after_ms=600000,
+                evidence_note="Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                result_kind="final_go",
+            )
+        ],
+    ).to_dict()
+
+    validate_instance(payload, "vision_fact_observation")
+
+
 def test_vision_fact_observation_schema_accepts_all_fact_ids() -> None:
     payload = VisionFactObservation(
         session_id="sess-live",

@@ -635,6 +635,7 @@ def test_infer_step_holds_s18_when_only_fcsmc_pbit_result_page_is_seen(
                 "fact_id": "fcs_bit_result_visible",
                 "state": "seen",
                 "evidence_note": "Right DDI FCS-MC page shows final results: FCSA PBIT GO and FCSB PBIT GO.",
+                "result_kind": "intermediate_go",
             },
         ],
     )
@@ -664,6 +665,7 @@ def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
                 "fact_id": "fcs_bit_result_visible",
                 "state": "seen",
                 "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                "result_kind": "final_go",
             },
         ],
     )

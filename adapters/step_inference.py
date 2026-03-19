@@ -894,17 +894,7 @@ def _vision_fact_state_is_seen(fact: Mapping[str, Any] | None) -> bool:
 
 
 def _is_s18_final_go_result_fact(fact: Mapping[str, Any]) -> bool:
-    evidence_note = fact.get("evidence_note")
-    if not isinstance(evidence_note, str) or not evidence_note.strip():
-        return False
-    note_lower = evidence_note.lower()
-    if "pbit go" in note_lower:
-        return False
-    if "in test" in note_lower:
-        return False
-    if "not rdy" in note_lower or "not ready" in note_lower:
-        return False
-    return "fcsa" in note_lower and "fcsb" in note_lower and "go" in note_lower
+    return fact.get("result_kind") == "final_go"
 
 
 def _is_soft_block_from_rule(

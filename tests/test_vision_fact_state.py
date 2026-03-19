@@ -10,6 +10,7 @@ from core.vision_facts import (
     VisionFactsConfigError,
     build_vision_fact_summary,
     default_vision_facts_path,
+    extract_vision_fact_snapshot,
     facts_satisfy_step_binding,
     load_vision_facts_config,
     merge_vision_fact_observation,
@@ -340,6 +341,39 @@ def test_load_vision_facts_config_rejects_empty_all_of_binding(tmp_path: Path) -
         load_vision_facts_config(path)
 
 
+def test_load_vision_facts_config_allows_explicit_empty_any_of_binding(tmp_path: Path) -> None:
+    path = tmp_path / "vision_facts.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "v1",
+                "layout_id": "custom_layout",
+                "facts": [
+                    {
+                        "fact_id": "fcs_page_visible",
+                        "sticky": False,
+                        "expires_after_ms": 1234,
+                    }
+                ],
+                "step_bindings": {
+                    "S15": {
+                        "all_of": ["fcs_page_visible"],
+                        "any_of": [],
+                    }
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_vision_facts_config(path)
+
+    assert config["step_bindings"]["S15"]["all_of"] == ("fcs_page_visible",)
+    assert config["step_bindings"]["S15"]["any_of"] == ()
+
+
 def test_load_vision_facts_config_rejects_string_intended_regions(tmp_path: Path) -> None:
     path = tmp_path / "vision_facts.yaml"
     path.write_text(
@@ -431,3 +465,17 @@ def test_facts_satisfy_step_binding_supports_any_of_right_ddi_equivalents() -> N
     }
 
     assert facts_satisfy_step_binding(snapshot, step_id="S08", config=config) is True
+
+
+def test_extract_vision_fact_snapshot_backfills_structured_s18_result_kind() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"

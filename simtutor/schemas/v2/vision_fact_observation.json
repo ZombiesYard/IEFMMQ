@@ -95,6 +95,10 @@
             "minLength": 1,
             "maxLength": 240
           },
+          "result_kind": {
+            "type": ["string", "null"],
+            "enum": ["final_go", "intermediate_go", "in_test", "not_ready", "other", null]
+          },
           "observed_at_wall_ms": {
             "type": ["integer", "null"],
             "minimum": 0

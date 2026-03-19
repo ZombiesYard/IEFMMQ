@@ -106,7 +106,9 @@ python live_dcs.py \
 ```
 
 Run the local vision sidecar on the DCS host so live help can trigger an
-immediate composite-panel screenshot while the low-fps stream keeps growing:
+immediate composite-panel screenshot. By default this sidecar is help-trigger
+only; add `--capture-fps 1` or `--capture-fps 2` when you also want a continuous
+low-fps frame stream growing in the background:
 
 ```bash
 python tools/capture_vision_sidecar.py \
