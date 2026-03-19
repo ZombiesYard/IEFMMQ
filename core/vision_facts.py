@@ -491,9 +491,20 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
             normalized_item = dict(item)
             evidence_note = normalized_item.get("evidence_note")
             if isinstance(evidence_note, str) and evidence_note.strip():
-                result_kind = _normalize_result_kind(fact_id, normalized_item.get("result_kind"), evidence_note.strip())
+                try:
+                    result_kind = _normalize_result_kind(
+                        fact_id,
+                        normalized_item.get("result_kind"),
+                        evidence_note.strip(),
+                    )
+                except ValueError:
+                    # Best-effort snapshot extraction should stay resilient to
+                    # partially-invalid or untrusted vision fact payloads.
+                    result_kind = _normalize_result_kind(fact_id, None, evidence_note.strip())
                 if result_kind is not None:
                     normalized_item["result_kind"] = result_kind
+                else:
+                    normalized_item.pop("result_kind", None)
             out[fact_id] = normalized_item
     return out
 

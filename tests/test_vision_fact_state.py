@@ -479,3 +479,33 @@ def test_extract_vision_fact_snapshot_backfills_structured_s18_result_kind() -> 
     )
 
     assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+
+
+def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_from_note() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "result_kind": "bad-value",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+
+
+def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_cannot_backfill() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "left_ddi_fcs_page_button_visible",
+                "state": "seen",
+                "result_kind": "bad-value",
+                "evidence_note": "FCS label visible on the left DDI menu.",
+            }
+        ]
+    )
+
+    assert "result_kind" not in snapshot["left_ddi_fcs_page_button_visible"]
