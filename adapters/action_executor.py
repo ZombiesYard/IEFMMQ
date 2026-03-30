@@ -197,6 +197,29 @@ class OverlayActionExecutor:
         report.rejected.append(detail)
         self._emit("overlay_failed", detail)
 
+    def _preview_highlight_intent(self, action: Mapping[str, Any] | Any) -> tuple[dict[str, Any] | None, str | None]:
+        if not isinstance(action, Mapping):
+            return None, "invalid_action_payload"
+        if action.get("type") != "overlay":
+            return None, "rejected_non_overlay_action"
+        if action.get("evidence_required") is True:
+            raw_refs = action.get("evidence_refs")
+            if not isinstance(raw_refs, list):
+                return None, "overlay_missing_evidence_refs"
+            evidence_refs = [ref for ref in raw_refs if isinstance(ref, str) and ref]
+            if not evidence_refs:
+                return None, "overlay_missing_evidence_refs"
+        target = action.get("target")
+        if not isinstance(target, str) or not target:
+            return None, "invalid_overlay_target"
+        if target not in self._allowlist:
+            return None, "overlay_target_not_in_allowlist"
+        try:
+            intent = self._planner.plan(target, intent="highlight")
+        except (KeyError, ValueError):
+            return None, "overlay_target_unmappable"
+        return {"target": target, "intent": intent}, None
+
     def execute_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> ActionExecutionReport:
         report = ActionExecutionReport()
         executed_count = 0
@@ -206,18 +229,10 @@ class OverlayActionExecutor:
 
         if callable(push_preserve_targets) and callable(pop_preserve_targets) and self.max_targets > 1:
             for action in actions:
-                if not isinstance(action, Mapping):
+                preview, reason = self._preview_highlight_intent(action)
+                if preview is None or reason is not None:
                     continue
-                if action.get("type") != "overlay":
-                    continue
-                target = action.get("target")
-                if not isinstance(target, str) or not target or target not in self._allowlist:
-                    continue
-                try:
-                    intent = self._planner.plan(target, intent="highlight")
-                except (KeyError, ValueError):
-                    continue
-                preserve_targets.append(intent.element_id)
+                preserve_targets.append(preview["intent"].element_id)
                 if len(preserve_targets) >= self.max_targets:
                     break
 
@@ -228,33 +243,12 @@ class OverlayActionExecutor:
 
         try:
             for idx, action in enumerate(actions):
-                if not isinstance(action, Mapping):
-                    self._reject(report, reason="invalid_action_payload", action_idx=idx, action=action)
+                preview, reason = self._preview_highlight_intent(action)
+                if preview is None:
+                    self._reject(report, reason=reason or "invalid_action_payload", action_idx=idx, action=action)
                     continue
-
-                action_type = action.get("type")
-                if action_type != "overlay":
-                    self._reject(report, reason="rejected_non_overlay_action", action_idx=idx, action=action)
-                    continue
-
-                if action.get("evidence_required") is True:
-                    raw_refs = action.get("evidence_refs")
-                    if not isinstance(raw_refs, list):
-                        self._reject(report, reason="overlay_missing_evidence_refs", action_idx=idx, action=action)
-                        continue
-                    evidence_refs = [ref for ref in raw_refs if isinstance(ref, str) and ref]
-                    if not evidence_refs:
-                        self._reject(report, reason="overlay_missing_evidence_refs", action_idx=idx, action=action)
-                        continue
-
-                target = action.get("target")
-                if not isinstance(target, str) or not target:
-                    self._reject(report, reason="invalid_overlay_target", action_idx=idx, action=action)
-                    continue
-
-                if target not in self._allowlist:
-                    self._reject(report, reason="overlay_target_not_in_allowlist", action_idx=idx, action=action)
-                    continue
+                target = preview["target"]
+                intent = preview["intent"]
 
                 if executed_count >= self.max_targets:
                     drop_detail = {
@@ -265,11 +259,6 @@ class OverlayActionExecutor:
                     report.dropped.append(drop_detail)
                     continue
 
-                try:
-                    intent = self._planner.plan(target, intent="highlight")
-                except (KeyError, ValueError):
-                    self._reject(report, reason="overlay_target_unmappable", action_idx=idx, action=action)
-                    continue
                 if self.dry_run:
                     preview = {
                         "target": target,

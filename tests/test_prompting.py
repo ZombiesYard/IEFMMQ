@@ -103,6 +103,18 @@ def test_prompt_metadata_records_max_overlay_targets() -> None:
     ]
 
 
+def test_prompt_explicitly_disables_overlay_when_max_targets_zero() -> None:
+    result = build_help_prompt_result(_base_context(), "en", max_overlay_targets=0)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert payload["overlay_target_policy"]["max_targets"] == 0
+    assert payload["overlay_target_policy"]["mode"] == "overlay_disabled"
+    assert payload["output_example_json"]["overlay"]["targets"] == []
+    assert payload["output_example_json"]["overlay"]["evidence"] == []
+    assert 'overlay":{"targets":[],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]}' not in result.prompt
+    assert "overlay.targets=[] and overlay.evidence=[]" in result.prompt
+
+
 def test_prompt_includes_explicit_interaction_policy_and_target_hints() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S05"]

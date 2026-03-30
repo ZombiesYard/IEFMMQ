@@ -246,6 +246,51 @@ def test_executor_with_auto_clear_preserves_multi_target_batch_and_clears_both_o
     assert [item["target"] for item in second_report.executed] == ["apu_switch"]
 
 
+def test_executor_preserve_prepass_ignores_invalid_evidence_actions(monkeypatch) -> None:
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsOverlaySender(auto_clear=True, ack_enabled=False)
+    executor = OverlayActionExecutor(sender=sender, max_targets=2)
+
+    first_report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "fcs_bit_switch",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.fcs_bit_switch"],
+            }
+        ]
+    )
+    assert [item["target"] for item in first_report.executed] == ["fcs_bit_switch"]
+
+    second_report = executor.execute_actions(
+        [
+            {
+                "type": "overlay",
+                "target": "right_mdi_pb5",
+                "evidence_required": True,
+                "evidence_refs": [],
+            },
+            {
+                "type": "overlay",
+                "target": "apu_switch",
+                "evidence_required": True,
+                "evidence_refs": ["RECENT_UI_TARGETS.apu_switch"],
+            },
+        ]
+    )
+
+    cmds = [decode_overlay_command(item[0]) for item in dummy.sent]
+    assert [(cmd["action"], cmd["target"]) for cmd in cmds] == [
+        ("highlight", "pnt_470"),
+        ("clear", "pnt_470"),
+        ("highlight", "pnt_375"),
+    ]
+    assert [item["target"] for item in second_report.executed] == ["apu_switch"]
+    assert second_report.rejected[0]["reason"] == "overlay_missing_evidence_refs"
+
+
 def test_executor_rejects_overlay_target_not_in_allowlist(monkeypatch) -> None:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)

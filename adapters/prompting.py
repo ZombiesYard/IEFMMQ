@@ -598,7 +598,12 @@ def _build_overlay_target_priority(
 
 def _build_overlay_target_policy(priority_targets: list[str], *, max_targets: int = 1) -> dict[str, Any]:
     effective_max_targets = max(0, int(max_targets))
-    mode = "single_target_preferred" if effective_max_targets <= 1 else "multi_target_allowed"
+    if effective_max_targets == 0:
+        mode = "overlay_disabled"
+    elif effective_max_targets == 1:
+        mode = "single_target_preferred"
+    else:
+        mode = "multi_target_allowed"
     return {
         "mode": mode,
         "max_targets": effective_max_targets,
@@ -1064,10 +1069,14 @@ def _build_multimodal_input_payload(context: Mapping[str, Any]) -> dict[str, Any
 
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     targets_shape = '["..."]'
+    evidence_shape = '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
     overlay_policy = payload.get("overlay_target_policy")
     if isinstance(overlay_policy, Mapping):
         max_targets = overlay_policy.get("max_targets")
-        if isinstance(max_targets, int) and max_targets > 1:
+        if isinstance(max_targets, int) and max_targets <= 0:
+            targets_shape = "[]"
+            evidence_shape = "[]"
+        elif isinstance(max_targets, int) and max_targets > 1:
             targets_shape = '["...","..."]'
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -1078,7 +1087,7 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
         "Output must follow this schema shape exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
-        f'"overlay":{{"targets":{targets_shape},"evidence":[{{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}}]}},'
+        f'"overlay":{{"targets":{targets_shape},"evidence":{evidence_shape}}},'
         '"explanations":["..."],'
         '"confidence":0.0}'
     )
@@ -1147,8 +1156,10 @@ def build_help_prompt_result(
             "必须从 allowed_error_categories 中选择 diagnosis.error_category。",
             "overlay.evidence.type 必须从 allowed_overlay_evidence_types 中选择。",
             (
-                "最多只返回 1 个 overlay target；必须优先选择 overlay_target_policy.candidate_targets_in_priority_order 中最靠前且证据最强的 target。"
-                if effective_max_overlay_targets <= 1
+                "当前系统禁用 overlay；overlay.targets 必须返回 []，overlay.evidence 也必须返回 []。"
+                if effective_max_overlay_targets == 0
+                else "最多只返回 1 个 overlay target；必须优先选择 overlay_target_policy.candidate_targets_in_priority_order 中最靠前且证据最强的 target。"
+                if effective_max_overlay_targets == 1
                 else f"最多返回 {effective_max_overlay_targets} 个 overlay target；必须优先选择 overlay_target_policy.candidate_targets_in_priority_order 中最靠前且证据最强的 target。"
             ),
             "只允许引用 EVIDENCE_SOURCES 中出现的 ref。",
@@ -1172,8 +1183,10 @@ def build_help_prompt_result(
             "对于 S18，要明确区分流程：先在 BIT FAILURES / BIT root 页面按 PB5 进入 FCS-MC BIT 页，再按住 FCS BIT 开关并同时按 PB5 启动自检。VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持，不表示 off。仅仅看到 FCS-MC、PBIT GO、FCSA/FCSB PBIT GO、NOT RDY 或 IN TEST，都不代表 S18 已完成；只有明确的最终 GO 结果才算完成。若右 DDI 能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 已成立。",
             "S18 分阶段判断时必须遵守：若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC，不得要求先按住 FCS BIT 开关，也不要把 fcs_bit_switch 当成主高亮。",
             (
-                "S18 分阶段判断时必须遵守：若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步；当前系统是单目标模式，因此这一步应优先高亮 fcs_bit_switch，并在 explanation 中明确同时按 PB5。"
-                if effective_max_overlay_targets <= 1
+                "S18 分阶段判断时必须遵守：当前系统禁用 overlay，因此即使识别出可操作目标，也必须返回空的 overlay.targets 与 overlay.evidence，并仅在 explanation 中说明动作。"
+                if effective_max_overlay_targets == 0
+                else "S18 分阶段判断时必须遵守：若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步；当前系统是单目标模式，因此这一步应优先高亮 fcs_bit_switch，并在 explanation 中明确同时按 PB5。"
+                if effective_max_overlay_targets == 1
                 else "S18 分阶段判断时必须遵守：若已经进入 FCS-MC 页面但还未开始测试，且当前系统允许多目标，则 overlay.targets 必须同时返回 fcs_bit_switch 与 right_mdi_pb5，不能只返回其中一个。"
             ),
             "S18 的“按住 FCS BIT 开关并按 PB5”仅用于启动 BIT，不得指导用户在整个测试过程中持续按住 FCS BIT 开关；若需要描述操作，应表述为“按住开关并同时按 PB5 以启动测试，看到测试开始后即可松开”，不得写“持续按住直到测试完成”。",
@@ -1185,8 +1198,10 @@ def build_help_prompt_result(
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
             "若 deterministic_step_hint.requires_visual_confirmation=false 且 deterministic_step_hint.observability_status=observable，不得把“视觉不可用”或“缺乏变量证据”当作主要理由；应优先依据 gates_summary、current_vars_selected 与 missing_conditions 解释当前缺失条件。",
             (
-                "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认，且 overlay 仍只能返回单目标。"
-                if effective_max_overlay_targets <= 1
+                "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认；当前系统禁用 overlay，因此仍必须返回空 targets 与空 evidence。"
+                if effective_max_overlay_targets == 0
+                else "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认，且 overlay 仍只能返回单目标。"
+                if effective_max_overlay_targets == 1
                 else "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认；overlay.targets 数量仍不得超过 overlay_target_policy.max_targets。"
             ),
             "若 uncertainty_policy.unknown 生效：必须返回空 targets 和空 evidence，并要求确认，不得猜测高亮。",
@@ -1206,8 +1221,10 @@ def build_help_prompt_result(
             "diagnosis.error_category must be chosen from allowed_error_categories.",
             "overlay.evidence.type must be chosen from allowed_overlay_evidence_types.",
             (
-                "Return at most one overlay target. Pick the highest-confidence target from overlay_target_policy.candidate_targets_in_priority_order."
-                if effective_max_overlay_targets <= 1
+                "Overlay is disabled for this request. You must return overlay.targets=[] and overlay.evidence=[]."
+                if effective_max_overlay_targets == 0
+                else "Return at most one overlay target. Pick the highest-confidence target from overlay_target_policy.candidate_targets_in_priority_order."
+                if effective_max_overlay_targets == 1
                 else f"Return at most {effective_max_overlay_targets} overlay targets. Pick the strongest targets from overlay_target_policy.candidate_targets_in_priority_order."
             ),
             "Only refs that appear in EVIDENCE_SOURCES are allowed.",
@@ -1231,8 +1248,10 @@ def build_help_prompt_result(
             "For S18, model the sequence explicitly: first press PB5 on the BIT FAILURES / BIT root page to enter the FCS-MC BIT page, then hold the FCS BIT switch and press PB5 to start the self-test. VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up/engaged, not off. Seeing FCS-MC, PBIT GO, FCSA/FCSB PBIT GO, NOT RDY, or IN TEST does not mean S18 is complete; only a clear final GO result counts as completion. If the right DDI clearly shows both FCSA=GO and FCSB=GO at the same time, treat that as sufficient final-GO evidence.",
             "When reasoning about S18, obey this stage split: if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC. Do not ask the user to hold the FCS BIT switch first, and do not make fcs_bit_switch the primary overlay on the root page.",
             (
-                "When reasoning about S18, obey this stage split: only after the right DDI has entered the FCS-MC page but before the BIT has started should you describe the action as 'hold FCS BIT and press PB5'. The current system is single-target only, so prefer highlighting fcs_bit_switch and state explicitly that PB5 must be pressed at the same time."
-                if effective_max_overlay_targets <= 1
+                "When reasoning about S18, overlay is disabled for this request. Even if you identify the next control correctly, keep overlay.targets=[] and overlay.evidence=[] and explain the action in text only."
+                if effective_max_overlay_targets == 0
+                else "When reasoning about S18, obey this stage split: only after the right DDI has entered the FCS-MC page but before the BIT has started should you describe the action as 'hold FCS BIT and press PB5'. The current system is single-target only, so prefer highlighting fcs_bit_switch and state explicitly that PB5 must be pressed at the same time."
+                if effective_max_overlay_targets == 1
                 else "When reasoning about S18, obey this stage split: only after the right DDI has entered the FCS-MC page but before the BIT has started, and multi-target overlay is allowed, overlay.targets must include both fcs_bit_switch and right_mdi_pb5 together; do not return only one of them."
             ),
             "For S18, 'hold FCS BIT and press PB5' is only the BIT start action. Do not instruct the user to keep holding the FCS BIT switch for the entire test. If you describe the action, say to hold the switch while pressing PB5 to start the test, then release it once the BIT has started; never say 'hold it until the test completes'.",
@@ -1244,8 +1263,10 @@ def build_help_prompt_result(
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
             "If deterministic_step_hint.requires_visual_confirmation=false and deterministic_step_hint.observability_status=observable, do not use 'vision unavailable' or 'missing variable evidence' as the main reason; explain the missing condition from gates_summary, current_vars_selected, and missing_conditions instead.",
             (
-                "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation and overlay stays single-target only."
-                if effective_max_overlay_targets <= 1
+                "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation; overlay is disabled, so keep overlay.targets=[] and overlay.evidence=[]."
+                if effective_max_overlay_targets == 0
+                else "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation and overlay stays single-target only."
+                if effective_max_overlay_targets == 1
                 else "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation and overlay.targets must still stay within overlay_target_policy.max_targets."
             ),
             "If uncertainty_policy.unknown applies, keep overlay.targets=[] and overlay.evidence=[], then ask for confirmation instead of guessing.",
@@ -1314,7 +1335,7 @@ def build_help_prompt_result(
             example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
             if isinstance(example_target, str) and example_target:
                 example_targets.append(example_target)
-        if not allowed_refs:
+        if not allowed_refs or effective_max_overlay_targets == 0:
             example_targets = []
         example_overlay_evidence: list[dict[str, Any]] = []
         if example_targets:
@@ -1422,11 +1443,22 @@ def build_help_prompt_result(
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
-        compact_targets_example = '["..."]' if effective_max_overlay_targets <= 1 else '["...","..."]'
+        compact_targets_example = (
+            "[]"
+            if effective_max_overlay_targets == 0
+            else '["..."]'
+            if effective_max_overlay_targets == 1
+            else '["...","..."]'
+        )
+        compact_evidence_example = (
+            "[]"
+            if effective_max_overlay_targets == 0
+            else '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
+        )
         compact_schema_line = (
             'Output shape={"diagnosis":{"step_id":"...","error_category":"..."},'
             '"next":{"step_id":"..."},'
-            f'"overlay":{{"targets":{compact_targets_example},"evidence":[{{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}}]}},'
+            f'"overlay":{{"targets":{compact_targets_example},"evidence":{compact_evidence_example}}},'
             '"explanations":["..."],'
             '"confidence":0.0}'
         )
@@ -1434,7 +1466,7 @@ def build_help_prompt_result(
             compact_schema_line = (
                 '输出形状={"diagnosis":{"step_id":"...","error_category":"..."},'
                 '"next":{"step_id":"..."},'
-                f'"overlay":{{"targets":{compact_targets_example},"evidence":[{{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}}]}},'
+                f'"overlay":{{"targets":{compact_targets_example},"evidence":{compact_evidence_example}}},'
                 '"explanations":["..."],'
                 '"confidence":0.0}'
             )
