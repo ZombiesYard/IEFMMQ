@@ -929,9 +929,9 @@ def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
     zh_result = build_help_prompt_result(ctx, "zh")
     en_result = build_help_prompt_result(ctx, "en")
 
-    assert "若右 DDI 能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 已成立" in zh_result.prompt
-    assert "If the right DDI clearly shows both FCSA=GO and FCSB=GO at the same time" in en_result.prompt
-    assert "clearly reading both FCSA=GO and FCSB=GO is sufficient final-GO evidence" in en_result.prompt
+    assert "必须同时明确读到 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO" in zh_result.prompt
+    assert "Treat S18 as complete only when the right DDI clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together" in en_result.prompt
+    assert "partial GO evidence is not enough either" in en_result.prompt
 
 
 def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:
@@ -1048,6 +1048,7 @@ def test_prompt_contains_multi_target_output_shape_when_enabled() -> None:
 
     assert payload["output_example_json"]["overlay"]["targets"] == ["apu_switch", "battery_switch"]
     assert len(payload["output_example_json"]["overlay"]["evidence"]) == 2
+    assert "Their lengths may range from 0 to 2 for this request" in prompt
     assert (
         '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...",'
         '"ref":"...","quote":"...","grounding_confidence":0.0},{"target":"...","type":"...",'
@@ -1067,8 +1068,10 @@ def test_prompt_compact_schema_uses_multi_target_evidence_shape_when_enabled() -
     assert result.metadata["prompt_trimmed"] is True
     assert "compact_template" in result.metadata["trim_reasons"]
     assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert "overlay arrays may contain 0..2 items for this request" in result.prompt
     assert (
-        'Output shape={"diagnosis":{"step_id":"...","error_category":"..."},'
+        'Output shape (overlay arrays may contain 0..2 items for this request; the example below shows the maximum allowed array length)='
+        '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
         '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
         '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'

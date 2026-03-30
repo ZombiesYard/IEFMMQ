@@ -1070,17 +1070,31 @@ def _build_multimodal_input_payload(context: Mapping[str, Any]) -> dict[str, Any
 def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> str:
     targets_shape = '["..."]'
     evidence_shape = '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
+    array_length_note = (
+        "overlay.targets and overlay.evidence are arrays. Their lengths may range from 0 to 1 for this request; the schema below illustrates the allowed item shape."
+    )
     overlay_policy = payload.get("overlay_target_policy")
     if isinstance(overlay_policy, Mapping):
         max_targets = overlay_policy.get("max_targets")
         if isinstance(max_targets, int) and max_targets <= 0:
             targets_shape = "[]"
             evidence_shape = "[]"
+            array_length_note = (
+                "overlay.targets and overlay.evidence are disabled for this request and must both be empty arrays."
+            )
         elif isinstance(max_targets, int) and max_targets > 1:
-            targets_shape = '["...","..."]'
+            targets_shape = "[" + ",".join('"..."' for _ in range(max_targets)) + "]"
             evidence_shape = (
-                '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
-                '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
+                "["
+                + ",".join(
+                    '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}'
+                    for _ in range(max_targets)
+                )
+                + "]"
+            )
+            array_length_note = (
+                "overlay.targets and overlay.evidence are arrays. Their lengths may range from 0 to "
+                f"{max_targets} for this request; the schema below illustrates the maximum allowed array length, not a requirement to fill every slot."
             )
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -1088,7 +1102,8 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
         f"Rules:\n{rendered_rules}\n"
         f"Context and constraints JSON:\n"
         f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
-        "Output must follow this schema shape exactly:\n"
+        f"{array_length_note}\n"
+        "Output must follow this JSON object structure exactly:\n"
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
         f'"overlay":{{"targets":{targets_shape},"evidence":{evidence_shape}}},'
@@ -1184,7 +1199,7 @@ def build_help_prompt_result(
             "只有当左 DDI 真正显示 FCS 页面主体时，才能把 vision_facts.fcs_page_visible 当成已满足；这类主体特征应包括 LEF/TEF/AIL/RUD 等控制面名称与姿态/上下方向提示、飞控通道格子/网格、SV1/SV2 等通道区域。若这些主体特征看不到，就不能说 FCS 页面已显示，也不能说 S08 已完成。",
             "对于 S08，右 DDI 只能把顶层 BIT root 页面的证据当作完成条件；bit_page_visible、bit_root_page_visible、bit_page_failure_visible 可以算完成，而 right_ddi_fcsmc_page_visible、fcs_bit_result_visible 不可以。BIT FAILURES 页面就是 BIT root 页面，上电后默认就会看到这行字。",
             "对于 FCS RESET：在未 reset 或 reset 未完成时，FCS 页面里的 SV1/SV2 等飞控通道格子通常仍有大量 X/故障填充；只有这些 X 大部分已经清空，才可视为 fcs_reset_seen 或 reset 后状态成立。",
-            "对于 S18，要明确区分流程：先在 BIT FAILURES / BIT root 页面按 PB5 进入 FCS-MC BIT 页，再按住 FCS BIT 开关并同时按 PB5 启动自检。VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持，不表示 off。仅仅看到 FCS-MC、PBIT GO、FCSA/FCSB PBIT GO、NOT RDY 或 IN TEST，都不代表 S18 已完成；只有明确的最终 GO 结果才算完成。若右 DDI 能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 已成立。",
+            "对于 S18，要明确区分流程：先在 BIT FAILURES / BIT root 页面按 PB5 进入 FCS-MC BIT 页，再按住 FCS BIT 开关并同时按 PB5 启动自检。VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持，不表示 off。仅仅看到 FCS-MC、PBIT GO、FCSA/FCSB PBIT GO、NOT RDY 或 IN TEST，都不代表 S18 已完成；只有右 DDI 明确显示 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO，且没有 PBIT GO/IN TEST/NOT RDY 等中间态时，才算明确的最终 GO 结果。",
             "S18 分阶段判断时必须遵守：若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC，不得要求先按住 FCS BIT 开关，也不要把 fcs_bit_switch 当成主高亮。",
             (
                 "S18 分阶段判断时必须遵守：当前系统禁用 overlay，因此即使识别出可操作目标，也必须返回空的 overlay.targets 与 overlay.evidence，并仅在 explanation 中说明动作。"
@@ -1195,7 +1210,7 @@ def build_help_prompt_result(
             ),
             "S18 的“按住 FCS BIT 开关并按 PB5”仅用于启动 BIT，不得指导用户在整个测试过程中持续按住 FCS BIT 开关；若需要描述操作，应表述为“按住开关并同时按 PB5 以启动测试，看到测试开始后即可松开”，不得写“持续按住直到测试完成”。",
             "S18 分阶段判断时必须遵守：若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO 或其他明显测试进行中/中间结果，说明测试已经开始；即使此时 VARS.fcs_bit_switch_up=false，也不能仅凭该变量退回去要求重新按住开关。",
-            "S18 分阶段判断时必须遵守：只有当右 DDI 明确显示最终 GO 结果时，才能说 S18 完成并推进到下一步；FCSA/FCSB PBIT GO 不等于最终 GO，但若能同时明确读到 FCSA=GO 与 FCSB=GO，则可视为最终 GO。",
+            "S18 分阶段判断时必须遵守：只有当右 DDI 明确显示最终 GO 结果时，才能说 S18 完成并推进到下一步；FCSA/FCSB PBIT GO 不等于最终 GO，仅看到部分 GO（例如只有 FCSA/FCSB=GO 而看不到 MC1/MC2 的最终 GO 指示）也不够。必须同时明确读到 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO，且没有中间态标记，才能视为最终 GO。",
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段；必须把它与右 DDI 当前页面状态一起解释。若页面状态不可确认，也不能把 root 页面、FCS-MC 页面、测试进行中、测试完成互相混淆。",
             "区分 S08 与 S18 时，可结合左 DDI FCS 页面中的 X 填充：S08 阶段由于尚未完成后续 FCS 流程，飞控通道格子里仍可能有大量 X；若仍看到大量 X，不要把后续 FCS BIT 完成误判为已满足。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
@@ -1249,7 +1264,7 @@ def build_help_prompt_result(
             "Treat vision_facts.fcs_page_visible as satisfied only when the left DDI clearly shows the actual FCS page body. Strong anchors include LEF/TEF/AIL/RUD control-surface labels with orientation cues, the flight-control channel boxes/grid, and SV1/SV2 channel areas. If those body cues are absent, do not claim the FCS page is visible and do not claim S08 is complete.",
             "For S08, only top-level BIT root-page evidence on the right DDI may satisfy completion: bit_page_visible, bit_root_page_visible, or bit_page_failure_visible. right_ddi_fcsmc_page_visible and fcs_bit_result_visible belong to the later S18 FCS BIT flow and must not complete S08. The BIT FAILURES page is the BIT root page and is the default powered-up right-DDI page.",
             "For FCS RESET, before reset or while reset is incomplete, the FCS page often still shows many X/fault fills across SV1/SV2 or other flight-control channel boxes. Only when those X marks are mostly cleared may you treat fcs_reset_seen or the post-reset state as satisfied.",
-            "For S18, model the sequence explicitly: first press PB5 on the BIT FAILURES / BIT root page to enter the FCS-MC BIT page, then hold the FCS BIT switch and press PB5 to start the self-test. VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up/engaged, not off. Seeing FCS-MC, PBIT GO, FCSA/FCSB PBIT GO, NOT RDY, or IN TEST does not mean S18 is complete; only a clear final GO result counts as completion. If the right DDI clearly shows both FCSA=GO and FCSB=GO at the same time, treat that as sufficient final-GO evidence.",
+            "For S18, model the sequence explicitly: first press PB5 on the BIT FAILURES / BIT root page to enter the FCS-MC BIT page, then hold the FCS BIT switch and press PB5 to start the self-test. VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up/engaged, not off. Seeing FCS-MC, PBIT GO, FCSA/FCSB PBIT GO, NOT RDY, or IN TEST does not mean S18 is complete; only a clear final GO result counts as completion. Treat S18 as complete only when the right DDI clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together, with no intermediate markers such as PBIT GO, IN TEST, or NOT RDY.",
             "When reasoning about S18, obey this stage split: if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC. Do not ask the user to hold the FCS BIT switch first, and do not make fcs_bit_switch the primary overlay on the root page.",
             (
                 "When reasoning about S18, overlay is disabled for this request. Even if you identify the next control correctly, keep overlay.targets=[] and overlay.evidence=[] and explain the action in text only."
@@ -1260,7 +1275,7 @@ def build_help_prompt_result(
             ),
             "For S18, 'hold FCS BIT and press PB5' is only the BIT start action. Do not instruct the user to keep holding the FCS BIT switch for the entire test. If you describe the action, say to hold the switch while pressing PB5 to start the test, then release it once the BIT has started; never say 'hold it until the test completes'.",
             "When reasoning about S18, obey this stage split: if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO, or another obvious test-in-progress/intermediate state, the BIT has already started. Even if VARS.fcs_bit_switch_up=false at that moment, do not regress to telling the user to hold the switch again based on that variable alone.",
-            "When reasoning about S18, obey this stage split: only a clear final GO result means S18 is complete and may advance. FCSA/FCSB PBIT GO is not the same as the final GO result, but clearly reading both FCSA=GO and FCSB=GO is sufficient final-GO evidence.",
+            "When reasoning about S18, obey this stage split: only a clear final GO result means S18 is complete and may advance. FCSA/FCSB PBIT GO is not the same as the final GO result, and partial GO evidence is not enough either. Treat S18 as complete only when the right DDI clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together, with no intermediate markers.",
             "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on. Combine it with the right-DDI page state; if the page state is uncertain, do not confuse the BIT root page, the FCS-MC page, the in-test state, and the completed final-GO state.",
             "Use the left DDI FCS-page X fills to help distinguish S08 from later FCS BIT stages: during S08 there may still be many X marks in the flight-control channel boxes; if many X marks remain, do not claim the later FCS BIT completion is satisfied.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
@@ -1465,7 +1480,8 @@ def build_help_prompt_result(
             )
         )
         compact_schema_line = (
-            'Output shape={"diagnosis":{"step_id":"...","error_category":"..."},'
+            f'Output shape (overlay arrays may contain 0..{effective_max_overlay_targets} items for this request; the example below shows the maximum allowed array length)='
+            '{"diagnosis":{"step_id":"...","error_category":"..."},'
             '"next":{"step_id":"..."},'
             f'"overlay":{{"targets":{compact_targets_example},"evidence":{compact_evidence_example}}},'
             '"explanations":["..."],'
@@ -1473,7 +1489,8 @@ def build_help_prompt_result(
         )
         if lang == "zh":
             compact_schema_line = (
-                '输出形状={"diagnosis":{"step_id":"...","error_category":"..."},'
+                f'输出形状（本次请求的 overlay 数组长度可为 0..{effective_max_overlay_targets}；下方仅展示允许的最大数组长度示例）='
+                '{"diagnosis":{"step_id":"...","error_category":"..."},'
                 '"next":{"step_id":"..."},'
                 f'"overlay":{{"targets":{compact_targets_example},"evidence":{compact_evidence_example}}},'
                 '"explanations":["..."],'
