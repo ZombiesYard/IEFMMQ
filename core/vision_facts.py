@@ -40,6 +40,8 @@ _SUPPORTED_SCHEMA_VERSIONS = {"v1"}
 _STICKY_PRESERVE_STATES = frozenset({"not_seen", "uncertain"})
 _S18_RESULT_KINDS = frozenset({"final_go", "intermediate_go", "in_test", "not_ready", "other"})
 _S18_GO_NEGATIVE_RE = re.compile(r"\bno\s+go\b", re.IGNORECASE)
+_S18_MC1_GO_RE = re.compile(r"\bmc1\b\s*[:=]?\s*go\b", re.IGNORECASE)
+_S18_MC2_GO_RE = re.compile(r"\bmc2\b\s*[:=]?\s*go\b", re.IGNORECASE)
 _S18_FCSA_GO_RE = re.compile(r"\bfcsa\b\s*[:=]?\s*go\b", re.IGNORECASE)
 _S18_FCSB_GO_RE = re.compile(r"\bfcsb\b\s*[:=]?\s*go\b", re.IGNORECASE)
 
@@ -284,7 +286,12 @@ def _normalize_result_kind(
         return "intermediate_go"
     if _S18_GO_NEGATIVE_RE.search(evidence_note):
         return "other"
-    if _S18_FCSA_GO_RE.search(evidence_note) and _S18_FCSB_GO_RE.search(evidence_note):
+    if (
+        _S18_MC1_GO_RE.search(evidence_note)
+        and _S18_MC2_GO_RE.search(evidence_note)
+        and _S18_FCSA_GO_RE.search(evidence_note)
+        and _S18_FCSB_GO_RE.search(evidence_note)
+    ):
         return "final_go"
     return "other"
 
@@ -530,6 +537,21 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
                 normalized_item["result_kind"] = result_kind
             else:
                 normalized_item.pop("result_kind", None)
+            state = normalize_fact_state(normalized_item.get("state"))
+            confidence_raw = normalized_item.get("confidence", 0.0)
+            if isinstance(confidence_raw, bool) or not isinstance(confidence_raw, (int, float)):
+                confidence_value = 0.0
+            else:
+                confidence_value = max(0.0, min(1.0, float(confidence_raw)))
+            coerced_state, coerced_confidence = _coerce_s18_result_fact_state(
+                fact_id=fact_id,
+                state=state,
+                result_kind=result_kind,
+                confidence=confidence_value,
+            )
+            normalized_item["state"] = coerced_state
+            if "confidence" in normalized_item or coerced_confidence != confidence_value:
+                normalized_item["confidence"] = coerced_confidence
             out[fact_id] = normalized_item
     return out
 

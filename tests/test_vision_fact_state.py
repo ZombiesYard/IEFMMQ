@@ -117,7 +117,7 @@ def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfil
                     source_frame_id="1772872445010_000123",
                     confidence=0.95,
                     expires_after_ms=600000,
-                    evidence_note="Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                    evidence_note="Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO.",
                     result_kind="bad-value",
                 )
             ],
@@ -553,7 +553,7 @@ def test_extract_vision_fact_snapshot_backfills_structured_s18_result_kind() -> 
             {
                 "fact_id": "fcs_bit_result_visible",
                 "state": "seen",
-                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                "evidence_note": "Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO.",
             }
         ]
     )
@@ -582,12 +582,27 @@ def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_
                 "fact_id": "fcs_bit_result_visible",
                 "state": "seen",
                 "result_kind": "bad-value",
-                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                "evidence_note": "Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO.",
             }
         ]
     )
 
     assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+
+
+def test_extract_vision_fact_snapshot_does_not_backfill_final_go_from_only_fcsa_fcsb_go() -> None:
+    snapshot = extract_vision_fact_snapshot(
+        [
+            {
+                "fact_id": "fcs_bit_result_visible",
+                "state": "seen",
+                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+            }
+        ]
+    )
+
+    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
+    assert snapshot["fcs_bit_result_visible"]["state"] == "uncertain"
 
 
 def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_cannot_backfill() -> None:

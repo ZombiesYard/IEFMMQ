@@ -1078,6 +1078,10 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
             evidence_shape = "[]"
         elif isinstance(max_targets, int) and max_targets > 1:
             targets_shape = '["...","..."]'
+            evidence_shape = (
+                '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+                '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
+            )
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
         f"{header}\n"

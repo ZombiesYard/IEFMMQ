@@ -1050,6 +1050,7 @@ def test_prompt_contains_multi_target_output_shape_when_enabled() -> None:
     assert len(payload["output_example_json"]["overlay"]["evidence"]) == 2
     assert (
         '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...",'
+        '"ref":"...","quote":"...","grounding_confidence":0.0},{"target":"...","type":"...",'
         '"ref":"...","quote":"...","grounding_confidence":0.0}]}'
     ) in prompt
 
