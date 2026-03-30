@@ -103,8 +103,9 @@ def _generation_mode_from_repair_state(
     *,
     json_repaired: bool,
     repair_applied: bool,
+    evidence_ref_repair_applied: bool = False,
 ) -> str:
-    if json_repaired or repair_applied:
+    if json_repaired or repair_applied or evidence_ref_repair_applied:
         return "repair"
     return "model"
 
@@ -325,6 +326,7 @@ class BaseHelpModel(ModelPort):
                     "generation_mode": _generation_mode_from_repair_state(
                         json_repaired=extraction.json_repaired,
                         repair_applied=bool(repair_details.get("repair_applied")),
+                        evidence_ref_repair_applied=bool(evidence_ref_repair.get("repair_applied")),
                     ),
                     "latency_ms": int((perf_counter() - start) * 1000),
                     "help_response_pre_guardrail": sanitize_help_response_for_log(pre_guardrail_help_obj, lang=self.lang),

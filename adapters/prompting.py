@@ -1458,6 +1458,11 @@ def build_help_prompt_result(
             "[]"
             if effective_max_overlay_targets == 0
             else '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
+            if effective_max_overlay_targets == 1
+            else (
+                '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+                '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
+            )
         )
         compact_schema_line = (
             'Output shape={"diagnosis":{"step_id":"...","error_category":"..."},'

@@ -1055,6 +1055,28 @@ def test_prompt_contains_multi_target_output_shape_when_enabled() -> None:
     ) in prompt
 
 
+def test_prompt_compact_schema_uses_multi_target_evidence_shape_when_enabled() -> None:
+    result = build_help_prompt_result(
+        _base_context(),
+        "en",
+        max_overlay_targets=2,
+        max_prompt_chars=400,
+        max_prompt_tokens_est=120,
+    )
+
+    assert result.metadata["prompt_trimmed"] is True
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert (
+        'Output shape={"diagnosis":{"step_id":"...","error_category":"..."},'
+        '"next":{"step_id":"..."},'
+        '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+        '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
+        '"explanations":["..."],'
+        '"confidence":0.0}'
+    ) in result.prompt
+
+
 def test_prompt_lang_switch_zh_and_en() -> None:
     prompt_zh = build_help_prompt(_base_context(), "zh")
     prompt_en = build_help_prompt(_base_context(), "en")

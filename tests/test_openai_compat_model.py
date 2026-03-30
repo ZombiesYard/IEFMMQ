@@ -402,6 +402,7 @@ def test_explain_error_repairs_visual_fact_alias_to_allowed_frame_ref() -> None:
     assert res.actions[0]["evidence_refs"] == ["VISION_FACTS.bit_page_failure_visible@1773950407644_000006"]
     assert res.metadata["evidence_guardrail_applied"] is False
     assert res.metadata["evidence_ref_repair"]["repair_applied"] is True
+    assert res.metadata["generation_mode"] == "repair"
     assert res.metadata["evidence_ref_repair"]["details"][0]["from_ref"] == "VISION_FACTS.right_ddi_bit_failures_page_visible"
     assert res.metadata["evidence_ref_repair"]["details"][0]["to_ref"] == "VISION_FACTS.bit_page_failure_visible@1773950407644_000006"
     assert res.metadata["evidence_ref_repair"]["details"][0]["reason"] == "attach_single_visible_frame_id"
