@@ -204,6 +204,7 @@ end
 local function clear_target(target)
   local active = ACTIVE_BY_TARGET[target]
   if type(active) ~= "table" then
+    remove_active_order(target)
     return true, nil
   end
   local ok, err = clear_hilite_id(active.hilite_id)
@@ -247,14 +248,11 @@ end
 local function assign_hilite_id_for_target(target)
   local current = ACTIVE_BY_TARGET[target]
   if type(current) == "table" and type(current.hilite_id) == "number" then
-    remove_active_order(target)
-    ACTIVE_ORDER[#ACTIVE_ORDER + 1] = target
     return current.hilite_id, nil
   end
 
   local free_id = find_free_hilite_id()
   if free_id ~= nil then
-    ACTIVE_ORDER[#ACTIVE_ORDER + 1] = target
     return free_id, nil
   end
 
@@ -263,7 +261,6 @@ local function assign_hilite_id_for_target(target)
     if not ok then
       return nil, err
     end
-    ACTIVE_ORDER[#ACTIVE_ORDER + 1] = target
     return HILITE_IDS[1], nil
   end
 
@@ -281,6 +278,8 @@ local function do_highlight(pnt)
     return false, err
   end
   ACTIVE_BY_TARGET[pnt] = { hilite_id = hilite_id }
+  remove_active_order(pnt)
+  ACTIVE_ORDER[#ACTIVE_ORDER + 1] = pnt
   return true, nil
 end
 
