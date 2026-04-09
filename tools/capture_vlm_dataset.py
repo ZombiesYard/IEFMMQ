@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import sys
 import time
 from typing import Any, Callable
 
@@ -17,6 +18,10 @@ from PIL import Image
 from adapters.vision_capture_trigger import (
     DEFAULT_VISION_CAPTURE_TRIGGER_HOST,
     DEFAULT_VISION_CAPTURE_TRIGGER_PORT,
+)
+from adapters.windows_global_help_trigger import (
+    DEFAULT_GLOBAL_HELP_COOLDOWN_MS,
+    WindowsGlobalHelpTrigger,
 )
 from adapters.vision_frames import (
     DEFAULT_ARTIFACT_SUFFIX,
@@ -181,26 +186,96 @@ class DatasetFrameWriter:
         }
 
 
+class CaptureEventSource:
+    def poll(self) -> dict[str, Any] | None:
+        raise NotImplementedError
+
+    def close(self) -> None:
+        return
+
+
+class GlobalHelpEventSource(CaptureEventSource):
+    def __init__(
+        self,
+        *,
+        hotkey: str,
+        modifiers: str = "",
+        cooldown_ms: int = DEFAULT_GLOBAL_HELP_COOLDOWN_MS,
+        trigger: WindowsGlobalHelpTrigger | None = None,
+    ) -> None:
+        self.hotkey = str(hotkey).strip()
+        self.modifiers = str(modifiers).strip()
+        self.cooldown_ms = int(cooldown_ms)
+        self._trigger = (
+            trigger
+            if trigger is not None
+            else WindowsGlobalHelpTrigger(
+                hotkey=self.hotkey,
+                modifiers=self.modifiers,
+                cooldown_ms=self.cooldown_ms,
+            )
+        )
+        self.hotkey_label = getattr(self._trigger, "hotkey_label", self.hotkey)
+        self._started = False
+
+    def start(self) -> None:
+        self._trigger.start()
+        self._started = True
+
+    def poll(self) -> dict[str, Any] | None:
+        if hasattr(self._trigger, "poll") and self._trigger.poll():
+            return {"reason": "help", "source": "global_hotkey", "hotkey_label": self.hotkey_label}
+        return None
+
+    def request_stop(self) -> None:
+        if hasattr(self._trigger, "request_stop"):
+            self._trigger.request_stop()
+
+    def close(self) -> None:
+        if not self._started:
+            return
+        self._trigger.close()
+
+
+class UdpEventSource(CaptureEventSource):
+    def __init__(self, listener: UdpCaptureRequestListener) -> None:
+        self.listener = listener
+
+    def poll(self) -> dict[str, Any] | None:
+        payload = self.listener.poll()
+        if payload is None:
+            return None
+        return {
+            "reason": str(payload.get("reason") or "help"),
+            "source": "udp",
+        }
+
+    def close(self) -> None:
+        self.listener.close()
+
+
 class HelpTriggeredDatasetCapture:
     def __init__(
         self,
         *,
         writer: DatasetFrameWriter,
-        request_listener: UdpCaptureRequestListener | None = None,
+        event_sources: list[CaptureEventSource] | None = None,
         capture_fps: float = DEFAULT_CAPTURE_FPS,
         start_on_launch: bool = False,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        print_frame: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         normalized_capture_fps = float(capture_fps)
         if normalized_capture_fps <= 0:
             raise ValueError("capture_fps must be > 0")
         self.writer = writer
-        self.request_listener = request_listener
+        self.event_sources = list(event_sources or [])
         self.capture_interval_s = 1.0 / normalized_capture_fps
         self.start_on_launch = bool(start_on_launch)
         self.monotonic = monotonic
         self.sleep = sleep
+        self.print_frame = print_frame
 
     def run(
         self,
@@ -228,7 +303,11 @@ class HelpTriggeredDatasetCapture:
             if duration_s > 0 and (now - start) >= duration_s:
                 break
 
-            request = self.request_listener.poll() if self.request_listener is not None else None
+            request = None
+            for event_source in self.event_sources:
+                request = event_source.poll()
+                if request is not None:
+                    break
             reason: str | None = None
             if request is not None and not active:
                 active = True
@@ -240,6 +319,8 @@ class HelpTriggeredDatasetCapture:
             if reason is not None:
                 frame = self.writer.capture_frame(reason=reason)
                 last_frame_id = str(frame["frame_id"])
+                if self.print_frame is not None:
+                    self.print_frame(frame)
                 frames_written += 1
                 if reason == "help_start":
                     help_start_captures += 1
@@ -270,6 +351,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config-path", default=None, help="Optional explicit SimTutorConfig.lua path.")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT), help="Dataset capture output root.")
     parser.add_argument("--fps", type=float, default=DEFAULT_CAPTURE_FPS, help="Continuous capture FPS after help starts.")
+    parser.add_argument(
+        "--global-help-hotkey",
+        default="X1",
+        help="Optional Windows global help hotkey: ESC, F1-F24, X1/MOUSE4, X2/MOUSE5. Empty disables.",
+    )
+    parser.add_argument("--global-help-modifiers", default="", help="Optional modifiers joined by +, e.g. Ctrl+Shift.")
+    parser.add_argument(
+        "--global-help-cooldown-ms",
+        type=int,
+        default=DEFAULT_GLOBAL_HELP_COOLDOWN_MS,
+        help="Debounce window for the Windows global help trigger in milliseconds.",
+    )
     parser.add_argument("--help-trigger-host", default=DEFAULT_VISION_CAPTURE_TRIGGER_HOST, help="UDP host for help-trigger capture requests.")
     parser.add_argument("--help-trigger-port", type=int, default=DEFAULT_VISION_CAPTURE_TRIGGER_PORT, help="UDP port for help-trigger capture requests.")
     parser.add_argument("--trigger-timeout", type=float, default=0.1, help="UDP receive timeout in seconds.")
@@ -317,6 +410,22 @@ def _resolve_runtime_config(args: argparse.Namespace) -> tuple[DatasetCaptureCon
     )
 
 
+def _print_frame_event(frame: dict[str, Any]) -> None:
+    print(
+        "[CAPTURE_VLM_DATASET] frame="
+        + json.dumps(
+            {
+                "frame_id": frame.get("frame_id"),
+                "reason": frame.get("capture_reason"),
+                "raw_image_path": frame.get("image_path"),
+                "artifact_image_path": frame.get("artifact_image_path"),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+
 def main() -> int:
     args = build_arg_parser().parse_args()
     try:
@@ -332,18 +441,34 @@ def main() -> int:
                 height=config.screen_height,
             ),
         )
-        listener = UdpCaptureRequestListener(
-            session_id=config.session_id,
-            host=args.help_trigger_host,
-            port=args.help_trigger_port,
-            timeout=args.trigger_timeout,
-        )
+        event_sources: list[CaptureEventSource] = []
+        global_hotkey_source: GlobalHelpEventSource | None = None
+        if str(args.global_help_hotkey).strip():
+            if sys.platform != "win32":
+                raise RuntimeError("--global-help-hotkey is only supported on Windows")
+            global_hotkey_source = GlobalHelpEventSource(
+                hotkey=args.global_help_hotkey,
+                modifiers=args.global_help_modifiers,
+                cooldown_ms=args.global_help_cooldown_ms,
+            )
+            global_hotkey_source.start()
+            event_sources.append(global_hotkey_source)
+        listener: UdpCaptureRequestListener | None = None
+        if int(args.help_trigger_port) > 0:
+            listener = UdpCaptureRequestListener(
+                session_id=config.session_id,
+                host=args.help_trigger_host,
+                port=args.help_trigger_port,
+                timeout=args.trigger_timeout,
+            )
+            event_sources.append(UdpEventSource(listener))
         try:
             runner = HelpTriggeredDatasetCapture(
                 writer=writer,
-                request_listener=listener,
+                event_sources=event_sources,
                 capture_fps=args.fps,
                 start_on_launch=args.start_on_launch,
+                print_frame=_print_frame_event,
             )
             print(
                 "[CAPTURE_VLM_DATASET] config="
@@ -357,8 +482,9 @@ def main() -> int:
                         "screen_width": config.screen_width,
                         "screen_height": config.screen_height,
                         "fps": args.fps,
+                        "global_help_hotkey": getattr(global_hotkey_source, "hotkey_label", None),
                         "trigger_host": args.help_trigger_host,
-                        "trigger_port": listener.bound_port,
+                        "trigger_port": listener.bound_port if listener is not None else 0,
                         "render_vlm_artifacts": config.render_vlm_artifacts,
                         "start_on_launch": bool(args.start_on_launch),
                     },
@@ -366,9 +492,17 @@ def main() -> int:
                     sort_keys=True,
                 )
             )
+            if global_hotkey_source is not None:
+                print(
+                    f"[CAPTURE_VLM_DATASET] press {global_hotkey_source.hotkey_label} once to start capture, "
+                    "then press Ctrl+C to stop"
+                )
             stats = runner.run(duration_s=args.duration_s, max_frames=args.max_frames)
         finally:
-            listener.close()
+            if listener is not None:
+                listener.close()
+            if global_hotkey_source is not None:
+                global_hotkey_source.close()
     except KeyboardInterrupt:
         return 130
     except Exception as exc:

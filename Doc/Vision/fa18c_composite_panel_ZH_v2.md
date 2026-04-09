@@ -274,6 +274,44 @@ python live_dcs.py \
 - 确认 Python 侧能看到 `VisionObservation`
 - 若视觉 sidecar 尚未就绪，也必须只出现 `vision_unavailable` 降级，而不是中断 telemetry 主链路
 
+## 数据集采集工具
+
+若当前目标不是 live tutor，而是为后续 VLM/SFT 准备截图数据，可直接使用：
+
+```powershell
+python .\tools\capture_vlm_dataset.py `
+  --session-id fa18c-coldstart-run-001 `
+  --saved-games-dir "$env:USERPROFILE\Saved Games\DCS"
+```
+
+当前工具行为：
+
+- 默认输出到 `tools/.captures/<session_id>/`
+- 保存原始整屏截图到 `raw/`
+- 同步生成按当前组合图 contract 裁剪和加标注后的 VLM-ready 工件到 `artifacts/`
+- 写出：
+  - `frames.jsonl`
+  - `capture_index.jsonl`
+- 在 Windows 上默认监听全局 help 侧键 `X1` / `MOUSE4`
+- 启动后先 idle；第一次按 help 侧键后开始持续采集
+- 默认采样频率为 `2 fps`
+- 用 `Ctrl+C` 结束
+
+若你的 help 侧键是第二个鼠标侧键，可改为：
+
+```powershell
+python .\tools\capture_vlm_dataset.py `
+  --session-id fa18c-coldstart-run-001 `
+  --saved-games-dir "$env:USERPROFILE\Saved Games\DCS" `
+  --global-help-hotkey X2
+```
+
+说明：
+
+- 这个工具面向“截图数据采集”，不参与 tutor 主链路
+- 它复用了当前 `fa18c_composite_panel_v2` 的相同截图和裁剪流程，确保训练输入形态和线上一致
+- `tools/.captures/` 已默认加入 `.gitignore`
+
 ### 5. 失败时优先排查
 
 - Monitor Setup 没选对，导致 `LEFT_MFCD/CENTER_MFCD/RIGHT_MFCD` 没有排到约定位置

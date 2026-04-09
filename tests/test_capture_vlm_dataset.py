@@ -10,8 +10,11 @@ from tools.capture_vision_sidecar import UdpCaptureRequestListener
 from tools.capture_vlm_dataset import (
     DEFAULT_OUTPUT_ROOT,
     DatasetFrameWriter,
+    GlobalHelpEventSource,
     HelpTriggeredDatasetCapture,
+    UdpEventSource,
     _resolve_runtime_config,
+    _print_frame_event,
     build_arg_parser,
 )
 
@@ -51,6 +54,30 @@ class FakeClock:
 
     def sleep(self, seconds: float) -> None:
         self.value += max(0.0, float(seconds))
+
+
+class FakeTrigger:
+    def __init__(self, *, hotkey_label: str = "X1") -> None:
+        self.hotkey_label = hotkey_label
+        self.started = False
+        self.closed = False
+        self.stop_requested = False
+        self.events = 0
+
+    def start(self) -> None:
+        self.started = True
+
+    def poll(self) -> bool:
+        if self.events <= 0:
+            return False
+        self.events -= 1
+        return True
+
+    def request_stop(self) -> None:
+        self.stop_requested = True
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def _write_lua_config(base_dir: Path) -> Path:
@@ -98,7 +125,7 @@ def test_dataset_capture_waits_for_help_before_writing_frames(tmp_path: Path) ->
     clock = FakeClock()
     runner = HelpTriggeredDatasetCapture(
         writer=writer,
-        request_listener=None,
+        event_sources=[],
         capture_fps=2.0,
         monotonic=clock.now,
         sleep=clock.sleep,
@@ -134,7 +161,7 @@ def test_dataset_capture_starts_on_first_help_and_writes_artifact_and_index(tmp_
         clock = FakeClock()
         runner = HelpTriggeredDatasetCapture(
             writer=writer,
-            request_listener=listener,
+            event_sources=[UdpEventSource(listener)],
             capture_fps=2.0,
             monotonic=clock.now,
             sleep=clock.sleep,
@@ -159,6 +186,55 @@ def test_dataset_capture_starts_on_first_help_and_writes_artifact_and_index(tmp_
     assert first_index["capture_reason"] == "help_start"
     assert first_index["frame_id"] == first_manifest["frame_id"]
     assert first_index["session_id"] == "sess-live"
+
+
+def test_dataset_capture_starts_on_global_hotkey_in_single_terminal_mode(tmp_path: Path) -> None:
+    fake_trigger = FakeTrigger(hotkey_label="X1")
+    source = GlobalHelpEventSource(hotkey="X1", trigger=fake_trigger)
+    source.start()
+    fake_trigger.events = 1
+    writer = DatasetFrameWriter(
+        output_root=tmp_path / "captures",
+        session_id="sess-live",
+        channel="composite_panel",
+        layout_id="fa18c_composite_panel_v2",
+        capture_callable=_capture_image,
+        clock=lambda: 1772872445.010,
+    )
+    clock = FakeClock()
+    runner = HelpTriggeredDatasetCapture(
+        writer=writer,
+        event_sources=[source],
+        capture_fps=2.0,
+        monotonic=clock.now,
+        sleep=clock.sleep,
+    )
+
+    stats = runner.run(duration_s=0.6, max_frames=2)
+    source.close()
+
+    assert fake_trigger.started is True
+    assert fake_trigger.closed is True
+    assert stats.started is True
+    assert stats.help_start_captures == 1
+    assert stats.interval_captures == 1
+
+
+def test_print_frame_event_logs_paths(capsys) -> None:
+    _print_frame_event(
+        {
+            "frame_id": "1772872445010_000000",
+            "capture_reason": "help_start",
+            "image_path": "/tmp/raw.png",
+            "artifact_image_path": "/tmp/artifact.png",
+        }
+    )
+
+    out = capsys.readouterr().out
+    assert "1772872445010_000000" in out
+    assert "help_start" in out
+    assert "/tmp/raw.png" in out
+    assert "/tmp/artifact.png" in out
 
 
 def test_dataset_capture_index_and_output_dirs_match_expected_layout(tmp_path: Path) -> None:
@@ -196,6 +272,7 @@ def test_dataset_capture_cli_defaults_and_runtime_config(tmp_path: Path) -> None
     config, resolved_config_path = _resolve_runtime_config(args)
 
     assert args.fps == 2.0
+    assert args.global_help_hotkey == "X1"
     assert args.output_root == str(DEFAULT_OUTPUT_ROOT)
     assert config.output_root == DEFAULT_OUTPUT_ROOT
     assert config.screen_width == 1600

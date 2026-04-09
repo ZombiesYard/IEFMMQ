@@ -116,6 +116,28 @@ python tools/capture_vision_sidecar.py \
   --session-id sess-live
 ```
 
+Capture a VLM fine-tuning dataset on the DCS host with the same composite-panel
+flow, but save the raw screenshots plus VLM-ready cropped artifacts under
+`tools/.captures/<session_id>/...`. On Windows, this tool now defaults to a
+single-terminal workflow: launch it once, then press the global help side-button
+hotkey `X1` / `MOUSE4` to start continuous capture at `2 fps`, and stop with
+`Ctrl+C`.
+
+PowerShell example:
+
+```powershell
+python .\tools\capture_vlm_dataset.py `
+  --session-id fa18c-coldstart-run-001 `
+  --saved-games-dir "$env:USERPROFILE\Saved Games\DCS"
+```
+
+Optional switches:
+
+- `--global-help-hotkey X2` if your help button is the second side button
+- `--fps 2.0` to change the post-help capture rate
+- `--start-on-launch` to bypass the hotkey and start recording immediately
+- `--no-render-vlm-artifacts` to keep only raw screenshots without cropped VLM artifacts
+
 `live_dcs.py` no longer assumes continuous low-fps frame recording. In live mode, BIOS
 streaming remains continuous, while vision is treated as help-triggered capture: SimTutor
 waits for the post-help frame written into the configured sidecar directory. Use
