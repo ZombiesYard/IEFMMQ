@@ -1112,6 +1112,26 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
     )
 
 
+def _render_compact_overlay_examples(max_targets: int) -> tuple[str, str]:
+    if max_targets <= 0:
+        return "[]", "[]"
+    if max_targets == 1:
+        return (
+            '["..."]',
+            '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]',
+        )
+    targets_shape = "[" + ",".join('"..."' for _ in range(max_targets)) + "]"
+    evidence_shape = (
+        "["
+        + ",".join(
+            '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}'
+            for _ in range(max_targets)
+        )
+        + "]"
+    )
+    return targets_shape, evidence_shape
+
+
 def _record_trim_event(message: str) -> None:
     if os.getenv("SIMTUTOR_PROMPT_TRIM_PRINT", "").strip().lower() in {"1", "true", "yes", "on"}:
         print(f"[PROMPT] {message}")
@@ -1348,7 +1368,7 @@ def build_help_prompt_result(
             for item in priority_candidates:
                 if isinstance(item, str) and item and item not in example_targets:
                     example_targets.append(item)
-                if len(example_targets) >= max(1, min(effective_max_overlay_targets, 2)):
+                if len(example_targets) >= max(1, effective_max_overlay_targets):
                     break
         if not example_targets:
             example_target = current_overlay_target_policy["preferred_target"] or (overlay_targets[0] if overlay_targets else None)
@@ -1462,22 +1482,8 @@ def build_help_prompt_result(
         compact_header = "JSON only. Follow enum constraints strictly."
         if lang == "zh":
             compact_header = "仅输出 JSON；严格遵循枚举约束。"
-        compact_targets_example = (
-            "[]"
-            if effective_max_overlay_targets == 0
-            else '["..."]'
-            if effective_max_overlay_targets == 1
-            else '["...","..."]'
-        )
-        compact_evidence_example = (
-            "[]"
-            if effective_max_overlay_targets == 0
-            else '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
-            if effective_max_overlay_targets == 1
-            else (
-                '[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
-                '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]'
-            )
+        compact_targets_example, compact_evidence_example = _render_compact_overlay_examples(
+            effective_max_overlay_targets
         )
         compact_schema_line = (
             f'Output shape (overlay arrays may contain 0..{effective_max_overlay_targets} items for this request; the example below shows the maximum allowed array length)='

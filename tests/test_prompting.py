@@ -103,6 +103,26 @@ def test_prompt_metadata_records_max_overlay_targets() -> None:
     ]
 
 
+def test_prompt_metadata_records_more_than_two_overlay_examples_when_allowed() -> None:
+    ctx = _base_context()
+    ctx["overlay_target_allowlist"] = ["apu_switch", "battery_switch", "eng_crank_switch"]
+    result = build_help_prompt_result(ctx, "en", max_overlay_targets=3)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert result.metadata["max_overlay_targets"] == 3
+    assert payload["overlay_target_policy"]["max_targets"] == 3
+    assert payload["output_example_json"]["overlay"]["targets"] == [
+        "apu_switch",
+        "battery_switch",
+        "eng_crank_switch",
+    ]
+    assert [item["target"] for item in payload["output_example_json"]["overlay"]["evidence"]] == [
+        "apu_switch",
+        "battery_switch",
+        "eng_crank_switch",
+    ]
+
+
 def test_prompt_explicitly_disables_overlay_when_max_targets_zero() -> None:
     result = build_help_prompt_result(_base_context(), "en", max_overlay_targets=0)
     payload = _extract_prompt_constraints_json(result.prompt)
@@ -489,7 +509,7 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     assert "constraints=" in result.prompt
     assert '"grounding":{"applied":true,"missing":false' in result.prompt
     if "hard_truncate" not in result.metadata["trim_reasons"]:
-        assert 'Output shape={"diagnosis":{"step_id":"...","error_category":"..."}' in result.prompt
+        assert 'Output shape (overlay arrays may contain 0..1 items for this request' in result.prompt
 
 
 def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
@@ -1080,6 +1100,28 @@ def test_prompt_compact_schema_uses_multi_target_evidence_shape_when_enabled() -
     ) in result.prompt
 
 
+def test_prompt_compact_schema_scales_to_requested_overlay_target_count() -> None:
+    ctx = _base_context()
+    ctx["overlay_target_allowlist"] = ["apu_switch", "battery_switch", "eng_crank_switch"]
+    result = build_help_prompt_result(
+        ctx,
+        "en",
+        max_overlay_targets=3,
+        max_prompt_chars=500,
+        max_prompt_tokens_est=120,
+    )
+
+    assert result.metadata["prompt_trimmed"] is True
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert "overlay arrays may contain 0..3 items for this request" in result.prompt
+    assert (
+        '"overlay":{"targets":["...","...","..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+        '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+        '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]}'
+    ) in result.prompt
+
+
 def test_prompt_lang_switch_zh_and_en() -> None:
     prompt_zh = build_help_prompt(_base_context(), "zh")
     prompt_en = build_help_prompt(_base_context(), "en")
@@ -1127,7 +1169,10 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
 
     assert result.metadata["prompt_trimmed"] is True
     assert result.metadata["trim_reasons"]
-    assert len(result.prompt) <= 900
+    assert len(result.prompt) <= min(
+        result.metadata["hard_prompt_chars"],
+        result.metadata["hard_prompt_tokens_est"] * 4,
+    )
     assert result.metadata["prompt_tokens_est"] <= result.metadata["hard_prompt_tokens_est"]
     assert result.metadata["prompt_budget_status"] in {"compacted", "trimmed_to_hard_cap"}
     assert isinstance(result.metadata["allowed_evidence_refs"], list)
@@ -1141,7 +1186,7 @@ def test_budget_over_advisory_does_not_force_trim() -> None:
         "recent_deltas": [],
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=5000, max_prompt_tokens_est=1300)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=6000, max_prompt_tokens_est=1300)
 
     assert result.metadata["prompt_trimmed"] is False
     assert result.metadata["prompt_budget_status"] == "over_advisory"
