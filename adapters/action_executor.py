@@ -197,105 +197,123 @@ class OverlayActionExecutor:
         report.rejected.append(detail)
         self._emit("overlay_failed", detail)
 
+    def _preview_highlight_intent(self, action: Mapping[str, Any] | Any) -> tuple[dict[str, Any] | None, str | None]:
+        if not isinstance(action, Mapping):
+            return None, "invalid_action_payload"
+        if action.get("type") != "overlay":
+            return None, "rejected_non_overlay_action"
+        if action.get("evidence_required") is True:
+            raw_refs = action.get("evidence_refs")
+            if not isinstance(raw_refs, list):
+                return None, "overlay_missing_evidence_refs"
+            evidence_refs = [ref for ref in raw_refs if isinstance(ref, str) and ref]
+            if not evidence_refs:
+                return None, "overlay_missing_evidence_refs"
+        target = action.get("target")
+        if not isinstance(target, str) or not target:
+            return None, "invalid_overlay_target"
+        if target not in self._allowlist:
+            return None, "overlay_target_not_in_allowlist"
+        try:
+            intent = self._planner.plan(target, intent="highlight")
+        except (KeyError, ValueError):
+            return None, "overlay_target_unmappable"
+        return {"target": target, "intent": intent}, None
+
     def execute_actions(self, actions: Sequence[Mapping[str, Any] | Any]) -> ActionExecutionReport:
         report = ActionExecutionReport()
         executed_count = 0
+        preserve_targets: list[str] = []
+        push_preserve_targets = getattr(self._sender, "push_preserve_targets", None)
+        pop_preserve_targets = getattr(self._sender, "pop_preserve_targets", None)
 
-        for idx, action in enumerate(actions):
-            if not isinstance(action, Mapping):
-                self._reject(report, reason="invalid_action_payload", action_idx=idx, action=action)
-                continue
-
-            action_type = action.get("type")
-            if action_type != "overlay":
-                self._reject(report, reason="rejected_non_overlay_action", action_idx=idx, action=action)
-                continue
-
-            if action.get("evidence_required") is True:
-                raw_refs = action.get("evidence_refs")
-                if not isinstance(raw_refs, list):
-                    self._reject(report, reason="overlay_missing_evidence_refs", action_idx=idx, action=action)
+        if callable(push_preserve_targets) and callable(pop_preserve_targets) and self.max_targets > 1:
+            for action in actions:
+                preview, reason = self._preview_highlight_intent(action)
+                if preview is None or reason is not None:
                     continue
-                evidence_refs = [ref for ref in raw_refs if isinstance(ref, str) and ref]
-                if not evidence_refs:
-                    self._reject(report, reason="overlay_missing_evidence_refs", action_idx=idx, action=action)
+                preserve_targets.append(preview["intent"].element_id)
+                if len(preserve_targets) >= self.max_targets:
+                    break
+
+        preserve_pushed = False
+        if len(preserve_targets) > 1 and callable(push_preserve_targets):
+            push_preserve_targets(preserve_targets)
+            preserve_pushed = True
+
+        try:
+            for idx, action in enumerate(actions):
+                preview, reason = self._preview_highlight_intent(action)
+                if preview is None:
+                    self._reject(report, reason=reason or "invalid_action_payload", action_idx=idx, action=action)
+                    continue
+                target = preview["target"]
+                intent = preview["intent"]
+
+                if executed_count >= self.max_targets:
+                    drop_detail = {
+                        "reason": "max_targets_exceeded",
+                        "action_index": idx,
+                        "target": target,
+                    }
+                    report.dropped.append(drop_detail)
                     continue
 
-            target = action.get("target")
-            if not isinstance(target, str) or not target:
-                self._reject(report, reason="invalid_overlay_target", action_idx=idx, action=action)
-                continue
+                if self.dry_run:
+                    preview = {
+                        "target": target,
+                        "element_id": intent.element_id,
+                        "intent": "highlight",
+                        "ttl_s": self.ttl_s,
+                        "pulse_enabled": self.pulse_enabled,
+                    }
+                    preview = self._trace_payload(action, preview)
+                    report.dry_run.append(preview)
+                    self._emit("overlay_dry_run", preview)
+                    executed_count += 1
+                    continue
 
-            if target not in self._allowlist:
-                self._reject(report, reason="overlay_target_not_in_allowlist", action_idx=idx, action=action)
-                continue
+                if getattr(self._sender, "enabled", True) is False:
+                    self._reject(report, reason="overlay_sender_disabled", action_idx=idx, action=action)
+                    continue
 
-            if executed_count >= self.max_targets:
-                drop_detail = {
-                    "reason": "max_targets_exceeded",
-                    "action_index": idx,
-                    "target": target,
-                }
-                report.dropped.append(drop_detail)
-                continue
-
-            try:
-                intent = self._planner.plan(target, intent="highlight")
-            except (KeyError, ValueError):
-                self._reject(report, reason="overlay_target_unmappable", action_idx=idx, action=action)
-                continue
-            if self.dry_run:
-                preview = {
+                pushed_trace = self._push_sender_trace(action)
+                try:
+                    ack = self._sender.send_intent(intent, expect_ack=self.expect_ack)
+                finally:
+                    self._pop_sender_trace(pushed_trace)
+                if not self._sender_emits_to_executor_sink():
+                    requested = {
+                        "action": "highlight",
+                        "target": intent.element_id,
+                        "target_name": target,
+                    }
+                    requested = self._trace_payload(action, requested)
+                    self._emit("overlay_requested", requested)
+                    if isinstance(ack, Mapping):
+                        ack_payload = dict(ack)
+                        ack_payload["intent"] = "highlight"
+                        ack_payload["target"] = intent.element_id
+                        ack_payload = self._trace_payload(action, ack_payload)
+                        kind = "overlay_applied" if ack.get("status") == "ok" else "overlay_failed"
+                        self._emit(kind, ack_payload)
+                applied = {
                     "target": target,
                     "element_id": intent.element_id,
                     "intent": "highlight",
-                    "ttl_s": self.ttl_s,
-                    "pulse_enabled": self.pulse_enabled,
+                    "ack": ack,
                 }
-                preview = self._trace_payload(action, preview)
-                report.dry_run.append(preview)
-                self._emit("overlay_dry_run", preview)
+                applied = self._trace_payload(action, applied)
+                report.executed.append(applied)
                 executed_count += 1
-                continue
 
-            if getattr(self._sender, "enabled", True) is False:
-                self._reject(report, reason="overlay_sender_disabled", action_idx=idx, action=action)
-                continue
-
-            pushed_trace = self._push_sender_trace(action)
-            try:
-                ack = self._sender.send_intent(intent, expect_ack=self.expect_ack)
-            finally:
-                self._pop_sender_trace(pushed_trace)
-            if not self._sender_emits_to_executor_sink():
-                requested = {
-                    "action": "highlight",
-                    "target": intent.element_id,
-                    "target_name": target,
-                }
-                requested = self._trace_payload(action, requested)
-                self._emit("overlay_requested", requested)
-                if isinstance(ack, Mapping):
-                    ack_payload = dict(ack)
-                    ack_payload["intent"] = "highlight"
-                    ack_payload["target"] = intent.element_id
-                    ack_payload = self._trace_payload(action, ack_payload)
-                    kind = "overlay_applied" if ack.get("status") == "ok" else "overlay_failed"
-                    self._emit(kind, ack_payload)
-            applied = {
-                "target": target,
-                "element_id": intent.element_id,
-                "intent": "highlight",
-                "ack": ack,
-            }
-            applied = self._trace_payload(action, applied)
-            report.executed.append(applied)
-            executed_count += 1
-
-            if self.pulse_enabled and self.ttl_s > 0:
-                time.sleep(self.ttl_s)
-                clear_intent = self._planner.plan(target, intent="clear")
-                self._sender.send_intent(clear_intent, expect_ack=False)
+                if self.pulse_enabled and self.ttl_s > 0:
+                    time.sleep(self.ttl_s)
+                    clear_intent = self._planner.plan(target, intent="clear")
+                    self._sender.send_intent(clear_intent, expect_ack=False)
+        finally:
+            if preserve_pushed and callable(pop_preserve_targets):
+                pop_preserve_targets()
 
         return report
 

@@ -3,7 +3,7 @@ from pathlib import Path
 from adapters.openai_compat_model import OpenAICompatModel
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL, JSON_EXTRACT_FAIL, MODEL_HTTP_FAIL, SCHEMA_FAIL
 from core.llm_schema import validate_help_response
-from core.types import Observation
+from core.types import Observation, TutorRequest
 from tests._fakes import (
     FakeClient,
     FakeResponse,
@@ -110,6 +110,71 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert prompt_payload["overlay_target_policy"]["max_targets"] == 1
     assert "uncertainty_policy" in prompt_payload
     assert prompt_payload["decision_priority"][:2] == ["deterministic_step_hint", "gates_summary"]
+
+
+def test_explain_error_accepts_multiple_overlay_targets_when_enabled() -> None:
+    help_obj = {
+        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+        "next": {"step_id": "S18"},
+        "overlay": {
+            "targets": ["fcs_bit_switch", "right_mdi_pb5"],
+            "evidence": [
+                {
+                    "target": "fcs_bit_switch",
+                    "type": "delta",
+                    "ref": "RECENT_UI_TARGETS.fcs_bit_switch",
+                    "quote": "Recent delta shows the FCS BIT switch interaction.",
+                    "grounding_confidence": 0.92,
+                },
+                {
+                    "target": "right_mdi_pb5",
+                    "type": "delta",
+                    "ref": "RECENT_UI_TARGETS.right_mdi_pb5",
+                    "quote": "Recent delta shows the right DDI PB5 interaction.",
+                    "grounding_confidence": 0.9,
+                },
+            ],
+        },
+        "explanations": ["Hold FCS BIT and press right DDI PB5 together."],
+        "confidence": 0.91,
+    }
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        max_overlay_targets=2,
+    )
+    req = TutorRequest(
+        intent="help",
+        message="Need help with FCS BIT.",
+        context={
+            "vars": {
+                "right_ddi_on": True,
+                "fcs_bit_switch_up": False,
+            },
+            "recent_deltas": [
+                {"mapped_ui_target": "fcs_bit_switch", "bios_key": "FCS_BIT_SW"},
+                {"mapped_ui_target": "right_mdi_pb5", "bios_key": "RIGHT_DDI_PB_05"},
+            ],
+            "gates": {"S18.precondition": {"status": "allowed"}},
+            "rag_topk": [{"id": "manual_s18_1", "snippet": "Run FCS BIT by holding the switch and pressing PB5."}],
+            "candidate_steps": ["S18", "S19"],
+            "overlay_target_allowlist": ["fcs_bit_switch", "right_mdi_pb5"],
+        },
+    )
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S18"), req)
+
+    assert res.status == "ok"
+    assert [action["target"] for action in res.actions] == ["fcs_bit_switch", "right_mdi_pb5"]
+    assert res.actions[0]["element_id"] == "pnt_470"
+    assert res.actions[1]["element_id"] == "pnt_83"
+    assert res.actions[0]["evidence_refs"] == ["RECENT_UI_TARGETS.fcs_bit_switch"]
+    assert res.actions[1]["evidence_refs"] == ["RECENT_UI_TARGETS.right_mdi_pb5"]
+
+    call = fake.calls[0]
+    prompt_payload = _extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
+    assert prompt_payload["overlay_target_policy"]["mode"] == "multi_target_allowed"
+    assert prompt_payload["overlay_target_policy"]["max_targets"] == 2
 
 
 def test_openai_compat_schema_is_loaded_once_per_model_instance(monkeypatch) -> None:
@@ -279,6 +344,70 @@ def test_explain_error_invalid_evidence_ref_clears_overlay() -> None:
     assert "invalid_target_evidence_refs:apu_switch" in res.metadata["evidence_guardrail_reasons"]
     assert res.metadata["help_response"]["overlay"]["targets"] == []
     assert res.metadata["failure_code"] == EVIDENCE_FAIL
+
+
+def test_explain_error_repairs_visual_fact_alias_to_allowed_frame_ref() -> None:
+    help_obj = {
+        "diagnosis": {"step_id": "S18", "error_category": "CO"},
+        "next": {"step_id": "S18"},
+        "overlay": {
+            "targets": ["right_mdi_pb5"],
+            "evidence": [
+                {
+                    "target": "right_mdi_pb5",
+                    "type": "visual",
+                    "ref": "VISION_FACTS.right_ddi_bit_failures_page_visible",
+                    "quote": "BIT FAILURES is visible on the right DDI, so PB5 should be pressed.",
+                    "grounding_confidence": 0.95,
+                }
+            ],
+        },
+        "explanations": ["Press right DDI PB5 to enter FCS-MC from the BIT root page."],
+        "confidence": 0.95,
+    }
+    req = TutorRequest(
+        intent="help",
+        message="Need help with FCS BIT root page.",
+        context={
+            "vars": {"right_ddi_on": True},
+            "gates": {"S18.completion": {"status": "blocked"}},
+            "vision_facts": [
+                {
+                    "fact_id": "bit_page_failure_visible",
+                    "state": "seen",
+                    "source_frame_id": "1773950407644_000006",
+                    "confidence": 0.99,
+                    "evidence_note": "BIT FAILURES line is clearly visible on the right DDI.",
+                }
+            ],
+            "vision_fact_summary": {
+                "status": "available",
+                "frame_ids": ["1773950407644_000006"],
+                "seen_fact_ids": ["bit_page_failure_visible"],
+                "uncertain_fact_ids": [],
+                "not_seen_fact_ids": [],
+                "summary_text": "seen=bit_page_failure_visible",
+            },
+            "candidate_steps": ["S18", "S19"],
+            "overlay_target_allowlist": ["right_mdi_pb5", "fcs_bit_switch"],
+        },
+    )
+    fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
+    model = OpenAICompatModel(client=fake)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S18"), req)
+
+    assert res.status == "ok"
+    assert [action["target"] for action in res.actions] == ["right_mdi_pb5"]
+    assert res.actions[0]["evidence_refs"] == ["VISION_FACTS.bit_page_failure_visible@1773950407644_000006"]
+    assert res.metadata["evidence_guardrail_applied"] is False
+    assert res.metadata["evidence_ref_repair"]["repair_applied"] is True
+    assert res.metadata["generation_mode"] == "repair"
+    assert res.metadata["evidence_ref_repair"]["details"][0]["from_ref"] == "VISION_FACTS.right_ddi_bit_failures_page_visible"
+    assert res.metadata["evidence_ref_repair"]["details"][0]["to_ref"] == "VISION_FACTS.bit_page_failure_visible@1773950407644_000006"
+    assert res.metadata["evidence_ref_repair"]["details"][0]["reason"] == "attach_single_visible_frame_id"
+    assert res.metadata["help_response_pre_guardrail"]["overlay"]["evidence"][0]["ref"] == "VISION_FACTS.right_ddi_bit_failures_page_visible"
+    assert res.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == "VISION_FACTS.bit_page_failure_visible@1773950407644_000006"
 
 
 def test_explain_error_http_5xx_fallback_no_overlay() -> None:

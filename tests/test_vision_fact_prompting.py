@@ -134,5 +134,11 @@ def test_vision_fact_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -
         config=_minimal_config(),
     )
 
-    assert "若能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 结果成立" in zh_prompt
-    assert "both FCSA=GO and FCSB=GO at the same time" in en_prompt
+    assert "MC1=GO、MC2=GO、FCSA=GO、FCSB=GO" in zh_prompt
+    assert "MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together" in en_prompt
+    assert "若页面仍出现 PBIT GO" in zh_prompt
+    assert "If PBIT GO is still visible anywhere on the page" in en_prompt
+    assert "FCSA/FCSB 显示的是 PBIT GO" in zh_prompt
+    assert "If FCSA/FCSB read PBIT GO" in en_prompt
+    assert "confidence=1.0 只允许用于最终 GO" in zh_prompt
+    assert "confidence=1.0 is allowed only when the final GO result is unambiguous" in en_prompt

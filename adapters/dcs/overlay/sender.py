@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import socket
 import time
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional, Sequence
 from uuid import uuid4
 
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
@@ -39,6 +39,8 @@ class DcsOverlaySender:
         self.session_id = session_id
         self.event_sink = event_sink
         self._last_target: Optional[str] = None
+        self._active_targets: list[str] = []
+        self._preserve_targets_stack: list[set[str]] = []
         self._event_metadata_stack: list[dict[str, Any]] = []
 
     def close(self) -> None:
@@ -69,6 +71,32 @@ class DcsOverlaySender:
     def pop_event_metadata(self) -> None:
         if self._event_metadata_stack:
             self._event_metadata_stack.pop()
+
+    def push_preserve_targets(self, targets: Sequence[str] | None) -> None:
+        preserve = {
+            item
+            for item in (targets or [])
+            if isinstance(item, str) and item
+        }
+        self._preserve_targets_stack.append(preserve)
+
+    def pop_preserve_targets(self) -> None:
+        if self._preserve_targets_stack:
+            self._preserve_targets_stack.pop()
+
+    def _current_preserve_targets(self) -> set[str]:
+        if not self._preserve_targets_stack:
+            return set()
+        return set(self._preserve_targets_stack[-1])
+
+    def _track_active_target(self, target: str) -> None:
+        self._active_targets = [item for item in self._active_targets if item != target]
+        self._active_targets.append(target)
+        self._last_target = target
+
+    def _forget_active_target(self, target: str) -> None:
+        self._active_targets = [item for item in self._active_targets if item != target]
+        self._last_target = self._active_targets[-1] if self._active_targets else None
 
     def _send_command(self, payload: dict) -> None:
         data = encode_command(payload)
@@ -179,27 +207,35 @@ class DcsOverlaySender:
             self._emit_event(evt)
             return None
         target = intent.element_id
-        if self.auto_clear and intent.intent == "highlight" and self._last_target and self._last_target != target:
-            clear_payload = {
-                "schema_version": "v2",
-                "cmd_id": str(uuid4()),
-                "action": "clear",
-                "target": self._last_target,
-            }
-            self._record_request(clear_payload)
-            try:
-                self._send_command(clear_payload)
-            except OSError as exc:
-                clear_failure = self._build_failed_result_for_command(
-                    cmd=clear_payload,
-                    intent="clear",
-                    target=self._last_target,
-                    attempt_count=1,
-                    failure_class="transport_error",
-                    reason=str(exc),
-                )
-                self._emit_ack_result(clear_failure)
-                return clear_failure
+        if self.auto_clear and intent.intent == "highlight":
+            preserve_targets = self._current_preserve_targets()
+            stale_targets = [
+                item
+                for item in self._active_targets
+                if item != target and item not in preserve_targets
+            ]
+            for stale_target in stale_targets:
+                clear_payload = {
+                    "schema_version": "v2",
+                    "cmd_id": str(uuid4()),
+                    "action": "clear",
+                    "target": stale_target,
+                }
+                self._record_request(clear_payload)
+                try:
+                    self._send_command(clear_payload)
+                except OSError as exc:
+                    clear_failure = self._build_failed_result_for_command(
+                        cmd=clear_payload,
+                        intent="clear",
+                        target=stale_target,
+                        attempt_count=1,
+                        failure_class="transport_error",
+                        reason=str(exc),
+                    )
+                    self._emit_ack_result(clear_failure)
+                    return clear_failure
+                self._forget_active_target(stale_target)
 
         cmd = command_from_intent(intent)
         ack_expected = self.ack_enabled and expect_ack and self.ack_receiver is not None
@@ -241,16 +277,16 @@ class DcsOverlaySender:
 
         if not ack_expected:
             if intent.intent == "highlight":
-                self._last_target = target
+                self._track_active_target(target)
             elif intent.intent == "clear":
-                self._last_target = None
+                self._forget_active_target(target)
             return None
 
         if ack and self._should_track_last_target_after_ack(intent, ack):
             if intent.intent == "highlight":
-                self._last_target = target
+                self._track_active_target(target)
             elif intent.intent == "clear":
-                self._last_target = None
+                self._forget_active_target(target)
         return ack
 
     def __enter__(self) -> "DcsOverlaySender":

@@ -88,6 +88,53 @@ def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:
     assert "DELTA_KEYS." not in contract["type_ref_prefixes"]["delta"]
 
 
+def test_prompt_metadata_records_max_overlay_targets() -> None:
+    result = build_help_prompt_result(_base_context(), "en", max_overlay_targets=2)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert result.metadata["max_overlay_targets"] == 2
+    assert payload["overlay_target_policy"]["max_targets"] == 2
+    assert payload["overlay_target_policy"]["mode"] == "multi_target_allowed"
+    assert len(payload["output_example_json"]["overlay"]["targets"]) == 2
+    assert payload["output_example_json"]["overlay"]["targets"] == ["apu_switch", "battery_switch"]
+    assert [item["target"] for item in payload["output_example_json"]["overlay"]["evidence"]] == [
+        "apu_switch",
+        "battery_switch",
+    ]
+
+
+def test_prompt_metadata_records_more_than_two_overlay_examples_when_allowed() -> None:
+    ctx = _base_context()
+    ctx["overlay_target_allowlist"] = ["apu_switch", "battery_switch", "eng_crank_switch"]
+    result = build_help_prompt_result(ctx, "en", max_overlay_targets=3)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert result.metadata["max_overlay_targets"] == 3
+    assert payload["overlay_target_policy"]["max_targets"] == 3
+    assert payload["output_example_json"]["overlay"]["targets"] == [
+        "apu_switch",
+        "battery_switch",
+        "eng_crank_switch",
+    ]
+    assert [item["target"] for item in payload["output_example_json"]["overlay"]["evidence"]] == [
+        "apu_switch",
+        "battery_switch",
+        "eng_crank_switch",
+    ]
+
+
+def test_prompt_explicitly_disables_overlay_when_max_targets_zero() -> None:
+    result = build_help_prompt_result(_base_context(), "en", max_overlay_targets=0)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert payload["overlay_target_policy"]["max_targets"] == 0
+    assert payload["overlay_target_policy"]["mode"] == "overlay_disabled"
+    assert payload["output_example_json"]["overlay"]["targets"] == []
+    assert payload["output_example_json"]["overlay"]["evidence"] == []
+    assert 'overlay":{"targets":[],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]}' not in result.prompt
+    assert "overlay.targets=[] and overlay.evidence=[]" in result.prompt
+
+
 def test_prompt_includes_explicit_interaction_policy_and_target_hints() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S05"]
@@ -312,6 +359,33 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
     ]
 
 
+def test_prompt_requires_exact_visual_fact_refs_and_forbids_alias_names() -> None:
+    ctx = _base_context()
+    ctx["vision_fact_summary"] = {
+        "status": "available",
+        "frame_ids": ["1773950407644_000006"],
+        "seen_fact_ids": ["bit_page_failure_visible"],
+        "uncertain_fact_ids": [],
+        "not_seen_fact_ids": [],
+        "summary_text": "seen=bit_page_failure_visible",
+    }
+    ctx["vision_facts"] = [
+        {
+            "fact_id": "bit_page_failure_visible",
+            "state": "seen",
+            "source_frame_id": "1773950407644_000006",
+            "confidence": 0.99,
+            "evidence_note": "BIT FAILURES line is clearly visible on the right DDI.",
+        }
+    ]
+
+    result = build_help_prompt_result(ctx, "en")
+
+    assert "must exactly match a full entry from allowed_evidence_refs" in result.prompt
+    assert "bit_page_failure_visible" in result.prompt
+    assert "right_ddi_bit_failures_page_visible" in result.prompt
+
+
 def test_prompt_prioritizes_missing_condition_vars_when_var_budget_trims() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S07"]
@@ -435,7 +509,7 @@ def test_prompt_compact_template_keeps_grounding_metadata_consistent_with_emitte
     assert "constraints=" in result.prompt
     assert '"grounding":{"applied":true,"missing":false' in result.prompt
     if "hard_truncate" not in result.metadata["trim_reasons"]:
-        assert 'Output shape={"diagnosis":{"step_id":"...","error_category":"..."}' in result.prompt
+        assert 'Output shape (overlay arrays may contain 0..1 items for this request' in result.prompt
 
 
 def test_prompt_recomputes_overlay_target_policy_after_overlay_enum_trim() -> None:
@@ -835,20 +909,24 @@ def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> 
         },
     }
 
-    zh_result = build_help_prompt_result(ctx, "zh")
-    en_result = build_help_prompt_result(ctx, "en")
+    zh_result = build_help_prompt_result(ctx, "zh", max_overlay_targets=2)
+    en_result = build_help_prompt_result(ctx, "en", max_overlay_targets=2)
 
     assert "若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC" in zh_result.prompt
-    assert "若已经进入 FCS-MC 页面但还未开始测试，才是“按住 FCS BIT 开关并按 PB5”这一步" in zh_result.prompt
+    assert "若已经进入 FCS-MC 页面但还未开始测试，且当前系统允许多目标" in zh_result.prompt
     assert "若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO" in zh_result.prompt
     assert "FCSA/FCSB PBIT GO 不等于最终 GO" in zh_result.prompt
     assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段" in zh_result.prompt
+    assert "overlay.targets 必须同时返回 fcs_bit_switch 与 right_mdi_pb5，不能只返回其中一个" in zh_result.prompt
+    assert "不得写“持续按住直到测试完成”" in zh_result.prompt
 
     assert "if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC" in en_result.prompt
-    assert "only after the right DDI has entered the FCS-MC page but before the BIT has started" in en_result.prompt
+    assert "only after the right DDI has entered the FCS-MC page but before the BIT has started, and multi-target overlay is allowed" in en_result.prompt
     assert "if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO" in en_result.prompt
     assert "FCSA/FCSB PBIT GO is not the same as the final GO result" in en_result.prompt
     assert "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on" in en_result.prompt
+    assert "overlay.targets must include both fcs_bit_switch and right_mdi_pb5 together" in en_result.prompt
+    assert "never say 'hold it until the test completes'" in en_result.prompt
 
 
 def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
@@ -871,9 +949,9 @@ def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
     zh_result = build_help_prompt_result(ctx, "zh")
     en_result = build_help_prompt_result(ctx, "en")
 
-    assert "若右 DDI 能同时明确读到 FCSA=GO 与 FCSB=GO，可直接视为最终 GO 已成立" in zh_result.prompt
-    assert "If the right DDI clearly shows both FCSA=GO and FCSB=GO at the same time" in en_result.prompt
-    assert "clearly reading both FCSA=GO and FCSB=GO is sufficient final-GO evidence" in en_result.prompt
+    assert "必须同时明确读到 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO" in zh_result.prompt
+    assert "Treat S18 as complete only when the right DDI clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together" in en_result.prompt
+    assert "partial GO evidence is not enough either" in en_result.prompt
 
 
 def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:
@@ -984,6 +1062,66 @@ def test_prompt_contains_strict_json_output_constraints() -> None:
     ) in prompt
 
 
+def test_prompt_contains_multi_target_output_shape_when_enabled() -> None:
+    prompt = build_help_prompt_result(_base_context(), "en", max_overlay_targets=2).prompt
+    payload = _extract_prompt_constraints_json(prompt)
+
+    assert payload["output_example_json"]["overlay"]["targets"] == ["apu_switch", "battery_switch"]
+    assert len(payload["output_example_json"]["overlay"]["evidence"]) == 2
+    assert "Their lengths may range from 0 to 2 for this request" in prompt
+    assert (
+        '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...",'
+        '"ref":"...","quote":"...","grounding_confidence":0.0},{"target":"...","type":"...",'
+        '"ref":"...","quote":"...","grounding_confidence":0.0}]}'
+    ) in prompt
+
+
+def test_prompt_compact_schema_uses_multi_target_evidence_shape_when_enabled() -> None:
+    result = build_help_prompt_result(
+        _base_context(),
+        "en",
+        max_overlay_targets=2,
+        max_prompt_chars=400,
+        max_prompt_tokens_est=120,
+    )
+
+    assert result.metadata["prompt_trimmed"] is True
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert "overlay arrays may contain 0..2 items for this request" in result.prompt
+    assert (
+        'Output shape (overlay arrays may contain 0..2 items for this request; the example below shows the maximum allowed array length)='
+        '{"diagnosis":{"step_id":"...","error_category":"..."},'
+        '"next":{"step_id":"..."},'
+        '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+        '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
+        '"explanations":["..."],'
+        '"confidence":0.0}'
+    ) in result.prompt
+
+
+def test_prompt_compact_schema_scales_to_requested_overlay_target_count() -> None:
+    ctx = _base_context()
+    ctx["overlay_target_allowlist"] = ["apu_switch", "battery_switch", "eng_crank_switch"]
+    result = build_help_prompt_result(
+        ctx,
+        "en",
+        max_overlay_targets=3,
+        max_prompt_chars=500,
+        max_prompt_tokens_est=120,
+    )
+
+    assert result.metadata["prompt_trimmed"] is True
+    assert "compact_template" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
+    assert "overlay arrays may contain 0..3 items for this request" in result.prompt
+    assert (
+        '"overlay":{"targets":["...","...","..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+        '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
+        '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]}'
+    ) in result.prompt
+
+
 def test_prompt_lang_switch_zh_and_en() -> None:
     prompt_zh = build_help_prompt(_base_context(), "zh")
     prompt_en = build_help_prompt(_base_context(), "en")
@@ -1031,7 +1169,10 @@ def test_budget_trim_enforced_and_recorded_in_metadata() -> None:
 
     assert result.metadata["prompt_trimmed"] is True
     assert result.metadata["trim_reasons"]
-    assert len(result.prompt) <= 900
+    assert len(result.prompt) <= min(
+        result.metadata["hard_prompt_chars"],
+        result.metadata["hard_prompt_tokens_est"] * 4,
+    )
     assert result.metadata["prompt_tokens_est"] <= result.metadata["hard_prompt_tokens_est"]
     assert result.metadata["prompt_budget_status"] in {"compacted", "trimmed_to_hard_cap"}
     assert isinstance(result.metadata["allowed_evidence_refs"], list)
@@ -1045,7 +1186,7 @@ def test_budget_over_advisory_does_not_force_trim() -> None:
         "recent_deltas": [],
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=5000, max_prompt_tokens_est=1300)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=6000, max_prompt_tokens_est=1300)
 
     assert result.metadata["prompt_trimmed"] is False
     assert result.metadata["prompt_budget_status"] == "over_advisory"

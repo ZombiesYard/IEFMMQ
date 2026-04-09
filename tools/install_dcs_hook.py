@@ -185,6 +185,7 @@ def build_composite_panel_config(
         f"        ack_port = {int(overlay_ack_port)},",
         f"        auto_clear = {'true' if overlay_auto_clear else 'false'},",
         f"        hilite_id = {int(overlay_hilite_id)},",
+        f"        hilite_ids = {{{int(overlay_hilite_id)}, {int(overlay_hilite_id) + 1}}},",
         "    },",
         "    vision = {",
         "        enabled = true,",
