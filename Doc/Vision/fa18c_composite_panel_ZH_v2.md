@@ -238,6 +238,31 @@ python live_dcs.py \
   - `Right DDI`
 - 该过程必须适配不同分辨率和宽高比，只能依赖当前冻结的 normalized layout 计算 crop，不允许写死像素
 
+## 单图初标约定
+
+为后续微调准备数据时，首版 AI 初标工具固定使用 `artifacts/` 下的单张组合屏图片，不拆成 3 张区域图。这样可以保证：
+
+- 初标输入分布与运行时 VLM 输入分布一致
+- 模型持续看到同一套固定布局先验：`left_ddi -> ampcd -> right_ddi`
+- 不需要为了数据准备去修改 `live_dcs.py` 的运行时输入 contract
+
+初标输出刻意收窄为轻量结构，只保留：
+
+- `summary`
+- `facts[].fact_id`
+- `facts[].state`
+- `facts[].evidence_note`
+
+初标 prompt 会明确禁止模型输出这些字段：
+
+- `frame_id`
+- `source_frame_id`
+- `confidence`
+- `expires_after_ms`
+- `sticky`
+
+其中 `frame_id` 只允许由工具根据 `capture_index.jsonl` 和文件名回填，不能信任模型臆造。
+
 ## 最小联调检查清单
 
 ### 1. 安装配置

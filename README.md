@@ -138,6 +138,35 @@ Optional switches:
 - `--start-on-launch` to bypass the hotkey and start recording immediately
 - `--no-render-vlm-artifacts` to keep only raw screenshots without cropped VLM artifacts
 
+Generate initial VLM prelabels from one composite-panel artifact image at a time
+and export both normalized JSONL plus Label Studio review tasks. This tool keeps
+the training/annotation input shape aligned with runtime inference: one composite
+panel image in, one structured prelabel out. The prompt explicitly forbids the
+model from inventing `frame_id`, `source_frame_id`, or `confidence`; those are
+derived or omitted by the tool itself.
+
+There are now three entrypoints:
+
+- `python -m tools.generate_vlm_prelabels`: generic entrypoint, language configurable with `--lang`
+- `python -m tools.generate_vlm_prelabels_zh`: Chinese-default wrapper
+- `python -m tools.generate_vlm_prelabels_en`: English-default wrapper
+
+PowerShell example:
+
+```powershell
+$env:DASHSCOPE_API_KEY = "sk-..."
+python .\tools\generate_vlm_prelabels_en.py `
+  --session-dir .\tools\.captures\fa18c-coldstart-run-001 `
+  --overwrite
+```
+
+Outputs are written under `tools/.captures/<session_id>/prelabels/`:
+
+- `vision_prelabels.jsonl`: normalized internal prelabels
+- `label_studio_tasks.json`: single-image review tasks for Label Studio
+- `raw_model_outputs.jsonl`: prompt/response metadata and parser warnings
+- `prelabels_failures.jsonl`: per-image failures without aborting the batch
+
 `live_dcs.py` no longer assumes continuous low-fps frame recording. In live mode, BIOS
 streaming remains continuous, while vision is treated as help-triggered capture: SimTutor
 waits for the post-help frame written into the configured sidecar directory. Use
