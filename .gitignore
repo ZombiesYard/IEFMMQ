@@ -43,3 +43,6 @@ logs/thesisproposal1128_extract.txt
 Doc/Engineering
 contractV03.md
 contractV04.md
+
+# Local Label Studio state
+.label_studio/

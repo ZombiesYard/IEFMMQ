@@ -167,6 +167,36 @@ Outputs are written under `tools/.captures/<session_id>/prelabels/`:
 - `raw_model_outputs.jsonl`: prompt/response metadata and parser warnings
 - `prelabels_failures.jsonl`: per-image failures without aborting the batch
 
+For WSL review, install Label Studio into a separate virtual environment so it
+does not interfere with the project environment:
+
+```bash
+python3 -m venv ~/venvs/label-studio-wsl
+source ~/venvs/label-studio-wsl/bin/activate
+python -m pip install --upgrade pip wheel setuptools
+pip install label-studio
+```
+
+Then start it from WSL and open `http://localhost:8080` in a Windows browser:
+
+```bash
+cd "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ"
+./tools/start_label_studio_wsl.sh
+```
+
+The startup script keeps Label Studio state inside `./.label_studio/` by
+setting `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, and `XDG_CACHE_HOME`, so it does
+not depend on `~/.local/share/label-studio`.
+
+Use [`tools/label_studio_review_config.xml`](tools/label_studio_review_config.xml)
+as the project labeling config, then import either:
+
+- `tools/.captures/<session_id>/prelabels/label_studio_tasks.json`
+- `tools/.captures/<session_id>/prelabels_en/label_studio_tasks.json`
+
+These task files embed each image as a data URL, so no separate local storage
+configuration is required for the first review pass.
+
 `live_dcs.py` no longer assumes continuous low-fps frame recording. In live mode, BIOS
 streaming remains continuous, while vision is treated as help-triggered capture: SimTutor
 waits for the post-help frame written into the configured sidecar directory. Use

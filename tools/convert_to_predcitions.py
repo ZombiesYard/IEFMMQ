@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import json
+from pathlib import Path
+from typing import Dict, List, Any
+
+
+FACT_FIELDS = [
+    "fcs_page_visible",
+    "bit_root_page_visible",
+    "bit_page_failure_visible",
+    "right_ddi_fcsmc_page_visible",
+    "right_ddi_in_test_visible",
+    "fcs_bit_result_visible",
+    "ins_alignment_page_visible",
+    "ins_go",
+]
+
+VALID_STATES = {"seen", "not_seen", "uncertain"}
+TO_NAME = "panel_image"
+
+
+def build_choice_result(field: str, value: str) -> Dict[str, Any]:
+    return {
+        "from_name": f"{field}_review",
+        "to_name": TO_NAME,
+        "type": "choices",
+        "value": {
+            "choices": [value]
+        }
+    }
+
+
+def build_textarea_result(from_name: str, text: str) -> Dict[str, Any]:
+    return {
+        "from_name": from_name,
+        "to_name": TO_NAME,
+        "type": "textarea",
+        "value": {
+            "text": [text]
+        }
+    }
+
+
+def parse_ai_prelabel_json(data: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    """
+    从 ai_prelabel_json 兜底提取 facts:
+    {
+        "fcs_page_visible": {"state": "not_seen", "note": "..."},
+        ...
+    }
+    """
+    ai_facts: Dict[str, Dict[str, str]] = {}
+    raw = data.get("ai_prelabel_json")
+
+    if not isinstance(raw, str) or not raw.strip():
+        return ai_facts
+
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return ai_facts
+
+    facts = parsed.get("facts", [])
+    if not isinstance(facts, list):
+        return ai_facts
+
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        fact_id = fact.get("fact_id")
+        state = fact.get("state")
+        note = fact.get("evidence_note", "")
+        if isinstance(fact_id, str) and fact_id:
+            ai_facts[fact_id] = {
+                "state": state if isinstance(state, str) else "",
+                "note": note if isinstance(note, str) else "",
+            }
+
+    return ai_facts
+
+
+def normalize_path_string(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    if value.startswith("data:image/"):
+        return value
+    return value.replace("\\", "/")
+
+
+def convert_task(task: Dict[str, Any], score: float = 0.95) -> Dict[str, Any]:
+    data = task.get("data", {})
+    meta = task.get("meta", {})
+
+    if not isinstance(data, dict):
+        data = {}
+
+    if not isinstance(meta, dict):
+        meta = {}
+
+    # 简单清理路径展示
+    for key in ["artifact_image_path", "raw_image_path"]:
+        if key in data:
+            data[key] = normalize_path_string(data[key])
+
+    ai_facts = parse_ai_prelabel_json(data)
+
+    results: List[Dict[str, Any]] = []
+
+    # 1) summary 也预填进 review 框
+    summary = data.get("summary", "")
+    if isinstance(summary, str) and summary.strip():
+        results.append(build_textarea_result("summary_review", summary.strip()))
+
+    # 2) facts 的 choices + note
+    for field in FACT_FIELDS:
+        state = data.get(field)
+        note = data.get(f"{field}_note", "")
+
+        # 顶层没有时，用 ai_prelabel_json 兜底
+        if (state is None or state == "") and field in ai_facts:
+            state = ai_facts[field].get("state", "")
+        if (not isinstance(note, str) or not note.strip()) and field in ai_facts:
+            note = ai_facts[field].get("note", "")
+
+        if isinstance(state, str) and state in VALID_STATES:
+            results.append(build_choice_result(field, state))
+
+        if isinstance(note, str) and note.strip():
+            results.append(build_textarea_result(f"{field}_note_review", note.strip()))
+
+    prediction = {
+        "model_version": "ai_prelabel_v2",
+        "score": score,
+        "result": results,
+    }
+
+    converted = {
+        "data": data,
+        "predictions": [prediction],
+    }
+
+    if meta:
+        converted["meta"] = meta
+
+    return converted
+
+
+def convert_file(input_path: Path, output_path: Path) -> None:
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input JSON not found: {input_path}")
+
+    with input_path.open("r", encoding="utf-8") as f:
+        tasks = json.load(f)
+
+    if not isinstance(tasks, list):
+        raise ValueError("Input JSON top-level must be a list of tasks.")
+
+    converted_tasks = [convert_task(task) for task in tasks]
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(converted_tasks, f, ensure_ascii=False, indent=2)
+
+    print(f"Converted {len(converted_tasks)} tasks")
+    print(f"Input : {input_path}")
+    print(f"Output: {output_path}")
+
+
+def resolve_default_paths() -> tuple[Path, Path]:
+    script_dir = Path(__file__).resolve().parent
+    prelabels_dir = script_dir / "prelabels"
+
+    input_json = prelabels_dir / "label_studio_tasks.json"
+    output_json = prelabels_dir / "label_studio_tasks_with_predictions.json"
+    return input_json, output_json
+
+
+def main() -> None:
+    input_json, output_json = resolve_default_paths()
+    convert_file(input_json, output_json)
+
+
+if __name__ == "__main__":
+    main()
