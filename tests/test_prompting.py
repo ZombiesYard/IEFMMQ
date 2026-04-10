@@ -331,7 +331,6 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
             "fact_id": "fcs_reset_seen",
             "state": "seen",
             "source_frame_id": "1772872445010_000123",
-            "confidence": 0.96,
             "evidence_note": "RESET cue visible on the FCS page.",
         }
     ]
@@ -348,7 +347,6 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
             "fact_id": "fcs_reset_seen",
             "state": "seen",
             "source_frame_id": "1772872445010_000123",
-            "confidence": 0.96,
             "evidence_note": "RESET cue visible on the FCS page.",
         }
     ]
@@ -374,7 +372,6 @@ def test_prompt_requires_exact_visual_fact_refs_and_forbids_alias_names() -> Non
             "fact_id": "bit_page_failure_visible",
             "state": "seen",
             "source_frame_id": "1773950407644_000006",
-            "confidence": 0.99,
             "evidence_note": "BIT FAILURES line is clearly visible on the right DDI.",
         }
     ]
@@ -659,14 +656,12 @@ def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
                 "fact_id": "bit_page_visible",
                 "state": "seen",
                 "source_frame_id": "1772872445010_000123",
-                "confidence": 0.98,
                 "evidence_note": "BIT page title is visible on the right DDI.",
             },
             {
                 "fact_id": "left_ddi_fcs_option_visible",
                 "state": "seen",
                 "source_frame_id": "1772872445010_000123",
-                "confidence": 0.97,
                 "evidence_note": "Left DDI menu shows FCS selectable on PB15.",
             },
         ],
@@ -1095,8 +1090,7 @@ def test_prompt_compact_schema_uses_multi_target_evidence_shape_when_enabled() -
         '"next":{"step_id":"..."},'
         '"overlay":{"targets":["...","..."],"evidence":[{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0},'
         '{"target":"...","type":"...","ref":"...","quote":"...","grounding_confidence":0.0}]},'
-        '"explanations":["..."],'
-        '"confidence":0.0}'
+        '"explanations":["..."]}'
     ) in result.prompt
 
 

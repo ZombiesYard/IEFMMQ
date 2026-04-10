@@ -136,7 +136,6 @@ def test_explain_error_accepts_multiple_overlay_targets_when_enabled() -> None:
             ],
         },
         "explanations": ["Hold FCS BIT and press right DDI PB5 together."],
-        "confidence": 0.91,
     }
     fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(
@@ -219,7 +218,6 @@ def test_explain_error_records_raw_llm_text_when_enabled() -> None:
 def test_explain_error_repairs_missing_required_top_level_fields_from_context() -> None:
     help_obj = _help_obj_ok()
     del help_obj["diagnosis"]
-    del help_obj["confidence"]
     fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(client=fake)
 
@@ -231,11 +229,9 @@ def test_explain_error_repairs_missing_required_top_level_fields_from_context() 
     assert res.metadata["retry_count"] == 0
     repaired = res.metadata["help_response"]
     validate_help_response(repaired)
-    assert repaired["confidence"] == 0.51
     assert repaired["diagnosis"]["step_id"] == repaired["next"]["step_id"]
     repaired_fields = {item["field"] for item in res.metadata["repair_details"]["details"]}
     assert "diagnosis" in repaired_fields
-    assert "confidence" in repaired_fields
     assert len(fake.calls) == 1
 
 
@@ -243,10 +239,10 @@ def test_retry_hint_mentions_required_top_level_fields() -> None:
     model = OpenAICompatModel(client=FakeClient(responses=[]), lang="zh")
     messages = [{"role": "user", "content": "ping"}]
 
-    retry_messages = model._build_retry_messages(messages, ValueError("missing confidence"))
+    retry_messages = model._build_retry_messages(messages, ValueError("missing explanations"))
 
     assert retry_messages[-1]["role"] == "user"
-    assert "diagnosis、next、overlay、explanations、confidence" in retry_messages[-1]["content"]
+    assert "diagnosis、next、overlay、explanations" in retry_messages[-1]["content"]
 
 
 def test_explain_error_print_model_io_outputs_prompt_and_unicode_reply(capsys) -> None:
@@ -363,7 +359,6 @@ def test_explain_error_repairs_visual_fact_alias_to_allowed_frame_ref() -> None:
             ],
         },
         "explanations": ["Press right DDI PB5 to enter FCS-MC from the BIT root page."],
-        "confidence": 0.95,
     }
     req = TutorRequest(
         intent="help",
@@ -1432,7 +1427,6 @@ def test_explain_error_prefix_suffix_repair_marks_metadata() -> None:
 
 def test_explain_error_marks_unobservable_step_with_visual_confirmation_metadata() -> None:
     help_obj = _help_obj_ok()
-    help_obj["confidence"] = 0.97
     fake = FakeClient(responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)])
     model = OpenAICompatModel(client=fake)
     req = _request_help()
@@ -1447,8 +1441,6 @@ def test_explain_error_marks_unobservable_step_with_visual_confirmation_metadata
     assert res.status == "ok"
     assert res.metadata["observability_status"] == "unobservable"
     assert res.metadata["requires_visual_confirmation"] is True
-    assert res.metadata["effective_confidence"] < res.metadata["model_confidence"]
-    assert res.metadata["confidence_adjustment_reason"] == "observability:unobservable"
     assert res.metadata["evidence_strength"] == "limited"
     assert any("待视觉确认" in item for item in res.explanations)
 

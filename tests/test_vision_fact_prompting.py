@@ -53,7 +53,7 @@ def test_vision_fact_prompt_example_matches_extractor_response_shape_in_en() -> 
     assert '"expires_after_ms"' not in example_line
     assert example_line == (
         '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain",'
-        '"source_frame_id":"1772872445010_000123","confidence":0.0,"evidence_note":"..."}]}'
+        '"source_frame_id":"1772872445010_000123","evidence_note":"..."}]}'
     )
 
 
@@ -140,5 +140,5 @@ def test_vision_fact_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -
     assert "If PBIT GO is still visible anywhere on the page" in en_prompt
     assert "FCSA/FCSB 显示的是 PBIT GO" in zh_prompt
     assert "If FCSA/FCSB read PBIT GO" in en_prompt
-    assert "confidence=1.0 只允许用于最终 GO" in zh_prompt
-    assert "confidence=1.0 is allowed only when the final GO result is unambiguous" in en_prompt
+    assert "只有在最终 GO 结果毫无歧义时才可输出 seen" in zh_prompt
+    assert "output seen only when the final GO result is unambiguous" in en_prompt

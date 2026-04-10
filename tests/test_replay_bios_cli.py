@@ -141,7 +141,6 @@ class OverlayModel:
                         ],
                     },
                     "explanations": ["Turn on APU."],
-                    "confidence": 0.9,
                 },
             },
         )

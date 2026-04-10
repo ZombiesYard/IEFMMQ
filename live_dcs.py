@@ -3704,7 +3704,6 @@ class LiveDcsTutorLoop:
                     else f"Please operate {fallback_target} first."
                 )
             ],
-            "confidence": 0.51,
         }
         return fallback_help_obj, f"deterministic_step:{inferred_step_id}"
 

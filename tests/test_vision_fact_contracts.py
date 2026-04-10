@@ -20,7 +20,6 @@ def test_vision_fact_observation_schema_accepts_uncertain_fact() -> None:
                 fact_id="fcs_reset_seen",
                 state="uncertain",
                 source_frame_id="1772872445010_000123",
-                confidence=0.42,
                 expires_after_ms=600000,
                 evidence_note="FCS page content is too blurry to confirm reset state.",
                 observed_at_wall_ms=1772872445000,
@@ -43,7 +42,6 @@ def test_vision_fact_observation_schema_accepts_structured_result_kind() -> None
                 fact_id="fcs_bit_result_visible",
                 state="seen",
                 source_frame_id="1772872445010_000123",
-                confidence=0.88,
                 expires_after_ms=600000,
                 evidence_note="Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
                 result_kind="final_go",
@@ -64,7 +62,6 @@ def test_vision_fact_observation_schema_accepts_all_fact_ids() -> None:
                 fact_id=fact_id,
                 state="not_seen",
                 source_frame_id="1772872445010_000123",
-                confidence=0.1,
                 expires_after_ms=2000,
                 evidence_note=f"{fact_id} not visible in current frame.",
             )

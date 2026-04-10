@@ -76,7 +76,7 @@ def build_vision_fact_prompt(
             "对 S18，只有当同一页面里能明确确认 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO 这四个通道/项目都为 GO，且页面上看不到 PBIT GO、IN TEST、NOT RDY、NO GO 等中间态或失败态提示时，才可把 fcs_bit_result_visible 判为 seen。",
             "若页面仍出现 PBIT GO，哪怕同时能看到 GO 字样，也必须把 fcs_bit_result_visible 判为 not_seen 或 uncertain，因为这仍属于中间态，不是最终完成态。",
             "如果 FCSA/FCSB 显示的是 PBIT GO，而不是明确的 GO，就绝不能把 fcs_bit_result_visible 判为 seen；这类情况默认返回 not_seen，最多 uncertain。",
-            "对 fcs_bit_result_visible，confidence=1.0 只允许用于最终 GO 结果毫无歧义的情况；若仍有 PBIT GO、字样模糊、或只能推测是 GO，confidence 必须明显降低，且不要输出 seen。",
+            "对 fcs_bit_result_visible，只有在最终 GO 结果毫无歧义时才可输出 seen；若仍有 PBIT GO、字样模糊、或只能推测是 GO，就不要输出 seen。",
             "S18 的动作顺序要严格区分：先在 BIT FAILURES / BIT root 页面按 PB5 进入 FCS-MC BIT 页，之后才是按住 FCS BIT 开关并同时按 PB5 开始自检。只看到 FCS-MC、PBIT GO、FCSA/FCSB 等字样，不代表 S18 已完成。",
             "takeoff_trim_seen 只有在 FCS 页面上能看到按下 TAKEOFF TRIM 后的配平/舵面指示变化时才可为 seen。",
             "区分 S08 与 S18 时，可结合左 DDI FCS 页面里的 X 填充：S08 只要求进入 FCS 页面，此时飞控通道格子里仍可能有大量 X；若仍看到大量 X，就不能把后续 FCS 自检已完成说成 seen。",
@@ -114,7 +114,7 @@ def build_vision_fact_prompt(
             "For S18, mark fcs_bit_result_visible as seen only when the same page clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together, and the page does not show any intermediate or failed markers such as PBIT GO, IN TEST, NOT RDY, or NO GO.",
             "If PBIT GO is still visible anywhere on the page, then fcs_bit_result_visible must be not_seen or uncertain even if some GO text is also visible, because that is still an intermediate state rather than the final completed BIT result.",
             "If FCSA/FCSB read PBIT GO rather than an explicit final GO, never mark fcs_bit_result_visible as seen; default to not_seen, or at most uncertain if the text is ambiguous.",
-            "For fcs_bit_result_visible, confidence=1.0 is allowed only when the final GO result is unambiguous. If PBIT GO remains visible, the text is blurry, or GO is only inferred, lower confidence substantially and do not output seen.",
+            "For fcs_bit_result_visible, output seen only when the final GO result is unambiguous. If PBIT GO remains visible, the text is blurry, or GO is only inferred, do not output seen.",
             "Model the S18 sequence explicitly: first press PB5 on the BIT FAILURES / BIT root page to enter the FCS-MC BIT page, then hold the FCS BIT switch and press PB5 to start the BIT. Seeing FCS-MC, PBIT GO, or FCSA/FCSB text alone does not mean S18 is complete.",
             "takeoff_trim_seen may be seen only when the FCS page shows trim/control-surface changes after TAKEOFF TRIM.",
             "To distinguish S08 from later FCS BIT stages, use the left DDI FCS-page X fills carefully: S08 may still show many X marks in the flight-control channel boxes because no FCS RESET/BIT completion has happened yet. If many X marks remain, do not claim the later FCS BIT completion is seen.",
@@ -128,7 +128,7 @@ def build_vision_fact_prompt(
         "Context JSON:\n"
         f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
         "Output JSON shape exactly:\n"
-        '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain","source_frame_id":"1772872445010_000123","confidence":0.0,"evidence_note":"..."}]}'
+        '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain","source_frame_id":"1772872445010_000123","evidence_note":"..."}]}'
     )
 
 

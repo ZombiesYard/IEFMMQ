@@ -986,9 +986,6 @@ def _build_evidence_sources(
             }
             if isinstance(source_frame_id, str) and source_frame_id:
                 visual_entry["source_frame_id"] = source_frame_id
-            confidence = item.get("confidence")
-            if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
-                visual_entry["confidence"] = float(confidence)
             evidence_note = item.get("evidence_note")
             if isinstance(evidence_note, str) and evidence_note:
                 visual_entry["evidence_note"] = _sanitize_scalar(evidence_note)
@@ -1107,8 +1104,7 @@ def _compose_prompt(header: str, rules: list[str], payload: dict[str, Any]) -> s
         '{"diagnosis":{"step_id":"...","error_category":"..."},'
         '"next":{"step_id":"..."},'
         f'"overlay":{{"targets":{targets_shape},"evidence":{evidence_shape}}},'
-        '"explanations":["..."],'
-        '"confidence":0.0}'
+        '"explanations":["..."]}'
     )
 
 
@@ -1397,7 +1393,6 @@ def build_help_prompt_result(
             "next": {"step_id": next_step},
             "overlay": {"targets": example_targets, "evidence": example_overlay_evidence},
             "explanations": ["Use concise guidance." if lang == "en" else "请给出简洁指导。"],
-            "confidence": 0.75,
         }
         payload = {
             "allowed_step_ids": candidate_steps,
@@ -1490,8 +1485,7 @@ def build_help_prompt_result(
             '{"diagnosis":{"step_id":"...","error_category":"..."},'
             '"next":{"step_id":"..."},'
             f'"overlay":{{"targets":{compact_targets_example},"evidence":{compact_evidence_example}}},'
-            '"explanations":["..."],'
-            '"confidence":0.0}'
+            '"explanations":["..."]}'
         )
         if lang == "zh":
             compact_schema_line = (
@@ -1499,8 +1493,7 @@ def build_help_prompt_result(
                 '{"diagnosis":{"step_id":"...","error_category":"..."},'
                 '"next":{"step_id":"..."},'
                 f'"overlay":{{"targets":{compact_targets_example},"evidence":{compact_evidence_example}}},'
-                '"explanations":["..."],'
-                '"confidence":0.0}'
+                '"explanations":["..."]}'
             )
         compact_hint = {
             "inferred_step_id": deterministic_step_hint.get("inferred_step_id"),

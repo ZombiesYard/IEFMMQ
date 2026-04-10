@@ -72,14 +72,12 @@ def test_vision_fact_extractor_builds_two_image_request_and_parses_positive_fact
                             "fact_id": "fcs_bit_interaction_seen",
                             "state": "seen",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.91,
                             "evidence_note": "Right DDI BIT/FCS page shows active FCS BIT.",
                         },
                         {
                             "fact_id": "fcs_bit_result_visible",
                             "state": "seen",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.88,
                             "evidence_note": "BIT result text is visible on the right DDI.",
                         },
                     ]
@@ -150,7 +148,6 @@ def test_vision_fact_extractor_records_raw_json_and_prints_model_io(
                     "fact_id": "fcs_reset_seen",
                     "state": "seen",
                     "source_frame_id": "1772872445010_000123",
-                    "confidence": 0.93,
                     "evidence_note": "FCS reset visible on the left DDI.",
                 }
             ]
@@ -200,7 +197,6 @@ def test_vision_fact_extractor_returns_uncertain_when_model_is_unsure(tmp_path: 
                             "fact_id": "fcs_reset_seen",
                             "state": "uncertain",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.22,
                             "evidence_note": "FCS page is too blurry to confirm reset marks.",
                         }
                     ]
@@ -267,7 +263,6 @@ def test_vision_fact_extractor_coerces_unknown_source_frame_id_to_default(tmp_pa
                             "fact_id": "fcs_reset_seen",
                             "state": "seen",
                             "source_frame_id": "unknown_frame_from_model",
-                            "confidence": 0.82,
                             "evidence_note": "Reset marks appear cleared.",
                         }
                     ]
@@ -333,7 +328,6 @@ def test_vision_fact_extractor_uses_only_successful_frame_ids_in_prompt_and_meta
                             "fact_id": "fcs_page_visible",
                             "state": "seen",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.91,
                             "evidence_note": "FCS page is visible on the surviving frame.",
                         }
                     ]
@@ -376,7 +370,6 @@ def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: 
                             "fact_id": fact_id,
                             "state": "not_seen",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.84,
                             "evidence_note": f"{fact_id} is confidently not visible in this frame.",
                         }
                         for fact_id in VISION_FACT_IDS
@@ -437,7 +430,6 @@ def test_vision_fact_extractor_uses_configured_fact_subset_without_keyerror(tmp_
                             "fact_id": "fcs_page_visible",
                             "state": "seen",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.95,
                             "evidence_note": "FCS page is visible.",
                         }
                     ]
@@ -477,7 +469,6 @@ def test_vision_fact_extractor_schema_includes_left_ddi_fcs_page_button_visible(
                             "fact_id": "left_ddi_fcs_page_button_visible",
                             "state": "seen",
                             "source_frame_id": "1772872445010_000123",
-                            "confidence": 0.97,
                             "evidence_note": "Left DDI clearly shows the FCS button label at PB15.",
                         }
                     ]

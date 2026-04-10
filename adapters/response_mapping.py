@@ -60,12 +60,6 @@ def _collect_allowed_evidence_refs(request: TutorRequest | None) -> set[str]:
     return collect_evidence_refs_from_context(request.context)
 
 
-def _coerce_confidence(raw: Any) -> float | None:
-    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-        return None
-    return float(raw)
-
-
 def _extract_observability_metadata(
     request: TutorRequest | None,
 ) -> tuple[str | None, bool, list[str]]:
@@ -89,14 +83,6 @@ def _extract_observability_metadata(
     else:
         requires_visual_confirmation = compute_requires_visual_confirmation(observability, requirements)
     return observability, requires_visual_confirmation, requirements
-
-
-def _downgrade_confidence(confidence: float, observability_status: str | None) -> float:
-    if observability_status == "partial":
-        return min(confidence, 0.74)
-    if observability_status == "unobservable":
-        return min(confidence, 0.49)
-    return confidence
 
 
 def _visual_confirmation_note(observability_status: str | None, *, lang: str) -> str:
@@ -131,27 +117,14 @@ def _annotate_response_metadata(
         if isinstance(next_step, Mapping):
             metadata["next"] = dict(next_step)
 
-    raw_confidence = _coerce_confidence(help_obj.get("confidence") if isinstance(help_obj, Mapping) else None)
     observability_status, requires_visual_confirmation, _requirements = _extract_observability_metadata(request)
-
-    if raw_confidence is not None:
-        metadata["model_confidence"] = raw_confidence
 
     if observability_status is not None:
         metadata["observability_status"] = observability_status
     metadata["requires_visual_confirmation"] = bool(requires_visual_confirmation)
 
-    effective_confidence = raw_confidence
-    if raw_confidence is not None and requires_visual_confirmation:
-        effective_confidence = _downgrade_confidence(raw_confidence, observability_status)
-        metadata["confidence_adjustment_reason"] = f"observability:{observability_status or 'unspecified'}"
-        metadata["confidence_adjusted"] = effective_confidence != raw_confidence
+    if requires_visual_confirmation:
         metadata["evidence_strength"] = "limited"
-    elif raw_confidence is not None:
-        metadata["confidence_adjusted"] = False
-
-    if effective_confidence is not None:
-        metadata["effective_confidence"] = effective_confidence
 
     if requires_visual_confirmation:
         explanations = _append_unique_explanation(

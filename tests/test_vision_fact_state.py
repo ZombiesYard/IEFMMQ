@@ -36,7 +36,6 @@ def _obs(
                 fact_id=fact_id,
                 state=state,
                 source_frame_id=frame_id,
-                confidence=0.9 if state == "seen" else 0.2,
                 expires_after_ms=600000 if fact_id != "fcs_page_visible" else 2000,
                 evidence_note=f"{fact_id}:{state}",
                 observed_at_wall_ms=trigger_wall_ms,
@@ -115,7 +114,6 @@ def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfil
                     fact_id="fcs_bit_result_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
-                    confidence=0.95,
                     expires_after_ms=600000,
                     evidence_note="Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO.",
                     result_kind="bad-value",
@@ -141,7 +139,6 @@ def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen
                     fact_id="fcs_bit_result_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
-                    confidence=1.0,
                     expires_after_ms=600000,
                     evidence_note="Right DDI FCS-MC page shows PBIT GO for FCSA and FCSB.",
                 )
@@ -153,7 +150,7 @@ def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen
 
     assert snapshot["fcs_bit_result_visible"]["result_kind"] == "intermediate_go"
     assert snapshot["fcs_bit_result_visible"]["state"] == "not_seen"
-    assert snapshot["fcs_bit_result_visible"]["confidence"] == 0.25
+    assert "confidence" not in snapshot["fcs_bit_result_visible"]
 
 
 def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_seen() -> None:
@@ -168,7 +165,6 @@ def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_see
                     fact_id="fcs_bit_result_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
-                    confidence=1.0,
                     expires_after_ms=600000,
                     evidence_note="Right DDI FCS-MC page shows GO status for MC1, MC2, FCSA, and FCSB, indicating completed BIT results.",
                 )
@@ -180,7 +176,7 @@ def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_see
 
     assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
     assert snapshot["fcs_bit_result_visible"]["state"] == "uncertain"
-    assert snapshot["fcs_bit_result_visible"]["confidence"] == 0.5
+    assert "confidence" not in snapshot["fcs_bit_result_visible"]
 
 
 def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
@@ -213,7 +209,6 @@ def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
                     fact_id="fcs_bit_result_visible",
                     state="uncertain",
                     source_frame_id="1772872445010_000123",
-                    confidence=0.33,
                     expires_after_ms=600000,
                     evidence_note="BIT text too blurry.",
                 ),
@@ -221,7 +216,6 @@ def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
                     fact_id="fcs_bit_interaction_seen",
                     state="seen",
                     source_frame_id="1772872445010_000123",
-                    confidence=0.91,
                     expires_after_ms=600000,
                     evidence_note="BIT page shows active FCS test.",
                 ),

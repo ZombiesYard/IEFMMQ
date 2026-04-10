@@ -34,7 +34,6 @@ def _valid_help_response() -> dict:
             "Power is available but APU is still off.",
             "Turn on APU before engine crank.",
         ],
-        "confidence": 0.87,
     }
 
 
@@ -54,14 +53,6 @@ def test_help_response_schema_injects_step_and_target_enums() -> None:
 
 def test_validate_help_response_accepts_valid_payload() -> None:
     validate_help_response(_valid_help_response())
-
-
-@pytest.mark.parametrize("confidence", [0.0, 1.0])
-def test_validate_help_response_accepts_confidence_boundaries(confidence: float) -> None:
-    payload = _valid_help_response()
-    payload["confidence"] = confidence
-
-    validate_help_response(payload)
 
 
 def test_validate_help_response_accepts_multiple_overlay_targets_with_evidence() -> None:
@@ -121,9 +112,9 @@ def test_validate_help_response_reports_invalid_target_path() -> None:
 
 def test_validate_help_response_reports_type_error_path() -> None:
     payload = _valid_help_response()
-    payload["confidence"] = "high"
+    payload["explanations"] = "high"
 
-    with pytest.raises(ValidationError, match=r"\$\.confidence"):
+    with pytest.raises(ValidationError, match=r"\$\.explanations"):
         validate_help_response(payload)
 
 
@@ -214,15 +205,6 @@ def test_validate_help_response_rejects_empty_explanations_array() -> None:
     payload["explanations"] = []
 
     with pytest.raises(ValidationError, match=r"\$\.explanations"):
-        validate_help_response(payload)
-
-
-@pytest.mark.parametrize("confidence", [-0.01, 1.01])
-def test_validate_help_response_rejects_confidence_out_of_range(confidence: float) -> None:
-    payload = _valid_help_response()
-    payload["confidence"] = confidence
-
-    with pytest.raises(ValidationError, match=r"\$\.confidence"):
         validate_help_response(payload)
 
 

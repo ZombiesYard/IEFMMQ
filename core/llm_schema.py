@@ -196,7 +196,7 @@ def build_help_response_schema(
         "title": "HelpResponse",
         "type": "object",
         "additionalProperties": False,
-        "required": ["diagnosis", "next", "overlay", "explanations", "confidence"],
+        "required": ["diagnosis", "next", "overlay", "explanations"],
         "properties": {
             "diagnosis": {
                 "type": "object",
@@ -239,7 +239,6 @@ def build_help_response_schema(
                 "minItems": 1,
                 "items": {"type": "string", "minLength": 1},
             },
-            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         },
     }
     return schema
