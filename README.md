@@ -167,6 +167,29 @@ Outputs are written under `tools/.captures/<session_id>/prelabels/`:
 - `raw_model_outputs.jsonl`: prompt/response metadata and parser warnings
 - `prelabels_failures.jsonl`: per-image failures without aborting the batch
 
+Once Label Studio review is complete, convert the exported project JSON into a
+reviewed dataset plus bilingual SFT JSONL files:
+
+```bash
+python3 -m tools.export_vision_sft_dataset \
+  --input tools/project-1-at-2026-04-10-17-49-13000d76.json \
+  --output-dir datasets/vision_sft \
+  --lang both \
+  --overwrite
+```
+
+This writes:
+
+- `datasets/vision_sft/reviewed.jsonl`
+- `datasets/vision_sft/sft_en.jsonl`
+- `datasets/vision_sft/sft_zh.jsonl`
+- `datasets/vision_sft/stats.json`
+
+The exported SFT samples keep the single composite-panel image as a data URL and
+use the medium-rule visual-fact prompt, but they do not expose `frame_id`,
+`session_id`, `artifact_image_path`, `raw_image_path`, `source_frame_id`, or
+`confidence` to the model.
+
 For WSL review, install Label Studio into a separate virtual environment so it
 does not interfere with the project environment:
 
