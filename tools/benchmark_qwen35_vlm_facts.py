@@ -800,20 +800,25 @@ def _make_charts(output_dir: Path, metrics_by_model: Mapping[str, Mapping[str, A
         for fact_id in CORE_FACT_IDS:
             matrix = metrics["fact_scores"][fact_id]["confusion_matrix"]
             values = [[int(matrix[gold][pred]) for pred in ALLOWED_STATES] for gold in ALLOWED_STATES]
-            plt.figure(figsize=(5, 4))
-            plt.imshow(values, cmap="Blues")
-            plt.title(f"{fact_id} {model_label}")
-            plt.xticks(range(len(ALLOWED_STATES)), ALLOWED_STATES, rotation=25, ha="right")
-            plt.yticks(range(len(ALLOWED_STATES)), ALLOWED_STATES)
-            plt.xlabel("predicted")
-            plt.ylabel("gold")
+            fig, ax = plt.subplots(figsize=(5.8, 5.2))
+            ax.imshow(values, cmap="Blues")
+            ax.set_title(f"{fact_id} {model_label}", pad=14)
+            ax.set_xticks(range(len(ALLOWED_STATES)))
+            ax.set_xticklabels(ALLOWED_STATES, rotation=0, ha="center")
+            ax.set_yticks(range(len(ALLOWED_STATES)))
+            ax.set_yticklabels(ALLOWED_STATES)
+            ax.set_xlabel("Predicted label", labelpad=14)
+            ax.set_ylabel("Gold label", labelpad=18)
+            ax.tick_params(axis="x", pad=8)
+            ax.tick_params(axis="y", pad=8)
             for row_index, row in enumerate(values):
                 for col_index, value in enumerate(row):
-                    plt.text(col_index, row_index, str(value), ha="center", va="center")
-            plt.tight_layout()
+                    ax.text(col_index, row_index, str(value), ha="center", va="center")
+            fig.tight_layout()
+            fig.subplots_adjust(left=0.24, bottom=0.19)
             path = chart_dir / f"confusion_{fact_id}_{model_label}.png"
-            plt.savefig(path)
-            plt.close()
+            fig.savefig(path, dpi=160)
+            plt.close(fig)
             generated.append(str(path))
 
     return generated
@@ -969,24 +974,26 @@ def _make_pil_charts(chart_dir: Path, metrics_by_model: Mapping[str, Mapping[str
         for fact_id in CORE_FACT_IDS:
             matrix = metrics["fact_scores"][fact_id]["confusion_matrix"]
             max_cell = max(1, *[int(matrix[gold][pred]) for gold in ALLOWED_STATES for pred in ALLOWED_STATES])
-            cell = 92
-            width = 430
-            height = 390
+            cell = 96
+            grid_left = 145
+            grid_top = 125
+            width = 490
+            height = 440
             image = Image.new("RGB", (width, height), "white")
             draw = ImageDraw.Draw(image)
             _draw_text(draw, (25, 18), f"{fact_id} {model_label}")
-            _draw_text(draw, (160, 45), "predicted")
-            _draw_text(draw, (12, 188), "gold")
+            _draw_text(draw, (grid_left + 58, 58), "Predicted label")
+            _draw_text(draw, (20, grid_top - 28), "Gold label")
             for col_index, pred in enumerate(ALLOWED_STATES):
-                _draw_text(draw, (120 + col_index * cell, 70), pred)
+                _draw_text(draw, (grid_left + col_index * cell + 8, 88), pred)
             for row_index, gold in enumerate(ALLOWED_STATES):
-                _draw_text(draw, (20, 105 + row_index * cell), gold)
+                _draw_text(draw, (24, grid_top + row_index * cell + 34), gold)
                 for col_index, pred in enumerate(ALLOWED_STATES):
                     value = int(matrix[gold][pred])
                     intensity = int(245 - 170 * (value / max_cell))
                     color = (intensity, intensity + 5 if intensity < 250 else 250, 255)
-                    left = 120 + col_index * cell
-                    top = 100 + row_index * cell
+                    left = grid_left + col_index * cell
+                    top = grid_top + row_index * cell
                     draw.rectangle((left, top, left + cell - 5, top + cell - 5), fill=color, outline="#404040")
                     _draw_text(draw, (left + 36, top + 35), str(value))
             path = chart_dir / f"confusion_{fact_id}_{model_label}.png"
