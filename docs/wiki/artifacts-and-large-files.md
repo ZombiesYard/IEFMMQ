@@ -10,7 +10,9 @@ Large files should be tracked with Git LFS. The repository includes `.gitattribu
 - `*.bin`
 - `*.pt`
 - `datasets/**/*.jsonl`
-- selected model metadata files
+- `models/**/tokenizer.json`
+
+Small model metadata such as adapter configs, processor configs, training summaries, and chat templates should remain normal Git files so they stay human-reviewable in diffs.
 
 Install Git LFS before committing large artifacts:
 

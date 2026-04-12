@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from core.llm_schema import validate_help_response
+from core.types import Observation, TutorRequest
 from simtutor.__main__ import main
 from simtutor.replay_eval import (
     ReplayEvalCase,
@@ -70,6 +72,27 @@ def test_run_replay_eval_suite_does_not_print_dry_run_actions(
 
     captured = capsys.readouterr()
     assert "dry_run_actions" not in captured.out
+
+
+def test_replay_eval_oracle_help_response_matches_schema_without_top_level_confidence() -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+    case = suite.cases[0]
+    model = ReplayEvalOracleModel(case, lang=suite.lang)
+    request = TutorRequest(
+        context={
+            "recent_deltas": [
+                {
+                    "ui_target": case.expectation.overlay_target,
+                }
+            ]
+        }
+    )
+
+    response = model.explain_error(Observation(), request)
+    help_response = response.metadata["help_response"]
+
+    assert "confidence" not in help_response
+    validate_help_response(help_response)
 
 
 def test_cli_replay_eval_writes_report(monkeypatch, tmp_path: Path) -> None:

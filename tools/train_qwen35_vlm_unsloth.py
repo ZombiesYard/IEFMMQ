@@ -140,6 +140,19 @@ def _split_rows(
     return ListDataset(train_rows), ListDataset(eval_rows)
 
 
+def _select_train_rows(
+    rows: Sequence[dict[str, Any]],
+    *,
+    max_train_samples: int,
+    seed: int,
+) -> list[dict[str, Any]]:
+    selected = list(rows)
+    if max_train_samples <= 0 or max_train_samples >= len(selected):
+        return selected
+    random.Random(seed).shuffle(selected)
+    return selected[:max_train_samples]
+
+
 def train_qwen35_vlm_unsloth(
     *,
     train_jsonl: Sequence[str | Path],
@@ -171,8 +184,7 @@ def train_qwen35_vlm_unsloth(
     output_path.mkdir(parents=True, exist_ok=True)
 
     rows = _load_rows(train_jsonl)
-    if max_train_samples > 0:
-        rows = rows[:max_train_samples]
+    rows = _select_train_rows(rows, max_train_samples=max_train_samples, seed=seed)
     if not rows:
         raise ValueError("No training rows were loaded")
 
