@@ -301,7 +301,7 @@ def _coerce_s18_result_fact_state(
     fact_id: str,
     state: str,
     result_kind: str | None,
- ) -> str:
+) -> str:
     if fact_id != "fcs_bit_result_visible" or state != "seen":
         return state
     if result_kind == "final_go":
