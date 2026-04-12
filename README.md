@@ -2,7 +2,6 @@
 
 [![Build Status](https://github.com/ZombiesYard/IEFMMQ/actions/workflows/ci-guard.yml/badge.svg)](https://github.com/ZombiesYard/IEFMMQ/actions/workflows/ci-guard.yml)
 [![Code Coverage](https://codecov.io/gh/ZombiesYard/IEFMMQ/branch/main/graph/badge.svg)](https://codecov.io/gh/ZombiesYard/IEFMMQ)
-[![Coverage Status](https://coveralls.io/repos/github/ZombiesYard/IEFMMQ/badge.svg?branch=main)](https://coveralls.io/github/ZombiesYard/IEFMMQ?branch=main)
 [![Last Commit](https://img.shields.io/github/last-commit/ZombiesYard/IEFMMQ?logo=github)](https://github.com/ZombiesYard/IEFMMQ/commits/main)
 [![Documentation](https://img.shields.io/badge/docs-wiki-0EA5E9?logo=readthedocs&logoColor=white)](https://github.com/ZombiesYard/IEFMMQ/tree/main/docs/wiki)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
