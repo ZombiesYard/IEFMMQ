@@ -1,0 +1,17 @@
+model,fact_id,accuracy,macro_f1,seen_precision,seen_recall,seen_f1,seen_false_positives,seen_false_negatives
+base,fcs_page_visible,0.677778,0.398974,0.885965,0.691781,0.776923,13,45
+base,bit_root_page_visible,0.577778,0.375998,0.947368,0.327273,0.486486,2,74
+base,bit_page_failure_visible,0.994444,0.664269,1.0,1.0,1.0,0,0
+base,right_ddi_fcsmc_page_visible,0.916667,0.598668,0.745763,1.0,0.854369,15,0
+base,right_ddi_in_test_visible,0.994444,0.659513,0.964286,1.0,0.981818,1,0
+base,fcs_bit_result_visible,0.888889,0.371463,0.666667,0.1,0.173913,1,18
+base,ins_alignment_page_visible,0.4,0.223802,0.727273,0.070796,0.129032,3,105
+base,ins_go,0.911111,0.471115,0.75,0.333333,0.461538,2,12
+lora,fcs_page_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,bit_root_page_visible,0.977778,0.651082,0.981818,0.981818,0.981818,2,2
+lora,bit_page_failure_visible,0.994444,0.664269,1.0,1.0,1.0,0,0
+lora,right_ddi_fcsmc_page_visible,0.988889,0.65679,0.956522,1.0,0.977778,2,0
+lora,right_ddi_in_test_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcs_bit_result_visible,0.977778,0.635499,1.0,0.85,0.918919,0,3
+lora,ins_alignment_page_visible,0.855556,0.553212,0.817518,0.99115,0.896,25,1
+lora,ins_go,0.961111,0.605768,1.0,0.722222,0.83871,0,5

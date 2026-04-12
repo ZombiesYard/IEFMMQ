@@ -1,0 +1,16 @@
+{
+  "schema_version": "v1",
+  "has_comparison": true,
+  "fact_accuracy_delta": 0.174305,
+  "macro_f1_delta": 0.167019,
+  "seen_f1_delta": 0.343643,
+  "sample_exact_match_delta": 0.594445,
+  "critical_false_positive_delta": -17,
+  "recommend_simtutor_chain_validation": true,
+  "benchmark_kind": "contaminated_dev_set",
+  "reviewed_jsonl": "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/reviewed.jsonl",
+  "base_model": "Qwen/Qwen3.5-9B-Base",
+  "adapter": "/scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter",
+  "sample_count": 180,
+  "lang": "en"
+}

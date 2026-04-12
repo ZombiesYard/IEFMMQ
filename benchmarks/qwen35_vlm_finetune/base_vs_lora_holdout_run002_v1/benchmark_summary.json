@@ -1,0 +1,45 @@
+{
+  "output_dir": "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1",
+  "comparison": {
+    "schema_version": "v1",
+    "has_comparison": true,
+    "fact_accuracy_delta": 0.155,
+    "macro_f1_delta": 0.160529,
+    "seen_f1_delta": 0.366627,
+    "sample_exact_match_delta": 0.3,
+    "critical_false_positive_delta": 2,
+    "recommend_simtutor_chain_validation": false,
+    "benchmark_kind": "heldout_new_session",
+    "reviewed_jsonl": "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/holdout_run002/reviewed.jsonl",
+    "base_model": "Qwen/Qwen3.5-9B-Base",
+    "adapter": "/scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter",
+    "sample_count": 50,
+    "lang": "en"
+  },
+  "charts": [
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/overall_accuracy.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/fact_f1_by_model.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/seen_f1_by_fact.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/critical_false_positives.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_fcs_page_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_bit_root_page_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_bit_page_failure_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_right_ddi_fcsmc_page_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_right_ddi_in_test_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_fcs_bit_result_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_ins_alignment_page_visible_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_ins_go_base.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_fcs_page_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_bit_root_page_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_bit_page_failure_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_right_ddi_fcsmc_page_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_right_ddi_in_test_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_fcs_bit_result_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_ins_alignment_page_visible_lora.png",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_holdout_run002_v1/charts/confusion_ins_go_lora.png"
+  ],
+  "models": [
+    "base",
+    "lora"
+  ]
+}

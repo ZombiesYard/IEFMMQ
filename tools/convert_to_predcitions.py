@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+import argparse
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -19,6 +20,7 @@ FACT_FIELDS = [
 
 VALID_STATES = {"seen", "not_seen", "uncertain"}
 TO_NAME = "panel_image"
+DEFAULT_SCORE = 0.95
 
 
 def build_choice_result(field: str, value: str) -> Dict[str, Any]:
@@ -89,7 +91,7 @@ def normalize_path_string(value: Any) -> Any:
     return value.replace("\\", "/")
 
 
-def convert_task(task: Dict[str, Any], score: float = 0.95) -> Dict[str, Any]:
+def convert_task(task: Dict[str, Any], score: float = DEFAULT_SCORE) -> Dict[str, Any]:
     data = task.get("data", {})
     meta = task.get("meta", {})
 
@@ -144,10 +146,14 @@ def convert_task(task: Dict[str, Any], score: float = 0.95) -> Dict[str, Any]:
     if meta:
         converted["meta"] = meta
 
+    for passthrough_key in ("id", "inner_id", "created_at", "updated_at"):
+        if passthrough_key in task:
+            converted[passthrough_key] = task[passthrough_key]
+
     return converted
 
 
-def convert_file(input_path: Path, output_path: Path) -> None:
+def convert_file(input_path: Path, output_path: Path, *, score: float = DEFAULT_SCORE) -> None:
     if not input_path.exists():
         raise FileNotFoundError(f"Input JSON not found: {input_path}")
 
@@ -157,7 +163,7 @@ def convert_file(input_path: Path, output_path: Path) -> None:
     if not isinstance(tasks, list):
         raise ValueError("Input JSON top-level must be a list of tasks.")
 
-    converted_tasks = [convert_task(task) for task in tasks]
+    converted_tasks = [convert_task(task, score=score) for task in tasks]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as f:
@@ -168,18 +174,72 @@ def convert_file(input_path: Path, output_path: Path) -> None:
     print(f"Output: {output_path}")
 
 
-def resolve_default_paths() -> tuple[Path, Path]:
-    script_dir = Path(__file__).resolve().parent
-    prelabels_dir = script_dir / "prelabels"
+def resolve_paths(
+    *,
+    input_path: str | None,
+    output_path: str | None,
+    session_dir: str | None,
+    prelabels_dirname: str,
+) -> tuple[Path, Path]:
+    if input_path:
+        resolved_input = Path(input_path).expanduser()
+    else:
+        base_dir = Path(session_dir).expanduser() if session_dir else Path(__file__).resolve().parent
+        resolved_input = base_dir / prelabels_dirname / "label_studio_tasks.json"
 
-    input_json = prelabels_dir / "label_studio_tasks.json"
-    output_json = prelabels_dir / "label_studio_tasks_with_predictions.json"
-    return input_json, output_json
+    if output_path:
+        resolved_output = Path(output_path).expanduser()
+    else:
+        resolved_output = resolved_input.with_name("label_studio_tasks_with_predictions.json")
+
+    return resolved_input, resolved_output
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Convert generated Label Studio task JSON into a task JSON with "
+            "AI prelabels stored as Label Studio predictions."
+        )
+    )
+    parser.add_argument(
+        "--session-dir",
+        default=None,
+        help="Capture session directory, e.g. tools/.captures/fa18c-coldstart-run-002.",
+    )
+    parser.add_argument(
+        "--prelabels-dirname",
+        default="prelabels",
+        help="Prelabels subdirectory under --session-dir. Defaults to prelabels.",
+    )
+    parser.add_argument(
+        "--input",
+        default=None,
+        help="Explicit input label_studio_tasks.json path. Overrides --session-dir.",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Explicit output JSON path. Defaults to label_studio_tasks_with_predictions.json next to input.",
+    )
+    parser.add_argument(
+        "--score",
+        type=float,
+        default=DEFAULT_SCORE,
+        help="Prediction score written to Label Studio predictions.",
+    )
+    return parser
 
 
 def main() -> None:
-    input_json, output_json = resolve_default_paths()
-    convert_file(input_json, output_json)
+    args = build_arg_parser().parse_args()
+    input_json, output_json = resolve_paths(
+        input_path=args.input,
+        output_path=args.output,
+        session_dir=args.session_dir,
+        prelabels_dirname=args.prelabels_dirname,
+    )
+    convert_file(input_json, output_json, score=args.score)
 
 
 if __name__ == "__main__":

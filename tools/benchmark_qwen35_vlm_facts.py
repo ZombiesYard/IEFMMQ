@@ -794,6 +794,36 @@ def _make_pil_charts(chart_dir: Path, metrics_by_model: Mapping[str, Mapping[str
     def _draw_text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, fill: str = "#202020") -> None:
         draw.text(xy, text, fill=fill)
 
+    def _short_fact_label(label: str) -> str:
+        replacements = {
+            "right_ddi": "r_ddi",
+            "visible": "vis",
+            "alignment": "align",
+            "failure": "fail",
+            "result": "result",
+            "page": "page",
+        }
+        shortened = label
+        for old, new in replacements.items():
+            shortened = shortened.replace(old, new)
+        return shortened
+
+    def _wrap_label(label: str, *, max_line_chars: int = 12) -> list[str]:
+        words = _short_fact_label(label).split("_")
+        lines: list[str] = []
+        current = ""
+        for word in words:
+            candidate = word if not current else f"{current}_{word}"
+            if len(candidate) <= max_line_chars:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines or [label]
+
     def _save_grouped_bars(
         path: Path,
         *,
@@ -802,12 +832,12 @@ def _make_pil_charts(chart_dir: Path, metrics_by_model: Mapping[str, Mapping[str
         values_by_label: Mapping[str, Sequence[float]],
         max_value: float,
     ) -> None:
-        width = max(900, 90 * len(categories) + 180)
-        height = 560
+        width = max(1100, 140 * len(categories) + 220)
+        height = 660
         margin_left = 90
         margin_right = 40
         margin_top = 55
-        margin_bottom = 145
+        margin_bottom = 205
         plot_width = width - margin_left - margin_right
         plot_height = height - margin_top - margin_bottom
         image = Image.new("RGB", (width, height), "white")
@@ -835,7 +865,9 @@ def _make_pil_charts(chart_dir: Path, metrics_by_model: Mapping[str, Mapping[str
                 draw.rectangle((left, top, right, bottom), fill=palette[label_index % len(palette)])
                 _draw_text(draw, (left, max(margin_top, top - 15)), f"{raw_value:.2f}" if max_value <= 1 else str(int(raw_value)))
             label_x = int(margin_left + category_width * category_index + 4)
-            _draw_text(draw, (label_x, margin_top + plot_height + 12), category[:26])
+            label_y = margin_top + plot_height + 12
+            for line_index, line in enumerate(_wrap_label(category)):
+                _draw_text(draw, (label_x, label_y + line_index * 14), line)
 
         legend_x = margin_left
         legend_y = height - 35
