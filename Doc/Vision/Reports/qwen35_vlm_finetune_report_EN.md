@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This report studies a task-oriented multimodal learning problem: whether a small set of human-reviewed cockpit screenshots is sufficient to adapt `Qwen/Qwen3.5-9B-Base` into a reliable structured visual fact extractor for the F/A-18C cold-start procedure. The experiment uses a single composite cockpit-panel image as input and trains the model to produce JSON labels for eight core visual facts. The fine-tuning method is Unsloth 4-bit LoRA VLM SFT. The training set is derived from 180 human-reviewed Run-001 images and exported into English and Chinese SFT variants, yielding 360 training examples. Evaluation is performed in two stages: Run-001 as a contaminated development set and Run-002 as a heldout new session.
+This report studies a task-oriented multimodal learning problem: whether a small set of human-reviewed cockpit screenshots is sufficient to adapt `Qwen/Qwen3.5-9B-Base` into a reliable structured visual fact extractor for the F/A-18C cold-start procedure. The experiment uses a single composite cockpit-panel image as input and trains the model to produce JSON labels for eight core visual facts. The fine-tuning stack combines Unsloth VLM loading and 4-bit/LoRA preparation, PEFT LoRA adapters, and the TRL `SFTTrainer` supervised fine-tuning loop. The training set is derived from 180 human-reviewed Run-001 images and exported into English and Chinese SFT variants, yielding 360 training examples. Evaluation is performed in two stages: Run-001 as a contaminated development set and Run-002 as a heldout new session.
 
 The results show that LoRA-v1 substantially improves structured output and most cockpit visual facts. On Run-002, fact accuracy improves from `0.7600` to `0.9150`, and seen F1 improves from `0.4714` to `0.8380`. However, `ins_go` produces 13 false positives on Run-002, revealing that the current target ontology compresses a higher-level procedural state into a single-frame visual fact. The experiment therefore supports the hypothesis that small human-reviewed domain data can significantly improve structured VLM extraction, while also showing that some targets must be redesigned into lower-level, directly observable visual evidence.
 
@@ -174,7 +174,7 @@ The Chinese version uses the same image and the same fact labels, but the system
 }
 ```
 
-This format is chosen for several reasons. It aligns with Qwen/OpenAI-compatible multimodal chat APIs and with the message format expected by Unsloth VLM SFT. It also keeps the learning target clear: image plus instruction should produce a structured JSON object. The assistant target contains only `summary` and `facts`. Each fact contains only `fact_id`, `state`, and `evidence_note`.
+This format is chosen for several reasons. It aligns with Qwen/OpenAI-compatible multimodal chat APIs and with the message format expected by Unsloth/TRL multimodal SFT. It also keeps the learning target clear: image plus instruction should produce a structured JSON object. The assistant target contains only `summary` and `facts`. Each fact contains only `fact_id`, `state`, and `evidence_note`.
 
 The training target intentionally excludes `frame_id`, `session_id`, `artifact_image_path`, `raw_image_path`, `source_frame_id`, and `confidence`. These fields are either dataset management metadata or external identifiers produced by the capture/runtime framework; they should not be generated from image content. `confidence` is also excluded because self-reported model confidence is not calibrated and can create a misleading sense of reliability. The VLM is trained to output auditable states and evidence notes, not pseudo-probabilities.
 
@@ -182,7 +182,7 @@ Bilingual SFT is used to increase instruction diversity rather than visual diver
 
 ## 5. Fine-Tuning Details
 
-The base model is `Qwen/Qwen3.5-9B-Base`. Fine-tuning uses Unsloth 4-bit LoRA VLM SFT. The LoRA adapter is stored at:
+The base model is `Qwen/Qwen3.5-9B-Base`. More precisely, this experiment uses an Unsloth + PEFT LoRA + TRL `SFTTrainer` stack: Unsloth handles VLM loading, 4-bit preparation, LoRA injection, and vision batch collation; PEFT defines the LoRA adapter format; and TRL `SFTTrainer` runs the supervised fine-tuning loop. The LoRA adapter is stored at:
 
 ```text
 /scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter
@@ -202,7 +202,7 @@ The training set consists of the Run-001 bilingual SFT data: 360 total examples,
 | `lora_dropout` | 0.0 | First experiment prioritizes learnability and avoids extra regularization instability |
 | `seed` | 3407 | Makes the split and training setup reproducible |
 
-4-bit LoRA is chosen for resource efficiency. Full fine-tuning a 9B VLM would require significantly more memory and training time, while this task has a small dataset and a constrained output space. LoRA is therefore a suitable first adaptation method. The `r=16` and `alpha=16` setting provides moderate adaptation capacity: enough to learn cockpit layout and JSON formatting, but not as large as a high-capacity adapter that might overfit the small dataset more aggressively.
+4-bit LoRA is chosen for resource efficiency. In this setup, Unsloth performs the 4-bit VLM loading and preparation, PEFT/LoRA provides the trainable adapter, and TRL `SFTTrainer` runs the SFT loop. Full fine-tuning a 9B VLM would require significantly more memory and training time, while this task has a small dataset and a constrained output space. LoRA is therefore a suitable first adaptation method. The `r=16` and `alpha=16` setting provides moderate adaptation capacity: enough to learn cockpit layout and JSON formatting, but not as large as a high-capacity adapter that might overfit the small dataset more aggressively.
 
 The number of epochs is set to 4 as a first-pass compromise. With only 360 examples, too few epochs may not reliably teach the model the fixed schema and fact boundaries. Too many epochs may overfit Run-001. The final training record is:
 
@@ -355,6 +355,6 @@ Fourth, refine evaluation. Fact accuracy and seen F1 should still be reported, b
 
 ## 10. Conclusion
 
-This experiment completes a full loop from cockpit image capture, AI pre-labeling, human review, bilingual SFT export, Unsloth LoRA fine-tuning, and base-vs-LoRA benchmarking. The results show that `Qwen/Qwen3.5-9B-Base` can be substantially adapted to SimTutor cockpit visual fact extraction with a small amount of reviewed domain data. On the independent Run-002 benchmark, LoRA-v1 improves fact accuracy from `0.7600` to `0.9150` and seen F1 from `0.4714` to `0.8380`.
+This experiment completes a full loop from cockpit image capture, AI pre-labeling, human review, bilingual SFT export, Unsloth + PEFT LoRA + TRL SFTTrainer fine-tuning, and base-vs-LoRA benchmarking. The results show that `Qwen/Qwen3.5-9B-Base` can be substantially adapted to SimTutor cockpit visual fact extraction with a small amount of reviewed domain data. On the independent Run-002 benchmark, LoRA-v1 improves fact accuracy from `0.7600` to `0.9150` and seen F1 from `0.4714` to `0.8380`.
 
 At the same time, the `ins_go` false positives reveal a significant weakness in the current target design. The main contribution of this iteration is therefore not that the first ontology is complete, but that the workflow makes such weaknesses measurable. A more robust next iteration should decompose higher-level procedural states into lower-level visual evidence and evaluate them on a new independent session.

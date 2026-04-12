@@ -1,210 +1,108 @@
 ---
 base_model: Qwen/Qwen3.5-9B-Base
 library_name: peft
-pipeline_tag: text-generation
+pipeline_tag: image-text-to-text
 tags:
 - base_model:adapter:Qwen/Qwen3.5-9B-Base
+- qwen3.5
+- vision-language
 - lora
-- sft
-- transformers
-- trl
+- peft
 - unsloth
+- trl
+- sft
+- cockpit
+- visual-fact-extraction
 ---
 
-# Model Card for Model ID
+# SimTutor Qwen3.5-9B VLM LoRA Adapter
 
-<!-- Provide a quick summary of what the model is/does. -->
+This is a PEFT LoRA adapter for `Qwen/Qwen3.5-9B-Base`, trained for structured cockpit visual fact extraction.
 
+The adapter was trained with an Unsloth VLM workflow:
 
+- `unsloth.FastVisionModel` for base VLM loading and 4-bit preparation
+- `FastVisionModel.get_peft_model` for LoRA injection
+- `UnslothVisionDataCollator` for multimodal SFT batches
+- `trl.SFTTrainer` for the supervised fine-tuning loop
 
-## Model Details
+So the training stack is best described as:
 
-### Model Description
+```text
+Unsloth + PEFT LoRA + TRL SFTTrainer
+```
 
-<!-- Provide a longer summary of what this model is. -->
+## Intended Task
 
+Input: one composite F/A-18C cockpit panel image.
 
+Output: a JSON object containing a short summary and eight structured visual facts:
 
-- **Developed by:** [More Information Needed]
-- **Funded by [optional]:** [More Information Needed]
-- **Shared by [optional]:** [More Information Needed]
-- **Model type:** [More Information Needed]
-- **Language(s) (NLP):** [More Information Needed]
-- **License:** [More Information Needed]
-- **Finetuned from model [optional]:** [More Information Needed]
+- `fcs_page_visible`
+- `bit_root_page_visible`
+- `bit_page_failure_visible`
+- `right_ddi_fcsmc_page_visible`
+- `right_ddi_in_test_visible`
+- `fcs_bit_result_visible`
+- `ins_alignment_page_visible`
+- `ins_go`
 
-### Model Sources [optional]
+Each fact uses:
 
-<!-- Provide the basic links for the model. -->
+- `state`: one of `seen`, `not_seen`, `uncertain`
+- `evidence_note`: a short visual explanation
 
-- **Repository:** [More Information Needed]
-- **Paper [optional]:** [More Information Needed]
-- **Demo [optional]:** [More Information Needed]
+The adapter is not trained to emit `frame_id`, `source_frame_id`, `session_id`, file paths, or `confidence`.
 
-## Uses
+## Training Summary
 
-<!-- Address questions around how the model is intended to be used, including the foreseeable users of the model and those affected by the model. -->
+| Field | Value |
+|---|---:|
+| Base model | `Qwen/Qwen3.5-9B-Base` |
+| Source data | Run-001 reviewed cockpit screenshots |
+| Reviewed images | 180 |
+| SFT rows | 360 bilingual rows |
+| Train rows | 324 |
+| Eval rows | 36 |
+| Epochs | 4 |
+| Learning rate | 2e-4 |
+| LoRA rank | 16 |
+| LoRA alpha | 16 |
+| LoRA dropout | 0.0 |
+| Train loss | 0.57036 |
+| Final eval loss | 0.03269 |
 
-### Direct Use
+## Evaluation Summary
 
-<!-- This section is for the model use without fine-tuning or plugging into a larger ecosystem/app. -->
+On Run-002 heldout new session:
 
-[More Information Needed]
+| Metric | Base | LoRA-v1 |
+|---|---:|---:|
+| Fact accuracy | 0.7600 | 0.9150 |
+| Seen F1 | 0.4714 | 0.8380 |
+| Sample exact match | 0.0600 | 0.3600 |
+| Critical false positives | 13 | 15 |
 
-### Downstream Use [optional]
+Most facts improve substantially, but `ins_go` shows a concentrated false-positive failure mode. Future experiments should decompose `ins_go` into lower-level visual evidence.
 
-<!-- This section is for the model use when fine-tuned for a task, or when plugged into a larger ecosystem/app -->
+## Loading
 
-[More Information Needed]
+Load this adapter on top of `Qwen/Qwen3.5-9B-Base`.
 
-### Out-of-Scope Use
+```python
+from peft import PeftModel
+from unsloth import FastVisionModel
 
-<!-- This section addresses misuse, malicious use, and uses that the model will not work well for. -->
+model, processor = FastVisionModel.from_pretrained(
+    model_name="Qwen/Qwen3.5-9B-Base",
+    max_seq_length=4096,
+    load_in_4bit=True,
+    trust_remote_code=True,
+)
+model = PeftModel.from_pretrained(model, "path/to/adapter")
+model.eval()
+```
 
-[More Information Needed]
+## Limitations
 
-## Bias, Risks, and Limitations
-
-<!-- This section is meant to convey both technical and sociotechnical limitations. -->
-
-[More Information Needed]
-
-### Recommendations
-
-<!-- This section is meant to convey recommendations with respect to the bias, risk, and technical limitations. -->
-
-Users (both direct and downstream) should be made aware of the risks, biases and limitations of the model. More information needed for further recommendations.
-
-## How to Get Started with the Model
-
-Use the code below to get started with the model.
-
-[More Information Needed]
-
-## Training Details
-
-### Training Data
-
-<!-- This should link to a Dataset Card, perhaps with a short stub of information on what the training data is all about as well as documentation related to data pre-processing or additional filtering. -->
-
-[More Information Needed]
-
-### Training Procedure
-
-<!-- This relates heavily to the Technical Specifications. Content here should link to that section when it is relevant to the training procedure. -->
-
-#### Preprocessing [optional]
-
-[More Information Needed]
-
-
-#### Training Hyperparameters
-
-- **Training regime:** [More Information Needed] <!--fp32, fp16 mixed precision, bf16 mixed precision, bf16 non-mixed precision, fp16 non-mixed precision, fp8 mixed precision -->
-
-#### Speeds, Sizes, Times [optional]
-
-<!-- This section provides information about throughput, start/end time, checkpoint size if relevant, etc. -->
-
-[More Information Needed]
-
-## Evaluation
-
-<!-- This section describes the evaluation protocols and provides the results. -->
-
-### Testing Data, Factors & Metrics
-
-#### Testing Data
-
-<!-- This should link to a Dataset Card if possible. -->
-
-[More Information Needed]
-
-#### Factors
-
-<!-- These are the things the evaluation is disaggregating by, e.g., subpopulations or domains. -->
-
-[More Information Needed]
-
-#### Metrics
-
-<!-- These are the evaluation metrics being used, ideally with a description of why. -->
-
-[More Information Needed]
-
-### Results
-
-[More Information Needed]
-
-#### Summary
-
-
-
-## Model Examination [optional]
-
-<!-- Relevant interpretability work for the model goes here -->
-
-[More Information Needed]
-
-## Environmental Impact
-
-<!-- Total emissions (in grams of CO2eq) and additional considerations, such as electricity usage, go here. Edit the suggested text below accordingly -->
-
-Carbon emissions can be estimated using the [Machine Learning Impact calculator](https://mlco2.github.io/impact#compute) presented in [Lacoste et al. (2019)](https://arxiv.org/abs/1910.09700).
-
-- **Hardware Type:** [More Information Needed]
-- **Hours used:** [More Information Needed]
-- **Cloud Provider:** [More Information Needed]
-- **Compute Region:** [More Information Needed]
-- **Carbon Emitted:** [More Information Needed]
-
-## Technical Specifications [optional]
-
-### Model Architecture and Objective
-
-[More Information Needed]
-
-### Compute Infrastructure
-
-[More Information Needed]
-
-#### Hardware
-
-[More Information Needed]
-
-#### Software
-
-[More Information Needed]
-
-## Citation [optional]
-
-<!-- If there is a paper or blog post introducing the model, the APA and Bibtex information for that should go in this section. -->
-
-**BibTeX:**
-
-[More Information Needed]
-
-**APA:**
-
-[More Information Needed]
-
-## Glossary [optional]
-
-<!-- If relevant, include terms and calculations in this section that can help readers understand the model or model card. -->
-
-[More Information Needed]
-
-## More Information [optional]
-
-[More Information Needed]
-
-## Model Card Authors [optional]
-
-[More Information Needed]
-
-## Model Card Contact
-
-[More Information Needed]
-### Framework versions
-
-- PEFT 0.18.1
+This is a small-data research adapter trained for a narrow cockpit visual fact extraction task. It is not a general aviation VLM and should be evaluated on additional independent sessions before broader use.

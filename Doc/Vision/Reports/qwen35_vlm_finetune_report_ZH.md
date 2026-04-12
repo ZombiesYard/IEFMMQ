@@ -2,7 +2,7 @@
 
 ## 摘要
 
-本报告研究一个面向任务型多模态系统的具体问题：在 F/A-18C 冷启动场景中，少量人工复核的 cockpit 图像是否足以让 `Qwen/Qwen3.5-9B-Base` 学会稳定抽取结构化视觉事实。实验采用单张组合屏图像作为输入，要求模型输出 8 个核心 visual facts 的 JSON 标签。训练方法为 Unsloth 4-bit LoRA VLM SFT，训练数据来自 Run-001 的 180 张人工复核图像，并导出为英文和中文两套 SFT 样本，共 360 条。评测分两层：Run-001 contaminated development set 用于快速回归检查，Run-002 heldout new session 用于独立会话泛化评估。
+本报告研究一个面向任务型多模态系统的具体问题：在 F/A-18C 冷启动场景中，少量人工复核的 cockpit 图像是否足以让 `Qwen/Qwen3.5-9B-Base` 学会稳定抽取结构化视觉事实。实验采用单张组合屏图像作为输入，要求模型输出 8 个核心 visual facts 的 JSON 标签。训练栈为 Unsloth VLM 加载与 4-bit/LoRA 适配、PEFT LoRA adapter，以及 TRL `SFTTrainer` 监督微调循环；训练数据来自 Run-001 的 180 张人工复核图像，并导出为英文和中文两套 SFT 样本，共 360 条。评测分两层：Run-001 contaminated development set 用于快速回归检查，Run-002 heldout new session 用于独立会话泛化评估。
 
 结果显示，LoRA-v1 在结构化输出稳定性和多数 cockpit facts 上显著优于 base model。在 Run-002 上，fact accuracy 从 `0.7600` 提升至 `0.9150`，seen F1 从 `0.4714` 提升至 `0.8380`。然而，`ins_go` 在 Run-002 中出现 13 个 false positives，表明当前 target ontology 将较高层流程状态压缩为单帧视觉事实，存在抽象层级不合理的问题。因此，本实验支持“领域内小规模人工复核数据可以显著提升 VLM 结构化视觉抽取能力”的结论，但也表明后续研究需要重新设计部分 facts，尤其是将 `ins_go` 拆解为更低层、可直接观察的视觉证据。
 
@@ -173,7 +173,7 @@ Run-002 来自 `fa18c-coldstart-run-002`，包含 50 张人工复核图像。该
 }
 ```
 
-这种格式的设计有几个目的。首先，它与 Qwen/OpenAI-compatible multimodal chat API 的输入形式一致，也与 Unsloth VLM SFT 的 message 数据结构兼容。其次，它把学习目标限制为“图像 + 指令 -> 结构化 JSON facts”，减少模型学习无关输出形式的机会。第三，它让训练目标贴近后续系统需要解析的格式。
+这种格式的设计有几个目的。首先，它与 Qwen/OpenAI-compatible multimodal chat API 的输入形式一致，也与 Unsloth/TRL 多模态 SFT 所需的 message 数据结构兼容。其次，它把学习目标限制为“图像 + 指令 -> 结构化 JSON facts”，减少模型学习无关输出形式的机会。第三，它让训练目标贴近后续系统需要解析的格式。
 
 训练目标刻意不包含 `frame_id`、`session_id`、`artifact_image_path`、`raw_image_path`、`source_frame_id` 和 `confidence`。这些字段要么是数据管理 metadata，要么是由采集框架确定的外部索引，不应由视觉模型从图像中生成。`confidence` 也被排除，因为模型自报置信度通常未经校准，容易给下游推理造成错误安全感。视觉模型应输出可审查的状态和证据说明，而不是伪概率。
 
@@ -181,7 +181,7 @@ Run-002 来自 `fa18c-coldstart-run-002`，包含 50 张人工复核图像。该
 
 ## 5. 微调训练细节
 
-微调模型为 `Qwen/Qwen3.5-9B-Base`。训练方法为 Unsloth 4-bit LoRA VLM SFT。LoRA adapter 输出目录为：
+微调模型为 `Qwen/Qwen3.5-9B-Base`。准确地说，本实验使用 Unsloth + PEFT LoRA + TRL `SFTTrainer` 的组合训练栈：Unsloth 负责 VLM 加载、4-bit 准备、LoRA 注入和视觉 batch collation；PEFT 定义 LoRA adapter 格式；TRL `SFTTrainer` 执行监督微调训练循环。LoRA adapter 输出目录为：
 
 ```text
 /scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter
@@ -201,7 +201,7 @@ Run-002 来自 `fa18c-coldstart-run-002`，包含 50 张人工复核图像。该
 | `lora_dropout` | 0.0 | 首轮优先验证可学习性，避免额外正则引入不稳定 |
 | `seed` | 3407 | 固定数据切分和训练随机性 |
 
-4-bit LoRA 的选择主要来自资源和实验效率考虑。完整微调 9B VLM 需要更高显存和更长训练时间，而本任务的数据规模较小、输出空间固定，LoRA 更适合作为首轮领域适配方法。`r=16` 与 `alpha=16` 提供中等参数容量，既允许模型学习 cockpit layout 和 JSON 输出格式，又尽量降低小数据集上过度记忆的风险。
+4-bit LoRA 的选择主要来自资源和实验效率考虑。这里的 4-bit 加载和视觉模型准备由 Unsloth 完成，adapter 注入使用 PEFT/LoRA，训练循环由 TRL `SFTTrainer` 执行。完整微调 9B VLM 需要更高显存和更长训练时间，而本任务的数据规模较小、输出空间固定，LoRA 更适合作为首轮领域适配方法。`r=16` 与 `alpha=16` 提供中等参数容量，既允许模型学习 cockpit layout 和 JSON 输出格式，又尽量降低小数据集上过度记忆的风险。
 
 epoch 数设置为 4 是一个首轮实验折中。由于训练样本只有 360 条，如果 epoch 太少，模型可能尚未稳定学习固定 JSON schema 和 8 个 fact 的边界；如果 epoch 太多，则更容易记忆 Run-001 的具体图像分布。最终训练记录为：
 
@@ -354,6 +354,6 @@ Run-002 中 LoRA-v1 的 per-fact 表现如下：
 
 ## 10. 结论
 
-本实验完成了从 cockpit 图像采集、AI 初标、人工复核、双语 SFT 数据导出、Unsloth LoRA 微调到 base-vs-LoRA benchmark 的完整闭环。结果表明，`Qwen/Qwen3.5-9B-Base` 经过少量领域样本微调后，可以显著提升 SimTutor cockpit visual facts 的结构化抽取能力。在独立 Run-002 上，LoRA-v1 将 fact accuracy 从 `0.7600` 提高到 `0.9150`，seen F1 从 `0.4714` 提高到 `0.8380`。
+本实验完成了从 cockpit 图像采集、AI 初标、人工复核、双语 SFT 数据导出、Unsloth + PEFT LoRA + TRL SFTTrainer 微调到 base-vs-LoRA benchmark 的完整闭环。结果表明，`Qwen/Qwen3.5-9B-Base` 经过少量领域样本微调后，可以显著提升 SimTutor cockpit visual facts 的结构化抽取能力。在独立 Run-002 上，LoRA-v1 将 fact accuracy 从 `0.7600` 提高到 `0.9150`，seen F1 从 `0.4714` 提高到 `0.8380`。
 
 同时，`ins_go` 的 false positives 表明，当前 8 facts 的 target 设计仍存在重要问题。未来研究应将高层流程状态拆解为低层视觉证据，并通过新的 heldout session 验证改进后的 ontology 和 LoRA-v2。该实验的主要贡献不是证明首版 target 已经充分，而是证明了一条可复现的领域 VLM 微调与诊断路线：先用结构化 facts 建立可测量闭环，再通过独立 session 暴露 target 和数据覆盖缺陷。
