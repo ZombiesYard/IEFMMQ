@@ -185,7 +185,7 @@ Bilingual SFT is used to increase instruction diversity rather than visual diver
 The base model is `Qwen/Qwen3.5-9B-Base`. More precisely, this experiment uses an Unsloth + PEFT LoRA + TRL `SFTTrainer` stack: Unsloth handles VLM loading, 4-bit preparation, LoRA injection, and vision batch collation; PEFT defines the LoRA adapter format; and TRL `SFTTrainer` runs the supervised fine-tuning loop. The LoRA adapter is stored at:
 
 ```text
-/scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter
+<scratch-root>/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter
 ```
 
 The training set consists of the Run-001 bilingual SFT data: 360 total examples, split into 324 train examples and 36 eval examples. Key training parameters are:

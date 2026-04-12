@@ -184,7 +184,7 @@ Run-002 来自 `fa18c-coldstart-run-002`，包含 50 张人工复核图像。该
 微调模型为 `Qwen/Qwen3.5-9B-Base`。准确地说，本实验使用 Unsloth + PEFT LoRA + TRL `SFTTrainer` 的组合训练栈：Unsloth 负责 VLM 加载、4-bit 准备、LoRA 注入和视觉 batch collation；PEFT 定义 LoRA adapter 格式；TRL `SFTTrainer` 执行监督微调训练循环。LoRA adapter 输出目录为：
 
 ```text
-/scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter
+<scratch-root>/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter
 ```
 
 训练使用 Run-001 的中英双语 SFT 数据，共 360 条样本，随机切分为 324 条训练样本和 36 条 eval 样本。关键参数如下：

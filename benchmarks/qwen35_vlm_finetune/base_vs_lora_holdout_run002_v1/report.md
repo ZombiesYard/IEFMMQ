@@ -1,9 +1,9 @@
 # Qwen3.5 VLM Fact Benchmark
 
 - benchmark_kind: `heldout_new_session`
-- dataset: `/scratch/yz50/iefmmq_vlm_ft_unsloth/data/holdout_run002/reviewed.jsonl`
+- dataset: `<scratch-root>/iefmmq_vlm_ft_unsloth/data/holdout_run002/reviewed.jsonl`
 - base_model: `Qwen/Qwen3.5-9B-Base`
-- adapter: `/scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter`
+- adapter: `<scratch-root>/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter`
 
 ## Overall Metrics
 
