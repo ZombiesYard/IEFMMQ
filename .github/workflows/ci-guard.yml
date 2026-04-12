@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: ["*"]
   push:
-    branches: ["main", "vlm-fineTune"]
+    branches: ["main", "master", "develop"]
 
 permissions:
   contents: read
