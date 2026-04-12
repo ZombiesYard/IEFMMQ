@@ -35,7 +35,24 @@ CRITICAL_FACT_IDS = (
     "right_ddi_fcsmc_page_visible",
 )
 
+CHART_LABELS = {
+    "fcs_page_visible": "FCS\npage",
+    "bit_root_page_visible": "BIT\nroot",
+    "bit_page_failure_visible": "BIT\nfailure",
+    "right_ddi_fcsmc_page_visible": "Right DDI\nFCS-MC",
+    "right_ddi_in_test_visible": "Right DDI\nIN TEST",
+    "fcs_bit_result_visible": "FCS BIT\nresult",
+    "ins_alignment_page_visible": "INS\nalignment",
+    "ins_go": "INS\nGO",
+    "fact_accuracy": "Fact\naccuracy",
+    "sample_exact_match": "Sample\nexact match",
+}
+
 _THINK_BLOCK_RE = re.compile(r"(?is)^\s*<think(?:\s[^>]*)?>.*?</think>\s*")
+
+
+def _chart_label(label: str) -> str:
+    return CHART_LABELS.get(label, label.replace("_", "\n"))
 
 
 @dataclass(frozen=True)
@@ -694,15 +711,17 @@ def _make_charts(output_dir: Path, metrics_by_model: Mapping[str, Mapping[str, A
     x = list(range(len(labels)))
 
     def save_bar(path: Path, title: str, ylabel: str, values: Sequence[float]) -> None:
-        plt.figure(figsize=(7, 4))
-        plt.bar(x, values)
-        plt.xticks(x, labels)
-        plt.title(title)
-        plt.ylabel(ylabel)
-        plt.ylim(0, 1)
-        plt.tight_layout()
-        plt.savefig(path)
-        plt.close()
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.bar(x, values)
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, ha="center")
+        ax.set_title(title)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(0, 1)
+        ax.tick_params(axis="x", pad=8)
+        fig.tight_layout()
+        fig.savefig(path, dpi=160)
+        plt.close(fig)
         generated.append(str(path))
 
     save_bar(
@@ -724,25 +743,33 @@ def _make_charts(output_dir: Path, metrics_by_model: Mapping[str, Mapping[str, A
         ("macro_f1", "fact_f1_by_model.png", "Fact Macro F1 by Model"),
         ("seen_f1", "seen_f1_by_fact.png", "Seen F1 by Fact"),
     ]:
-        plt.figure(figsize=(13, 5))
+        fig, ax = plt.subplots(figsize=(13, 5.6))
         for idx, label in enumerate(labels):
             offset = (idx - (len(labels) - 1) / 2) * width
             values = [
                 float(metrics_by_model[label]["fact_scores"][fact_id][metric_name])
                 for fact_id in CORE_FACT_IDS
             ]
-            plt.bar([pos + offset for pos in fact_x], values, width=width, label=label)
-        plt.xticks(fact_x, CORE_FACT_IDS, rotation=35, ha="right")
-        plt.title(title)
-        plt.ylim(0, 1)
-        plt.legend()
-        plt.tight_layout()
+            ax.bar([pos + offset for pos in fact_x], values, width=width, label=label)
+        ax.set_xticks(fact_x)
+        ax.set_xticklabels(
+            [_chart_label(fact_id) for fact_id in CORE_FACT_IDS],
+            rotation=0,
+            ha="center",
+            multialignment="center",
+        )
+        ax.set_title(title)
+        ax.set_ylim(0, 1)
+        ax.legend()
+        ax.tick_params(axis="x", pad=10)
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.22)
         path = chart_dir / file_name
-        plt.savefig(path)
-        plt.close()
+        fig.savefig(path, dpi=160)
+        plt.close(fig)
         generated.append(str(path))
 
-    plt.figure(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(9, 4.8))
     critical_x = list(range(len(CRITICAL_FACT_IDS)))
     for idx, label in enumerate(labels):
         offset = (idx - (len(labels) - 1) / 2) * width
@@ -750,15 +777,23 @@ def _make_charts(output_dir: Path, metrics_by_model: Mapping[str, Mapping[str, A
             int(metrics_by_model[label]["critical_false_positives_by_fact"].get(fact_id, 0))
             for fact_id in CRITICAL_FACT_IDS
         ]
-        plt.bar([pos + offset for pos in critical_x], values, width=width, label=label)
-    plt.xticks(critical_x, CRITICAL_FACT_IDS, rotation=25, ha="right")
-    plt.title("Critical False Positives")
-    plt.ylabel("count")
-    plt.legend()
-    plt.tight_layout()
+        ax.bar([pos + offset for pos in critical_x], values, width=width, label=label)
+    ax.set_xticks(critical_x)
+    ax.set_xticklabels(
+        [_chart_label(fact_id) for fact_id in CRITICAL_FACT_IDS],
+        rotation=0,
+        ha="center",
+        multialignment="center",
+    )
+    ax.set_title("Critical False Positives")
+    ax.set_ylabel("count")
+    ax.legend()
+    ax.tick_params(axis="x", pad=10)
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.24)
     path = chart_dir / "critical_false_positives.png"
-    plt.savefig(path)
-    plt.close()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
     generated.append(str(path))
 
     for model_label, metrics in metrics_by_model.items():
@@ -794,22 +829,11 @@ def _make_pil_charts(chart_dir: Path, metrics_by_model: Mapping[str, Mapping[str
     def _draw_text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, fill: str = "#202020") -> None:
         draw.text(xy, text, fill=fill)
 
-    def _short_fact_label(label: str) -> str:
-        replacements = {
-            "right_ddi": "r_ddi",
-            "visible": "vis",
-            "alignment": "align",
-            "failure": "fail",
-            "result": "result",
-            "page": "page",
-        }
-        shortened = label
-        for old, new in replacements.items():
-            shortened = shortened.replace(old, new)
-        return shortened
-
     def _wrap_label(label: str, *, max_line_chars: int = 12) -> list[str]:
-        words = _short_fact_label(label).split("_")
+        chart_label = _chart_label(label)
+        if "\n" in chart_label:
+            return chart_label.splitlines()
+        words = chart_label.split("_")
         lines: list[str] = []
         current = ""
         for word in words:
@@ -864,10 +888,11 @@ def _make_pil_charts(chart_dir: Path, metrics_by_model: Mapping[str, Mapping[str
                 bottom = margin_top + plot_height
                 draw.rectangle((left, top, right, bottom), fill=palette[label_index % len(palette)])
                 _draw_text(draw, (left, max(margin_top, top - 15)), f"{raw_value:.2f}" if max_value <= 1 else str(int(raw_value)))
-            label_x = int(margin_left + category_width * category_index + 4)
+            label_x = int(margin_left + category_width * (category_index + 0.5))
             label_y = margin_top + plot_height + 12
             for line_index, line in enumerate(_wrap_label(category)):
-                _draw_text(draw, (label_x, label_y + line_index * 14), line)
+                text_width = draw.textlength(line)
+                _draw_text(draw, (int(label_x - text_width / 2), label_y + line_index * 14), line)
 
         legend_x = margin_left
         legend_y = height - 35
