@@ -261,7 +261,7 @@ def test_mapping_accumulates_multiple_mapping_errors_without_overwriting_first()
     _validate_tutor_response(payload)
 
 
-def test_mapping_marks_partial_visual_confirmation_and_downgrades_confidence() -> None:
+def test_mapping_marks_partial_visual_confirmation_with_limited_evidence() -> None:
     help_obj = {
         "diagnosis": {"step_id": "S14", "error_category": "OM"},
         "next": {"step_id": "S15"},
@@ -270,7 +270,6 @@ def test_mapping_marks_partial_visual_confirmation_and_downgrades_confidence() -
             "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
         },
         "explanations": ["Check the highlighted control and continue the sequence."],
-        "confidence": 0.91,
     }
     req = _request_with_evidence_context()
     req.context["deterministic_step_hint"] = {
@@ -284,9 +283,6 @@ def test_mapping_marks_partial_visual_confirmation_and_downgrades_confidence() -
 
     assert payload["metadata"]["observability_status"] == "partial"
     assert payload["metadata"]["requires_visual_confirmation"] is True
-    assert payload["metadata"]["model_confidence"] == 0.91
-    assert payload["metadata"]["effective_confidence"] < payload["metadata"]["model_confidence"]
-    assert payload["metadata"]["confidence_adjustment_reason"] == "observability:partial"
     assert payload["metadata"]["evidence_strength"] == "limited"
     assert any("待视觉确认" in item for item in payload["explanations"])
     _validate_tutor_response(payload)
@@ -301,7 +297,6 @@ def test_mapping_normalizes_unobservable_status_from_request_hint() -> None:
             "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
         },
         "explanations": ["Use the highlighted control as the next single action."],
-        "confidence": 0.88,
     }
     req = _request_with_evidence_context()
     req.context["deterministic_step_hint"] = {
@@ -315,7 +310,7 @@ def test_mapping_normalizes_unobservable_status_from_request_hint() -> None:
 
     assert payload["metadata"]["observability_status"] == "unobservable"
     assert payload["metadata"]["requires_visual_confirmation"] is True
-    assert payload["metadata"]["effective_confidence"] < payload["metadata"]["model_confidence"]
+    assert payload["metadata"]["evidence_strength"] == "limited"
     assert any("待视觉确认" in item for item in payload["explanations"])
     _validate_tutor_response(payload)
 
@@ -329,7 +324,6 @@ def test_mapping_emits_english_visual_confirmation_note_when_lang_is_en() -> Non
             "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
         },
         "explanations": ["Use the highlighted control as the next single action."],
-        "confidence": 0.88,
     }
     req = _request_with_evidence_context()
     req.context["deterministic_step_hint"] = {
@@ -344,7 +338,7 @@ def test_mapping_emits_english_visual_confirmation_note_when_lang_is_en() -> Non
     assert not any("待视觉确认" in item for item in res.explanations)
 
 
-def test_mapping_uses_unspecified_adjustment_reason_when_visual_confirmation_lacks_observability() -> None:
+def test_mapping_marks_limited_evidence_when_visual_confirmation_lacks_observability() -> None:
     help_obj = {
         "diagnosis": {"step_id": "S14", "error_category": "OM"},
         "next": {"step_id": "S15"},
@@ -353,7 +347,6 @@ def test_mapping_uses_unspecified_adjustment_reason_when_visual_confirmation_lac
             "evidence": [_evidence("apu_switch", kind="delta", ref="RECENT_UI_TARGETS.apu_switch")],
         },
         "explanations": ["Check the highlighted control and continue the sequence."],
-        "confidence": 0.91,
     }
     req = _request_with_evidence_context()
     req.context["deterministic_step_hint"] = {
@@ -365,7 +358,7 @@ def test_mapping_uses_unspecified_adjustment_reason_when_visual_confirmation_lac
 
     assert res.metadata["requires_visual_confirmation"] is True
     assert "observability_status" not in res.metadata
-    assert res.metadata["confidence_adjustment_reason"] == "observability:unspecified"
+    assert res.metadata["evidence_strength"] == "limited"
 
 
 def test_mapping_reuses_overlay_planner_cache(monkeypatch, tmp_path: Path) -> None:

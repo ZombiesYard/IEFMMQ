@@ -81,7 +81,6 @@ class VisionFact:
     fact_id: str = ""
     state: str = "uncertain"
     source_frame_id: str = ""
-    confidence: float = 0.0
     expires_after_ms: int = 0
     evidence_note: str = ""
     result_kind: Optional[str] = None

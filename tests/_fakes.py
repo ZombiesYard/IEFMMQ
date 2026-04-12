@@ -87,7 +87,6 @@ def _help_obj_ok() -> dict[str, Any]:
             ],
         },
         "explanations": ["APU is off, switch APU to ON before engine crank."],
-        "confidence": 0.93,
     }
 
 

@@ -1,0 +1,16 @@
+{
+  "schema_version": "v1",
+  "has_comparison": true,
+  "fact_accuracy_delta": 0.155,
+  "macro_f1_delta": 0.160529,
+  "seen_f1_delta": 0.366627,
+  "sample_exact_match_delta": 0.3,
+  "critical_false_positive_delta": 2,
+  "recommend_simtutor_chain_validation": false,
+  "benchmark_kind": "heldout_new_session",
+  "reviewed_jsonl": "<scratch-root>/iefmmq_vlm_ft_unsloth/data/holdout_run002/reviewed.jsonl",
+  "base_model": "Qwen/Qwen3.5-9B-Base",
+  "adapter": "<scratch-root>/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter",
+  "sample_count": 50,
+  "lang": "en"
+}

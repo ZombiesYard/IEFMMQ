@@ -238,6 +238,31 @@ python live_dcs.py \
   - `Right DDI`
 - 该过程必须适配不同分辨率和宽高比，只能依赖当前冻结的 normalized layout 计算 crop，不允许写死像素
 
+## 单图初标约定
+
+为后续微调准备数据时，首版 AI 初标工具固定使用 `artifacts/` 下的单张组合屏图片，不拆成 3 张区域图。这样可以保证：
+
+- 初标输入分布与运行时 VLM 输入分布一致
+- 模型持续看到同一套固定布局先验：`left_ddi -> ampcd -> right_ddi`
+- 不需要为了数据准备去修改 `live_dcs.py` 的运行时输入 contract
+
+初标输出刻意收窄为轻量结构，只保留：
+
+- `summary`
+- `facts[].fact_id`
+- `facts[].state`
+- `facts[].evidence_note`
+
+初标 prompt 会明确禁止模型输出这些字段：
+
+- `frame_id`
+- `source_frame_id`
+- `confidence`
+- `expires_after_ms`
+- `sticky`
+
+其中 `frame_id` 只允许由工具根据 `capture_index.jsonl` 和文件名回填，不能信任模型臆造。
+
 ## 最小联调检查清单
 
 ### 1. 安装配置
@@ -273,6 +298,44 @@ python live_dcs.py \
 - 启动 `python live_dcs.py`
 - 确认 Python 侧能看到 `VisionObservation`
 - 若视觉 sidecar 尚未就绪，也必须只出现 `vision_unavailable` 降级，而不是中断 telemetry 主链路
+
+## 数据集采集工具
+
+若当前目标不是 live tutor，而是为后续 VLM/SFT 准备截图数据，可直接使用：
+
+```powershell
+python .\tools\capture_vlm_dataset.py `
+  --session-id fa18c-coldstart-run-001 `
+  --saved-games-dir "$env:USERPROFILE\Saved Games\DCS"
+```
+
+当前工具行为：
+
+- 默认输出到 `tools/.captures/<session_id>/`
+- 保存原始整屏截图到 `raw/`
+- 同步生成按当前组合图 contract 裁剪和加标注后的 VLM-ready 工件到 `artifacts/`
+- 写出：
+  - `frames.jsonl`
+  - `capture_index.jsonl`
+- 在 Windows 上默认监听全局 help 侧键 `X1` / `MOUSE4`
+- 启动后先 idle；第一次按 help 侧键后开始持续采集
+- 默认采样频率为 `2 fps`
+- 用 `Ctrl+C` 结束
+
+若你的 help 侧键是第二个鼠标侧键，可改为：
+
+```powershell
+python .\tools\capture_vlm_dataset.py `
+  --session-id fa18c-coldstart-run-001 `
+  --saved-games-dir "$env:USERPROFILE\Saved Games\DCS" `
+  --global-help-hotkey X2
+```
+
+说明：
+
+- 这个工具面向“截图数据采集”，不参与 tutor 主链路
+- 它复用了当前 `fa18c_composite_panel_v2` 的相同截图和裁剪流程，确保训练输入形态和线上一致
+- `tools/.captures/` 已默认加入 `.gitignore`
 
 ### 5. 失败时优先排查
 

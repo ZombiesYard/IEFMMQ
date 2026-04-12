@@ -160,6 +160,7 @@ class ReplayEvalOracleModel:
 
     def explain_error(self, observation, request: TutorRequest | None = None) -> TutorResponse:
         evidence_ref, evidence_type = self._pick_evidence(request, self.case.expectation.overlay_target)
+        grounding_confidence = 0.86 if not self.case.expectation.requires_visual_confirmation else 0.62
         help_response = {
             "diagnosis": {
                 "step_id": self.case.expectation.step_id,
@@ -176,11 +177,11 @@ class ReplayEvalOracleModel:
                         "type": evidence_type,
                         "ref": evidence_ref,
                         "quote": self._evidence_quote(),
+                        "grounding_confidence": grounding_confidence,
                     }
                 ],
             },
             "explanations": [self._message_text()],
-            "confidence": 0.86 if not self.case.expectation.requires_visual_confirmation else 0.62,
         }
         return TutorResponse(
             status="ok",

@@ -1,0 +1,45 @@
+{
+  "output_dir": "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1",
+  "comparison": {
+    "schema_version": "v1",
+    "has_comparison": true,
+    "fact_accuracy_delta": 0.174305,
+    "macro_f1_delta": 0.167019,
+    "seen_f1_delta": 0.343643,
+    "sample_exact_match_delta": 0.594445,
+    "critical_false_positive_delta": -17,
+    "recommend_simtutor_chain_validation": true,
+    "benchmark_kind": "contaminated_dev_set",
+    "reviewed_jsonl": "<scratch-root>/iefmmq_vlm_ft_unsloth/data/reviewed.jsonl",
+    "base_model": "Qwen/Qwen3.5-9B-Base",
+    "adapter": "<scratch-root>/iefmmq_vlm_ft_unsloth/runs/full_qwen35_9b_base_bilingual_v1/adapter",
+    "sample_count": 180,
+    "lang": "en"
+  },
+  "charts": [
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/overall_accuracy.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/fact_f1_by_model.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/seen_f1_by_fact.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/critical_false_positives.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_fcs_page_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_bit_root_page_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_bit_page_failure_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_right_ddi_fcsmc_page_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_right_ddi_in_test_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_fcs_bit_result_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_ins_alignment_page_visible_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_ins_go_base.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_fcs_page_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_bit_root_page_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_bit_page_failure_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_right_ddi_fcsmc_page_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_right_ddi_in_test_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_fcs_bit_result_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_ins_alignment_page_visible_lora.png",
+    "<scratch-root>/iefmmq_vlm_ft_unsloth/benchmarks/base_vs_lora_current180_v1/charts/confusion_ins_go_lora.png"
+  ],
+  "models": [
+    "base",
+    "lora"
+  ]
+}

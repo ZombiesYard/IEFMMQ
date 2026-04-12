@@ -1,0 +1,86 @@
+{
+  "schema_version": "v1",
+  "input_path": "<repo>/tools/project-2-at-2026-04-12-14-28-752f9c8f.json",
+  "total_tasks": 50,
+  "reviewed_samples": 50,
+  "skipped_tasks": 0,
+  "exported_languages": [
+    "en"
+  ],
+  "train_samples_by_lang": {
+    "en": 50
+  },
+  "missing_summary_count": 0,
+  "missing_notes_by_fact": {
+    "fcs_page_visible": 0,
+    "bit_root_page_visible": 0,
+    "bit_page_failure_visible": 0,
+    "right_ddi_fcsmc_page_visible": 0,
+    "right_ddi_in_test_visible": 0,
+    "fcs_bit_result_visible": 0,
+    "ins_alignment_page_visible": 0,
+    "ins_go": 0
+  },
+  "fact_state_counts": {
+    "fcs_page_visible": {
+      "seen": 13,
+      "not_seen": 37,
+      "uncertain": 0
+    },
+    "bit_root_page_visible": {
+      "seen": 9,
+      "not_seen": 41,
+      "uncertain": 0
+    },
+    "bit_page_failure_visible": {
+      "seen": 9,
+      "not_seen": 41,
+      "uncertain": 0
+    },
+    "right_ddi_fcsmc_page_visible": {
+      "seen": 9,
+      "not_seen": 41,
+      "uncertain": 0
+    },
+    "right_ddi_in_test_visible": {
+      "seen": 6,
+      "not_seen": 44,
+      "uncertain": 0
+    },
+    "fcs_bit_result_visible": {
+      "seen": 3,
+      "not_seen": 47,
+      "uncertain": 0
+    },
+    "ins_alignment_page_visible": {
+      "seen": 43,
+      "not_seen": 7,
+      "uncertain": 0
+    },
+    "ins_go": {
+      "seen": 4,
+      "not_seen": 46,
+      "uncertain": 0
+    }
+  },
+  "length_stats": {
+    "summary_chars": {
+      "count": 50,
+      "min": 89,
+      "max": 149,
+      "avg": 119.64
+    },
+    "image_data_url_chars": {
+      "count": 50,
+      "min": 92098,
+      "max": 658230,
+      "avg": 392034.08
+    },
+    "assistant_chars_en": {
+      "count": 50,
+      "min": 1251,
+      "max": 1680,
+      "avg": 1447.64
+    }
+  }
+}

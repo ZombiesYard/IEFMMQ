@@ -968,14 +968,14 @@ class BaseHelpModel(ModelPort):
             retry_hint = (
                 "上一次输出未通过结构化校验。"
                 "请仅输出一个合法 JSON 对象，严格遵循 schema 与枚举，不要输出任何解释文本。"
-                "顶层必须包含 diagnosis、next、overlay、explanations、confidence 五个字段。"
+                "顶层必须包含 diagnosis、next、overlay、explanations 四个字段。"
                 f"上一轮错误：{error_text}"
             )
         else:
             retry_hint = (
                 "Previous output failed structured validation. "
                 "Return exactly one valid JSON object that strictly follows schema/enums, with no prose. "
-                "The top-level object must include diagnosis, next, overlay, explanations, and confidence. "
+                "The top-level object must include diagnosis, next, overlay, and explanations. "
                 f"Previous error: {error_text}"
             )
         retry_messages = [dict(msg) for msg in messages]
@@ -1124,11 +1124,6 @@ class BaseHelpModel(ModelPort):
         if not isinstance(explanations, list) or not any(isinstance(item, str) and item.strip() for item in explanations):
             repaired["explanations"] = [self._default_repair_explanation(inferred_step_id, missing_conditions)]
             details.append({"field": "explanations", "action": "filled_default"})
-
-        confidence = repaired.get("confidence")
-        if not isinstance(confidence, (int, float)):
-            repaired["confidence"] = 0.51
-            details.append({"field": "confidence", "action": "filled_default"})
 
         return repaired, details
 

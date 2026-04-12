@@ -1,0 +1,405 @@
+{
+  "schema_version": "v1",
+  "model_label": "lora",
+  "sample_count": 180,
+  "fact_count": 1440,
+  "json_valid_rate": 1.0,
+  "schema_valid_rate": 1.0,
+  "fact_accuracy": 0.969444,
+  "sample_exact_match": 0.777778,
+  "macro_f1": 0.637494,
+  "seen_f1": 0.951653,
+  "critical_false_positive_count": 2,
+  "critical_false_positives_by_fact": {
+    "fcs_bit_result_visible": 0,
+    "ins_go": 0,
+    "right_ddi_in_test_visible": 0,
+    "right_ddi_fcsmc_page_visible": 2
+  },
+  "fact_scores": {
+    "fcs_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 146,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 34,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 146,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 34,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "bit_root_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 108,
+          "fp": 2,
+          "fn": 2,
+          "precision": 0.981818,
+          "recall": 0.981818,
+          "f1": 0.981818
+        },
+        "not_seen": {
+          "tp": 68,
+          "fp": 2,
+          "fn": 2,
+          "precision": 0.971429,
+          "recall": 0.971429,
+          "f1": 0.971429
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.651082,
+      "seen_f1": 0.981818,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 108,
+          "not_seen": 2,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 2,
+          "not_seen": 68,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.977778
+    },
+    "bit_page_failure_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 110,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 69,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.985714,
+          "recall": 1.0,
+          "f1": 0.992806
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.664269,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 110,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 69,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 1,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.994444
+    },
+    "right_ddi_fcsmc_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 44,
+          "fp": 2,
+          "fn": 0,
+          "precision": 0.956522,
+          "recall": 1.0,
+          "f1": 0.977778
+        },
+        "not_seen": {
+          "tp": 134,
+          "fp": 0,
+          "fn": 2,
+          "precision": 1.0,
+          "recall": 0.985294,
+          "f1": 0.992593
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.65679,
+      "seen_f1": 0.977778,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 44,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 2,
+          "not_seen": 134,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.988889
+    },
+    "right_ddi_in_test_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 27,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 153,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 27,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 153,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcs_bit_result_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 17,
+          "fp": 0,
+          "fn": 3,
+          "precision": 1.0,
+          "recall": 0.85,
+          "f1": 0.918919
+        },
+        "not_seen": {
+          "tp": 159,
+          "fp": 4,
+          "fn": 0,
+          "precision": 0.97546,
+          "recall": 1.0,
+          "f1": 0.987578
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.635499,
+      "seen_f1": 0.918919,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 17,
+          "not_seen": 3,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 159,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 1,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.977778
+    },
+    "ins_alignment_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 112,
+          "fp": 25,
+          "fn": 1,
+          "precision": 0.817518,
+          "recall": 0.99115,
+          "f1": 0.896
+        },
+        "not_seen": {
+          "tp": 42,
+          "fp": 1,
+          "fn": 25,
+          "precision": 0.976744,
+          "recall": 0.626866,
+          "f1": 0.763636
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.553212,
+      "seen_f1": 0.896,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 112,
+          "not_seen": 1,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 25,
+          "not_seen": 42,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.855556
+    },
+    "ins_go": {
+      "state_scores": {
+        "seen": {
+          "tp": 13,
+          "fp": 0,
+          "fn": 5,
+          "precision": 1.0,
+          "recall": 0.722222,
+          "f1": 0.83871
+        },
+        "not_seen": {
+          "tp": 160,
+          "fp": 7,
+          "fn": 0,
+          "precision": 0.958084,
+          "recall": 1.0,
+          "f1": 0.978593
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 2,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.605768,
+      "seen_f1": 0.83871,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 13,
+          "not_seen": 5,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 160,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 2,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.961111
+    }
+  }
+}

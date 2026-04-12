@@ -301,15 +301,14 @@ def _coerce_s18_result_fact_state(
     fact_id: str,
     state: str,
     result_kind: str | None,
-    confidence: float,
-) -> tuple[str, float]:
+) -> str:
     if fact_id != "fcs_bit_result_visible" or state != "seen":
-        return state, confidence
+        return state
     if result_kind == "final_go":
-        return state, confidence
+        return state
     if result_kind in {"intermediate_go", "in_test", "not_ready"}:
-        return "not_seen", min(confidence, 0.25)
-    return "uncertain", min(confidence, 0.5)
+        return "not_seen"
+    return "uncertain"
 
 
 def normalize_vision_fact(
@@ -328,10 +327,6 @@ def normalize_vision_fact(
     source_frame_id = raw_fact.get("source_frame_id")
     if not isinstance(source_frame_id, str) or not source_frame_id:
         raise ValueError(f"vision fact {fact_id} missing source_frame_id")
-    confidence = raw_fact.get("confidence")
-    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
-        raise ValueError(f"vision fact {fact_id} confidence must be numeric")
-    confidence_value = max(0.0, min(1.0, float(confidence)))
     evidence_note = raw_fact.get("evidence_note")
     if not isinstance(evidence_note, str) or not evidence_note.strip():
         raise ValueError(f"vision fact {fact_id} evidence_note must be non-empty")
@@ -350,7 +345,6 @@ def normalize_vision_fact(
         "fact_id": fact_id,
         "state": normalize_fact_state(raw_fact.get("state")),
         "source_frame_id": source_frame_id,
-        "confidence": confidence_value,
         "expires_after_ms": int(spec["expires_after_ms"]),
         "evidence_note": evidence_note.strip(),
         "observed_at_wall_ms": observed_at_wall_ms,
@@ -359,14 +353,12 @@ def normalize_vision_fact(
     result_kind = _normalize_result_kind(fact_id, raw_fact.get("result_kind"), normalized["evidence_note"])
     if result_kind is not None:
         normalized["result_kind"] = result_kind
-    coerced_state, coerced_confidence = _coerce_s18_result_fact_state(
+    coerced_state = _coerce_s18_result_fact_state(
         fact_id=fact_id,
         state=str(normalized["state"]),
         result_kind=result_kind,
-        confidence=float(normalized["confidence"]),
     )
     normalized["state"] = coerced_state
-    normalized["confidence"] = coerced_confidence
     if normalized["observed_at_wall_ms"] is not None:
         normalized["expires_at_wall_ms"] = normalized["observed_at_wall_ms"] + normalized["expires_after_ms"]
     else:
@@ -538,20 +530,13 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
             else:
                 normalized_item.pop("result_kind", None)
             state = normalize_fact_state(normalized_item.get("state"))
-            confidence_raw = normalized_item.get("confidence", 0.0)
-            if isinstance(confidence_raw, bool) or not isinstance(confidence_raw, (int, float)):
-                confidence_value = 0.0
-            else:
-                confidence_value = max(0.0, min(1.0, float(confidence_raw)))
-            coerced_state, coerced_confidence = _coerce_s18_result_fact_state(
+            coerced_state = _coerce_s18_result_fact_state(
                 fact_id=fact_id,
                 state=state,
                 result_kind=result_kind,
-                confidence=confidence_value,
             )
             normalized_item["state"] = coerced_state
-            if "confidence" in normalized_item or coerced_confidence != confidence_value:
-                normalized_item["confidence"] = coerced_confidence
+            normalized_item.pop("confidence", None)
             out[fact_id] = normalized_item
     return out
 

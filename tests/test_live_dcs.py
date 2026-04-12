@@ -4257,7 +4257,6 @@ def test_emit_vision_fact_observation_event_uses_frame_refs() -> None:
                     fact_id="fcs_reset_seen",
                     state="seen",
                     source_frame_id="1772872445010_000123",
-                    confidence=0.91,
                     expires_after_ms=600000,
                     evidence_note="FCS reset evidence visible on the left DDI.",
                 )
@@ -4326,7 +4325,6 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
                                 fact_id="fcs_reset_seen",
                                 state="seen",
                                 source_frame_id="1772872445010_000123",
-                                confidence=0.93,
                                 expires_after_ms=600000,
                                 evidence_note="FCS reset visible on the left DDI.",
                             )
@@ -4383,7 +4381,7 @@ def test_live_loop_records_vision_fact_raw_json_in_event(tmp_path: Path) -> None
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
     raw_llm_text = (
         '{"facts":[{"fact_id":"fcs_reset_seen","state":"seen","source_frame_id":"1772872445010_000123",'
-        '"confidence":0.93,"evidence_note":"FCS reset visible on the left DDI."}]}'
+        '"evidence_note":"FCS reset visible on the left DDI."}]}'
     )
 
     class StaticVisionPort:
@@ -4424,7 +4422,6 @@ def test_live_loop_records_vision_fact_raw_json_in_event(tmp_path: Path) -> None
                                 fact_id="fcs_reset_seen",
                                 state="seen",
                                 source_frame_id="1772872445010_000123",
-                                confidence=0.93,
                                 expires_after_ms=600000,
                                 evidence_note="FCS reset visible on the left DDI.",
                             )
@@ -4636,7 +4633,6 @@ def test_extract_vision_fact_context_degrades_when_merge_raises(tmp_path: Path) 
                                 fact_id="fcs_reset_seen",
                                 state="seen",
                                 source_frame_id="1772872445010_000123",
-                                confidence=0.9,
                                 expires_after_ms=600000,
                                 evidence_note="FCS reset visible.",
                             )
@@ -4808,7 +4804,6 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
                                 fact_id="fcs_reset_seen",
                                 state="seen",
                                 source_frame_id="10000_000123",
-                                confidence=0.91,
                                 expires_after_ms=600000,
                                 evidence_note="FCS RESET visible.",
                             )
@@ -4850,7 +4845,6 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
                             ],
                         },
                         "explanations": ["Turn on APU."],
-                        "confidence": 0.9,
                     },
                 },
             )
@@ -5091,7 +5085,6 @@ def test_live_loop_tracks_vision_text_fallback_in_metadata_and_stats(tmp_path: P
                                 fact_id="fcs_reset_seen",
                                 state="seen",
                                 source_frame_id="10000_000123",
-                                confidence=0.9,
                                 expires_after_ms=600000,
                                 evidence_note="FCS RESET visible.",
                             )
@@ -5130,7 +5123,6 @@ def test_live_loop_tracks_vision_text_fallback_in_metadata_and_stats(tmp_path: P
                             ],
                         },
                         "explanations": ["Turn on APU."],
-                        "confidence": 0.88,
                     },
                 },
             )
@@ -5213,7 +5205,6 @@ def test_live_loop_marks_vision_conflict_unresolved_when_model_disagrees_with_fu
                                 fact_id="fcs_reset_seen",
                                 state="seen",
                                 source_frame_id="10000_000123",
-                                confidence=0.9,
                                 expires_after_ms=600000,
                                 evidence_note="FCS RESET visible.",
                             )
@@ -5256,7 +5247,6 @@ def test_live_loop_marks_vision_conflict_unresolved_when_model_disagrees_with_fu
                             ],
                         },
                         "explanations": ["Check the highlighted switch."],
-                        "confidence": 0.7,
                     },
                 },
             )
@@ -5338,7 +5328,6 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                                 fact_id="left_ddi_menu_root_visible",
                                 state="seen",
                                 source_frame_id="10000_000124",
-                                confidence=0.99,
                                 expires_after_ms=2000,
                                 evidence_note="Left DDI root menu visible.",
                             ),
@@ -5346,7 +5335,6 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                                 fact_id="left_ddi_fcs_page_button_visible",
                                 state="seen",
                                 source_frame_id="10000_000124",
-                                confidence=0.99,
                                 expires_after_ms=2000,
                                 evidence_note="Left DDI PB15 FCS button visible.",
                             ),
@@ -5354,7 +5342,6 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                                 fact_id="fcs_page_visible",
                                 state="not_seen",
                                 source_frame_id="10000_000124",
-                                confidence=1.0,
                                 expires_after_ms=2000,
                                 evidence_note="Left DDI is not yet on the FCS page.",
                             ),
@@ -5362,7 +5349,6 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                                 fact_id="bit_page_visible",
                                 state="not_seen",
                                 source_frame_id="10000_000124",
-                                confidence=1.0,
                                 expires_after_ms=2000,
                                 evidence_note="Right DDI is not on the top BIT page.",
                             ),
@@ -5404,7 +5390,6 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                         "explanations": [
                             "Displays are powered on with FCS page visible on Left DDI and BIT failures on Right DDI, indicating S08 is complete. Proceed to configure communications (S09)."
                         ],
-                        "confidence": 0.95,
                     },
                 },
             )
@@ -6249,7 +6234,6 @@ def test_live_loop_does_not_advance_s18_from_structured_fact_when_evidence_lacks
                         "explanations": [
                             "Need more information/please confirm: right_mdi_pb5",
                         ],
-                        "confidence": 0.95,
                     },
                 },
             )
@@ -6270,7 +6254,6 @@ def test_live_loop_does_not_advance_s18_from_structured_fact_when_evidence_lacks
                             fact_id="fcs_bit_result_visible",
                             state="seen",
                             source_frame_id="1772872445010_000123",
-                            confidence=0.95,
                             expires_after_ms=600000,
                             evidence_note="Right DDI FCS-MC page shows FCSA GO and FCSB GO.",
                             sticky=True,

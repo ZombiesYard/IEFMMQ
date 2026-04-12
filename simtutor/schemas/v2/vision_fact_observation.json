@@ -42,7 +42,6 @@
           "fact_id",
           "state",
           "source_frame_id",
-          "confidence",
           "expires_after_ms",
           "evidence_note"
         ],
@@ -80,11 +79,6 @@
               { "type": "string", "format": "uuid" },
               { "type": "string", "pattern": "^[0-9]{1,20}_[0-9]{6}$" }
             ]
-          },
-          "confidence": {
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 1.0
           },
           "expires_after_ms": {
             "type": "integer",

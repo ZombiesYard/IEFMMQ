@@ -3,6 +3,7 @@
 /adapters/__pycache__/
 /packs/__pycache__/
 /tools/__pycache__/
+/tools/.captures/
 /tests/__pycache__/
 tests/__pycache__
 /tests/.tmp_overlay/
@@ -31,6 +32,7 @@ adapters/dcs/caps/__pycache__
 help_flow.md
 __pycache__
 /.tmp/
+.codex
 tests/.tmp_bios_ui_map
 tests/.tmp_delta_policy/bool_max_changes_case
 CockpitScripts
@@ -41,3 +43,6 @@ logs/thesisproposal1128_extract.txt
 Doc/Engineering
 contractV03.md
 contractV04.md
+
+# Local Label Studio state
+.label_studio/
