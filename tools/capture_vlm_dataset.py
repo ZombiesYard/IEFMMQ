@@ -5,13 +5,14 @@ Help-triggered dataset capture tool for VLM fine-tuning.
 from __future__ import annotations
 
 import argparse
+import csv
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sys
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from PIL import Image
 
@@ -69,8 +70,766 @@ class DatasetCaptureStats:
         }
 
 
+@dataclass(frozen=True)
+class CapturePlanItem:
+    seq: int
+    total: int
+    category_id: str
+    category_name: str
+    target_display: str
+    left_ddi_content: str
+    ampcd_content: str
+    right_ddi_content: str
+    expected_primary_content: str
+    expected_other_displays: str
+    expected_key_facts: str
+    capture_instruction: str
+
+    def to_row(self) -> dict[str, Any]:
+        return {
+            "seq": self.seq,
+            "total": self.total,
+            "category_id": self.category_id,
+            "category_name": self.category_name,
+            "target_display": self.target_display,
+            "left_ddi_content": self.left_ddi_content,
+            "ampcd_content": self.ampcd_content,
+            "right_ddi_content": self.right_ddi_content,
+            "expected_primary_content": self.expected_primary_content,
+            "expected_other_displays": self.expected_other_displays,
+            "expected_key_facts": self.expected_key_facts,
+            "capture_instruction": self.capture_instruction,
+        }
+
+
 def _default_config_path(saved_games_dir: Path) -> Path:
     return saved_games_dir / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
+
+
+_CAPTURE_PLAN_FIELDNAMES = [
+    "seq",
+    "total",
+    "category_id",
+    "category_name",
+    "target_display",
+    "left_ddi_content",
+    "ampcd_content",
+    "right_ddi_content",
+    "expected_primary_content",
+    "expected_other_displays",
+    "expected_key_facts",
+    "capture_instruction",
+]
+
+_CAPTURE_PLAN_PROGRESS_FIELDNAMES = [
+    *_CAPTURE_PLAN_FIELDNAMES,
+    "captured_frame_id",
+    "capture_reason",
+    "artifact_image_path",
+    "raw_image_path",
+    "captured_at_wall_ms",
+    "status",
+    "operator_note",
+]
+
+
+def _build_fa18c_run003_v3_220_plan() -> list[CapturePlanItem]:
+    total = 220
+    non_target_pool = "EW/RADAR/STORES/MIDS/SA/DATA/FPAS/CHKLIST or another non-target page"
+    specs = [
+        {
+            "count": 8,
+            "category_id": "tac_page",
+            "category_name": "TAC page on left DDI",
+            "target_display": "left_ddi",
+            "left_ddi_content": "TAC / TAC MENU",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural context; avoid BIT root or FCS-MC if practical.",
+            "expected_primary_content": "TAC / TAC MENU",
+            "expected_other_displays": "AMPCD and right DDI stay realistic; avoid intentionally showing another target page.",
+            "expected_key_facts": "tac_page_visible=seen; supt_page_visible=not_seen; fcs_page_visible=not_seen",
+            "capture_instruction": "Set left DDI to TAC / TAC MENU. Other displays may remain natural.",
+        },
+        {
+            "count": 2,
+            "category_id": "tac_page",
+            "category_name": "TAC page off-canonical display",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "TAC / TAC MENU",
+            "expected_primary_content": "TAC / TAC MENU",
+            "expected_other_displays": "Small display-position perturbation for TAC recognition.",
+            "expected_key_facts": "tac_page_visible=seen; supt_page_visible=not_seen; fcs_page_visible=not_seen",
+            "capture_instruction": "Set right DDI to TAC / TAC MENU if convenient.",
+        },
+        {
+            "count": 8,
+            "category_id": "supt_page",
+            "category_name": "SUPT page on left DDI",
+            "target_display": "left_ddi",
+            "left_ddi_content": "SUPT page",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural context; avoid BIT root or FCS-MC if practical.",
+            "expected_primary_content": "SUPT page",
+            "expected_other_displays": "AMPCD and right DDI stay realistic; avoid intentionally showing another target page.",
+            "expected_key_facts": "supt_page_visible=seen; tac_page_visible=not_seen; fcs_page_visible=not_seen",
+            "capture_instruction": "Set left DDI to SUPT.",
+        },
+        {
+            "count": 2,
+            "category_id": "supt_page",
+            "category_name": "SUPT page off-canonical display",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "SUPT page",
+            "expected_primary_content": "SUPT page",
+            "expected_other_displays": "Small display-position perturbation for SUPT recognition.",
+            "expected_key_facts": "supt_page_visible=seen; tac_page_visible=not_seen; fcs_page_visible=not_seen",
+            "capture_instruction": "Set right DDI to SUPT if convenient.",
+        },
+        {
+            "count": 6,
+            "category_id": "other_non_target_page",
+            "category_name": "Left DDI non-target page",
+            "target_display": "left_ddi",
+            "left_ddi_content": non_target_pool,
+            "ampcd_content": "Non-HSI page, blank, or map-free non-target if practical.",
+            "right_ddi_content": "Non-target or blank page.",
+            "expected_primary_content": "No TAC/SUPT/FCS/BIT root/FCS-MC/HSI target page visible",
+            "expected_other_displays": "Use this block for none-of-target negatives, not for page classification.",
+            "expected_key_facts": "all target page facts should be not_seen unless the image is genuinely unreadable",
+            "capture_instruction": "Put a non-target page on left DDI; avoid all target pages on all displays.",
+        },
+        {
+            "count": 6,
+            "category_id": "other_non_target_page",
+            "category_name": "Right DDI non-target page",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Non-target or blank page.",
+            "ampcd_content": "Non-HSI page, blank, or map-free non-target if practical.",
+            "right_ddi_content": non_target_pool,
+            "expected_primary_content": "No TAC/SUPT/FCS/BIT root/FCS-MC/HSI target page visible",
+            "expected_other_displays": "Use this block for none-of-target negatives, not for page classification.",
+            "expected_key_facts": "all target page facts should be not_seen unless the image is genuinely unreadable",
+            "capture_instruction": "Put a non-target page on right DDI; avoid all target pages on all displays.",
+        },
+        {
+            "count": 4,
+            "category_id": "other_non_target_page",
+            "category_name": "AMPCD non-HSI page",
+            "target_display": "ampcd",
+            "left_ddi_content": "Non-target or blank page.",
+            "ampcd_content": "Non-HSI/non-INS page if practical; otherwise blank/dark stable display.",
+            "right_ddi_content": "Non-target or blank page.",
+            "expected_primary_content": "No HSI/INS page on AMPCD and no target page elsewhere",
+            "expected_other_displays": "This block tests that AMPCD content is not automatically HSI/INS.",
+            "expected_key_facts": "hsi_page_visible=not_seen; other target page facts=not_seen",
+            "capture_instruction": "Put AMPCD on a non-HSI page or stable blank/dark state.",
+        },
+        {
+            "count": 8,
+            "category_id": "other_non_target_page",
+            "category_name": "All displays non-target",
+            "target_display": "all",
+            "left_ddi_content": non_target_pool,
+            "ampcd_content": "Non-HSI page, blank, or stable non-target display.",
+            "right_ddi_content": non_target_pool,
+            "expected_primary_content": "All three displays are non-target pages",
+            "expected_other_displays": "This block represents a user who has fully navigated away from the procedure pages.",
+            "expected_key_facts": "all target page facts should be not_seen",
+            "capture_instruction": "Set all three displays to non-target pages; rotate EW/RADAR/STORES/MIDS/SA/DATA when convenient.",
+        },
+        {
+            "count": 4,
+            "category_id": "other_non_target_page",
+            "category_name": "Mixed non-target plus stable blank",
+            "target_display": "all",
+            "left_ddi_content": "Non-target or stable blank.",
+            "ampcd_content": "Non-HSI non-target or stable blank.",
+            "right_ddi_content": "Non-target or stable blank.",
+            "expected_primary_content": "No target page visible; at least one display may be stable blank/dark",
+            "expected_other_displays": "Stable blank/dark is allowed here, but not a transition blur.",
+            "expected_key_facts": "all target page facts should be not_seen",
+            "capture_instruction": "Capture mixed non-target and stable blank/dark displays.",
+        },
+        {
+            "count": 12,
+            "category_id": "fcs_page_with_x",
+            "category_name": "FCS page with X marks on left DDI",
+            "target_display": "left_ddi",
+            "left_ddi_content": "FCS page with obvious X/fault fills",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural context; avoid BIT root or FCS-MC if practical.",
+            "expected_primary_content": "FCS page with obvious X/fault fills",
+            "expected_other_displays": "Do not intentionally show FCS-MC on another display.",
+            "expected_key_facts": "fcs_page_visible=seen; fcs_page_x_marks_visible=seen; fcsmc_page_visible=not_seen",
+            "capture_instruction": "Set left DDI to the true FCS page before FCS reset, with X/fault fills visible.",
+        },
+        {
+            "count": 4,
+            "category_id": "fcs_page_with_x",
+            "category_name": "FCS page with X marks off-canonical display",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "FCS page with obvious X/fault fills",
+            "expected_primary_content": "FCS page with obvious X/fault fills",
+            "expected_other_displays": "Small display-position perturbation for FCS recognition.",
+            "expected_key_facts": "fcs_page_visible=seen; fcs_page_x_marks_visible=seen; fcsmc_page_visible=not_seen",
+            "capture_instruction": "Set right DDI to the true FCS page before FCS reset if convenient.",
+        },
+        {
+            "count": 10,
+            "category_id": "fcs_page_without_obvious_x",
+            "category_name": "FCS page reset-cleared on left DDI",
+            "target_display": "left_ddi",
+            "left_ddi_content": "FCS page without obvious X/fault fills",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural context; avoid BIT root or FCS-MC if practical.",
+            "expected_primary_content": "FCS page without obvious X/fault fills",
+            "expected_other_displays": "Do not intentionally show FCS-MC on another display.",
+            "expected_key_facts": "fcs_page_visible=seen; fcs_page_x_marks_visible=not_seen; fcsmc_page_visible=not_seen",
+            "capture_instruction": "Set left DDI to the true FCS page after FCS reset or when X/fault fills are no longer obvious.",
+        },
+        {
+            "count": 4,
+            "category_id": "fcs_page_without_obvious_x",
+            "category_name": "FCS page reset-cleared off-canonical display",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "FCS page without obvious X/fault fills",
+            "expected_primary_content": "FCS page without obvious X/fault fills",
+            "expected_other_displays": "Small display-position perturbation for reset-cleared FCS recognition.",
+            "expected_key_facts": "fcs_page_visible=seen; fcs_page_x_marks_visible=not_seen; fcsmc_page_visible=not_seen",
+            "capture_instruction": "Set right DDI to the true FCS page after reset if convenient.",
+        },
+        {
+            "count": 14,
+            "category_id": "bit_root_failures",
+            "category_name": "BIT root on right DDI",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or SUPT only if needed for navigation.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "BIT FAILURES / BIT root page",
+            "expected_primary_content": "BIT FAILURES / BIT root",
+            "expected_other_displays": "Avoid showing FCS-MC on any other display.",
+            "expected_key_facts": "bit_root_page_visible=seen; fcsmc_page_visible=not_seen",
+            "capture_instruction": "Set right DDI to BIT FAILURES / BIT root; do not enter the FCS-MC subpage yet.",
+        },
+        {
+            "count": 4,
+            "category_id": "bit_root_failures",
+            "category_name": "BIT root off-canonical display",
+            "target_display": "left_ddi",
+            "left_ddi_content": "BIT FAILURES / BIT root page",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural non-target or blank page.",
+            "expected_primary_content": "BIT FAILURES / BIT root",
+            "expected_other_displays": "Small display-position perturbation for BIT root recognition.",
+            "expected_key_facts": "bit_root_page_visible=seen; fcsmc_page_visible=not_seen",
+            "capture_instruction": "Set left DDI to BIT FAILURES / BIT root if convenient; do not enter FCS-MC.",
+        },
+        {
+            "count": 16,
+            "category_id": "fcsmc_pbit_go",
+            "category_name": "FCS-MC PBIT GO on right DDI",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "FCS-MC page with FCSA/FCSB PBIT GO",
+            "expected_primary_content": "FCS-MC with PBIT GO",
+            "expected_other_displays": "PBIT GO is an intermediate status, not final GO.",
+            "expected_key_facts": "fcsmc_page_visible=seen; fcsmc_intermediate_result_visible=seen; fcsmc_final_go_result_visible=not_seen",
+            "capture_instruction": "Set right DDI to FCS-MC before running the test, with FCSA/FCSB PBIT GO visible.",
+        },
+        {
+            "count": 2,
+            "category_id": "fcsmc_pbit_go",
+            "category_name": "FCS-MC PBIT GO off-canonical display",
+            "target_display": "left_ddi",
+            "left_ddi_content": "FCS-MC page with FCSA/FCSB PBIT GO",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural non-target or blank page.",
+            "expected_primary_content": "FCS-MC with PBIT GO",
+            "expected_other_displays": "Small display-position perturbation for FCS-MC recognition.",
+            "expected_key_facts": "fcsmc_page_visible=seen; fcsmc_intermediate_result_visible=seen; fcsmc_final_go_result_visible=not_seen",
+            "capture_instruction": "Set left DDI to FCS-MC PBIT GO if convenient.",
+        },
+        {
+            "count": 16,
+            "category_id": "fcsmc_in_test",
+            "category_name": "FCS-MC IN TEST on right DDI",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "FCS-MC page showing IN TEST",
+            "expected_primary_content": "FCS-MC IN TEST",
+            "expected_other_displays": "IN TEST is a running state, not final GO.",
+            "expected_key_facts": "fcsmc_page_visible=seen; fcsmc_in_test_visible=seen; fcsmc_final_go_result_visible=not_seen",
+            "capture_instruction": "Start FCS-MC BIT and capture while the page clearly shows IN TEST.",
+        },
+        {
+            "count": 2,
+            "category_id": "fcsmc_in_test",
+            "category_name": "FCS-MC IN TEST off-canonical display",
+            "target_display": "left_ddi",
+            "left_ddi_content": "FCS-MC page showing IN TEST",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural non-target or blank page.",
+            "expected_primary_content": "FCS-MC IN TEST",
+            "expected_other_displays": "Small display-position perturbation for FCS-MC IN TEST.",
+            "expected_key_facts": "fcsmc_page_visible=seen; fcsmc_in_test_visible=seen; fcsmc_final_go_result_visible=not_seen",
+            "capture_instruction": "Set left DDI to FCS-MC IN TEST if convenient.",
+        },
+        {
+            "count": 16,
+            "category_id": "fcsmc_final_go",
+            "category_name": "FCS-MC final GO on right DDI",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "FCS-MC page with final GO results",
+            "expected_primary_content": "FCS-MC final GO",
+            "expected_other_displays": "Final GO should be clearly distinguishable from PBIT GO and IN TEST.",
+            "expected_key_facts": "fcsmc_page_visible=seen; fcsmc_final_go_result_visible=seen; fcsmc_intermediate_result_visible=not_seen; fcsmc_in_test_visible=not_seen",
+            "capture_instruction": "Capture after FCS-MC BIT completes and the final GO results are clearly visible.",
+        },
+        {
+            "count": 2,
+            "category_id": "fcsmc_final_go",
+            "category_name": "FCS-MC final GO off-canonical display",
+            "target_display": "left_ddi",
+            "left_ddi_content": "FCS-MC page with final GO results",
+            "ampcd_content": "Natural cold-start context; HSI/MAP is acceptable.",
+            "right_ddi_content": "Natural non-target or blank page.",
+            "expected_primary_content": "FCS-MC final GO",
+            "expected_other_displays": "Small display-position perturbation for final GO.",
+            "expected_key_facts": "fcsmc_page_visible=seen; fcsmc_final_go_result_visible=seen; fcsmc_intermediate_result_visible=not_seen; fcsmc_in_test_visible=not_seen",
+            "capture_instruction": "Set left DDI to FCS-MC final GO if convenient.",
+        },
+        {
+            "count": 20,
+            "category_id": "hsi_map_overlay",
+            "category_name": "HSI with MAP overlay on AMPCD",
+            "target_display": "ampcd",
+            "left_ddi_content": "Natural non-target or procedure context.",
+            "ampcd_content": "HSI with MAP overlay; INS/QUAL text may be hard to read.",
+            "right_ddi_content": "Natural non-target or procedure context.",
+            "expected_primary_content": "HSI with MAP overlay",
+            "expected_other_displays": "This is the main INS hard negative block.",
+            "expected_key_facts": "hsi_page_visible=seen; hsi_map_layer_visible=seen; ins_ok_text_visible=not_seen/uncertain",
+            "capture_instruction": "Set AMPCD to HSI with MAP overlay on; capture cases where INS text is partly obscured or hard to read.",
+        },
+        {
+            "count": 2,
+            "category_id": "hsi_map_overlay",
+            "category_name": "HSI with MAP overlay on AMPCD, alternate DDI context",
+            "target_display": "ampcd",
+            "left_ddi_content": "Natural non-target, TAC/SUPT navigation context, or stable blank page.",
+            "ampcd_content": "HSI with MAP overlay; use a different range/zoom/clutter state if practical.",
+            "right_ddi_content": "Natural non-target, TAC/SUPT navigation context, or stable blank page.",
+            "expected_primary_content": "HSI with MAP overlay",
+            "expected_other_displays": "DDIs provide background variation; MAP overlay remains on AMPCD because DDI MAP overlay is not available.",
+            "expected_key_facts": "hsi_page_visible=seen; hsi_map_layer_visible=seen; ins_ok_text_visible=not_seen/uncertain",
+            "capture_instruction": "Keep HSI with MAP overlay on AMPCD; vary left/right DDI background pages instead of moving MAP overlay to a DDI.",
+        },
+        {
+            "count": 2,
+            "category_id": "hsi_map_overlay",
+            "category_name": "HSI with MAP overlay on AMPCD, hard-to-read variant",
+            "target_display": "ampcd",
+            "left_ddi_content": "Natural non-target, TAC/SUPT navigation context, or stable blank page.",
+            "ampcd_content": "HSI with MAP overlay; prefer hard-to-read INS/QUAL text, clutter, or similar-looking map symbols.",
+            "right_ddi_content": "Natural non-target, TAC/SUPT navigation context, or stable blank page.",
+            "expected_primary_content": "HSI with MAP overlay",
+            "expected_other_displays": "This replaces the impossible DDI MAP-overlay perturbation with AMPCD visual variation.",
+            "expected_key_facts": "hsi_page_visible=seen; hsi_map_layer_visible=seen; ins_ok_text_visible=not_seen/uncertain",
+            "capture_instruction": "Keep HSI with MAP overlay on AMPCD; choose a visually difficult MAP overlay frame if possible.",
+        },
+        {
+            "count": 18,
+            "category_id": "hsi_alignment_running_map_off",
+            "category_name": "HSI alignment running, MAP off on AMPCD",
+            "target_display": "ampcd",
+            "left_ddi_content": "Natural non-target or procedure context.",
+            "ampcd_content": "HSI with MAP off; GRND/QUAL/countdown visible; no OK.",
+            "right_ddi_content": "Natural non-target or procedure context.",
+            "expected_primary_content": "GRND/QUAL/countdown, no OK",
+            "expected_other_displays": "This separates alignment running from final OK.",
+            "expected_key_facts": "hsi_page_visible=seen; hsi_map_layer_visible=not_seen; ins_grnd_alignment_text_visible=seen; ins_ok_text_visible=not_seen",
+            "capture_instruction": "Turn MAP off on HSI and capture alignment running states with QUAL/countdown visible but no OK.",
+        },
+        {
+            "count": 2,
+            "category_id": "hsi_alignment_running_map_off",
+            "category_name": "HSI alignment running off-canonical display",
+            "target_display": "left_ddi",
+            "left_ddi_content": "HSI with MAP off; GRND/QUAL/countdown visible; no OK.",
+            "ampcd_content": "Natural non-HSI or blank if practical.",
+            "right_ddi_content": "Natural non-target or blank page.",
+            "expected_primary_content": "GRND/QUAL/countdown, no OK",
+            "expected_other_displays": "Small display-position perturbation for HSI alignment running.",
+            "expected_key_facts": "hsi_page_visible=seen; hsi_map_layer_visible=not_seen; ins_grnd_alignment_text_visible=seen; ins_ok_text_visible=not_seen",
+            "capture_instruction": "Set left DDI to HSI MAP off with running alignment if convenient.",
+        },
+        {
+            "count": 2,
+            "category_id": "hsi_alignment_running_map_off",
+            "category_name": "HSI alignment running off-canonical display",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural non-HSI or blank if practical.",
+            "right_ddi_content": "HSI with MAP off; GRND/QUAL/countdown visible; no OK.",
+            "expected_primary_content": "GRND/QUAL/countdown, no OK",
+            "expected_other_displays": "Small display-position perturbation for HSI alignment running.",
+            "expected_key_facts": "hsi_page_visible=seen; hsi_map_layer_visible=not_seen; ins_grnd_alignment_text_visible=seen; ins_ok_text_visible=not_seen",
+            "capture_instruction": "Set right DDI to HSI MAP off with running alignment if convenient.",
+        },
+        {
+            "count": 10,
+            "category_id": "hsi_ok",
+            "category_name": "HSI OK on AMPCD",
+            "target_display": "ampcd",
+            "left_ddi_content": "Natural non-target or procedure context.",
+            "ampcd_content": "HSI with clear OK text.",
+            "right_ddi_content": "Natural non-target or procedure context.",
+            "expected_primary_content": "HSI OK",
+            "expected_other_displays": "Final OK positive examples are intentionally fewer than running/MAP hard negatives.",
+            "expected_key_facts": "hsi_page_visible=seen; ins_ok_text_visible=seen",
+            "capture_instruction": "Capture HSI after alignment reaches a clearly visible OK state.",
+        },
+        {
+            "count": 1,
+            "category_id": "hsi_ok",
+            "category_name": "HSI OK off-canonical display",
+            "target_display": "left_ddi",
+            "left_ddi_content": "HSI with clear OK text.",
+            "ampcd_content": "Natural non-HSI or blank if practical.",
+            "right_ddi_content": "Natural non-target or blank page.",
+            "expected_primary_content": "HSI OK",
+            "expected_other_displays": "Small display-position perturbation for HSI OK.",
+            "expected_key_facts": "hsi_page_visible=seen; ins_ok_text_visible=seen",
+            "capture_instruction": "Set left DDI to HSI OK if convenient.",
+        },
+        {
+            "count": 1,
+            "category_id": "hsi_ok",
+            "category_name": "HSI OK off-canonical display",
+            "target_display": "right_ddi",
+            "left_ddi_content": "Natural non-target or blank page.",
+            "ampcd_content": "Natural non-HSI or blank if practical.",
+            "right_ddi_content": "HSI with clear OK text.",
+            "expected_primary_content": "HSI OK",
+            "expected_other_displays": "Small display-position perturbation for HSI OK.",
+            "expected_key_facts": "hsi_page_visible=seen; ins_ok_text_visible=seen",
+            "capture_instruction": "Set right DDI to HSI OK if convenient.",
+        },
+        {
+            "count": 4,
+            "category_id": "unreadable_transition",
+            "category_name": "Page transition / blur",
+            "target_display": "any",
+            "left_ddi_content": "Any display may be changing pages, blurred, or partly unreadable.",
+            "ampcd_content": "Any display may be changing pages, blurred, or partly unreadable.",
+            "right_ddi_content": "Any display may be changing pages, blurred, or partly unreadable.",
+            "expected_primary_content": "transition/blur/unreadable",
+            "expected_other_displays": "Capture realistic page-change moments or motion blur.",
+            "expected_key_facts": "ambiguous target facts should be uncertain rather than guessed seen",
+            "capture_instruction": "Press capture during a page transition or while the text is visibly blurred/unreadable.",
+        },
+        {
+            "count": 4,
+            "category_id": "unreadable_transition",
+            "category_name": "Stable dark or partly blank display",
+            "target_display": "any",
+            "left_ddi_content": "Stable blank/dark or partly unreadable display.",
+            "ampcd_content": "Stable blank/dark or partly unreadable display.",
+            "right_ddi_content": "Stable blank/dark or partly unreadable display.",
+            "expected_primary_content": "stable blank/dark/unreadable state",
+            "expected_other_displays": "This teaches conservative not_seen/uncertain behavior.",
+            "expected_key_facts": "target facts should be not_seen when truly absent, uncertain when unreadable",
+            "capture_instruction": "Capture stable blank/dark or partially unreadable displays.",
+        },
+        {
+            "count": 4,
+            "category_id": "unreadable_transition",
+            "category_name": "Cropped or obscured text",
+            "target_display": "any",
+            "left_ddi_content": "Target or non-target page may be cropped/obscured.",
+            "ampcd_content": "Target or non-target page may be cropped/obscured.",
+            "right_ddi_content": "Target or non-target page may be cropped/obscured.",
+            "expected_primary_content": "cropped/obscured/unreadable text",
+            "expected_other_displays": "Useful for uncertain labels and failed OCR-like cases.",
+            "expected_key_facts": "ambiguous target facts should be uncertain rather than guessed seen",
+            "capture_instruction": "Capture a case where one or more relevant labels/text areas are not readable enough to trust.",
+        },
+    ]
+    if sum(int(spec["count"]) for spec in specs) != total:
+        raise AssertionError("manual capture plan must contain exactly 220 items")
+
+    out: list[CapturePlanItem] = []
+    seq = 1
+    for spec in specs:
+        for _ in range(int(spec["count"])):
+            out.append(
+                CapturePlanItem(
+                    seq=seq,
+                    total=total,
+                    category_id=str(spec["category_id"]),
+                    category_name=str(spec["category_name"]),
+                    target_display=str(spec["target_display"]),
+                    left_ddi_content=str(spec["left_ddi_content"]),
+                    ampcd_content=str(spec["ampcd_content"]),
+                    right_ddi_content=str(spec["right_ddi_content"]),
+                    expected_primary_content=str(spec["expected_primary_content"]),
+                    expected_other_displays=str(spec["expected_other_displays"]),
+                    expected_key_facts=str(spec["expected_key_facts"]),
+                    capture_instruction=str(spec["capture_instruction"]),
+                )
+            )
+            seq += 1
+    return out
+
+
+def _resolve_manual_plan(name: str) -> list[CapturePlanItem]:
+    normalized = str(name).strip()
+    if normalized == "fa18c_run003_v3_220":
+        return _build_fa18c_run003_v3_220_plan()
+    if normalized == "fa18c_run003_v2_200":
+        raise ValueError("fa18c_run003_v2_200 was superseded by fa18c_run003_v3_220")
+    raise ValueError(f"unsupported manual plan: {name!r}")
+
+
+def _write_capture_plan_csv(session_dir: Path, plan: list[CapturePlanItem]) -> None:
+    session_dir.mkdir(parents=True, exist_ok=True)
+    path = session_dir / "capture_plan.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_CAPTURE_PLAN_FIELDNAMES)
+        writer.writeheader()
+        for item in plan:
+            writer.writerow(item.to_row())
+
+
+def _capture_plan_progress_row(
+    *,
+    item: CapturePlanItem,
+    frame: Mapping[str, Any] | None,
+    status: str,
+    operator_note: str = "",
+) -> dict[str, Any]:
+    row = item.to_row()
+    frame_payload = frame if isinstance(frame, Mapping) else {}
+    row.update(
+        {
+            "captured_frame_id": frame_payload.get("frame_id") or "",
+            "capture_reason": frame_payload.get("capture_reason") or f"manual_plan:{item.category_id}",
+            "artifact_image_path": frame_payload.get("artifact_image_path") or "",
+            "raw_image_path": frame_payload.get("image_path") or "",
+            "captured_at_wall_ms": frame_payload.get("capture_wall_ms") or "",
+            "status": status,
+            "operator_note": operator_note,
+        }
+    )
+    return row
+
+
+def _append_capture_plan_progress_csv(
+    session_dir: Path,
+    *,
+    item: CapturePlanItem,
+    frame: Mapping[str, Any] | None,
+    status: str,
+    operator_note: str = "",
+) -> None:
+    session_dir.mkdir(parents=True, exist_ok=True)
+    path = session_dir / "capture_plan_progress.csv"
+    write_header = not path.exists() or path.stat().st_size == 0
+    row = _capture_plan_progress_row(
+        item=item,
+        frame=frame,
+        status=status,
+        operator_note=operator_note,
+    )
+    with path.open("a", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_CAPTURE_PLAN_PROGRESS_FIELDNAMES)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def _append_capture_plan_progress_jsonl(
+    session_dir: Path,
+    *,
+    item: CapturePlanItem,
+    frame: Mapping[str, Any] | None,
+    status: str,
+    operator_note: str = "",
+) -> None:
+    session_dir.mkdir(parents=True, exist_ok=True)
+    path = session_dir / "capture_plan_progress.jsonl"
+    row = _capture_plan_progress_row(
+        item=item,
+        frame=frame,
+        status=status,
+        operator_note=operator_note,
+    )
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        handle.flush()
+
+
+def run_manual_plan_capture(
+    *,
+    writer: "DatasetFrameWriter",
+    plan: list[CapturePlanItem],
+    event_sources: list["CaptureEventSource"] | None = None,
+    start_seq: int = 1,
+    input_func: Callable[[str], str] = input,
+    sleep: Callable[[float], None] = time.sleep,
+    idle_sleep_s: float = 0.02,
+) -> DatasetCaptureStats:
+    if not plan:
+        raise ValueError("manual capture plan must not be empty")
+    start_seq = int(start_seq)
+    if start_seq < 1:
+        raise ValueError("manual plan start seq must be >= 1")
+    if start_seq > plan[-1].total + 1:
+        raise ValueError(f"manual plan start seq must be <= {plan[-1].total + 1}")
+    session_dir = writer.session_dir
+    plan_csv_path = session_dir / "capture_plan.csv"
+    if start_seq <= 1 or not plan_csv_path.exists():
+        _write_capture_plan_csv(session_dir, plan)
+    print(
+        "[CAPTURE_VLM_DATASET] manual_plan="
+        + json.dumps(
+            {
+                "items": len(plan),
+                "start_seq": start_seq,
+                "capture_plan": str((session_dir / "capture_plan.csv").resolve()),
+                "capture_plan_progress_csv": str((session_dir / "capture_plan_progress.csv").resolve()),
+                "capture_plan_progress_jsonl": str((session_dir / "capture_plan_progress.jsonl").resolve()),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+
+    frames_written = 0
+    skipped = 0
+    last_frame_id: str | None = None
+    sources = list(event_sources or [])
+    for item in [candidate for candidate in plan if candidate.seq >= start_seq]:
+        if sources:
+            print(
+                f"[{item.seq:03d}/{item.total:03d}] {item.category_id} | "
+                f"target_display={item.target_display}"
+            )
+            print(f"Goal: {item.expected_primary_content} on {item.target_display}.")
+            print(f"Left DDI: {item.left_ddi_content}")
+            print(f"AMPCD: {item.ampcd_content}")
+            print(f"Right DDI: {item.right_ddi_content}")
+            print(f"Instruction: {item.capture_instruction}")
+            print("[CAPTURE_VLM_DATASET] press the configured trigger once to capture; Ctrl+C to stop")
+            while True:
+                request = None
+                for event_source in sources:
+                    request = event_source.poll()
+                    if request is not None:
+                        break
+                if request is None:
+                    sleep(max(0.0, idle_sleep_s))
+                    continue
+                reason = f"manual_plan:{item.category_id}"
+                frame = writer.capture_frame(reason=reason)
+                last_frame_id = str(frame["frame_id"])
+                frames_written += 1
+                _append_capture_plan_progress_csv(
+                    session_dir,
+                    item=item,
+                    frame=frame,
+                    status="captured",
+                )
+                _append_capture_plan_progress_jsonl(
+                    session_dir,
+                    item=item,
+                    frame=frame,
+                    status="captured",
+                )
+                _print_frame_event(frame)
+                break
+            continue
+
+        while True:
+            prompt = (
+                f"[{item.seq:03d}/{item.total:03d}] {item.category_id} | "
+                f"target_display={item.target_display}\n"
+                f"Goal: {item.expected_primary_content} on {item.target_display}.\n"
+                f"Left DDI: {item.left_ddi_content}\n"
+                f"AMPCD: {item.ampcd_content}\n"
+                f"Right DDI: {item.right_ddi_content}\n"
+                f"Instruction: {item.capture_instruction}\n"
+                "Press Enter to capture, s to skip, q to quit: "
+            )
+            try:
+                command = input_func(prompt).strip().lower()
+            except EOFError:
+                command = "q"
+            if command in {"q", "quit", "exit"}:
+                print("[CAPTURE_VLM_DATASET] manual capture stopped by operator")
+                return DatasetCaptureStats(
+                    frames_written=frames_written,
+                    help_start_captures=0,
+                    interval_captures=frames_written,
+                    started=frames_written > 0 or skipped > 0,
+                    last_frame_id=last_frame_id,
+                )
+            if command in {"s", "skip"}:
+                _append_capture_plan_progress_csv(
+                    session_dir,
+                    item=item,
+                    frame=None,
+                    status="skipped",
+                )
+                _append_capture_plan_progress_jsonl(
+                    session_dir,
+                    item=item,
+                    frame=None,
+                    status="skipped",
+                )
+                skipped += 1
+                print(f"[CAPTURE_VLM_DATASET] skipped seq={item.seq:03d} category={item.category_id}")
+                break
+            if command == "":
+                frame = writer.capture_frame(reason=f"manual_plan:{item.category_id}")
+                last_frame_id = str(frame["frame_id"])
+                frames_written += 1
+                _append_capture_plan_progress_csv(
+                    session_dir,
+                    item=item,
+                    frame=frame,
+                    status="captured",
+                )
+                _append_capture_plan_progress_jsonl(
+                    session_dir,
+                    item=item,
+                    frame=frame,
+                    status="captured",
+                )
+                _print_frame_event(frame)
+                break
+            print("[CAPTURE_VLM_DATASET] unknown command; press Enter, s, or q")
+
+    print("[CAPTURE_VLM_DATASET] manual capture plan completed")
+    return DatasetCaptureStats(
+        frames_written=frames_written,
+        help_start_captures=0,
+        interval_captures=frames_written,
+        started=frames_written > 0 or skipped > 0,
+        last_frame_id=last_frame_id,
+    )
 
 
 class DatasetFrameWriter:
@@ -98,7 +857,7 @@ class DatasetFrameWriter:
         self.capture_callable = capture_callable
         self.render_vlm_artifacts = bool(render_vlm_artifacts)
         self.clock = clock
-        self._frame_seq = 0
+        self._frame_seq = self._resolve_next_frame_seq()
 
     @property
     def session_dir(self) -> Path:
@@ -119,6 +878,24 @@ class DatasetFrameWriter:
     @property
     def capture_index_path(self) -> Path:
         return self.session_dir / "capture_index.jsonl"
+
+    def _resolve_next_frame_seq(self) -> int:
+        path = self.manifest_path
+        if not path.exists():
+            return 0
+        max_frame_seq = -1
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    payload = json.loads(text)
+                    frame_seq = int(payload.get("frame_seq", -1))
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    continue
+                max_frame_seq = max(max_frame_seq, frame_seq)
+        return max_frame_seq + 1
 
     def capture_frame(self, *, reason: str) -> dict[str, Any]:
         image = self.capture_callable()
@@ -374,6 +1151,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--duration-s", type=float, default=0.0, help="Optional run duration in seconds.")
     parser.add_argument("--start-on-launch", action="store_true", help="Start capturing immediately without waiting for help.")
     parser.add_argument(
+        "--manual-plan",
+        default="",
+        help="Optional manual capture plan name. Currently supports fa18c_run003_v3_220.",
+    )
+    parser.add_argument(
+        "--manual-plan-start-seq",
+        type=int,
+        default=1,
+        help="Start a manual plan from this 1-based seq number. Useful after repairing or resuming a session.",
+    )
+    parser.add_argument(
         "--no-render-vlm-artifacts",
         action="store_true",
         help="Disable VLM-ready artifact rendering and only keep raw frames.",
@@ -428,8 +1216,12 @@ def _print_frame_event(frame: dict[str, Any]) -> None:
 
 def main() -> int:
     args = build_arg_parser().parse_args()
+    listener: UdpCaptureRequestListener | None = None
+    global_hotkey_source: GlobalHelpEventSource | None = None
     try:
         config, config_path = _resolve_runtime_config(args)
+        if str(args.manual_plan).strip() and not config.render_vlm_artifacts:
+            raise ValueError("--manual-plan requires VLM artifact rendering; remove --no-render-vlm-artifacts")
         writer = DatasetFrameWriter(
             output_root=config.output_root,
             session_id=config.session_id,
@@ -442,7 +1234,6 @@ def main() -> int:
             ),
         )
         event_sources: list[CaptureEventSource] = []
-        global_hotkey_source: GlobalHelpEventSource | None = None
         if str(args.global_help_hotkey).strip():
             if sys.platform != "win32":
                 raise RuntimeError("--global-help-hotkey is only supported on Windows")
@@ -453,7 +1244,6 @@ def main() -> int:
             )
             global_hotkey_source.start()
             event_sources.append(global_hotkey_source)
-        listener: UdpCaptureRequestListener | None = None
         if int(args.help_trigger_port) > 0:
             listener = UdpCaptureRequestListener(
                 session_id=config.session_id,
@@ -463,6 +1253,19 @@ def main() -> int:
             )
             event_sources.append(UdpEventSource(listener))
         try:
+            if str(args.manual_plan).strip():
+                stats = run_manual_plan_capture(
+                    writer=writer,
+                    plan=_resolve_manual_plan(args.manual_plan),
+                    event_sources=event_sources,
+                    start_seq=args.manual_plan_start_seq,
+                )
+                print(
+                    f"[CAPTURE_VLM_DATASET] stats="
+                    f"{json.dumps(stats.to_dict(), ensure_ascii=False, sort_keys=True)}"
+                )
+                return 0
+
             runner = HelpTriggeredDatasetCapture(
                 writer=writer,
                 event_sources=event_sources,
