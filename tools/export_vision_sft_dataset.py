@@ -15,14 +15,19 @@ DEFAULT_OUTPUT_DIR = Path("datasets/vision_sft")
 DEFAULT_LABEL_SOURCE = "label_studio_review"
 ALLOWED_STATES = frozenset({"seen", "not_seen", "uncertain"})
 CORE_FACT_IDS: tuple[str, ...] = (
+    "tac_page_visible",
+    "supt_page_visible",
     "fcs_page_visible",
+    "fcs_page_x_marks_visible",
     "bit_root_page_visible",
-    "bit_page_failure_visible",
-    "right_ddi_fcsmc_page_visible",
-    "right_ddi_in_test_visible",
-    "fcs_bit_result_visible",
-    "ins_alignment_page_visible",
-    "ins_go",
+    "fcsmc_page_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_final_go_result_visible",
+    "hsi_page_visible",
+    "hsi_map_layer_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
 )
 
 
@@ -276,26 +281,38 @@ def _user_prompt(lang: str) -> str:
             "Its fixed top-to-bottom regions are: left_ddi, ampcd, right_ddi.\n"
             "\n"
             "Task:\n"
-            "Inspect only this image and output visual fact labels for the 8 core facts below.\n"
+            "Inspect only this image and output visual fact labels for the 13 core facts below.\n"
             "If the image is blurry, obstructed, or the state cannot be confirmed from this image alone, use state='uncertain'.\n"
             "\n"
             "Facts to label:\n"
-            "1. fcs_page_visible\n"
-            "2. bit_root_page_visible\n"
-            "3. bit_page_failure_visible\n"
-            "4. right_ddi_fcsmc_page_visible\n"
-            "5. right_ddi_in_test_visible\n"
-            "6. fcs_bit_result_visible\n"
-            "7. ins_alignment_page_visible\n"
-            "8. ins_go\n"
+            "1. tac_page_visible\n"
+            "2. supt_page_visible\n"
+            "3. fcs_page_visible\n"
+            "4. fcs_page_x_marks_visible\n"
+            "5. bit_root_page_visible\n"
+            "6. fcsmc_page_visible\n"
+            "7. fcsmc_intermediate_result_visible\n"
+            "8. fcsmc_in_test_visible\n"
+            "9. fcsmc_final_go_result_visible\n"
+            "10. hsi_page_visible\n"
+            "11. hsi_map_layer_visible\n"
+            "12. ins_grnd_alignment_text_visible\n"
+            "13. ins_ok_text_visible\n"
             "\n"
             "Key decision boundaries:\n"
-            "- fcs_page_visible means a real FCS page is visible. Seeing only an FCS option/button is not enough.\n"
-            "- bit_root_page_visible, bit_page_failure_visible, and right_ddi_fcsmc_page_visible must be distinguished.\n"
-            "- right_ddi_in_test_visible means the right DDI is clearly in an IN TEST state, not just a generic BIT context.\n"
-            "- fcs_bit_result_visible must only be 'seen' when the final FCS BIT result is clearly visible. Intermediate or PBIT GO cues are not enough.\n"
-            "- ins_alignment_page_visible and ins_go must be distinguished.\n"
-            "- If AMPCD shows a MAP layer or a non-alignment page, do not hallucinate ins_go.\n"
+            "- Page option labels are not pages. Do not mark a page visible just because its name appears as a pushbutton/menu option.\n"
+            "- tac_page_visible requires the actual TAC/TAC MENU page; a small TAC/MENU navigation label alone is not enough.\n"
+            "- supt_page_visible requires the actual SUPT/SUPT MENU page; a small SUPT option label alone is not enough.\n"
+            "- fcs_page_visible is the dedicated flight-control FCS page with readable LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS grid labels.\n"
+            "- fcs_page_x_marks_visible only means literal X/fault fills inside FCS page channel boxes.\n"
+            "- bit_root_page_visible is the BIT FAILURES/root page; an FCS-MC entry label is not the FCS-MC subpage.\n"
+            "- fcsmc_page_visible requires a readable FCS-MC title/subpage with MC1, MC2, FCSA, and FCSB rows.\n"
+            "- PBIT GO is intermediate, not final GO. IN TEST is running, not final GO.\n"
+            "- fcsmc_final_go_result_visible requires final GO results for the relevant FCS-MC rows, especially FCSA and FCSB.\n"
+            "- hsi_page_visible means an HSI navigation/POS page is visible; it does not imply INS alignment text or INS OK.\n"
+            "- hsi_map_layer_visible requires a colored topographic/chart MAP background; black HSI symbology alone is not MAP.\n"
+            "- ins_grnd_alignment_text_visible requires a literal GRND alignment block with QUAL or TIME/countdown text.\n"
+            "- ins_ok_text_visible requires clearly readable OK near the INS alignment block, usually near QUAL.\n"
             "\n"
             "Output requirements:\n"
             "- Output exactly one JSON object.\n"
@@ -307,14 +324,14 @@ def _user_prompt(lang: str) -> str:
             "- Do NOT output expires_after_ms or sticky.\n"
             "- Do NOT output tutor answers, step suggestions, or action suggestions.\n"
             "- Do NOT wrap the JSON in markdown or any extra prose.\n"
-            "- Include all 8 facts. When unsure, use state='uncertain'.\n"
+            "- Include all 13 facts. When unsure, use state='uncertain'.\n"
             "\n"
             "Return format:\n"
             "{\n"
             '  "summary": "one short sentence",\n'
             '  "facts": [\n'
-            '    {"fact_id": "fcs_page_visible", "state": "seen", "evidence_note": "short evidence"},\n'
-            '    {"fact_id": "bit_root_page_visible", "state": "not_seen", "evidence_note": "short evidence"}\n'
+            '    {"fact_id": "tac_page_visible", "state": "seen", "evidence_note": "short evidence"},\n'
+            '    {"fact_id": "fcsmc_final_go_result_visible", "state": "not_seen", "evidence_note": "short evidence"}\n'
             "  ]\n"
             "}\n"
         )
@@ -324,26 +341,38 @@ def _user_prompt(lang: str) -> str:
         "这张图内部的固定区域从上到下依次是：left_ddi、ampcd、right_ddi。\n"
         "\n"
         "任务：\n"
-        "只根据当前这一张图，为下面 8 个核心视觉 fact 输出标注。\n"
+        "只根据当前这一张图，为下面 13 个核心视觉 fact 输出标注。\n"
         "如果当前图模糊、遮挡、页面不完整、或者仅凭这一张图无法确认，请使用 state='uncertain'。\n"
         "\n"
         "需要标注的 fact：\n"
-        "1. fcs_page_visible\n"
-        "2. bit_root_page_visible\n"
-        "3. bit_page_failure_visible\n"
-        "4. right_ddi_fcsmc_page_visible\n"
-        "5. right_ddi_in_test_visible\n"
-        "6. fcs_bit_result_visible\n"
-        "7. ins_alignment_page_visible\n"
-        "8. ins_go\n"
+        "1. tac_page_visible\n"
+        "2. supt_page_visible\n"
+        "3. fcs_page_visible\n"
+        "4. fcs_page_x_marks_visible\n"
+        "5. bit_root_page_visible\n"
+        "6. fcsmc_page_visible\n"
+        "7. fcsmc_intermediate_result_visible\n"
+        "8. fcsmc_in_test_visible\n"
+        "9. fcsmc_final_go_result_visible\n"
+        "10. hsi_page_visible\n"
+        "11. hsi_map_layer_visible\n"
+        "12. ins_grnd_alignment_text_visible\n"
+        "13. ins_ok_text_visible\n"
         "\n"
         "关键判别边界：\n"
-        "- fcs_page_visible 只有在真正显示 FCS 页面时才算 seen；仅看到 FCS 选项或按钮不算。\n"
-        "- bit_root_page_visible、bit_page_failure_visible、right_ddi_fcsmc_page_visible 必须区分开。\n"
-        "- right_ddi_in_test_visible 只有在右 DDI 明确处于 IN TEST 状态时才算 seen。\n"
-        "- fcs_bit_result_visible 只有在最终 FCS BIT 结果明确可见时才算 seen；中间态或 PBIT GO 不能算。\n"
-        "- ins_alignment_page_visible 和 ins_go 必须区分开。\n"
-        "- 如果 AMPCD 显示 MAP 图层或其它非对准页面，不要臆测 ins_go=seen。\n"
+        "- 页面选项标签不等于页面本身。不要因为某个 pushbutton/menu option 写着页面名就标 seen。\n"
+        "- tac_page_visible 需要实际 TAC/TAC MENU 页面；单独小的 TAC/MENU 导航标签不够。\n"
+        "- supt_page_visible 需要实际 SUPT/SUPT MENU 页面；单独小的 SUPT 选项标签不够。\n"
+        "- fcs_page_visible 是专用飞控 FCS 页面，需要能读到 LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS grid 等标签。\n"
+        "- fcs_page_x_marks_visible 只表示 FCS 页面通道格子内的字面 X/fault fills。\n"
+        "- bit_root_page_visible 是 BIT FAILURES/root 页面；FCS-MC 入口标签不等于 FCS-MC 子页面。\n"
+        "- fcsmc_page_visible 需要能读到 FCS-MC 标题/子页面，并有 MC1、MC2、FCSA、FCSB 等行。\n"
+        "- PBIT GO 是中间态，不是 final GO。IN TEST 是运行中，不是 final GO。\n"
+        "- fcsmc_final_go_result_visible 必须是相关 FCS-MC 行的最终 GO，尤其 FCSA 和 FCSB。\n"
+        "- hsi_page_visible 是 HSI navigation/POS 页面可见；它本身不代表 INS 对准文字或 INS OK 可见。\n"
+        "- hsi_map_layer_visible 需要彩色地形/航图 MAP 背景；黑底 HSI 符号本身不算 MAP。\n"
+        "- ins_grnd_alignment_text_visible 需要字面 GRND 对准文字块，并伴随 QUAL 或 TIME/countdown。\n"
+        "- ins_ok_text_visible 需要在 INS 对准文字块附近清楚读到 OK，通常在 QUAL 附近。\n"
         "\n"
         "输出要求：\n"
         "- 只输出一个 JSON object。\n"
@@ -355,14 +384,14 @@ def _user_prompt(lang: str) -> str:
         "- 严禁输出 expires_after_ms 或 sticky。\n"
         "- 严禁输出 tutor answer、步骤推进建议、操作建议。\n"
         "- 严禁输出 markdown、代码块或 JSON 之外的说明文字。\n"
-        "- 8 个 fact 都要给出条目；看不清就用 state='uncertain'。\n"
+        "- 13 个 fact 都要给出条目；看不清就用 state='uncertain'。\n"
         "\n"
         "返回格式：\n"
         "{\n"
         '  "summary": "一句短总结",\n'
         '  "facts": [\n'
-        '    {"fact_id": "fcs_page_visible", "state": "seen", "evidence_note": "简短证据"},\n'
-        '    {"fact_id": "bit_root_page_visible", "state": "not_seen", "evidence_note": "简短证据"}\n'
+        '    {"fact_id": "tac_page_visible", "state": "seen", "evidence_note": "简短证据"},\n'
+        '    {"fact_id": "fcsmc_final_go_result_visible", "state": "not_seen", "evidence_note": "简短证据"}\n'
         "  ]\n"
         "}\n"
     )
