@@ -17,33 +17,45 @@ from typing import Any, Mapping, Sequence
 from PIL import Image
 
 CORE_FACT_IDS: tuple[str, ...] = (
+    "tac_page_visible",
+    "supt_page_visible",
     "fcs_page_visible",
+    "fcs_page_x_marks_visible",
     "bit_root_page_visible",
-    "bit_page_failure_visible",
-    "right_ddi_fcsmc_page_visible",
-    "right_ddi_in_test_visible",
-    "fcs_bit_result_visible",
-    "ins_alignment_page_visible",
-    "ins_go",
+    "fcsmc_page_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_final_go_result_visible",
+    "hsi_page_visible",
+    "hsi_map_layer_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
 )
 
 ALLOWED_STATES = ("seen", "not_seen", "uncertain")
 CRITICAL_FACT_IDS = (
-    "fcs_bit_result_visible",
-    "ins_go",
-    "right_ddi_in_test_visible",
-    "right_ddi_fcsmc_page_visible",
+    "fcs_page_x_marks_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_final_go_result_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
 )
 
 CHART_LABELS = {
+    "tac_page_visible": "TAC\npage",
+    "supt_page_visible": "SUPT\npage",
     "fcs_page_visible": "FCS\npage",
+    "fcs_page_x_marks_visible": "FCS\nX marks",
     "bit_root_page_visible": "BIT\nroot",
-    "bit_page_failure_visible": "BIT\nfailure",
-    "right_ddi_fcsmc_page_visible": "Right DDI\nFCS-MC",
-    "right_ddi_in_test_visible": "Right DDI\nIN TEST",
-    "fcs_bit_result_visible": "FCS BIT\nresult",
-    "ins_alignment_page_visible": "INS\nalignment",
-    "ins_go": "INS\nGO",
+    "fcsmc_page_visible": "FCS-MC\npage",
+    "fcsmc_intermediate_result_visible": "FCS-MC\nPBIT",
+    "fcsmc_in_test_visible": "FCS-MC\nIN TEST",
+    "fcsmc_final_go_result_visible": "FCS-MC\nfinal GO",
+    "hsi_page_visible": "HSI\npage",
+    "hsi_map_layer_visible": "HSI MAP\nlayer",
+    "ins_grnd_alignment_text_visible": "GRND/QUAL\ntext",
+    "ins_ok_text_visible": "INS OK\ntext",
     "fact_accuracy": "Fact\naccuracy",
     "sample_exact_match": "Sample\nexact match",
 }
@@ -100,90 +112,54 @@ def _system_prompt(lang: str) -> str:
 def _user_prompt(lang: str) -> str:
     if lang == "en":
         return (
-            "You are the SimTutor visual fact extractor for the F/A-18C cold-start dataset.\n"
-            "The input is exactly one composite-panel image.\n"
-            "Its fixed top-to-bottom regions are: left_ddi, ampcd, right_ddi.\n\n"
-            "Task:\n"
-            "Inspect only this image and output visual fact labels for the 8 core facts below.\n"
-            "If the image is blurry, obstructed, or the state cannot be confirmed from this image alone, use state='uncertain'.\n\n"
-            "Facts to label:\n"
-            "1. fcs_page_visible\n"
-            "2. bit_root_page_visible\n"
-            "3. bit_page_failure_visible\n"
-            "4. right_ddi_fcsmc_page_visible\n"
-            "5. right_ddi_in_test_visible\n"
-            "6. fcs_bit_result_visible\n"
-            "7. ins_alignment_page_visible\n"
-            "8. ins_go\n\n"
-            "Key decision boundaries:\n"
-            "- fcs_page_visible means a real FCS page is visible. Seeing only an FCS option/button is not enough.\n"
-            "- bit_root_page_visible, bit_page_failure_visible, and right_ddi_fcsmc_page_visible must be distinguished.\n"
-            "- right_ddi_in_test_visible means the right DDI is clearly in an IN TEST state, not just a generic BIT context.\n"
-            "- fcs_bit_result_visible must only be 'seen' when the final FCS BIT result is clearly visible. Intermediate or PBIT GO cues are not enough.\n"
-            "- ins_alignment_page_visible and ins_go must be distinguished.\n"
-            "- If AMPCD shows a MAP layer or a non-alignment page, do not hallucinate ins_go.\n\n"
-            "Output requirements:\n"
-            "- Output exactly one JSON object.\n"
-            "- The top-level object may contain only: summary, facts.\n"
-            "- Each fact object may contain only: fact_id, state, evidence_note.\n"
-            "- Do NOT output frame_id.\n"
-            "- Do NOT output source_frame_id.\n"
-            "- Do NOT output confidence.\n"
-            "- Do NOT output expires_after_ms or sticky.\n"
-            "- Do NOT output tutor answers, step suggestions, or action suggestions.\n"
-            "- Do NOT wrap the JSON in markdown or any extra prose.\n"
-            "- Include all 8 facts. When unsure, use state='uncertain'.\n\n"
-            "Return format:\n"
-            "{\n"
-            '  "summary": "one short sentence",\n'
-            '  "facts": [\n'
-            '    {"fact_id": "fcs_page_visible", "state": "seen", "evidence_note": "short evidence"},\n'
-            '    {"fact_id": "bit_root_page_visible", "state": "not_seen", "evidence_note": "short evidence"}\n'
-            "  ]\n"
-            "}\n"
+            "You are a strict visual fact extractor for F/A-18C cockpit screenshots.\n"
+            "Input: one composite image with fixed regions from top to bottom: left_ddi, ampcd, right_ddi.\n"
+            "Use only visible evidence in this single image. Do not infer from procedure history.\n"
+            "States: seen = clearly visible; not_seen = absent; uncertain = too blurry/obscured/partial to trust.\n"
+            "\n"
+            "Return all 13 facts:\n"
+            "tac_page_visible, supt_page_visible, fcs_page_visible, fcs_page_x_marks_visible,\n"
+            "bit_root_page_visible, fcsmc_page_visible, fcsmc_intermediate_result_visible,\n"
+            "fcsmc_in_test_visible, fcsmc_final_go_result_visible, hsi_page_visible,\n"
+            "hsi_map_layer_visible, ins_grnd_alignment_text_visible, ins_ok_text_visible.\n"
+            "\n"
+            "Decision boundaries:\n"
+            "- Page option labels are not pages. Do not mark a page visible just because its name appears as a pushbutton/menu option.\n"
+            "- tac_page_visible requires the actual TAC/TAC MENU page, usually a boxed TAC MENU plus multiple menu items such as STORES, RDR ATTK, HUD, FCS, EW. A small TAC/MENU navigation label, GO/NOGO table, UFC/MSNCDR page, or generic bottom MENU label is not enough.\n"
+            "- supt_page_visible requires the actual SUPT/SUPT MENU page. A small SUPT option label alone is not enough. TAC and SUPT pages can contain an FCS option label.\n"
+            "- An FCS option/button label on TAC/SUPT is NOT the FCS page.\n"
+            "- fcs_page_visible is the dedicated flight-control FCS page with readable channel/control labels such as LEF, TEF, AIL, RUD, STAB, SV1/SV2, and CAS/P/Y/R grid. Do not count pages that only show FLAPS OFF, AIL OFF, CANOPY, FCS option text, INS ATT, INS DEGD, TAC/SUPT menus, or the FCS-MC BIT page.\n"
+            "- fcs_page_x_marks_visible is seen only when literal diagonal/cross X fault fills are visible inside FCS page channel boxes. Empty channel boxes, grid lines, numbers, INS ATT/INS DEGD text, caution text, and boxed menu labels are not X marks.\n"
+            "- bit_root_page_visible is the BIT FAILURES/root page; seeing an FCS-MC entry label is not FCS-MC page.\n"
+            "- fcsmc_page_visible requires a readable FCS-MC title/subpage with rows such as MC1, MC2, FCSA, and FCSB. Do not infer FCS-MC from blank displays, SAFE/GUN/HUD symbology, BIT root summaries, or unreadable transition pages.\n"
+            "- FCS-MC result facts require the FCS-MC subpage. A BIT root summary row such as FCS-MC GO is not an FCS-MC subpage result.\n"
+            "- fcsmc_intermediate_result_visible means clear PBIT GO/pre-test result text on the FCS-MC subpage. MC1/MC2 GO alone is not enough; IN TEST is not intermediate_result.\n"
+            "- IN TEST is running: fcsmc_in_test_visible=seen, final_go=not_seen. If FCSA/FCSB show IN TEST, do not mark final GO even if MC1/MC2 show GO.\n"
+            "- fcsmc_final_go_result_visible requires clear final GO results for the relevant FCS-MC rows, especially FCSA and FCSB. Do not mark final GO for PBIT GO, IN TEST, MC1/MC2-only GO, or BIT root summary GO.\n"
+            "- hsi_page_visible means an HSI navigation/POS page is visible on any display. This alone is not evidence that INS alignment text or INS OK is visible.\n"
+            "- hsi_map_layer_visible means a colored topographic/chart MAP background is visible. Black HSI symbology, compass roses, waypoint marks, or text-only HSI pages are not a MAP layer.\n"
+            "- ins_grnd_alignment_text_visible requires a literal GRND alignment block with QUAL or TIME/countdown text. Do not infer it from INS ATT/INS DEGD, POS/INS, coordinates, or map-only HSI pages.\n"
+            "- ins_ok_text_visible requires clearly readable OK near the INS alignment block, usually near or after QUAL such as 'QUAL 0.5 OK'. MAP clutter or similar marks are not OK.\n"
+            "- If no target page is visible, mark target facts not_seen. If text is unreadable, use uncertain.\n"
+            "\n"
+            "Output JSON only. Top level may contain only summary and facts. Each fact may contain only fact_id, state, evidence_note.\n"
+            "Never output frame_id, source_frame_id, confidence, expires_after_ms, sticky, actions, or tutor advice.\n"
         )
     return (
-        "你是 SimTutor 的视觉事实抽取器，负责给 F/A-18C 冷启动数据集做视觉事实标注。\n"
-        "输入只有一张组合面板图。\n"
-        "这张图内部的固定区域从上到下依次是：left_ddi、ampcd、right_ddi。\n\n"
-        "任务：\n"
-        "只根据当前这一张图，为下面 8 个核心视觉 fact 输出标注。\n"
-        "如果当前图模糊、遮挡、页面不完整、或者仅凭这一张图无法确认，请使用 state='uncertain'。\n\n"
-        "需要标注的 fact：\n"
-        "1. fcs_page_visible\n"
-        "2. bit_root_page_visible\n"
-        "3. bit_page_failure_visible\n"
-        "4. right_ddi_fcsmc_page_visible\n"
-        "5. right_ddi_in_test_visible\n"
-        "6. fcs_bit_result_visible\n"
-        "7. ins_alignment_page_visible\n"
-        "8. ins_go\n\n"
-        "关键判别边界：\n"
-        "- fcs_page_visible 只有在真正显示 FCS 页面时才算 seen；仅看到 FCS 选项或按钮不算。\n"
-        "- bit_root_page_visible、bit_page_failure_visible、right_ddi_fcsmc_page_visible 必须区分开。\n"
-        "- right_ddi_in_test_visible 只有在右 DDI 明确处于 IN TEST 状态时才算 seen。\n"
-        "- fcs_bit_result_visible 只有在最终 FCS BIT 结果明确可见时才算 seen；中间态或 PBIT GO 不能算。\n"
-        "- ins_alignment_page_visible 和 ins_go 必须区分开。\n"
-        "- 如果 AMPCD 显示 MAP 图层或其它非对准页面，不要臆测 ins_go=seen。\n\n"
-        "输出要求：\n"
-        "- 只输出一个 JSON object。\n"
-        "- 顶层只允许包含：summary、facts。\n"
-        "- facts 数组里的每个对象只允许包含：fact_id、state、evidence_note。\n"
-        "- 严禁输出 frame_id。\n"
-        "- 严禁输出 source_frame_id。\n"
-        "- 严禁输出 confidence。\n"
-        "- 严禁输出 expires_after_ms 或 sticky。\n"
-        "- 严禁输出 tutor answer、步骤推进建议、操作建议。\n"
-        "- 严禁输出 markdown、代码块或 JSON 之外的说明文字。\n"
-        "- 8 个 fact 都要给出条目；看不清就用 state='uncertain'。\n\n"
-        "返回格式：\n"
-        "{\n"
-        '  "summary": "一句短总结",\n'
-        '  "facts": [\n'
-        '    {"fact_id": "fcs_page_visible", "state": "seen", "evidence_note": "简短证据"},\n'
-        '    {"fact_id": "bit_root_page_visible", "state": "not_seen", "evidence_note": "简短证据"}\n'
-        "  ]\n"
-        "}\n"
+        "你是 F/A-18C cockpit 截图的严格视觉事实抽取器。\n"
+        "输入是一张组合图，固定区域从上到下为：left_ddi、ampcd、right_ddi。\n"
+        "只看当前单帧图像，不根据流程历史推断。\n"
+        "状态：seen=清楚可见；not_seen=不存在；uncertain=模糊/遮挡/过渡/局部可见而无法可靠判断。\n"
+        "\n"
+        "必须返回 13 个 facts：\n"
+        "tac_page_visible, supt_page_visible, fcs_page_visible, fcs_page_x_marks_visible,\n"
+        "bit_root_page_visible, fcsmc_page_visible, fcsmc_intermediate_result_visible,\n"
+        "fcsmc_in_test_visible, fcsmc_final_go_result_visible, hsi_page_visible,\n"
+        "hsi_map_layer_visible, ins_grnd_alignment_text_visible, ins_ok_text_visible。\n"
+        "\n"
+        "判别边界：页面选项标签不等于页面本身；TAC/SUPT 上的 FCS 选项不等于 FCS 页面；FCS 页面需可读到 LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS/P/Y/R 等布局；FCS X marks 只指 FCS 页面格子内字面 X fault fills；BIT root 是 BIT FAILURES/root 页，FCS-MC 入口不等于 FCS-MC 子页面；FCS-MC 结果类 fact 必须来自 FCS-MC 子页面；PBIT GO/IN TEST/最终 GO 必须区分；HSI page 不等于 INS 对准文字；MAP layer 是彩色地形/航图背景；GRND/QUAL/TIME 和 OK 必须清楚可读。\n"
+        "没有目标页时标 not_seen；文字看不清时标 uncertain。\n"
+        "只输出 JSON。顶层只允许 summary 和 facts。每个 fact 只允许 fact_id、state、evidence_note。严禁输出 frame_id、source_frame_id、confidence、expires_after_ms、sticky、动作建议或 tutor 建议。\n"
     )
 
 
@@ -281,7 +257,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--benchmark-kind", default="contaminated_dev_set")
     parser.add_argument("--max-samples", type=int, default=0)
     parser.add_argument("--max-seq-length", type=int, default=4096)
-    parser.add_argument("--max-new-tokens", type=int, default=768)
+    parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument(

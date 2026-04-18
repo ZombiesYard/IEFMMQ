@@ -34,7 +34,7 @@ def test_normalize_prediction_accepts_json_and_fills_missing_facts() -> None:
     assert record.json_valid is True
     assert record.schema_valid is False
     assert record.facts["fcs_page_visible"] == "seen"
-    assert record.facts["ins_go"] == "uncertain"
+    assert record.facts["ins_ok_text_visible"] == "uncertain"
     assert any(item.startswith("missing_facts:") for item in record.warnings)
 
 
@@ -43,10 +43,10 @@ def test_normalize_prediction_flags_forbidden_fields() -> None:
         {
             "facts": [
                 {
-                    "fact_id": "ins_go",
+                    "fact_id": "ins_ok_text_visible",
                     "state": "seen",
                     "confidence": 0.99,
-                    "evidence_note": "GO is visible.",
+                    "evidence_note": "OK is visible.",
                 }
             ]
         }
@@ -56,7 +56,7 @@ def test_normalize_prediction_flags_forbidden_fields() -> None:
 
     assert record.json_valid is True
     assert record.schema_valid is False
-    assert record.facts["ins_go"] == "seen"
+    assert record.facts["ins_ok_text_visible"] == "seen"
     assert any("unknown_keys:confidence" in item for item in record.warnings)
 
 
@@ -68,7 +68,7 @@ def test_compute_metrics_counts_critical_false_positives() -> None:
         facts=gold,
     )
     predicted = _facts("not_seen")
-    predicted["ins_go"] = "seen"
+    predicted["ins_ok_text_visible"] = "seen"
     prediction = PredictionRecord(
         sample_id="sample-1",
         raw_text="{}",
@@ -83,12 +83,12 @@ def test_compute_metrics_counts_critical_false_positives() -> None:
         model_label="lora",
     )
 
-    assert metrics["fact_accuracy"] == 0.875
+    assert metrics["fact_accuracy"] == round((len(CORE_FACT_IDS) - 1) / len(CORE_FACT_IDS), 6)
     assert metrics["sample_exact_match"] == 0.0
     assert metrics["critical_false_positive_count"] == 1
-    assert metrics["critical_false_positives_by_fact"]["ins_go"] == 1
+    assert metrics["critical_false_positives_by_fact"]["ins_ok_text_visible"] == 1
     assert len(errors) == 1
-    assert errors[0]["fact_id"] == "ins_go"
+    assert errors[0]["fact_id"] == "ins_ok_text_visible"
 
 
 def test_compute_metrics_exact_match() -> None:

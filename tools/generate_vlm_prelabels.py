@@ -57,6 +57,20 @@ FORBIDDEN_MODEL_FIELDS: frozenset[str] = frozenset(
 )
 LABEL_STUDIO_TO_NAME = "panel_image"
 LABEL_STUDIO_PREDICTION_SCORE = 0.95
+LABEL_STUDIO_CAPTURE_PLAN_DATA_FIELDS: tuple[str, ...] = (
+    "seq",
+    "total",
+    "category_id",
+    "category_name",
+    "target_display",
+    "left_ddi_content",
+    "ampcd_content",
+    "right_ddi_content",
+    "expected_primary_content",
+    "expected_other_displays",
+    "expected_key_facts",
+    "capture_instruction",
+)
 
 
 @dataclass(frozen=True)
@@ -674,21 +688,11 @@ def _build_label_studio_task(
             indent=2,
         ),
     }
+    for key in LABEL_STUDIO_CAPTURE_PLAN_DATA_FIELDS:
+        data[f"capture_plan_{key}"] = ""
     capture_plan = sample.get("capture_plan")
     if isinstance(capture_plan, Mapping):
-        for key in (
-            "seq",
-            "total",
-            "category_id",
-            "category_name",
-            "target_display",
-            "left_ddi_content",
-            "ampcd_content",
-            "right_ddi_content",
-            "expected_primary_content",
-            "expected_key_facts",
-            "capture_instruction",
-        ):
+        for key in LABEL_STUDIO_CAPTURE_PLAN_DATA_FIELDS:
             if key in capture_plan:
                 data[f"capture_plan_{key}"] = capture_plan.get(key)
     for item in facts:
