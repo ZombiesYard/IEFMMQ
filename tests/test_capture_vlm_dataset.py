@@ -13,6 +13,7 @@ from tools.capture_vlm_dataset import (
     GlobalHelpEventSource,
     HelpTriggeredDatasetCapture,
     UdpEventSource,
+    _resolve_manual_plan,
     _resolve_runtime_config,
     _print_frame_event,
     build_arg_parser,
@@ -279,6 +280,25 @@ def test_dataset_capture_cli_defaults_and_runtime_config(tmp_path: Path) -> None
     assert config.screen_height == 900
     assert config.render_vlm_artifacts is True
     assert resolved_config_path == config_path
+
+
+def test_run005_manual_plan_shape_and_key_sequences() -> None:
+    plan = _resolve_manual_plan("fa18c_run005_composition_rebalance_122")
+
+    assert len(plan) == 122
+    assert plan[0].seq == 1
+    assert plan[0].total == 122
+    assert plan[0].category_id == "default_TAC_HSI_MAP_BITROOT"
+    assert "TAC" in plan[0].left_ddi_content
+    assert "HSI" in plan[0].ampcd_content
+    assert "BIT" in plan[0].right_ddi_content
+
+    assert plan[86].seq == 87
+    assert plan[86].category_id == "FCSMC_FINALGO_HSI_OK"
+    assert "OK" in plan[86].ampcd_content
+
+    assert plan[-1].seq == 122
+    assert plan[-1].category_id == "HSI_TRANSITION_UNREADABLE"
 
 
 def test_gitignore_ignores_tool_capture_output() -> None:

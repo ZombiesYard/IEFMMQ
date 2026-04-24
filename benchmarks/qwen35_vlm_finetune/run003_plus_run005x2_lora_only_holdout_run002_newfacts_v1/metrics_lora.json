@@ -1,0 +1,647 @@
+{
+  "schema_version": "v1",
+  "model_label": "lora",
+  "sample_count": 50,
+  "fact_count": 650,
+  "json_valid_rate": 1.0,
+  "schema_valid_rate": 1.0,
+  "fact_accuracy": 0.990769,
+  "sample_exact_match": 0.88,
+  "macro_f1": 0.651478,
+  "seen_f1": 0.964829,
+  "critical_false_positive_count": 4,
+  "critical_false_positives_by_fact": {
+    "fcs_page_x_marks_visible": 0,
+    "fcsmc_intermediate_result_visible": 0,
+    "fcsmc_in_test_visible": 0,
+    "fcsmc_final_go_result_visible": 1,
+    "ins_grnd_alignment_text_visible": 1,
+    "ins_ok_text_visible": 2
+  },
+  "fact_scores": {
+    "tac_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 21,
+          "fp": 0,
+          "fn": 2,
+          "precision": 1.0,
+          "recall": 0.913043,
+          "f1": 0.954545
+        },
+        "not_seen": {
+          "tp": 27,
+          "fp": 2,
+          "fn": 0,
+          "precision": 0.931034,
+          "recall": 1.0,
+          "f1": 0.964286
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.63961,
+      "seen_f1": 0.954545,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 21,
+          "not_seen": 2,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 27,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.96
+    },
+    "supt_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 5,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 45,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 5,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 45,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcs_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 13,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 37,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 13,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 37,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcs_page_x_marks_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 49,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 1,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 49,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "bit_root_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 9,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 41,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 9,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 41,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcsmc_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 9,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 41,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 9,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 41,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcsmc_intermediate_result_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 49,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 1,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 49,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcsmc_in_test_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 6,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 44,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 6,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 44,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "fcsmc_final_go_result_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 2,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.666667,
+          "recall": 1.0,
+          "f1": 0.8
+        },
+        "not_seen": {
+          "tp": 47,
+          "fp": 0,
+          "fn": 1,
+          "precision": 1.0,
+          "recall": 0.979167,
+          "f1": 0.989474
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.596491,
+      "seen_f1": 0.8,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 2,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 1,
+          "not_seen": 47,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.98
+    },
+    "hsi_page_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 49,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 49,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 1,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "hsi_map_layer_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 27,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "not_seen": {
+          "tp": 23,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.666667,
+      "seen_f1": 1.0,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 27,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 0,
+          "not_seen": 23,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 1.0
+    },
+    "ins_grnd_alignment_text_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 42,
+          "fp": 1,
+          "fn": 0,
+          "precision": 0.976744,
+          "recall": 1.0,
+          "f1": 0.988235
+        },
+        "not_seen": {
+          "tp": 7,
+          "fp": 0,
+          "fn": 1,
+          "precision": 1.0,
+          "recall": 0.875,
+          "f1": 0.933333
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.640523,
+      "seen_f1": 0.988235,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 42,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 1,
+          "not_seen": 7,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.98
+    },
+    "ins_ok_text_visible": {
+      "state_scores": {
+        "seen": {
+          "tp": 4,
+          "fp": 2,
+          "fn": 0,
+          "precision": 0.666667,
+          "recall": 1.0,
+          "f1": 0.8
+        },
+        "not_seen": {
+          "tp": 44,
+          "fp": 0,
+          "fn": 2,
+          "precision": 1.0,
+          "recall": 0.956522,
+          "f1": 0.977778
+        },
+        "uncertain": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "macro_f1": 0.592593,
+      "seen_f1": 0.8,
+      "confusion_matrix": {
+        "seen": {
+          "seen": 4,
+          "not_seen": 0,
+          "uncertain": 0
+        },
+        "not_seen": {
+          "seen": 2,
+          "not_seen": 44,
+          "uncertain": 0
+        },
+        "uncertain": {
+          "seen": 0,
+          "not_seen": 0,
+          "uncertain": 0
+        }
+      },
+      "accuracy": 0.96
+    }
+  }
+}
