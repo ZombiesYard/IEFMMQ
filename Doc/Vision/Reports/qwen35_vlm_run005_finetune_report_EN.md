@@ -2,13 +2,13 @@
 
 ## Abstract
 
-This report documents the Run-005 composition-rebalance data collection and the subsequent LoRA fine-tuning round for SimTutor's F/A-18C cockpit visual fact extractor. Unlike the Run-003 transition, this round does not change the ontology. Instead, it keeps the current 13 visual facts fixed and targets a different bottleneck: data distribution. The main goal is to add multi-display co-occurrence, targeted hard negatives, and more small-text state positives, then increase the weight of those supplemental examples during training.
+This report documents the Run-005 composition-rebalance data collection and the subsequent LoRA fine-tuning round for SimTutor's F/A-18C cockpit visual fact extractor. Compared with Run-003, this round does not change the ontology. It keeps the current 13 visual facts fixed and focuses on data distribution, including multi-display co-occurrence, targeted hard negatives, small-text state positives, and moderate oversampling of the Run-005 supplement.
 
-The model is still `Qwen/Qwen3.5-9B-Base`, trained with an Unsloth-accelerated PEFT LoRA VLM SFT setup using TRL `SFTTrainer`. The training corpus combines Run-003 and Run-005: Run-003 contributes 220 human-reviewed images, and Run-005 contributes 122 composition-rebalance images. After bilingual export, the final training input contains 928 rows because the bilingual Run-005 set is repeated once more to emphasize the new distribution.
+The model is still `Qwen/Qwen3.5-9B-Base`, trained with an Unsloth-accelerated PEFT LoRA VLM SFT setup using TRL `SFTTrainer`. The training corpus combines Run-003 and Run-005: Run-003 contributes 220 human-reviewed images, and Run-005 contributes 122 composition-rebalance images. After bilingual export, the final training input contains 928 rows because the bilingual Run-005 set is repeated once more to give that supplement more weight during training.
 
 On the stronger external benchmark `Run-002 newfacts holdout`, the new adapter improves fact accuracy from `0.8677` to `0.9908`, seen F1 from `0.5022` to `0.9648`, sample exact match from `0.10` to `0.88`, and critical false positives from `11` down to `4`. On `Run-004 random holdout` with 100 samples, it likewise clearly outperforms both the base model and the earlier Run-003 adapter: fact accuracy improves from `0.8038` to `0.9931`, seen F1 from `0.5659` to `0.9159`, sample exact match from `0.03` to `0.92`, and critical false positives drop from `70` to `8`.
 
-At the same time, this report explicitly cautions against over-reading the per-fact seen-F1 chart. Run-004 has no exact image overlap with training, but its positive support is uneven, so several near-`1.0` seen-F1 values are based on very small positive counts. The stronger claim supported by this experiment is therefore narrower and more useful: with the 13-fact ontology held constant, composition-balanced supplemental data and moderate oversampling can substantially improve structured cockpit visual fact extraction under multi-display co-occurrence, while Run-002 provides the stronger external generalization evidence.
+It should also be noted that Run-004 has no exact image overlap with training, but its positive support is uneven. Several near-`1.0` seen-F1 values are therefore based on very small positive counts and should be read together with support size. Taken together, the two holdouts indicate that, with the 13-fact ontology held constant, composition-balanced supplemental data and moderate oversampling can substantially improve structured cockpit visual fact extraction under multi-display co-occurrence, while Run-002 remains the stronger source of external generalization evidence.
 
 ## 1. Background and Motivation
 
@@ -34,14 +34,14 @@ Run-003 already showed that this ontology is learnable. On `Run-002 newfacts hol
 1. `ins_ok_text_visible` produced many false positives, meaning that the old `ins_go` risk did not disappear completely; it moved into a more specific visual completion cue.
 2. On `Run-004 random holdout`, the Run-003 adapter still looked conservative on `bit_root_page_visible`, `fcsmc_page_visible`, `fcsmc_intermediate_result_visible`, and `fcsmc_in_test_visible`, suggesting a remaining mismatch between the training set and realistic multi-display cockpit composition.
 
-### 1.2 Why this round keeps the ontology fixed
+### 1.2 Why the ontology is kept fixed in this round
 
-This round deliberately keeps the 13-fact ontology unchanged. The reason is not that the ontology is already final, but that the main variable now needs to be isolated. After Run-003, two conclusions were already clear:
+This round keeps the 13-fact ontology unchanged in order to isolate the main remaining variable. After Run-003, two points were already clear:
 
 - the ontology is trainable, interpretable, and operationally controllable;
 - the larger remaining problem appears to be data distribution rather than label definition.
 
-Run-005 therefore asks a focused question:
+Run-005 therefore addresses the following question:
 
 > If the 13 facts stay fixed, can better multi-display composition data and better hard negatives substantially improve the adapter?
 
@@ -77,14 +77,14 @@ The downstream system still consumes structured fact states rather than model su
 
 ## 3. Why Run-005 Composition Rebalance Was Needed
 
-The main weakness of Run-003 was not simply that some facts had too few positives. The deeper issue was that Run-003 behaved like a clean boundary dataset: it taught single-fact distinctions well, but it underrepresented realistic multi-display co-occurrence. Common cold-start compositions include:
+The main weakness of Run-003 was not only that some facts had too few positives. More importantly, Run-003 behaved like a clean boundary dataset: it taught single-fact distinctions well, but it underrepresented realistic multi-display co-occurrence. Common cold-start compositions include:
 
 - TAC or SUPT on the left, HSI on the AMPCD, and BIT root on the right;
 - HSI GRND/QUAL/TIME co-occurring with `PBIT GO`, `IN TEST`, or `final GO` on FCS-MC;
 - `FCS-MC final GO` combined with `INS OK not seen`, which is exactly the hard-negative case needed to avoid unsafe completion hallucinations;
 - purely non-target pages, stable blank screens, and blurred transition states.
 
-Run-005 was therefore designed as a supplemental dataset rather than a replacement for Run-003. Its goals were:
+Run-005 was therefore designed as a supplemental dataset rather than a replacement for Run-003. Its main goals were:
 
 1. add more positives and realistic co-occurrence for `bit_root_page_visible`, `fcs_page_visible`, and `fcsmc_page_visible`;
 2. add more small-text positives for `PBIT GO`, `IN TEST`, and `final GO`;
@@ -127,7 +127,7 @@ Run-003 bilingual once
 + Run-005 bilingual twice
 ```
 
-In other words, the Run-005 EN/ZH set is repeated once more during training. The goal is not to imitate natural cockpit frequencies. The goal is to give sufficient weight to the newly collected composition-balanced examples so the model actually learns:
+In other words, the Run-005 EN/ZH set is repeated once more during training. The purpose is not to imitate natural cockpit frequencies. The purpose is to give sufficient weight to the newly collected composition-balanced examples so that the model more reliably learns:
 
 - multi-display co-occurrence;
 - small-text state cues;
@@ -299,7 +299,7 @@ Relative to the old Run-003 adapter, the new adapter improves:
 - sample exact match by `+0.68`
 - critical false positives by `-16`
 
-Importantly, the gain is not just a more conservative decision boundary. On this stronger external holdout, the model improves recall while also reducing unsafe false positives:
+For the key facts below, the gain is not simply the result of a more conservative decision boundary. On this stronger external holdout, recall improves while unsafe false positives also decrease:
 
 | fact_id | Run-003 seen F1 | new adapter seen F1 | Run-003 FP/FN | new adapter FP/FN |
 |---|---:|---:|---:|---:|
@@ -311,7 +311,7 @@ Importantly, the gain is not just a more conservative decision boundary. On this
 | `ins_grnd_alignment_text_visible` | 0.7647 | 0.9882 | 0 / 16 | 1 / 0 |
 | `ins_ok_text_visible` | 0.0000 | 0.8000 | 17 / 4 | 2 / 0 |
 
-This means that Run-005 does not merely repair the `bit_root` and `FCS-MC` recall problem. It also materially fixes the most dangerous `ins_ok_text_visible` over-reporting pattern seen in Run-003.
+This indicates that Run-005 does not only improve `bit_root` and `FCS-MC` recall. It also substantially reduces the `ins_ok_text_visible` over-reporting pattern observed in Run-003.
 
 Key confusion matrices on Run-002 are:
 
@@ -369,7 +369,7 @@ Relative to the old Run-003 adapter, the new adapter improves:
 
 ### 7.3 Key fact changes on Run-004
 
-The most important improvements align closely with the design goals of Run-005:
+The clearest improvements are concentrated in the facts that Run-005 was designed to reinforce:
 
 | fact_id | Run-003 seen F1 | Run-003+Run-005x2 seen F1 | Run-003 FP/FN | new adapter FP/FN |
 |---|---:|---:|---:|---:|
@@ -381,7 +381,7 @@ The most important improvements align closely with the design goals of Run-005:
 | `fcsmc_final_go_result_visible` | 0.7778 | 0.9375 | 17 / 11 | 8 / 0 |
 | `ins_grnd_alignment_text_visible` | 0.8403 | 1.0000 | 0 / 19 | 0 / 0 |
 
-In practice, Run-005 fixes two major error patterns:
+In practice, Run-005 mainly improves two error patterns:
 
 1. **missed detections**, especially for `bit_root_page_visible`, `fcsmc_intermediate_result_visible`, and `fcsmc_in_test_visible`;
 2. **stage confusion**, especially between `PBIT GO`, `IN TEST`, and `final GO`.
@@ -416,27 +416,27 @@ In practice, Run-005 fixes two major error patterns:
 
 ### 8.1 Why the improvement is unlikely to be a simple artifact
 
-Because the new result is very strong, the first question is whether the data might be misleading. The current evidence argues against that:
+Because the gain in this round is large, the first step is to check for data leakage or benchmark bias. The current evidence argues against that:
 
 1. both Run-002 and Run-004 have exact-overlap `0` against the Run-003 + Run-005 training union;
 2. Run-002 and Run-004 also have no internal exact duplicates in the benchmark set itself;
 3. the gains are not limited to low-support facts; on the stronger Run-002 holdout, `bit_root_page_visible`, `fcsmc_intermediate_result_visible`, `ins_grnd_alignment_text_visible`, and `ins_ok_text_visible` all improve substantially.
 
-The more plausible explanation is therefore that:
+The more plausible explanation is that:
 
-- Run-005 directly targets the real weakness of Run-003;
+- Run-005 directly targets the main weakness of Run-003;
 - oversampling gives the supplemental composition-balanced data enough influence during training.
 
-### 8.2 Why the seen-F1 chart looks almost too good
+### 8.2 Why the seen-F1 chart looks unusually high
 
-The per-fact seen-F1 chart is easy to misread. The main reason is not that the model is suddenly perfect, but that Run-004 support is skewed:
+The per-fact seen-F1 chart is easy to over-read. The main reason is not that the model is suddenly perfect, but that Run-004 support is skewed:
 
 - `tac_page_visible` has only 3 positives;
 - `supt_page_visible` has only 3 positives;
 - `fcsmc_intermediate_result_visible` has only 7 positives;
 - `ins_ok_text_visible` has no positives at all.
 
-So the Run-004 chart must always be read together with support counts rather than in isolation. In contrast, although Run-002 is smaller, it is the stronger external evidence for this round because it provides more informative positives for `ins_ok_text_visible`, `bit_root_page_visible`, and the `fcsmc_*` facts.
+For this reason, the Run-004 chart should always be read together with support counts rather than in isolation. By contrast, although Run-002 is smaller, it is the stronger external evidence for this round because it provides more informative positives for `ins_ok_text_visible`, `bit_root_page_visible`, and the `fcsmc_*` facts.
 
 ### 8.3 The main remaining problem
 
@@ -445,7 +445,7 @@ The remaining error profile is now much smaller but not yet empty:
 - on Run-002, the remaining 4 critical false positives are distributed across `fcsmc_final_go_result_visible` (1), `ins_grnd_alignment_text_visible` (1), and `ins_ok_text_visible` (2);
 - on Run-004, all 8 remaining critical false positives concentrate in `fcsmc_final_go_result_visible`.
 
-In other words, the new adapter now separates `bit_root`, `PBIT GO`, `IN TEST`, and `GRND/QUAL/TIME` much more reliably, but it still retains some over-eagerness on completion-style cues, especially final GO.
+Overall, the new adapter now separates `bit_root`, `PBIT GO`, `IN TEST`, and `GRND/QUAL/TIME` much more reliably, but it still retains some over-eagerness on completion-style cues, especially final GO.
 
 ## 9. Limitations
 
@@ -459,12 +459,8 @@ This report should be read with the following limits in mind:
 
 ## 10. Conclusion
 
-Run-005 answers a very concrete question:
+This round shows that, without changing the facts again, a combination of more representative multi-display compositions, targeted hard negatives, and moderate oversampling can make the 13-fact VLM substantially more stable.
 
-**If the ontology stays fixed, can better multi-display composition data, better hard negatives, and moderate oversampling make the 13-fact VLM substantially more reliable?**
+Compared with the base model, `Run-003 + Run-005x2` improves clearly on both `Run-002 newfacts` and `Run-004 random`. Compared with the older Run-003 adapter, it also shows a consistent second-stage gain. The strongest improvements are aligned with the purpose of Run-005, including `bit_root`, `FCS-MC intermediate`, `IN TEST`, `GRND/QUAL/TIME`, and `INS OK`, which were previously among the most error-prone facts.
 
-The current answer is yes.
-
-Compared with the base model, `Run-003 + Run-005x2` achieves a very large improvement on both `Run-002 newfacts` and `Run-004 random`. Compared with the older Run-003 adapter, it also delivers a coherent second-stage gain rather than a marginal bump. Most importantly, the direction of the improvement matches the intent of the Run-005 collection: `bit_root`, `FCS-MC intermediate`, `IN TEST`, `GRND/QUAL/TIME`, and `INS OK` are exactly the facts that improve most clearly.
-
-The more careful conclusion is that the current 13-fact ontology can remain stable for now, while the next priority should be more representative composition data, more independent positive support, and full SimTutor-chain validation rather than another immediate ontology rewrite. The most valuable next step is to validate this adapter inside the downstream reasoning stack while continuing to collect fully fresh holdout sessions, especially for rare but high-risk completion cues such as `INS OK` and `final GO`.
+Taken together, the current results support keeping the 13-fact ontology stable for now. The next priority is better composition coverage, more independent positive support, and validation inside the full SimTutor downstream reasoning chain rather than another immediate ontology rewrite. Further fully fresh holdout sessions are still needed, especially for rare but high-risk completion cues such as `INS OK` and `final GO`.
