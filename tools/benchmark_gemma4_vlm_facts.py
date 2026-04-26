@@ -436,10 +436,10 @@ def _load_model(
     local_files_only: bool,
 ):
     from unsloth import FastVisionModel
-    from peft import PeftModel
 
+    model_name = adapter or base_model
     model, processor = FastVisionModel.from_pretrained(
-        model_name=base_model,
+        model_name=model_name,
         max_seq_length=max_seq_length,
         load_in_4bit=load_in_4bit,
         full_finetuning=False,
@@ -449,8 +449,6 @@ def _load_model(
         local_files_only=local_files_only,
     )
     processor = _apply_unsloth_chat_template(processor, chat_template)
-    if adapter:
-        model = PeftModel.from_pretrained(model, adapter)
     FastVisionModel.for_inference(model)
     return model, processor
 
