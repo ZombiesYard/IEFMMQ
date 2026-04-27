@@ -1,0 +1,37 @@
+{
+  "model_name": "google/gemma-4-31B",
+  "output_dir": "/scratch/yz50/iefmmq_vlm_ft_unsloth/runs/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1",
+  "train_rows": 928,
+  "eval_rows": 0,
+  "input_files": [
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/run003/sft_en.jsonl",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/run003/sft_zh.jsonl",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/run005_composition_rebalance/sft_en.jsonl",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/run005_composition_rebalance/sft_zh.jsonl",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/run005_composition_rebalance/sft_en.jsonl",
+    "/scratch/yz50/iefmmq_vlm_ft_unsloth/data/run005_composition_rebalance/sft_zh.jsonl"
+  ],
+  "max_seq_length": 4096,
+  "num_train_epochs": 4.0,
+  "learning_rate": 0.0002,
+  "per_device_train_batch_size": 1,
+  "gradient_accumulation_steps": 4,
+  "lora_r": 16,
+  "lora_alpha": 16,
+  "lora_dropout": 0.0,
+  "lora_target_modules": "all-linear",
+  "finetune_vision_layers": false,
+  "load_in_4bit": true,
+  "gpu_memory_utilization": 0.95,
+  "chat_template": "gemma-4",
+  "max_steps": -1,
+  "seed": 3407,
+  "metrics": {
+    "train_runtime": 8049.6528,
+    "train_samples_per_second": 0.461,
+    "train_steps_per_second": 0.115,
+    "total_flos": 1.0141404337973514e+18,
+    "train_loss": 0.04742160257843227,
+    "epoch": 4.0
+  }
+}

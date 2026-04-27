@@ -305,7 +305,7 @@ The main limitations are:
 
 ## 10. Next Steps
 
-The facts should remain frozen for the next iteration to preserve comparability. The recommended next step is a Run-005 composition dataset:
+The facts should remain frozen for the next iteration to preserve comparability. The next step is add a Run-005 composition dataset:
 
 | Category | Purpose |
 |---|---|
