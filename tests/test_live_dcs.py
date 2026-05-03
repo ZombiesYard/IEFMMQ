@@ -2864,15 +2864,9 @@ def test_safe_fallback_overlay_prefers_left_ddi_menu_navigation_for_s08_fcs_page
                     {"gate_id": "S08.precondition", "status": "allowed"},
                 ],
                 "vision_fact_summary": {
-                    "seen_fact_ids": ["bit_page_visible"],
-                    "not_seen_fact_ids": [
-                        "left_ddi_dark",
-                        "right_ddi_dark",
-                        "ampcd_dark",
-                        "left_ddi_fcs_option_visible",
-                        "fcs_page_visible",
-                    ],
-                    "uncertain_fact_ids": ["left_ddi_menu_root_visible"],
+                    "seen_fact_ids": ["bit_root_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
+                    "uncertain_fact_ids": ["tac_page_visible"],
                 },
                 "deterministic_step_hint": {
                     "inferred_step_id": "S08",
@@ -2918,13 +2912,8 @@ def test_safe_fallback_overlay_prefers_left_ddi_fcs_button_when_menu_page_visibl
                     {"gate_id": "S08.precondition", "status": "allowed"},
                 ],
                 "vision_fact_summary": {
-                    "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
-                    "not_seen_fact_ids": [
-                        "left_ddi_dark",
-                        "right_ddi_dark",
-                        "ampcd_dark",
-                        "fcs_page_visible",
-                    ],
+                    "seen_fact_ids": ["bit_root_page_visible", "supt_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
                     "uncertain_fact_ids": [],
                 },
                 "deterministic_step_hint": {
@@ -2954,8 +2943,8 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_s08_
         missing_conditions=["vision_facts.fcs_page_visible==seen"],
         context={
             "vision_fact_summary": {
-                "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
-                "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
+                "seen_fact_ids": ["bit_root_page_visible", "supt_page_visible"],
+                "not_seen_fact_ids": ["fcs_page_visible"],
                 "uncertain_fact_ids": [],
             }
         },
@@ -2971,9 +2960,9 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb18_for_s08_
         missing_conditions=["vision_facts.fcs_page_visible==seen"],
         context={
             "vision_fact_summary": {
-                "seen_fact_ids": ["bit_page_visible", "left_ddi_menu_root_visible"],
-                "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
-                "uncertain_fact_ids": ["left_ddi_fcs_option_visible", "left_ddi_fcs_page_button_visible"],
+                "seen_fact_ids": ["bit_root_page_visible", "tac_page_visible"],
+                "not_seen_fact_ids": ["fcs_page_visible"],
+                "uncertain_fact_ids": ["supt_page_visible"],
             }
         },
         allowed_targets=["left_mdi_pb18", "left_mdi_pb15", "left_mdi_brightness_selector"],
@@ -2988,8 +2977,8 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_expl
         missing_conditions=["vision_facts.fcs_page_visible==seen"],
         context={
             "vision_fact_summary": {
-                "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_page_button_visible"],
-                "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
+                "seen_fact_ids": ["bit_root_page_visible", "supt_page_visible"],
+                "not_seen_fact_ids": ["fcs_page_visible"],
                 "uncertain_fact_ids": [],
             }
         },
@@ -3023,12 +3012,9 @@ def test_visual_action_hint_overlay_override_rewrites_s08_tac_guidance_to_pb18(t
                 ],
                 "vision_fact_summary": {
                     "status": "available",
-                    "seen_fact_ids": ["bit_page_visible", "left_ddi_menu_root_visible"],
-                    "not_seen_fact_ids": ["left_ddi_dark", "fcs_page_visible"],
-                    "uncertain_fact_ids": [
-                        "left_ddi_fcs_option_visible",
-                        "left_ddi_fcs_page_button_visible",
-                    ],
+                    "seen_fact_ids": ["bit_root_page_visible", "tac_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
+                    "uncertain_fact_ids": ["supt_page_visible"],
                 },
                 "deterministic_step_hint": {
                     "inferred_step_id": "S08",
@@ -3167,14 +3153,14 @@ def test_action_hint_overlay_override_rewrites_s18_fcsmc_step_to_fcs_bit_switch(
                 ],
                 "vision_fact_summary": {
                     "status": "uncertain",
-                    "seen_fact_ids": ["fcs_page_visible", "right_ddi_fcsmc_page_visible"],
-                    "not_seen_fact_ids": ["bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"],
-                    "uncertain_fact_ids": ["fcs_bit_result_visible"],
+                    "seen_fact_ids": ["fcs_page_visible", "fcsmc_page_visible"],
+                    "not_seen_fact_ids": ["bit_root_page_visible"],
+                    "uncertain_fact_ids": ["fcsmc_final_go_result_visible"],
                 },
                 "deterministic_step_hint": {
                     "inferred_step_id": "S18",
                     "overlay_step_id": "S18",
-                    "missing_conditions": ["vision_facts.fcs_bit_result_visible==seen"],
+                    "missing_conditions": ["vision_facts.fcsmc_final_go_result_visible==seen"],
                     "gate_blockers": [],
                     "observability_status": "partial",
                     "requires_visual_confirmation": True,
@@ -3341,7 +3327,7 @@ def test_build_procedural_action_hint_for_s18_prefers_right_ddi_pb5() -> None:
         inferred_step_id="S18",
         vars_selected={"fcs_bit_switch_up": False},
         allowed_targets=allowed,
-        vision_fact_summary={"seen_fact_ids": ["right_ddi_fcsmc_page_visible"]},
+        vision_fact_summary={"seen_fact_ids": ["fcsmc_page_visible"]},
     ) == {
         "target": "fcs_bit_switch",
         "reason": "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
@@ -3451,7 +3437,7 @@ def test_resolve_overlay_step_id_advances_to_next_step_when_current_step_has_no_
     ) == "S09"
     assert _resolve_overlay_step_id(
         "S08",
-        missing_conditions=["vision_facts.bit_page_visible==seen"],
+        missing_conditions=["vision_facts.bit_root_page_visible==seen"],
         candidate_steps=candidate_steps,
         step_order_index=step_order_index,
     ) == "S08"
@@ -4254,11 +4240,11 @@ def test_emit_vision_fact_observation_event_uses_frame_refs() -> None:
             frame_ids=["1772872444950_000122", "1772872445010_000123"],
             facts=[
                 VisionFact(
-                    fact_id="fcs_reset_seen",
+                    fact_id="supt_page_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
-                    expires_after_ms=600000,
-                    evidence_note="FCS reset evidence visible on the left DDI.",
+                    expires_after_ms=2000,
+                    evidence_note="SUPT page evidence visible on the left DDI.",
                 )
             ],
         ),
@@ -4322,11 +4308,11 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
                         frame_ids=["1772872445010_000123"],
                         facts=[
                             VisionFact(
-                                fact_id="fcs_reset_seen",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="1772872445010_000123",
-                                expires_after_ms=600000,
-                                evidence_note="FCS reset visible on the left DDI.",
+                                expires_after_ms=2000,
+                                evidence_note="SUPT page visible on the left DDI.",
                             )
                         ],
                     ),
@@ -4362,10 +4348,10 @@ def test_live_loop_records_vision_fact_context_and_event(tmp_path: Path) -> None
     assert response is not None
     request = model.calls[0]["request"]
     assert request.context["vision_fact_summary"]["status"] == "available"
-    assert request.context["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
+    assert request.context["vision_fact_summary"]["seen_fact_ids"] == ["supt_page_visible"]
     assert request.metadata["vision_fact_status"] == "available"
     assert response.metadata["vision_fact_status"] == "available"
-    assert response.metadata["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
+    assert response.metadata["vision_fact_summary"]["seen_fact_ids"] == ["supt_page_visible"]
     fact_events = [
         event
         for event in events
@@ -4380,8 +4366,8 @@ def test_live_loop_records_vision_fact_raw_json_in_event(tmp_path: Path) -> None
     replay_path = tmp_path / "bios_with_vision_fact_raw_json.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
     raw_llm_text = (
-        '{"facts":[{"fact_id":"fcs_reset_seen","state":"seen","source_frame_id":"1772872445010_000123",'
-        '"evidence_note":"FCS reset visible on the left DDI."}]}'
+        '{"facts":[{"fact_id":"supt_page_visible","state":"seen",'
+        '"evidence_note":"SUPT page visible on the left DDI."}]}'
     )
 
     class StaticVisionPort:
@@ -4419,11 +4405,11 @@ def test_live_loop_records_vision_fact_raw_json_in_event(tmp_path: Path) -> None
                         frame_ids=["1772872445010_000123"],
                         facts=[
                             VisionFact(
-                                fact_id="fcs_reset_seen",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="1772872445010_000123",
-                                expires_after_ms=600000,
-                                evidence_note="FCS reset visible on the left DDI.",
+                                expires_after_ms=2000,
+                                evidence_note="SUPT page visible on the left DDI.",
                             )
                         ],
                         metadata={"raw_llm_text": raw_llm_text},
@@ -4630,11 +4616,11 @@ def test_extract_vision_fact_context_degrades_when_merge_raises(tmp_path: Path) 
                         frame_ids=list(vision["frame_ids"]),
                         facts=[
                             VisionFact(
-                                fact_id="fcs_reset_seen",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="1772872445010_000123",
-                                expires_after_ms=600000,
-                                evidence_note="FCS reset visible.",
+                                expires_after_ms=2000,
+                                evidence_note="SUPT page visible.",
                             )
                         ],
                     ),
@@ -4801,11 +4787,11 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
                         frame_ids=list(vision["frame_ids"]),
                         facts=[
                             VisionFact(
-                                fact_id="fcs_reset_seen",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="10000_000123",
-                                expires_after_ms=600000,
-                                evidence_note="FCS RESET visible.",
+                                expires_after_ms=2000,
+                                evidence_note="SUPT page visible.",
                             )
                         ],
                     ),
@@ -5082,11 +5068,11 @@ def test_live_loop_tracks_vision_text_fallback_in_metadata_and_stats(tmp_path: P
                         frame_ids=list(vision["frame_ids"]),
                         facts=[
                             VisionFact(
-                                fact_id="fcs_reset_seen",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="10000_000123",
-                                expires_after_ms=600000,
-                                evidence_note="FCS RESET visible.",
+                                expires_after_ms=2000,
+                                evidence_note="SUPT page visible.",
                             )
                         ],
                     ),
@@ -5202,11 +5188,11 @@ def test_live_loop_marks_vision_conflict_unresolved_when_model_disagrees_with_fu
                         frame_ids=list(vision["frame_ids"]),
                         facts=[
                             VisionFact(
-                                fact_id="fcs_reset_seen",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="10000_000123",
-                                expires_after_ms=600000,
-                                evidence_note="FCS RESET visible.",
+                                expires_after_ms=2000,
+                                evidence_note="SUPT page visible.",
                             )
                         ],
                     ),
@@ -5325,18 +5311,18 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                         frame_ids=list(vision["frame_ids"]),
                         facts=[
                             VisionFact(
-                                fact_id="left_ddi_menu_root_visible",
+                                fact_id="tac_page_visible",
                                 state="seen",
                                 source_frame_id="10000_000124",
                                 expires_after_ms=2000,
-                                evidence_note="Left DDI root menu visible.",
+                                evidence_note="Left DDI TAC page visible.",
                             ),
                             VisionFact(
-                                fact_id="left_ddi_fcs_page_button_visible",
+                                fact_id="supt_page_visible",
                                 state="seen",
                                 source_frame_id="10000_000124",
                                 expires_after_ms=2000,
-                                evidence_note="Left DDI PB15 FCS button visible.",
+                                evidence_note="Left DDI SUPT page visible.",
                             ),
                             VisionFact(
                                 fact_id="fcs_page_visible",
@@ -5346,11 +5332,11 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
                                 evidence_note="Left DDI is not yet on the FCS page.",
                             ),
                             VisionFact(
-                                fact_id="bit_page_visible",
+                                fact_id="bit_root_page_visible",
                                 state="not_seen",
                                 source_frame_id="10000_000124",
                                 expires_after_ms=2000,
-                                evidence_note="Right DDI is not on the top BIT page.",
+                                evidence_note="Right DDI is not on the BIT root page.",
                             ),
                         ],
                     ),
@@ -5673,11 +5659,11 @@ def test_map_response_actions_backfills_s18_pb5_when_fcs_bit_is_highlighted_on_f
             },
             "vision_fact_summary": {
                 "status": "uncertain",
-                "seen_fact_ids": ["right_ddi_fcsmc_page_visible"],
+                "seen_fact_ids": ["fcsmc_page_visible"],
             },
             "vision_facts": [
                 {
-                    "fact_id": "right_ddi_fcsmc_page_visible",
+                    "fact_id": "fcsmc_page_visible",
                     "source_frame_id": "1773956832104_000021",
                 }
             ],
@@ -5698,7 +5684,7 @@ def test_map_response_actions_backfills_s18_pb5_when_fcs_bit_is_highlighted_on_f
                         {
                             "target": "fcs_bit_switch",
                             "type": "visual",
-                            "ref": "VISION_FACTS.right_ddi_fcsmc_page_visible@1773956832104_000021",
+                            "ref": "VISION_FACTS.fcsmc_page_visible@1773956832104_000021",
                             "quote": "Right DDI explicitly displays the title 'FCS-MC' with MC1, MC2, FCSA, FCSB status lines.",
                             "grounding_confidence": 1.0,
                         }
@@ -5833,7 +5819,7 @@ def test_live_loop_backfills_s18_pb5_without_clearing_first_target_mid_batch(
                                 {
                                     "target": "fcs_bit_switch",
                                     "type": "visual",
-                                    "ref": "VISION_FACTS.right_ddi_fcsmc_page_visible@1773957437530_000024",
+                                    "ref": "VISION_FACTS.fcsmc_page_visible@1773957437530_000024",
                                     "quote": "Right DDI is on the FCS-MC sub-page, not the BIT root page.",
                                     "grounding_confidence": 1.0,
                                 }
@@ -5896,12 +5882,12 @@ def test_live_loop_backfills_s18_pb5_without_clearing_first_target_mid_batch(
                     },
                     "vision_fact_summary": {
                         "status": "uncertain",
-                        "seen_fact_ids": ["right_ddi_fcsmc_page_visible"],
+                        "seen_fact_ids": ["fcsmc_page_visible"],
                         "frame_ids": ["1773957437530_000024"],
                     },
                     "vision_facts": [
                         {
-                            "fact_id": "right_ddi_fcsmc_page_visible",
+                            "fact_id": "fcsmc_page_visible",
                             "state": "seen",
                             "source_frame_id": "1773957437530_000024",
                             "confidence": 1.0,
@@ -6251,7 +6237,7 @@ def test_live_loop_does_not_advance_s18_from_structured_fact_when_evidence_lacks
                     frame_ids=["1772872445010_000123"],
                     facts=[
                         VisionFact(
-                            fact_id="fcs_bit_result_visible",
+                            fact_id="fcsmc_final_go_result_visible",
                             state="seen",
                             source_frame_id="1772872445010_000123",
                             expires_after_ms=600000,
@@ -6260,10 +6246,10 @@ def test_live_loop_does_not_advance_s18_from_structured_fact_when_evidence_lacks
                             observed_at_wall_ms=trigger_wall_ms,
                         )
                     ],
-                    summary="seen=fcs_bit_result_visible",
+                    summary="seen=fcsmc_final_go_result_visible",
                     metadata={},
                 ),
-                metadata={"vision_fact_summary": {"status": "available", "seen_fact_ids": ["fcs_bit_result_visible"]}},
+                metadata={"vision_fact_summary": {"status": "available", "seen_fact_ids": ["fcsmc_final_go_result_visible"]}},
             )
 
     monkeypatch.setattr(
@@ -6291,7 +6277,7 @@ def test_live_loop_does_not_advance_s18_from_structured_fact_when_evidence_lacks
     assert response is not None
     assert response.metadata.get("s18_visual_completion_rewritten") is not True
     assert response.metadata["vision_fact_summary"]["seen_fact_ids"] == []
-    assert response.metadata["vision_fact_summary"]["uncertain_fact_ids"] == ["fcs_bit_result_visible"]
+    assert response.metadata["vision_fact_summary"]["uncertain_fact_ids"] == ["fcsmc_final_go_result_visible"]
     assert response.metadata.get("fallback_overlay_reason") != "deterministic_step:S19"
 
 

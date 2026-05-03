@@ -862,17 +862,17 @@ def _should_skip_visual_hold_due_to_later_stage_context(
     if not completion_evidence.missing_conditions:
         return False
     if not any(
-        "bit_page_visible" in item or "bit_root_page_visible" in item or "bit_page_failure_visible" in item
+        "bit_root_page_visible" in item
         for item in completion_evidence.missing_conditions
     ):
         return False
     return any(
         _vision_fact_state_is_seen(vision_fact_snapshot.get(fact_id))
         for fact_id in (
-            "right_ddi_fcsmc_page_visible",
-            "right_ddi_in_test_visible",
-            "fcs_bit_interaction_seen",
-            "fcs_bit_result_visible",
+            "fcsmc_page_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_final_go_result_visible",
         )
     )
 
@@ -884,7 +884,7 @@ def _vision_fact_counts_as_seen(
 ) -> bool:
     if not _vision_fact_state_is_seen(fact):
         return False
-    if step_id == "S18" and fact_id == "fcs_bit_result_visible":
+    if step_id == "S18" and fact_id == "fcsmc_final_go_result_visible":
         return _is_s18_final_go_result_fact(fact)
     return True
 

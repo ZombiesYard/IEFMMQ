@@ -6,41 +6,45 @@ from adapters.vision_fact_prompting import build_vision_fact_prompt
 def _minimal_config() -> dict:
     return {
         "facts_by_id": {
-            "left_ddi_fcs_page_button_visible": {},
+            "tac_page_visible": {},
+            "supt_page_visible": {},
             "fcs_page_visible": {},
-            "bit_page_visible": {},
+            "fcs_page_x_marks_visible": {},
             "bit_root_page_visible": {},
-            "bit_page_failure_visible": {},
-            "right_ddi_fcsmc_page_visible": {},
-            "right_ddi_in_test_visible": {},
-            "fcs_bit_result_visible": {},
-            "fcs_reset_seen": {},
+            "fcsmc_page_visible": {},
+            "fcsmc_intermediate_result_visible": {},
+            "fcsmc_in_test_visible": {},
+            "fcsmc_final_go_result_visible": {},
+            "hsi_page_visible": {},
+            "hsi_map_layer_visible": {},
+            "ins_grnd_alignment_text_visible": {},
+            "ins_ok_text_visible": {},
         },
         "step_bindings": {
             "S08": {
-                "all_of": ["fcs_page_visible"],
-                "any_of": ["bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"],
+                "all_of": ["fcs_page_visible", "bit_root_page_visible"],
+                "any_of": [],
             },
             "S18": {
-                "all_of": ["fcs_bit_result_visible"],
+                "all_of": ["fcsmc_final_go_result_visible"],
                 "any_of": [],
             },
         },
     }
 
 
-def test_vision_fact_prompt_requires_top_level_facts_object_in_zh() -> None:
+def test_vision_fact_prompt_requires_summary_and_facts_top_level_only_in_zh() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="zh",
         config=_minimal_config(),
     )
 
-    assert "顶层只允许 facts 字段" in prompt
-    assert "只输出 facts 数组" not in prompt
+    assert "顶层只允许包含：summary、facts" in prompt
+    assert "严禁输出 source_frame_id" in prompt
 
 
-def test_vision_fact_prompt_example_matches_extractor_response_shape_in_en() -> None:
+def test_vision_fact_prompt_example_matches_aligned_response_shape_in_en() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="en",
@@ -48,12 +52,13 @@ def test_vision_fact_prompt_example_matches_extractor_response_shape_in_en() -> 
     )
 
     example_line = prompt.strip().splitlines()[-1]
-    assert "contain only the facts field" in prompt
-    assert "Return facts array only" not in prompt
+    assert "The top-level object may contain only: summary, facts." in prompt
+    assert "Do NOT output source_frame_id." in prompt
     assert '"expires_after_ms"' not in example_line
+    assert '"source_frame_id"' not in example_line
     assert example_line == (
-        '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain",'
-        '"source_frame_id":"1772872445010_000123","evidence_note":"..."}]}'
+        '{"summary":"one short sentence","facts":[{"fact_id":"tac_page_visible",'
+        '"state":"seen","evidence_note":"short evidence"}]}'
     )
 
 
@@ -68,77 +73,42 @@ def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
     assert '"step_bindings":{}' in prompt
 
 
-def test_vision_fact_prompt_mentions_ddi_menu_and_in_test_navigation_rules_in_zh() -> None:
+def test_vision_fact_prompt_mentions_tac_supt_and_real_fcs_page_boundaries() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="zh",
         config=_minimal_config(),
     )
 
+    assert "tac_page_visible" in prompt
+    assert "supt_page_visible" in prompt
+    assert "fcs_page_visible" in prompt
+    assert "页面选项标签不等于页面本身" in prompt
     assert "PB18" in prompt
-    assert "根菜单/顶层菜单页" in prompt
-    assert "FCS 按钮本身" in prompt
-    assert "FCS-MC" in prompt
-    assert "IN TEST" in prompt
-    assert "TAC 页" in prompt
-    assert "SUPT 页" in prompt
+    assert "PB15" in prompt
+    assert "LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS" in prompt
 
 
-def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_page() -> None:
-    prompt = build_vision_fact_prompt(
-        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
-        lang="zh",
-        config=_minimal_config(),
-    )
-
-    assert "并不等于 fcs_page_visible" in prompt
-    assert "LEF/TEF/AIL/RUD" in prompt
-    assert "SV1/SV2" in prompt
-    assert "大量 X" in prompt
-
-
-def test_vision_fact_prompt_explicitly_distinguishes_fcs_button_from_real_fcs_page_in_en() -> None:
+def test_vision_fact_prompt_explicitly_distinguishes_bit_root_and_fcsmc_states() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="en",
         config=_minimal_config(),
     )
 
-    assert "does not imply fcs_page_visible" in prompt
-    assert "LEF/TEF/AIL/RUD" in prompt
-    assert "SV1/SV2" in prompt
-    assert "many X marks remain" in prompt
-    assert "SUPT page" in prompt
+    assert "bit_root_page_visible" in prompt
+    assert "fcsmc_page_visible" in prompt
+    assert "PBIT GO is intermediate, not final GO." in prompt
+    assert "IN TEST is running, not final GO." in prompt
+    assert "fcsmc_final_go_result_visible requires final GO results" in prompt
 
 
-def test_vision_fact_prompt_treats_bit_failures_as_valid_s08_bit_page_evidence() -> None:
+def test_vision_fact_prompt_lists_all_13_aligned_fact_ids() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="en",
         config=_minimal_config(),
     )
 
-    assert "BIT FAILURES line. The BIT FAILURES page is the BIT root page itself" in prompt
-    assert '"any_of":["bit_page_visible","bit_root_page_visible","bit_page_failure_visible"]' in prompt
-
-
-def test_vision_fact_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
-    zh_prompt = build_vision_fact_prompt(
-        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
-        lang="zh",
-        config=_minimal_config(),
-    )
-    en_prompt = build_vision_fact_prompt(
-        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
-        lang="en",
-        config=_minimal_config(),
-    )
-
-    assert "MC1=GO、MC2=GO、FCSA=GO、FCSB=GO" in zh_prompt
-    assert "MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together" in en_prompt
-    assert "若页面仍出现 PBIT GO" in zh_prompt
-    assert "If PBIT GO is still visible anywhere on the page" in en_prompt
-    assert "FCSA/FCSB 显示的是 PBIT GO" in zh_prompt
-    assert "If FCSA/FCSB read PBIT GO" in en_prompt
-    assert "只有在最终 GO 结果毫无歧义时才可输出 seen" in zh_prompt
-    assert "output seen only when the final GO result is unambiguous" in en_prompt
+    for fact_id in _minimal_config()["facts_by_id"]:
+        assert fact_id in prompt

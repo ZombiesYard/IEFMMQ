@@ -1425,18 +1425,14 @@ def _prefer_navigation_target_from_vision_context(
         item for item in summary.get("not_seen_fact_ids", [])
         if isinstance(item, str) and item
     }
-    if "left_ddi_dark" in not_seen:
-        if "left_ddi_fcs_page_button_visible" in seen and "left_mdi_pb15" in allowed:
-            return ["left_mdi_pb15"]
-        if "left_ddi_fcs_option_visible" in seen and "left_mdi_pb15" in allowed:
-            return ["left_mdi_pb15"]
-        if "left_ddi_menu_root_visible" in seen and "left_mdi_pb18" in allowed:
-            return ["left_mdi_pb18"]
-        if (
-            "left_ddi_menu_root_visible" in uncertain
-            or "left_ddi_menu_root_visible" in not_seen
-        ) and "left_mdi_pb18" in allowed:
-            return ["left_mdi_pb18"]
+    if "supt_page_visible" in seen and "left_mdi_pb15" in allowed:
+        return ["left_mdi_pb15"]
+    if "tac_page_visible" in seen and "left_mdi_pb18" in allowed:
+        return ["left_mdi_pb18"]
+    if "tac_page_visible" in uncertain and "left_mdi_pb18" in allowed:
+        return ["left_mdi_pb18"]
+    if "supt_page_visible" in uncertain and "left_mdi_pb15" in allowed:
+        return ["left_mdi_pb15"]
     if "left_mdi_brightness_selector" in allowed:
         return ["left_mdi_brightness_selector"]
     return []
@@ -1541,9 +1537,9 @@ def _build_procedural_action_hint(
                 return None
             return {"target": target, "reason": reason}
 
-        if "fcs_bit_result_visible" in seen_fact_ids:
+        if "fcsmc_final_go_result_visible" in seen_fact_ids:
             return None
-        if "right_ddi_fcsmc_page_visible" in seen_fact_ids:
+        if "fcsmc_page_visible" in seen_fact_ids:
             return _hint(
                 "fcs_bit_switch",
                 "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
@@ -3024,7 +3020,7 @@ class LiveDcsTutorLoop:
         if (
             inferred_step_id == "S08"
             and "vision_facts.fcs_page_visible==seen" in missing_set
-            and "vision_facts.bit_page_visible==seen" in missing_set
+            and "vision_facts.bit_root_page_visible==seen" in missing_set
             and action_target == "left_mdi_pb15"
         ):
             if self.lang == "zh":
@@ -3162,7 +3158,7 @@ class LiveDcsTutorLoop:
                     }:
                         action_target = hinted_target
                         override_kind = "action_hint"
-                    elif inferred_step_id == "S18" and "right_ddi_fcsmc_page_visible" in seen_fact_ids:
+                    elif inferred_step_id == "S18" and "fcsmc_page_visible" in seen_fact_ids:
                         action_target = hinted_target
                         override_kind = "action_hint"
         elif inferred_step_id == "S19":
@@ -3242,7 +3238,7 @@ class LiveDcsTutorLoop:
             inferred_step_id == "S18"
             and override_kind == "action_hint"
             and action_target == "fcs_bit_switch"
-            and "right_ddi_fcsmc_page_visible" in seen_fact_ids
+            and "fcsmc_page_visible" in seen_fact_ids
         ):
             original_message = response.message
             original_explanations = list(response.explanations)
@@ -3487,7 +3483,7 @@ class LiveDcsTutorLoop:
                 for item in vision_fact_summary.get("seen_fact_ids", [])
                 if isinstance(item, str) and item
             }
-        if "right_ddi_fcsmc_page_visible" not in seen_fact_ids:
+        if "fcsmc_page_visible" not in seen_fact_ids:
             return help_obj, False, "fcsmc_not_visually_confirmed"
 
         evidence_raw = overlay.get("evidence")
@@ -3501,7 +3497,7 @@ class LiveDcsTutorLoop:
             if item.get("target") != "fcs_bit_switch":
                 continue
             ref = item.get("ref")
-            if isinstance(ref, str) and ref.startswith("VISION_FACTS.right_ddi_fcsmc_page_visible"):
+            if isinstance(ref, str) and ref.startswith("VISION_FACTS.fcsmc_page_visible"):
                 template_item = item
                 break
         if template_item is None:
@@ -3896,15 +3892,15 @@ class LiveDcsTutorLoop:
             item for item in vision_fact_summary.get("seen_fact_ids", [])
             if isinstance(item, str) and item
         }
-        if "fcs_bit_result_visible" not in seen_fact_ids:
-            return False, "missing_fcs_bit_result_visible"
+        if "fcsmc_final_go_result_visible" not in seen_fact_ids:
+            return False, "missing_fcsmc_final_go_result_visible"
         vision_facts = context.get("vision_facts")
         matching_fact = None
         if isinstance(vision_facts, list):
             for fact in vision_facts:
                 if not isinstance(fact, Mapping):
                     continue
-                if fact.get("fact_id") != "fcs_bit_result_visible":
+                if fact.get("fact_id") != "fcsmc_final_go_result_visible":
                     continue
                 state = fact.get("state")
                 if state not in {"seen", "fresh"}:

@@ -605,7 +605,7 @@ def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Ma
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             {"fact_id": "fcs_page_visible", "state": "seen"},
-            {"fact_id": "bit_page_visible", "state": "seen"},
+            {"fact_id": "bit_root_page_visible", "state": "seen"},
         ],
     )
 
@@ -630,9 +630,9 @@ def test_infer_step_holds_s18_when_only_fcsmc_pbit_result_page_is_seen(
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             {"fact_id": "fcs_page_visible", "state": "seen"},
-            {"fact_id": "right_ddi_fcsmc_page_visible", "state": "seen"},
+            {"fact_id": "fcsmc_page_visible", "state": "seen"},
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
                 "evidence_note": "Right DDI FCS-MC page shows final results: FCSA PBIT GO and FCSB PBIT GO.",
                 "result_kind": "intermediate_go",
@@ -641,7 +641,7 @@ def test_infer_step_holds_s18_when_only_fcsmc_pbit_result_page_is_seen(
     )
 
     assert blocked.inferred_step_id == "S18"
-    assert blocked.missing_conditions == ("vision_facts.fcs_bit_result_visible==seen",)
+    assert blocked.missing_conditions == ("vision_facts.fcsmc_final_go_result_visible==seen",)
 
 
 def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
@@ -660,11 +660,11 @@ def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             {"fact_id": "fcs_page_visible", "state": "seen"},
-            {"fact_id": "right_ddi_fcsmc_page_visible", "state": "seen"},
+            {"fact_id": "fcsmc_page_visible", "state": "seen"},
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
-                "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                "evidence_note": "Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, FCSB GO.",
                 "result_kind": "final_go",
             },
         ],
@@ -689,7 +689,7 @@ def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             {"fact_id": "fcs_page_visible", "state": "seen"},
-            {"fact_id": "bit_page_visible", "state": "seen"},
+            {"fact_id": "bit_root_page_visible", "state": "seen"},
         ],
     )
 
@@ -704,7 +704,7 @@ def test_infer_step_uses_fcs_reset_completion_gate_to_advance_past_s15(real_pack
     vars_map["fcs_reset_complete"] = False
     prior_vision_facts = [
         {"fact_id": "fcs_page_visible", "state": "seen"},
-        {"fact_id": "bit_page_visible", "state": "seen"},
+        {"fact_id": "bit_root_page_visible", "state": "seen"},
     ]
 
     blocked = infer_step_id(
@@ -765,14 +765,14 @@ def test_infer_step_pack_specific_visual_completion_requires_all_required_facts(
                     "expires_after_ms": 2000,
                 },
                 {
-                    "fact_id": "fcs_reset_seen",
-                    "sticky": True,
-                    "expires_after_ms": 600000,
+                    "fact_id": "fcsmc_page_visible",
+                    "sticky": False,
+                    "expires_after_ms": 2000,
                 },
             ],
             "step_bindings": {
                 "S15": {
-                    "all_of": ["fcs_reset_seen", "fcs_page_visible"],
+                    "all_of": ["fcsmc_page_visible", "fcs_page_visible"],
                 }
             },
         },
@@ -784,7 +784,7 @@ def test_infer_step_pack_specific_visual_completion_requires_all_required_facts(
         vars_map={},
         recent_ui_targets=[],
         pack_path=pack_path,
-        vision_facts=[{"fact_id": "fcs_reset_seen", "state": "seen"}],
+        vision_facts=[{"fact_id": "fcsmc_page_visible", "state": "seen"}],
     )
     advanced = infer_step_id(
         pack_steps,
@@ -792,7 +792,7 @@ def test_infer_step_pack_specific_visual_completion_requires_all_required_facts(
         recent_ui_targets=[],
         pack_path=pack_path,
         vision_facts=[
-            {"fact_id": "fcs_reset_seen", "state": "seen"},
+            {"fact_id": "fcsmc_page_visible", "state": "seen"},
             {"fact_id": "fcs_page_visible", "state": "seen"},
         ],
     )
@@ -809,9 +809,7 @@ def test_infer_step_does_not_advance_past_s18_from_in_test_page_alone(real_pack_
     vars_map = dict(real_pack_ctx["baseline_vars"])
     prior_vision_facts = [
         {"fact_id": "fcs_page_visible", "state": "seen"},
-        {"fact_id": "bit_page_visible", "state": "seen"},
-        {"fact_id": "fcs_reset_seen", "state": "seen"},
-        {"fact_id": "takeoff_trim_seen", "state": "seen"},
+        {"fact_id": "bit_root_page_visible", "state": "seen"},
     ]
 
     blocked = infer_step_id(
@@ -823,7 +821,7 @@ def test_infer_step_does_not_advance_past_s18_from_in_test_page_alone(real_pack_
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             *prior_vision_facts,
-            {"fact_id": "right_ddi_in_test_visible", "state": "seen"},
+            {"fact_id": "fcsmc_in_test_visible", "state": "seen"},
         ],
     )
 
@@ -844,9 +842,7 @@ def test_infer_step_does_not_advance_past_s18_from_switch_interaction_alone(real
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             {"fact_id": "fcs_page_visible", "state": "seen"},
-            {"fact_id": "bit_page_visible", "state": "seen"},
-            {"fact_id": "fcs_reset_seen", "state": "seen"},
-            {"fact_id": "takeoff_trim_seen", "state": "seen"},
+            {"fact_id": "bit_root_page_visible", "state": "seen"},
         ],
     )
 
@@ -871,13 +867,12 @@ def test_infer_step_advances_past_s17_without_takeoff_trim_visual_fact_when_trim
         pack_path=REAL_PACK_PATH,
         vision_facts=[
             {"fact_id": "fcs_page_visible", "state": "seen"},
-            {"fact_id": "bit_page_visible", "state": "seen"},
-            {"fact_id": "fcs_reset_seen", "state": "seen"},
+            {"fact_id": "bit_root_page_visible", "state": "seen"},
         ],
     )
 
     assert result.inferred_step_id == "S18"
-    assert "vision_facts.takeoff_trim_seen==seen" not in result.missing_conditions
+    assert "vision_facts.fcsmc_final_go_result_visible==seen" in result.missing_conditions
 
 
 def test_infer_step_uses_pack_specific_vision_fact_bindings(tmp_path: Path) -> None:

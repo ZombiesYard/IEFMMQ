@@ -69,16 +69,14 @@ def test_vision_fact_extractor_builds_two_image_request_and_parses_positive_fact
                 _chat_payload(
                     [
                         {
-                            "fact_id": "fcs_bit_interaction_seen",
+                            "fact_id": "fcsmc_in_test_visible",
                             "state": "seen",
-                            "source_frame_id": "1772872445010_000123",
-                            "evidence_note": "Right DDI BIT/FCS page shows active FCS BIT.",
+                            "evidence_note": "Right DDI FCS-MC page clearly shows IN TEST.",
                         },
                         {
-                            "fact_id": "fcs_bit_result_visible",
+                            "fact_id": "fcsmc_final_go_result_visible",
                             "state": "seen",
-                            "source_frame_id": "1772872445010_000123",
-                            "evidence_note": "BIT result text is visible on the right DDI.",
+                            "evidence_note": "Right DDI FCS-MC page clearly shows MC1 GO, MC2 GO, FCSA GO, FCSB GO.",
                         },
                     ]
                 )
@@ -100,14 +98,17 @@ def test_vision_fact_extractor_builds_two_image_request_and_parses_positive_fact
     assert result.status == "uncertain"
     assert result.observation is not None
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
-    assert facts_by_id["fcs_bit_interaction_seen"].state == "seen"
-    assert facts_by_id["fcs_bit_result_visible"].state == "seen"
-    assert facts_by_id["fcs_reset_seen"].state == "uncertain"
+    assert facts_by_id["fcsmc_in_test_visible"].state == "seen"
+    assert facts_by_id["fcsmc_final_go_result_visible"].state == "seen"
+    assert facts_by_id["tac_page_visible"].state == "uncertain"
+    assert facts_by_id["fcsmc_in_test_visible"].source_frame_id == "1772872444950_000122"
     call = fake.calls[0]
     content = call["json"]["messages"][1]["content"]
     assert len(content) == 3
     assert [item["type"] for item in content[:2]] == ["image_url", "image_url"]
     assert call["json"]["response_format"]["json_schema"]["name"] == "VisionFactResponse"
+    response_schema = call["json"]["response_format"]["json_schema"]["schema"]
+    assert "source_frame_id" not in response_schema["properties"]["facts"]["items"]["required"]
 
 
 def test_vision_fact_extractor_dashscope_qwen35_uses_json_object_and_omits_max_tokens(tmp_path: Path) -> None:
@@ -145,10 +146,9 @@ def test_vision_fact_extractor_records_raw_json_and_prints_model_io(
         {
             "facts": [
                 {
-                    "fact_id": "fcs_reset_seen",
+                    "fact_id": "supt_page_visible",
                     "state": "seen",
-                    "source_frame_id": "1772872445010_000123",
-                    "evidence_note": "FCS reset visible on the left DDI.",
+                    "evidence_note": "Left DDI clearly shows the SUPT page.",
                 }
             ]
         },
@@ -194,10 +194,9 @@ def test_vision_fact_extractor_returns_uncertain_when_model_is_unsure(tmp_path: 
                 _chat_payload(
                     [
                         {
-                            "fact_id": "fcs_reset_seen",
+                            "fact_id": "fcsmc_intermediate_result_visible",
                             "state": "uncertain",
-                            "source_frame_id": "1772872445010_000123",
-                            "evidence_note": "FCS page is too blurry to confirm reset marks.",
+                            "evidence_note": "FCS-MC result text is too blurry to classify.",
                         }
                     ]
                 )
@@ -218,7 +217,7 @@ def test_vision_fact_extractor_returns_uncertain_when_model_is_unsure(tmp_path: 
     assert result.status == "uncertain"
     assert result.observation is not None
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
-    assert facts_by_id["fcs_reset_seen"].state == "uncertain"
+    assert facts_by_id["fcsmc_intermediate_result_visible"].state == "uncertain"
 
 
 def test_vision_fact_extractor_defaults_empty_fact_array_to_all_uncertain(tmp_path: Path) -> None:
@@ -251,7 +250,7 @@ def test_vision_fact_extractor_defaults_empty_fact_array_to_all_uncertain(tmp_pa
     }
 
 
-def test_vision_fact_extractor_coerces_unknown_source_frame_id_to_default(tmp_path: Path) -> None:
+def test_vision_fact_extractor_attaches_default_source_frame_id_when_model_omits_it(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)
     fake = FakeClient(
@@ -260,10 +259,9 @@ def test_vision_fact_extractor_coerces_unknown_source_frame_id_to_default(tmp_pa
                 _chat_payload(
                     [
                         {
-                            "fact_id": "fcs_reset_seen",
+                            "fact_id": "supt_page_visible",
                             "state": "seen",
-                            "source_frame_id": "unknown_frame_from_model",
-                            "evidence_note": "Reset marks appear cleared.",
+                            "evidence_note": "SUPT page label is clearly visible.",
                         }
                     ]
                 )
@@ -283,8 +281,8 @@ def test_vision_fact_extractor_coerces_unknown_source_frame_id_to_default(tmp_pa
 
     assert result.observation is not None
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
-    assert facts_by_id["fcs_reset_seen"].source_frame_id == "1772872445010_000123"
-    assert result.observation.metadata["coerced_source_frame_fact_ids"] == ["fcs_reset_seen"]
+    assert facts_by_id["supt_page_visible"].source_frame_id == "1772872445010_000123"
+    assert result.observation.metadata["coerced_source_frame_fact_ids"] == []
 
 
 def test_vision_fact_extractor_downgrades_when_multimodal_rejected(tmp_path: Path) -> None:
@@ -327,7 +325,6 @@ def test_vision_fact_extractor_uses_only_successful_frame_ids_in_prompt_and_meta
                         {
                             "fact_id": "fcs_page_visible",
                             "state": "seen",
-                            "source_frame_id": "1772872445010_000123",
                             "evidence_note": "FCS page is visible on the surviving frame.",
                         }
                     ]
@@ -369,7 +366,6 @@ def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: 
                         {
                             "fact_id": fact_id,
                             "state": "not_seen",
-                            "source_frame_id": "1772872445010_000123",
                             "evidence_note": f"{fact_id} is confidently not visible in this frame.",
                         }
                         for fact_id in VISION_FACT_IDS
@@ -393,8 +389,8 @@ def test_vision_fact_extractor_negative_fcs_bit_sample_stays_not_seen(tmp_path: 
     assert result.observation is not None
     assert result.metadata["vision_fact_summary"]["status"] == "available"
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
-    assert facts_by_id["fcs_bit_interaction_seen"].state == "not_seen"
-    assert facts_by_id["fcs_bit_result_visible"].state == "not_seen"
+    assert facts_by_id["fcsmc_in_test_visible"].state == "not_seen"
+    assert facts_by_id["fcsmc_final_go_result_visible"].state == "not_seen"
 
 
 def test_vision_fact_extractor_uses_configured_fact_subset_without_keyerror(tmp_path: Path) -> None:
@@ -429,7 +425,6 @@ def test_vision_fact_extractor_uses_configured_fact_subset_without_keyerror(tmp_
                         {
                             "fact_id": "fcs_page_visible",
                             "state": "seen",
-                            "source_frame_id": "1772872445010_000123",
                             "evidence_note": "FCS page is visible.",
                         }
                     ]
@@ -457,7 +452,7 @@ def test_vision_fact_extractor_uses_configured_fact_subset_without_keyerror(tmp_
     assert response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"] == ["fcs_page_visible"]
 
 
-def test_vision_fact_extractor_schema_includes_left_ddi_fcs_page_button_visible(tmp_path: Path) -> None:
+def test_vision_fact_extractor_schema_includes_supt_page_visible(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)
     fake = FakeClient(
@@ -466,10 +461,9 @@ def test_vision_fact_extractor_schema_includes_left_ddi_fcs_page_button_visible(
                 _chat_payload(
                     [
                         {
-                            "fact_id": "left_ddi_fcs_page_button_visible",
+                            "fact_id": "supt_page_visible",
                             "state": "seen",
-                            "source_frame_id": "1772872445010_000123",
-                            "evidence_note": "Left DDI clearly shows the FCS button label at PB15.",
+                            "evidence_note": "Left DDI clearly shows the SUPT page.",
                         }
                     ]
                 )
@@ -489,7 +483,7 @@ def test_vision_fact_extractor_schema_includes_left_ddi_fcs_page_button_visible(
 
     assert result.observation is not None
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
-    assert facts_by_id["left_ddi_fcs_page_button_visible"].state == "seen"
+    assert facts_by_id["supt_page_visible"].state == "seen"
     call = fake.calls[0]
     response_schema = call["json"]["response_format"]["json_schema"]["schema"]
-    assert "left_ddi_fcs_page_button_visible" in response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"]
+    assert "supt_page_visible" in response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"]

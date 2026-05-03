@@ -368,7 +368,7 @@ def test_explain_error_repairs_visual_fact_alias_to_allowed_frame_ref() -> None:
             "gates": {"S18.completion": {"status": "blocked"}},
             "vision_facts": [
                 {
-                    "fact_id": "bit_page_failure_visible",
+                    "fact_id": "bit_root_page_visible",
                     "state": "seen",
                     "source_frame_id": "1773950407644_000006",
                     "confidence": 0.99,
@@ -378,10 +378,10 @@ def test_explain_error_repairs_visual_fact_alias_to_allowed_frame_ref() -> None:
             "vision_fact_summary": {
                 "status": "available",
                 "frame_ids": ["1773950407644_000006"],
-                "seen_fact_ids": ["bit_page_failure_visible"],
+                "seen_fact_ids": ["bit_root_page_visible"],
                 "uncertain_fact_ids": [],
                 "not_seen_fact_ids": [],
-                "summary_text": "seen=bit_page_failure_visible",
+                "summary_text": "seen=bit_root_page_visible",
             },
             "candidate_steps": ["S18", "S19"],
             "overlay_target_allowlist": ["right_mdi_pb5", "fcs_bit_switch"],
@@ -394,15 +394,15 @@ def test_explain_error_repairs_visual_fact_alias_to_allowed_frame_ref() -> None:
 
     assert res.status == "ok"
     assert [action["target"] for action in res.actions] == ["right_mdi_pb5"]
-    assert res.actions[0]["evidence_refs"] == ["VISION_FACTS.bit_page_failure_visible@1773950407644_000006"]
+    assert res.actions[0]["evidence_refs"] == ["VISION_FACTS.bit_root_page_visible@1773950407644_000006"]
     assert res.metadata["evidence_guardrail_applied"] is False
     assert res.metadata["evidence_ref_repair"]["repair_applied"] is True
     assert res.metadata["generation_mode"] == "repair"
     assert res.metadata["evidence_ref_repair"]["details"][0]["from_ref"] == "VISION_FACTS.right_ddi_bit_failures_page_visible"
-    assert res.metadata["evidence_ref_repair"]["details"][0]["to_ref"] == "VISION_FACTS.bit_page_failure_visible@1773950407644_000006"
+    assert res.metadata["evidence_ref_repair"]["details"][0]["to_ref"] == "VISION_FACTS.bit_root_page_visible@1773950407644_000006"
     assert res.metadata["evidence_ref_repair"]["details"][0]["reason"] == "attach_single_visible_frame_id"
     assert res.metadata["help_response_pre_guardrail"]["overlay"]["evidence"][0]["ref"] == "VISION_FACTS.right_ddi_bit_failures_page_visible"
-    assert res.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == "VISION_FACTS.bit_page_failure_visible@1773950407644_000006"
+    assert res.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == "VISION_FACTS.bit_root_page_visible@1773950407644_000006"
 
 
 def test_explain_error_http_5xx_fallback_no_overlay() -> None:

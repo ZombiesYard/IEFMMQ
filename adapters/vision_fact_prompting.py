@@ -34,93 +34,75 @@ def build_vision_fact_prompt(
             }
             for step_id, required_facts in bindings.items()
         },
-        "facts": [
-            {
-                "fact_id": fact_id,
-                "sticky": bool(fact_specs.get(fact_id, {}).get("sticky")),
-                "expires_after_ms": fact_specs.get(fact_id, {}).get("expires_after_ms"),
-                "intended_regions": list(fact_specs.get(fact_id, {}).get("intended_regions", [])),
-            }
-            for fact_id in fact_ids
-        ],
+        "facts": fact_ids,
     }
 
-    if lang == "zh":
+    if lang == "en":
         rules = [
-            "你是 SimTutor 的视觉事实抽取器。只能输出一个 JSON 对象，禁止输出 tutor answer、markdown 或自然语言段落。",
-            "你必须输出一个 JSON 对象，且顶层只允许 facts 字段；不要输出其他顶层键。",
-            "facts 必须是数组；每个 fact_id 只能出现一次。",
-            "state 只能是 seen、not_seen、uncertain。",
-            "只有在图像证据明确时才能输出 seen；模糊、遮挡、页面不完整时必须输出 uncertain。",
-            "source_frame_id 必须引用提供的 frame_ids 之一。",
-            "evidence_note 必须简短描述可验证的视觉依据，不得编造 BIOS 值。",
-            "left_ddi_dark、right_ddi_dark、ampcd_dark 只有在对应显示器区域基本黑屏/未点亮、没有可读页面符号时才可为 seen；若只是较暗但仍能读到页面，不算 dark。",
-            "left_ddi_menu_root_visible 只有在左 DDI 明确显示根菜单/顶层菜单页时才可为 seen；通常会看到 PB18 对应的 MENU，以及 FCS 等菜单项。",
-            "若左 DDI 当前仍是 TAC 页或只显示根菜单第一页，PB18 常用于切换到 SUPT 页；只有到 SUPT 页并真正看到 FCS 标签/按钮时，才可把 left_ddi_fcs_option_visible 或 left_ddi_fcs_page_button_visible 判为 seen。",
-            "left_ddi_fcs_option_visible 只有在左 DDI 当前页明确提供 FCS 选项时才可为 seen；这通常发生在根菜单/菜单翻页后的 FCS 选择页，且 FCS 对应 PB15。",
-            "left_ddi_fcs_page_button_visible 只有在左 DDI 当前页能明确看到用于进入 FCS 页面的按钮/标签时才可为 seen；这比 left_ddi_fcs_option_visible 更窄，要求能识别出 FCS 按钮本身，而不只是推测菜单里可能有该选项。",
-            "left_ddi_fcs_option_visible 或 left_ddi_fcs_page_button_visible 为 seen，并不等于 fcs_page_visible；看到 FCS 按钮/菜单项时，通常说明还没进入真正的 FCS 页面。",
-            "如果左 DDI 还在 TAC 页、STATUS/TAC 一类页面，或者只能确认 PB18/MENU 导航而看不到 FCS 标签，则下一步应优先按 PB18 进入 SUPT，而不是直接按 PB15。",
-            "fcs_page_visible 只表示左 DDI 已经在真正的 FCS 页面；必须看到明显的飞控页面特征，例如 LEF/TEF/AIL/RUD 等控制面名称与上下偏转指示、飞控通道格子/网格、以及 SV1/SV2 等通道区域。若只是菜单页里出现 FCS 选项，不算 seen。",
-            "若图上只能确认看到 FCS 按钮，但看不到 LEF/TEF/AIL/RUD、飞控通道格子、SV1/SV2 等 FCS 页面主体内容，fcs_page_visible 必须是 not_seen 或 uncertain，不能是 seen。",
-            "bit_page_visible 只表示右 DDI 已经在顶层 BIT 页面 / BIT root 页面；上电后的默认页就属于这一类。",
-            "bit_root_page_visible 只在右 DDI 明确停留在 BIT root 页面时为 seen；该页面上通常会一直显示 BIT FAILURES 这一行字。",
-            "bit_page_failure_visible 只在右 DDI 的 BIT root 页面里能明确读到 BIT FAILURES 这一行结果文字时为 seen；BIT FAILURES 页面本身就是 BIT root 页面，而不是 FCS-MC 子页。",
-            "对于 S08，右侧只接受 bit_page_visible、bit_root_page_visible、bit_page_failure_visible 作为完成证据；right_ddi_fcsmc_page_visible 或 fcs_bit_result_visible 不能用来判定 S08 完成。",
-            "right_ddi_fcsmc_page_visible 只有在右 DDI 标题/主内容明确显示 FCS-MC 页面时才可为 seen；这属于 S18 的导航/自检阶段，不等于 S08 的 BIT root 页面。",
-            "right_ddi_fcs_option_visible 只有在右 DDI 当前页明确显示可按的 FCS 选项时才可为 seen；这通常出现在 FCS-MC 页面的 PB5 位置。",
-            "right_ddi_in_test_visible 只有在右 DDI FCS-MC 页面明确显示 IN TEST 时才可为 seen。",
-            "fcs_reset_seen 只有在左 DDI FCS 页面可见且 RESET 之后原本填在 SV1/SV2 等飞控通道格子里的大部分 X/故障标记已经清空时才可为 seen；如果仍看到大量 X，说明 reset 尚未完成或故障仍在。",
-            "fcs_bit_interaction_seen 只有在右 DDI 页面证据支持 FCS BIT 流程已被实际触发时才可为 seen；若只有 BIT/FCS-MC 页面但看不到测试正在执行，返回 uncertain。",
-            "fcs_bit_result_visible 只有在右 DDI FCS-MC BIT 页面明确显示 FCS BIT 已完成的最终 GO 结果时才可为 seen。",
-            "对 S18，只有当同一页面里能明确确认 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO 这四个通道/项目都为 GO，且页面上看不到 PBIT GO、IN TEST、NOT RDY、NO GO 等中间态或失败态提示时，才可把 fcs_bit_result_visible 判为 seen。",
-            "若页面仍出现 PBIT GO，哪怕同时能看到 GO 字样，也必须把 fcs_bit_result_visible 判为 not_seen 或 uncertain，因为这仍属于中间态，不是最终完成态。",
-            "如果 FCSA/FCSB 显示的是 PBIT GO，而不是明确的 GO，就绝不能把 fcs_bit_result_visible 判为 seen；这类情况默认返回 not_seen，最多 uncertain。",
-            "对 fcs_bit_result_visible，只有在最终 GO 结果毫无歧义时才可输出 seen；若仍有 PBIT GO、字样模糊、或只能推测是 GO，就不要输出 seen。",
-            "S18 的动作顺序要严格区分：先在 BIT FAILURES / BIT root 页面按 PB5 进入 FCS-MC BIT 页，之后才是按住 FCS BIT 开关并同时按 PB5 开始自检。只看到 FCS-MC、PBIT GO、FCSA/FCSB 等字样，不代表 S18 已完成。",
-            "takeoff_trim_seen 只有在 FCS 页面上能看到按下 TAKEOFF TRIM 后的配平/舵面指示变化时才可为 seen。",
-            "区分 S08 与 S18 时，可结合左 DDI FCS 页面里的 X 填充：S08 只要求进入 FCS 页面，此时飞控通道格子里仍可能有大量 X；若仍看到大量 X，就不能把后续 FCS 自检已完成说成 seen。",
-            "ins_go 只有在 AMPCD 对准信息明确显示到 GO/0.5 附近时才可为 seen。",
-            build_vlm_region_prompt(lang="zh"),
-        ]
-    else:
-        rules = [
-            "You are SimTutor's visual fact extractor. Output exactly one JSON object only.",
-            "The top-level object must contain only the facts field; do not output any other top-level keys.",
-            "facts must be an array, and each fact_id must appear at most once.",
-            "state must be one of seen, not_seen, uncertain.",
-            "Use seen only when the image evidence is clear; if blurry, occluded, or incomplete, use uncertain.",
-            "source_frame_id must cite one of the provided frame_ids.",
-            "evidence_note must briefly describe verifiable visual evidence and must not invent BIOS values.",
-            "left_ddi_dark, right_ddi_dark, and ampcd_dark may be seen only when that display region is effectively dark/off with no readable page symbology; a dim but readable page is not dark.",
-            "left_ddi_menu_root_visible may be seen only when the left DDI clearly shows the root/top menu page, typically including the PB18 MENU label and menu options such as FCS.",
-            "If the left DDI is still on the TAC page or only on the first root-menu page, PB18 commonly advances to the SUPT page; only once the SUPT page clearly shows the FCS label/button may left_ddi_fcs_option_visible or left_ddi_fcs_page_button_visible be marked seen.",
-            "left_ddi_fcs_option_visible may be seen only when the current left DDI page clearly offers FCS as a selectable option, typically on PB15 of the root menu or the menu page that exposes the FCS entry.",
-            "left_ddi_fcs_page_button_visible may be seen only when the current left DDI page clearly shows the actual button/label used to enter the FCS page. This is narrower than left_ddi_fcs_option_visible and requires the FCS button itself to be visually identifiable.",
-            "left_ddi_fcs_option_visible or left_ddi_fcs_page_button_visible does not imply fcs_page_visible; seeing the FCS button usually means the display is still on a menu page and has not entered the real FCS page yet.",
-            "If the left DDI is still on TAC, STATUS/TAC, or only shows PB18/MENU navigation without a visible FCS label, the next action should be PB18 to reach SUPT, not PB15 directly.",
-            "fcs_page_visible means the left DDI is already on the real FCS page. You should see strong FCS-page anchors such as LEF/TEF/AIL/RUD control-surface labels with up/down deflection cues, flight-control channel boxes/grid, and SV1/SV2 channel areas. A menu page that merely contains an FCS option does not count.",
-            "If the image only proves that the FCS button is visible but does not show LEF/TEF/AIL/RUD, the flight-control channel grid, or SV1/SV2 page body content, then fcs_page_visible must be not_seen or uncertain, never seen.",
-            "bit_page_visible means the right DDI is on the top-level BIT page / BIT root page; the powered-up default page belongs here.",
-            "bit_root_page_visible may be seen only when the right DDI clearly remains on the BIT root page. That page commonly keeps a BIT FAILURES line visible.",
-            "bit_page_failure_visible may be seen only when the right DDI BIT root page clearly shows the BIT FAILURES line. The BIT FAILURES page is the BIT root page itself, not the FCS-MC subpage.",
-            "For S08, only bit_page_visible, bit_root_page_visible, or bit_page_failure_visible may satisfy the right-side BIT-page requirement. Do not use right_ddi_fcsmc_page_visible or fcs_bit_result_visible to mark S08 complete.",
-            "right_ddi_fcsmc_page_visible may be seen only when the right DDI title/content clearly shows the FCS-MC page. That belongs to the S18 navigation/BIT flow and is not the same as the S08 BIT root page.",
-            "right_ddi_fcs_option_visible may be seen only when the right DDI page clearly shows the selectable FCS option, typically at PB5 on the FCS-MC flow.",
-            "right_ddi_in_test_visible may be seen only when the right DDI FCS-MC page clearly shows IN TEST.",
-            "fcs_reset_seen may be seen only when the left DDI FCS page is visible and, after reset, most X/fault marks that previously filled SV1/SV2 or other flight-control channel boxes have cleared. If many X marks remain, reset is not confirmed complete.",
-            "fcs_bit_interaction_seen may be seen only when the right DDI evidence supports that the FCS BIT flow has actually been triggered; a static BIT/FCS-MC page alone is not enough.",
-            "fcs_bit_result_visible may be seen only when the right DDI FCS-MC BIT page clearly shows the final completed GO result.",
-            "For S18, mark fcs_bit_result_visible as seen only when the same page clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together, and the page does not show any intermediate or failed markers such as PBIT GO, IN TEST, NOT RDY, or NO GO.",
-            "If PBIT GO is still visible anywhere on the page, then fcs_bit_result_visible must be not_seen or uncertain even if some GO text is also visible, because that is still an intermediate state rather than the final completed BIT result.",
-            "If FCSA/FCSB read PBIT GO rather than an explicit final GO, never mark fcs_bit_result_visible as seen; default to not_seen, or at most uncertain if the text is ambiguous.",
-            "For fcs_bit_result_visible, output seen only when the final GO result is unambiguous. If PBIT GO remains visible, the text is blurry, or GO is only inferred, do not output seen.",
-            "Model the S18 sequence explicitly: first press PB5 on the BIT FAILURES / BIT root page to enter the FCS-MC BIT page, then hold the FCS BIT switch and press PB5 to start the BIT. Seeing FCS-MC, PBIT GO, or FCSA/FCSB text alone does not mean S18 is complete.",
-            "takeoff_trim_seen may be seen only when the FCS page shows trim/control-surface changes after TAKEOFF TRIM.",
-            "To distinguish S08 from later FCS BIT stages, use the left DDI FCS-page X fills carefully: S08 may still show many X marks in the flight-control channel boxes because no FCS RESET/BIT completion has happened yet. If many X marks remain, do not claim the later FCS BIT completion is seen.",
-            "ins_go may be seen only when the AMPCD alignment info clearly reaches GO or about 0.5.",
+            "You are the SimTutor visual fact extractor for the F/A-18C cold-start flow.",
+            "The input is exactly one composite-panel image with fixed top-to-bottom regions: left_ddi, ampcd, right_ddi.",
+            "Inspect only this image and label the configured visual facts.",
+            "If the image is blurry, obstructed, or cannot be confirmed from this image alone, use state='uncertain'.",
+            "The top-level object may contain only: summary, facts.",
+            "Each fact object may contain only: fact_id, state, evidence_note.",
+            "Do NOT output frame_id.",
+            "Do NOT output source_frame_id.",
+            "Do NOT output confidence, expires_after_ms, sticky, actions, or tutor advice.",
+            "Page option labels are not pages. Do not mark a page visible just because its name appears as a pushbutton/menu option.",
+            "tac_page_visible requires the actual TAC/TAC MENU page; a small TAC/MENU navigation label alone is not enough.",
+            "supt_page_visible requires the actual SUPT/SUPT MENU page; a small SUPT option label alone is not enough.",
+            "If the left DDI is on TAC, PB18 is the navigation step toward SUPT. If the left DDI is already on SUPT, PB15 is the step toward the real FCS page.",
+            "fcs_page_visible is the dedicated flight-control page with readable LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS grid labels. A page label or menu option is not enough.",
+            "fcs_page_x_marks_visible only means literal X/fault fills inside FCS page channel boxes.",
+            "bit_root_page_visible is the BIT FAILURES/root page; an FCS-MC entry label is not the FCS-MC subpage.",
+            "fcsmc_page_visible requires a readable FCS-MC title/subpage with MC1, MC2, FCSA, and FCSB rows.",
+            "PBIT GO is intermediate, not final GO.",
+            "IN TEST is running, not final GO.",
+            "fcsmc_intermediate_result_visible is for readable intermediate FCS-MC result states such as PBIT GO, but not the final completed GO result.",
+            "fcsmc_final_go_result_visible requires final GO results for MC1, MC2, FCSA, and FCSB together.",
+            "hsi_page_visible means an HSI navigation/POS page is visible; it does not imply INS alignment text or INS OK.",
+            "hsi_map_layer_visible requires a colored topographic/chart MAP background; black HSI symbology alone is not MAP.",
+            "ins_grnd_alignment_text_visible requires a literal GRND alignment block with QUAL or TIME/countdown text.",
+            "ins_ok_text_visible requires clearly readable OK near the INS alignment block, usually near QUAL.",
             build_vlm_region_prompt(lang="en"),
         ]
+        example = (
+            '{"summary":"one short sentence","facts":[{"fact_id":"tac_page_visible",'
+            '"state":"seen","evidence_note":"short evidence"}]}'
+        )
+    else:
+        rules = [
+            "你是 SimTutor 的视觉事实抽取器，负责 F/A-18C 冷启动流程的视觉事实判断。",
+            "输入只有一张组合面板图，固定从上到下依次是：left_ddi、ampcd、right_ddi。",
+            "只根据当前这一张图，为配置中的视觉 facts 输出标注。",
+            "如果当前图模糊、遮挡、页面不完整、或者仅凭这一张图无法确认，请使用 state='uncertain'。",
+            "顶层只允许包含：summary、facts。",
+            "facts 数组里的每个对象只允许包含：fact_id、state、evidence_note。",
+            "严禁输出 frame_id。",
+            "严禁输出 source_frame_id。",
+            "严禁输出 confidence、expires_after_ms、sticky、actions 或 tutor advice。",
+            "页面选项标签不等于页面本身。不要因为某个 pushbutton/menu option 写着页面名就标 seen。",
+            "tac_page_visible 就是单独小的 TAC/MENU 导航标签可见。",
+            "supt_page_visible 就是单独小的 SUPT 选项标签可见。",
+            "如果左 DDI 还在 TAC 页，下一步导航应是 PB18 进入 SUPT；如果左 DDI 已在 SUPT 页，下一步导航应是 PB15 进入真正的 FCS 页面。",
+            "fcs_page_visible 是专用飞控 FCS 页面，需要能读到 LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS grid 等标签；菜单项或页面名不算。",
+            "fcs_page_x_marks_visible 只表示 FCS 页面通道格子内的字面 X/fault fills。",
+            "bit_root_page_visible 是 BIT FAILURES/root 页面；FCS-MC 入口标签不等于 FCS-MC 子页面。",
+            "fcsmc_page_visible 需要能读到 FCS-MC 标题/子页面，并有 MC1、MC2、FCSA、FCSB 等行。",
+            "PBIT GO 是中间态，不是 final GO。",
+            "IN TEST 是运行中，不是 final GO。",
+            "fcsmc_intermediate_result_visible 表示能明确读到 PBIT GO 等 FCS-MC 中间结果，而不是最终完成结果。",
+            "fcsmc_final_go_result_visible 必须是 MC1、MC2、FCSA、FCSB 同页可读的最终 GO 结果。",
+            "hsi_page_visible 是 HSI navigation/POS 页面可见；它本身不代表 INS 对准文字或 INS OK 可见。",
+            "hsi_map_layer_visible 需要彩色地形/航图 MAP 背景；黑底 HSI 符号本身不算 MAP。",
+            "ins_grnd_alignment_text_visible 需要字面 GRND 对准文字块，并伴随 QUAL 或 TIME/countdown。",
+            "ins_ok_text_visible 需要在 INS 对准文字块附近清楚读到 OK，通常在 QUAL 附近。",
+            build_vlm_region_prompt(lang="zh"),
+        ]
+        example = (
+            '{"summary":"一句短总结","facts":[{"fact_id":"tac_page_visible",'
+            '"state":"seen","evidence_note":"简短证据"}]}'
+        )
 
     rendered_rules = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -128,7 +110,7 @@ def build_vision_fact_prompt(
         "Context JSON:\n"
         f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)}\n"
         "Output JSON shape exactly:\n"
-        '{"facts":[{"fact_id":"fcs_page_visible","state":"uncertain","source_frame_id":"1772872445010_000123","evidence_note":"..."}]}'
+        f"{example}"
     )
 
 

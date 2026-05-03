@@ -860,7 +860,7 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None
         },
         "vision_fact_summary": {
             "status": "available",
-            "seen_fact_ids": ["left_ddi_fcs_page_button_visible"],
+            "seen_fact_ids": ["supt_page_visible"],
             "not_seen_fact_ids": ["fcs_page_visible"],
         },
         "deterministic_step_hint": {
@@ -876,7 +876,7 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None
 
     result = build_help_prompt_result(ctx, "zh")
 
-    assert "不要把“左 DDI 看见 FCS 按钮/菜单项”误判成“已经进入 FCS 页面”" in result.prompt
+    assert "不要把 tac_page_visible 或 supt_page_visible 误判成 fcs_page_visible" in result.prompt
     assert "LEF/TEF/AIL/RUD" in result.prompt
     assert "SV1/SV2" in result.prompt
     assert "大量 X/故障填充" in result.prompt
@@ -961,7 +961,7 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -
         },
         "vision_fact_summary": {
             "status": "available",
-            "seen_fact_ids": ["left_ddi_fcs_page_button_visible"],
+            "seen_fact_ids": ["supt_page_visible"],
             "not_seen_fact_ids": ["fcs_page_visible"],
         },
         "deterministic_step_hint": {
@@ -977,7 +977,7 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -
 
     result = build_help_prompt_result(ctx, "en")
 
-    assert "Do not mistake 'the left DDI shows the FCS button/menu entry'" in result.prompt
+    assert "Do not mistake tac_page_visible or supt_page_visible for fcs_page_visible" in result.prompt
     assert "LEF/TEF/AIL/RUD" in result.prompt
     assert "SV1/SV2" in result.prompt
     assert "many X/fault fills" in result.prompt
