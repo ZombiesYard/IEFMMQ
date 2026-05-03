@@ -23,8 +23,6 @@
 
 - Repo root:
   `/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ`
-- 当前分支:
-  `vlm-fineTune-Gemma`
 - Git remote:
   `https://github.com/ZombiesYard/IEFMMQ.git`
 

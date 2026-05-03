@@ -1,7 +1,11 @@
-﻿from adapters.ollama_model import OllamaModel
+﻿import socket
+
+from adapters.action_executor import OverlayActionExecutor
+from adapters.dcs.overlay.sender import DcsOverlaySender
+from adapters.ollama_model import OllamaModel
 from core.help_failure import SCHEMA_FAIL
 from core.llm_schema import validate_help_response
-from core.types import Observation
+from core.types import Observation, TutorRequest
 from tests._fakes import (
     FakeClient,
     FakeResponse,
@@ -10,6 +14,7 @@ from tests._fakes import (
     _ollama_response_payload_from_help_obj,
     _request_help,
 )
+from tests.adapters.socket_stubs import DummySocket
 
 
 def test_explain_error_success_with_valid_help_response() -> None:
@@ -47,6 +52,74 @@ def test_explain_error_success_with_valid_help_response() -> None:
     assert call["json"]["model"] == "qwen3:8b"
     assert call["json"]["stream"] is False
     assert call["json"]["options"]["temperature"] == 0
+
+
+def test_explain_error_multi_target_fake_llm_json_reaches_overlay_executor(
+    monkeypatch,
+) -> None:
+    help_obj = {
+        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+        "next": {"step_id": "S18"},
+        "overlay": {
+            "targets": ["fcs_bit_switch", "right_mdi_pb5"],
+            "evidence": [
+                {
+                    "target": "fcs_bit_switch",
+                    "type": "gate",
+                    "ref": "GATES.S18.completion",
+                    "quote": "Run the FCS BIT from the current blocked stage.",
+                    "grounding_confidence": 0.92,
+                },
+                {
+                    "target": "right_mdi_pb5",
+                    "type": "gate",
+                    "ref": "GATES.S18.completion",
+                    "quote": "Run the FCS BIT from the current blocked stage.",
+                    "grounding_confidence": 0.9,
+                },
+            ],
+        },
+        "explanations": ["Hold FCS BIT and press PB5 together."],
+    }
+    fake = FakeClient(responses=[FakeResponse(_ollama_message_payload_from_help_obj(help_obj))])
+    model = OllamaModel(model_name="qwen3:8b", client=fake)
+    model.max_overlay_targets = 2
+    obs = Observation(source="mock", procedure_hint="S18")
+    req = TutorRequest(
+        intent="help",
+        message="Need help with the FCS BIT sequence.",
+        context={
+            "vars": {"right_ddi_on": True, "fcs_bit_switch_up": False},
+            "gates": {"S18.completion": {"status": "blocked"}},
+            "rag_topk": [],
+            "candidate_steps": ["S18"],
+            "overlay_target_allowlist": ["fcs_bit_switch", "right_mdi_pb5"],
+        },
+    )
+
+    res = model.explain_error(obs, req)
+
+    assert res.status == "ok"
+    assert [action["target"] for action in res.actions] == ["fcs_bit_switch", "right_mdi_pb5"]
+    assert all(action["type"] == "overlay" for action in res.actions)
+    assert all(action["intent"] == "highlight" for action in res.actions)
+    assert [action["evidence_refs"] for action in res.actions] == [
+        ["GATES.S18.completion"],
+        ["GATES.S18.completion"],
+    ]
+    validate_help_response(res.metadata["help_response"])
+
+    dummy = DummySocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    with OverlayActionExecutor(
+        sender=DcsOverlaySender(auto_clear=False, ack_enabled=False),
+        max_targets=2,
+    ) as executor:
+        report = executor.execute_actions(res.actions).to_dict()
+
+    assert [item["target"] for item in report["executed"]] == ["fcs_bit_switch", "right_mdi_pb5"]
+    assert report["rejected"] == []
+    assert report["dropped"] == []
 
 
 def test_explain_error_bad_output_fallback_no_overlay() -> None:
