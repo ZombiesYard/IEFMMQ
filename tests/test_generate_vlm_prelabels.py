@@ -39,6 +39,33 @@ def _write_capture_index(
         handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def _write_capture_plan_progress(
+    session_dir: Path,
+    *,
+    seq: int,
+    frame_id: str,
+    category_id: str = "probe",
+) -> None:
+    path = session_dir / "capture_plan_progress.jsonl"
+    row = {
+        "seq": seq,
+        "total": 3,
+        "category_id": category_id,
+        "category_name": category_id,
+        "target_display": "left_ddi",
+        "left_ddi_content": category_id,
+        "ampcd_content": "natural",
+        "right_ddi_content": "natural",
+        "expected_primary_content": category_id,
+        "expected_key_facts": "",
+        "capture_instruction": "test instruction",
+        "captured_frame_id": frame_id,
+        "status": "captured",
+    }
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
 def _read_jsonl(path: Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -156,7 +183,7 @@ def test_generate_vlm_prelabels_normalizes_facts_and_exports_label_studio_tasks(
             FakeResponse(
                 _chat_payload(
                     {
-                        "summary": "FCS page is visible; INS GO is not visible.",
+                        "summary": "FCS page is visible; INS OK is not visible.",
                         "facts": [
                             {
                                 "fact_id": "fcs_page_visible",
@@ -164,9 +191,9 @@ def test_generate_vlm_prelabels_normalizes_facts_and_exports_label_studio_tasks(
                                 "evidence_note": "The left DDI shows the FCS page.",
                             },
                             {
-                                "fact_id": "ins_go",
+                                "fact_id": "ins_ok_text_visible",
                                 "state": "not_seen",
-                                "evidence_note": "AMPCD does not show a GO cue.",
+                                "evidence_note": "AMPCD does not show a clear OK cue.",
                             },
                         ],
                     }
@@ -192,7 +219,7 @@ def test_generate_vlm_prelabels_normalizes_facts_and_exports_label_studio_tasks(
     facts_by_id = {item["fact_id"]: item for item in sample["facts"]}
     assert list(facts_by_id) == list(CORE_FACT_IDS)
     assert facts_by_id["fcs_page_visible"]["state"] == "seen"
-    assert facts_by_id["ins_go"]["state"] == "not_seen"
+    assert facts_by_id["ins_ok_text_visible"]["state"] == "not_seen"
     assert facts_by_id["bit_root_page_visible"]["state"] == "uncertain"
 
     tasks = json.loads((output_dir / "label_studio_tasks.json").read_text(encoding="utf-8"))
@@ -203,6 +230,7 @@ def test_generate_vlm_prelabels_normalizes_facts_and_exports_label_studio_tasks(
     assert task["data"]["fcs_page_visible"] == "seen"
     assert task["data"]["bit_root_page_visible"] == "uncertain"
     assert task["data"]["fcs_page_visible_note"] == "The left DDI shows the FCS page."
+    assert task["predictions"][0]["result"]
     assert "source_frame_id" not in task["data"]["ai_prelabel_json"]
     assert "confidence" not in task["data"]["ai_prelabel_json"]
 
@@ -395,6 +423,61 @@ def test_generate_vlm_prelabels_records_failures_without_stopping_batch(
     assert failure_rows[0]["frame_id"] == "1772872445010_000123"
     assert "unsupported state" in failure_rows[0]["error"]
     assert success_rows[0]["frame_id"] == "1772872446010_000124"
+
+
+def test_generate_vlm_prelabels_can_select_capture_plan_sequences(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    session_dir = tmp_path / "captures" / "sess-live"
+    frame_ids = [
+        "1772872445010_000001",
+        "1772872446010_000002",
+        "1772872447010_000003",
+    ]
+    for index, frame_id in enumerate(frame_ids, start=1):
+        artifact_path = session_dir / "artifacts" / f"{frame_id}_vlm.png"
+        raw_path = session_dir / "raw" / f"{frame_id}.png"
+        _write_png(artifact_path)
+        _write_png(raw_path)
+        _write_capture_index(
+            session_dir,
+            frame_id=frame_id,
+            raw_image_path=raw_path,
+            artifact_image_path=artifact_path,
+        )
+        _write_capture_plan_progress(
+            session_dir,
+            seq=index,
+            frame_id=frame_id,
+            category_id=f"cat_{index}",
+        )
+    fake = FakeClient(
+        responses=[
+            FakeResponse(_chat_payload({"summary": "second", "facts": []})),
+            FakeResponse(_chat_payload({"summary": "first", "facts": []})),
+        ]
+    )
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test")
+
+    output_dir = session_dir / "prelabels"
+    stats = generate_prelabels(
+        session_dir=session_dir,
+        output_dir=output_dir,
+        capture_plan_seqs="2,1",
+        include_capture_plan_hint=True,
+        client=fake,
+    )
+
+    assert stats.total_images == 2
+    assert stats.succeeded == 2
+    rows = _read_jsonl(output_dir / "vision_prelabels.jsonl")
+    assert [row["frame_id"] for row in rows] == [frame_ids[1], frame_ids[0]]
+    assert [row["capture_plan"]["seq"] for row in rows] == [2, 1]
+    assert [row["capture_plan"]["category_id"] for row in rows] == ["cat_2", "cat_1"]
+    first_prompt = fake.calls[0]["json"]["messages"][1]["content"][1]["text"]
+    assert "采集计划提示" in first_prompt
+    assert "category_id=cat_2" in first_prompt
 
 
 def test_generate_vlm_prelabels_parser_supports_switchable_default_lang() -> None:

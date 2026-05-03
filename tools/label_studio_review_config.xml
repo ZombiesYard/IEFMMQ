@@ -1,183 +1,222 @@
-<View>
-  <View style="display:flex; gap:14px; align-items:flex-start; width:100%;">
+<View style="height:calc(100vh - 96px); overflow:hidden; display:grid; grid-template-columns:44% 56%; gap:10px; padding:4px; box-sizing:border-box; font-size:12px; line-height:1.15;">
 
-    <!-- LEFT SPACER: push content toward screen center on ultrawide -->
-    <View style="width:6%;"></View>
+  <!-- LEFT: image and capture context. Keep this column fixed-height to avoid page scrolling. -->
+  <View style="height:100%; overflow:hidden; display:grid; grid-template-rows:auto 1fr auto; gap:6px;">
+    <View style="display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:6px; border:1px solid #333; border-radius:6px;">
+      <Text name="capture_seq_text" value="Seq: $capture_plan_seq / $capture_plan_total" />
+      <Text name="capture_category_text" value="Category: $capture_plan_category_id" />
+      <Text name="capture_target_text" value="Target: $capture_plan_target_display" />
+      <Text name="frame_id_text" value="Frame: $frame_id" />
+      <Text name="capture_primary_text" value="Primary: $capture_plan_expected_primary_content" />
+      <Text name="capture_expected_text" value="Expected: $capture_plan_expected_key_facts" />
+    </View>
 
-    <!-- IMAGE COLUMN -->
-    <View style="width:34%;">
-      <Header value="Composite Panel" />
+    <View style="height:100%; overflow:hidden;">
       <Image name="panel_image"
              value="$image"
              zoom="true"
              zoomControl="true"
-             rotateControl="false" />
+             rotateControl="false"
+             style="max-height:100%; width:100%; object-fit:contain;" />
+    </View>
 
-      <View style="margin-top:6px;">
-        <Text name="frame_id_text" value="Frame: $frame_id" />
-        <Text name="session_id_text" value="Session: $session_id" />
+    <View style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; padding:5px; border:1px solid #333; border-radius:6px;">
+      <Text name="left_ddi_hint" value="Left: $capture_plan_left_ddi_content" />
+      <Text name="ampcd_hint" value="AMPCD: $capture_plan_ampcd_content" />
+      <Text name="right_ddi_hint" value="Right: $capture_plan_right_ddi_content" />
+    </View>
+  </View>
+
+  <!-- RIGHT: compact review board. Three columns keep all 13 facts in one viewport. -->
+  <View style="height:100%; overflow:hidden; display:grid; grid-template-rows:auto 1fr auto; gap:6px;">
+
+    <View style="display:grid; grid-template-columns:1fr 1.2fr; gap:6px; align-items:start; padding:6px; border:1px solid #333; border-radius:6px;">
+      <View>
+        <Header value="Run-003 Visual Fact Review" />
+        <Text name="state_legend" value="seen = clearly visible | not_seen = absent | uncertain = unreadable/partial" />
+      </View>
+      <View>
+        <Text name="summary_ai_text" value="AI summary: $summary" />
+        <TextArea name="summary_review"
+                  toName="panel_image"
+                  editable="true"
+                  rows="1"
+                  placeholder="Short reviewed summary..." />
       </View>
     </View>
 
-    <!-- REVIEW AREA -->
-    <View style="width:60%; display:flex; gap:12px; align-items:flex-start;">
+    <View style="height:100%; overflow:hidden; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
 
-      <!-- REVIEW COL 1 -->
-      <View style="width:50%;">
+      <!-- Column 1: page identity and FCS page -->
+      <View style="height:100%; overflow:hidden; display:flex; flex-direction:column; gap:5px;">
+        <Header value="Pages / FCS" />
 
-        <View style="padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="Summary" />
-          <Text name="summary_ai_text" value="AI: $summary" />
-          <TextArea name="summary_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="2"
-                    placeholder="Edit / confirm summary..." />
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="tac_page_visible_label" value="TAC page | AI: $tac_page_visible" />
+          <Text name="tac_page_visible_hint" value="TAC/TAC MENU page, not only a TAC option label." />
+          <Choices name="tac_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
         </View>
 
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="Left DDI shows FCS page" />
-          <Text name="fcs_page_visible_ai"
-                value="AI: $fcs_page_visible | $fcs_page_visible_note" />
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="supt_page_visible_label" value="SUPT page | AI: $supt_page_visible" />
+          <Text name="supt_page_visible_hint" value="SUPT/SUPT MENU page, not only a SUPT option label." />
+          <Choices name="supt_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
+        </View>
+
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="fcs_page_visible_label" value="FCS page | AI: $fcs_page_visible" />
+          <Text name="fcs_page_visible_hint" value="Dedicated FCS control page with LEF/TEF/AIL/RUD/STAB layout." />
           <Choices name="fcs_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
             <Choice value="seen" />
             <Choice value="not_seen" />
             <Choice value="uncertain" />
           </Choices>
-          <TextArea name="fcs_page_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
         </View>
 
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="BIT root page visible" />
-          <Text name="bit_root_page_visible_ai"
-                value="AI: $bit_root_page_visible | $bit_root_page_visible_note" />
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="fcs_page_x_marks_visible_label" value="FCS X marks | AI: $fcs_page_x_marks_visible" />
+          <Text name="fcs_page_x_marks_visible_hint" value="Literal X/fault fills inside FCS page boxes only." />
+          <Choices name="fcs_page_x_marks_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
+        </View>
+
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="bit_root_page_visible_label" value="BIT root | AI: $bit_root_page_visible" />
+          <Text name="bit_root_page_visible_hint" value="BIT FAILURES/root list, not the FCS-MC subpage." />
           <Choices name="bit_root_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
             <Choice value="seen" />
             <Choice value="not_seen" />
             <Choice value="uncertain" />
           </Choices>
-          <TextArea name="bit_root_page_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
         </View>
-
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="BIT failure page visible" />
-          <Text name="bit_page_failure_visible_ai"
-                value="AI: $bit_page_failure_visible | $bit_page_failure_visible_note" />
-          <Choices name="bit_page_failure_visible_review" toName="panel_image" choice="single-radio" showInline="true">
-            <Choice value="seen" />
-            <Choice value="not_seen" />
-            <Choice value="uncertain" />
-          </Choices>
-          <TextArea name="bit_page_failure_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
-        </View>
-
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="Right DDI shows FCSMC page" />
-          <Text name="right_ddi_fcsmc_page_visible_ai"
-                value="AI: $right_ddi_fcsmc_page_visible | $right_ddi_fcsmc_page_visible_note" />
-          <Choices name="right_ddi_fcsmc_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
-            <Choice value="seen" />
-            <Choice value="not_seen" />
-            <Choice value="uncertain" />
-          </Choices>
-          <TextArea name="right_ddi_fcsmc_page_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
-        </View>
-
       </View>
 
-      <!-- REVIEW COL 2 -->
-      <View style="width:50%;">
+      <!-- Column 2: FCS-MC subpage and result states -->
+      <View style="height:100%; overflow:hidden; display:flex; flex-direction:column; gap:5px;">
+        <Header value="FCS-MC BIT" />
 
-        <View style="padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="Right DDI shows IN TEST" />
-          <Text name="right_ddi_in_test_visible_ai"
-                value="AI: $right_ddi_in_test_visible | $right_ddi_in_test_visible_note" />
-          <Choices name="right_ddi_in_test_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="fcsmc_page_visible_label" value="FCS-MC page | AI: $fcsmc_page_visible" />
+          <Text name="fcsmc_page_visible_hint" value="Readable FCS-MC title with MC1/MC2/FCSA/FCSB rows." />
+          <Choices name="fcsmc_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
             <Choice value="seen" />
             <Choice value="not_seen" />
             <Choice value="uncertain" />
           </Choices>
-          <TextArea name="right_ddi_in_test_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
         </View>
 
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="FCS BIT result visible" />
-          <Text name="fcs_bit_result_visible_ai"
-                value="AI: $fcs_bit_result_visible | $fcs_bit_result_visible_note" />
-          <Choices name="fcs_bit_result_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="fcsmc_intermediate_result_visible_label" value="PBIT/intermediate | AI: $fcsmc_intermediate_result_visible" />
+          <Text name="fcsmc_intermediate_result_visible_hint" value="PBIT GO or pre-test result on FCS-MC page; not final GO." />
+          <Choices name="fcsmc_intermediate_result_visible_review" toName="panel_image" choice="single-radio" showInline="true">
             <Choice value="seen" />
             <Choice value="not_seen" />
             <Choice value="uncertain" />
           </Choices>
-          <TextArea name="fcs_bit_result_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
         </View>
 
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="AMPCD shows INS alignment page" />
-          <Text name="ins_alignment_page_visible_ai"
-                value="AI: $ins_alignment_page_visible | $ins_alignment_page_visible_note" />
-          <Choices name="ins_alignment_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="fcsmc_in_test_visible_label" value="IN TEST | AI: $fcsmc_in_test_visible" />
+          <Text name="fcsmc_in_test_visible_hint" value="FCSA/FCSB or relevant row clearly says IN TEST." />
+          <Choices name="fcsmc_in_test_visible_review" toName="panel_image" choice="single-radio" showInline="true">
             <Choice value="seen" />
             <Choice value="not_seen" />
             <Choice value="uncertain" />
           </Choices>
-          <TextArea name="ins_alignment_page_visible_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
         </View>
 
-        <View style="margin-top:8px; padding-bottom:6px; border-bottom:1px solid #333;">
-          <Header value="INS GO visible" />
-          <Text name="ins_go_ai"
-                value="AI: $ins_go | $ins_go_note" />
-          <Choices name="ins_go_review" toName="panel_image" choice="single-radio" showInline="true">
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="fcsmc_final_go_result_visible_label" value="Final GO | AI: $fcsmc_final_go_result_visible" />
+          <Text name="fcsmc_final_go_result_visible_hint" value="Final GO rows, especially FCSA and FCSB; not PBIT GO/IN TEST." />
+          <Choices name="fcsmc_final_go_result_visible_review" toName="panel_image" choice="single-radio" showInline="true">
             <Choice value="seen" />
             <Choice value="not_seen" />
             <Choice value="uncertain" />
           </Choices>
-          <TextArea name="ins_go_note_review"
-                    toName="panel_image"
-                    editable="true"
-                    rows="1"
-                    placeholder="Optional note..." />
+        </View>
+      </View>
+
+      <!-- Column 3: HSI page and INS alignment cues -->
+      <View style="height:100%; overflow:hidden; display:flex; flex-direction:column; gap:5px;">
+        <Header value="HSI / INS Cues" />
+
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="hsi_page_visible_label" value="HSI nav page | AI: $hsi_page_visible" />
+          <Text name="hsi_page_visible_hint" value="HSI navigation/POS page visible; this alone is not INS alignment evidence." />
+          <Choices name="hsi_page_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
         </View>
 
-        <View style="margin-top:8px;">
-          <Header value="Overall Comment" />
-          <TextArea name="overall_comment"
-                    toName="panel_image"
-                    editable="true"
-                    rows="2"
-                    placeholder="Optional overall comment..." />
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="hsi_map_layer_visible_label" value="HSI MAP layer | AI: $hsi_map_layer_visible" />
+          <Text name="hsi_map_layer_visible_hint" value="Colored terrain/chart MAP overlay; black symbology alone is not MAP." />
+          <Choices name="hsi_map_layer_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
         </View>
 
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="ins_grnd_alignment_text_visible_label" value="GRND/QUAL/TIME | AI: $ins_grnd_alignment_text_visible" />
+          <Text name="ins_grnd_alignment_text_visible_hint" value="Literal GRND alignment block with QUAL or TIME/countdown." />
+          <Choices name="ins_grnd_alignment_text_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
+        </View>
+
+        <View style="padding:5px; border:1px solid #444; border-radius:6px;">
+          <Text name="ins_ok_text_visible_label" value="INS OK | AI: $ins_ok_text_visible" />
+          <Text name="ins_ok_text_visible_hint" value="Readable OK near the QUAL/GRND alignment block." />
+          <Choices name="ins_ok_text_visible_review" toName="panel_image" choice="single-radio" showInline="true">
+            <Choice value="seen" />
+            <Choice value="not_seen" />
+            <Choice value="uncertain" />
+          </Choices>
+        </View>
       </View>
     </View>
+
+    <View style="display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:5px; border:1px solid #333; border-radius:6px;">
+      <Text name="human_tip" value="Review target facts first; use uncertain for blur/transition. AI notes are preserved but hidden to save vertical space." />
+      <TextArea name="overall_comment"
+                toName="panel_image"
+                editable="true"
+                rows="1"
+                placeholder="Optional overall comment..." />
+    </View>
+  </View>
+
+  <!-- Hidden note controls keep prediction/export field names compatible without making the page tall. -->
+  <View style="display:none;">
+    <TextArea name="tac_page_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="supt_page_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="fcs_page_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="fcs_page_x_marks_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="bit_root_page_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="fcsmc_page_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="fcsmc_intermediate_result_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="fcsmc_in_test_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="fcsmc_final_go_result_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="hsi_page_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="hsi_map_layer_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="ins_grnd_alignment_text_visible_note_review" toName="panel_image" editable="true" rows="1" />
+    <TextArea name="ins_ok_text_visible_note_review" toName="panel_image" editable="true" rows="1" />
   </View>
 </View>

@@ -1,0 +1,14 @@
+model,fact_id,accuracy,macro_f1,seen_precision,seen_recall,seen_f1,seen_false_positives,seen_false_negatives
+lora,tac_page_visible,0.96,0.63961,1.0,0.913043,0.954545,0,2
+lora,supt_page_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcs_page_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcs_page_x_marks_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,bit_root_page_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcsmc_page_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcsmc_intermediate_result_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcsmc_in_test_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,fcsmc_final_go_result_visible,0.98,0.596491,0.666667,1.0,0.8,1,0
+lora,hsi_page_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,hsi_map_layer_visible,1.0,0.666667,1.0,1.0,1.0,0,0
+lora,ins_grnd_alignment_text_visible,0.98,0.640523,0.976744,1.0,0.988235,1,0
+lora,ins_ok_text_visible,0.96,0.592593,0.666667,1.0,0.8,2,0

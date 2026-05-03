@@ -1,0 +1,124 @@
+{
+  "schema_version": "v1",
+  "input_path": "/mnt/l/documents/files/yu zhang tu clausthal/thesis/iefmmq/tools/.captures/fa18c-coldstart-run-003-v3.json",
+  "total_tasks": 220,
+  "reviewed_samples": 220,
+  "skipped_tasks": 0,
+  "exported_languages": [
+    "en",
+    "zh"
+  ],
+  "train_samples_by_lang": {
+    "en": 220,
+    "zh": 220
+  },
+  "missing_summary_count": 82,
+  "missing_notes_by_fact": {
+    "tac_page_visible": 0,
+    "supt_page_visible": 0,
+    "fcs_page_visible": 0,
+    "fcs_page_x_marks_visible": 0,
+    "bit_root_page_visible": 0,
+    "fcsmc_page_visible": 0,
+    "fcsmc_intermediate_result_visible": 0,
+    "fcsmc_in_test_visible": 0,
+    "fcsmc_final_go_result_visible": 0,
+    "hsi_page_visible": 0,
+    "hsi_map_layer_visible": 0,
+    "ins_grnd_alignment_text_visible": 0,
+    "ins_ok_text_visible": 0
+  },
+  "fact_state_counts": {
+    "tac_page_visible": {
+      "seen": 46,
+      "not_seen": 174,
+      "uncertain": 0
+    },
+    "supt_page_visible": {
+      "seen": 20,
+      "not_seen": 200,
+      "uncertain": 0
+    },
+    "fcs_page_visible": {
+      "seen": 30,
+      "not_seen": 190,
+      "uncertain": 0
+    },
+    "fcs_page_x_marks_visible": {
+      "seen": 16,
+      "not_seen": 204,
+      "uncertain": 0
+    },
+    "bit_root_page_visible": {
+      "seen": 18,
+      "not_seen": 202,
+      "uncertain": 0
+    },
+    "fcsmc_page_visible": {
+      "seen": 55,
+      "not_seen": 165,
+      "uncertain": 0
+    },
+    "fcsmc_intermediate_result_visible": {
+      "seen": 18,
+      "not_seen": 202,
+      "uncertain": 0
+    },
+    "fcsmc_in_test_visible": {
+      "seen": 18,
+      "not_seen": 202,
+      "uncertain": 0
+    },
+    "fcsmc_final_go_result_visible": {
+      "seen": 18,
+      "not_seen": 202,
+      "uncertain": 0
+    },
+    "hsi_page_visible": {
+      "seen": 106,
+      "not_seen": 114,
+      "uncertain": 0
+    },
+    "hsi_map_layer_visible": {
+      "seen": 79,
+      "not_seen": 141,
+      "uncertain": 0
+    },
+    "ins_grnd_alignment_text_visible": {
+      "seen": 58,
+      "not_seen": 162,
+      "uncertain": 0
+    },
+    "ins_ok_text_visible": {
+      "seen": 12,
+      "not_seen": 206,
+      "uncertain": 2
+    }
+  },
+  "length_stats": {
+    "summary_chars": {
+      "count": 220,
+      "min": 0,
+      "max": 416,
+      "avg": 114.6
+    },
+    "image_data_url_chars": {
+      "count": 220,
+      "min": 15842,
+      "max": 657298,
+      "avg": 277072.98
+    },
+    "assistant_chars_en": {
+      "count": 220,
+      "min": 962,
+      "max": 982,
+      "avg": 973.03
+    },
+    "assistant_chars_zh": {
+      "count": 220,
+      "min": 962,
+      "max": 982,
+      "avg": 973.03
+    }
+  }
+}

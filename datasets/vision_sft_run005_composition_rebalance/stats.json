@@ -1,0 +1,124 @@
+{
+  "schema_version": "v1",
+  "input_path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/tools/.captures/fa18c-coldstart-run-005-composition-rebalance.json",
+  "total_tasks": 122,
+  "reviewed_samples": 122,
+  "skipped_tasks": 0,
+  "exported_languages": [
+    "en",
+    "zh"
+  ],
+  "train_samples_by_lang": {
+    "en": 122,
+    "zh": 122
+  },
+  "missing_summary_count": 25,
+  "missing_notes_by_fact": {
+    "tac_page_visible": 0,
+    "supt_page_visible": 0,
+    "fcs_page_visible": 0,
+    "fcs_page_x_marks_visible": 0,
+    "bit_root_page_visible": 0,
+    "fcsmc_page_visible": 0,
+    "fcsmc_intermediate_result_visible": 0,
+    "fcsmc_in_test_visible": 0,
+    "fcsmc_final_go_result_visible": 0,
+    "hsi_page_visible": 0,
+    "hsi_map_layer_visible": 0,
+    "ins_grnd_alignment_text_visible": 0,
+    "ins_ok_text_visible": 0
+  },
+  "fact_state_counts": {
+    "tac_page_visible": {
+      "seen": 24,
+      "not_seen": 98,
+      "uncertain": 0
+    },
+    "supt_page_visible": {
+      "seen": 34,
+      "not_seen": 88,
+      "uncertain": 0
+    },
+    "fcs_page_visible": {
+      "seen": 40,
+      "not_seen": 79,
+      "uncertain": 3
+    },
+    "fcs_page_x_marks_visible": {
+      "seen": 18,
+      "not_seen": 104,
+      "uncertain": 0
+    },
+    "bit_root_page_visible": {
+      "seen": 43,
+      "not_seen": 78,
+      "uncertain": 1
+    },
+    "fcsmc_page_visible": {
+      "seen": 56,
+      "not_seen": 65,
+      "uncertain": 1
+    },
+    "fcsmc_intermediate_result_visible": {
+      "seen": 15,
+      "not_seen": 107,
+      "uncertain": 0
+    },
+    "fcsmc_in_test_visible": {
+      "seen": 19,
+      "not_seen": 103,
+      "uncertain": 0
+    },
+    "fcsmc_final_go_result_visible": {
+      "seen": 22,
+      "not_seen": 100,
+      "uncertain": 0
+    },
+    "hsi_page_visible": {
+      "seen": 109,
+      "not_seen": 13,
+      "uncertain": 0
+    },
+    "hsi_map_layer_visible": {
+      "seen": 37,
+      "not_seen": 85,
+      "uncertain": 0
+    },
+    "ins_grnd_alignment_text_visible": {
+      "seen": 72,
+      "not_seen": 48,
+      "uncertain": 2
+    },
+    "ins_ok_text_visible": {
+      "seen": 14,
+      "not_seen": 106,
+      "uncertain": 2
+    }
+  },
+  "length_stats": {
+    "summary_chars": {
+      "count": 122,
+      "min": 0,
+      "max": 338,
+      "avg": 129.34
+    },
+    "image_data_url_chars": {
+      "count": 122,
+      "min": 63594,
+      "max": 655362,
+      "avg": 265811.41
+    },
+    "assistant_chars_en": {
+      "count": 122,
+      "min": 958,
+      "max": 983,
+      "avg": 965.58
+    },
+    "assistant_chars_zh": {
+      "count": 122,
+      "min": 958,
+      "max": 983,
+      "avg": 965.58
+    }
+  }
+}

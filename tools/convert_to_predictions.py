@@ -8,14 +8,19 @@ from typing import Dict, List, Any
 
 
 FACT_FIELDS = [
+    "tac_page_visible",
+    "supt_page_visible",
     "fcs_page_visible",
+    "fcs_page_x_marks_visible",
     "bit_root_page_visible",
-    "bit_page_failure_visible",
-    "right_ddi_fcsmc_page_visible",
-    "right_ddi_in_test_visible",
-    "fcs_bit_result_visible",
-    "ins_alignment_page_visible",
-    "ins_go",
+    "fcsmc_page_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_final_go_result_visible",
+    "hsi_page_visible",
+    "hsi_map_layer_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
 ]
 
 VALID_STATES = {"seen", "not_seen", "uncertain"}

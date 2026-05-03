@@ -1,0 +1,116 @@
+{
+  "schema_version": "v1",
+  "input_path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/tools/.captures/prelabels_en_run002_holdout50_run003_prompt.json",
+  "total_tasks": 50,
+  "reviewed_samples": 50,
+  "skipped_tasks": 0,
+  "exported_languages": [
+    "en"
+  ],
+  "train_samples_by_lang": {
+    "en": 50
+  },
+  "missing_summary_count": 0,
+  "missing_notes_by_fact": {
+    "tac_page_visible": 0,
+    "supt_page_visible": 0,
+    "fcs_page_visible": 0,
+    "fcs_page_x_marks_visible": 0,
+    "bit_root_page_visible": 0,
+    "fcsmc_page_visible": 0,
+    "fcsmc_intermediate_result_visible": 0,
+    "fcsmc_in_test_visible": 0,
+    "fcsmc_final_go_result_visible": 0,
+    "hsi_page_visible": 0,
+    "hsi_map_layer_visible": 0,
+    "ins_grnd_alignment_text_visible": 0,
+    "ins_ok_text_visible": 0
+  },
+  "fact_state_counts": {
+    "tac_page_visible": {
+      "seen": 23,
+      "not_seen": 27,
+      "uncertain": 0
+    },
+    "supt_page_visible": {
+      "seen": 5,
+      "not_seen": 45,
+      "uncertain": 0
+    },
+    "fcs_page_visible": {
+      "seen": 13,
+      "not_seen": 37,
+      "uncertain": 0
+    },
+    "fcs_page_x_marks_visible": {
+      "seen": 1,
+      "not_seen": 49,
+      "uncertain": 0
+    },
+    "bit_root_page_visible": {
+      "seen": 9,
+      "not_seen": 41,
+      "uncertain": 0
+    },
+    "fcsmc_page_visible": {
+      "seen": 9,
+      "not_seen": 41,
+      "uncertain": 0
+    },
+    "fcsmc_intermediate_result_visible": {
+      "seen": 1,
+      "not_seen": 49,
+      "uncertain": 0
+    },
+    "fcsmc_in_test_visible": {
+      "seen": 6,
+      "not_seen": 44,
+      "uncertain": 0
+    },
+    "fcsmc_final_go_result_visible": {
+      "seen": 2,
+      "not_seen": 48,
+      "uncertain": 0
+    },
+    "hsi_page_visible": {
+      "seen": 49,
+      "not_seen": 1,
+      "uncertain": 0
+    },
+    "hsi_map_layer_visible": {
+      "seen": 27,
+      "not_seen": 23,
+      "uncertain": 0
+    },
+    "ins_grnd_alignment_text_visible": {
+      "seen": 42,
+      "not_seen": 8,
+      "uncertain": 0
+    },
+    "ins_ok_text_visible": {
+      "seen": 4,
+      "not_seen": 46,
+      "uncertain": 0
+    }
+  },
+  "length_stats": {
+    "summary_chars": {
+      "count": 50,
+      "min": 102,
+      "max": 273,
+      "avg": 154.64
+    },
+    "image_data_url_chars": {
+      "count": 50,
+      "min": 92098,
+      "max": 658230,
+      "avg": 392034.08
+    },
+    "assistant_chars_en": {
+      "count": 50,
+      "min": 958,
+      "max": 974,
+      "avg": 966.72
+    }
+  }
+}
