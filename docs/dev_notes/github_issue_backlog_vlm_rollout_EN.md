@@ -1,16 +1,16 @@
 # GitHub Issue Backlog for SimTutor VLM Rollout
 
-This file collects the English issue drafts that should be created on GitHub for the current SimTutor VLM rollout work.
+This file collects the English issue drafts and issue summaries for the current SimTutor VLM rollout work.
 
 Repository:
 
 - `https://github.com/ZombiesYard/IEFMMQ`
 - current branch in local worktree: `vlm-fineTune-Gemma`
 
-Important note:
+Current status:
 
-- The local `gh` CLI is installed, but the current GitHub token is invalid.
-- As a result, the issue texts are prepared here first and should be pushed to GitHub after re-authentication.
+- The corresponding GitHub issues have already been created.
+- This file is now primarily a local reference / backup copy of the issue texts.
 
 ---
 
