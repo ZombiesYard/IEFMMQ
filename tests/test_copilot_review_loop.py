@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tools.copilot_review_digest import PullRequestReviewDigest, ReviewComment, ReviewThread
 from tools.copilot_review_loop import (
+    default_bundle_output_path,
     FailedRunLog,
     PullRequestSnapshot,
     fetch_failed_log_text,
@@ -131,3 +132,7 @@ def test_fetch_failed_log_text_truncates_long_logs(monkeypatch) -> None:
     rendered = fetch_failed_log_text("ZombiesYard/IEFMMQ", 123, max_chars=20)
 
     assert rendered.endswith("...[truncated]...")
+
+
+def test_default_bundle_output_path_includes_pr_number() -> None:
+    assert default_bundle_output_path(206) == ".tmp/copilot_review_bundle_pr206.md"

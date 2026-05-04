@@ -103,6 +103,12 @@ python3 -m tools.copilot_review_loop --output .tmp/copilot_review_bundle.md
 python3 -m tools.copilot_review_loop --pr 205 --output .tmp/copilot_review_bundle.md
 ```
 
+如果你**不传 `--output`**，现在默认会写到当前 repo 的：
+
+```bash
+.tmp/copilot_review_bundle_pr205.md
+```
+
 ### 重新请求 Copilot review
 
 如果你已经 push 了修复，并且想显式再请求一次 Copilot review，可以用：
@@ -185,9 +191,9 @@ python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs
 这条命令会：
 
 - 先生成一个整理好的修复 prompt
-- 写到 `.tmp/copilot_review_bundle.md`
+- 默认写到 `.tmp/copilot_review_bundle_pr205.md`
 - 再调用 `codex exec`
-- 把 Codex 的最后总结写到 `.tmp/copilot_autofix_last_message.md`
+- 把 Codex 的最后总结默认写到 `.tmp/copilot_autofix_last_message_pr205.md`
 
 ### 先只看命令，不真正执行
 

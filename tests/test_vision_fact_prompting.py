@@ -62,6 +62,20 @@ def test_vision_fact_prompt_example_matches_aligned_response_shape_in_en() -> No
     )
 
 
+def test_vision_fact_prompt_describes_one_or_two_images_when_multiple_frames_are_available() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={
+            "frame_ids": ["1772872444950_000122", "1772872445010_000123"],
+            "frame_id": "1772872444950_000122",
+        },
+        lang="en",
+        config=_minimal_config(),
+    )
+
+    assert "The input contains one or two composite-panel images" in prompt
+    assert "pre-trigger frame first and trigger frame second" in prompt
+
+
 def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
@@ -73,7 +87,7 @@ def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
     assert '"step_bindings":{}' in prompt
 
 
-def test_vision_fact_prompt_mentions_tac_supt_and_real_fcs_page_boundaries() -> None:
+def test_vision_fact_prompt_mentions_tac_supt_navigation_cues_and_real_fcs_page_boundaries() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="zh",
@@ -83,10 +97,24 @@ def test_vision_fact_prompt_mentions_tac_supt_and_real_fcs_page_boundaries() -> 
     assert "tac_page_visible" in prompt
     assert "supt_page_visible" in prompt
     assert "fcs_page_visible" in prompt
-    assert "页面选项标签不等于页面本身" in prompt
+    assert "除了 tac_page_visible 和 supt_page_visible 之外" in prompt
+    assert "tac_page_visible 就是单独小的 TAC/MENU 导航标签可见" in prompt
+    assert "supt_page_visible 就是单独小的 SUPT 选项标签可见" in prompt
     assert "PB18" in prompt
     assert "PB15" in prompt
     assert "LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS" in prompt
+
+
+def test_vision_fact_prompt_en_aligns_tac_supt_special_cases_with_zh() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="en",
+        config=_minimal_config(),
+    )
+
+    assert "Except for tac_page_visible and supt_page_visible" in prompt
+    assert "tac_page_visible means a small TAC/MENU navigation label is visible." in prompt
+    assert "supt_page_visible means a small SUPT option label is visible." in prompt
 
 
 def test_vision_fact_prompt_explicitly_distinguishes_bit_root_and_fcsmc_states() -> None:

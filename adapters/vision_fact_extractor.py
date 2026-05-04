@@ -49,6 +49,7 @@ def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
                     "properties": {
                         "fact_id": {"type": "string", "enum": list(fact_ids)},
                         "state": {"type": "string", "enum": ["seen", "not_seen", "uncertain"]},
+                        "source_frame_id": {"type": "string", "minLength": 1},
                         "evidence_note": {"type": "string", "minLength": 0, "maxLength": 240},
                     },
                 },
@@ -227,6 +228,7 @@ class VisionFactExtractor:
             )
 
         result_status = "available"
+        model_summary = observation.summary if isinstance(observation.summary, str) and observation.summary.strip() else None
         summary = build_vision_fact_summary(
             {fact.fact_id: fact.to_dict() for fact in observation.facts},
             status=result_status,
@@ -237,22 +239,25 @@ class VisionFactExtractor:
             result_status = "uncertain"
             summary["status"] = result_status
         observation.summary = summary["summary_text"]
-        observation.metadata = {
-            **dict(observation.metadata),
-            "vision_fact_summary": summary,
-        }
+        observation_metadata = {**dict(observation.metadata), "vision_fact_summary": summary}
+        if model_summary is not None:
+            observation_metadata["model_summary"] = model_summary
+        observation.metadata = observation_metadata
         if self.log_raw_llm_text:
             observation.metadata["raw_llm_text"] = raw_text
+        result_metadata = {
+            "frame_ids": frame_ids,
+            "multimodal_failed_frame_ids": list(built["failed_frame_ids"]),
+            "multimodal_frame_failures": dict(built["frame_failures"]),
+            "vision_fact_summary": summary,
+            "raw_llm_text": raw_text if self.log_raw_llm_text else "",
+        }
+        if model_summary is not None:
+            result_metadata["model_summary"] = model_summary
         return VisionFactExtractionResult(
             status=result_status,
             observation=observation,
-            metadata={
-                "frame_ids": frame_ids,
-                "multimodal_failed_frame_ids": list(built["failed_frame_ids"]),
-                "multimodal_frame_failures": dict(built["frame_failures"]),
-                "vision_fact_summary": summary,
-                "raw_llm_text": raw_text if self.log_raw_llm_text else "",
-            },
+            metadata=result_metadata,
         )
 
     def _candidate_frames(self, vision: Mapping[str, Any]) -> list[dict[str, Any]]:

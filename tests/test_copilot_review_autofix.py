@@ -4,9 +4,11 @@ from pathlib import Path
 
 from tools.copilot_review_autofix import (
     build_codex_exec_command,
+    default_last_message_output_path,
     get_current_branch,
     has_staged_changes,
     render_autofix_prompt,
+    resolve_codex_binary,
     run_git,
     write_text,
 )
@@ -30,6 +32,7 @@ def test_build_codex_exec_command_includes_selected_options(tmp_path: Path) -> N
     last_message_path = tmp_path / "last.md"
 
     cmd = build_codex_exec_command(
+        codex_bin="/usr/local/bin/codex",
         prompt_path=prompt_path,
         last_message_path=last_message_path,
         model="gpt-5.5",
@@ -38,7 +41,7 @@ def test_build_codex_exec_command_includes_selected_options(tmp_path: Path) -> N
         approval_policy="never",
     )
 
-    assert cmd[:2] == ["codex", "exec"]
+    assert cmd[:2] == ["/usr/local/bin/codex", "exec"]
     assert "-m" in cmd and "gpt-5.5" in cmd
     assert "-p" in cmd and "default" in cmd
     assert "-s" in cmd and "workspace-write" in cmd
@@ -88,3 +91,24 @@ def test_has_staged_changes_checks_git_diff_exit_code(monkeypatch) -> None:
 
     monkeypatch.setattr("tools.copilot_review_autofix.subprocess.run", lambda *args, **kwargs: Result(0))
     assert has_staged_changes() is False
+
+
+def test_resolve_codex_binary_prefers_explicit_existing_path(tmp_path: Path) -> None:
+    codex_path = tmp_path / "codex"
+    codex_path.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    resolved = resolve_codex_binary(str(codex_path))
+
+    assert resolved == str(codex_path)
+
+
+def test_resolve_codex_binary_uses_which(monkeypatch) -> None:
+    monkeypatch.setattr("tools.copilot_review_autofix.shutil.which", lambda candidate: "/usr/bin/codex" if candidate == "codex" else None)
+
+    resolved = resolve_codex_binary("")
+
+    assert resolved == "/usr/bin/codex"
+
+
+def test_default_last_message_output_path_includes_pr_number() -> None:
+    assert default_last_message_output_path(206) == ".tmp/copilot_autofix_last_message_pr206.md"

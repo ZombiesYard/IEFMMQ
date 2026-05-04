@@ -19,6 +19,9 @@ from tools.copilot_review_digest import (
 )
 
 
+DEFAULT_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_review_bundle_pr{pr}.md"
+
+
 @dataclass(frozen=True)
 class PullRequestSnapshot:
     repo: str
@@ -57,7 +60,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         default="",
-        help="Optional output file path. Defaults to stdout.",
+        help="Optional output file path. Defaults to .tmp/copilot_review_bundle_pr<PR>.md.",
     )
     parser.add_argument(
         "--request-copilot-review",
@@ -313,6 +316,10 @@ def write_output(text: str, output_path: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def default_bundle_output_path(pr_number: int) -> str:
+    return DEFAULT_BUNDLE_OUTPUT_TEMPLATE.format(pr=pr_number)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
@@ -342,7 +349,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ]
             )
 
-        write_output(rendered, args.output)
+        output_path = args.output or default_bundle_output_path(pr_number)
+        write_output(rendered, output_path)
+        print(f"Review bundle written to: {output_path}")
+        print(f"PR #{snapshot.number}: {snapshot.title}")
+        print(f"Copilot threads included: {len(digest.threads)}")
+        if args.include_failed_run_logs:
+            print(f"Failed run logs included: {len(failed_run_logs)}")
         return 0
     except Exception as exc:  # pragma: no cover - exercised via CLI behavior
         parser.exit(
