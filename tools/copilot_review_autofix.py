@@ -13,9 +13,7 @@ from typing import Sequence
 
 from tools.copilot_review_digest import build_digest, resolve_pr_number, resolve_repo_slug
 from tools.copilot_review_loop import (
-    DEFAULT_BUNDLE_OUTPUT_TEMPLATE,
     FailedRunLog,
-    default_bundle_output_path,
     fetch_failed_run_logs,
     fetch_snapshot,
     request_copilot_review,
@@ -23,6 +21,7 @@ from tools.copilot_review_loop import (
 )
 
 
+DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_bundle_pr{pr}.md"
 DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_last_message_pr{pr}.md"
 DEFAULT_CODEX_CANDIDATES = ("codex",)
 
@@ -63,7 +62,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--bundle-output",
         default="",
-        help=f"Where to write the generated Codex bundle prompt. Defaults to {DEFAULT_BUNDLE_OUTPUT_TEMPLATE}.",
+        help=f"Where to write the generated Codex bundle prompt. Defaults to {DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE}.",
     )
     parser.add_argument(
         "--last-message-output",
@@ -172,6 +171,10 @@ def write_text(path_text: str, content: str) -> Path:
 
 def default_last_message_output_path(pr_number: int) -> str:
     return DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE.format(pr=pr_number)
+
+
+def default_autofix_bundle_output_path(pr_number: int) -> str:
+    return DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE.format(pr=pr_number)
 
 
 def build_codex_exec_command(
@@ -302,7 +305,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         bundle_text = render_bundle_codex_zh(snapshot, digest, failed_run_logs)
         prompt_text = render_autofix_prompt(bundle_text, repo=repo, pr_number=pr_number)
 
-        bundle_output = args.bundle_output or default_bundle_output_path(pr_number)
+        bundle_output = args.bundle_output or default_autofix_bundle_output_path(pr_number)
         last_message_output = args.last_message_output or default_last_message_output_path(pr_number)
         bundle_path = write_text(bundle_output, prompt_text)
         last_message_path = Path(last_message_output)

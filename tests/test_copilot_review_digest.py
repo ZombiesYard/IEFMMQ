@@ -148,6 +148,35 @@ def test_normalize_threads_can_filter_to_latest_commit_window() -> None:
     assert threads[0].comments[0].body == "New Copilot note."
 
 
+def test_normalize_threads_excludes_unparseable_created_at_when_latest_commit_filter_is_enabled() -> None:
+    raw_threads = [
+        {
+            "isResolved": False,
+            "path": "adapters/example.py",
+            "line": 42,
+            "originalLine": 42,
+            "comments": {
+                "nodes": [
+                    {
+                        "body": "Timestamp is malformed.",
+                        "url": "https://example.test/comment/3",
+                        "createdAt": "not-a-timestamp",
+                        "author": {"login": "github-copilot[bot]"},
+                    },
+                ]
+            },
+        },
+    ]
+
+    threads = normalize_threads(
+        raw_threads,
+        include_resolved=False,
+        created_after=_parse_github_datetime("2026-05-03T12:05:00Z"),
+    )
+
+    assert threads == ()
+
+
 def test_resolve_pr_number_uses_current_branch_when_no_explicit_pr(monkeypatch) -> None:
     monkeypatch.setattr("tools.copilot_review_digest._run_git", lambda *args: "feature/test")
     monkeypatch.setattr(

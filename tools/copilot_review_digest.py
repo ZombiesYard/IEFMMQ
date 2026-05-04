@@ -306,7 +306,7 @@ def normalize_threads(
                 created_at = str(raw.get("createdAt") or "").strip()
                 if created_after is not None:
                     created_at_dt = _parse_github_datetime(created_at)
-                    if created_at_dt is not None and created_at_dt < created_after:
+                    if created_at_dt is None or created_at_dt < created_after:
                         continue
                 body = _normalize_body(str(raw.get("body") or ""))
                 comments.append(
