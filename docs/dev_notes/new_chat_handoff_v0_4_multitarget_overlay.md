@@ -1,6 +1,7 @@
-# New Chat Handoff: v0.4 Runtime Status and Pending Issues
+# New Chat Handoff: v0.4 Runtime Status and Working Conventions
 
-这份文档用于开启一个**新对话**时，向新的 Codex 说明仓库背景、工程约束、当前系统状态，以及**当前推荐优先 issue**。  
+这份文档用于开启一个**新对话**时，向新的 Codex 说明仓库背景、工程约束、当前系统状态，以及通用工作方式。  
+它是**长期有效的通用 handoff**，不是某一个固定 issue 的任务说明。  
 可直接把本文件内容贴给新对话，或让新对话先读取本文件。
 
 ---
@@ -289,9 +290,12 @@ Schema 规则：
 
 - 系统整体**已经能跑**
 - 单帧 help 模式**已经能正确生成回复和高亮**
-- 多目标高亮**看起来大概率已经能成功**，但还需要更系统化测试
+- 多目标高亮**已有一定基础**，但是否需要补测试、补契约或补执行路径，应以当前 issue 为准
 - 线上 / 当前接入的 VLM 仍是**阿里云的原版未微调模型**
 - 下一阶段目标是：在 `yz50@cloud-247.rz.tu-clausthal.de` 那台 H100 机器上部署 VLM，并接入**微调后的 Qwen 或 Gemma adapter**
+
+当前实验与训练侧的**事实 ontology 基线已经稳定为 13 facts**。  
+如果某个具体 issue 仍在讨论旧 runtime contract、旧 fact IDs 或迁移问题，应以对应的 issue 文档或 GitHub issue 为准，而不是把“仍未切到 13 facts”当作全局事实。
 
 关于模型兼容性，有一个必须牢记的约束：
 
@@ -307,34 +311,26 @@ Schema 规则：
 
 ---
 
-## 12. Recommended Next Issue
+## 12. Task Selection Rule
 
-如果新对话没有收到用户重新指定的 issue，**推荐优先处理下面这个 issue**：
+新对话开始时，**永远以用户当前明确指定的任务为准**。  
+如果用户给了：
 
-**测试多个按钮高亮，并通过 fake LLM 的 JSON 返回多个 overlay targets，至少包含 `fcs_bit_switch` 和 `right_mdi_pb5`。**
+- GitHub issue 编号
+- PR 编号
+- 本地 `docs/dev_notes/issue_*.md`
+- 明确的自然语言任务描述
 
-这个 issue 的核心是：
+就应优先处理它，而不是自行从 backlog 中挑选任务。
 
-1. 验证当前系统是否能接受**多目标 overlay/highlight**
-2. 使用 fake LLM / fake model 返回结构化 JSON
-3. JSON 中包含多个高亮目标
-4. 目标至少包括：
-   - `fcs_bit_switch`
-   - `right_mdi_pb5`
-5. 测试当前链路是否能正确：
-   - 解析模型输出
-   - 映射为多个 overlay actions
-   - 通过 allowlist 校验
-   - 执行到 overlay sender / action executor 层
-6. 只能测试高亮，不允许引入任何自动点击或自动执行
-
-但这不是唯一待办。当前还有一组已经识别出来的高优先级 / 中优先级问题，见下面的“Open Issue Backlog”。
+如果用户没有明确给出任务，才可以把下面的 backlog 当作候选池，并先向用户确认或在回复里说明你准备处理哪一项。
 
 ---
 
 ## 13. Open Issue Backlog
 
-以下 issue 都已经明确，适合拆成独立 GitHub issues：
+以下条目是**候选问题池 / 历史待办方向**。  
+它们不自动构成“当前任务”，也不应覆盖用户在当前对话里显式指定的 issue。
 
 1. **Align runtime VLM contract with the Run-003 / Run-005 fine-tuned 13-fact adapter**
    - 运行时 prompt / schema / step bindings 仍与训练侧分叉
@@ -372,110 +368,46 @@ Schema 规则：
 
 ---
 
-## 14. Very Likely Relevant Files
+## 14. How to Start Any New Issue
 
-新对话开始时，建议优先查看这些文件：
+收到当前 issue 后，建议按这个顺序做：
 
-### 直接相关实现
+1. 读取任务来源
+   - 如果用户给了 GitHub issue 编号，优先使用：
+     `gh issue view <ISSUE_NUMBER> --repo ZombiesYard/IEFMMQ`
+   - 如果用户同时给了本地 `docs/dev_notes/issue_*.md`，把它作为仓库内部补充背景
+   - 如果两者冲突，以 GitHub issue 为主，并明确指出冲突点
 
-- `adapters/openai_compat_model.py`
-- `adapters/base_help_model.py`
-- `adapters/action_executor.py`
-- `adapters/response_mapping.py`
-- `core/overlay.py`
-- `packs/fa18c_startup/ui_map.yaml`
-
-### 直接相关测试
-
-- `tests/test_openai_compat_model.py`
-- `tests/adapters/test_action_executor.py`
-- `tests/test_overlay_planner.py`
-
-### 额外相关线索
-
-- `adapters/prompting.py`
-- `core/llm_schema.py`
-- `packs/fa18c_startup/pack.yaml`
-
----
-
-## 15. Important Existing Clues Already Found
-
-仓库里已经能找到和“多目标高亮”非常相关的现有线索，不要从零开始乱做：
-
-### 在 `tests/test_openai_compat_model.py`
-
-已存在与 `fcs_bit_switch` 和 `right_mdi_pb5` 相关的多目标断言线索，例如：
-
-- `targets: ["fcs_bit_switch", "right_mdi_pb5"]`
-- `assert [action["target"] for action in res.actions] == ["fcs_bit_switch", "right_mdi_pb5"]`
-
-### 在 `tests/adapters/test_action_executor.py`
-
-已存在多目标执行相关断言，例如：
-
-- `assert [item["target"] for item in report.executed] == ["fcs_bit_switch", "right_mdi_pb5"]`
-
-### 在 `adapters/prompting.py`
-
-已经出现多目标语义约束：
-
-- 当系统允许多目标时，`overlay.targets` 应同时返回 `fcs_bit_switch` 与 `right_mdi_pb5`
-
-这说明：
-
-- 当前仓库**并不是完全没有多目标概念**
-- 很可能已经有部分实现或半实现
-- 当前 issue 更像是：**把“多目标高亮”测试补齐、打通、或修正到稳定可用**
-
----
-
-## 16. Expected Workflow for the New Chat
-
-收到当前 issue 后，必须按这个顺序做：
-
-1. 仓库勘探
+2. 仓库勘探
    - 列出关键目录与相关文件
-   - grep 定位 contracts / tests / overlay / model adapter / ui_map
+   - 使用 `rg` / `grep` 定位 contracts / tests / adapters / packs / schemas / 调用链
 
-2. 明确将修改 / 新增的文件清单
+3. 明确将修改 / 新增的文件清单
 
-3. 给出简短实现计划
-   - 当前系统是否已经部分支持多目标
-   - 是补测试、补解析、还是补执行路径
+4. 给出简短实现计划
 
-4. 如有必要，先写 failing tests
+5. 如有必要，先写 failing tests
 
-5. 实现最小必要代码
+6. 实现最小必要代码
 
-6. 跑测试并修到全绿
+7. 跑测试并修到全绿
 
-7. 输出 PR 风格总结
+8. 输出 PR 风格总结
    - 改了什么
    - 如何运行
-- 如何测试
-- 已知限制
+   - 如何测试
+   - 已知限制
 
 ---
 
-## 17. Acceptance Intent for the Multi-Target Overlay Issue
+## 15. Suggested Generic Prompt for a New Chat
 
-如果当前处理的是“多目标高亮测试”这个 issue，至少应满足以下结果：
+可以把下面这段作为新对话的通用开头模板：
 
-- fake LLM JSON 可以表达多个 overlay target
-- `fcs_bit_switch` 与 `right_mdi_pb5` 能一起通过当前系统链路
-- 测试清楚验证多目标高亮行为
-- 不破坏单目标高亮现有逻辑
-- 不引入自动点击
-- 不扩大为其他 feature
-
----
-
-## 18. Suggested Starting Prompt for the New Chat
-
-可以把下面这段作为新对话的开头：
-
-> 请先阅读 `docs/dev_notes/new_chat_handoff_v0_4_multitarget_overlay.md`。  
-> 先根据文档里的当前系统状态与 open issue backlog 做仓库勘探。  
-> 如果我没有另外指定 issue，请优先实现多目标高亮测试这一项：通过 fake LLM 的 JSON 返回多个 overlay targets，至少包含 `fcs_bit_switch` 和 `right_mdi_pb5`，验证当前系统从模型输出到 overlay/action executor 的多目标高亮链路。  
-> 所有回复请用中文，遵守文档里的架构、安全边界、TDD 和 scope 约束；同时注意运行时 VLM 契约目前与微调 adapter 的 13-fact 契约存在分叉，不要忽略这一背景。
+> 请使用 karpathy-guidelines skill。  
+> 先阅读 `docs/dev_notes/new_chat_handoff_v0_4_multitarget_overlay.md`。  
+> 当前唯一任务由我在本条消息中明确指定；请忽略 handoff 文档里的 backlog 候选项，不要自行挑选别的任务。  
+> 如果我给了 GitHub issue 编号，请先用 `gh issue view <ISSUE_NUMBER> --repo ZombiesYard/IEFMMQ` 读取 issue；如果我同时给了本地 `docs/dev_notes/issue_*.md`，再把它作为补充背景。  
+> 先做仓库勘探和 grep 定位，不要直接改代码。  
+> 请先给我：GitHub issue 摘要、关键调用链、计划修改文件清单、实施计划，然后再开始改代码。  
+> 所有回复请使用中文，并遵守本文档中的架构、安全边界、TDD 和 scope 约束。
