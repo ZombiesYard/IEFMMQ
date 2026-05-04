@@ -26,6 +26,8 @@ from adapters.vision_fact_prompting import build_vision_fact_prompt
 from core.types_v2 import VisionFact, VisionFactObservation
 from core.vision_facts import build_vision_fact_summary, load_vision_facts_config
 
+_ALLOWED_MODEL_FACT_STATES = frozenset({"seen", "not_seen", "uncertain"})
+
 
 def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
     return {
@@ -77,11 +79,14 @@ def _sanitize_model_response(
                 skipped_non_mapping_fact_count += 1
                 continue
             fact_id = item.get("fact_id")
+            state = item.get("state")
+            evidence_note = item.get("evidence_note")
             has_required_fields = (
                 isinstance(fact_id, str)
                 and bool(fact_id)
-                and "state" in item
-                and "evidence_note" in item
+                and isinstance(state, str)
+                and state in _ALLOWED_MODEL_FACT_STATES
+                and isinstance(evidence_note, str)
             )
             if not has_required_fields:
                 skipped_incomplete_mapping_fact_count += 1
@@ -95,10 +100,8 @@ def _sanitize_model_response(
             fact["fact_id"] = fact_id
             if ignored_fields:
                 ignored[fact_id] = sorted(ignored_fields)
-            if "state" in item:
-                fact["state"] = item.get("state")
-            if "evidence_note" in item:
-                fact["evidence_note"] = item.get("evidence_note")
+            fact["state"] = state
+            fact["evidence_note"] = evidence_note
             sanitized_facts.append(fact)
         sanitized["facts"] = sanitized_facts
 
@@ -468,6 +471,9 @@ class VisionFactExtractor:
         obj, _ = parse_first_json(raw_text)
         if not isinstance(obj, Mapping):
             raise ValueError("vision fact response must be a JSON object")
+        raw_facts = obj.get("facts")
+        if raw_facts is not None and not isinstance(raw_facts, list):
+            raise ValueError("vision fact response facts must be a list")
         sanitized_obj, ignored_fact_fields, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count = _sanitize_model_response(obj)
         self._response_validator.validate(sanitized_obj)
         facts_raw = sanitized_obj.get("facts")
@@ -525,6 +531,7 @@ class VisionFactExtractor:
                 "raw_fact_count": len(facts_raw),
                 "configured_fact_count": len(self._fact_ids),
                 "coerced_source_frame_fact_ids": ignored_legacy_source_frame_fact_ids,
+                "coerced_source_frame_fact_ids_alias_of": "ignored_legacy_source_frame_fact_ids",
                 "ignored_legacy_source_frame_fact_ids": ignored_legacy_source_frame_fact_ids,
                 "ignored_model_fact_fields": ignored_fact_fields,
                 "skipped_non_mapping_fact_count": skipped_non_mapping_fact_count,

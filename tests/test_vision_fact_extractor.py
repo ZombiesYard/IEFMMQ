@@ -46,7 +46,7 @@ def _vision_context(primary: Path, secondary: Path | None = None) -> dict[str, o
     return payload
 
 
-def _chat_payload(facts: list[dict[str, object]]) -> dict[str, object]:
+def _chat_payload(facts: list[object]) -> dict[str, object]:
     return {
         "choices": [
             {
@@ -284,6 +284,7 @@ def test_vision_fact_extractor_attaches_default_source_frame_id_when_model_omits
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["supt_page_visible"].source_frame_id == "1772872445010_000123"
     assert result.observation.metadata["coerced_source_frame_fact_ids"] == []
+    assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == []
     assert result.observation.metadata["ignored_model_fact_fields"] == {}
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 0
@@ -326,6 +327,7 @@ def test_vision_fact_extractor_ignores_legacy_source_frame_id_from_model(tmp_pat
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["fcsmc_page_visible"].source_frame_id == "1772872444950_000122"
     assert result.observation.metadata["coerced_source_frame_fact_ids"] == ["fcsmc_page_visible"]
+    assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == ["fcsmc_page_visible"]
     assert result.observation.metadata["ignored_model_fact_fields"] == {
         "fcsmc_page_visible": ["source_frame_id"]
@@ -371,6 +373,7 @@ def test_vision_fact_extractor_ignores_other_legacy_model_only_fields(tmp_path: 
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["fcsmc_page_visible"].source_frame_id == "1772872444950_000122"
     assert result.observation.metadata["coerced_source_frame_fact_ids"] == ["fcsmc_page_visible"]
+    assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == ["fcsmc_page_visible"]
     assert result.observation.metadata["ignored_model_fact_fields"] == {
         "fcsmc_page_visible": ["confidence", "source_frame_id"]
@@ -413,6 +416,7 @@ def test_vision_fact_extractor_skips_non_mapping_fact_entries_and_tracks_count(t
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["supt_page_visible"].state == "seen"
     assert result.observation.metadata["coerced_source_frame_fact_ids"] == []
+    assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == []
     assert result.observation.metadata["ignored_model_fact_fields"] == {}
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 1
@@ -457,10 +461,87 @@ def test_vision_fact_extractor_skips_incomplete_mapping_fact_entries_and_tracks_
     assert facts_by_id["supt_page_visible"].state == "seen"
     assert facts_by_id["fcsmc_page_visible"].state == "uncertain"
     assert result.observation.metadata["coerced_source_frame_fact_ids"] == []
+    assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == []
     assert result.observation.metadata["ignored_model_fact_fields"] == {}
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 0
     assert result.observation.metadata["skipped_incomplete_mapping_fact_count"] == 1
+
+
+def test_vision_fact_extractor_skips_invalid_typed_mapping_fact_entries_and_tracks_count(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "supt_page_visible",
+                            "state": "seen",
+                            "evidence_note": "Left DDI clearly shows the SUPT page.",
+                        },
+                        {
+                            "fact_id": "fcsmc_page_visible",
+                            "state": 1,
+                            "evidence_note": None,
+                        },
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
+    assert facts_by_id["supt_page_visible"].state == "seen"
+    assert facts_by_id["fcsmc_page_visible"].state == "uncertain"
+    assert result.observation.metadata["skipped_non_mapping_fact_count"] == 0
+    assert result.observation.metadata["skipped_incomplete_mapping_fact_count"] == 1
+
+
+def test_vision_fact_extractor_raises_clear_error_when_facts_is_not_a_list(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps({"facts": "bad"}, ensure_ascii=False),
+                            }
+                        }
+                    ]
+                }
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.status == "extractor_failed"
+    assert result.error is not None
+    assert "vision fact response facts must be a list" in result.error
 
 
 def test_vision_fact_extractor_preserves_model_summary_in_metadata(tmp_path: Path) -> None:
