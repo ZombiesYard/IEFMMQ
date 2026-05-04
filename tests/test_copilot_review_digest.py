@@ -5,6 +5,7 @@ from tools.copilot_review_digest import (
     ReviewComment,
     ReviewThread,
     _parse_repo_slug,
+    _parse_github_datetime,
     is_copilot_login,
     normalize_threads,
     render_codex_prompt_zh,
@@ -108,6 +109,72 @@ def test_render_codex_prompt_zh_contains_review_location_and_comment() -> None:
     assert "Location: core/example.py:17" in rendered
     assert "This branch looks untested." in rendered
     assert "你准备拒绝的 review items 及理由" in rendered
+
+
+def test_normalize_threads_can_filter_to_latest_commit_window() -> None:
+    raw_threads = [
+        {
+            "isResolved": False,
+            "path": "adapters/example.py",
+            "line": 42,
+            "originalLine": 42,
+            "comments": {
+                "nodes": [
+                    {
+                        "body": "Old Copilot note.",
+                        "url": "https://example.test/comment/1",
+                        "createdAt": "2026-05-03T12:00:00Z",
+                        "author": {"login": "github-copilot[bot]"},
+                    },
+                    {
+                        "body": "New Copilot note.",
+                        "url": "https://example.test/comment/2",
+                        "createdAt": "2026-05-03T12:10:00Z",
+                        "author": {"login": "github-copilot[bot]"},
+                    },
+                ]
+            },
+        },
+    ]
+
+    threads = normalize_threads(
+        raw_threads,
+        include_resolved=False,
+        created_after=_parse_github_datetime("2026-05-03T12:05:00Z"),
+    )
+
+    assert len(threads) == 1
+    assert len(threads[0].comments) == 1
+    assert threads[0].comments[0].body == "New Copilot note."
+
+
+def test_normalize_threads_excludes_unparseable_created_at_when_latest_commit_filter_is_enabled() -> None:
+    raw_threads = [
+        {
+            "isResolved": False,
+            "path": "adapters/example.py",
+            "line": 42,
+            "originalLine": 42,
+            "comments": {
+                "nodes": [
+                    {
+                        "body": "Timestamp is malformed.",
+                        "url": "https://example.test/comment/3",
+                        "createdAt": "not-a-timestamp",
+                        "author": {"login": "github-copilot[bot]"},
+                    },
+                ]
+            },
+        },
+    ]
+
+    threads = normalize_threads(
+        raw_threads,
+        include_resolved=False,
+        created_after=_parse_github_datetime("2026-05-03T12:05:00Z"),
+    )
+
+    assert threads == ()
 
 
 def test_resolve_pr_number_uses_current_branch_when_no_explicit_pr(monkeypatch) -> None:

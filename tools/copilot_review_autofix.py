@@ -5,7 +5,9 @@ Generate a Codex autofix prompt from Copilot review context and run `codex exec`
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+import shutil
 import subprocess
 from typing import Sequence
 
@@ -19,8 +21,9 @@ from tools.copilot_review_loop import (
 )
 
 
-DEFAULT_BUNDLE_OUTPUT = ".tmp/copilot_review_bundle.md"
-DEFAULT_LAST_MESSAGE_OUTPUT = ".tmp/copilot_autofix_last_message.md"
+DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_review_bundle.md"
+DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_last_message.md"
+DEFAULT_CODEX_CANDIDATES = ("codex",)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -33,6 +36,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--include-resolved",
         action="store_true",
         help="Include resolved Copilot review threads in the digest.",
+    )
+    parser.add_argument(
+        "--since-latest-commit",
+        action="store_true",
+        help="Only include Copilot comments created after the PR's latest head commit.",
     )
     parser.add_argument(
         "--include-failed-run-logs",
@@ -53,18 +61,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--bundle-output",
-        default=DEFAULT_BUNDLE_OUTPUT,
-        help="Where to write the generated Codex bundle prompt.",
+        default="",
+        help=f"Where to write the generated Codex bundle prompt. Defaults to {DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE}.",
     )
     parser.add_argument(
         "--last-message-output",
-        default=DEFAULT_LAST_MESSAGE_OUTPUT,
-        help="Where to write the last Codex message.",
+        default="",
+        help="Where to write the last Codex message. Defaults to .tmp/copilot_autofix_last_message.md.",
     )
     parser.add_argument(
         "--codex-model",
         default="",
         help="Optional model override for `codex exec`.",
+    )
+    parser.add_argument(
+        "--codex-bin",
+        default="",
+        help="Optional explicit path to the `codex` executable. Defaults to auto-detection.",
     )
     parser.add_argument(
         "--codex-profile",
@@ -156,8 +169,19 @@ def write_text(path_text: str, content: str) -> Path:
     return path
 
 
+def default_last_message_output_path(pr_number: int) -> str:
+    del pr_number
+    return DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE
+
+
+def default_autofix_bundle_output_path(pr_number: int) -> str:
+    del pr_number
+    return DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE
+
+
 def build_codex_exec_command(
     *,
+    codex_bin: str,
     prompt_path: Path,
     last_message_path: Path,
     model: str,
@@ -166,7 +190,7 @@ def build_codex_exec_command(
     approval_policy: str,
 ) -> list[str]:
     cmd = [
-        "codex",
+        codex_bin,
         "exec",
         "-C",
         str(Path.cwd()),
@@ -184,6 +208,29 @@ def build_codex_exec_command(
         insert_at = 2 if not model else 4
         cmd[insert_at:insert_at] = ["-p", profile]
     return cmd
+
+
+def _is_executable_file(path_text: str) -> bool:
+    path = Path(path_text)
+    return path.is_file() and os.access(path, os.X_OK)
+
+
+def resolve_codex_binary(explicit_path: str) -> str:
+    if explicit_path.strip():
+        candidate = explicit_path.strip()
+        if _is_executable_file(candidate):
+            return candidate
+        if Path(candidate).is_file():
+            raise RuntimeError(f"configured codex binary is not executable: {candidate}")
+        raise RuntimeError(f"configured codex binary does not exist: {candidate}")
+
+    for candidate in DEFAULT_CODEX_CANDIDATES:
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    raise RuntimeError(
+        "could not locate `codex` in PATH; rerun with --codex-bin /path/to/codex"
+    )
 
 
 def run_codex_exec(command: Sequence[str], prompt_text: str) -> int:
@@ -243,7 +290,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         repo = resolve_repo_slug(args.repo)
         pr_number = resolve_pr_number(repo, args.pr)
         snapshot = fetch_snapshot(repo, pr_number)
-        digest = build_digest(repo, pr_number, include_resolved=args.include_resolved)
+        digest = build_digest(
+            repo,
+            pr_number,
+            include_resolved=args.include_resolved,
+            since_latest_commit=args.since_latest_commit,
+        )
         failed_run_logs: tuple[FailedRunLog, ...] = ()
         if args.include_failed_run_logs:
             failed_run_logs = fetch_failed_run_logs(
@@ -255,12 +307,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         bundle_text = render_bundle_codex_zh(snapshot, digest, failed_run_logs)
         prompt_text = render_autofix_prompt(bundle_text, repo=repo, pr_number=pr_number)
 
-        bundle_path = write_text(args.bundle_output, prompt_text)
-        last_message_path = Path(args.last_message_output)
+        bundle_output = args.bundle_output or default_autofix_bundle_output_path(pr_number)
+        last_message_output = args.last_message_output or default_last_message_output_path(pr_number)
+        bundle_path = write_text(bundle_output, prompt_text)
+        last_message_path = Path(last_message_output)
         if last_message_path.parent != Path("."):
             last_message_path.parent.mkdir(parents=True, exist_ok=True)
 
         command = build_codex_exec_command(
+            codex_bin=resolve_codex_binary(args.codex_bin),
             prompt_path=bundle_path,
             last_message_path=last_message_path,
             model=args.codex_model,

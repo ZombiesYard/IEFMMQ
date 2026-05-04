@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import subprocess
+import sys
 from typing import Mapping, Sequence
 
 from tools.copilot_review_digest import (
@@ -17,6 +18,9 @@ from tools.copilot_review_digest import (
     resolve_pr_number,
     resolve_repo_slug,
 )
+
+
+DEFAULT_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_review_bundle.md"
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--include-resolved",
         action="store_true",
         help="Include resolved Copilot review threads in the digest.",
+    )
+    parser.add_argument(
+        "--since-latest-commit",
+        action="store_true",
+        help="Only include Copilot comments created after the PR's latest head commit.",
     )
     parser.add_argument(
         "--output",
@@ -304,13 +313,18 @@ def request_copilot_review(repo: str, pr_number: int) -> str:
 
 
 def write_output(text: str, output_path: str) -> None:
-    if not output_path:
+    if not output_path or output_path == "-":
         print(text)
         return
     path = Path(output_path)
     if path.parent != Path("."):
         path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def default_bundle_output_path(pr_number: int) -> str:
+    del pr_number
+    return DEFAULT_BUNDLE_OUTPUT_TEMPLATE
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -320,7 +334,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         repo = resolve_repo_slug(args.repo)
         pr_number = resolve_pr_number(repo, args.pr)
         snapshot = fetch_snapshot(repo, pr_number)
-        digest = build_digest(repo, pr_number, include_resolved=args.include_resolved)
+        digest = build_digest(
+            repo,
+            pr_number,
+            include_resolved=args.include_resolved,
+            since_latest_commit=args.since_latest_commit,
+        )
         failed_run_logs: tuple[FailedRunLog, ...] = ()
         if args.include_failed_run_logs:
             failed_run_logs = fetch_failed_run_logs(
@@ -342,7 +361,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ]
             )
 
-        write_output(rendered, args.output)
+        output_path = args.output.strip() if isinstance(args.output, str) else ""
+        write_output(rendered, output_path)
+        print(
+            f"Review bundle written to: {output_path if output_path else 'stdout'}",
+            file=sys.stderr,
+        )
+        print(f"PR #{snapshot.number}: {snapshot.title}", file=sys.stderr)
+        print(f"Copilot threads included: {len(digest.threads)}", file=sys.stderr)
+        if args.since_latest_commit:
+            print("Filtered to comments since latest head commit: yes", file=sys.stderr)
+        if args.include_failed_run_logs:
+            print(f"Failed run logs included: {len(failed_run_logs)}", file=sys.stderr)
         return 0
     except Exception as exc:  # pragma: no cover - exercised via CLI behavior
         parser.exit(

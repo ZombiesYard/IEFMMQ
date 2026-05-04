@@ -20,6 +20,12 @@ python -m tools.copilot_review_digest
 python -m tools.copilot_review_digest --pr 205
 ```
 
+### 2.1 只看最新提交之后的新 review
+
+```bash
+python -m tools.copilot_review_digest --pr 205 --since-latest-commit
+```
+
 ### 3. 输出到文件，方便直接复制或让其他工具读取
 
 ```bash
@@ -101,6 +107,14 @@ python3 -m tools.copilot_review_loop --output .tmp/copilot_review_bundle.md
 
 ```bash
 python3 -m tools.copilot_review_loop --pr 205 --output .tmp/copilot_review_bundle.md
+```
+
+如果你**不传 `--output`**，现在默认直接输出到 stdout。
+
+如果你只想抓 **最新一次 push 之后** 的 Copilot review，而不是把旧评论也混进来，加上：
+
+```bash
+python3 -m tools.copilot_review_loop --pr 205 --since-latest-commit
 ```
 
 ### 重新请求 Copilot review
@@ -185,14 +199,20 @@ python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs
 这条命令会：
 
 - 先生成一个整理好的修复 prompt
-- 写到 `.tmp/copilot_review_bundle.md`
+- 默认写到 `.tmp/copilot_review_bundle.md`
 - 再调用 `codex exec`
-- 把 Codex 的最后总结写到 `.tmp/copilot_autofix_last_message.md`
+- 把 Codex 的最后总结默认写到 `.tmp/copilot_autofix_last_message.md`
 
 ### 先只看命令，不真正执行
 
 ```bash
 python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs --dry-run
+```
+
+如果你只想让 Codex 处理**最新提交之后的新 review**，加上：
+
+```bash
+python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs --since-latest-commit
 ```
 
 这个模式适合先检查：

@@ -27,6 +27,9 @@ def _obs(
     frame_id: str,
     trigger_wall_ms: int,
 ) -> VisionFactObservation:
+    evidence_note = f"{fact_id}:{state}"
+    if fact_id == "fcsmc_final_go_result_visible" and state == "seen":
+        evidence_note = "Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO."
     return VisionFactObservation(
         session_id="sess-live",
         trigger_wall_ms=trigger_wall_ms,
@@ -37,7 +40,7 @@ def _obs(
                 state=state,
                 source_frame_id=frame_id,
                 expires_after_ms=600000 if fact_id != "fcs_page_visible" else 2000,
-                evidence_note=f"{fact_id}:{state}",
+                evidence_note=evidence_note,
                 observed_at_wall_ms=trigger_wall_ms,
             )
         ],
@@ -48,7 +51,7 @@ def test_merge_vision_fact_observation_preserves_sticky_seen_after_not_seen() ->
     snapshot = merge_vision_fact_observation(
         {},
         _obs(
-            "fcs_reset_seen",
+            "fcsmc_final_go_result_visible",
             state="seen",
             frame_id="1772872445010_000123",
             trigger_wall_ms=1772872445000,
@@ -60,7 +63,7 @@ def test_merge_vision_fact_observation_preserves_sticky_seen_after_not_seen() ->
     snapshot = merge_vision_fact_observation(
         snapshot,
         _obs(
-            "fcs_reset_seen",
+            "fcsmc_final_go_result_visible",
             state="not_seen",
             frame_id="1772872447010_000124",
             trigger_wall_ms=1772872447000,
@@ -69,8 +72,8 @@ def test_merge_vision_fact_observation_preserves_sticky_seen_after_not_seen() ->
         now_wall_ms=1772872447000,
     )
 
-    assert snapshot["fcs_reset_seen"]["state"] == "seen"
-    assert snapshot["fcs_reset_seen"]["source_frame_id"] == "1772872445010_000123"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "seen"
+    assert snapshot["fcsmc_final_go_result_visible"]["source_frame_id"] == "1772872445010_000123"
 
 
 def test_merge_vision_fact_observation_updates_nonsticky_visibility() -> None:
@@ -111,7 +114,7 @@ def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfil
             frame_ids=["1772872445010_000123"],
             facts=[
                 VisionFact(
-                    fact_id="fcs_bit_result_visible",
+                    fact_id="fcsmc_final_go_result_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
                     expires_after_ms=600000,
@@ -124,7 +127,7 @@ def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfil
         now_wall_ms=1772872445000,
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
 
 
 def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen() -> None:
@@ -136,7 +139,7 @@ def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen
             frame_ids=["1772872445010_000123"],
             facts=[
                 VisionFact(
-                    fact_id="fcs_bit_result_visible",
+                    fact_id="fcsmc_final_go_result_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
                     expires_after_ms=600000,
@@ -148,9 +151,9 @@ def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen
         now_wall_ms=1772872445000,
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "intermediate_go"
-    assert snapshot["fcs_bit_result_visible"]["state"] == "not_seen"
-    assert "confidence" not in snapshot["fcs_bit_result_visible"]
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "intermediate_go"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "not_seen"
+    assert "confidence" not in snapshot["fcsmc_final_go_result_visible"]
 
 
 def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_seen() -> None:
@@ -162,7 +165,7 @@ def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_see
             frame_ids=["1772872445010_000123"],
             facts=[
                 VisionFact(
-                    fact_id="fcs_bit_result_visible",
+                    fact_id="fcsmc_final_go_result_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
                     expires_after_ms=600000,
@@ -174,16 +177,16 @@ def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_see
         now_wall_ms=1772872445000,
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
-    assert snapshot["fcs_bit_result_visible"]["state"] == "uncertain"
-    assert "confidence" not in snapshot["fcs_bit_result_visible"]
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "other"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "uncertain"
+    assert "confidence" not in snapshot["fcsmc_final_go_result_visible"]
 
 
 def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
     snapshot = merge_vision_fact_observation(
         {},
         _obs(
-            "takeoff_trim_seen",
+            "fcsmc_final_go_result_visible",
             state="seen",
             frame_id="1772872445010_000123",
             trigger_wall_ms=1772872445000,
@@ -194,7 +197,7 @@ def test_prune_expired_facts_drops_sticky_after_ttl() -> None:
 
     pruned = prune_expired_facts(snapshot, now_wall_ms=1772873045001)
 
-    assert "takeoff_trim_seen" not in pruned
+    assert "fcsmc_final_go_result_visible" not in pruned
 
 
 def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
@@ -206,14 +209,14 @@ def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
             frame_ids=["1772872445010_000123"],
             facts=[
                 VisionFact(
-                    fact_id="fcs_bit_result_visible",
+                    fact_id="fcsmc_final_go_result_visible",
                     state="uncertain",
                     source_frame_id="1772872445010_000123",
                     expires_after_ms=600000,
                     evidence_note="BIT text too blurry.",
                 ),
                 VisionFact(
-                    fact_id="fcs_bit_interaction_seen",
+                    fact_id="fcsmc_in_test_visible",
                     state="seen",
                     source_frame_id="1772872445010_000123",
                     expires_after_ms=600000,
@@ -229,13 +232,13 @@ def test_build_vision_fact_summary_reports_uncertain_and_seen_ids() -> None:
         snapshot,
         status="available",
         frame_ids=["1772872445010_000123"],
-        fresh_fact_ids=["fcs_bit_interaction_seen"],
+        fresh_fact_ids=["fcsmc_in_test_visible"],
     )
 
     assert summary["status"] == "available"
-    assert summary["seen_fact_ids"] == ["fcs_bit_interaction_seen"]
-    assert summary["uncertain_fact_ids"] == ["fcs_bit_result_visible"]
-    assert "fcs_bit_interaction_seen" in summary["summary_text"]
+    assert summary["seen_fact_ids"] == ["fcsmc_in_test_visible"]
+    assert summary["uncertain_fact_ids"] == ["fcsmc_final_go_result_visible"]
+    assert "fcsmc_in_test_visible" in summary["summary_text"]
 
 
 def test_default_vision_facts_path_reads_pack_metadata_override(tmp_path: Path) -> None:
@@ -518,22 +521,22 @@ def test_merge_vision_fact_observation_requires_config() -> None:
 def test_facts_satisfy_step_binding_respects_explicit_empty_config() -> None:
     snapshot = {
         "fcs_page_visible": {"fact_id": "fcs_page_visible", "state": "seen"},
-        "bit_page_visible": {"fact_id": "bit_page_visible", "state": "seen"},
+        "bit_root_page_visible": {"fact_id": "bit_root_page_visible", "state": "seen"},
     }
 
     assert facts_satisfy_step_binding(snapshot, step_id="S08", config={}) is False
 
 
-def test_facts_satisfy_step_binding_supports_any_of_right_ddi_equivalents() -> None:
+def test_facts_satisfy_step_binding_supports_aligned_s08_binding() -> None:
     snapshot = {
         "fcs_page_visible": {"fact_id": "fcs_page_visible", "state": "seen"},
-        "bit_page_failure_visible": {"fact_id": "bit_page_failure_visible", "state": "seen"},
+        "bit_root_page_visible": {"fact_id": "bit_root_page_visible", "state": "seen"},
     }
     config = {
         "step_bindings": {
             "S08": {
-                "all_of": ("fcs_page_visible",),
-                "any_of": ("bit_page_visible", "bit_root_page_visible", "bit_page_failure_visible"),
+                "all_of": ("fcs_page_visible", "bit_root_page_visible"),
+                "any_of": (),
             }
         }
     }
@@ -545,35 +548,35 @@ def test_extract_vision_fact_snapshot_backfills_structured_s18_result_kind() -> 
     snapshot = extract_vision_fact_snapshot(
         [
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
                 "evidence_note": "Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO.",
             }
         ]
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
 
 
 def test_extract_vision_fact_snapshot_does_not_treat_no_go_as_final_go() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
                 "evidence_note": "Right DDI shows FCSA NO GO and FCSB NO GO.",
             }
         ]
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "other"
 
 
 def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_from_note() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
                 "result_kind": "bad-value",
                 "evidence_note": "Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, and FCSB GO.",
@@ -581,48 +584,48 @@ def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_
         ]
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "final_go"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
 
 
 def test_extract_vision_fact_snapshot_does_not_backfill_final_go_from_only_fcsa_fcsb_go() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
                 "evidence_note": "Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
             }
         ]
     )
 
-    assert snapshot["fcs_bit_result_visible"]["result_kind"] == "other"
-    assert snapshot["fcs_bit_result_visible"]["state"] == "uncertain"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "other"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "uncertain"
 
 
 def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_cannot_backfill() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
             {
-                "fact_id": "left_ddi_fcs_page_button_visible",
+                "fact_id": "supt_page_visible",
                 "state": "seen",
                 "result_kind": "bad-value",
-                "evidence_note": "FCS label visible on the left DDI menu.",
+                "evidence_note": "SUPT page label is clearly visible on the left DDI.",
             }
         ]
     )
 
-    assert "result_kind" not in snapshot["left_ddi_fcs_page_button_visible"]
+    assert "result_kind" not in snapshot["supt_page_visible"]
 
 
 def test_extract_vision_fact_snapshot_strips_invalid_result_kind_without_evidence_note() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
             {
-                "fact_id": "fcs_bit_result_visible",
+                "fact_id": "fcsmc_final_go_result_visible",
                 "state": "seen",
                 "result_kind": "bad-value",
             }
         ]
     )
 
-    assert "result_kind" not in snapshot["fcs_bit_result_visible"]
+    assert "result_kind" not in snapshot["fcsmc_final_go_result_visible"]

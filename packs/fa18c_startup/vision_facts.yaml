@@ -1,70 +1,34 @@
 schema_version: v1
 layout_id: fa18c_composite_panel_v2
 facts:
-  - fact_id: left_ddi_dark
+  - fact_id: tac_page_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - left_ddi
     steps:
       - S08
-      - S15
-  - fact_id: right_ddi_dark
-    sticky: false
-    expires_after_ms: 2000
-    intended_regions:
-      - right_ddi
-    steps:
-      - S08
-      - S18
-  - fact_id: ampcd_dark
-    sticky: false
-    expires_after_ms: 2000
-    intended_regions:
-      - ampcd
-    steps:
-      - S08
-  - fact_id: left_ddi_menu_root_visible
+  - fact_id: supt_page_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - left_ddi
     steps:
       - S08
-      - S15
-  - fact_id: left_ddi_fcs_option_visible
-    sticky: false
-    expires_after_ms: 2000
-    intended_regions:
-      - left_ddi
-    steps:
-      - S08
-      - S15
-  - fact_id: left_ddi_fcs_page_button_visible
-    sticky: false
-    expires_after_ms: 2000
-    intended_regions:
-      - left_ddi
-    steps:
-      - S08
-      - S15
   - fact_id: fcs_page_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - left_ddi
-      - right_ddi
     steps:
       - S08
-      - S15
-  - fact_id: bit_page_visible
+  - fact_id: fcs_page_x_marks_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
-      - right_ddi
+      - left_ddi
     steps:
-      - S08
-      - S18
+      - S15
   - fact_id: bit_root_page_visible
     sticky: false
     expires_after_ms: 2000
@@ -73,73 +37,58 @@ facts:
     steps:
       - S08
       - S18
-  - fact_id: bit_page_failure_visible
-    sticky: false
-    expires_after_ms: 2000
-    intended_regions:
-      - right_ddi
-    steps:
-      - S08
-      - S18
-  - fact_id: right_ddi_fcsmc_page_visible
+  - fact_id: fcsmc_page_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - right_ddi
     steps:
       - S18
-  - fact_id: right_ddi_fcs_option_visible
+  - fact_id: fcsmc_intermediate_result_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - right_ddi
     steps:
       - S18
-  - fact_id: right_ddi_in_test_visible
+  - fact_id: fcsmc_in_test_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - right_ddi
+    steps:
+      - S18
+  - fact_id: fcsmc_final_go_result_visible
     sticky: true
     expires_after_ms: 600000
     intended_regions:
       - right_ddi
     steps:
       - S18
-  - fact_id: fcs_reset_seen
-    sticky: true
-    expires_after_ms: 600000
-    intended_regions:
-      - left_ddi
-    steps:
-      - S15
-  - fact_id: fcs_bit_interaction_seen
-    sticky: true
-    expires_after_ms: 600000
-    intended_regions:
-      - right_ddi
-    steps:
-      - S18
-  - fact_id: fcs_bit_result_visible
-    sticky: true
-    expires_after_ms: 600000
-    intended_regions:
-      - right_ddi
-    steps:
-      - S18
-  - fact_id: takeoff_trim_seen
-    sticky: true
-    expires_after_ms: 600000
-    intended_regions:
-      - left_ddi
-    steps:
-      - S17
-  - fact_id: ins_alignment_page_visible
+  - fact_id: hsi_page_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - ampcd
     steps:
       - S12
-  - fact_id: ins_go
-    sticky: true
-    expires_after_ms: 900000
+  - fact_id: hsi_map_layer_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - ampcd
+    steps:
+      - S12
+  - fact_id: ins_grnd_alignment_text_visible
+    sticky: false
+    expires_after_ms: 2000
+    intended_regions:
+      - ampcd
+    steps:
+      - S12
+  - fact_id: ins_ok_text_visible
+    sticky: false
+    expires_after_ms: 2000
     intended_regions:
       - ampcd
     steps:
@@ -148,10 +97,7 @@ step_bindings:
   S08:
     all_of:
       - fcs_page_visible
-    any_of:
-      - bit_page_visible
       - bit_root_page_visible
-      - bit_page_failure_visible
   S18:
     all_of:
-      - fcs_bit_result_visible
+      - fcsmc_final_go_result_visible

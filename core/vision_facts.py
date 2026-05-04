@@ -15,25 +15,19 @@ import yaml
 from core.types_v2 import VisionFactObservation
 
 VISION_FACT_IDS: tuple[str, ...] = (
-    "left_ddi_dark",
-    "right_ddi_dark",
-    "ampcd_dark",
-    "left_ddi_menu_root_visible",
-    "left_ddi_fcs_option_visible",
-    "left_ddi_fcs_page_button_visible",
+    "tac_page_visible",
+    "supt_page_visible",
     "fcs_page_visible",
-    "bit_page_visible",
+    "fcs_page_x_marks_visible",
     "bit_root_page_visible",
-    "bit_page_failure_visible",
-    "right_ddi_fcsmc_page_visible",
-    "right_ddi_fcs_option_visible",
-    "right_ddi_in_test_visible",
-    "fcs_reset_seen",
-    "fcs_bit_interaction_seen",
-    "fcs_bit_result_visible",
-    "takeoff_trim_seen",
-    "ins_alignment_page_visible",
-    "ins_go",
+    "fcsmc_page_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_final_go_result_visible",
+    "hsi_page_visible",
+    "hsi_map_layer_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
 )
 VISION_FACT_STATES: frozenset[str] = frozenset({"seen", "not_seen", "uncertain"})
 _SUPPORTED_SCHEMA_VERSIONS = {"v1"}
@@ -273,7 +267,7 @@ def _normalize_result_kind(
         normalized = raw_result_kind.strip().lower()
         if normalized in _S18_RESULT_KINDS:
             return normalized
-    if fact_id != "fcs_bit_result_visible":
+    if fact_id != "fcsmc_final_go_result_visible":
         return None
     note_lower = evidence_note.lower()
     if not note_lower:
@@ -302,7 +296,7 @@ def _coerce_s18_result_fact_state(
     state: str,
     result_kind: str | None,
 ) -> str:
-    if fact_id != "fcs_bit_result_visible" or state != "seen":
+    if fact_id != "fcsmc_final_go_result_visible" or state != "seen":
         return state
     if result_kind == "final_go":
         return state
@@ -328,8 +322,8 @@ def normalize_vision_fact(
     if not isinstance(source_frame_id, str) or not source_frame_id:
         raise ValueError(f"vision fact {fact_id} missing source_frame_id")
     evidence_note = raw_fact.get("evidence_note")
-    if not isinstance(evidence_note, str) or not evidence_note.strip():
-        raise ValueError(f"vision fact {fact_id} evidence_note must be non-empty")
+    if not isinstance(evidence_note, str):
+        raise ValueError(f"vision fact {fact_id} evidence_note must be a string")
     observed_at_wall_ms = raw_fact.get("observed_at_wall_ms")
     if observed_at_wall_ms is None:
         observed_at_wall_ms = default_observed_at_wall_ms

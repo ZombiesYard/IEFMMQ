@@ -17,16 +17,16 @@ def test_vision_fact_observation_schema_accepts_uncertain_fact() -> None:
         frame_ids=["1772872444950_000122", "1772872445010_000123"],
         facts=[
             VisionFact(
-                fact_id="fcs_reset_seen",
+                fact_id="fcsmc_intermediate_result_visible",
                 state="uncertain",
                 source_frame_id="1772872445010_000123",
-                expires_after_ms=600000,
-                evidence_note="FCS page content is too blurry to confirm reset state.",
+                expires_after_ms=2000,
+                evidence_note="FCS-MC result text is too blurry to classify as intermediate or final.",
                 observed_at_wall_ms=1772872445000,
-                sticky=True,
+                sticky=False,
             )
         ],
-        summary="uncertain=fcs_reset_seen",
+        summary="uncertain=fcsmc_intermediate_result_visible",
     ).to_dict()
 
     validate_instance(payload, "vision_fact_observation")
@@ -39,11 +39,11 @@ def test_vision_fact_observation_schema_accepts_structured_result_kind() -> None
         frame_ids=["1772872445010_000123"],
         facts=[
             VisionFact(
-                fact_id="fcs_bit_result_visible",
+                fact_id="fcsmc_final_go_result_visible",
                 state="seen",
                 source_frame_id="1772872445010_000123",
                 expires_after_ms=600000,
-                evidence_note="Right DDI FCS-MC page shows final results: FCSA GO and FCSB GO.",
+                evidence_note="Right DDI FCS-MC page shows final results: MC1 GO, MC2 GO, FCSA GO, FCSB GO.",
                 result_kind="final_go",
             )
         ],
@@ -66,25 +66,19 @@ def test_vision_fact_observation_schema_accepts_all_fact_ids() -> None:
                 evidence_note=f"{fact_id} not visible in current frame.",
             )
             for fact_id in (
-                "left_ddi_dark",
-                "right_ddi_dark",
-                "ampcd_dark",
-                "left_ddi_menu_root_visible",
-                "left_ddi_fcs_option_visible",
-                "left_ddi_fcs_page_button_visible",
+                "tac_page_visible",
+                "supt_page_visible",
                 "fcs_page_visible",
-                "bit_page_visible",
+                "fcs_page_x_marks_visible",
                 "bit_root_page_visible",
-                "bit_page_failure_visible",
-                "right_ddi_fcsmc_page_visible",
-                "right_ddi_fcs_option_visible",
-                "right_ddi_in_test_visible",
-                "fcs_reset_seen",
-                "fcs_bit_interaction_seen",
-                "fcs_bit_result_visible",
-                "takeoff_trim_seen",
-                "ins_alignment_page_visible",
-                "ins_go",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible",
             )
         ],
     ).to_dict()

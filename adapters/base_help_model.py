@@ -51,12 +51,12 @@ _DERIVED_CONDITION_FALLBACKS: dict[str, tuple[str, ...]] = {
 _VAR_RESOLVER_CACHE: OrderedDict[str, VarResolver] = OrderedDict()
 _MAX_VAR_RESOLVER_CACHE = 8
 _VISUAL_FACT_REF_ALIASES: dict[str, str] = {
-    "right_ddi_bit_failures_page_visible": "bit_page_failure_visible",
-    "right_ddi_bit_failure_page_visible": "bit_page_failure_visible",
-    "bit_failures_page_visible": "bit_page_failure_visible",
-    "bit_failure_page_visible": "bit_page_failure_visible",
+    "right_ddi_bit_failures_page_visible": "bit_root_page_visible",
+    "right_ddi_bit_failure_page_visible": "bit_root_page_visible",
+    "bit_failures_page_visible": "bit_root_page_visible",
+    "bit_failure_page_visible": "bit_root_page_visible",
     "right_ddi_bit_root_page_visible": "bit_root_page_visible",
-    "right_ddi_bit_page_visible": "bit_page_visible",
+    "right_ddi_bit_page_visible": "bit_root_page_visible",
 }
 
 

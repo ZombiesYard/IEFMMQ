@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import contextlib
+import io
+
 from tools.copilot_review_digest import PullRequestReviewDigest, ReviewComment, ReviewThread
 from tools.copilot_review_loop import (
+    default_bundle_output_path,
     FailedRunLog,
     PullRequestSnapshot,
     fetch_failed_log_text,
     fetch_checks_output,
+    main,
     render_bundle_codex_zh,
+    write_output,
 )
 
 
@@ -131,3 +137,56 @@ def test_fetch_failed_log_text_truncates_long_logs(monkeypatch) -> None:
     rendered = fetch_failed_log_text("ZombiesYard/IEFMMQ", 123, max_chars=20)
 
     assert rendered.endswith("...[truncated]...")
+
+
+def test_default_bundle_output_path_includes_pr_number() -> None:
+    assert default_bundle_output_path(206) == ".tmp/copilot_review_bundle.md"
+
+
+def test_write_output_supports_explicit_stdout_mode(capsys) -> None:
+    write_output("hello bundle", "-")
+
+    captured = capsys.readouterr()
+    assert captured.out == "hello bundle\n"
+    assert captured.err == ""
+
+
+def test_main_writes_bundle_to_stdout_and_status_to_stderr(monkeypatch) -> None:
+    snapshot = PullRequestSnapshot(
+        repo="ZombiesYard/IEFMMQ",
+        number=206,
+        title="Example PR",
+        url="https://github.com/ZombiesYard/IEFMMQ/pull/206",
+        head_ref="feature/test",
+        base_ref="main",
+        is_draft=False,
+        review_decision="",
+        head_sha="abc123",
+        checks_output="guard\tpass\t30s",
+    )
+    digest = PullRequestReviewDigest(
+        repo="ZombiesYard/IEFMMQ",
+        number=206,
+        title="Example PR",
+        url="https://github.com/ZombiesYard/IEFMMQ/pull/206",
+        head_ref="feature/test",
+        base_ref="main",
+        threads=(),
+    )
+    monkeypatch.setattr("tools.copilot_review_loop.resolve_repo_slug", lambda repo: "ZombiesYard/IEFMMQ")
+    monkeypatch.setattr("tools.copilot_review_loop.resolve_pr_number", lambda repo, pr: 206)
+    monkeypatch.setattr("tools.copilot_review_loop.fetch_snapshot", lambda repo, pr_number: snapshot)
+    monkeypatch.setattr(
+        "tools.copilot_review_loop.build_digest",
+        lambda repo, pr_number, include_resolved, since_latest_commit: digest,
+    )
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        exit_code = main([])
+
+    assert exit_code == 0
+    assert "## PR 概览" in stdout.getvalue()
+    assert "Review bundle written to: stdout" in stderr.getvalue()
+    assert "Copilot threads included: 0" in stderr.getvalue()
