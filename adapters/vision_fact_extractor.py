@@ -57,9 +57,12 @@ def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
     }
 
 
-def _sanitize_model_response(obj: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, list[str]]]:
+def _sanitize_model_response(
+    obj: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, list[str]], int]:
     sanitized: dict[str, Any] = {}
     ignored: dict[str, list[str]] = {}
+    skipped_non_mapping_fact_count = 0
 
     summary = obj.get("summary")
     if isinstance(summary, str):
@@ -70,7 +73,7 @@ def _sanitize_model_response(obj: Mapping[str, Any]) -> tuple[dict[str, Any], di
         sanitized_facts: list[dict[str, Any]] = []
         for item in facts_raw:
             if not isinstance(item, Mapping):
-                sanitized_facts.append({})
+                skipped_non_mapping_fact_count += 1
                 continue
             fact: dict[str, Any] = {}
             ignored_fields = [
@@ -92,7 +95,7 @@ def _sanitize_model_response(obj: Mapping[str, Any]) -> tuple[dict[str, Any], di
             sanitized_facts.append(fact)
         sanitized["facts"] = sanitized_facts
 
-    return sanitized, ignored
+    return sanitized, ignored, skipped_non_mapping_fact_count
 
 @dataclass
 class VisionFactExtractionResult:
@@ -458,7 +461,7 @@ class VisionFactExtractor:
         obj, _ = parse_first_json(raw_text)
         if not isinstance(obj, Mapping):
             raise ValueError("vision fact response must be a JSON object")
-        sanitized_obj, ignored_fact_fields = _sanitize_model_response(obj)
+        sanitized_obj, ignored_fact_fields, skipped_non_mapping_fact_count = _sanitize_model_response(obj)
         self._response_validator.validate(sanitized_obj)
         facts_raw = sanitized_obj.get("facts")
         if not isinstance(facts_raw, list):
@@ -500,6 +503,11 @@ class VisionFactExtractor:
             facts.append(fact)
 
         model_summary = obj.get("summary")
+        coerced_source_frame_fact_ids = sorted(
+            fact_id
+            for fact_id, fields in ignored_fact_fields.items()
+            if "source_frame_id" in fields and not fact_id.startswith("<unknown:")
+        )
         return VisionFactObservation(
             session_id=session_id,
             trigger_wall_ms=trigger_wall_ms,
@@ -509,7 +517,9 @@ class VisionFactExtractor:
             metadata={
                 "raw_fact_count": len(facts_raw),
                 "configured_fact_count": len(self._fact_ids),
+                "coerced_source_frame_fact_ids": coerced_source_frame_fact_ids,
                 "ignored_model_fact_fields": ignored_fact_fields,
+                "skipped_non_mapping_fact_count": skipped_non_mapping_fact_count,
             },
         )
 
