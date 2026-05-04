@@ -9,8 +9,8 @@ Repository:
 
 Important note:
 
-- The local `gh` CLI is installed, but the current GitHub token is invalid.
-- As a result, the issue texts are prepared here first and should be pushed to GitHub after re-authentication.
+- This file is a local reference copy of issue drafts and rollout notes.
+- The actual source of truth for an active task should be the current GitHub issue or the user's explicit task in the conversation.
 
 ---
 

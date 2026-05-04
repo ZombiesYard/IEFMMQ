@@ -87,7 +87,7 @@ def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
     assert '"step_bindings":{}' in prompt
 
 
-def test_vision_fact_prompt_mentions_tac_supt_navigation_cues_and_real_fcs_page_boundaries() -> None:
+def test_vision_fact_prompt_mentions_real_tac_supt_and_fcs_page_boundaries() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="zh",
@@ -97,24 +97,24 @@ def test_vision_fact_prompt_mentions_tac_supt_navigation_cues_and_real_fcs_page_
     assert "tac_page_visible" in prompt
     assert "supt_page_visible" in prompt
     assert "fcs_page_visible" in prompt
-    assert "除了 tac_page_visible 和 supt_page_visible 之外" in prompt
-    assert "tac_page_visible 就是单独小的 TAC/MENU 导航标签可见" in prompt
-    assert "supt_page_visible 就是单独小的 SUPT 选项标签可见" in prompt
+    assert "页面选项标签不等于页面本身" in prompt
+    assert "tac_page_visible 需要实际 TAC/TAC MENU 页面" in prompt
+    assert "supt_page_visible 需要实际 SUPT/SUPT MENU 页面" in prompt
     assert "PB18" in prompt
     assert "PB15" in prompt
     assert "LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS" in prompt
 
 
-def test_vision_fact_prompt_en_aligns_tac_supt_special_cases_with_zh() -> None:
+def test_vision_fact_prompt_en_aligns_tac_supt_with_training_contract() -> None:
     prompt = build_vision_fact_prompt(
         vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
         lang="en",
         config=_minimal_config(),
     )
 
-    assert "Except for tac_page_visible and supt_page_visible" in prompt
-    assert "tac_page_visible means a small TAC/MENU navigation label is visible." in prompt
-    assert "supt_page_visible means a small SUPT option label is visible." in prompt
+    assert "Page option labels are not pages." in prompt
+    assert "tac_page_visible requires the actual TAC/TAC MENU page" in prompt
+    assert "supt_page_visible requires the actual SUPT/SUPT MENU page" in prompt
 
 
 def test_vision_fact_prompt_explicitly_distinguishes_bit_root_and_fcsmc_states() -> None:
