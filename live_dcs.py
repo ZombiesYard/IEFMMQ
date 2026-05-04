@@ -1417,22 +1417,10 @@ def _prefer_navigation_target_from_vision_context(
         item for item in summary.get("seen_fact_ids", [])
         if isinstance(item, str) and item
     }
-    uncertain = {
-        item for item in summary.get("uncertain_fact_ids", [])
-        if isinstance(item, str) and item
-    }
-    not_seen = {
-        item for item in summary.get("not_seen_fact_ids", [])
-        if isinstance(item, str) and item
-    }
     if "supt_page_visible" in seen and "left_mdi_pb15" in allowed:
         return ["left_mdi_pb15"]
     if "tac_page_visible" in seen and "left_mdi_pb18" in allowed:
         return ["left_mdi_pb18"]
-    if "tac_page_visible" in uncertain and "left_mdi_pb18" in allowed:
-        return ["left_mdi_pb18"]
-    if "supt_page_visible" in uncertain and "left_mdi_pb15" in allowed:
-        return ["left_mdi_pb15"]
     if "left_mdi_brightness_selector" in allowed:
         return ["left_mdi_brightness_selector"]
     return []

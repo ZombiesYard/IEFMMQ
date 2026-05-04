@@ -2971,6 +2971,23 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb18_for_s08_
     assert targets == ["left_mdi_pb18"]
 
 
+def test_prefer_navigation_target_from_vision_context_does_not_use_uncertain_tac_supt_as_navigation_evidence() -> None:
+    targets = _prefer_navigation_target_from_vision_context(
+        inferred_step_id="S08",
+        missing_conditions=["vision_facts.fcs_page_visible==seen"],
+        context={
+            "vision_fact_summary": {
+                "seen_fact_ids": ["bit_root_page_visible"],
+                "not_seen_fact_ids": ["fcs_page_visible"],
+                "uncertain_fact_ids": ["tac_page_visible", "supt_page_visible"],
+            }
+        },
+        allowed_targets=["left_mdi_pb18", "left_mdi_pb15", "left_mdi_brightness_selector"],
+    )
+
+    assert targets == ["left_mdi_brightness_selector"]
+
+
 def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_explicit_fcs_button_fact() -> None:
     targets = _prefer_navigation_target_from_vision_context(
         inferred_step_id="S08",

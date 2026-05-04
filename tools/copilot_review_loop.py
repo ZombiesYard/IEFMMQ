@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import subprocess
+import sys
 from typing import Mapping, Sequence
 
 from tools.copilot_review_digest import (
@@ -312,7 +313,7 @@ def request_copilot_review(repo: str, pr_number: int) -> str:
 
 
 def write_output(text: str, output_path: str) -> None:
-    if not output_path:
+    if not output_path or output_path == "-":
         print(text)
         return
     path = Path(output_path)
@@ -361,13 +362,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         output_path = args.output or default_bundle_output_path(pr_number)
         write_output(rendered, output_path)
-        print(f"Review bundle written to: {output_path}")
-        print(f"PR #{snapshot.number}: {snapshot.title}")
-        print(f"Copilot threads included: {len(digest.threads)}")
+        print(f"Review bundle written to: {output_path}", file=sys.stderr)
+        print(f"PR #{snapshot.number}: {snapshot.title}", file=sys.stderr)
+        print(f"Copilot threads included: {len(digest.threads)}", file=sys.stderr)
         if args.since_latest_commit:
-            print("Filtered to comments since latest head commit: yes")
+            print("Filtered to comments since latest head commit: yes", file=sys.stderr)
         if args.include_failed_run_logs:
-            print(f"Failed run logs included: {len(failed_run_logs)}")
+            print(f"Failed run logs included: {len(failed_run_logs)}", file=sys.stderr)
         return 0
     except Exception as exc:  # pragma: no cover - exercised via CLI behavior
         parser.exit(

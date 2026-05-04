@@ -203,7 +203,7 @@ python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs
 这条命令会：
 
 - 先生成一个整理好的修复 prompt
-- 默认写到 `.tmp/copilot_review_bundle_pr205.md`
+- 默认写到 `.tmp/copilot_autofix_bundle_pr205.md`
 - 再调用 `codex exec`
 - 把 Codex 的最后总结默认写到 `.tmp/copilot_autofix_last_message_pr205.md`
 
