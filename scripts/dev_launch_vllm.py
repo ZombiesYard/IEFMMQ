@@ -114,6 +114,8 @@ env["PATH"] = "/scratch/yz50/.local/bin:/scratch/yz50/vllm_qwen35/venv/bin:/usr/
 print(f"Launching vLLM: {' '.join(CMD)}", flush=True)
 print(f"Log: {LOG_PATH}", flush=True)
 
+LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 with LOG_PATH.open("a", encoding="utf-8") as log_f:
     log_f.write(f"\n{'=' * 60}\n")
     log_f.write(f"Launch at PID {os.getpid()}\n")
@@ -131,4 +133,4 @@ with LOG_PATH.open("a", encoding="utf-8") as log_f:
         env=env,
     )
     print(f"vLLM pid: {proc.pid}", flush=True)
-    proc.wait()
+    raise SystemExit(proc.wait())

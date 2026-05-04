@@ -419,6 +419,8 @@ def test_vision_fact_extractor_skips_non_mapping_fact_entries_and_tracks_count(t
     assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == []
     assert result.observation.metadata["ignored_model_fact_fields"] == {}
+    assert result.observation.metadata["raw_fact_count"] == 2
+    assert result.observation.metadata["sanitized_fact_count"] == 1
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 1
     assert result.observation.metadata["skipped_incomplete_mapping_fact_count"] == 0
 
@@ -464,6 +466,8 @@ def test_vision_fact_extractor_skips_incomplete_mapping_fact_entries_and_tracks_
     assert result.observation.metadata["coerced_source_frame_fact_ids_alias_of"] == "ignored_legacy_source_frame_fact_ids"
     assert result.observation.metadata["ignored_legacy_source_frame_fact_ids"] == []
     assert result.observation.metadata["ignored_model_fact_fields"] == {}
+    assert result.observation.metadata["raw_fact_count"] == 2
+    assert result.observation.metadata["sanitized_fact_count"] == 1
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 0
     assert result.observation.metadata["skipped_incomplete_mapping_fact_count"] == 1
 
@@ -506,6 +510,8 @@ def test_vision_fact_extractor_skips_invalid_typed_mapping_fact_entries_and_trac
     facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
     assert facts_by_id["supt_page_visible"].state == "seen"
     assert facts_by_id["fcsmc_page_visible"].state == "uncertain"
+    assert result.observation.metadata["raw_fact_count"] == 2
+    assert result.observation.metadata["sanitized_fact_count"] == 1
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 0
     assert result.observation.metadata["skipped_incomplete_mapping_fact_count"] == 1
 

@@ -528,7 +528,8 @@ class VisionFactExtractor:
             facts=facts,
             summary=model_summary if isinstance(model_summary, str) and model_summary.strip() else None,
             metadata={
-                "raw_fact_count": len(facts_raw),
+                "raw_fact_count": len(raw_facts) if isinstance(raw_facts, list) else 0,
+                "sanitized_fact_count": len(facts_raw),
                 "configured_fact_count": len(self._fact_ids),
                 "coerced_source_frame_fact_ids": ignored_legacy_source_frame_fact_ids,
                 "coerced_source_frame_fact_ids_alias_of": "ignored_legacy_source_frame_fact_ids",
