@@ -49,13 +49,50 @@ def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
                     "properties": {
                         "fact_id": {"type": "string", "enum": list(fact_ids)},
                         "state": {"type": "string", "enum": ["seen", "not_seen", "uncertain"]},
-                        "source_frame_id": {"type": "string", "minLength": 1},
                         "evidence_note": {"type": "string", "minLength": 0, "maxLength": 240},
                     },
                 },
             }
         },
     }
+
+
+def _sanitize_model_response(obj: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, list[str]]]:
+    sanitized: dict[str, Any] = {}
+    ignored: dict[str, list[str]] = {}
+
+    summary = obj.get("summary")
+    if isinstance(summary, str):
+        sanitized["summary"] = summary
+
+    facts_raw = obj.get("facts")
+    if isinstance(facts_raw, list):
+        sanitized_facts: list[dict[str, Any]] = []
+        for item in facts_raw:
+            if not isinstance(item, Mapping):
+                sanitized_facts.append({})
+                continue
+            fact: dict[str, Any] = {}
+            ignored_fields = [
+                key
+                for key in item.keys()
+                if key not in {"fact_id", "state", "evidence_note"}
+            ]
+            fact_id = item.get("fact_id")
+            if isinstance(fact_id, str) and fact_id:
+                fact["fact_id"] = fact_id
+                if ignored_fields:
+                    ignored[fact_id] = sorted(ignored_fields)
+            elif ignored_fields:
+                ignored[f"<unknown:{len(sanitized_facts)}>"] = sorted(ignored_fields)
+            if "state" in item:
+                fact["state"] = item.get("state")
+            if "evidence_note" in item:
+                fact["evidence_note"] = item.get("evidence_note")
+            sanitized_facts.append(fact)
+        sanitized["facts"] = sanitized_facts
+
+    return sanitized, ignored
 
 @dataclass
 class VisionFactExtractionResult:
@@ -421,15 +458,14 @@ class VisionFactExtractor:
         obj, _ = parse_first_json(raw_text)
         if not isinstance(obj, Mapping):
             raise ValueError("vision fact response must be a JSON object")
-        self._response_validator.validate(obj)
-        facts_raw = obj.get("facts")
+        sanitized_obj, ignored_fact_fields = _sanitize_model_response(obj)
+        self._response_validator.validate(sanitized_obj)
+        facts_raw = sanitized_obj.get("facts")
         if not isinstance(facts_raw, list):
             raise ValueError("vision fact response facts must be a list")
 
         default_frame_id = frame_ids[0] if frame_ids else "unknown_frame"
-        valid_frame_ids = {item for item in frame_ids if isinstance(item, str) and item}
         facts_by_id: dict[str, VisionFact] = {}
-        coerced_source_frame_fact_ids: list[str] = []
         for item in facts_raw:
             if not isinstance(item, Mapping):
                 continue
@@ -437,17 +473,10 @@ class VisionFactExtractor:
             if not isinstance(fact_id, str) or fact_id not in self._fact_ids or fact_id in facts_by_id:
                 continue
             spec = self._config["facts_by_id"][fact_id]
-            source_frame_id = default_frame_id
-            raw_source_frame_id = item.get("source_frame_id")
-            if isinstance(raw_source_frame_id, str) and raw_source_frame_id:
-                if raw_source_frame_id in valid_frame_ids:
-                    source_frame_id = raw_source_frame_id
-                else:
-                    coerced_source_frame_fact_ids.append(fact_id)
             facts_by_id[fact_id] = VisionFact(
                 fact_id=fact_id,
                 state=str(item.get("state")),
-                source_frame_id=source_frame_id,
+                source_frame_id=default_frame_id,
                 expires_after_ms=int(spec["expires_after_ms"]),
                 evidence_note=str(item.get("evidence_note")).strip(),
                 observed_at_wall_ms=trigger_wall_ms,
@@ -480,7 +509,7 @@ class VisionFactExtractor:
             metadata={
                 "raw_fact_count": len(facts_raw),
                 "configured_fact_count": len(self._fact_ids),
-                "coerced_source_frame_fact_ids": coerced_source_frame_fact_ids,
+                "ignored_model_fact_fields": ignored_fact_fields,
             },
         )
 
