@@ -37,6 +37,104 @@
 - 不要随便运行 `rm`；如需删除任何远程文件，必须先明确询问用户
 - 远程很多环境变量要用 `setenv`，不是 `export`
 
+### 远程 `tcsh` / SSH 实战注意事项
+
+这是一个容易踩坑的地方，必须记住：
+
+- 远程默认交互环境是 `tcsh`，很多 bash 写法会直接失效
+- 优先使用：
+  `ssh yz50@cloud-247.rz.tu-clausthal.de "tcsh -f -c '...'"`  
+  也就是：
+  - 外层本地 shell 用双引号
+  - 远程 `tcsh -f -c` 里的命令块优先用单引号
+- `tcsh -f` 很重要：它会尽量减少被远程用户初始化脚本干扰
+- 如果命令本身需要复杂管道、变量展开或多步操作，优先把整段逻辑放进 `tcsh -f -c '...'`
+- 在远程 `tcsh` 里：
+  - 用 `setenv VAR value`，不要用 `export VAR=value`
+  - 激活环境通常用：
+    `source /scratch/yz50/iefmmq_vlm_ft_unsloth/venv/bin/activate.csh`
+  - 修改 `PATH` 后最好 `rehash`
+
+我们之前实际采用并验证过的稳妥模式有两种：
+
+1. 简单单条命令：
+
+```bash
+ssh yz50@cloud-247.rz.tu-clausthal.de "tcsh -f -c 'nvidia-smi'"
+```
+
+2. 需要进入目录、激活环境、再运行命令时：
+
+```bash
+ssh yz50@cloud-247.rz.tu-clausthal.de "tcsh -f -c 'cd /scratch/yz50/iefmmq_vlm_ft_unsloth; source venv/bin/activate.csh; setenv TMPDIR /scratch/yz50/tmp; python --version'"
+```
+
+如果一定要在本地先用 bash 拼一层再 ssh，也可以用：
+
+```bash
+/bin/bash -lc "ssh -o BatchMode=yes yz50@cloud-247.rz.tu-clausthal.de \"tcsh -f -c 'nvidia-smi'\""
+```
+
+这个写法的经验规则是：
+
+- 最外层是本地 bash 的双引号
+- 内层 ssh 远程整段再包一层转义双引号
+- 最里面真正给 `tcsh -c` 的命令块用单引号
+
+常见错误来源：
+
+- 把 `export`、`source venv/bin/activate`、`&&` 之类 bash 习惯直接搬进远程 `tcsh`
+- 本地和远程两层引号混用，导致远程命令在本地就先被展开
+- 在远程 home 目录写缓存，触发 2GB quota 问题
+
+这次实际又踩到过一个典型坑：
+
+- 在 `tcsh` 里如果命令包含某些 `!`、方括号模式或会触发 history expansion 的片段，可能直接报：
+  `Event not found.`
+
+我们这次就遇到过类似情况：本来只是想在远程列出 home 目录占用，但因为命令片段和 `tcsh` 的历史展开规则撞上了，结果命令在真正执行前就失败了。
+
+遇到这种情况时，优先采用下面的解决办法：
+
+1. **不要硬跟 `tcsh` 斗引号和历史展开**
+2. 对于纯文件系统检查、`du`、`ls`、`find`、`sort` 这类不依赖 `tcsh` 语法的命令，直接改成走远程 `/bin/sh -lc`
+
+例如这条是稳定可用的：
+
+```bash
+ssh yz50@cloud-247.rz.tu-clausthal.de "/bin/sh -lc 'cd ~ && du -sh .[^.]* * 2>/dev/null | sort -h | tail -n 40'"
+```
+
+也就是说，远程命令实际上有两种推荐模式：
+
+### 模式 A：需要远程环境、`setenv`、`activate.csh`、vLLM / Python 服务启动
+
+用 `tcsh -f -c`：
+
+```bash
+ssh yz50@cloud-247.rz.tu-clausthal.de "tcsh -f -c 'cd /scratch/yz50/iefmmq_vlm_ft_unsloth; source venv/bin/activate.csh; setenv TMPDIR /scratch/yz50/tmp; python --version'"
+```
+
+### 模式 B：只做纯 shell 检查、磁盘排查、日志查看、目录统计
+
+优先用 `/bin/sh -lc`，通常更省心：
+
+```bash
+ssh yz50@cloud-247.rz.tu-clausthal.de "/bin/sh -lc 'cd ~ && du -sh .cache .local 2>/dev/null'"
+```
+
+经验规则：
+
+- **涉及 `setenv` / `source activate.csh` / `rehash` / venv / tcsh 环境变量时，用 `tcsh -f -c`**
+- **涉及 `du` / `find` / `ls` / `sort` / `tail` / 纯文件系统检查时，优先用 `/bin/sh -lc`**
+
+这样能明显减少：
+
+- `Event not found`
+- 引号嵌套错位
+- 本地 shell 先展开远程命令
+- `tcsh` 特有语法把普通检查命令搞坏
+
 ### 当前已知远程缓存习惯
 
 如果需要在远程运行模型、benchmark 或训练，优先确保这些目录与环境变量：
