@@ -59,10 +59,11 @@ def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
 
 def _sanitize_model_response(
     obj: Mapping[str, Any],
-) -> tuple[dict[str, Any], dict[str, list[str]], int]:
+) -> tuple[dict[str, Any], dict[str, list[str]], int, int]:
     sanitized: dict[str, Any] = {}
     ignored: dict[str, list[str]] = {}
     skipped_non_mapping_fact_count = 0
+    skipped_incomplete_mapping_fact_count = 0
 
     summary = obj.get("summary")
     if isinstance(summary, str):
@@ -75,19 +76,25 @@ def _sanitize_model_response(
             if not isinstance(item, Mapping):
                 skipped_non_mapping_fact_count += 1
                 continue
+            fact_id = item.get("fact_id")
+            has_required_fields = (
+                isinstance(fact_id, str)
+                and bool(fact_id)
+                and "state" in item
+                and "evidence_note" in item
+            )
+            if not has_required_fields:
+                skipped_incomplete_mapping_fact_count += 1
+                continue
             fact: dict[str, Any] = {}
             ignored_fields = [
                 key
                 for key in item.keys()
                 if key not in {"fact_id", "state", "evidence_note"}
             ]
-            fact_id = item.get("fact_id")
-            if isinstance(fact_id, str) and fact_id:
-                fact["fact_id"] = fact_id
-                if ignored_fields:
-                    ignored[fact_id] = sorted(ignored_fields)
-            elif ignored_fields:
-                ignored[f"<unknown:{len(sanitized_facts)}>"] = sorted(ignored_fields)
+            fact["fact_id"] = fact_id
+            if ignored_fields:
+                ignored[fact_id] = sorted(ignored_fields)
             if "state" in item:
                 fact["state"] = item.get("state")
             if "evidence_note" in item:
@@ -95,7 +102,7 @@ def _sanitize_model_response(
             sanitized_facts.append(fact)
         sanitized["facts"] = sanitized_facts
 
-    return sanitized, ignored, skipped_non_mapping_fact_count
+    return sanitized, ignored, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count
 
 @dataclass
 class VisionFactExtractionResult:
@@ -461,7 +468,7 @@ class VisionFactExtractor:
         obj, _ = parse_first_json(raw_text)
         if not isinstance(obj, Mapping):
             raise ValueError("vision fact response must be a JSON object")
-        sanitized_obj, ignored_fact_fields, skipped_non_mapping_fact_count = _sanitize_model_response(obj)
+        sanitized_obj, ignored_fact_fields, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count = _sanitize_model_response(obj)
         self._response_validator.validate(sanitized_obj)
         facts_raw = sanitized_obj.get("facts")
         if not isinstance(facts_raw, list):
@@ -503,10 +510,10 @@ class VisionFactExtractor:
             facts.append(fact)
 
         model_summary = obj.get("summary")
-        coerced_source_frame_fact_ids = sorted(
+        ignored_legacy_source_frame_fact_ids = sorted(
             fact_id
             for fact_id, fields in ignored_fact_fields.items()
-            if "source_frame_id" in fields and not fact_id.startswith("<unknown:")
+            if "source_frame_id" in fields
         )
         return VisionFactObservation(
             session_id=session_id,
@@ -517,9 +524,11 @@ class VisionFactExtractor:
             metadata={
                 "raw_fact_count": len(facts_raw),
                 "configured_fact_count": len(self._fact_ids),
-                "coerced_source_frame_fact_ids": coerced_source_frame_fact_ids,
+                "coerced_source_frame_fact_ids": ignored_legacy_source_frame_fact_ids,
+                "ignored_legacy_source_frame_fact_ids": ignored_legacy_source_frame_fact_ids,
                 "ignored_model_fact_fields": ignored_fact_fields,
                 "skipped_non_mapping_fact_count": skipped_non_mapping_fact_count,
+                "skipped_incomplete_mapping_fact_count": skipped_incomplete_mapping_fact_count,
             },
         )
 
