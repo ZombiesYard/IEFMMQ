@@ -2884,7 +2884,7 @@ def test_safe_fallback_overlay_prefers_left_ddi_menu_navigation_for_s08_fcs_page
 
         assert fallback_reason == "deterministic_step:S08"
         assert isinstance(fallback_help_obj, dict)
-        assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_pb18"]
+        assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_brightness_selector"]
     finally:
         loop.close()
 

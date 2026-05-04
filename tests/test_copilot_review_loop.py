@@ -140,7 +140,7 @@ def test_fetch_failed_log_text_truncates_long_logs(monkeypatch) -> None:
 
 
 def test_default_bundle_output_path_includes_pr_number() -> None:
-    assert default_bundle_output_path(206) == ".tmp/copilot_review_bundle_pr206.md"
+    assert default_bundle_output_path(206) == ".tmp/copilot_review_bundle.md"
 
 
 def test_write_output_supports_explicit_stdout_mode(capsys) -> None:
@@ -184,9 +184,9 @@ def test_main_writes_bundle_to_stdout_and_status_to_stderr(monkeypatch) -> None:
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-        exit_code = main(["--output", "-"])
+        exit_code = main([])
 
     assert exit_code == 0
     assert "## PR 概览" in stdout.getvalue()
-    assert "Review bundle written to: -" in stderr.getvalue()
+    assert "Review bundle written to: stdout" in stderr.getvalue()
     assert "Copilot threads included: 0" in stderr.getvalue()

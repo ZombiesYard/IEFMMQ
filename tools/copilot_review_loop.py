@@ -20,7 +20,7 @@ from tools.copilot_review_digest import (
 )
 
 
-DEFAULT_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_review_bundle_pr{pr}.md"
+DEFAULT_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_review_bundle.md"
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         default="",
-        help="Optional output file path. Defaults to .tmp/copilot_review_bundle_pr<PR>.md.",
+        help="Optional output file path. Defaults to stdout.",
     )
     parser.add_argument(
         "--request-copilot-review",
@@ -323,7 +323,8 @@ def write_output(text: str, output_path: str) -> None:
 
 
 def default_bundle_output_path(pr_number: int) -> str:
-    return DEFAULT_BUNDLE_OUTPUT_TEMPLATE.format(pr=pr_number)
+    del pr_number
+    return DEFAULT_BUNDLE_OUTPUT_TEMPLATE
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -360,9 +361,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ]
             )
 
-        output_path = args.output or default_bundle_output_path(pr_number)
+        output_path = args.output.strip() if isinstance(args.output, str) else ""
         write_output(rendered, output_path)
-        print(f"Review bundle written to: {output_path}", file=sys.stderr)
+        print(
+            f"Review bundle written to: {output_path if output_path else 'stdout'}",
+            file=sys.stderr,
+        )
         print(f"PR #{snapshot.number}: {snapshot.title}", file=sys.stderr)
         print(f"Copilot threads included: {len(digest.threads)}", file=sys.stderr)
         if args.since_latest_commit:

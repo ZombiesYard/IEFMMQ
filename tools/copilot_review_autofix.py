@@ -21,8 +21,8 @@ from tools.copilot_review_loop import (
 )
 
 
-DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_bundle_pr{pr}.md"
-DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_last_message_pr{pr}.md"
+DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE = ".tmp/copilot_review_bundle.md"
+DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_last_message.md"
 DEFAULT_CODEX_CANDIDATES = ("codex",)
 
 
@@ -67,7 +67,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--last-message-output",
         default="",
-        help="Where to write the last Codex message. Defaults to .tmp/copilot_autofix_last_message_pr<PR>.md.",
+        help="Where to write the last Codex message. Defaults to .tmp/copilot_autofix_last_message.md.",
     )
     parser.add_argument(
         "--codex-model",
@@ -170,11 +170,13 @@ def write_text(path_text: str, content: str) -> Path:
 
 
 def default_last_message_output_path(pr_number: int) -> str:
-    return DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE.format(pr=pr_number)
+    del pr_number
+    return DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE
 
 
 def default_autofix_bundle_output_path(pr_number: int) -> str:
-    return DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE.format(pr=pr_number)
+    del pr_number
+    return DEFAULT_AUTOFIX_BUNDLE_OUTPUT_TEMPLATE
 
 
 def build_codex_exec_command(

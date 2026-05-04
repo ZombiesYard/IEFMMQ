@@ -324,6 +324,44 @@ def test_vision_fact_extractor_accepts_legacy_source_frame_id_from_model(tmp_pat
     assert result.observation.metadata["coerced_source_frame_fact_ids"] == []
 
 
+def test_vision_fact_extractor_coerces_invalid_legacy_source_frame_id_to_default_frame(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    secondary = tmp_path / "1772872444950_000122.png"
+    _write_png(primary)
+    _write_png(secondary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "fcsmc_page_visible",
+                            "state": "seen",
+                            "source_frame_id": "hallucinated_frame",
+                            "evidence_note": "Right DDI clearly shows the FCS-MC page.",
+                        }
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary, secondary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
+    assert facts_by_id["fcsmc_page_visible"].source_frame_id == "1772872444950_000122"
+    assert result.observation.metadata["coerced_source_frame_fact_ids"] == ["fcsmc_page_visible"]
+
+
 def test_vision_fact_extractor_preserves_model_summary_in_metadata(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     _write_png(primary)

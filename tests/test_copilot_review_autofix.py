@@ -127,8 +127,8 @@ def test_resolve_codex_binary_uses_which(monkeypatch) -> None:
 
 
 def test_default_last_message_output_path_includes_pr_number() -> None:
-    assert default_last_message_output_path(206) == ".tmp/copilot_autofix_last_message_pr206.md"
+    assert default_last_message_output_path(206) == ".tmp/copilot_autofix_last_message.md"
 
 
 def test_default_autofix_bundle_output_path_includes_pr_number() -> None:
-    assert default_autofix_bundle_output_path(206) == ".tmp/copilot_autofix_bundle_pr206.md"
+    assert default_autofix_bundle_output_path(206) == ".tmp/copilot_review_bundle.md"

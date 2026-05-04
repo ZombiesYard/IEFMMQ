@@ -321,33 +321,33 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
     ctx["vision_fact_summary"] = {
         "status": "available",
         "frame_ids": ["1772872444950_000122", "1772872445010_000123"],
-        "seen_fact_ids": ["fcs_reset_seen"],
-        "uncertain_fact_ids": ["fcs_bit_result_visible"],
+        "seen_fact_ids": ["fcs_page_visible"],
+        "uncertain_fact_ids": ["fcsmc_final_go_result_visible"],
         "not_seen_fact_ids": [],
-        "summary_text": "seen=fcs_reset_seen; uncertain=fcs_bit_result_visible",
+        "summary_text": "seen=fcs_page_visible; uncertain=fcsmc_final_go_result_visible",
     }
     ctx["vision_facts"] = [
         {
-            "fact_id": "fcs_reset_seen",
+            "fact_id": "fcs_page_visible",
             "state": "seen",
             "source_frame_id": "1772872445010_000123",
-            "evidence_note": "RESET cue visible on the FCS page.",
+            "evidence_note": "The left DDI clearly shows the FCS page body.",
         }
     ]
 
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
 
     assert payload["vision_fact_summary"]["status"] == "available"
-    assert payload["vision_fact_summary"]["seen_fact_ids"] == ["fcs_reset_seen"]
+    assert payload["vision_fact_summary"]["seen_fact_ids"] == ["fcs_page_visible"]
     assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]
-    assert "VISION_FACTS.fcs_reset_seen@1772872445010_000123" in payload["allowed_evidence_refs"]
+    assert "VISION_FACTS.fcs_page_visible@1772872445010_000123" in payload["allowed_evidence_refs"]
     assert payload["EVIDENCE_SOURCES"]["VISION_FACTS"] == [
         {
-            "ref": "VISION_FACTS.fcs_reset_seen@1772872445010_000123",
-            "fact_id": "fcs_reset_seen",
+            "ref": "VISION_FACTS.fcs_page_visible@1772872445010_000123",
+            "fact_id": "fcs_page_visible",
             "state": "seen",
             "source_frame_id": "1772872445010_000123",
-            "evidence_note": "RESET cue visible on the FCS page.",
+            "evidence_note": "The left DDI clearly shows the FCS page body.",
         }
     ]
     assert payload["decision_priority"][:3] == [
@@ -362,14 +362,14 @@ def test_prompt_requires_exact_visual_fact_refs_and_forbids_alias_names() -> Non
     ctx["vision_fact_summary"] = {
         "status": "available",
         "frame_ids": ["1773950407644_000006"],
-        "seen_fact_ids": ["bit_page_failure_visible"],
+        "seen_fact_ids": ["bit_root_page_visible"],
         "uncertain_fact_ids": [],
         "not_seen_fact_ids": [],
-        "summary_text": "seen=bit_page_failure_visible",
+        "summary_text": "seen=bit_root_page_visible",
     }
     ctx["vision_facts"] = [
         {
-            "fact_id": "bit_page_failure_visible",
+            "fact_id": "bit_root_page_visible",
             "state": "seen",
             "source_frame_id": "1773950407644_000006",
             "evidence_note": "BIT FAILURES line is clearly visible on the right DDI.",
@@ -379,7 +379,7 @@ def test_prompt_requires_exact_visual_fact_refs_and_forbids_alias_names() -> Non
     result = build_help_prompt_result(ctx, "en")
 
     assert "must exactly match a full entry from allowed_evidence_refs" in result.prompt
-    assert "bit_page_failure_visible" in result.prompt
+    assert "bit_root_page_visible" in result.prompt
     assert "right_ddi_bit_failures_page_visible" in result.prompt
 
 
@@ -648,21 +648,21 @@ def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
         "recent_actions": {"current_button": None, "recent_buttons": []},
         "vision_fact_summary": {
             "status": "available",
-            "seen_fact_ids": ["bit_page_visible", "left_ddi_fcs_option_visible"],
+            "seen_fact_ids": ["bit_root_page_visible", "supt_page_visible"],
             "not_seen_fact_ids": ["fcs_page_visible"],
         },
         "vision_facts": [
             {
-                "fact_id": "bit_page_visible",
+                "fact_id": "bit_root_page_visible",
                 "state": "seen",
                 "source_frame_id": "1772872445010_000123",
-                "evidence_note": "BIT page title is visible on the right DDI.",
+                "evidence_note": "BIT FAILURES/root page title is visible on the right DDI.",
             },
             {
-                "fact_id": "left_ddi_fcs_option_visible",
+                "fact_id": "supt_page_visible",
                 "state": "seen",
                 "source_frame_id": "1772872445010_000123",
-                "evidence_note": "Left DDI menu shows FCS selectable on PB15.",
+                "evidence_note": "Left DDI shows the SUPT cue, so PB15 leads into the FCS page.",
             },
         ],
         "deterministic_step_hint": {
@@ -673,7 +673,7 @@ def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
             "step_evidence_requirements": ["visual", "gate"],
             "visual_action_hint": {
                 "target": "left_mdi_pb15",
-                "reason": "BIT is already visible and FCS is selectable on PB15.",
+                "reason": "BIT root is already visible and the left DDI is on SUPT, so PB15 enters the FCS page.",
             },
         },
     }
