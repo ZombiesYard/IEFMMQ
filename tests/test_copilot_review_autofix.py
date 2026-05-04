@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
 from tools.copilot_review_autofix import (
@@ -96,10 +97,24 @@ def test_has_staged_changes_checks_git_diff_exit_code(monkeypatch) -> None:
 def test_resolve_codex_binary_prefers_explicit_existing_path(tmp_path: Path) -> None:
     codex_path = tmp_path / "codex"
     codex_path.write_text("#!/bin/sh\n", encoding="utf-8")
+    codex_path.chmod(codex_path.stat().st_mode | stat.S_IXUSR)
 
     resolved = resolve_codex_binary(str(codex_path))
 
     assert resolved == str(codex_path)
+
+
+def test_resolve_codex_binary_rejects_non_executable_explicit_path(tmp_path: Path) -> None:
+    codex_path = tmp_path / "codex"
+    codex_path.write_text("#!/bin/sh\n", encoding="utf-8")
+    codex_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+    try:
+        resolve_codex_binary(str(codex_path))
+    except RuntimeError as exc:
+        assert "is not executable" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("resolve_codex_binary should reject non-executable files")
 
 
 def test_resolve_codex_binary_uses_which(monkeypatch) -> None:

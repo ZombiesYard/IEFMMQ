@@ -5,6 +5,7 @@ Generate a Codex autofix prompt from Copilot review context and run `codex exec`
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,10 +24,7 @@ from tools.copilot_review_loop import (
 
 
 DEFAULT_LAST_MESSAGE_OUTPUT_TEMPLATE = ".tmp/copilot_autofix_last_message_pr{pr}.md"
-DEFAULT_CODEX_CANDIDATES = (
-    "codex",
-    "/mnt/c/Users/15423/.vscode/extensions/openai.chatgpt-26.429.30905-win32-x64/bin/linux-x86_64/codex",
-)
+DEFAULT_CODEX_CANDIDATES = ("codex",)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -202,20 +200,24 @@ def build_codex_exec_command(
     return cmd
 
 
+def _is_executable_file(path_text: str) -> bool:
+    path = Path(path_text)
+    return path.is_file() and os.access(path, os.X_OK)
+
+
 def resolve_codex_binary(explicit_path: str) -> str:
     if explicit_path.strip():
         candidate = explicit_path.strip()
-        if Path(candidate).is_file():
+        if _is_executable_file(candidate):
             return candidate
+        if Path(candidate).is_file():
+            raise RuntimeError(f"configured codex binary is not executable: {candidate}")
         raise RuntimeError(f"configured codex binary does not exist: {candidate}")
 
     for candidate in DEFAULT_CODEX_CANDIDATES:
         resolved = shutil.which(candidate)
         if resolved:
             return resolved
-        path_candidate = Path(candidate)
-        if path_candidate.is_file():
-            return str(path_candidate)
     raise RuntimeError(
         "could not locate `codex` in PATH; rerun with --codex-bin /path/to/codex"
     )
