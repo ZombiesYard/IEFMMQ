@@ -20,6 +20,12 @@ python -m tools.copilot_review_digest
 python -m tools.copilot_review_digest --pr 205
 ```
 
+### 2.1 只看最新提交之后的新 review
+
+```bash
+python -m tools.copilot_review_digest --pr 205 --since-latest-commit
+```
+
 ### 3. 输出到文件，方便直接复制或让其他工具读取
 
 ```bash
@@ -107,6 +113,12 @@ python3 -m tools.copilot_review_loop --pr 205 --output .tmp/copilot_review_bundl
 
 ```bash
 .tmp/copilot_review_bundle_pr205.md
+```
+
+如果你只想抓 **最新一次 push 之后** 的 Copilot review，而不是把旧评论也混进来，加上：
+
+```bash
+python3 -m tools.copilot_review_loop --pr 205 --since-latest-commit
 ```
 
 ### 重新请求 Copilot review
@@ -199,6 +211,12 @@ python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs
 
 ```bash
 python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs --dry-run
+```
+
+如果你只想让 Codex 处理**最新提交之后的新 review**，加上：
+
+```bash
+python3 -m tools.copilot_review_autofix --pr 205 --include-failed-run-logs --since-latest-commit
 ```
 
 这个模式适合先检查：

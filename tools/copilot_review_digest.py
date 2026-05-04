@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -62,6 +63,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--output",
         default="",
         help="Optional output file path. Defaults to stdout.",
+    )
+    parser.add_argument(
+        "--since-latest-commit",
+        action="store_true",
+        help="Only include Copilot comments created after the PR's latest head commit.",
     )
     return parser
 
@@ -150,6 +156,55 @@ def fetch_pr_metadata(repo: str, pr_number: int) -> dict[str, Any]:
     return dict(payload)
 
 
+def fetch_pr_latest_commit_at(repo: str, pr_number: int) -> str:
+    owner, name = repo.split("/", 1)
+    query = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      commits(last: 1) {
+        nodes {
+          commit {
+            committedDate
+            pushedDate
+          }
+        }
+      }
+    }
+  }
+}
+""".strip()
+    payload = json.loads(
+        _run_gh(
+            "api",
+            "graphql",
+            "-f",
+            f"query={query}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={pr_number}",
+        )
+    )
+    nodes = (
+        payload.get("data", {})
+        .get("repository", {})
+        .get("pullRequest", {})
+        .get("commits", {})
+        .get("nodes", [])
+    )
+    if not isinstance(nodes, list) or not nodes:
+        return ""
+    commit = (nodes[0] or {}).get("commit", {})
+    if not isinstance(commit, Mapping):
+        return ""
+    pushed_date = str(commit.get("pushedDate") or "").strip()
+    committed_date = str(commit.get("committedDate") or "").strip()
+    return pushed_date or committed_date
+
+
 def fetch_review_threads(repo: str, pr_number: int) -> list[dict[str, Any]]:
     owner, name = repo.split("/", 1)
     query = """
@@ -226,6 +281,7 @@ def normalize_threads(
     raw_threads: Sequence[Mapping[str, Any]],
     *,
     include_resolved: bool,
+    created_after: datetime | None = None,
 ) -> tuple[ReviewThread, ...]:
     normalized: list[ReviewThread] = []
     for item in raw_threads:
@@ -247,13 +303,18 @@ def normalize_threads(
                 login = str(author.get("login") or "").strip()
                 if not login or not is_copilot_login(login):
                     continue
+                created_at = str(raw.get("createdAt") or "").strip()
+                if created_after is not None:
+                    created_at_dt = _parse_github_datetime(created_at)
+                    if created_at_dt is not None and created_at_dt < created_after:
+                        continue
                 body = _normalize_body(str(raw.get("body") or ""))
                 comments.append(
                     ReviewComment(
                         author_login=login,
                         body=body,
                         url=str(raw.get("url") or "").strip(),
-                        created_at=str(raw.get("createdAt") or "").strip(),
+                        created_at=created_at,
                     )
                 )
         if not comments:
@@ -275,10 +336,34 @@ def _normalize_body(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-def build_digest(repo: str, pr_number: int, *, include_resolved: bool) -> PullRequestReviewDigest:
+def _parse_github_datetime(text: str) -> datetime | None:
+    value = text.strip()
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def build_digest(
+    repo: str,
+    pr_number: int,
+    *,
+    include_resolved: bool,
+    since_latest_commit: bool = False,
+) -> PullRequestReviewDigest:
     metadata = fetch_pr_metadata(repo, pr_number)
     raw_threads = fetch_review_threads(repo, pr_number)
-    threads = normalize_threads(raw_threads, include_resolved=include_resolved)
+    created_after = None
+    if since_latest_commit:
+        latest_commit_at = fetch_pr_latest_commit_at(repo, pr_number)
+        created_after = _parse_github_datetime(latest_commit_at)
+    threads = normalize_threads(
+        raw_threads,
+        include_resolved=include_resolved,
+        created_after=created_after,
+    )
     return PullRequestReviewDigest(
         repo=repo,
         number=pr_number,
@@ -425,7 +510,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         repo = resolve_repo_slug(args.repo)
         pr_number = resolve_pr_number(repo, args.pr)
-        digest = build_digest(repo, pr_number, include_resolved=bool(args.include_resolved))
+        digest = build_digest(
+            repo,
+            pr_number,
+            include_resolved=bool(args.include_resolved),
+            since_latest_commit=bool(args.since_latest_commit),
+        )
         if args.format == "markdown":
             rendered = render_markdown(digest)
         elif args.format == "json":

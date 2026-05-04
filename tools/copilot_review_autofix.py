@@ -39,6 +39,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Include resolved Copilot review threads in the digest.",
     )
     parser.add_argument(
+        "--since-latest-commit",
+        action="store_true",
+        help="Only include Copilot comments created after the PR's latest head commit.",
+    )
+    parser.add_argument(
         "--include-failed-run-logs",
         action="store_true",
         help="Include excerpts from failed GitHub Actions runs for the PR head commit.",
@@ -280,7 +285,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         repo = resolve_repo_slug(args.repo)
         pr_number = resolve_pr_number(repo, args.pr)
         snapshot = fetch_snapshot(repo, pr_number)
-        digest = build_digest(repo, pr_number, include_resolved=args.include_resolved)
+        digest = build_digest(
+            repo,
+            pr_number,
+            include_resolved=args.include_resolved,
+            since_latest_commit=args.since_latest_commit,
+        )
         failed_run_logs: tuple[FailedRunLog, ...] = ()
         if args.include_failed_run_logs:
             failed_run_logs = fetch_failed_run_logs(
