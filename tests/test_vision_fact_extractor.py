@@ -715,7 +715,7 @@ def test_vision_fact_extractor_downgrades_when_multimodal_rejected(tmp_path: Pat
     assert "Unknown field image_url" in str(result.error)
 
 
-def test_vision_fact_extractor_uses_only_successful_frame_ids_in_prompt_and_metadata(tmp_path: Path) -> None:
+def test_vision_fact_extractor_prompt_excludes_frame_ids(tmp_path: Path) -> None:
     primary = tmp_path / "1772872445010_000123.png"
     missing = tmp_path / "1772872444950_000122.png"
     _write_png(primary)

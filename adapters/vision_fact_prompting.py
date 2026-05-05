@@ -18,20 +18,29 @@ def _render_fact_list(fact_ids: list[str], *, empty_label: str) -> str:
 
 def build_vision_fact_prompt(
     *,
-    vision: Mapping[str, Any],
+    vision: Mapping[str, Any] | None = None,
     lang: str = "zh",
     config: Mapping[str, Any] | None = None,
 ) -> str:
+    del vision  # intentionally unused; kept for backward compat
     current_config = config if config is not None else load_vision_facts_config()
     fact_specs = current_config.get("facts_by_id", {})
     fact_ids = [fact_id for fact_id in fact_specs.keys() if isinstance(fact_id, str) and fact_id]
+    _include_instruction = (
+        "Include all configured facts. When unsure, use state='uncertain'."
+        if fact_ids
+        else "No facts are configured; output an empty facts array."
+    )
 
     if lang == "en":
         facts_block = _render_fact_list(fact_ids, empty_label="(none configured)")
-        example = (
-            '{"summary":"one short sentence","facts":[{"fact_id":"tac_page_visible",'
-            '"state":"seen","evidence_note":"short evidence"}]}'
-        )
+        if fact_ids:
+            example = (
+                '{"summary":"one short sentence","facts":[{"fact_id":"tac_page_visible",'
+                '"state":"seen","evidence_note":"short evidence"}]}'
+            )
+        else:
+            example = '{"summary":"one short sentence","facts":[]}'
         return (
             "You are the SimTutor visual fact extractor for the F/A-18C cold-start flow.\n"
             "The input contains one or two composite-panel images with fixed top-to-bottom regions: left_ddi, ampcd, right_ddi.\n"
@@ -73,17 +82,22 @@ def build_vision_fact_prompt(
             "- Do NOT output source_frame_id.\n"
             "- Do NOT output confidence, expires_after_ms, sticky, actions, or tutor advice.\n"
             "- Do NOT wrap the JSON in markdown or any extra prose.\n"
-            "- Include all configured facts. When unsure, use state='uncertain'.\n"
+            f"- {_include_instruction}\n"
             "\n"
             "Return format:\n"
             f"{example}"
         )
     else:
         facts_block = _render_fact_list(fact_ids, empty_label="（当前没有配置 fact）")
-        example = (
-            '{"summary":"一句短总结","facts":[{"fact_id":"tac_page_visible",'
-            '"state":"seen","evidence_note":"简短证据"}]}'
-        )
+        if fact_ids:
+            example = (
+                '{"summary":"一句短总结","facts":[{"fact_id":"tac_page_visible",'
+                '"state":"seen","evidence_note":"简短证据"}]}'
+            )
+            zh_include = "配置中的 facts 都要覆盖；拿不准时用 state='uncertain'。"
+        else:
+            example = '{"summary":"一句短总结","facts":[]}'
+            zh_include = "当前没有配置 fact；输出空的 facts 数组。"
         return (
             "你是 SimTutor 的视觉事实抽取器，负责 F/A-18C 冷启动流程的视觉事实判断。\n"
             "输入可能包含一张或两张组合面板图，固定从上到下依次是：left_ddi、ampcd、right_ddi。\n"
@@ -125,7 +139,7 @@ def build_vision_fact_prompt(
             "- 严禁输出 source_frame_id。\n"
             "- 严禁输出 confidence、expires_after_ms、sticky、actions 或 tutor advice。\n"
             "- 不要输出 markdown，也不要输出额外解释。\n"
-            "- 配置中的 facts 都要覆盖；拿不准时用 state='uncertain'。\n"
+            f"- {zh_include}\n"
             "\n"
             "返回格式：\n"
             f"{example}"

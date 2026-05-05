@@ -169,3 +169,31 @@ def test_vision_fact_prompt_stays_image_grounded_without_procedural_navigation_h
     assert "Do not infer from procedure history or expected step." in prompt
     assert "PB18" not in prompt
     assert "PB15" not in prompt
+
+
+def test_vision_fact_prompt_empty_config_yields_empty_facts_example_en() -> None:
+    """When no facts are configured, the en example must use an empty facts array."""
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="en",
+        config={"facts_by_id": {}},
+    )
+
+    assert "Facts to label:" in prompt
+    assert "(none configured)" in prompt
+    example_line = prompt.strip().splitlines()[-1]
+    assert example_line == '{"summary":"one short sentence","facts":[]}'
+
+
+def test_vision_fact_prompt_empty_config_yields_empty_facts_example_zh() -> None:
+    """When no facts are configured, the zh example must use an empty facts array."""
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="zh",
+        config={"facts_by_id": {}},
+    )
+
+    assert "需要标注的 fact：" in prompt
+    assert "（当前没有配置 fact）" in prompt
+    example_line = prompt.strip().splitlines()[-1]
+    assert example_line == '{"summary":"一句短总结","facts":[]}'
