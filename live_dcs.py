@@ -3156,13 +3156,6 @@ class LiveDcsTutorLoop:
                 if isinstance(hinted_target, str) and hinted_target:
                     action_target = hinted_target
                     override_kind = "action_hint"
-        if action_target is None:
-            visual_action_hint = hint.get("visual_action_hint")
-            if isinstance(visual_action_hint, Mapping):
-                hinted_target = visual_action_hint.get("target")
-                if isinstance(hinted_target, str) and hinted_target:
-                    action_target = hinted_target
-                    override_kind = "visual_action_hint"
         if not isinstance(action_target, str) or not action_target:
             return False, "missing_override_target"
 
@@ -3197,32 +3190,6 @@ class LiveDcsTutorLoop:
             return False, f"override_failed:{override_reason}"
 
         if (
-            inferred_step_id == "S08"
-            and override_kind == "visual_action_hint"
-            and action_target == "left_mdi_pb18"
-        ):
-            original_message = response.message
-            original_explanations = list(response.explanations)
-            if self.lang == "zh":
-                rewritten = (
-                    "当前左 DDI 仍在 TAC 页面，还不是 S08 所需的 FCS 页面。"
-                    "请先按 PB18 切到 SUPT 页面，待 FCS 选项出现后再进入 FCS 页面。"
-                )
-            else:
-                rewritten = (
-                    "The Left DDI is currently on the TAC (Tactical) page, not the required "
-                    "FCS (Flight Control System) page for Step S08. Press PB18 first to switch "
-                    "to the SUPT page, then select FCS once the option is visible."
-                )
-            response.message = rewritten
-            response.explanations = [rewritten]
-            if original_message != rewritten:
-                response.metadata["visual_action_hint_override_original_message"] = original_message
-            if original_explanations and original_explanations != [rewritten]:
-                response.metadata["visual_action_hint_override_original_explanations"] = original_explanations
-            response.metadata["visual_action_hint_override_used"] = True
-            response.metadata["visual_action_hint_override_target"] = action_target
-        elif (
             inferred_step_id == "S18"
             and override_kind == "action_hint"
             and action_target == "fcs_bit_switch"

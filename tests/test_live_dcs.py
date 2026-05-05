@@ -3005,7 +3005,7 @@ def test_prefer_navigation_target_from_vision_context_returns_left_pb15_for_expl
     assert targets == ["left_mdi_pb15"]
 
 
-def test_visual_action_hint_overlay_override_rewrites_s08_tac_guidance_to_pb18(tmp_path: Path) -> None:
+def test_visual_action_hint_does_not_override_existing_model_action(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_visual_action_hint_override_s08.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
 
@@ -3070,16 +3070,12 @@ def test_visual_action_hint_overlay_override_rewrites_s08_tac_guidance_to_pb18(t
 
         override_used, override_reason = loop._apply_action_hint_overlay_override(response, request)
 
-        assert override_used is True
-        assert override_reason == "deterministic_step:S08"
+        assert override_used is False
+        assert override_reason == "missing_override_target"
         assert response.actions
-        assert response.actions[0]["target"] == "left_mdi_pb18"
-        assert "Press PB18 first to switch to the SUPT page" in response.message
-        assert response.explanations == [response.message]
-        assert response.metadata["action_hint_overlay_override_kind"] == "visual_action_hint"
-        assert response.metadata["visual_action_hint_override_used"] is True
-        assert response.metadata["visual_action_hint_override_target"] == "left_mdi_pb18"
-        assert response.metadata["action_hint_overlay_override_original_targets"] == ["left_mdi_pb15"]
+        assert response.actions[0]["target"] == "left_mdi_pb15"
+        assert "Press PB15 to enter FCS" in response.message
+        assert response.metadata == {}
     finally:
         loop.close()
 
