@@ -753,7 +753,7 @@ def test_vision_fact_extractor_uses_only_successful_frame_ids_in_prompt_and_meta
     call = fake.calls[0]
     content = call["json"]["messages"][1]["content"]
     assert [item["type"] for item in content] == ["image_url", "text"]
-    assert '"frame_ids":["1772872445010_000123"]' in content[1]["text"]
+    assert "1772872445010_000123" not in content[1]["text"]
     assert "1772872444950_000122" not in content[1]["text"]
 
 
@@ -889,3 +889,31 @@ def test_vision_fact_extractor_schema_includes_supt_page_visible(tmp_path: Path)
     call = fake.calls[0]
     response_schema = call["json"]["response_format"]["json_schema"]["schema"]
     assert "supt_page_visible" in response_schema["properties"]["facts"]["items"]["properties"]["fact_id"]["enum"]
+
+
+def test_vision_fact_extractor_prompt_stays_image_grounded_without_runtime_bias(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(responses=[FakeResponse(_chat_payload([]), status_code=200)])
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+        lang="en",
+    )
+
+    result = extractor.extract(
+        {
+            **_vision_context(primary),
+            "status": "available",
+        },
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.status == "uncertain"
+    prompt = fake.calls[0]["json"]["messages"][1]["content"][-1]["text"]
+    assert "step_bindings" not in prompt
+    assert "primary_frame_id" not in prompt
+    assert "vision_status" not in prompt
+    assert "PB18" not in prompt
+    assert "PB15" not in prompt

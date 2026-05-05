@@ -83,8 +83,9 @@ def test_vision_fact_prompt_respects_explicit_empty_config() -> None:
         config={},
     )
 
-    assert '"facts":[]' in prompt
-    assert '"step_bindings":{}' in prompt
+    assert "Facts to label:" in prompt
+    assert "(none configured)" in prompt
+    assert "step_bindings" not in prompt
 
 
 def test_vision_fact_prompt_mentions_real_tac_supt_and_fcs_page_boundaries() -> None:
@@ -100,8 +101,7 @@ def test_vision_fact_prompt_mentions_real_tac_supt_and_fcs_page_boundaries() -> 
     assert "页面选项标签不等于页面本身" in prompt
     assert "tac_page_visible 需要实际 TAC/TAC MENU 页面" in prompt
     assert "supt_page_visible 需要实际 SUPT/SUPT MENU 页面" in prompt
-    assert "PB18" in prompt
-    assert "PB15" in prompt
+    assert "不要根据流程历史或预期步骤去推断" in prompt
     assert "LEF/TEF/AIL/RUD/STAB/SV1/SV2/CAS" in prompt
 
 
@@ -140,3 +140,32 @@ def test_vision_fact_prompt_lists_all_13_aligned_fact_ids() -> None:
 
     for fact_id in _minimal_config()["facts_by_id"]:
         assert fact_id in prompt
+
+
+def test_vision_fact_prompt_omits_runtime_step_binding_and_frame_metadata() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={
+            "frame_ids": ["1772872444950_000122", "1772872445010_000123"],
+            "frame_id": "1772872444950_000122",
+            "status": "available",
+        },
+        lang="en",
+        config=_minimal_config(),
+    )
+
+    assert "Context JSON:" not in prompt
+    assert "step_bindings" not in prompt
+    assert "primary_frame_id" not in prompt
+    assert "vision_status" not in prompt
+
+
+def test_vision_fact_prompt_stays_image_grounded_without_procedural_navigation_hints() -> None:
+    prompt = build_vision_fact_prompt(
+        vision={"frame_ids": ["1772872445010_000123"], "frame_id": "1772872445010_000123"},
+        lang="en",
+        config=_minimal_config(),
+    )
+
+    assert "Do not infer from procedure history or expected step." in prompt
+    assert "PB18" not in prompt
+    assert "PB15" not in prompt
