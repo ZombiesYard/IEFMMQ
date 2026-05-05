@@ -9,7 +9,7 @@ The vLLM venv under /scratch may survive while its original uv-managed base
 interpreter under /home gets cleaned, which leaves venv/bin/python broken.
 
 Example on remote host:
-    /usr/bin/python3 scripts/dev_launch_vllm.py
+    /usr/bin/python3.12 scripts/dev_launch_vllm.py
 """
 
 from __future__ import annotations
