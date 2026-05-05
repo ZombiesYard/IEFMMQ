@@ -514,6 +514,96 @@ def test_vision_fact_extractor_skips_invalid_typed_mapping_fact_entries_and_trac
     assert result.observation.metadata["sanitized_fact_count"] == 1
     assert result.observation.metadata["skipped_non_mapping_fact_count"] == 0
     assert result.observation.metadata["skipped_incomplete_mapping_fact_count"] == 1
+    assert result.observation.metadata["skipped_unknown_fact_id_count"] == 0
+
+
+def test_vision_fact_extractor_skips_unknown_fact_ids_and_tracks_count(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "supt_page_visible",
+                            "state": "seen",
+                            "source_frame_id": "1772872445010_000123",
+                            "evidence_note": "Left DDI clearly shows the SUPT page.",
+                        },
+                        {
+                            "fact_id": "unknown_fact_id",
+                            "state": "seen",
+                            "evidence_note": "This should be ignored.",
+                        },
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    facts_by_id = {fact.fact_id: fact for fact in result.observation.facts}
+    assert facts_by_id["supt_page_visible"].state == "seen"
+    assert "unknown_fact_id" not in facts_by_id
+    assert result.observation.metadata["ignored_model_fact_fields"] == {
+        "supt_page_visible": ["source_frame_id"]
+    }
+    assert result.observation.metadata["raw_fact_count"] == 2
+    assert result.observation.metadata["sanitized_fact_count"] == 1
+    assert result.observation.metadata["skipped_unknown_fact_id_count"] == 1
+
+
+def test_vision_fact_extractor_merges_ignored_fields_across_duplicate_fact_ids(tmp_path: Path) -> None:
+    primary = tmp_path / "1772872445010_000123.png"
+    _write_png(primary)
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                _chat_payload(
+                    [
+                        {
+                            "fact_id": "supt_page_visible",
+                            "state": "seen",
+                            "source_frame_id": "1772872445010_000123",
+                            "evidence_note": "First duplicate entry.",
+                        },
+                        {
+                            "fact_id": "supt_page_visible",
+                            "state": "seen",
+                            "confidence": 0.99,
+                            "evidence_note": "Second duplicate entry.",
+                        },
+                    ]
+                )
+            )
+        ]
+    )
+    extractor = VisionFactExtractor(
+        client=fake,
+        allowed_local_image_roots=[str(tmp_path)],
+    )
+
+    result = extractor.extract(
+        _vision_context(primary),
+        session_id="sess-live",
+        trigger_wall_ms=1772872445000,
+    )
+
+    assert result.observation is not None
+    assert result.observation.metadata["ignored_model_fact_fields"] == {
+        "supt_page_visible": ["confidence", "source_frame_id"]
+    }
 
 
 def test_vision_fact_extractor_raises_clear_error_when_facts_is_not_a_list(tmp_path: Path) -> None:

@@ -105,7 +105,9 @@ def _sanitize_model_response(
             ]
             fact["fact_id"] = fact_id
             if ignored_fields:
-                ignored[fact_id] = sorted(ignored_fields)
+                merged_ignored_fields = set(ignored.get(fact_id, ()))
+                merged_ignored_fields.update(ignored_fields)
+                ignored[fact_id] = sorted(merged_ignored_fields)
             fact["state"] = state
             fact["evidence_note"] = evidence_note
             sanitized_facts.append(fact)
