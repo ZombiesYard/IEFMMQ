@@ -66,13 +66,6 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.rpm_r": ("eng_crank_switch", "throttle_quadrant_reference"),
     "vars.throttle_r_idle_complete": ("throttle_quadrant_reference",),
 }
-_VISION_MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
-    "vision_facts.fcs_page_visible": (
-        "left_mdi_pb15",
-        "left_mdi_pb18",
-        "left_mdi_brightness_selector",
-    ),
-}
 _DEFAULT_INTERACTION_POLICY_TEXT = {
     "zh": {
         "two_position": "2 位开关要明确说左键还是右键。",
@@ -531,27 +524,27 @@ def _build_overlay_target_priority(
     recent_actions_signal: Mapping[str, Any],
     deterministic_step_hint: Mapping[str, Any],
     recent_deltas_summary: Mapping[str, Any],
-) -> list[str]:
+) -> tuple[list[str], bool]:
     if not overlay_targets:
-        return []
+        return [], False
 
     allowed_targets = set(overlay_targets)
     ranked: list[str] = []
     seen: set[str] = set()
+    has_priority_signal = False
 
-    def _append_if_allowed(value: Any) -> None:
+    def _append_if_allowed(value: Any, *, marks_priority: bool = False) -> None:
+        nonlocal has_priority_signal
         if not isinstance(value, str) or not value or value not in allowed_targets or value in seen:
             return
         seen.add(value)
         ranked.append(value)
+        if marks_priority:
+            has_priority_signal = True
 
     action_hint = deterministic_step_hint.get("action_hint")
     if isinstance(action_hint, Mapping):
-        _append_if_allowed(action_hint.get("target"))
-
-    visual_action_hint = deterministic_step_hint.get("visual_action_hint")
-    if isinstance(visual_action_hint, Mapping):
-        _append_if_allowed(visual_action_hint.get("target"))
+        _append_if_allowed(action_hint.get("target"), marks_priority=True)
 
     missing_conditions = deterministic_step_hint.get("missing_conditions")
     if isinstance(missing_conditions, list):
@@ -560,43 +553,40 @@ def _build_overlay_target_priority(
                 continue
             matched = re.match(r"^(vars\.[A-Za-z0-9_]+)\s*(?:==|!=|>=|<=|>|<)", item.strip())
             if matched is None:
-                vision_matched = re.match(
-                    r"^(vision_facts\.[A-Za-z0-9_]+)\s*(?:==|!=|>=|<=|>|<)",
-                    item.strip(),
-                )
-                if vision_matched is None:
-                    continue
-                for target in _VISION_MISSING_CONDITION_TARGET_HINTS.get(vision_matched.group(1), ()):
-                    _append_if_allowed(target)
                 continue
             for target in _MISSING_CONDITION_TARGET_HINTS.get(matched.group(1), ()):
-                _append_if_allowed(target)
+                _append_if_allowed(target, marks_priority=True)
 
     hint_targets = deterministic_step_hint.get("recent_ui_targets")
     if isinstance(hint_targets, list):
         for item in hint_targets:
-            _append_if_allowed(item)
+            _append_if_allowed(item, marks_priority=True)
 
-    _append_if_allowed(recent_actions_signal.get("current_button"))
+    _append_if_allowed(recent_actions_signal.get("current_button"), marks_priority=True)
 
     recent_buttons = recent_actions_signal.get("recent_buttons")
     if isinstance(recent_buttons, list):
         for item in recent_buttons:
-            _append_if_allowed(item)
+            _append_if_allowed(item, marks_priority=True)
 
     delta_items = recent_deltas_summary.get("items")
     if isinstance(delta_items, list):
         for item in delta_items:
             if isinstance(item, Mapping):
-                _append_if_allowed(item.get("ui_target"))
+                _append_if_allowed(item.get("ui_target"), marks_priority=True)
 
     for target in overlay_targets:
         _append_if_allowed(target)
 
-    return ranked[:MAX_PRIORITY_OVERLAY_TARGETS]
+    return ranked[:MAX_PRIORITY_OVERLAY_TARGETS], has_priority_signal
 
 
-def _build_overlay_target_policy(priority_targets: list[str], *, max_targets: int = 1) -> dict[str, Any]:
+def _build_overlay_target_policy(
+    priority_targets: list[str],
+    *,
+    max_targets: int = 1,
+    has_priority_signal: bool = True,
+) -> dict[str, Any]:
     effective_max_targets = max(0, int(max_targets))
     if effective_max_targets == 0:
         mode = "overlay_disabled"
@@ -608,7 +598,7 @@ def _build_overlay_target_policy(priority_targets: list[str], *, max_targets: in
         "mode": mode,
         "max_targets": effective_max_targets,
         "empty_overlay_if_uncertain": True,
-        "preferred_target": priority_targets[0] if priority_targets else None,
+        "preferred_target": priority_targets[0] if priority_targets and has_priority_signal else None,
         "candidate_targets_in_priority_order": list(priority_targets),
     }
 
@@ -1202,7 +1192,7 @@ def build_help_prompt_result(
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，且 quote 最长 120 字符。",
             "deterministic_step_hint.step_evidence_requirements 仅表示步骤证据偏好，不等于 overlay.evidence.type 枚举。",
             "若 deterministic_step_hint.action_hint.target 存在，且与当前 vars / missing_conditions 不冲突，应优先把它作为单目标候选。",
-            "若 deterministic_step_hint.visual_action_hint.target 存在，且与 vision_fact_summary / allowed_evidence_refs 不冲突，应优先把它作为单目标候选。",
+            "deterministic_step_hint.visual_action_hint 只可作为弱提示：当没有更强的 vars / gate / recent / delta / 直接视觉证据时，可用于 explanation 或 fallback 参考，但不得覆盖更强证据。",
             "凡是指导用户操作控件时，必须明确写出具体交互方式：左键、右键、鼠标滚轮方向，或键盘热键；不要只说“点击/拨到/打开”。优先使用 interaction_policy 与 target_interaction_hints 中的明确提示。",
             "若 deterministic_step_hint.inferred_step_id='S08' 且 deterministic_step_hint.overlay_step_id='S09'，并且 deterministic_step_hint.action_hint.target='ufc_comm1_channel_selector_pull'，说明 S08 已满足、help 应直接引导进入 S09；此时不得继续高亮任何 left_mdi_* 目标，应直接高亮 UFC COMM1 频道选择旋钮。",
             "vision_fact_summary 只能辅助 diagnosis/next/explanations；若使用视觉证据，高亮必须引用 allowed_evidence_refs 中的 VISION_FACTS.* ref，并与实际 frame_id 可追溯。",
@@ -1267,7 +1257,7 @@ def build_help_prompt_result(
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence, and quote length must be <= 120 chars.",
             "deterministic_step_hint.step_evidence_requirements describes step-level evidence preference only; it is not the overlay.evidence.type enum.",
             "If deterministic_step_hint.action_hint.target is present and consistent with current vars / missing_conditions, prefer it as the single overlay candidate.",
-            "If deterministic_step_hint.visual_action_hint.target is present and consistent with vision_fact_summary / allowed_evidence_refs, prefer it as the single overlay candidate.",
+            "Treat deterministic_step_hint.visual_action_hint only as a weak cue. Use it for explanation or fallback only when stronger vars/gate/recent/delta/direct-visual evidence is unavailable, and never let it override stronger evidence.",
             "Whenever you tell the user how to operate a control, explicitly name the exact interaction: left-click, right-click, mouse-wheel direction, or keyboard hotkey. Do not say only 'click/toggle/set'. Prefer the explicit guidance in interaction_policy and target_interaction_hints.",
             "If deterministic_step_hint.inferred_step_id='S08' while deterministic_step_hint.overlay_step_id='S09' and deterministic_step_hint.action_hint.target='ufc_comm1_channel_selector_pull', treat S08 as already satisfied for help guidance and immediately highlight the UFC COMM1 channel selector; do not keep any left_mdi_* target in this case.",
             "vision_fact_summary may support diagnosis/next/explanations. If you use visual evidence for overlay, cite an allowed VISION_FACTS.* ref that remains traceable to the frame_id.",
@@ -1322,7 +1312,7 @@ def build_help_prompt_result(
     current_overlay_evidence_contract = _build_overlay_evidence_contract([])
     overlay_targets = list(overlay_targets)
 
-    initial_overlay_target_priority = _build_overlay_target_priority(
+    initial_overlay_target_priority, _initial_has_overlay_priority_signal = _build_overlay_target_priority(
         overlay_targets,
         recent_actions_signal,
         deterministic_step_hint,
@@ -1340,7 +1330,7 @@ def build_help_prompt_result(
             vision_facts=context.get("vision_facts"),
         )
         allowed_refs = refs
-        overlay_target_priority = _build_overlay_target_priority(
+        overlay_target_priority, has_overlay_priority_signal = _build_overlay_target_priority(
             overlay_targets,
             recent_actions_signal,
             deterministic_step_hint,
@@ -1349,6 +1339,7 @@ def build_help_prompt_result(
         current_overlay_target_policy = _build_overlay_target_policy(
             overlay_target_priority,
             max_targets=effective_max_overlay_targets,
+            has_priority_signal=has_overlay_priority_signal,
         )
         current_overlay_evidence_contract = _build_overlay_evidence_contract(allowed_refs)
         interaction_policy = _build_interaction_policy(lang, ui_map_path=ui_map_path)

@@ -630,7 +630,7 @@ def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
     assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "hud_symbology_brightness_knob"
 
 
-def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
+def test_prompt_keeps_visual_action_hint_for_s08_without_promoting_it_to_preferred_target() -> None:
     ctx = {
         "candidate_steps": ["S08"],
         "overlay_target_allowlist": [
@@ -681,8 +681,12 @@ def test_prompt_prioritizes_visual_action_hint_for_s08_fcs_entry() -> None:
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
 
     assert payload["deterministic_step_hint"]["visual_action_hint"]["target"] == "left_mdi_pb15"
-    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_pb15"
-    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "left_mdi_pb15"
+    assert payload["overlay_target_policy"]["preferred_target"] is None
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"] == [
+        "left_mdi_pb18",
+        "left_mdi_pb15",
+        "left_mdi_brightness_selector",
+    ]
 
 
 def test_prompt_prioritizes_action_hint_for_s09_ufc_entry() -> None:
@@ -759,7 +763,7 @@ def test_prompt_explicitly_redirects_completed_s08_help_to_s09_comm1_selector() 
     assert "immediately highlight the UFC COMM1 channel selector" in prompt
 
 
-def test_prompt_trim_keeps_s08_fcs_navigation_target_ahead_of_noisy_recent_actions() -> None:
+def test_prompt_trim_no_longer_forces_s08_navigation_target_ahead_of_recent_signals() -> None:
     ctx = {
         "candidate_steps": ["S08", "S10", "S11", "S12"],
         "overlay_target_allowlist": [
@@ -818,8 +822,8 @@ def test_prompt_trim_keeps_s08_fcs_navigation_target_ahead_of_noisy_recent_actio
     )
     payload = json.loads(constraints_line[len("constraints=") :])
 
-    assert payload["allowed_overlay_targets"] == ["left_mdi_pb15"]
-    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_pb15"
+    assert payload["allowed_overlay_targets"] == ["hud_symbology_brightness_knob"]
+    assert payload["overlay_target_policy"]["preferred_target"] == "hud_symbology_brightness_knob"
     assert payload["multimodal_input"]["attached"] is True
 
 
