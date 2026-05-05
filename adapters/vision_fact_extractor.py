@@ -61,11 +61,14 @@ def _vision_fact_response_schema(*, fact_ids: Sequence[str]) -> dict[str, Any]:
 
 def _sanitize_model_response(
     obj: Mapping[str, Any],
-) -> tuple[dict[str, Any], dict[str, list[str]], int, int]:
+    *,
+    valid_fact_ids: frozenset[str] | None = None,
+) -> tuple[dict[str, Any], dict[str, list[str]], int, int, int]:
     sanitized: dict[str, Any] = {}
     ignored: dict[str, list[str]] = {}
     skipped_non_mapping_fact_count = 0
     skipped_incomplete_mapping_fact_count = 0
+    skipped_unknown_fact_id_count = 0
 
     summary = obj.get("summary")
     if isinstance(summary, str):
@@ -91,6 +94,9 @@ def _sanitize_model_response(
             if not has_required_fields:
                 skipped_incomplete_mapping_fact_count += 1
                 continue
+            if valid_fact_ids is not None and fact_id not in valid_fact_ids:
+                skipped_unknown_fact_id_count += 1
+                continue
             fact: dict[str, Any] = {}
             ignored_fields = [
                 key
@@ -105,7 +111,7 @@ def _sanitize_model_response(
             sanitized_facts.append(fact)
         sanitized["facts"] = sanitized_facts
 
-    return sanitized, ignored, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count
+    return sanitized, ignored, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count, skipped_unknown_fact_id_count
 
 @dataclass
 class VisionFactExtractionResult:
@@ -474,7 +480,9 @@ class VisionFactExtractor:
         raw_facts = obj.get("facts")
         if raw_facts is not None and not isinstance(raw_facts, list):
             raise ValueError("vision fact response facts must be a list")
-        sanitized_obj, ignored_fact_fields, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count = _sanitize_model_response(obj)
+        sanitized_obj, ignored_fact_fields, skipped_non_mapping_fact_count, skipped_incomplete_mapping_fact_count, skipped_unknown_fact_id_count = _sanitize_model_response(
+            obj, valid_fact_ids=frozenset(self._fact_ids)
+        )
         self._response_validator.validate(sanitized_obj)
         facts_raw = sanitized_obj.get("facts")
         if not isinstance(facts_raw, list):
@@ -537,6 +545,7 @@ class VisionFactExtractor:
                 "ignored_model_fact_fields": ignored_fact_fields,
                 "skipped_non_mapping_fact_count": skipped_non_mapping_fact_count,
                 "skipped_incomplete_mapping_fact_count": skipped_incomplete_mapping_fact_count,
+                "skipped_unknown_fact_id_count": skipped_unknown_fact_id_count,
             },
         )
 

@@ -27,6 +27,61 @@
 - Git remote:
   `https://github.com/ZombiesYard/IEFMMQ.git`
 
+### 本地 Python / 测试环境（这点非常重要）
+
+仓库元数据里能看到：
+
+- `pyproject.toml` 使用 Poetry 风格依赖声明
+- 仓库根目录存在 `uv.lock`
+- `README.md` 里的通用示例偏向：
+  `python -m venv .venv` / `python -m pytest -q`
+
+但**当前这台本地工作机上，最稳妥、已经实际验证通过的测试入口不是这些通用示例，而是下面这套命令**：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate
+PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q
+```
+
+原因与经验规则：
+
+- 当前工作机会话里，系统默认 Python 不一定装全测试依赖
+- 我们真实遇到过：
+  `pytest` 收集阶段报
+  `ModuleNotFoundError: No module named 'PIL'`
+- 但切到
+  `~/venvs/iefmmq-wsl`
+  后，这些测试可以正常跑
+- 同时，这个环境下显式带上：
+  `PYTHONPATH=/usr/lib/python3/dist-packages`
+  是当前已验证可用的稳妥做法
+
+因此：
+
+- **如果只是看仓库文件，看到 `uv.lock` 不代表当前本地测试一定要用 `uv run`**
+- **如果只是看 README，看到 `.venv` 示例也不代表当前机器上 `.venv` 一定存在且可用**
+- 对这个仓库在当前工作机上的本地测试，优先使用：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q
+```
+
+如果需要跑单测子集，沿用同一入口，例如：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q tests/test_vision_fact_extractor.py
+```
+
+补充理解：
+
+- 另一个模型/对话如果用了 `uv`，通常不是“逻辑上必须用 uv”
+- 更可能是因为：
+  - 仓库里有 `uv.lock`
+  - 远程 vLLM 相关环境历史上确实出现过 uv-managed Python
+  - 有些 agent 会把“看见 `uv.lock`”当成优先信号
+- 但对**当前本地仓库测试**来说，我们已经有更可靠的经验：  
+  **优先用 `~/venvs/iefmmq-wsl`，不要默认切到 `uv run`**
+
 ### 远程服务器
 
 - SSH:

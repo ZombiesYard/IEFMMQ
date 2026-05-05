@@ -1,5 +1,9 @@
 """Launch vLLM serve with Qwen3.5-9B-Base + SimTutor LoRA.
 
+This is a yz50/cloud-247-specific dev/deploy helper.
+It intentionally targets the current remote scratch layout under /scratch/yz50
+and is not intended to be a portable launcher for arbitrary hosts.
+
 Run this helper with a working system Python, not the vLLM venv Python.
 The vLLM venv under /scratch may survive while its original uv-managed base
 interpreter under /home gets cleaned, which leaves venv/bin/python broken.
@@ -56,12 +60,26 @@ def _repair_broken_venv_python() -> None:
     if not cfg_path.exists():
         return
 
+    version_str = ""
+    try:
+        result = subprocess.run(
+            [str(SYSTEM_PYTHON), "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            version_str = result.stdout.strip()
+    except Exception:
+        pass
+
     rewritten: list[str] = []
     for line in cfg_path.read_text(encoding="utf-8").splitlines():
         if line.startswith("home = "):
             rewritten.append("home = /usr/bin")
         elif line.startswith("version_info = "):
-            rewritten.append("version_info = 3.12.3")
+            if version_str:
+                rewritten.append(f"version_info = {version_str}")
+            else:
+                rewritten.append(line)
         elif line.startswith("uv = "):
             continue
         else:

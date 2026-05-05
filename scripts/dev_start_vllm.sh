@@ -1,5 +1,9 @@
 #!/bin/tcsh -f
 
+# yz50/cloud-247-specific dev/deploy helper.
+# This script intentionally hard-codes the current /scratch/yz50 layout and
+# is not intended to be a portable launcher for arbitrary hosts.
+
 set VENV_DIR=/scratch/yz50/vllm_qwen35/venv
 set VLLM_BIN=$VENV_DIR/bin/vllm
 set VENV_PY=$VENV_DIR/bin/python3
