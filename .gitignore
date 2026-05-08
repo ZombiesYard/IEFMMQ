@@ -43,6 +43,9 @@ logs/thesisproposal1128_extract.txt
 Doc/Engineering
 contractV03.md
 contractV04.md
-
+paperwork/
+.github/copilot-instructions.md
+CLAUDE.md
+.vscode/
 # Local Label Studio state
 .label_studio/
