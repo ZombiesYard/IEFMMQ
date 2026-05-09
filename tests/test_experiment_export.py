@@ -15,7 +15,12 @@ from core.experiment_export import (
 # ── helpers ────────────────────────────────────────────────────────────
 
 def _make_events_with_help_cycles() -> list[dict]:
-    """Synthetic event log covering one session with two help cycles."""
+    """Synthetic event log covering one session with two help cycles.
+
+    Event structure mirrors production (live_dcs._sanitize_*_payload_for_event):
+    - event["metadata"] = normalized audit subset
+    - event["payload"]["metadata"] = full request/response metadata (rich fields)
+    """
     t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
     t1 = datetime(2026, 5, 9, 10, 0, 5, tzinfo=timezone.utc)
     t2 = datetime(2026, 5, 9, 10, 0, 12, tzinfo=timezone.utc)
@@ -42,7 +47,7 @@ def _make_events_with_help_cycles() -> list[dict]:
             "session_id": session_id,
             "timestamp": t0.isoformat(),
         },
-        # --- help cycle 1 ---
+        # --- help cycle 1 (model, vision available) ---
         {
             "kind": "tutor_request",
             "payload": {
@@ -51,9 +56,13 @@ def _make_events_with_help_cycles() -> list[dict]:
                     "deterministic_step_hint": {
                         "inferred_step_id": "S01",
                         "missing_conditions": ["battery_on"],
-                        "observability_status": "observable",
-                        "requires_visual_confirmation": False,
                     },
+                },
+                "metadata": {
+                    "help_cycle_id": cycle_1_id,
+                    "vision_status": "available",
+                    "vision_fact_status": "ok",
+                    "vision_used": True,
                 },
             },
             "t_wall": 5.0,
@@ -71,7 +80,6 @@ def _make_events_with_help_cycles() -> list[dict]:
                 "fused_step_id": "S01",
                 "fused_missing_conditions": ["battery_on"],
                 "layout_id": "v2",
-                "generation_mode": "model",
             },
             "timestamp": t1.isoformat(),
         },
@@ -90,6 +98,27 @@ def _make_events_with_help_cycles() -> list[dict]:
                 "actions": [
                     {"type": "highlight", "target": "battery_switch", "element_id": "pnt_301"}
                 ],
+                "metadata": {
+                    "help_response": {
+                        "diagnosis": {"step_id": "S01", "error_category": "OM"},
+                        "next": {"step_id": "S01"},
+                        "overlay": {
+                            "targets": ["battery_switch"],
+                            "evidence": [{"target": "battery_switch", "type": "gate", "ref": "GATES.battery_on"}],
+                        },
+                    },
+                    "response_mapping": {
+                        "executed": [{"target": "battery_switch", "type": "highlight"}],
+                        "rejected": [],
+                        "dropped": [],
+                    },
+                    "generation_mode": "model",
+                    "fallback_overlay_used": False,
+                    "fallback_overlay_reason": "not_needed",
+                    "observability_status": "observable",
+                    "requires_visual_confirmation": False,
+                    "scenario_profile": "airfield",
+                },
             },
             "t_wall": 5.5,
             "session_id": session_id,
@@ -104,32 +133,6 @@ def _make_events_with_help_cycles() -> list[dict]:
                 "fused_step_id": "S01",
                 "fused_missing_conditions": ["battery_on"],
                 "layout_id": "v2",
-                "help_response": {
-                    "diagnosis": {"step_id": "S01", "error_category": "OM"},
-                    "next": {"step_id": "S01"},
-                    "overlay": {
-                        "targets": ["battery_switch"],
-                        "evidence": [
-                            {
-                                "target": "battery_switch",
-                                "type": "gate",
-                                "ref": "GATES.battery_on",
-                                "quote": "Battery not yet on.",
-                                "grounding_confidence": 0.95,
-                            }
-                        ],
-                    },
-                },
-                "response_mapping": {
-                    "executed": [{"target": "battery_switch", "type": "highlight"}],
-                    "rejected": [],
-                    "dropped": [],
-                },
-                "fallback_overlay_used": False,
-                "fallback_overlay_reason": "not_needed",
-                "observability_status": "observable",
-                "requires_visual_confirmation": False,
-                "scenario_profile": "airfield",
             },
             "timestamp": t2.isoformat(),
         },
@@ -148,7 +151,7 @@ def _make_events_with_help_cycles() -> list[dict]:
             "t_wall": 9.0,
             "session_id": session_id,
         },
-        # --- help cycle 2 (with vision fallback) ---
+        # --- help cycle 2 (fallback, vision sync miss) ---
         {
             "kind": "tutor_request",
             "payload": {
@@ -157,9 +160,13 @@ def _make_events_with_help_cycles() -> list[dict]:
                     "deterministic_step_hint": {
                         "inferred_step_id": "S02",
                         "missing_conditions": ["left_ddi_on"],
-                        "observability_status": "requires_visual",
-                        "requires_visual_confirmation": True,
                     },
+                },
+                "metadata": {
+                    "help_cycle_id": cycle_2_id,
+                    "vision_status": "sync_miss",
+                    "vision_fact_status": "vision_unavailable",
+                    "vision_used": False,
                 },
             },
             "t_wall": 12.0,
@@ -171,12 +178,10 @@ def _make_events_with_help_cycles() -> list[dict]:
                 "vision_status": "sync_miss",
                 "vision_fact_status": "vision_unavailable",
                 "vision_used": False,
-                "sync_delta_ms": None,
                 "vision_fallback_reason": "vision_sync_miss",
                 "fused_step_id": "S02",
                 "fused_missing_conditions": ["left_ddi_on"],
                 "layout_id": "v2",
-                "generation_mode": "fallback",
             },
             "timestamp": t3.isoformat(),
         },
@@ -197,10 +202,7 @@ def _make_events_with_help_cycles() -> list[dict]:
             "t_wall": 12.4,
             "session_id": session_id,
             "related_id": cycle_2_id,
-            "metadata": {
-                "help_cycle_id": cycle_2_id,
-                "generation_mode": "fallback",
-            },
+            "metadata": {"help_cycle_id": cycle_2_id},
         },
         {
             "kind": "tutor_response",
@@ -208,6 +210,24 @@ def _make_events_with_help_cycles() -> list[dict]:
                 "status": "error",
                 "message": "无法确认左DDI状态，请检查亮度旋钮。",
                 "actions": [],
+                "metadata": {
+                    "help_response": {
+                        "diagnosis": {"step_id": "S02", "error_category": "OM"},
+                        "next": {"step_id": "S02"},
+                    },
+                    "response_mapping": {
+                        "executed": [],
+                        "rejected": [{"target": "left_mdi_brightness_selector", "reason": "evidence_missing"}],
+                        "dropped": [],
+                    },
+                    "response_mapping_failure_codes": ["vision_sync_miss"],
+                    "generation_mode": "fallback",
+                    "fallback_overlay_used": True,
+                    "fallback_overlay_reason": "vision_sync_miss",
+                    "observability_status": "requires_visual",
+                    "requires_visual_confirmation": True,
+                    "scenario_profile": "airfield",
+                },
             },
             "t_wall": 12.5,
             "session_id": session_id,
@@ -220,21 +240,6 @@ def _make_events_with_help_cycles() -> list[dict]:
                 "fused_step_id": "S02",
                 "fused_missing_conditions": ["left_ddi_on"],
                 "layout_id": "v2",
-                "help_response": {
-                    "diagnosis": {"step_id": "S02", "error_category": "OM"},
-                    "next": {"step_id": "S02"},
-                },
-                "response_mapping": {
-                    "executed": [],
-                    "rejected": [{"target": "left_mdi_brightness_selector", "reason": "evidence_missing"}],
-                    "dropped": [],
-                },
-                "response_mapping_failure_codes": ["vision_sync_miss"],
-                "fallback_overlay_used": True,
-                "fallback_overlay_reason": "vision_sync_miss",
-                "observability_status": "requires_visual",
-                "requires_visual_confirmation": True,
-                "scenario_profile": "airfield",
             },
             "timestamp": t3.isoformat(),
         },

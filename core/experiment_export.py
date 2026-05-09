@@ -154,44 +154,28 @@ class ExperimentExport:
 def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Group events by help_cycle_id and build per-cycle records."""
 
-    # index: help_cycle_id → events
     cycles: dict[str, dict[str, Any]] = {}
-    cycle_meta_index: dict[str, dict[str, Any]] = {}
     cycle_order: list[str] = []
 
     for ev in events:
         kind = ev.get("kind") or ev.get("type") or ""
-        metadata = ev.get("metadata")
-        if not isinstance(metadata, Mapping):
-            metadata = {}
-        payload = ev.get("payload")
-        if not isinstance(payload, Mapping):
-            payload = {}
+        ev_meta = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
+        payload = ev.get("payload") if isinstance(ev.get("payload"), Mapping) else {}
 
-        cid = metadata.get("help_cycle_id")
-        if not isinstance(cid, str) or not cid:
-            # try payload-level
-            cid = payload.get("help_cycle_id")
+        cid = ev_meta.get("help_cycle_id") or payload.get("help_cycle_id")
         if not isinstance(cid, str) or not cid:
             continue
 
         if cid not in cycles:
             cycles[cid] = {}
             cycle_order.append(cid)
-            cycle_meta_index[cid] = metadata
 
         bucket = cycles[cid]
 
         if kind == "tutor_request":
             bucket["request"] = ev
-            # merge request audit metadata
-            request_meta = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
-            cycle_meta_index[cid] = {**cycle_meta_index.get(cid, {}), **dict(request_meta)}
         elif kind == "tutor_response":
             bucket["response"] = ev
-            response_meta = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
-            cycle_meta_index[cid] = {**cycle_meta_index.get(cid, {}), **dict(response_meta)}
-            # per-action overlay events are keyed by target
         elif kind == "overlay_dry_run":
             bucket.setdefault("overlay_dry_runs", []).append(ev)
         elif kind == "overlay_rejected":
@@ -203,44 +187,81 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
 
         request_ev = bucket.get("request", {})
         response_ev = bucket.get("response", {})
-        response_payload = response_ev.get("payload") if isinstance(response_ev.get("payload"), Mapping) else {}
-        response_meta = response_ev.get("metadata") if isinstance(response_ev.get("metadata"), Mapping) else {}
-        request_meta = request_ev.get("metadata") if isinstance(request_ev.get("metadata"), Mapping) else {}
 
-        # overlay targets from dry_run events
+        # Merge metadata from both event-level and payload-level.
+        # In real logs, rich fields (help_response, response_mapping,
+        # fallback_overlay_used, observability_status, etc.) reside in
+        # payload["metadata"] — see live_dcs._sanitize_*_payload_for_event.
+        def _merged_meta(ev: Mapping[str, Any]) -> dict[str, Any]:
+            ev_meta = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
+            pl_meta = ev.get("payload", {}).get("metadata") if isinstance(ev.get("payload", {}).get("metadata"), Mapping) else {}
+            return {**ev_meta, **pl_meta}
+
+        request_meta = _merged_meta(request_ev)
+        response_meta = _merged_meta(response_ev)
+        response_payload = response_ev.get("payload") if isinstance(response_ev.get("payload"), Mapping) else {}
+
+        # overlay targets: prefer dry_run events; fall back to response
+        # payload actions and help_response overlay targets.
         dry_runs = bucket.get("overlay_dry_runs", [])
         overlay_targets: list[str] = []
         for dr in dry_runs:
             dr_payload = dr.get("payload") if isinstance(dr.get("payload"), Mapping) else {}
             target = dr_payload.get("target") or dr_payload.get("element_id")
-            if isinstance(target, str) and target:
+            if isinstance(target, str) and target and target not in overlay_targets:
                 overlay_targets.append(target)
+        if not overlay_targets:
+            # Fallback 1: response.actions
+            actions = response_payload.get("actions")
+            if isinstance(actions, list):
+                for act in actions:
+                    if isinstance(act, Mapping):
+                        target = act.get("target") or act.get("element_id")
+                        if isinstance(target, str) and target and target not in overlay_targets:
+                            overlay_targets.append(target)
+            # Fallback 2: help_response.overlay.targets
+            if not overlay_targets:
+                help_resp = response_meta.get("help_response")
+                if isinstance(help_resp, Mapping):
+                    overlay = help_resp.get("overlay")
+                    if isinstance(overlay, Mapping):
+                        targets = overlay.get("targets")
+                        if isinstance(targets, list):
+                            for t in targets:
+                                if isinstance(t, str) and t and t not in overlay_targets:
+                                    overlay_targets.append(t)
 
-        # overlay report from response metadata
+        # overlay report from response_mapping (payload metadata)
         response_mapping = response_meta.get("response_mapping")
         if isinstance(response_mapping, Mapping):
             report = response_mapping
         else:
-            report = response_meta.get("overlay_report")
-            if not isinstance(report, Mapping):
-                report = {}
+            report = {}
         overlay_exec = len(report.get("executed", [])) if isinstance(report.get("executed"), list) else 0
         overlay_rej = len(report.get("rejected", [])) if isinstance(report.get("rejected"), list) else 0
         overlay_drop = len(report.get("dropped", [])) if isinstance(report.get("dropped"), list) else 0
 
-        # audit fields from request metadata (primary) or response metadata (fallback)
+        # Fallback: if response_mapping report is empty, use overlay_rejected_list count
+        if overlay_rej == 0 and overlay_exec == 0 and overlay_drop == 0:
+            rejected_list = bucket.get("overlay_rejected_list", [])
+            if rejected_list:
+                overlay_rej = len(rejected_list)
+                for rj_ev in rejected_list:
+                    rj_payload = rj_ev.get("payload") if isinstance(rj_ev.get("payload"), Mapping) else {}
+                    rj_target = rj_payload.get("target")
+                    if isinstance(rj_target, str) and rj_target and rj_target not in overlay_targets:
+                        overlay_targets.append(rj_target)
+
+        # audit fields
         audit = normalize_help_cycle_audit_fields({**response_meta, **request_meta})
 
-        # model next step from response help_response
+        # model next step from help_response
         model_next = None
         help_resp = response_meta.get("help_response")
         if isinstance(help_resp, Mapping):
             next_payload = help_resp.get("next")
             if isinstance(next_payload, Mapping):
                 model_next = _opt_str(next_payload.get("step_id"))
-
-        # mapping failure codes
-        mapping_failure_codes = _str_list(response_meta.get("response_mapping_failure_codes"))
 
         record = {
             "cycle_index": idx,
@@ -261,7 +282,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
             "overlay_rejected": overlay_rej,
             "overlay_dropped": overlay_drop,
             "overlay_dry_run_count": len(dry_runs),
-            "response_mapping_failure_codes": mapping_failure_codes,
+            "response_mapping_failure_codes": _str_list(response_meta.get("response_mapping_failure_codes")),
             "response_status": response_payload.get("status"),
             "fallback_overlay_used": _opt_bool(response_meta.get("fallback_overlay_used")),
             "fallback_overlay_reason": response_meta.get("fallback_overlay_reason"),

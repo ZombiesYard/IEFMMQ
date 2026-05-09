@@ -348,6 +348,20 @@ def _run_replay_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sanitize_participant_slug(raw: str) -> str:
+    """Return a safe directory name from a participant identifier."""
+    # Discard any path component; only use the terminal name.
+    slug = Path(raw).name.strip()
+    if not slug or slug in (".", ".."):
+        raise ValueError(f"participant_id resolves to unsafe or empty path component: {raw!r}")
+    # Restrict to alphanumeric + underscore + hyphen for filesystem safety.
+    if not slug.replace("_", "").replace("-", "").isalnum():
+        raise ValueError(
+            f"participant_id must contain only letters, digits, underscores, and hyphens: {slug!r}"
+        )
+    return slug
+
+
 def _run_experiment_export(args: argparse.Namespace) -> int:
     import csv
 
@@ -385,7 +399,7 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     export = build_experiment_export(events, meta_overrides=meta_overrides, scoring=scoring)
     out_dir = Path(args.output_dir)
     if args.participant_id:
-        safe_id = Path(args.participant_id).name
+        safe_id = _sanitize_participant_slug(args.participant_id)
         out_dir = out_dir / safe_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
