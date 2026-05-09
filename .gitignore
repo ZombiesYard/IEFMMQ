@@ -43,9 +43,22 @@ logs/thesisproposal1128_extract.txt
 Doc/Engineering
 contractV03.md
 contractV04.md
-paperwork/
 .github/copilot-instructions.md
 CLAUDE.md
 .vscode/
 # Local Label Studio state
 .label_studio/
+
+# Track thesis source files in the private thesis repo,
+# but ignore common LaTeX build artifacts.
+paperwork/**/*.aux
+paperwork/**/*.bbl
+paperwork/**/*.bcf
+paperwork/**/*.blg
+paperwork/**/*.fdb_latexmk
+paperwork/**/*.fls
+paperwork/**/*.log
+paperwork/**/*.out
+paperwork/**/*.run.xml
+paperwork/**/*.synctex.gz
+paperwork/**/*.toc
