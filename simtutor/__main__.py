@@ -399,16 +399,28 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     export = build_experiment_export(events, meta_overrides=meta_overrides, scoring=scoring)
     out_dir = Path(args.output_dir)
     if args.participant_id:
-        safe_id = _sanitize_participant_slug(args.participant_id)
+        try:
+            safe_id = _sanitize_participant_slug(args.participant_id)
+        except ValueError as exc:
+            print(f"[EXPERIMENT_EXPORT] invalid participant_id: {exc}")
+            return 1
         out_dir = out_dir / safe_id
-    out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to create output directory: {exc}")
+        return 1
 
     # session.json
     session_path = out_dir / "session.json"
-    session_path.write_text(
-        json.dumps(export.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        session_path.write_text(
+            json.dumps(export.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to write session.json: {exc}")
+        return 1
     print(f"[EXPERIMENT_EXPORT] wrote {session_path}")
 
     # help_cycles.csv
@@ -416,7 +428,7 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
         csv_path = out_dir / "help_cycles.csv"
         cycle_fields = [
             "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-            "vision_used", "vision_fallback_reason", "sync_delta_ms",
+            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
             "fused_step_id", "fused_missing_conditions", "model_next_step_id",
             "overlay_targets", "overlay_executed", "overlay_rejected",
             "overlay_dropped", "response_status", "fallback_overlay_used",

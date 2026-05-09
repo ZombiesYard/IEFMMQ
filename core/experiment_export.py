@@ -86,7 +86,7 @@ class HelpCycleRecord:
     generation_mode: str | None = None
     vision_used: bool | None = None
     vision_fallback_reason: str | None = None
-    sync_status: str | None = None
+    vision_status: str | None = None
     sync_delta_ms: int | None = None
     frame_ids: list[str] = field(default_factory=list)
     layout_id: str | None = None
@@ -270,7 +270,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
             "generation_mode": audit.get("generation_mode") or response_meta.get("generation_mode"),
             "vision_used": _opt_bool(audit.get("vision_used")),
             "vision_fallback_reason": audit.get("vision_fallback_reason"),
-            "sync_status": request_meta.get("vision_status"),
+            "vision_status": request_meta.get("vision_status"),
             "sync_delta_ms": _opt_int(audit.get("sync_delta_ms")),
             "frame_ids": _str_list(request_ev.get("vision_refs")),
             "layout_id": audit.get("layout_id"),
@@ -358,8 +358,10 @@ def _build_timeline(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
                     active_step = None
                 state_changed = True
         elif kind == "tutor_request":
-            help_count += 1
-            state_changed = True
+            intent = (payload.get("intent") or "").lower()
+            if "help" in intent or "hint" in intent:
+                help_count += 1
+                state_changed = True
         elif kind == "observation":
             metadata = ev.get("metadata")
             if isinstance(metadata, Mapping) and metadata.get("observation_kind") in ("vision", "vision_fact"):
@@ -416,7 +418,7 @@ def build_experiment_export(
             generation_mode=rc["generation_mode"],
             vision_used=rc["vision_used"],
             vision_fallback_reason=rc["vision_fallback_reason"],
-            sync_status=rc["sync_status"],
+            vision_status=rc["vision_status"],
             sync_delta_ms=rc["sync_delta_ms"],
             frame_ids=rc["frame_ids"],
             layout_id=rc["layout_id"],
