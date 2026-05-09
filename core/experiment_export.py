@@ -194,7 +194,8 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
         # payload["metadata"] — see live_dcs._sanitize_*_payload_for_event.
         def _merged_meta(ev: Mapping[str, Any]) -> dict[str, Any]:
             ev_meta = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
-            pl_meta = ev.get("payload", {}).get("metadata") if isinstance(ev.get("payload", {}).get("metadata"), Mapping) else {}
+            pl = ev.get("payload")
+            pl_meta = pl.get("metadata") if isinstance(pl, Mapping) and isinstance(pl.get("metadata"), Mapping) else {}
             return {**ev_meta, **pl_meta}
 
         request_meta = _merged_meta(request_ev)
@@ -398,16 +399,7 @@ def build_experiment_export(
             {k: v for k, v in meta_overrides.items() if v is not None}
         )
 
-    meta = SessionMeta(
-        participant_id=_opt_str(extracted_meta.get("participant_id")) or "",
-        session_id=_opt_str(extracted_meta.get("session_id")) or "",
-        condition=_opt_str(extracted_meta.get("condition")) or "",
-        group=_opt_str(extracted_meta.get("group")) or "",
-        questionnaire_ref=_opt_str(extracted_meta.get("questionnaire_ref")),
-        experimenter_notes=_opt_str(extracted_meta.get("experimenter_notes")),
-        started_at=_opt_str(extracted_meta.get("started_at")),
-        ended_at=_opt_str(extracted_meta.get("ended_at")),
-    )
+    meta = SessionMeta.from_dict(extracted_meta)
 
     raw_cycles = _extract_help_cycles(events)
     help_cycles = [

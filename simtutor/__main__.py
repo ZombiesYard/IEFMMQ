@@ -448,10 +448,14 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
 
     # summary.json
     summary_path = out_dir / "summary.json"
-    summary_path.write_text(
-        json.dumps(export.summary.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        summary_path.write_text(
+            json.dumps(export.summary.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to write summary.json: {exc}")
+        return 1
     print(f"[EXPERIMENT_EXPORT] wrote {summary_path}")
 
     return 0
