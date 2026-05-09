@@ -44,7 +44,6 @@ Doc/Engineering
 contractV03.md
 contractV04.md
 .github/copilot-instructions.md
-CLAUDE.md
 .vscode/
 # Local Label Studio state
 .label_studio/
