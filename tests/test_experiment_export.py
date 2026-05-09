@@ -2,26 +2,17 @@
 End-to-end tests for experiment export pipeline.
 """
 
-from datetime import datetime, timezone
-from pathlib import Path
 import json
-import tempfile
+from datetime import datetime, timezone
 
 from core.experiment_export import (
     SessionMeta,
     HelpCycleRecord,
-    TimelineSnapshot,
-    ExperimentExport,
     build_experiment_export,
 )
-from core.interaction_metrics import InteractionMetrics
 
 
 # ── helpers ────────────────────────────────────────────────────────────
-
-def _iso(ts: str) -> str:
-    return ts
-
 
 def _make_events_with_help_cycles() -> list[dict]:
     """Synthetic event log covering one session with two help cycles."""

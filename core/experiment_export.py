@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
-from core.help_cycle_audit import HELP_CYCLE_AUDIT_FIELDS, normalize_help_cycle_audit_fields
+from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
 
 
@@ -200,11 +200,9 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
     records: list[dict[str, Any]] = []
     for idx, cid in enumerate(cycle_order):
         bucket = cycles[cid]
-        meta = cycle_meta_index.get(cid, {})
 
         request_ev = bucket.get("request", {})
         response_ev = bucket.get("response", {})
-        request_payload = request_ev.get("payload") if isinstance(request_ev.get("payload"), Mapping) else {}
         response_payload = response_ev.get("payload") if isinstance(response_ev.get("payload"), Mapping) else {}
         response_meta = response_ev.get("metadata") if isinstance(response_ev.get("metadata"), Mapping) else {}
         request_meta = request_ev.get("metadata") if isinstance(request_ev.get("metadata"), Mapping) else {}
@@ -233,12 +231,6 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
         # audit fields from request metadata (primary) or response metadata (fallback)
         audit = normalize_help_cycle_audit_fields({**response_meta, **request_meta})
 
-        # response action payload for executed/dropped from response
-        actions = response_payload.get("actions")
-        if isinstance(actions, list):
-            # actions → response_mapping report
-            pass
-
         # model next step from response help_response
         model_next = None
         help_resp = response_meta.get("help_response")
@@ -257,7 +249,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
             "generation_mode": audit.get("generation_mode") or response_meta.get("generation_mode"),
             "vision_used": _opt_bool(audit.get("vision_used")),
             "vision_fallback_reason": audit.get("vision_fallback_reason"),
-            "sync_status": audit.get("sync_status"),
+            "sync_status": request_meta.get("vision_status"),
             "sync_delta_ms": _opt_int(audit.get("sync_delta_ms")),
             "frame_ids": _str_list(request_ev.get("vision_refs")),
             "layout_id": audit.get("layout_id"),
@@ -276,7 +268,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
             "observability_status": response_meta.get("observability_status"),
             "requires_visual_confirmation": _opt_bool(response_meta.get("requires_visual_confirmation")),
             "scenario_profile": response_meta.get("scenario_profile"),
-            "vision_fact_status": audit.get("vision_fact_status"),
+            "vision_fact_status": request_meta.get("vision_fact_status"),
         }
         records.append(record)
 
@@ -364,25 +356,6 @@ def _build_timeline(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
             })
 
     return snapshots
-
-
-def _extract_overlay_execution_results(
-    events: Sequence[Mapping[str, Any]],
-) -> tuple[int, int, int]:
-    """Return (executed, rejected, dropped) totals from overlay events."""
-    executed = 0
-    rejected = 0
-    dropped = 0
-    for ev in events:
-        kind = ev.get("kind") or ev.get("type") or ""
-        payload = ev.get("payload")
-        if not isinstance(payload, Mapping):
-            continue
-        if kind == "overlay_dry_run":
-            pass  # these are previews, not execution results
-        elif kind == "overlay_rejected":
-            rejected += 1
-    return executed, rejected, dropped
 
 
 # ── main entry point ───────────────────────────────────────────────────

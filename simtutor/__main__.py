@@ -385,7 +385,8 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     export = build_experiment_export(events, meta_overrides=meta_overrides, scoring=scoring)
     out_dir = Path(args.output_dir)
     if args.participant_id:
-        out_dir = out_dir / args.participant_id
+        safe_id = Path(args.participant_id).name
+        out_dir = out_dir / safe_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # session.json
