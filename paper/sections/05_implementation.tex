@@ -1,0 +1,169 @@
+% ===========================================================================
+%  05 — Implementation
+%
+%  Source of truth: paper_context/repo_inventory.md
+%  Claims: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-VLM-01, C-VLM-02, C-VLM-03,
+%          C-TELEM-01, C-RAG-01, C-PROC-01, C-RUNTIME-01
+% ===========================================================================
+\section{Implementation}\label{sec:implementation}
+
+% TODO: Describe the concrete implementation details.
+
+% ===========================================================================
+\subsection{Technology Stack}\label{sec:impl-stack}
+
+% TODO: List the implementation technology stack.
+%
+% - Python 3.10+, Poetry for dependency management
+% - Core libraries: httpx, PyYAML, jsonschema, Pillow
+% - Testing: pytest, pytest-cov
+% - DCS integration: Lua scripts (Export.lua, VRHilite.lua, SimTutor.lua)
+% - Model serving: vLLM / llama.cpp server / TGI via OpenAI-compatible API
+% - Fine-tuning: Unsloth, PEFT, TRL
+% - Annotation: Label Studio
+%
+% Evidence:
+%   - pyproject.toml
+%   - model_access.md
+%   - DCS/Scripts/
+
+% ===========================================================================
+\subsection{Core Domain Logic}\label{sec:impl-core}
+
+% TODO: Describe the core/ implementation.
+%
+% Key modules:
+%   - procedure.py: Step state machine with activate/complete/block/rewind
+%   - gating.py: Rule evaluation engine (var_gte, arg_in_range, flag_true, time_since)
+%   - scoring.py: Event-log-based scoring with error taxonomy
+%   - vision_facts.py: Fact ontology loading, sticky aggregation, TTL expiry,
+%     step binding satisfaction
+%   - llm_schema.py: Runtime-generated HelpResponse JSON schema
+%   - types.py / types_v2.py: Versioned data contracts
+%   - event_store.py: JSONL event logging and replay
+%   - knowledge.py: BM25 retrieval
+%
+% Evidence:
+%   - core/procedure.py
+%   - core/gating.py
+%   - core/scoring.py
+%   - core/vision_facts.py
+%   - core/llm_schema.py
+%   - core/types.py, core/types_v2.py
+%   - core/event_store.py
+%
+% Claims: C-ARCH-01, C-PROC-01
+
+% ===========================================================================
+\subsection{Telemetry and DCS Integration}\label{sec:impl-telemetry}
+
+% TODO: Describe the telemetry pipeline implementation.
+%
+% - DCS-BIOS UDP receiver → raw JSONL
+% - BIOS-to-UI mapping via bios_to_ui.yaml
+% - Var resolution with source_missing tracking
+% - Delta sanitization (noise filtering, debouncing)
+% - Delta aggregation for prompt-safe summaries
+% - Telemetry frame schema (v2)
+%
+% Evidence:
+%   - adapters/telemetry_pipeline.py
+%   - adapters/delta_sanitizer.py
+%   - adapters/delta_aggregator.py
+%   - adapters/dcs_bios/
+%   - packs/fa18c_startup/telemetry_map.yaml
+%   - packs/fa18c_startup/bios_to_ui.yaml
+%   - packs/fa18c_startup/delta_policy.yaml
+%
+% Claims: C-TELEM-01
+
+% ===========================================================================
+\subsection{Structured Help Generation}\label{sec:impl-help}
+
+% TODO: Describe the help generation implementation.
+%
+% - Prompt construction from telemetry, knowledge, and recent actions
+% - OpenAI-compatible model adapter (with multimodal support)
+% - JSON extraction with minimal repair
+% - Schema validation against runtime-generated HelpResponse schema
+% - Response mapping: HelpResponse → TutorResponse
+% - Evidence grounding validation for overlay targets
+% - Deterministic fallback (step inference from pack + vars)
+% - Overlay execution: highlight / clear / pulse via UDP to DCS
+% - Action execution safety: allowlist check, max_targets=1, no auto-click
+%
+% Evidence:
+%   - adapters/prompting.py
+%   - adapters/openai_compat_model.py
+%   - adapters/json_extract.py
+%   - adapters/response_mapping.py
+%   - adapters/help_response_parser.py
+%   - adapters/action_executor.py
+%   - adapters/evidence_refs.py
+%   - adapters/step_inference.py
+%
+% Claims: C-ARCH-02, C-ARCH-03
+
+% ===========================================================================
+\subsection{VLM Visual Fact Extraction}\label{sec:impl-vlm}
+
+% TODO: Describe the VLM extraction implementation.
+%
+% - Vision capture trigger (UDP-based, session-aware)
+% - Frame selection: pre_trigger_frame + trigger_frame
+% - Multimodal payload construction (image + text, OpenAI-compatible)
+% - 13-fact prompt with layout description (left_ddi, ampcd, right_ddi)
+% - Structured JSON response with fact_id, state, evidence_note
+% - Sanitization: strict field filtering, unknown fact ID rejection,
+%   source_frame_id coercion
+% - Fact merging with sticky semantics and TTL-based expiry
+% - DashScope / vLLM backend compatibility handling
+% - Vision fact observation schema (v2)
+%
+% Evidence:
+%   - adapters/vision_fact_extractor.py
+%   - adapters/vision_fact_prompting.py
+%   - adapters/openai_compat_multimodal.py
+%   - adapters/vision_sync.py
+%   - adapters/vision_capture_trigger.py
+%   - core/vision_facts.py
+%   - packs/fa18c_startup/vision_facts.yaml
+%
+% Claims: C-VLM-01, C-VLM-02
+
+% ===========================================================================
+\subsection{Replay and Logging Infrastructure}\label{sec:impl-replay}
+
+% TODO: Describe the replay/logging system.
+%
+% - JSONL event store with append and load
+% - Event kinds: observation, tutor_request, tutor_response,
+%   overlay_requested, overlay_applied, overlay_failed
+% - Replay validation: step ordering, state machine consistency
+% - Interaction metrics: stall time, help requests, UI clicks, highlights
+% - Scoring: omission, state violation, critical multiplier
+%
+% Evidence:
+%   - simtutor/runner.py
+%   - core/event_store.py
+%   - core/interaction_metrics.py
+%   - core/scoring.py
+%   - replay_eval/fa18c_startup_v04/
+%
+% Claims: C-RUNTIME-01
+
+% ===========================================================================
+\subsection{CLI and Runtime Entrypoints}\label{sec:impl-cli}
+
+% TODO: Describe the CLI commands and runtime entrypoints.
+%
+% - simtutor run: execute a mock scenario
+% - simtutor replay: validate a log against a pack
+% - simtutor score: score a run log
+% - simtutor record-vlm: record VLM predictions for benchmarking
+% - simtutor replay-bios: replay DCS-BIOS raw captures
+% - live_dcs.py: full live DCS runtime orchestration
+%
+% Evidence:
+%   - simtutor/__main__.py
+%   - live_dcs.py

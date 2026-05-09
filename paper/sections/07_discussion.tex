@@ -1,0 +1,108 @@
+% ===========================================================================
+%  07 — Discussion
+%
+%  Source of truth: paper_context/paper_outline.md §2.7
+%  Claims: C-ARCH-03, C-VLM-06, C-VLM-07, C-RUNTIME-01, C-NARRATIVE-01,
+%          C-PROPOSAL-01, C-HUMAN-01
+% ===========================================================================
+\section{Discussion}\label{sec:discussion}
+
+% TODO: Write the discussion chapter.
+
+% ===========================================================================
+\subsection{Why the Project Shifted from VR-First to Telemetry/VLM-Heavy}\label{sec:disc-shift}
+
+% TODO: Explain the evolution from proposal to current system.
+%
+% Key factors:
+% - Building a robust telemetry-grounded runtime turned out to be a necessary
+%   prerequisite before VR deployment.
+% - The visual fact extraction problem emerged as a substantial research
+%   challenge in its own right.
+% - The VLM pipeline (capture → review → SFT → LoRA → benchmark) forms a
+%   complete, self-contained contribution.
+% - Desktop/DCS runtime provides a more controlled environment for
+%   systematic benchmarking before adding VR complexity.
+%
+% Evidence:
+%   - paper_context/system_delta_from_proposal.md
+%   - ThesisProposal1128.pdf
+
+% ===========================================================================
+\subsection{What Current Benchmarks Do and Do Not Prove}\label{sec:disc-benchmarks}
+
+% TODO: Discuss the scope and limits of the current benchmark results.
+%
+% What they show:
+%   - Small-data LoRA adaptation substantially improves structured VLM
+%     extraction on domain-specific cockpit facts.
+%   - The data recipe (Run-003 + Run-005x2, bilingual SFT) transfers
+%     across model backbones (Qwen and Gemma).
+%   - JSON/schema validity is near-perfect after LoRA training.
+%
+% What they do NOT show:
+%   - That improved visual fact extraction leads to better tutoring outcomes.
+%   - That the tutoring system improves human learning or reduces workload.
+%   - That the system works in real-time VR conditions.
+%
+% Claims: C-VLM-06, C-RUNTIME-01
+
+% ===========================================================================
+\subsection{Ontology Evolution: 8-Fact to 13-Fact}\label{sec:disc-ontology}
+
+% TODO: Discuss the evolution of the visual fact ontology.
+%
+% - 8-fact v1 mixed abstraction levels (page visibility + procedural state).
+% - ins_go was a compound high-level target → high false positive rate.
+% - 13-fact v2 decomposes ins_go into ins_grnd_alignment_text_visible
+%   and ins_ok_text_visible, and similarly refines BIT/FCS-MC facts.
+% - The ontology evolution illustrates a general principle: VLM fact targets
+%   should be low-level, locally verifiable visual evidence, with higher-level
+%   procedural interpretation handled by downstream reasoning.
+%
+% Evidence:
+%   - Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8
+%   - packs/fa18c_startup/vision_facts.yaml
+%   - datasets/vision_sft/stats.json
+%
+% Claims: C-VLM-07
+
+% ===========================================================================
+\subsection{Why Human-Subject Evidence Remains Essential}\label{sec:disc-human}
+
+% TODO: Argue why the planned human-subject evaluation is necessary.
+%
+% - Benchmarks measure fact extraction, not learning.
+% - The tutoring system's value can only be validated by measuring its
+%   effect on human procedural performance, workload, and retention.
+% - The current technical baseline enables but does not replace
+%   human-subject evaluation.
+%
+% Claims: C-HUMAN-01, C-PROPOSAL-01
+
+% ===========================================================================
+\subsection{Risks in Interpreting Benchmark Success as Learning Success}\label{sec:disc-risks}
+
+% TODO: Warn against over-interpreting benchmark results.
+%
+% - A VLM that extracts cockpit facts correctly does not guarantee that
+%   learners understand the procedure better.
+% - Overlay highlighting based on correct facts may still be mistimed,
+%   distracting, or pedagogically inappropriate.
+% - The benchmark measures a perception subtask, not the full tutoring
+%   interaction.
+
+% ===========================================================================
+\subsection{Limitations}\label{sec:disc-limitations}
+
+% TODO: List limitations of the current work.
+%
+% - Single procedure (F/A-18C cold-start); generalisability to other
+%   procedures / aircraft / simulators is unknown.
+% - Single composite-panel layout; other cockpit configurations may
+%   require retraining.
+% - Small dataset sizes (largest training run: 928 rows).
+% - No real-time VR deployment yet.
+% - No human-subject evaluation yet.
+% - The 13-fact ontology still has residual critical false positives
+%   on completion-type facts.

@@ -1,0 +1,154 @@
+% ===========================================================================
+%  SimTutor Paper — main.tex
+%  Target: generic CS conference/journal template.
+%  Swap \documentclass to llncs / acmart / IEEEtran as needed.
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+
+% ---------------------------------------------------------------------------
+%  Encoding & fonts
+% ---------------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[main=british]{babel}
+
+% ---------------------------------------------------------------------------
+%  Layout
+% ---------------------------------------------------------------------------
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ---------------------------------------------------------------------------
+%  Maths & units
+% ---------------------------------------------------------------------------
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{siunitx}
+\DeclareSIUnit\Darcy{D}
+
+% ---------------------------------------------------------------------------
+%  Tables
+% ---------------------------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array,longtable,tabularx,multirow}
+\usepackage{threeparttable}
+\usepackage[table]{xcolor}
+\usepackage{colortbl}
+
+% ---------------------------------------------------------------------------
+%  Figures & captions
+% ---------------------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage[
+  format=plain,
+  justification=centering,
+  margin=10pt,
+  font=small,
+  labelfont=bf
+]{caption}
+\usepackage{subcaption}
+
+% ---------------------------------------------------------------------------
+%  Headers & footers
+% ---------------------------------------------------------------------------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\small\scshape SimTutor}
+\fancyfoot[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14.5pt}
+
+% ---------------------------------------------------------------------------
+%  Hyperlinks
+% ---------------------------------------------------------------------------
+\usepackage[bookmarksnumbered=true,colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+% ---------------------------------------------------------------------------
+%  Bibliography
+% ---------------------------------------------------------------------------
+\usepackage[numbers,sort&compress]{natbib}
+
+% ---------------------------------------------------------------------------
+%  Code listings
+% ---------------------------------------------------------------------------
+\usepackage{listings}
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numbersep=5pt,
+  xleftmargin=10pt,
+}
+
+% ---------------------------------------------------------------------------
+%  Metadata  (TODO: update before submission)
+% ---------------------------------------------------------------------------
+\title{SimTutor: A Telemetry-Grounded Tutoring Runtime with \\
+       Structured Visual Fact Extraction for Procedural Learning}
+
+\author{Yu Zhang%
+\thanks{Institute for Software and Systems Engineering, Clausthal University of Technology.}%
+\thanks{Work supervised by Prof.\ Dr.\ Christian Bartelt and Prof.\ Dr.\ Rüdiger Ehlers.}%
+}
+
+\date{\today}
+
+% ===========================================================================
+\begin{document}
+
+\maketitle
+
+% ---------------------------------------------------------------------------
+\input{sections/00_abstract}
+% ---------------------------------------------------------------------------
+
+\newpage
+\tableofcontents
+
+\newpage
+\listoffigures
+\listoftables
+
+% ---------------------------------------------------------------------------
+\newpage
+\input{sections/01_introduction}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/02_background_related_work}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/03_system_design}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/04_methodology}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/05_implementation}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/06_evaluation}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/07_discussion}
+% ---------------------------------------------------------------------------
+
+\newpage
+\input{sections/08_conclusion}
+% ---------------------------------------------------------------------------
+
+% ---------------------------------------------------------------------------
+%  Bibliography
+% ---------------------------------------------------------------------------
+\newpage
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

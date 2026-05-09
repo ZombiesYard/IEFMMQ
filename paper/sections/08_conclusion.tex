@@ -1,0 +1,62 @@
+% ===========================================================================
+%  08 — Conclusion
+%
+%  Source of truth: paper_context/paper_outline.md §2.8
+% ===========================================================================
+\section{Conclusion}\label{sec:conclusion}
+
+% TODO: Write the conclusion after all other chapters are drafted.
+
+% ===========================================================================
+\subsection{Summary of Completed Work}\label{sec:conc-summary}
+
+% TODO: Summarise the technical contributions that have been completed.
+%
+% 1. A pack-driven, telemetry-grounded tutoring runtime for the DCS F/A-18C
+%    cold-start procedure, with structured help generation, overlay execution,
+%    and safety boundaries.
+%
+% 2. A structured visual fact ontology (evolved from 8-fact v1 to 13-fact v2)
+%    and a complete data pipeline from cockpit capture through human review,
+%    bilingual SFT export, LoRA fine-tuning, and benchmark evaluation.
+%
+% 3. Benchmark results demonstrating that LoRA adaptation of Qwen3.5-9B
+%    on a small set of human-reviewed cockpit images substantially improves
+%    structured visual fact extraction on independent held-out sessions.
+%
+% 4. A backbone comparison confirming that the data recipe transfers across
+%    model families, with Qwen3.5-9B providing the best overall extraction
+%    quality and Gemma-4-31B showing a more conservative error profile.
+%
+% Evidence:
+%   - paper_context/repo_inventory.md
+%   - paper_context/experiment_inventory.md
+%   - paper_context/claims_registry.md (verified claims)
+
+% ===========================================================================
+\subsection{Future Work}\label{sec:conc-future}
+
+% TODO: Outline the next steps.
+%
+% 1. Complete the VR runtime integration (Quest 3 + DCS-VR).
+%
+% 2. Finalise the runtime data collection system:
+%    participant/session schema, NASA-TLX integration, quiz/retention linkage.
+%
+% 3. Conduct the planned human-subject evaluation:
+%    three-condition comparison (video+notes, ungrounded LLM, grounded tutor),
+%    measuring completion, errors, workload, retention, and transfer.
+%
+% 4. Extend the visual fact ontology to cover additional procedures
+%    (e.g., taxi, takeoff, emergency checklists).
+%
+% 5. Investigate online adaptation: can the VLM continue to improve
+%    from in-situ human corrections during live tutoring?
+%
+% 6. Explore multi-frame temporal reasoning for facts that require
+%    observing transitions (e.g., countdown, animation) rather than
+%    single-frame states.
+%
+% Evidence:
+%   - paper_context/todos.md
+%   - paper_context/proposal_summary.md

@@ -1,0 +1,267 @@
+% ===========================================================================
+%  06 — Evaluation
+%
+%  Source of truth: paper_context/paper_outline.md §2.5, §2.6
+%  Claims (verified/likely): C-VLM-04, C-VLM-05, C-VLM-06, C-VLM-03b,
+%                            C-VLM-07, C-DATA-01
+%  Claims (TODO): C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01,
+%                 C-PROPOSAL-02
+% ===========================================================================
+\section{Evaluation}\label{sec:evaluation}
+
+% ===========================================================================
+% --- PART A: Current Technical Results ---
+% ===========================================================================
+\subsection{Current Technical Results}\label{sec:eval-tech}
+
+% WARNING: Only verified and likely claims may appear here.
+% TODO claims MUST stay in §6.2 (Planned Evaluation).
+
+% --- Datasets and Training ---
+\subsubsection{Dataset and Training Summary}\label{sec:eval-data}
+
+% TODO: Summarise dataset statistics and training configurations.
+%
+% TODO: Add Table~\ref{tab:dataset-summary} — dataset provenance table
+% (Run-001 through Run-005, role, fact ontology version, sample count).
+%
+% \begin{table}[htbp]
+%   \centering
+%   \caption{Dataset provenance and role.}
+%   \label{tab:dataset-summary}
+%   % TODO: Populate from datasets/*/stats.json
+% \end{table}
+%
+% Coverage:
+%   - 8-fact v1: Run-001 (train), Run-002 (holdout)
+%   - 13-fact v2: Run-003 (train), Run-005 (composition rebalance),
+%     Run-002 newfacts (holdout), Run-004 random (holdout)
+%
+% Evidence:
+%   - datasets/*/stats.json
+%   - paper_context/experiment_inventory.md §1
+%
+% Claims: C-DATA-01, C-VLM-07
+
+% --- Qwen 8-fact v1 ---
+\subsubsection{Qwen3.5 8-Fact V1 Baseline}\label{sec:eval-qwen-8fact}
+
+% TODO: Report the 8-fact v1 results (historical baseline).
+%
+% Run-002 holdout (8-fact):
+%   Base → LoRA-v1: fact accuracy 0.76 → 0.915, seen F1 0.4714 → 0.8380
+%   Critical FP: 13 → 15 (ins_go failure mode)
+%
+% These are early results; keep brief.
+%
+% TODO: Add Table~\ref{tab:qwen-8fact} from benchmark_summary.json.
+%
+% Evidence:
+%   - benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/
+%   - Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §7.2
+%
+% Claims: TODO:VERIFY — keep in main paper or move to appendix?
+
+% --- Qwen 13-fact v2 (main results) ---
+\subsubsection{Qwen3.5 13-Fact V2 Results}\label{sec:eval-qwen-13fact}
+
+% TODO: Report the 13-fact v2 Qwen results (current best line).
+%
+% === Holdout Run-002 newfacts (50 samples) ===
+% Base → LoRA:
+%   fact_accuracy:    0.8677 → 0.9908
+%   macro_f1:         0.4513 → 0.6515
+%   seen_f1:          0.5022 → 0.9648
+%   sample_exact_match: 0.10 → 0.88
+%   critical_fp:      11 → 4
+%
+% === Holdout Run-004 random (100 samples) ===
+% Base → LoRA:
+%   fact_accuracy:    0.8038 → 0.9931
+%   macro_f1:         0.4393 → 0.6100
+%   seen_f1:          0.5659 → 0.9159
+%   sample_exact_match: 0.03 → 0.92
+%   critical_fp:      70 → 8
+%
+% TODO: Add Table~\ref{tab:qwen-13fact-run002} and Table~\ref{tab:qwen-13fact-run004}.
+% TODO: Add per-fact breakdown table (Table~\ref{tab:qwen-per-fact}).
+% TODO: Add confusion matrix figures for critical facts.
+%
+% \begin{table}[htbp]
+%   \centering
+%   \caption{Qwen3.5 13-fact benchmark — Run-002 newfacts holdout.}
+%   \label{tab:qwen-13fact-run002}
+% \end{table}
+%
+% \begin{table}[htbp]
+%   \centering
+%   \caption{Qwen3.5 13-fact benchmark — Run-004 random holdout.}
+%   \label{tab:qwen-13fact-run004}
+% \end{table}
+%
+% Evidence:
+%   - benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/
+%   - benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/
+%   - paper_context/experiment_inventory.md §4.2, §4.3
+%
+% Claims: C-VLM-04, C-VLM-05
+
+% --- Gemma 13-fact v2 (backbone comparison) ---
+\subsubsection{Gemma-4 13-Fact V2 Comparison}\label{sec:eval-gemma}
+
+% TODO: Report the Gemma backbone comparison results.
+%
+% === Holdout Run-002 newfacts ===
+% Base → LoRA:
+%   fact_accuracy:    0.8169 → 0.9492
+%   seen_f1:          0.5128 → 0.8123
+%   sample_exact_match: 0.04 → 0.44
+%   critical_fp:      16 → 0
+%
+% === Holdout Run-004 random ===
+% Base → LoRA:
+%   fact_accuracy:    0.8146 → 0.9715
+%   seen_f1:          0.6332 → 0.7959
+%   sample_exact_match: 0.12 → 0.74
+%   critical_fp:      47 → 13
+%
+% Key finding: Gemma is more conservative (critical_fp = 0 on Run-002)
+% but weaker overall on fact_accuracy, seen_f1, and exact match.
+%
+% TODO: Add Table~\ref{tab:gemma-comparison}.
+% TODO: Add per-fact comparison between Qwen and Gemma.
+%
+% \begin{table}[htbp]
+%   \centering
+%   \caption{Gemma-4 13-fact benchmark results.}
+%   \label{tab:gemma-comparison}
+% \end{table}
+%
+% Evidence:
+%   - benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/
+%   - benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/
+%   - Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+%   - paper_context/experiment_inventory.md §4.4, §4.5
+%
+% Claims: C-VLM-06, C-VLM-03b
+
+% --- Error Analysis ---
+\subsubsection{Error Analysis}\label{sec:eval-errors}
+
+% TODO: Analyse error patterns.
+%
+% - Qwen: strongest overall, residual issues on fcsmc_final_go_result_visible
+%   and a small number of completion-type false positives.
+% - Gemma: more conservative, weak on supt_page_visible,
+%   ins_grnd_alignment_text_visible, ins_ok_text_visible.
+% - Both: the remaining critical false positives are concentrated in
+%   semantically complex completion-type facts, not page-visibility facts.
+%
+% TODO: Reference confusion matrix charts from benchmark directories.
+%
+% Evidence:
+%   - benchmarks/*/charts/confusion_*.png
+%   - benchmarks/*/errors_*.jsonl
+%   - Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+
+% ===========================================================================
+% --- PART B: Planned Human-Subject Evaluation ---
+% ===========================================================================
+\subsection{Planned Runtime Data Collection and Human-Subject Evaluation}\label{sec:eval-planned}
+
+% WARNING: This entire subsection contains planned / future work only.
+% Do NOT write any sentence that implies completed human-subject results.
+
+% --- Original Evaluation Vision ---
+\subsubsection{Original Evaluation Vision}\label{sec:eval-planned-vision}
+
+% TODO: Restate the original evaluation plan from the thesis proposal.
+%
+% - Three comparison conditions:
+%   1. video + notes (baseline)
+%   2. ungrounded text-only LLM tutor
+%   3. grounded RAG + LLM tutor (the proposed system)
+% - Target participants: beginner to intermediate, n ≈ 5–10
+% - Platform: Meta Quest 3 + DCS-VR
+%
+% Evidence:
+%   - ThesisProposal1128.pdf
+%   - paper_context/proposal_summary.md §3
+%
+% Claims: C-PROPOSAL-02, C-HUMAN-02
+
+% --- Planned Metrics ---
+\subsubsection{Planned Evaluation Metrics}\label{sec:eval-planned-metrics}
+
+% TODO: List the planned evaluation metrics.
+%
+% - Completion rate
+% - Procedural error rate (using the taxonomy: OM, CO, OR, PA, SV)
+% - Total time / per-step time
+% - Dead-end count (DE trial flag)
+% - Help request count (HR trial flag)
+% - NASA-TLX workload assessment
+% - Pre/post procedural knowledge quizzes
+% - 2–4 week retention test
+% - Transfer to a variant procedure
+%
+% TODO: Add planned table shells (Table~\ref{tab:planned-metrics}).
+%
+% Evidence:
+%   - ThesisProposal1128.pdf
+%   - packs/fa18c_startup/taxonomy.yaml
+%   - Doc/Evaluation/fa18c_nasatlx_vr.md
+%
+% Claims: C-HUMAN-01, C-HUMAN-03
+
+% --- Required Runtime Upgrades ---
+\subsubsection{Required Runtime Data Collection Upgrades}\label{sec:eval-planned-upgrades}
+
+% TODO: Describe what the runtime data collection system still needs.
+%
+% - Participant / session metadata schema
+% - Help cycle ID to participant linkage
+% - NASA-TLX data capture integration
+% - Quiz / retention / transfer data association
+% - Anonymisation strategy
+% - Freeze final log schema
+%
+% Evidence:
+%   - paper_context/todos.md §4, §5
+%
+% Claims: C-DATA-COLLECT-01
+
+% --- Planned Experiment Design ---
+\subsubsection{Planned Experiment Design}\label{sec:eval-planned-design}
+
+% TODO: Outline the planned experiment procedure.
+%
+% - Participant recruitment and screening
+% - Pre-test quiz
+% - Training session (one of three conditions)
+% - Procedure execution trial
+% - NASA-TLX administration
+% - Post-test quiz
+% - Retention test (2–4 weeks)
+% - Transfer task (variant procedure)
+%
+% TODO: Add planned participant flow diagram (Figure~\ref{fig:participant-flow}).
+%
+% \begin{figure}[htbp]
+%   \centering
+%   % \includegraphics[width=\textwidth]{figures/participant_flow.pdf}
+%   \caption{Planned participant flow (not yet executed).}
+%   \label{fig:participant-flow}
+% \end{figure}
+
+% --- Known Threats to Validity ---
+\subsubsection{Known Threats to Validity}\label{sec:eval-planned-threats}
+
+% TODO: Pre-register known threats.
+%
+% - Current system is desktop/DCS, not VR — the VR study requires
+%   additional integration work before participant recruitment.
+% - Current benchmark results measure VLM fact extraction quality, not
+%   human learning outcomes.
+% - Small planned sample size (n ≈ 5–10) limits statistical power.
+% - The F/A-18C cold-start task may not generalise to other procedures.
