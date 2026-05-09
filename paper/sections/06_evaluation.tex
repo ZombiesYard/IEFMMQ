@@ -1,61 +1,445 @@
 % ===========================================================================
 %  06 — Evaluation
-%  Verified: C-VLM-04, C-VLM-05, C-VLM-06, C-VLM-03b, C-VLM-07, C-DATA-01
-%  TODO: C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01, C-PROPOSAL-02
+%  Verified claims: C-VLM-04, C-VLM-05, C-VLM-06, C-VLM-03b, C-VLM-07,
+%                   C-DATA-01, C-VLM-03a, C-TRAIN-01
+%  Likely claims:   C-VLM-03b, C-RUNTIME-01
+%  TODO claims:     C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01,
+%                   C-PROPOSAL-02
 % ===========================================================================
 \chapter{Evaluation}\label{ch:evaluation}
+
+This chapter presents the empirical evidence gathered during the development of the visual fact extraction subsystem and the runtime infrastructure that supports it.
+It is divided into two clearly delineated parts.
+Part~A (Section~\ref{sec:eval-tech}) reports technical validation results that are backed by benchmark data, dataset statistics, and training artifacts currently present in the repository.
+Part~B (Section~\ref{sec:eval-planned}) describes the planned human-subject evaluation that constitutes the original research vision of this thesis but has not yet been conducted; it is included here to document the evaluation design against which future work can be measured.
 
 % ===========================================================================
 % --- PART A: Current Technical Results (verified/likely claims only) ---
 % ===========================================================================
 \section{Current Technical Results}\label{sec:eval-tech}
 
+The technical evaluation addresses a single core question: can a LoRA-fine-tuned vision-language model (VLM) reliably extract structured visual facts from F/A-18C cockpit screenshots, and does the resulting adapter substantially outperform the untuned base model?
+The question is assessed through a series of benchmark comparisons on data that the model has never seen during training (holdout sets with verified zero overlap).
+The metrics reported below are computed by the automated benchmark harness described in Section~\ref{sec:meth-benchmark} and are drawn directly from the benchmark artifacts stored in the repository.
+
+% ---------------------------------------------------------------------------
 \subsection{Dataset and Training Summary}\label{sec:eval-data}
-% TODO: Dataset provenance table (Run-001 through Run-005).
-% Evidence: datasets/*/stats.json, paper_context/experiment_inventory.md §1
+
+% Evidence: datasets/*/stats.json; paper_context/experiment_inventory.md §1
 % Claims: C-DATA-01, C-VLM-07
 
+The visual fact extraction task evolved across two generations of fact ontology.
+The first generation (v1) defined 8 visual facts and was used to establish the initial training and evaluation pipeline.
+The second generation (v2) expanded the ontology to 13 visual facts, aligning it with the runtime visual contract defined in \texttt{packs/fa18c\_startup/vision\_facts.yaml}.
+The 13 facts cover panel-level page visibility (e.g., \texttt{tac\_page\_visible}, \texttt{supt\_page\_visible}, \texttt{fcs\_page\_visible}), fine-grained state indicators within panels (\texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible}, \texttt{fcsmc\_final\_go\_result\_visible}), and small-text recognition targets (\texttt{ins\_grnd\_alignment\_text\_visible}, \texttt{ins\_ok\_text\_visible}).
+
+Table~\ref{tab:dataset-summary} summarises the six annotated datasets present in the repository, each with human-reviewed ground-truth labels.
+% Evidence: datasets/vision_sft/stats.json
+% Evidence: datasets/vision_sft_holdout_run002/stats.json
+% Evidence: datasets/vision_sft_holdout_run002_newfacts/stats.json
+% Evidence: datasets/vision_sft_holdout_run004_random/stats.json
+% Evidence: datasets/vision_sft_run003/stats.json
+% Evidence: datasets/vision_sft_run005_composition_rebalance/stats.json
+
+\begin{table}[htbp]
+\centering
+\caption{Summary of annotated visual fact datasets. Bilingual export produces separate EN and ZH samples from the same reviewed tasks. Holdout sets are English-only.}\label{tab:dataset-summary}
+\begin{tabular}{l c c c c c}
+\toprule
+\textbf{Dataset} & \textbf{Run} & \textbf{Facts} & \textbf{Tasks} & \textbf{Bilingual} & \textbf{Role} \\
+\midrule
+\texttt{vision\_sft}                     & Run-001 & 8  & 180 & yes & v1 training \\
+\texttt{vision\_sft\_holdout\_run002}    & Run-002 & 8  & 50  & no  & v1 holdout \\
+\texttt{vision\_sft\_holdout\_run002\_newfacts} & Run-002 & 13 & 50  & no  & v2 holdout \\
+\texttt{vision\_sft\_run003}             & Run-003 & 13 & 220 & yes & v2 training source \\
+\texttt{vision\_sft\_run005\_composition\_rebalance} & Run-005 & 13 & 122 & yes & v2 rebalance \\
+\texttt{vision\_sft\_holdout\_run004\_random} & Run-004 & 13 & 100 & no  & v2 holdout \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The v2 training recipe combines Run-003 (220 reviewed tasks) with Run-005 (122 reviewed tasks, collected specifically to rebalance under-represented fact states) and applies Run-005 twice (hereafter Run-005$\times$2) as a moderate oversampling strategy.
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+Bilingual export (EN + ZH) of Run-003 (220$\times$2 = 440 rows) and Run-005$\times$2 (122$\times$4 = 488 rows) yields a combined training set of \textbf{928 rows}.
+The v2 holdout sets---Run-002 newfacts (50 samples) and Run-004 random (100 samples)---are English-only and have been verified to contain \textbf{zero exact overlap} with the training data.
+% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+% Claim: C-VLM-03a
+
+% ---------------------------------------------------------------------------
 \subsection{Qwen3.5 8-Fact V1 Baseline}\label{sec:eval-qwen-8fact}
-% TODO: Run-002 holdout: Base→LoRA-v1 fact acc 0.76→0.915, seen F1 0.4714→0.8380.
-% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/
-% TODO:VERIFY — keep in main paper or move to appendix?
 
+% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/benchmark_summary.json
+% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/metrics_base.json
+% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/metrics_lora.json
+% TODO:VERIFY — Keep 8-fact v1 in main paper body or move to appendix?
+% Claim: C-VLM-07
+
+The earliest complete benchmark line uses an 8-fact LoRA adapter trained on the Run-001 dataset (180 tasks) and evaluated on the Run-002 holdout set (50 samples). This line predates the 13-fact ontology and serves primarily as a historical reference point; it is included here to establish the performance trajectory but may be more appropriately placed in the appendix.
+
+\begin{table}[htbp]
+\centering
+\caption{8-fact v1 benchmark: Qwen3.5-9B Base vs.\ LoRA-v1 on Run-002 holdout (50 samples, EN).}\label{tab:qwen-8fact}
+\begin{tabular}{l c c c c c}
+\toprule
+\textbf{Metric} & \textbf{Base} & \textbf{LoRA-v1} & \textbf{$\Delta$} \\
+\midrule
+JSON valid rate       & 1.0    & 1.0    & --- \\
+Schema valid rate     & 1.0    & 1.0    & --- \\
+Fact accuracy         & 0.7600 & 0.9150 & +0.1550 \\
+Macro $F_1$           & 0.4241 & 0.5847 & +0.1605 \\
+Seen $F_1$            & 0.4714 & 0.8380 & +0.3666 \\
+Sample exact match    & 0.06   & 0.36   & +0.30 \\
+Critical false positives & 13  & 15     & +2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:qwen-8fact} shows a substantial improvement in fact-level metrics: fact accuracy rises from 0.7600 to 0.9150, and seen $F_1$ nearly doubles from 0.4714 to 0.8380.
+However, the critical false positive count increases from 13 to 15, indicating that the 8-fact v1 adapter did not suppress hallucination on high-risk facts (facts whose false-positive assertions could mislead the tutoring system into skipping required steps).
+The sample exact match rate, at 0.36 for the LoRA adapter, shows that fully correct extraction of all eight facts within a single screenshot remained challenging.
+
+% ---------------------------------------------------------------------------
 \subsection{Qwen3.5 13-Fact V2 Results}\label{sec:eval-qwen-13fact}
-% TODO: Run-002 newfacts + Run-004 random holdout results (current best line).
-% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/
-%           benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/
-% Claims: C-VLM-04, C-VLM-05
 
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/benchmark_summary.json
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/metrics_base.json
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/metrics_lora.json
+% Claims: C-VLM-04
+
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/benchmark_summary.json
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/metrics_base.json
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/metrics_lora.json
+% Claims: C-VLM-05
+
+The primary technical result of this work is the performance of the Qwen3.5-9B LoRA adapter trained on the Run-003 + Run-005$\times$2 recipe under the 13-fact v2 ontology.
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+The adapter was trained for 4 epochs at a learning rate of $2 \times 10^{-4}$ with LoRA rank $r=16$, $\alpha=16$, dropout $=0.0$, effective batch size 4, and maximum sequence length 4096.
+Training converged in 6419 seconds with a final training loss of 0.2156.
+
+Table~\ref{tab:qwen-13fact} reports results on two held-out evaluation sets: the Run-002 newfacts holdout (50 samples) and the Run-004 random holdout (100 samples).
+Both holdouts are English-only and have zero exact overlap with the training data.
+
+\begin{table}[htbp]
+\centering
+\caption{13-fact v2 benchmark: Qwen3.5-9B Base vs.\ LoRA (Run-003 + Run-005$\times$2) on two holdout sets.}\label{tab:qwen-13fact}
+\begin{tabular}{l c c c c c c}
+\toprule
+& \multicolumn{3}{c}{\textbf{Run-002 newfacts (50)}} & \multicolumn{3}{c}{\textbf{Run-004 random (100)}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+\textbf{Metric} & \textbf{Base} & \textbf{LoRA} & \textbf{$\Delta$} & \textbf{Base} & \textbf{LoRA} & \textbf{$\Delta$} \\
+\midrule
+JSON valid       & 1.0    & 1.0    & ---  & 0.96   & 1.0    & +0.04 \\
+Schema valid     & 1.0    & 1.0    & ---  & 0.96   & 1.0    & +0.04 \\
+Fact accuracy    & 0.8677 & \textbf{0.9908} & +0.1231 & 0.8038 & \textbf{0.9931} & +0.1892 \\
+Macro $F_1$      & 0.4513 & \textbf{0.6515} & +0.2002 & 0.4393 & \textbf{0.6100} & +0.1707 \\
+Seen $F_1$       & 0.5022 & \textbf{0.9648} & +0.4626 & 0.5659 & \textbf{0.9159} & +0.3500 \\
+Exact match      & 0.10   & \textbf{0.88}   & +0.78  & 0.03   & \textbf{0.92}   & +0.89 \\
+Critical FP      & 11     & \textbf{4}      & $-$7   & 70     & \textbf{8}      & $-$62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Run-002 newfacts holdout.}
+The LoRA adapter achieves a fact accuracy of 0.9908, a seen $F_1$ of 0.9648, and a sample exact match rate of 0.88.
+This means that in 44 out of 50 samples, all 13 facts are correctly classified.
+The base model, in contrast, achieves a fact accuracy of 0.8677 and an exact match rate of only 0.10.
+The critical false positive count drops from 11 (base) to 4 (LoRA), a reduction of 7.
+The three remaining error sources in the LoRA adapter are: two false negatives on \texttt{tac\_page\_visible} (the adapter misses the TAC page when it is present), one false positive on \texttt{fcsmc\_final\_go\_result\_visible}, one false positive on \texttt{ins\_grnd\_alignment\_text\_visible}, and two false positives on \texttt{ins\_ok\_text\_visible}.
+% Evidence: metrics_lora.json → fact_scores → ins_ok_text_visible seen false_positives=2
+
+\textbf{Run-004 random holdout.}
+The pattern is consistent but the base model degrades more severely on this larger and more diverse holdout set.
+The base model produces 4 invalid JSON/schema responses (yielding a validity rate of 0.96), 70 critical false positives (nearly all concentrated on \texttt{fcsmc\_intermediate\_result\_visible} with 60), and a sample exact match rate of only 0.03.
+The LoRA adapter restores perfect JSON and schema validity (1.0), raises fact accuracy to 0.9931, and achieves a sample exact match rate of 0.92 (92 out of 100 samples fully correct).
+The critical false positive count drops from 70 to 8, all of which are on \texttt{fcsmc\_final\_go\_result\_visible}.
+% Evidence: metrics_lora.json for Run-004 random → critical_false_positives_by_fact: fcsmc_final_go_result_visible=8
+
+Across both holdouts, the LoRA adapter demonstrates three key properties.
+First, it restores output format reliability: the base model occasionally produces malformed JSON or schema-invalid responses on the Run-004 holdout, while the LoRA adapter does not.
+Second, it dramatically improves per-fact recall, as captured by seen $F_1$ rising from the range 0.50--0.57 (base) to 0.92--0.96 (LoRA).
+Third, it reduces critical false positives by 64\% (Run-002) and 89\% (Run-004), though a residual set of false positives on completion-type facts (\texttt{fcsmc\_final\_go\_result\_visible}, \texttt{ins\_ok\_text\_visible}) persists.
+
+\textbf{Comparison to 8-fact v1.}
+% Evidence: experiment_inventory.md §4.1 vs §4.2
+Moving from the 8-fact v1 to the 13-fact v2 ontology, the LoRA adapter's fact accuracy rises from 0.9150 to 0.9908 on Run-002-family holdouts, and the sample exact match rate rises from 0.36 to 0.88.
+Critically, the v2 adapter reduces critical false positives (from 15 to 4 on Run-002-family) rather than increasing them, as the v1 adapter did relative to its base model.
+This indicates that the combination of the expanded fact ontology, the Run-003 + Run-005$\times$2 data recipe, and the composition-rebalance strategy addressed the false-positive vulnerability that was present in the v1 line.
+% TODO:VERIFY — Whether to present the 8-fact→13-fact comparison as a within-paper finding or to keep 8-fact only in appendix.
+
+% ---------------------------------------------------------------------------
 \subsection{Gemma-4 13-Fact V2 Comparison}\label{sec:eval-gemma}
-% TODO: Run-002 newfacts + Run-004 random, critical_fp=0 on Run-002.
-% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/
-% Claims: C-VLM-06, C-VLM-03b
 
+% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/benchmark_summary.json
+% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/metrics_base.json
+% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/metrics_lora.json
+% Claims: C-VLM-06
+
+% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/benchmark_summary.json
+% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/metrics_base.json
+% Evidence: benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/metrics_lora.json
+
+To assess whether the training recipe generalises beyond a single backbone architecture, the identical data recipe (Run-003 + Run-005$\times$2, 928 rows, bilingual, 13-fact ontology) was applied to a second VLM backbone: \texttt{google/gemma-4-31B}.
+% Evidence: models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+Training hyperparameters were matched wherever possible: 4 epochs, learning rate $2 \times 10^{-4}$, LoRA $r=16$, $\alpha=16$, dropout $=0.0$, effective batch size 4, maximum sequence length 4096.
+Differences include the use of \texttt{all-linear} LoRA target modules (vs.\ Qwen's vision+language attachment), 4-bit quantization (\texttt{load\_in\_4bit=true}), GPU memory utilisation of 0.95, and the \texttt{gemma-4} chat template.
+Training converged in 8050 seconds with a final training loss of 0.0474.
+Note that training loss values are not directly comparable across backbones due to differences in tokenizer behaviour, template structure, and parameterisation.
+
+\begin{table}[htbp]
+\centering
+\caption{13-fact v2 benchmark: Gemma-4-31B Base vs.\ LoRA (Run-003 + Run-005$\times$2) on two holdout sets.}\label{tab:gemma-13fact}
+\begin{tabular}{l c c c c c c}
+\toprule
+& \multicolumn{3}{c}{\textbf{Run-002 newfacts (50)}} & \multicolumn{3}{c}{\textbf{Run-004 random (100)}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+\textbf{Metric} & \textbf{Base} & \textbf{LoRA} & \textbf{$\Delta$} & \textbf{Base} & \textbf{LoRA} & \textbf{$\Delta$} \\
+\midrule
+JSON valid       & 1.0    & 1.0    & ---  & 0.99   & 1.0    & +0.01 \\
+Schema valid     & 1.0    & 1.0    & ---  & 0.99   & 1.0    & +0.01 \\
+Fact accuracy    & 0.8169 & 0.9492 & +0.1323 & 0.8146 & 0.9715 & +0.1569 \\
+Macro $F_1$      & 0.4432 & 0.5857 & +0.1425 & 0.4400 & 0.5630 & +0.1229 \\
+Seen $F_1$       & 0.5128 & 0.8123 & +0.2995 & 0.6332 & 0.7959 & +0.1627 \\
+Exact match      & 0.04   & 0.44   & +0.40  & 0.12   & 0.74   & +0.62 \\
+Critical FP      & 16     & \textbf{0} & $-$16  & 47     & 13     & $-$34 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:gemma-13fact} confirms that the Run-003 + Run-005$\times$2 data recipe produces meaningful improvements for the Gemma backbone as well.
+% Claim: C-VLM-03b
+On both holdouts, fact accuracy rises from the base model's range of 0.81--0.82 to 0.95--0.97 for the LoRA adapter.
+The most distinctive result is on the Run-002 newfacts holdout, where the Gemma LoRA adapter achieves \textbf{zero critical false positives} (down from 16 for the Gemma base model).
+This contrasts with the Qwen LoRA adapter, which retains 4 critical false positives on the same holdout.
+
+However, Gemma's conservative behaviour comes at a cost in recall and exact-match performance.
+On Run-002, the Gemma LoRA adapter's sample exact match rate is 0.44, compared to 0.88 for Qwen LoRA.
+On Run-004, the gap is 0.74 (Gemma) vs.\ 0.92 (Qwen).
+Seen $F_1$ follows a similar pattern: 0.81 (Gemma) vs.\ 0.96 (Qwen) on Run-002, and 0.80 (Gemma) vs.\ 0.92 (Qwen) on Run-004.
+The Gemma base model is a stronger starting point on Run-004 (seen $F_1$ of 0.6332 vs.\ Qwen base's 0.5659), but the Qwen LoRA adapter's improvement is larger, yielding a higher absolute performance ceiling.
+
+The practical interpretation, consistent with the backbone comparison report, is that the Qwen3.5-9B adapter remains the better choice for downstream system integration, owing to its higher overall accuracy, stronger seen $F_1$, and higher sample exact match rate.
+% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+Gemma's zero-critical-FP result on Run-002 is noteworthy and suggests that backbone-level differences in error style (conservative vs.\ assertive) are observable even under matched training data.
+% TODO:VERIFY — Whether to present Gemma comparison in main paper body or in appendix/discussion.
+
+% ---------------------------------------------------------------------------
 \subsection{Error Analysis}\label{sec:eval-errors}
-% TODO: Per-fact breakdown, confusion matrices, residual failure modes.
-% Evidence: benchmarks/*/charts/confusion_*.png, benchmarks/*/errors_*.jsonl
+
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/fact_scores.csv
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/fact_scores.csv
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/metrics_lora.json
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/metrics_lora.json
+
+To understand where the remaining errors occur and what patterns differentiate the base model from the LoRA adapter, this section provides a per-fact breakdown of the strongest configuration (Qwen LoRA on the 13-fact v2 ontology).
+
+\subsubsection{Fact Categories by Difficulty}
+
+The 13 visual facts can be grouped into three categories that reflect distinct levels of extraction difficulty.
+
+\textbf{Group 1: Coarse panel presence (6 facts).}
+Facts in this group indicate whether a particular cockpit panel or display page is currently visible: \texttt{tac\_page\_visible}, \texttt{supt\_page\_visible}, \texttt{fcs\_page\_visible}, \texttt{bit\_root\_page\_visible}, \texttt{fcsmc\_page\_visible}, and \texttt{hsi\_page\_visible}.
+These are structural recognition tasks that rely on identifying large, visually distinctive panel layouts.
+
+The Qwen LoRA adapter achieves perfect classification on all six facts on both the Run-002 newfacts and Run-004 random holdouts, with the single exception of \texttt{tac\_page\_visible} on Run-002 (two false negatives out of 50 samples; the TAC page is seen in 23 of 50 samples, so these represent missed detections rather than hallucinations).
+% Evidence: Run-002 newfacts metrics_lora.json → tac_page_visible seen: tp=21, fn=2
+The base model, by contrast, fails on several of these facts: it completely misses all five occurrences of \texttt{supt\_page\_visible} on Run-002 (seen $F_1 = 0.0$), hallucinates five false positives on \texttt{bit\_root\_page\_visible} on Run-002, and misses 18 of 94 occurrences of \texttt{fcs\_page\_visible} on Run-004 (seen recall $=0.81$).
+
+\textbf{Group 2: Fine-grained state indicators (5 facts).}
+Facts in this group capture subtle within-panel states: \texttt{fcs\_page\_x\_marks\_visible} (X-marks on the FCS page), \texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible}, \texttt{fcsmc\_final\_go\_result\_visible} (three progressive states of the FCS-MC test sequence), and \texttt{hsi\_map\_layer\_visible} (whether the map overlay is active on the HSI).
+
+The Qwen LoRA adapter achieves perfect classification on \texttt{fcs\_page\_x\_marks\_visible}, \texttt{fcsmc\_intermediate\_result\_visible}, and \texttt{hsi\_map\_layer\_visible} on both holdouts.
+One false negative occurs on \texttt{fcsmc\_in\_test\_visible} on Run-004 (17 seen samples, 16 correctly identified).
+The most persistent error source is \texttt{fcsmc\_final\_go\_result\_visible}, where the adapter produces 1 false positive on Run-002 and 8 false positives on Run-004 (against 60 seen occurrences).
+% Evidence: Run-004 random metrics_lora.json → fcsmc_final_go_result_visible seen: tp=60, fp=8
+This fact requires distinguishing a specific numeric readout within the FCS-MC panel, and the consistent false-positive pattern suggests that visually similar intermediate states are occasionally misclassified as the final GO result.
+
+The base model's behaviour on this group is qualitatively different.
+On Run-004, the base model generates 60 critical false positives on \texttt{fcsmc\_intermediate\_result\_visible} alone (against only 7 true seen occurrences), indicating a near-complete failure to distinguish this state.
+The base model also shows poor recall on \texttt{fcs\_page\_x\_marks\_visible} (seen $F_1=0.0$ on both holdouts) and \texttt{fcsmc\_in\_test\_visible} (seen recall $\approx 0.33$--0.53).
+
+\textbf{Group 3: Small-text recognition (2 facts).}
+Facts \texttt{ins\_grnd\_alignment\_text\_visible} and \texttt{ins\_ok\_text\_visible} require the model to recognise small textual indicators on the INS panel.
+These are the most fine-grained facts in the ontology and represent a near-OCR-level challenge for the 9B-parameter model.
+
+The Qwen LoRA adapter performs strongly on \texttt{ins\_grnd\_alignment\_text\_visible}: perfect classification on Run-004 (69 seen, 31 not seen) and one false positive on Run-002 (42 seen, 7 not seen).
+% Evidence: Run-002 newfacts metrics_lora.json → ins_grnd_alignment_text_visible: accuracy=0.98, seen_f1=0.9882
+On \texttt{ins\_ok\_text\_visible}, the adapter produces 2 false positives on Run-002 (against 4 seen occurrences; these are samples where the OK text is not yet visible but the adapter asserts it is).
+On Run-004, where \texttt{ins\_ok\_text\_visible} is never seen (0 of 100), the adapter correctly produces no false positives, achieving perfect accuracy.
+
+The base model is effectively blind to both of these facts: seen $F_1 = 0.0$ on both holdouts for \texttt{ins\_grnd\_alignment\_text\_visible}, and seen $F_1 = 0.0$ for \texttt{ins\_ok\_text\_visible} (though the base model also never sees it on Run-004, so the $F_1$ metric reports 0.0 by construction).
+
+\subsubsection{Error Taxonomy}
+
+Aggregating across both holdouts for the Qwen LoRA adapter, the observed errors can be classified into three patterns:
+
+\begin{enumerate}
+  \item \textbf{Completion-fact false positives (majority).}
+  The largest share of residual errors comes from \texttt{fcsmc\_final\_go\_result\_visible} and \texttt{ins\_ok\_text\_visible}, where the adapter occasionally asserts a completion/finalisation state that is not yet present.
+  These are classified as \textit{critical} false positives in the benchmark because they carry direct downstream risk: if the tutoring system believes a step is complete when it is not, it may prematurely advance the procedure.
+
+  \item \textbf{Isolated false negatives (minor).}
+  Two false negatives on \texttt{tac\_page\_visible} (Run-002) and one on \texttt{fcsmc\_in\_test\_visible} (Run-004) represent missed detections of states that are actually present.
+  These are less severe from a tutoring-safety perspective (a missed detection triggers a redundant prompt rather than skipping a step) but indicate residual recall gaps.
+
+  \item \textbf{Small-text hallucination (minor).}
+  One false positive on \texttt{ins\_grnd\_alignment\_text\_visible} (Run-002) represents the adapter falsely detecting the alignment status text.
+  Given the small visual footprint of this indicator, this error is consistent with the expected difficulty profile.
+\end{enumerate}
+
+\subsubsection{Confusion Pattern Summary}
+
+% Evidence: benchmark directories contain per-fact confusion matrix charts for both base and lora models
+Per-fact confusion matrices (available as charts in each benchmark directory) reveal a systematic pattern in the base model's errors: the base model is prone to \textit{unidirectional hallucination} on facts that appear rarely in the training distribution.
+For instance, \texttt{fcsmc\_intermediate\_result\_visible} appears in only 7 of 100 samples in the Run-004 holdout, yet the base model asserts it as \texttt{seen} in 60 additional samples where it is not present.
+The LoRA adapter eliminates this class of error almost entirely, suggesting that the composition-rebalance and oversampling strategy effectively counteracted the base model's tendency to over-predict frequently co-occurring fact states.
+
+% ---------------------------------------------------------------------------
+\subsection{Runtime Infrastructure Readiness}\label{sec:eval-runtime}
+
+% Evidence: replay_eval/fa18c_startup_v04/suite.yaml, cases/*/
+% Evidence: logs/test_index/index.json
+% Claim: C-RUNTIME-01
+
+Beyond the VLM benchmark, the repository contains evidence of a functional replay-based evaluation infrastructure.
+The replay evaluation suite at \texttt{replay\_eval/fa18c\_startup\_v04/} defines five test cases (\texttt{batteryon\_2min}, \texttt{Batteryon\_enginGenoff\_2min}, \texttt{fcs\_reset\_fcs\_bit\_2min}, \texttt{ins\_2min}, \texttt{noop\_2min}) with DCS-BIOS raw captures (\texttt{dcs\_bios\_raw.jsonl}) and per-frame sidecar files (\texttt{frames.jsonl}).
+This infrastructure enables replay of recorded DCS sessions for offline testing of the telemetry pipeline, knowledge retrieval, and procedure execution logic without requiring a live DCS instance.
+
+The runtime data collection pipeline records structured events through the \texttt{core/event\_store.py} module and indexes them under \texttt{logs/test\_index/index.json}.
+At present, this pipeline captures telemetry snapshots, procedure step transitions, and VLM inference requests.
+It does not yet implement the participant/session schema, quiz linkage, or NASA-TLX integration that would be required for a human-subject study; these are discussed as planned upgrades in Section~\ref{sec:eval-planned-upgrades}.
 
 % ===========================================================================
 % --- PART B: Planned Human-Subject Evaluation (TODO claims only) ---
 % ===========================================================================
 \section{Planned Runtime Data Collection and Human-Subject Evaluation}\label{sec:eval-planned}
 
+The original research vision of this thesis, as articulated in the research proposal, includes a controlled human-subject evaluation of the grounded tutoring system in a DCS procedural learning context.
+This evaluation has not yet been conducted.
+The following subsections describe the planned evaluation design as it was formulated in the proposal, together with an assessment of the upgrades required to transition the current runtime infrastructure into a data-collection-ready state.
+All statements in this section represent future work and are included for transparency about the intended trajectory of the research.
+% Claim: C-PROPOSAL-02
+
+% ---------------------------------------------------------------------------
 \subsection{Original Evaluation Vision}\label{sec:eval-planned-vision}
-% TODO: 3 conditions (video+notes, ungrounded LLM, grounded tutor), n≈5–10, Quest 3.
-% Evidence: ThesisProposal1128.pdf, paper_context/proposal_summary.md §3
+
+% Evidence: ThesisProposal1128.pdf; paper_context/proposal_summary.md §2–3
 % Claims: C-PROPOSAL-02, C-HUMAN-02
 
+The proposal envisions a between-subjects comparison of three conditions:
+
+\begin{enumerate}
+  \item \textbf{Video + notes baseline.} Learners study a pre-recorded video walkthrough and written checklist before and during the cold-start procedure, without any integrated tutoring system.
+  \item \textbf{Ungrounded text-only LLM.} A language model provides step-by-step guidance via text, but without access to real-time simulator state, retrieved manual excerpts, or visual fact extraction.
+  \item \textbf{Grounded RAG + LLM tutor.} The full system described in Chapters~\ref{ch:system-design}, \ref{ch:methodology}, and \ref{ch:implementation}: telemetry-grounded, retrieval-augmented, with structured visual fact extraction and overlay execution.
+\end{enumerate}
+
+The original target platform is the Meta Quest 3 with DCS-VR, providing in-headset guidance through step cards or overlay annotations.
+The current system operates on the desktop/DCS (non-VR) configuration, so a VR deployment would need to be completed before this evaluation can proceed.
+Target sample size is approximately $n = 5$--$10$ participants per condition, drawn from a beginner-to-intermediate population with limited prior F/A-18C cold-start experience.
+
+% ---------------------------------------------------------------------------
 \subsection{Planned Evaluation Metrics}\label{sec:eval-planned-metrics}
-% TODO: Completion rate, error rate, time, dead-end, help count, NASA-TLX,
-%       pre/post quiz, 2–4 week retention, transfer task.
+
+% Evidence: ThesisProposal1128.pdf; paper_context/proposal_summary.md §3.2
 % Claims: C-HUMAN-01, C-HUMAN-03
 
+The proposal specifies a multi-dimensional evaluation framework with the following planned metrics:
+
+\begin{itemize}
+  \item \textbf{Immediate performance:} Procedure completion rate, procedural error rate, total task time, and dead-end count (number of times the participant becomes stuck and requires external intervention).
+
+  \item \textbf{Workload:} NASA Task Load Index (NASA-TLX) administered immediately after the training session.
+  % Evidence: Doc/Evaluation/fa18c_nasatlx_vr.md exists as a planned instrument
+
+  \item \textbf{Learning:} Pre-test and post-test quiz scores measuring declarative knowledge of the cold-start procedure.
+
+  \item \textbf{Retention:} A delayed post-test administered 2--4 weeks after the training session to assess knowledge retention.
+
+  \item \textbf{Transfer:} Performance on a variant procedure (e.g., a modified cold-start sequence) to assess whether skills generalise beyond the trained scenario.
+\end{itemize}
+
+All of these metrics remain in the planning stage; no participant-level data has been collected.
+
+% ---------------------------------------------------------------------------
 \subsection{Required Runtime Data Collection Upgrades}\label{sec:eval-planned-upgrades}
-% TODO: Participant/session schema, NASA-TLX integration, quiz linkage, anonymisation.
+
 % Claims: C-DATA-COLLECT-01
 
-\subsection{Planned Experiment Design}\label{sec:eval-planned-design}
-% TODO: Recruitment, pre-test, training, trial, NASA-TLX, post-test, retention, transfer.
+To support the planned human-subject evaluation, the current runtime data collection infrastructure requires several specific upgrades:
 
+\begin{enumerate}
+  \item \textbf{Participant and session schema.} The event store must be extended with a structured schema for participant demographics (anonymised ID, prior experience level, condition assignment), session metadata (date, duration, DCS version), and trial-level annotations.
+
+  \item \textbf{NASA-TLX integration.} A post-session instrument for administering and recording NASA-TLX responses must be integrated into the runtime, either as an in-application form or as a linked external survey with session-level traceability.
+
+  \item \textbf{Quiz linkage.} Pre-test and post-test quiz responses must be linked to participant and session identifiers to enable within-subject learning gain analysis.
+
+  \item \textbf{Anonymisation pipeline.} All participant-identifiable data must pass through an anonymisation step before storage, in compliance with standard research ethics requirements for human-subject data.
+
+  \item \textbf{VR deployment.} The runtime must be ported from the current desktop/DCS configuration to the Quest~3 / DCS-VR platform, including the in-headset overlay rendering and interaction handling described in the proposal.
+\end{enumerate}
+
+None of these upgrades have been implemented at the time of writing.
+
+% ---------------------------------------------------------------------------
+\subsection{Planned Experiment Design}\label{sec:eval-planned-design}
+
+% Evidence: ThesisProposal1128.pdf; paper_context/proposal_summary.md §3
+
+The planned experiment follows a standard pre-test / training / post-test / retention design:
+
+\begin{enumerate}
+  \item \textbf{Recruitment and screening.} Participants are recruited from a population with limited F/A-18C experience. A screening questionnaire establishes baseline DCS familiarity and assigns participants to conditions using stratified randomisation.
+
+  \item \textbf{Pre-test.} A written quiz assesses declarative knowledge of the cold-start procedure before any training exposure.
+
+  \item \textbf{Familiarisation.} A brief DCS cockpit familiarisation phase ensures all participants can locate basic controls and panels, reducing variance from platform unfamiliarity.
+
+  \item \textbf{Training trial.} Participants execute the F/A-18C cold-start procedure under their assigned condition. The system records all telemetry, procedure state transitions, help requests, VLM inference calls, and (for the grounded condition) overlay execution events.
+
+  \item \textbf{Post-test and NASA-TLX.} Immediately following the training trial, participants complete the NASA-TLX instrument and a post-test quiz identical in structure to the pre-test.
+
+  \item \textbf{Retention test.} After a 2--4 week interval, participants return for a delayed post-test and, where feasible, a second cold-start trial to assess procedural retention.
+
+  \item \textbf{Transfer task (optional).} A variant procedure is administered to assess the generality of learned skills.
+\end{enumerate}
+
+This design has been specified at the proposal level but has not been piloted or executed.
+
+% ---------------------------------------------------------------------------
 \subsection{Known Threats to Validity}\label{sec:eval-planned-threats}
-% TODO: Desktop not VR yet; benchmark ≠ learning outcome; small n.
+
+Several threats to validity can be identified at the design stage, prior to any data collection:
+
+\begin{enumerate}
+  \item \textbf{Desktop vs.\ VR platform gap.}
+  The current system operates on desktop DCS, not DCS-VR on Quest~3 as envisioned in the proposal.
+  Results obtained in either platform may not generalise to the other without additional validation.
+
+  \item \textbf{Benchmark performance does not imply learning outcomes.}
+  The VLM benchmark results reported in Section~\ref{sec:eval-tech} demonstrate that the LoRA adapter extracts visual facts accurately.
+  However, accurate visual fact extraction is a necessary but not sufficient condition for improving human learning outcomes.
+  A human-subject study is required to establish whether the fact extraction performance translates into measurable procedural learning gains.
+
+  \item \textbf{Small sample size.}
+  The planned sample size of $n = 5$--$10$ per condition is small by the standards of controlled human-subject research and limits statistical power for detecting between-condition differences, particularly for noisy metrics such as completion time and error rate.
+
+  \item \textbf{Beginner population generalisability.}
+  The planned participant pool consists of individuals with limited DCS experience.
+  Results may not generalise to experienced pilots or to other simulation platforms.
+
+  \item \textbf{Single procedure.}
+  The evaluation is designed around a single procedure (F/A-18C cold start).
+  Whether the tutoring approach transfers to other procedural tasks within DCS or to other domains remains an open question.
+
+  \item \textbf{Experimenter effects.}
+  In a small-$n$, single-site study, experimenter behaviour during familiarisation and intervention can introduce systematic bias that is difficult to separate from condition effects.
+\end{enumerate}
+
+These threats do not invalidate the planned evaluation design, but they do bound the scope of conclusions that can be drawn from its eventual results.
+Addressing them through careful protocol design, pre-registration of analysis plans, and explicit acknowledgement of limitations will be essential when the study proceeds.
+
+% ===========================================================================
+% --- Chapter summary ---
+% ===========================================================================
+In summary, this chapter has presented (a) technical validation results confirming that the LoRA-fine-tuned VLM adapter substantially and consistently outperforms the base model across two independent holdout sets under a 13-fact visual ontology, with the Qwen3.5-9B backbone achieving the strongest overall results; (b) evidence that the training recipe generalises to a second backbone architecture (Gemma-4-31B), though with a different precision--recall trade-off; (c) a per-fact error analysis identifying completion-fact false positives as the primary residual failure mode; and (d) a structured description of the planned human-subject evaluation, including its design, required infrastructure upgrades, and known threats to validity, all of which remain future work.｜｜DSML｜｜parameter>

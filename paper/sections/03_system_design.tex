@@ -8,6 +8,8 @@
 \chapter{System Design}\label{ch:system-design}
 
 This chapter describes the design of SimTutor, a telemetry-grounded tutoring runtime for procedural training in the DCS F/A-18C cold-start task.
+It covers the system architecture, component design, and design rationale.
+Detailed methodology---including the VLM adaptation protocol, dataset curation, and benchmark design---is deferred to Chapter~\ref{ch:methodology}; implementation-level details of specific modules appear in Chapter~\ref{ch:implementation}.
 Section~\ref{sec:design-goals} derives the design goals from the thesis problem statement.
 Section~\ref{sec:design-arch} presents the overall architecture and the separation of core tutoring logic from simulator-specific adapters.
 Section~\ref{sec:design-dataflow} describes the runtime data flow through the main help cycle.
@@ -21,7 +23,8 @@ Section~\ref{sec:design-delta} concludes with a systematic comparison to the ori
 \section{Design Goals and Requirements}\label{sec:design-goals}
 
 The thesis addresses the problem of providing grounded, context-aware procedural guidance to a learner operating a complex simulator.
-In the target scenario---the F/A-18C cold-start procedure in DCS World---the learner must execute a fixed sequence of 25 steps (S01--S25) spanning six phases, from battery power-up through engine start, avionics configuration, flight-control checks, and taxi preparation.
+In the target scenario---the F/A-18C cold-start procedure in DCS World---the learner must execute a fixed sequence of 25 steps (S01--S25) spanning six phases (P1--P6), from battery power-up through engine start, avionics configuration, flight-control checks, and taxi preparation.
+% Evidence: packs/fa18c_startup/pack.yaml (25 steps across phases P1--P6), packs/fa18c_startup/step_registry.yaml
 Each step has specific preconditions that must be satisfied before execution and completion conditions that must be met before advancing.
 Mistakes include omissions, order errors, parameter-setting errors, and state violations---categories formalised in the error taxonomy described in Chapter~\ref{ch:methodology}.
 
@@ -30,12 +33,14 @@ From this problem, we derive the following design goals:
 \begin{description}
 \item[G1 -- Simulator-based procedural tutoring.]
 The system must observe the learner's actions through simulator state, determine which procedural step the learner is currently attempting, and provide timely, grounded guidance when the learner is stuck or requests help.
-The tutoring output must reference concrete cockpit elements and cite evidence from telemetry, documentation, or visual observations.
+The tutoring output must reference concrete cockpit elements and cite evidence from telemetry, documentation, or visual facts.
+% Evidence: core/procedure.py, core/gating.py, core/step_hint.py, help_flow_en.md
 
 \item[G2 -- State-aware step guidance.]
 The system must track procedure progress through a formal state machine.
 It must evaluate preconditions before allowing a step to become active and verify completion conditions before advancing.
 Guidance must be conditional on the current simulator state, not merely on step order.
+% Evidence: core/procedure.py (state-machine tracking), core/gating.py (state-dependent gating)
 
 \item[G3 -- Separation between tutoring logic and simulator-specific integration.]
 The core tutoring logic---procedure tracking, gating, scoring, and help generation---must be independent of any particular simulator, model provider, or knowledge source.
@@ -75,8 +80,8 @@ The system is organised into three main layers, each with clearly defined respon
 \begin{description}
 \item[Core layer (\texttt{core/}).]
 The core contains all domain logic that is independent of any particular simulator, model provider, or external service.
-It defines the data contracts for runtime messaging (Section~\ref{sec:design-dataflow}), the procedure state machine and gating rule engine (Section~\ref{sec:design-procedure}), the scoring and interaction-metrics engines, the vision-fact ontology and aggregation rules, the BM25 retrieval implementation, the HelpResponse schema builder, and the security and audit infrastructure.
-The core depends on nothing outside itself except standard Python libraries and the abstract interfaces defined in the ports layer.
+It defines the data contracts for runtime messaging (Section~\ref{sec:design-dataflow}), the procedure state machine and gating rule engine (Section~\ref{sec:design-procedure}), the scoring and interaction-metrics engines, the vision fact ontology and sticky/TTL persistence semantics, the BM25 retrieval implementation, the HelpResponse schema builder, and the security and audit infrastructure.
+By design, the core depends only on standard Python libraries and the abstract interfaces defined in the ports layer.
 % Evidence: core/procedure.py, core/gating.py, core/scoring.py, core/vision_facts.py,
 %           core/types.py, core/types_v2.py, core/knowledge.py, core/llm_schema.py
 
@@ -87,7 +92,7 @@ These interfaces are the only dependency injection points between the core and t
 
 \item[Adapters layer (\texttt{adapters/}).]
 The adapters layer contains all simulator-specific, provider-specific, and infrastructure-specific code.
-It includes DCS-BIOS telemetry receivers, the telemetry enrichment and delta-sanitisation pipeline, DCS overlay senders, OpenAI-compatible model clients (with and without multimodal support), Ollama fallback clients, a deterministic model stub for testing, a local BM25 knowledge adapter, the vision-fact extraction runtime, and the response-mapping and action-execution components that bridge model output to runtime behaviour.
+It includes DCS-BIOS telemetry receivers, the telemetry enrichment and delta-sanitisation pipeline, DCS overlay senders, OpenAI-compatible model clients (with and without multimodal support), Ollama fallback clients, a deterministic model stub for testing, a local BM25 knowledge adapter, the vision fact extraction runtime, and the response-mapping and action-execution components that bridge model output to runtime behaviour.
 Adapters depend on the ports they implement and on the core types they produce and consume; they never introduce reverse dependencies into the core.
 % Evidence: adapters/telemetry_pipeline.py, adapters/dcs_adapter.py,
 %           adapters/openai_compat_model.py, adapters/vision_fact_extractor.py,
@@ -99,7 +104,7 @@ The three layers are complemented by two further structural elements:
 \begin{description}
 \item[Procedure packs (\texttt{packs/}).]
 A procedure pack is a directory of declarative YAML configuration files that fully describe one procedural task.
-The pack defines the step list, preconditions and completion conditions (gating rules), UI targets and their simulator-specific element identifiers, telemetry variable mappings, error taxonomy categories and scoring weights, delta-sanitisation policy, vision-fact ontology with step bindings, and vision layout description.
+The pack defines the step list, preconditions and completion conditions (gating rules), UI targets and their simulator-specific element identifiers, telemetry variable mappings, error taxonomy categories and scoring weights, delta-sanitisation policy, vision fact ontology with step bindings, and vision layout description.
 The current repository contains one pack: \texttt{fa18c\_startup}, covering the full F/A-18C cold-start procedure.
 % Evidence: packs/fa18c_startup/pack.yaml, packs/fa18c_startup/step_registry.yaml,
 %           packs/fa18c_startup/taxonomy.yaml, packs/fa18c_startup/ui_map.yaml,
@@ -145,9 +150,10 @@ Three providers (\texttt{openai\_compat}, \texttt{ollama}, \texttt{stub}) are su
 Porting the system to a new simulator or aircraft requires writing new telemetry and overlay adapters and creating new procedure packs.
 The procedural reasoning, gating, scoring, and help-generation infrastructure can be reused as-is.
 The port interfaces are intentionally minimal: a telemetry port requires \texttt{start}, \texttt{poll}, and \texttt{stop} methods; an overlay port requires only the ability to send highlight, clear, and pulse commands to named cockpit elements.
+% Evidence: ports/telemetry.py (TelemetryPort), adapters/dcs_adapter.py (overlay methods)
 
 \item \textbf{Independent evolution of the VLM pipeline.}
-The VLM visual-fact extraction component communicates with the tutoring runtime through the vision port and the vision-fact observation schema, not through direct coupling.
+The VLM visual fact extraction component communicates with the tutoring runtime through the vision port and the vision fact observation schema, not through direct coupling.
 The VLM pipeline can be developed, trained, and benchmarked independently of the tutoring runtime.
 A runtime deployment can include the VLM component, omit it entirely, or replace it with a different perception backend without affecting the tutoring logic.
 \end{enumerate}
@@ -174,7 +180,7 @@ The simulator adapter---in the current implementation, a DCS-BIOS UDP receiver--
 % Evidence: core/types.py:Observation, adapters/dcs_bios/receiver.py
 
 \subsection{Tutor Request}
-When the learner triggers help---via a hotkey, a UDP message, or a stall-detection heuristic---a \emph{tutor request} is created.
+When the learner triggers help---via a hotkey or a UDP message---a \emph{tutor request} is created.
 The request carries an intent (\texttt{help}), an optional free-text message, a reference to the current observation, and a context dictionary populated by the runtime orchestrator.
 % Evidence: core/types.py:TutorRequest
 
@@ -261,8 +267,8 @@ Rules short-circuit on first failure; the failure index and reason feed into the
 % Evidence: core/gating.py
 
 \subsection{Deterministic Step Inference}
-When no model is available or model output fails validation, the system falls back to deterministic step inference, which examines the active step, unsatisfied gating rules, and recent UI targets to produce a safe text hint.
-By default, no overlay highlights are sent in fallback mode unless a local rule can prove a unique safe target.
+When no model is available or model output fails validation, the system falls back to deterministic step inference, which examines the active step, unsatisfied gating rules, and recent UI targets to produce a text hint restricted to the currently active step.
+By default, no overlay highlights are sent in fallback mode unless a local rule can prove a unique, valid target given the current telemetry state.
 % Evidence: core/step_hint.py, adapters/step_inference.py, help_flow_en.md §5
 
 \subsection{Procedure Pack Structure}
@@ -296,7 +302,7 @@ The adapter maps abstract target names to DCS-internal point codes using the pro
 \subsection{Vision Input Adapter}
 Triggers screenshot captures in DCS via a UDP-based capture trigger.
 The Lua-side \texttt{SimTutor.lua} renders the three primary cockpit displays into a single composite image.
-The Python-side adapter selects pre-trigger and trigger frames and passes them to the vision-fact extractor.
+The Python-side adapter selects pre-trigger and trigger frames and passes them to the vision fact extractor.
 % Evidence: adapters/vision_capture_trigger.py, DCS/Scripts/SimTutor/SimTutor.lua
 
 \subsection{Lua-Side Integration}
@@ -334,6 +340,7 @@ Events are persisted in JSONL format via \texttt{JsonlEventStore}, supporting ap
 \subsection{Replay and Validation}
 A recorded event log can be replayed offline to verify step ordering and state machine consistency.
 Telemetry logs are independently validated for monotonic sequence numbers and timestamps.
+The replay infrastructure has been implemented at the code level and exercised with recorded telemetry traces; it has not yet been validated with end-to-end human-in-the-loop sessions.
 % Evidence: simtutor/runner.py
 
 \subsection{Scoring and Interaction Metrics}
@@ -342,8 +349,8 @@ Interaction metrics characterise learner behaviour: stall time, help requests, L
 % Evidence: core/scoring.py, core/interaction_metrics.py
 
 \subsection{Current Limitations}
-The replay infrastructure has not yet been extended to replay full multimodal sessions with synchronised vision frames.
-% TODO:VERIFY -- scope of vision-aware replay in replay_eval/fa18c_startup_v04/
+The replay infrastructure currently supports synthetic regression replay at the telemetry level, including scenarios with vision frame sidecars (\texttt{replay\_eval/fa18c\_startup\_v04/}).
+End-to-end replay of full multimodal sessions with synchronised vision frames from live human runs has not yet been validated.
 
 % ===========================================================================
 \section{Optional VLM Adaptation for Visual State Understanding}\label{sec:design-vlm}
@@ -375,20 +382,20 @@ Each fact has a three-valued state (\texttt{seen}, \texttt{not\_seen}, \texttt{u
 \subsection{VLM Integration in the Help Cycle}
 When a help request arrives and the active step is vision-priority (S08, S15, S18), a capture trigger is sent to DCS.
 Pre-trigger and trigger frames are rendered and sent to the VLM.
-The returned facts are merged into the vision-fact snapshot (with sticky and TTL semantics) and included in the help-cycle context.
+The returned facts are merged into the vision fact snapshot (with sticky and TTL semantics) and included in the help-cycle context.
 If the vision adapter is unavailable or the multimodal request fails, the help cycle proceeds with telemetry and knowledge only.
 % Evidence: adapters/vision_fact_extractor.py:extract, adapters/vision_sync.py
 
 \subsection{VLM Adaptation Pipeline}
 The VLM used at runtime is fine-tuned.
 The adaptation pipeline---detailed in Chapter~\ref{ch:methodology}---comprises screenshot capture, pre-labeling by a large VLM, human review in Label Studio, bilingual SFT export, LoRA fine-tuning (Unsloth + PEFT + TRL), and base-vs-LoRA benchmarking on independent held-out sessions.
-This pipeline is a complete, self-contained contribution.
+This pipeline forms a self-contained contribution spanning data capture through benchmark evaluation.
 % Evidence: tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
 %           tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py,
 %           tools/benchmark_qwen35_vlm_facts.py
 
 \subsection{Distinction from Rule-Based State Gating}
-Rule-based gating evaluates telemetry variables deterministically; it is fast and auditable but limited to telemetry-representable conditions.
+Rule-based gating evaluates telemetry variables deterministically; it is deterministic and auditable but limited to telemetry-representable conditions.
 VLM-based visual fact extraction interprets display content that has no telemetry representation.
 The two mechanisms are complementary: the gating engine provides the primary procedure-tracking backbone; visual facts supply supplementary evidence for steps whose completion cannot be inferred from telemetry alone.
 % Evidence: packs/fa18c_startup/pack.yaml (vision_priority_steps, bios_priority_steps)
@@ -406,14 +413,14 @@ We document these differences to establish a clear boundary between the original
 \subsection{From VR-First to Desktop-First Runtime}
 The original proposal described a Meta Quest 3 VR tutoring system with in-headset step cards.
 The current implementation is a desktop/DCS runtime with cockpit overlay highlighting as the primary output modality.
-This shift occurred because building a robust telemetry-grounded runtime proved a substantial prerequisite for VR deployment, and the desktop configuration provides a more controlled environment for systematic benchmarking.
+This shift occurred because building a telemetry-grounded runtime with delta sanitisation, deterministic fallback, and automated tests proved a substantial prerequisite for VR deployment, and the desktop configuration provides a more controlled environment for systematic benchmarking.
 The VR deployment remains a planned next phase (Section~\ref{sec:eval-planned}).
 % Evidence: system_delta_from_proposal.md §1, §4
 
 \subsection{Added VLM Adaptation Pipeline}
 The original proposal envisioned a text-only RAG+LLM tutor.
-The VLM visual-fact extraction pipeline was added after discovering that several critical procedure steps require visual confirmation not inferable from telemetry alone.
-The VLM pipeline evolved into a complete adaptation and benchmarking loop that now constitutes a major technical contribution.
+The VLM visual fact extraction pipeline was added after discovering that several critical procedure steps require visual confirmation not inferable from telemetry alone.
+The VLM pipeline evolved into an adaptation and benchmarking loop that now constitutes a substantial technical contribution.
 % Evidence: system_delta_from_proposal.md §3, §6
 
 \subsection{Expanded Telemetry Grounding}
@@ -447,16 +454,17 @@ Table~\ref{tab:design-delta} summarises the key differences.
   Platform & Meta Quest 3 VR & Desktop / DCS \\
   Output modality & In-headset step cards & Cockpit overlay highlights \\
   State input & Read-only DCS state flags & Full DCS-BIOS telemetry with delta sanitisation \\
-  Visual perception & None (text-only RAG) & Optional VLM visual-fact extraction (13-fact v2) \\
-  Model adaptation & Not addressed & LoRA fine-tuning pipeline (Qwen3.5-9B, Gemma-4-31B) \\
+  Visual perception & None (text-only RAG) & Optional VLM visual fact extraction (13-fact v2) \\
+  Model adaptation & Not addressed & LoRA fine-tuning pipeline (primary line: Qwen3.5-9B; supplementary: Gemma-4-31B)\footnotemark \\
   Procedure representation & Implicit in prompts & Explicit pack-driven configuration with gating rules \\
-  Error handling & Not specified & Structured taxonomy, deterministic fallback, safety boundary \\
+  Error handling & Not specified & Structured taxonomy, deterministic fallback, and action restrictions \\
   Evaluation infrastructure & Not specified & Event logging, replay validation, automated scoring, benchmark pipeline \\
   Human-subject study & Planned as main evaluation & Postponed; infrastructure prepared \\
   \bottomrule
   \end{tabular}
 \end{table}
+\footnotetext{Qwen3.5-9B (Qwen/Qwen3.5-9B-Base) fine-tuning and benchmark results are the primary verified experimental line (C-VLM-04, C-VLM-05). Gemma-4-31B (google/gemma-4-31B) results are supplementary (C-VLM-06, \emph{likely}).}
 
 This evolution does not invalidate the original proposal.
-Rather, the implemented system provides a significantly more robust technical baseline on which the planned VR deployment and human-subject evaluation can be built.
+Rather, the implemented system provides a concrete technical foundation---with running code, automated tests, and benchmark artifacts---on which the planned VR deployment and human-subject evaluation can be built.
 % Evidence: system_delta_from_proposal.md §8, §9
