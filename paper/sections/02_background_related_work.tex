@@ -3,102 +3,37 @@
 %
 %  Source of truth: paper_context/paper_outline.md §2.2, §2.3
 % ===========================================================================
-\section{Background and Related Work}\label{sec:background}
+\chapter{Background and Related Work}\label{ch:background}
 
 % TODO: Write the background and related work chapter.
 
-% ===========================================================================
-\subsection{Procedural Tutoring and Intelligent Assistance}\label{sec:rw-tutoring}
+\section{Procedural Tutoring and Intelligent Assistance}\label{sec:rw-tutoring}
+% TODO:CITE — ITS, procedural task guidance, aviation training
 
-% TODO: Survey procedural tutoring systems, intelligent tutoring systems (ITS),
-% and the specific challenges of sequence-sensitive, state-dependent procedures.
-%
-% TODO:CITE — ITS literature
-% TODO:CITE — procedural task guidance systems
-% TODO:CITE — cockpit / aviation training systems
+\section{Grounded LLM Systems and Retrieval-Augmented Help}\label{sec:rw-rag}
+% TODO:CITE — RAG (Lewis et al., 2020), grounded generation, citation-based QA
 
-% ===========================================================================
-\subsection{Grounded LLM Systems and Retrieval-Augmented Help}\label{sec:rw-rag}
+\section{Vision-Language Model Adaptation for Structured Outputs}\label{sec:rw-vlm}
+% TODO:CITE — LoRA (Hu et al., 2021), Qwen3.5, Unsloth/PEFT/TRL, structured JSON decoding
 
-% TODO: Cover RAG, grounded generation, citation-included LLM output,
-% and retrieval-augmented tutoring.
-%
-% TODO:CITE — RAG (Lewis et al., 2020)
-% TODO:CITE — grounded generation literature
-% TODO:CITE — citation-based QA / attribution
+\section{Simulator-Based Training and Instrumentation}\label{sec:rw-sim}
+% TODO:CITE — DCS World / DCS-BIOS, simulator-based training evaluation
 
-% ===========================================================================
-\subsection{Vision-Language Model Adaptation for Structured Outputs}\label{sec:rw-vlm}
+\section{Human-Subject Evaluation in Procedural Learning}\label{sec:rw-human}
+% TODO:CITE — NASA-TLX, procedural learning evaluation, VR training studies
 
-% TODO: Cover VLM fine-tuning, LoRA adapters, structured JSON output from VLMs,
-% and small-data domain adaptation.
-%
-% TODO:CITE — LoRA (Hu et al., 2021)
-% TODO:CITE — Qwen3.5 / Qwen-VL
-% TODO:CITE — Unsloth, PEFT, TRL
-% TODO:CITE — structured output / JSON decoding from LLMs/VLMs
-% TODO:CITE — small-data VLM fine-tuning
-
-% ===========================================================================
-\subsection{Simulator-Based Training and Instrumentation}\label{sec:rw-sim}
-
-% TODO: Cover the use of simulators (especially DCS World) as training platforms,
-% DCS-BIOS telemetry, and instrumentation for training research.
-%
-% TODO:CITE — DCS World / DCS-BIOS
-% TODO:CITE — simulator-based training evaluation
-% TODO:CITE — F/A-18C NATOPS or equivalent procedure documentation
-
-% ===========================================================================
-\subsection{Human-Subject Evaluation in Procedural Learning}\label{sec:rw-human}
-
-% TODO: Cover evaluation methodologies for procedural learning systems,
-% including NASA-TLX, completion metrics, error taxonomy, retention tests,
-% and transfer tasks.
-%
-% TODO:CITE — NASA-TLX
-% TODO:CITE — procedural learning evaluation frameworks
-% TODO:CITE — VR training evaluation studies
-
-% ===========================================================================
-\subsection{Positioning of This Work}\label{sec:rw-positioning}
-
-% TODO: Summarise how this thesis sits at the intersection of the above areas:
-% - A telemetry-grounded tutoring runtime that is not pure RAG but
-%   pack-driven + grounded.
-% - A VLM adaptation pipeline specifically for structured cockpit visual facts,
-%   not open-ended visual QA.
-% - A planned human-subject evaluation framework for VR procedural learning.
+\section{Positioning of This Work}\label{sec:rw-positioning}
+% TODO: How this thesis sits at the intersection of the above areas.
 
 % --- Domain Background ---
-\subsection{The F/A-18C Cold-Start Task}\label{sec:bg-coldstart}
+\section{The F/A-18C Cold-Start Task}\label{sec:bg-coldstart}
+% TODO: S01--S25 (phases P1--P6), cockpit displays, DCS-BIOS telemetry.
+% Evidence: packs/fa18c_startup/pack.yaml, Doc/Evaluation/fa18c_startup_master.md
 
-% TODO: Describe the F/A-18C cold-start procedure.
-% - S01–S25 phases (P1–P6)
-% - Key cockpit displays: left DDI, right DDI, AMPCD
-% - DCS-BIOS telemetry interface
-%
-% Evidence:
-%   - packs/fa18c_startup/pack.yaml
-%   - Doc/Evaluation/fa18c_startup_master.md
-%   - Doc/Evaluation/Appendix - Training Task Syllabus.md
-
-% --- Visual Fact Ontology ---
-\subsection{Visual Fact Ontology}\label{sec:bg-facts}
-
-% TODO: Explain the concept of visual facts as intermediate structured
-% representations between VLM perception and downstream task reasoning.
-%
-% - 8-fact v1 ontology (historical baseline)
-% - 13-fact v2 ontology (current runtime contract)
-% - Three fact states: seen / not_seen / uncertain
-% - Sticky vs non-sticky facts
-% - Step bindings: all_of / any_of
-%
-% Evidence:
-%   - packs/fa18c_startup/vision_facts.yaml
-%   - core/vision_facts.py
-%   - Doc/Vision/fa18c_visual_facts_v0_4.md
-%   - Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §1
-%
+\section{Visual Fact Ontology}\label{sec:bg-facts}
+% TODO: Visual facts as intermediate structured representations.
+% - 8-fact v1 → 13-fact v2
+% - seen / not\_seen / uncertain
+% - Sticky vs non-sticky, step bindings (all\_of / any\_of)
+% Evidence: packs/fa18c_startup/vision_facts.yaml, core/vision_facts.py
 % Claims: C-VLM-01, C-VLM-02, C-VLM-07

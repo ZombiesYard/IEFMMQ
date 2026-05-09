@@ -1,44 +1,46 @@
 % ===========================================================================
-%  SimTutor Paper — main.tex
-%  Target: generic CS conference/journal template.
-%  Swap \documentclass to llncs / acmart / IEEEtran as needed.
+%  SimTutor — Master's Thesis
+%  TU Clausthal, Institute for Software and Systems Engineering (ISSE)
+%
+%  Template adapted from paperwork/Thesis.tex (scrreprt, british, natbib).
+%  This file lives in paper/ to separate the thesis writing workspace from
+%  the original template files in paperwork/. See CLAUDE.md for rationale.
 % ===========================================================================
-\documentclass[11pt,a4paper]{article}
+\documentclass[12pt,a4paper,bibtotoc,numbers=noenddot]{scrreprt}
 
 % ---------------------------------------------------------------------------
-%  Encoding & fonts
+%  Language
+% ---------------------------------------------------------------------------
+\usepackage[main=british,ngerman]{babel}
+
+% ---------------------------------------------------------------------------
+%  Spacing
+% ---------------------------------------------------------------------------
+\usepackage[onehalfspacing]{setspace}
+
+% ---------------------------------------------------------------------------
+%  Encoding
 % ---------------------------------------------------------------------------
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[main=british]{babel}
+\usepackage{textcomp}
 
 % ---------------------------------------------------------------------------
-%  Layout
-% ---------------------------------------------------------------------------
-\usepackage[margin=2.5cm]{geometry}
-\usepackage{setspace}
-\onehalfspacing
-
-% ---------------------------------------------------------------------------
-%  Maths & units
-% ---------------------------------------------------------------------------
-\usepackage{amsmath,amssymb,mathtools}
-\usepackage{siunitx}
-\DeclareSIUnit\Darcy{D}
-
-% ---------------------------------------------------------------------------
-%  Tables
-% ---------------------------------------------------------------------------
-\usepackage{booktabs}
-\usepackage{array,longtable,tabularx,multirow}
-\usepackage{threeparttable}
-\usepackage[table]{xcolor}
-\usepackage{colortbl}
-
-% ---------------------------------------------------------------------------
-%  Figures & captions
+%  Tables, figures, maths
 % ---------------------------------------------------------------------------
 \usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array,longtable,tabularx,multirow}
+\usepackage{amsmath,amssymb,mathtools}
+
+% ---------------------------------------------------------------------------
+%  Units
+% ---------------------------------------------------------------------------
+\usepackage{siunitx}
+
+% ---------------------------------------------------------------------------
+%  Captions
+% ---------------------------------------------------------------------------
 \usepackage[
   format=plain,
   justification=centering,
@@ -49,24 +51,34 @@
 \usepackage{subcaption}
 
 % ---------------------------------------------------------------------------
-%  Headers & footers
+%  Page style
 % ---------------------------------------------------------------------------
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[R]{\small\scshape SimTutor}
+\fancyhead[R]{\leftmark}
 \fancyfoot[R]{\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
 \setlength{\headheight}{14.5pt}
 
 % ---------------------------------------------------------------------------
-%  Hyperlinks
+%  Hyperlinks (load late)
 % ---------------------------------------------------------------------------
 \usepackage[bookmarksnumbered=true,colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 % ---------------------------------------------------------------------------
-%  Bibliography
+%  Date formatting (British style)
 % ---------------------------------------------------------------------------
+\usepackage{datetime}
+\newdateformat{britishdate}{\ordinal{DAY} \monthname[\THEMONTH] \THEYEAR}
+\newdate{hand-in}{\day}{\month}{\year}
+
+% ---------------------------------------------------------------------------
+%  Misc
+% ---------------------------------------------------------------------------
+\usepackage{csquotes}
+\usepackage[table]{xcolor}
+\usepackage{colortbl}
+\usepackage{threeparttable}
 \usepackage[numbers,sort&compress]{natbib}
 
 % ---------------------------------------------------------------------------
@@ -83,72 +95,47 @@
 }
 
 % ---------------------------------------------------------------------------
-%  Metadata  (TODO: update before submission)
+%  Metadata (TODO: finalise title before submission)
 % ---------------------------------------------------------------------------
+\author{Yu Zhang}
 \title{SimTutor: A Telemetry-Grounded Tutoring Runtime with \\
        Structured Visual Fact Extraction for Procedural Learning}
-
-\author{Yu Zhang%
-\thanks{Institute for Software and Systems Engineering, Clausthal University of Technology.}%
-\thanks{Work supervised by Prof.\ Dr.\ Christian Bartelt and Prof.\ Dr.\ Rüdiger Ehlers.}%
-}
-
 \date{\today}
 
 % ===========================================================================
 \begin{document}
 
-\maketitle
+% --- Front matter (Roman page numbers) ---
+\pagenumbering{Roman}
 
-% ---------------------------------------------------------------------------
-\input{sections/00_abstract}
-% ---------------------------------------------------------------------------
+\include{Preamble}
+\include{sections/00_abstract}
+\include{sections/00_acknowledgements}
 
-\newpage
 \tableofcontents
-
-\newpage
 \listoffigures
 \listoftables
 
-% ---------------------------------------------------------------------------
-\newpage
-\input{sections/01_introduction}
-% ---------------------------------------------------------------------------
+% --- Main content (Arabic page numbers) ---
+\cleardoublepage
+\pagenumbering{arabic}
 
-\newpage
-\input{sections/02_background_related_work}
-% ---------------------------------------------------------------------------
+\include{sections/01_introduction}
+\include{sections/02_background_related_work}
+\include{sections/03_system_design}
+\include{sections/04_methodology}
+\include{sections/05_implementation}
+\include{sections/06_evaluation}
+\include{sections/07_discussion}
+\include{sections/08_conclusion}
 
-\newpage
-\input{sections/03_system_design}
-% ---------------------------------------------------------------------------
-
-\newpage
-\input{sections/04_methodology}
-% ---------------------------------------------------------------------------
-
-\newpage
-\input{sections/05_implementation}
-% ---------------------------------------------------------------------------
-
-\newpage
-\input{sections/06_evaluation}
-% ---------------------------------------------------------------------------
-
-\newpage
-\input{sections/07_discussion}
-% ---------------------------------------------------------------------------
-
-\newpage
-\input{sections/08_conclusion}
-% ---------------------------------------------------------------------------
-
-% ---------------------------------------------------------------------------
-%  Bibliography
-% ---------------------------------------------------------------------------
-\newpage
+% --- Bibliography ---
+\cleardoublepage
+\renewcommand{\bibname}{References}
 \bibliographystyle{plainnat}
 \bibliography{references}
+
+% --- Appendix ---
+\include{sections/09_appendix}
 
 \end{document}

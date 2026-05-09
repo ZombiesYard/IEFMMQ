@@ -1,176 +1,38 @@
 % ===========================================================================
 %  04 — Methodology
-%
-%  Source of truth: paper_context/paper_outline.md §2.4.2–2.4.5
-%  Claims: C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-03a,
-%          C-VLM-07, C-DATA-01, C-TRAIN-01
+%  Claims: C-TELEM-01, C-RAG-01, C-VLM-01 through C-VLM-07, C-DATA-01, C-TRAIN-01
 % ===========================================================================
-\section{Methodology}\label{sec:methodology}
+\chapter{Methodology}\label{ch:methodology}
 
-% TODO: Describe the methodology for each component.
+% TODO: Write the methodology chapter.
 
-% ===========================================================================
-\subsection{Procedure Runtime and Telemetry Grounding}\label{sec:meth-telem}
+\section{Procedure Runtime and Telemetry Grounding}\label{sec:meth-telem}
+% TODO: DCS-BIOS ingestion, var resolution, gating evaluation, delta sanitisation.
+% Evidence: adapters/telemetry_pipeline.py, core/gating.py, core/procedure.py
+% Claims: C-TELEM-01
 
-% TODO: Telemetry enrichment and procedure engine.
-%
-% - DCS-BIOS raw frame ingestion
-% - Var resolution and projection (vars_fa18c.md)
-% - Gating rule evaluation (var_gte, arg_in_range, flag_true, time_since)
-% - Delta sanitization and aggregation
-% - Step state machine (pending → active → done/blocked)
-%
-% Evidence:
-%   - adapters/telemetry_pipeline.py
-%   - core/gating.py
-%   - core/procedure.py
-%   - core/vars.py
-%   - adapters/delta_sanitizer.py
-%   - adapters/delta_aggregator.py
-%   - packs/fa18c_startup/pack.yaml (gates)
-%
-% Claims: C-TELEM-01, C-PROC-01
-
-% ===========================================================================
-\subsection{Knowledge Grounding and Source Policy}\label{sec:meth-knowledge}
-
-% TODO: Knowledge retrieval and source policy.
-%
-% - BM25 retrieval over indexed documentation
-% - Source policy (allowlist) restricts which document chunks can be cited
-% - Grounding queries built from procedure state
-% - Knowledge integration into the help prompt
-%
-% Evidence:
-%   - adapters/knowledge_local.py
-%   - core/knowledge.py
-%   - knowledge_source_policy.yaml
-%   - tools/index_docs.py
-%
+\section{Knowledge Grounding and Source Policy}\label{sec:meth-knowledge}
+% TODO: BM25 retrieval, source policy, grounding query construction.
+% Evidence: adapters/knowledge_local.py, knowledge_source_policy.yaml
 % Claims: C-RAG-01
 
-% ===========================================================================
-\subsection{Visual Fact Data Pipeline}\label{sec:meth-vlm-pipeline}
-
-% TODO: Describe the VLM data pipeline.
-%
-% Pipeline stages:
-%   1. DCS screenshot capture (composite panel rendering)
-%   2. Initial Qwen VLM pre-labeling
-%   3. Label Studio human review
-%   4. Reviewed JSONL export
-%   5. Bilingual SFT JSONL generation (en + zh)
-%   6. LoRA fine-tuning with Unsloth + PEFT + TRL SFTTrainer
-%   7. Base-vs-LoRA benchmark
-%
-% TODO: Add pipeline diagram (Figure~\ref{fig:vlm-pipeline}).
-%
-% \begin{figure}[htbp]
-%   \centering
-%   % \includegraphics[width=\textwidth]{figures/vlm_pipeline.pdf}
-%   \caption{VLM data pipeline: capture → prelabel → review → SFT → LoRA → benchmark.}
-%   \label{fig:vlm-pipeline}
-% \end{figure}
-%
-% Evidence:
-%   - tools/capture_vlm_dataset.py
-%   - tools/generate_vlm_prelabels.py
-%   - tools/export_vision_sft_dataset.py
-%   - tools/train_qwen35_vlm_unsloth.py
-%   - tools/benchmark_qwen35_vlm_facts.py
-%   - Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md
-%
+\section{Visual Fact Data Pipeline}\label{sec:meth-vlm-pipeline}
+% TODO: Capture → prelabel → human review → SFT export → LoRA training → benchmark.
+% Evidence: tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
+%           tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py
 % Claims: C-VLM-03
 
-% ===========================================================================
-\subsection{Dataset Curation}\label{sec:meth-datasets}
-
-% TODO: Describe the dataset sources and statistics.
-%
-% Datasets:
-%   Run-001: 180 reviewed samples, 8-fact v1, bilingual export (en + zh)
-%   Run-002: 50 reviewed samples, 8-fact v1 holdout, en only
-%   Run-002 newfacts: 50 reviewed samples, 13-fact v2 holdout
-%   Run-003: 220 reviewed samples, 13-fact v2 training source, bilingual
-%   Run-004 random: 100 reviewed samples, 13-fact v2 holdout
-%   Run-005 composition rebalance: 122 reviewed samples, 13-fact v2,
-%     bilingual, addresses class imbalance
-%
-% TODO: Add dataset summary table (Table~\ref{tab:datasets}).
-%
-% \begin{table}[htbp]
-%   \centering
-%   \caption{Dataset overview.}
-%   \label{tab:datasets}
-%   % TODO: Populate with stats from datasets/*/stats.json
-% \end{table}
-%
-% Evidence:
-%   - datasets/*/stats.json
-%   - Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §3
-%
+\section{Dataset Curation}\label{sec:meth-datasets}
+% TODO: Run-001 through Run-005, ontology versions, sample counts, label distributions.
+% Evidence: datasets/*/stats.json
 % Claims: C-DATA-01, C-VLM-07
 
-% ===========================================================================
-\subsection{LoRA Fine-Tuning Configuration}\label{sec:meth-training}
-
-% TODO: Describe the LoRA training setup.
-%
-% Base models:
-%   - Qwen/Qwen3.5-9B-Base
-%   - google/gemma-4-31B
-%
-% Training stack: Unsloth + PEFT LoRA + TRL SFTTrainer
-% Key hyperparameters:
-%   - max_seq_length=4096
-%   - num_train_epochs=4
-%   - learning_rate=2e-4
-%   - per_device_train_batch_size=1, gradient_accumulation_steps=4
-%   - lora_r=16, lora_alpha=16, lora_dropout=0.0
-%   - seed=3407
-%   - load_in_4bit=True
-%
-% TODO: Add training config table (Table~\ref{tab:training}).
-%
-% \begin{table}[htbp]
-%   \centering
-%   \caption{LoRA fine-tuning configuration.}
-%   \label{tab:training}
-%   % TODO: Populate from models/*/train_summary.json
-% \end{table}
-%
-% Evidence:
-%   - models/qwen35_vlm_lora/*/train_summary.json
-%   - models/gemma4_vlm_lora/*/train_summary.json
-%   - tools/train_qwen35_vlm_unsloth.py
-%   - tools/train_gemma4_vlm_unsloth.py
-%   - Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §5
-%
+\section{LoRA Fine-Tuning Configuration}\label{sec:meth-training}
+% TODO: Qwen3.5-9B / Gemma-4-31B, Unsloth + PEFT + TRL, hyperparameters.
+% Evidence: models/*/train_summary.json
 % Claims: C-TRAIN-01
 
-% ===========================================================================
-\subsection{Benchmark Protocol}\label{sec:meth-benchmark}
-
-% TODO: Describe the benchmark methodology.
-%
-% Metrics:
-%   - JSON valid rate, schema valid rate
-%   - Fact accuracy (three-class)
-%   - Macro F1, Seen F1
-%   - Sample exact match
-%   - Critical false positive count
-%
-% Benchmark variants:
-%   - base_vs_lora: base model vs. LoRA-loaded model
-%   - lora_only: LoRA model only
-%
-% Holdout independence:
-%   - Run-002 exact overlap with training = 0
-%   - Run-004 exact overlap with training = 0
-%
-% Evidence:
-%   - tools/benchmark_qwen35_vlm_facts.py
-%   - benchmarks/qwen35_vlm_finetune/*/benchmark_summary.json
-%   - Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
-%
+\section{Benchmark Protocol}\label{sec:meth-benchmark}
+% TODO: Metrics, holdout independence (overlap = 0), base vs LoRA comparison.
+% Evidence: tools/benchmark_qwen35_vlm_facts.py, benchmarks/*/benchmark_summary.json
 % Claims: C-VLM-03a

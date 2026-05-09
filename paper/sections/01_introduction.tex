@@ -4,88 +4,42 @@
 %  Source of truth: paper_context/paper_outline.md §2.1
 %  Claims: C-PROPOSAL-01, C-PROPOSAL-02, C-NARRATIVE-01
 % ===========================================================================
-\section{Introduction}\label{sec:introduction}
+\chapter{Introduction}\label{ch:introduction}
 
-% TODO: Write the introduction (see outline §2.1).
+% TODO: Write the introduction (see paper_context/paper_outline.md §2.1).
 
-% --- Problem & Motivation ---
-\subsection{Motivation}\label{sec:intro-motivation}
+\section{Motivation}\label{sec:intro-motivation}
 
 % TODO: Define the procedural learning problem.
 % - Why fixed, sequence-sensitive procedures are challenging in immersive training.
-% - The gap between existing training aids (video, notes, manuals) and what a
-%   learner actually needs during in-simulator practice.
+% - The gap between existing training aids and what a learner needs in-simulator.
 % - Why grounded, context-aware assistance is desirable.
 %
-% Evidence / context:
-%   - paper_context/proposal_summary.md §1
-%   - ThesisProposal1128.pdf
-%   - Doc/Evaluation/fa18c_startup_master.md
-%
+% Evidence: paper_context/proposal_summary.md, ThesisProposal1128.pdf
 % TODO:CITE — procedural tutoring / ITS literature
-% TODO:CITE — VR / immersive training literature
 
-% --- Thesis Vision ---
-\subsection{Thesis Vision and Scope}\label{sec:intro-vision}
+\section{Thesis Vision and Scope}\label{sec:intro-vision}
 
-% TODO: State the original thesis vision.
-% - VR-first grounded tutoring for procedural learning.
+% TODO: Original thesis vision: VR-first grounded tutoring.
 % - Meta Quest 3 + DCS-VR + in-headset guidance.
 % - Retrieval-augmented LLM with grounded citations.
 %
-% Evidence:
-%   - ThesisProposal1128.pdf
-%   - paper_context/proposal_summary.md
-%
+% Evidence: ThesisProposal1128.pdf, paper_context/proposal_summary.md
 % Claims: C-PROPOSAL-01, C-PROPOSAL-02
 
-% --- Current System ---
-\subsection{Current Implementation Scope}\label{sec:intro-scope}
+\section{Current Implementation Scope}\label{sec:intro-scope}
 
-% TODO: Describe the system that has actually been implemented.
-% - Desktop / DCS-centered tutoring runtime.
-% - Telemetry-grounded help generation.
-% - VLM visual fact extraction + LoRA fine-tuning pipeline.
+% TODO: Describe what has actually been implemented.
+% - Desktop/DCS runtime, not VR yet.
+% - VLM adaptation is a new main line not in the original proposal.
+% - Human-subject evaluation is planned, not executed.
 %
-% Key offset from proposal:
-%   - Not VR-first (yet) — current runtime is desktop/DCS.
-%   - VLM adaptation is a new main line not in the original proposal.
-%   - Human-subject evaluation is planned, not executed.
-%
-% Evidence:
-%   - paper_context/system_delta_from_proposal.md
-%   - paper_context/repo_inventory.md
+% Evidence: paper_context/system_delta_from_proposal.md
 
-% --- Contributions ---
-\subsection{Contributions}\label{sec:intro-contributions}
+\section{Contributions}\label{sec:intro-contributions}
 
-% TODO: List contributions in bullet or enumerated form.
-%
-% Suggested structure:
-% \begin{enumerate}
-%   \item A telemetry-grounded tutoring runtime that integrates DCS-BIOS state,
-%         knowledge retrieval, structured help generation, and overlay execution
-%         in a pack-driven architecture.
-%   \item A structured visual fact ontology (8-fact v1 → 13-fact v2) and a
-%         complete VLM data pipeline (capture → prelabel → human review →
-%         SFT export → LoRA fine-tuning → benchmark).
-%   \item Benchmark results showing that small-data LoRA adaptation of
-%         Qwen3.5-9B substantially improves cockpit visual fact extraction
-%         on independent held-out sessions.
-%   \item A backbone comparison (Qwen vs.\ Gemma) confirming data-recipe
-%         transferability across model families.
-%   \item A planned evaluation framework for future VR-based human-subject
-%         studies.
-% \end{enumerate}
+% TODO: Enumerate contributions after the full draft is stable.
 
-% --- Paper Structure ---
-\subsection{Paper Structure}\label{sec:intro-structure}
+\section{Thesis Structure}\label{sec:intro-structure}
 
-% TODO: Brief roadmap of the remaining sections.
-% §2 — Background and Related Work
-% §3 — System Design
-% §4 — Methodology
-% §5 — Implementation
-% §6 — Evaluation
-% §7 — Discussion
-% §8 — Conclusion
+% TODO: Brief roadmap of the remaining chapters.
