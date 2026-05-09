@@ -2,44 +2,279 @@
 %  01 — Introduction
 %
 %  Source of truth: paper_context/paper_outline.md §2.1
-%  Claims: C-PROPOSAL-01, C-PROPOSAL-02, C-NARRATIVE-01
+%  Evidence:       paper_context/proposal_summary.md
+%                  paper_context/system_delta_from_proposal.md
+%                  paper_context/claims_registry.md
+%  Terminology:    paper_context/terminology.md
+%  Claims:         C-PROPOSAL-01, C-PROPOSAL-02 (clearly marked as vision, not completed)
 % ===========================================================================
 \chapter{Introduction}\label{ch:introduction}
 
-% TODO: Write the introduction (see paper_context/paper_outline.md §2.1).
+This thesis describes the design, implementation, and technical evaluation of SimTutor,
+a telemetry-grounded tutoring runtime that combines procedure-pack-driven state tracking,
+retrieval-augmented language model help generation, and fine-tuned vision-language model
+(VLM) visual fact extraction to support procedural learning in a high-fidelity flight
+simulator. The work is motivated by the challenges of teaching complex, sequence-sensitive
+procedures---exemplified by the F/A-18C cold-start task in DCS World---and by the gap
+between the original research vision of a virtual-reality (VR) grounded tutoring system
+and the technical baseline that has been completed to date. This chapter defines the
+research problem, traces the evolution from proposal to current implementation, enumerates
+the contributions of the present work, and outlines the structure of the remainder of the
+thesis.
 
+% ===========================================================================
 \section{Motivation}\label{sec:intro-motivation}
 
-% TODO: Define the procedural learning problem.
-% - Why fixed, sequence-sensitive procedures are challenging in immersive training.
-% - The gap between existing training aids and what a learner needs in-simulator.
-% - Why grounded, context-aware assistance is desirable.
-%
-% Evidence: paper_context/proposal_summary.md, ThesisProposal1128.pdf
-% TODO:CITE — procedural tutoring / ITS literature
+Procedural learning---the acquisition of fixed, ordered sequences of actions that must
+be executed correctly and in the right context---presents distinct challenges that
+distinguish it from declarative or conceptual learning. A learner must not only memorise
+the steps but also recognise when each step applies, verify that its preconditions are
+satisfied, confirm its completion before advancing, and recover from errors without
+propagating mistakes through the remainder of the procedure. In high-fidelity simulation
+environments, these challenges are compounded by the complexity of the cockpit or
+workspace, the density of instrument information, and the cognitive load of maintaining
+situational awareness while executing an unfamiliar sequence.
 
+Traditional training aids---video walkthroughs, printed checklists, instructor-led
+demonstrations---are effective for initial familiarisation but break the continuity of
+in-simulator practice. A learner who pauses to consult a manual or replay a video segment
+must context-switch away from the cockpit, losing immersion and, in some cases, the
+transient simulator state that motivated the consultation in the first place.
+Conversely, ungrounded text-based assistance from a large language model (LLM) may
+provide fluent but factually incorrect guidance because the model has no access to the
+current simulator state. Between these extremes lies the need for \emph{grounded,
+context-aware} tutoring: a system that observes the learner's actions through live
+simulator telemetry, retrieves relevant documentation, extracts visual evidence from the
+cockpit where telemetry is insufficient, and delivers concise, verifiable guidance without
+disrupting the training flow.
+
+The F/A-18C cold-start procedure in DCS World serves as the training scenario for this
+thesis. The procedure comprises 25 steps (S01--S25) grouped into six phases (P1--P6),
+from battery power-up through engine start, avionics configuration, flight-control checks,
+and taxi preparation (see \S\ref{sec:bg-coldstart} for a detailed description).
+Each step carries explicit preconditions that depend on the completion of earlier steps
+and on the satisfaction of specific telemetry conditions: for example, the left engine
+crank (S10) requires right-engine parameters---RPM, temperature, fuel flow, nozzle
+position, and oil pressure---to fall within their nominal ranges before the left engine is
+engaged. These inter-step dependencies make the cold-start task a representative instance
+of the broader class of sequence-sensitive, state-dependent procedural tasks that
+characterise simulator-based training in aviation, maritime operations, industrial
+maintenance, and medical procedure instruction. TODO:CITE --- intelligent tutoring
+systems and procedural learning literature.
+
+The central premise of this work is that a tutoring system can be made substantially more
+reliable and auditable by grounding every actionable output in explicit evidence: a
+telemetry variable, a gating-rule evaluation, a retrieved document snippet, or a visual
+fact observation. This evidence-grounding constraint is not merely an architectural
+preference but a safety requirement: in the context of cockpit procedures, an incorrectly
+highlighted control or a misidentified procedure state could confuse or mislead the
+learner. The SimTutor system described in this thesis instantiates this principle in a
+working runtime with automated tests, benchmark artifacts, and replay infrastructure.
+
+% ===========================================================================
 \section{Thesis Vision and Scope}\label{sec:intro-vision}
 
-% TODO: Original thesis vision: VR-first grounded tutoring.
-% - Meta Quest 3 + DCS-VR + in-headset guidance.
-% - Retrieval-augmented LLM with grounded citations.
-%
-% Evidence: ThesisProposal1128.pdf, paper_context/proposal_summary.md
-% Claims: C-PROPOSAL-01, C-PROPOSAL-02
+The original research vision for this thesis, as articulated in the research proposal,
+centred on a VR-first grounded tutoring system operating on the Meta Quest~3 with
+DCS-VR~\citep{ThesisProposal1128}. The planned system would receive learner interactions
+through gaze, hand tracking, and voice input within the VR cockpit; retrieve relevant
+manual and checklist excerpts; generate concise, citation-backed step guidance through a
+retrieval-augmented LLM; and render the guidance as in-headset step cards or overlay
+annotations registered to cockpit controls. The proposal further specified a three-condition
+human-subject evaluation comparing a video-and-notes baseline, an ungrounded text-only LLM,
+and the grounded tutoring system, with metrics including completion rate, procedural error
+rate, task time, NASA-TLX workload scores, pre/post knowledge quizzes, and retention and
+transfer tests administered after a 2--4 week interval.
 
+This vision defines the long-term research agenda of the thesis. However, the work
+completed to date represents a technical baseline rather than a realisation of the full
+VR tutoring system. The current implementation operates on a desktop/DCS runtime, uses
+cockpit overlay highlighting rather than in-headset step cards as its primary output
+modality, and has been validated through automated benchmarks rather than human-subject
+experiments. The VR deployment and the human-subject evaluation remain planned next phases
+(see Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-planned}).
+
+We document this gap explicitly at the outset to establish a clear boundary between the
+original research vision and the completed technical contributions. The thesis should be
+read as: a system and methodology contribution that lays the technical foundation---runtime,
+instrumentation, VLM adaptation pipeline, benchmark infrastructure---on which the VR and
+human-subject evaluation can be built.
+
+% ===========================================================================
 \section{Current Implementation Scope}\label{sec:intro-scope}
 
-% TODO: Describe what has actually been implemented.
-% - Desktop/DCS runtime, not VR yet.
-% - VLM adaptation is a new main line not in the original proposal.
-% - Human-subject evaluation is planned, not executed.
-%
-% Evidence: paper_context/system_delta_from_proposal.md
+What has been built differs from the proposal in several important respects, and these
+differences are themselves a source of the thesis's contributions. A detailed comparison
+appears in Section~\ref{sec:design-delta}; we summarise the key differences here to orient
+the reader.
 
+\paragraph{Platform.}
+The current system operates on a desktop/DCS (non-VR) configuration. Displays are standard
+monitors; input is through keyboard and HOTAS (hands-on-throttle-and-stick); output is
+rendered as cockpit overlay highlights on the DCS screen rather than as in-headset step
+cards. The Meta Quest~3 VR adapter has not been implemented.
+
+\paragraph{Telemetry grounding.}
+The current implementation includes a substantially more elaborate telemetry subsystem than
+the proposal anticipated: raw DCS-BIOS UDP ingestion, variable resolution with
+source-missing tracking, delta sanitisation (threshold, debounce, and per-variable
+filtering), and delta aggregation for prompt-safe compression. These additions were driven
+by the practical realities of working with noisy, high-frequency simulator telemetry.
+
+\paragraph{VLM visual fact extraction.}
+The most significant addition relative to the proposal is the VLM visual fact extraction
+pipeline. The original proposal envisioned a text-only RAG+LLM tutor with read-only
+simulator state as the sole grounding signal. During implementation, it became clear that
+several critical procedure steps (S08, S15, S18) require visual confirmation of
+display-page content that is not exported by DCS-BIOS. The VLM pipeline was added to
+address this gap and evolved into a self-contained research contribution spanning
+structured visual fact ontology design, dataset curation with human review, bilingual
+LoRA fine-tuning, and automated benchmark evaluation across two model backbones.
+
+\paragraph{Procedure pack and infrastructure.}
+The current system organises procedure definitions, gating rules, telemetry mappings,
+error taxonomies, and vision fact ontologies as declarative YAML configuration (a
+\emph{procedure pack}) rather than encoding them implicitly in prompts or code. It also
+includes an event logging and replay infrastructure, an automated scoring engine, and a
+deterministic fallback path that operates when no model is available or when model output
+fails validation. None of these elements were specified in the original proposal.
+
+These differences do not invalidate the proposal; they reflect the engineering reality
+that a grounded tutoring runtime requires substantial supporting infrastructure before it
+can be deployed in a VR human-subject study. The current system provides precisely this
+infrastructure.
+
+% ===========================================================================
 \section{Contributions}\label{sec:intro-contributions}
 
-% TODO: Enumerate contributions after the full draft is stable.
+This thesis makes the following contributions:
 
+\begin{enumerate}
+
+\item \textbf{A pack-driven, telemetry-grounded tutoring runtime architecture.}
+We present the design and implementation of a tutoring runtime organised in a
+ports-and-adapters (hexagonal) architecture that separates simulator-agnostic core logic
+(procedure tracking, gating, scoring, knowledge retrieval) from simulator-specific
+adapters (DCS-BIOS telemetry, overlay rendering, vision capture). The system supports
+live help cycles in which the runtime assembles a structured context from normalised
+telemetry variables, delta summaries, candidate procedure steps, a deterministic step
+hint, an overlay-target allowlist, retrieved knowledge snippets, and optional visual
+fact observations; passes this context to an LLM for structured help response generation;
+validates the response against schema, allowlist, and evidence-grounding constraints; and
+executes the validated overlay actions while logging every stage for downstream replay
+and analysis. A deterministic fallback path ensures the system remains functional when no
+model is available or when model output fails validation. This contribution is described in
+Chapters~\ref{ch:system-design}, \ref{ch:methodology}, and \ref{ch:implementation}.
+% Evidence: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02, C-TELEM-01, C-RAG-01, C-RUNTIME-01
+
+\item \textbf{A structured visual fact ontology and a complete VLM data, adaptation, and
+benchmark pipeline.}
+We define a 13-fact visual ontology that decomposes cockpit display-page state into
+discrete, auditable propositions spanning three display regions (Left DDI, Right DDI,
+AMPCD). The ontology evolved across two generations---from an 8-fact v1 early baseline to
+the current runtime-aligned 13-fact v2---with lessons learned about abstraction-level
+mixing and false-positive risk. We implement a complete adaptation pipeline:
+screenshot capture in DCS, pre-labeling by a large VLM, human review in Label Studio,
+bilingual (English and Chinese) supervised fine-tuning export, LoRA fine-tuning using
+Unsloth, PEFT, and TRL, and automated base-vs-LoRA benchmarking on independent holdout
+sets with verified zero training overlap. Every artifact in this pipeline---raw captures,
+prelabels, human-reviewed labels, SFT datasets, training summaries, benchmark metrics,
+and per-fact confusion charts---is stored in the repository and can be independently
+inspected and reproduced. This contribution is described in
+Chapters~\ref{ch:system-design} and \ref{ch:methodology}.
+% Evidence: C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-03a, C-VLM-07, C-DATA-01, C-TRAIN-01
+
+\item \textbf{Benchmark results demonstrating that small-data LoRA adaptation substantially
+improves cockpit VLM fact extraction accuracy on independent holdout sets.}
+Under the 13-fact v2 ontology, a Qwen3.5-9B LoRA adapter trained on 928 bilingual rows
+(Run-003 + Run-005$\times$2) achieves a fact accuracy of 0.9908 (base: 0.8677) on the
+Run-002 newfacts holdout (50 samples) and 0.9931 (base: 0.8038) on the Run-004 random
+holdout (100 samples). Sample exact match rates rise from 0.10 to 0.88 on Run-002 and
+from 0.03 to 0.92 on Run-004. The critical false positive count---errors that carry direct
+downstream risk of prematurely advancing the procedure---drops by 64\% on Run-002 and by
+89\% on Run-004. A per-fact error analysis identifies completion-fact false positives as
+the primary residual failure mode. These results are presented in
+Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-tech}.
+% Evidence: C-VLM-04, C-VLM-05
+
+\item \textbf{A backbone comparison showing that the data recipe generalises across model
+architectures.}
+The identical data recipe (Run-003 + Run-005$\times$2, 928 rows, bilingual) was applied
+to a second VLM backbone, Gemma-4-31B. The Gemma LoRA adapter achieves a fact accuracy of
+0.9492 (base: 0.8169) on the Run-002 newfacts holdout and 0.9715 (base: 0.8146) on the
+Run-004 random holdout, with zero critical false positives on Run-002. While the Qwen
+adapter achieves higher absolute accuracy and recall, the Gemma results confirm that the
+data recipe---rather than a backbone-specific artefact---drives the improvement, and
+reveal backbone-level differences in precision--recall trade-off that are relevant for
+safety-critical deployment. These results are presented in Chapter~\ref{ch:evaluation},
+Section~\ref{sec:eval-gemma}.
+% Evidence: C-VLM-06, C-VLM-03b
+
+\item \textbf{A planned evaluation framework for future VR human-subject studies.}
+We specify, at the design level, a controlled between-subjects evaluation comparing
+video-and-notes, ungrounded text-only LLM, and grounded tutoring conditions, with planned
+metrics spanning immediate performance (completion rate, error rate, task time), workload
+(NASA-TLX), learning (pre/post quizzes), retention (2--4 week delayed post-test), and
+transfer (variant procedure). We identify the runtime data collection upgrades required to
+transition from the current replay infrastructure to a human-subject-ready data pipeline
+and catalogue the known threats to validity at the design stage. This planned evaluation
+is described in Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-planned}, and
+represents the next phase of the research programme.
+% Evidence: C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01 (all TODO, treated as design)
+\end{enumerate}
+
+Contributions 1--4 are supported by verified claims and benchmark artifacts currently
+present in the repository. Contribution~5 is a methodological and design contribution
+that documents the evaluation pathway; it does not report human-subject data, and its
+stated metrics and comparisons remain planned rather than completed.
+
+% ===========================================================================
 \section{Thesis Structure}\label{sec:intro-structure}
 
-% TODO: Brief roadmap of the remaining chapters.
+The remainder of the thesis is organised as follows.
+
+\textbf{Chapter~\ref{ch:background}} provides the domain and technical background
+necessary to understand the system. It describes the F/A-18C cold-start procedure in
+detail, introduces the visual fact ontology and its evolution from 8-fact v1 to 13-fact
+v2, and surveys related work across intelligent tutoring systems, simulator-based
+training, rule-based and state-aware tutoring, VLM adaptation for structured outputs,
+and explainable AI assistance in AR/VR contexts.
+
+\textbf{Chapter~\ref{ch:system-design}} presents the design of SimTutor. It derives design
+goals from the problem statement, describes the ports-and-adapters architecture, traces
+the runtime data flow through a complete help cycle, and details the design of the
+telemetry processing pipeline, the procedure and gating rule engines, the simulator
+adapter layer, the event logging and replay infrastructure, and the optional VLM
+adaptation component. The chapter closes with a systematic comparison to the original
+thesis proposal, documenting how the design evolved during implementation.
+
+\textbf{Chapter~\ref{ch:methodology}} describes the methodological framework for the VLM
+adaptation pipeline. It covers dataset curation (Run-001 through Run-005, ontology
+versions, label distributions, holdout construction with verified zero overlap), the
+capture--prelabel--review--export--train--benchmark pipeline, LoRA fine-tuning
+configuration for Qwen3.5-9B and Gemma-4-31B, and the benchmark protocol including
+metric definitions and contamination controls.
+
+\textbf{Chapter~\ref{ch:implementation}} documents implementation-level details of the
+technology stack, core domain logic modules, telemetry and DCS integration, structured
+help generation, VLM visual fact extraction, replay and logging infrastructure, and CLI
+and runtime entrypoints.
+
+\textbf{Chapter~\ref{ch:evaluation}} is divided into two parts. Part~A reports the current
+technical results: the dataset and training summary, the 8-fact v1 baseline, the primary
+13-fact v2 Qwen benchmark results, the Gemma backbone comparison, a per-fact error
+analysis, and an assessment of runtime infrastructure readiness. Part~B describes the
+planned human-subject evaluation: the original evaluation vision, planned metrics,
+required infrastructure upgrades, the proposed experiment design, and a catalogue of known
+threats to validity. All statements in Part~B represent future work.
+
+\textbf{Chapter~\ref{ch:discussion}} interprets the results and their limitations. It
+examines why the project shifted from a VR-first to a telemetry/VLM-heavy implementation,
+clarifies what the current benchmarks do and do not prove, analyses the ontology evolution
+from 8-fact to 13-fact, argues why human-subject evidence remains essential, and
+identifies the risks of interpreting benchmark success as learning success.
+
+\textbf{Chapter~\ref{ch:conclusion}} summarises the completed work, restates the
+contributions, and outlines directions for future work including VR runtime integration,
+human-subject evaluation, ontology extension to other procedures, multi-frame temporal
+reasoning, and online adaptation.

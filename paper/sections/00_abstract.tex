@@ -2,13 +2,70 @@
 %  00 — Abstract + Zusammenfassung
 %
 %  Source of truth: paper_context/paper_outline.md §2.1
+%  Evidence:       paper_context/claims_registry.md (verified claims only for results)
+%  Terminology:    paper_context/terminology.md
 % ===========================================================================
 
-% TODO: Write the abstract after the full thesis draft is complete.
-
 \chapter*{Abstract}
-% TODO: Abstract content — write last, after all chapters are drafted.
+
+Procedural learning in high-fidelity simulation environments presents distinct challenges:
+learners must execute fixed, ordered sequences of actions while verifying intermediate
+system states, recovering from errors, and maintaining situational awareness---all without
+the continuous presence of an expert instructor. Traditional training aids such as video
+walkthroughs and printed checklists break the continuity of in-simulator practice, while
+ungrounded language model assistance risks providing fluent but factually incorrect
+guidance. This thesis presents SimTutor, a telemetry-grounded tutoring runtime that
+combines procedure-pack-driven state tracking, retrieval-augmented language model help
+generation, and a fine-tuned vision-language model (VLM) for structured visual fact
+extraction from cockpit displays. The system enforces explicit evidence grounding: every
+overlay target and step recommendation must be traceable to a telemetry variable, a gating
+rule, a retrieved document snippet, or a visual fact observation. The training scenario is
+the F/A-18C cold-start procedure in DCS World, comprising 25 steps across six operational
+phases, with inter-step dependencies that make it representative of sequence-sensitive,
+state-dependent procedural tasks. The VLM adaptation pipeline---screenshot capture,
+pre-labeling, human review, bilingual supervised fine-tuning, LoRA adaptation, and
+automated benchmarking---is applied to two backbone architectures. On the primary 13-fact
+ontology, a Qwen3.5-9B LoRA adapter trained on 928 bilingual rows improves fact accuracy
+from 0.80--0.87 (base model) to 0.99 on two independent holdout sets with verified zero
+training overlap, while reducing critical false positives by 64--89\%. An identical data
+recipe applied to Gemma-4-31B confirms that the improvement generalises across backbones.
+The thesis delivers a working desktop runtime with automated tests, benchmark artifacts,
+and replay infrastructure. The VR deployment and controlled human-subject evaluation
+envisioned in the original research proposal remain planned next phases; the current
+system provides the technical baseline on which that evaluation can be built.
 
 \newpage
 \chapter*{Zusammenfassung}
-% TODO: German abstract — write last, after the English abstract is finalised.
+
+\begin{otherlanguage}{ngerman}
+Prozedurales Lernen in hochrealistischen Simulationsumgebungen stellt besondere
+Herausforderungen: Lernende m\"ussen feste, geordnete Handlungsabfolgen ausf\"uhren,
+w\"ahrend sie Zwischenzust\"ande des Systems \"uberpr\"ufen, Fehler korrigieren und das
+Situationsbewusstsein aufrechterhalten---und dies ohne die st\"andige Anwesenheit eines
+erfahrenen Ausbilders. Herk\"ommliche Trainingshilfen wie Videoanleitungen und gedruckte
+Checklisten unterbrechen den \"Ubungsfluss im Simulator, w\"ahrend nicht
+zustandsgebundene Sprachmodell-Assistenz Gefahr l\"auft, fl\"ussige, aber faktisch
+inkorrekte Anweisungen zu geben. Diese Arbeit stellt SimTutor vor, eine
+telemetriegest\"utzte Tutoring-Laufzeitumgebung, die paketbasierte
+Prozedurzustandsverfolgung, Retrieval-Augmented-LLM-Hilfegenerierung und ein
+feinabgestimmtes Vision-Language-Model (VLM) zur strukturierten Extraktion visueller
+Fakten aus Cockpit-Anzeigen kombiniert. Das System erzwingt eine explizite
+Evidenzgrundlage: Jede hervorgehobene Cockpit-Referenz und jede Schrittempfehlung muss
+auf eine Telemetrie-Variable, eine Gating-Regel, einen abgerufenen Dokumentausschnitt
+oder eine visuelle Faktbeobachtung zur\"uckf\"uhrbar sein. Als Trainingsszenario dient
+der Kaltstart der F/A-18C in DCS World mit 25 Schritten in sechs Betriebsphasen, deren
+Abh\"angigkeiten untereinander sie repr\"asentativ f\"ur zustandsabh\"angige prozedurale
+Aufgaben machen. Die VLM-Adaptationspipeline---Screenshot-Erfassung, Vorlabeling,
+menschliche \"Uberpr\"ufung, bilingualer SFT-Export, LoRA-Feinabstimmung und
+automatisiertes Benchmarking---wird auf zwei Backbone-Architekturen angewendet. Auf der
+prim\"aren 13-Fact-Ontologie verbessert ein Qwen3.5-9B LoRA-Adapter (928 bilinguale
+Trainingszeilen) die Fact-Genauigkeit von 0,80--0,87 (Basismodell) auf 0,99 auf zwei
+unabh\"angigen Holdout-Sets mit verifizierter Null-\"Uberlappung zum Training und
+reduziert kritische False-Positives um 64--89\%. Die identische Datenrezeptur, auf
+Gemma-4-31B angewendet, best\"atigt die \"Ubertragbarkeit der Verbesserung \"uber
+Backbones hinweg. Die Arbeit liefert eine funktionsf\"ahige Desktop-Laufzeitumgebung mit
+automatisierten Tests, Benchmark-Artefakten und Replay-Infrastruktur. Die im
+urspr\"unglichen Forschungsantrag vorgesehene VR-Implementierung und kontrollierte
+Human-Subject-Evaluation bleiben geplante n\"achste Phasen; das aktuelle System stellt
+die technische Basis dar, auf der diese Evaluation aufgebaut werden kann.
+\end{otherlanguage}
