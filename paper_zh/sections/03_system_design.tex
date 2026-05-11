@@ -1,0 +1,387 @@
+% ===========================================================================
+%  03 — 系统设计
+%
+%  事实来源：paper_context/repo_inventory.md §1–11
+%  声明：     C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02,
+%            C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-RUNTIME-01
+% ===========================================================================
+\chapter{系统设计}\label{ch:system-design}
+
+本章描述 SimTutor 的设计——一个用于 DCS F/A-18C 冷启动任务中程序性训练的基于遥测数据基础的教学运行时。本章涵盖系统架构、组件设计和设计原理。详细的方法论——包括 VLM 适配协议、数据集构建和基准测试设计——延至第\ref{ch:methodology}章；具体模块的实现级细节见第\ref{ch:implementation}章。第\ref{sec:design-goals}节从论文问题陈述中推导设计目标。第\ref{sec:design-arch}节呈现整体架构以及核心教学逻辑与仿真器特定适配器的分离。第\ref{sec:design-dataflow}节描述主帮助循环中的运行时数据流。第\ref{sec:design-telemetry}和\ref{sec:design-procedure}节涵盖遥测处理流水线以及程序和门控规则引擎。第\ref{sec:design-adapters}节详述仿真器适配层及 Lua 端集成。第\ref{sec:design-replay}节描述事件日志、回放和评分基础设施。第\ref{sec:design-vlm}节介绍用于视觉状态理解的可选 VLM 适配组件。第\ref{sec:design-delta}节最后与原论文研究计划进行系统性比较，记录设计在实现过程中的演进。
+
+% ===========================================================================
+\section{设计目标与需求}\label{sec:design-goals}
+
+本论文解决的是为操作复杂仿真器的学习者提供基于状态证据、上下文感知的程序性指导这一问题。在目标场景——DCS World 中 F/A-18C 冷启动程序——中，学习者必须执行跨越六个阶段（P1--P6）的 25 个固定步骤序列（S01--S25），从电瓶供电开始，历经发动机启动、航电配置、飞行控制检查，直至滑行准备。每个步骤都有执行前必须满足的特定前提条件和推进前必须满足的完成条件。错误包括遗漏、顺序错误、参数设置错误和状态违反——这些类别在第\ref{ch:methodology}章描述的错误分类法中予以形式化。
+% 证据：packs/fa18c_startup/pack.yaml（跨 P1--P6 阶段的 25 个步骤）, packs/fa18c_startup/step_registry.yaml
+
+基于此问题，我们推导出以下设计目标：
+
+\begin{description}
+\item[G1 -- 基于仿真器的程序性教学。]
+系统必须通过仿真器状态观察学习者的操作，确定学习者当前正在尝试的程序步骤，并在学习者卡住或请求帮助时提供及时、基于证据的指导。教学输出必须引用具体的座舱元素，并引用来自遥测、文档或视觉事实的证据。
+% 证据：core/procedure.py, core/gating.py, core/step_hint.py, help_flow_en.md
+
+\item[G2 -- 状态感知的步骤指导。]
+系统必须通过形式化状态机跟踪程序进度。在允许步骤变为活跃状态之前，必须评估前提条件；在推进之前，必须验证完成条件。指导必须以当前仿真器状态为条件，而不仅仅是步骤顺序。
+% 证据：core/procedure.py（状态机跟踪）, core/gating.py（状态依赖的门控）
+
+\item[G3 -- 教学逻辑与仿真器特定集成的分离。]
+核心教学逻辑——程序跟踪、门控、评分和帮助生成——必须独立于任何特定仿真器、模型提供者或知识源。仿真器特定代码、模型提供者代码和知识检索代码必须隔离在稳定接口之后，使核心能够在没有运行仿真器的情况下进行测试，并可移植到其他仿真器或训练领域。
+% 证据：ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
+
+\item[G4 -- 可回放性和可检查性。]
+学习者、教学系统和仿真器之间的每次交互都必须记录为结构化、带时间戳的事件。这些事件日志必须支持用于调试的离线回放、针对程序包的自动化评分，以及学习者行为的事后分析。它们还必须支持 VLM 适配流水线的遥测捕获和基准测试追踪的回放。
+% 证据：core/event_store.py, simtutor/runner.py
+
+\item[G5 -- 可选的基础模型和 VLM 支持。]
+系统必须能够在有大语言模型或无大语言模型的情况下运行。当模型可用时，它可以提供更丰富的诊断和解释。当模型不可用或其输出验证失败时，系统必须优雅降级到确定性的基于规则的降级行为。用于从座舱截图中提取视觉事实的 VLM 支持必须是可选的、可独立运行的组件。
+% 证据：help_flow_en.md §5, model_access.md
+
+\item[G6 -- 对不同仿真器和程序的可扩展性。]
+程序定义、UI 目标映射、遥测映射、错误分类法和知识源策略必须以声明式配置（YAML 文件）表达，而非硬编码在源代码中。添加新程序或将系统适配到不同仿真器应该仅需新的配置工件，而无需更改核心教学逻辑。
+% 证据：packs/fa18c_startup/*.yaml
+\end{description}
+
+这些目标直接影响以下各节描述的架构决策。
+
+% ===========================================================================
+\section{整体架构}\label{sec:design-arch}
+
+% 证据：README.md; pyproject.toml; live_dcs.py
+% 声明：C-ARCH-01
+
+SimTutor 遵循端口-适配器（六边形）架构。系统组织为三个主要层次，每个层次具有明确定义的职责和依赖方向。
+
+\begin{description}
+\item[核心层（\texttt{core/}）。]
+核心包含所有独立于任何特定仿真器、模型提供者或外部服务的领域逻辑。它定义了运行时消息传递的数据契约（第\ref{sec:design-dataflow}节）、程序状态机和门控规则引擎（第\ref{sec:design-procedure}节）、评分和交互度量引擎、视觉事实本体及粘性/TTL 持久化语义、BM25 检索实现、HelpResponse 模式构建器，以及安全和审计基础设施。按设计，核心仅依赖标准 Python 库和端口层中定义的抽象接口。
+% 证据：core/procedure.py, core/gating.py, core/scoring.py, core/vision_facts.py,
+%       core/types.py, core/types_v2.py, core/knowledge.py, core/llm_schema.py
+
+\item[端口层（\texttt{ports/}）。]
+端口层为核心在运行时可能需要的四个外部依赖定义了稳定的、技术无关的 Python 协议：模型推理（\texttt{ModelPort}）、知识检索（\texttt{KnowledgePort}）、视觉输入（\texttt{VisionPort}）和遥测输入（\texttt{TelemetryPort}）。这些接口是核心与外部世界之间的唯一依赖注入点。
+% 证据：ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
+
+\item[适配器层（\texttt{adapters/}）。]
+适配器层包含所有仿真器特定、提供者特定和基础设施特定的代码。它包括 DCS-BIOS 遥测接收器、遥测增强与增量去噪流水线、DCS 叠加发送器、OpenAI 兼容模型客户端（带和不带多模态支持）、Ollama 降级客户端、用于测试的确定性模型桩、本地 BM25 知识适配器、视觉事实提取运行时，以及连接模型输出与运行时行为的响应映射和操作执行组件。适配器依赖于它们所实现的端口以及它们生成和消费的核心类型；它们从不向核心引入反向依赖。
+% 证据：adapters/telemetry_pipeline.py, adapters/dcs_adapter.py,
+%       adapters/openai_compat_model.py, adapters/vision_fact_extractor.py,
+%       adapters/knowledge_local.py, adapters/action_executor.py
+\end{description}
+
+三个层次由另外两个结构元素补充：
+
+\begin{description}
+\item[程序包（\texttt{packs/}）。]
+程序包是一个声明式 YAML 配置文件的目录，完整描述一个程序性任务。包定义了步骤列表、前提条件和完成条件（门控规则）、UI 目标及其仿真器特定元素标识符、遥测变量映射、错误分类法类别和评分权重、增量去噪策略、带步骤绑定的视觉事实本体，以及视觉布局描述。当前代码仓库包含一个包：\texttt{fa18c\_startup}，涵盖完整的 F/A-18C 冷启动程序。
+% 证据：packs/fa18c_startup/pack.yaml, packs/fa18c_startup/step_registry.yaml,
+%       packs/fa18c_startup/taxonomy.yaml, packs/fa18c_startup/ui_map.yaml,
+%       packs/fa18c_startup/vision_facts.yaml
+
+\item[CLI 与运行时入口点（\texttt{simtutor/}、\texttt{live\_dcs.py}）。]
+\texttt{simtutor} 包提供命令行界面，用于运行模拟场景、回放和验证事件日志、评分运行、记录 VLM 预测以进行基准测试，以及回放 DCS-BIOS 原始捕获。\texttt{live\_dcs.py} 模块编排完整的实时运行时循环：它将 DCS-BIOS 接收器、遥测增强流水线、知识检索、基于模型的帮助生成、可选的 VLM 视觉事实提取、叠加操作执行和事件日志记录连接成一个长期运行进程。
+% 证据：simtutor/__main__.py, live_dcs.py
+\end{description}
+
+图\ref{fig:architecture}展示了高层组件图。
+
+\begin{figure}[htbp]
+  \centering
+  % TODO: 插入架构图。
+  % \includegraphics[width=\textwidth]{figures/architecture.pdf}
+  \caption{SimTutor 系统架构。核心层包含仿真器无关的领域逻辑。端口层定义抽象接口。适配器层为 DCS、模型提供者、知识源和视觉流水线提供具体实现。程序包提供声明式配置。}
+  \label{fig:architecture}
+\end{figure}
+
+% ===========================================================================
+\section{核心教学逻辑与仿真器适配器的分离}\label{sec:design-separation}
+
+% 证据：ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
+% 声明：C-ARCH-01
+
+仿真器无关核心逻辑与仿真器特定适配器之间的分离服务于四个具体目的：
+
+\begin{enumerate}
+\item \textbf{可测试性。}
+核心逻辑可以使用模拟适配器和确定性场景进行测试，无需运行中的 DCS 实例、GPU 或到模型服务器的网络连接。代码仓库包含一个重放预录制观察序列的 \texttt{MockEnvAdapter} 和一个返回确定性响应的 \texttt{ModelStub}，从而支持快速、可复现的单元和集成测试。
+% 证据：adapters/mock_env.py, adapters/model_stub.py
+
+\item \textbf{可维护性。}
+当仿真器 API 发生变化时，只需更新受影响的适配器；核心保持不变。当模型提供者发生变化时（例如，从 Ollama 变为 OpenAI 兼容的 vLLM 服务器），只有模型适配器配置受到影响。通过单一配置接口支持三种提供者（\texttt{openai\_compat}、\texttt{ollama}、\texttt{stub}）。
+% 证据：simtutor/config.py, model_access.md
+
+\item \textbf{可移植性。}
+将系统移植到新仿真器或飞机只需编写新的遥测和叠加适配器并创建新的程序包。程序性推理、门控、评分和帮助生成基础设施可以原样复用。端口接口有意保持最小化：遥测端口需要 \texttt{start}、\texttt{poll} 和 \texttt{stop} 方法；叠加端口仅需向命名座舱元素发送高亮、清除和脉冲命令的能力。
+% 证据：ports/telemetry.py (TelemetryPort), adapters/dcs_adapter.py（叠加方法）
+
+\item \textbf{VLM 流水线的独立演进。}
+VLM 视觉事实提取组件通过视觉端口和视觉事实观察模式与教学运行时通信，而非直接耦合。VLM 流水线可以独立于教学运行时进行开发、训练和基准测试。运行时部署可以包含 VLM 组件、完全省略它，或用不同的感知后端替换它，而不影响教学逻辑。
+\end{enumerate}
+
+% ===========================================================================
+\section{数据流}\label{sec:design-dataflow}
+
+% 证据：live_dcs.py; repo_inventory.md §11
+% 声明：C-ARCH-02
+
+运行时数据流遵循从仿真器观察到教学输出和日志记录的结构化流水线。图\ref{fig:dataflow}提供了可视化摘要。
+
+\begin{figure}[htbp]
+  \centering
+  % TODO: 插入数据流图。
+  % \includegraphics[width=\textwidth]{figures/dataflow.pdf}
+  \caption{主运行时数据流——贯穿帮助循环。}
+  \label{fig:dataflow}
+\end{figure}
+
+\subsection{观察}
+仿真器适配器——在当前实现中为 DCS-BIOS UDP 接收器——产生一组\emph{观察}流：带有版本号和时间戳的数据对象，包含原始仿真器状态以及增强后的一组规范化状态变量。
+% 证据：core/types.py:Observation, adapters/dcs_bios/receiver.py
+
+\subsection{教学请求}
+当学习者触发帮助时——通过热键或 UDP 消息——将创建一个\emph{教学请求}。该请求携带一个意图（\texttt{help}）、一个可选的自由文本消息、对当前观察的引用，以及由运行时编排器填充的上下文字典。
+% 证据：core/types.py:TutorRequest
+
+\subsection{上下文组装}
+运行时编排器通过收集以下内容为帮助循环组装上下文：
+\begin{itemize}
+\item \textbf{状态变量}（\texttt{vars}）：来自最近遥测观察的规范化键值对。
+\item \textbf{最近增量}（\texttt{recent\_deltas}）：最近状态变化的去噪、聚合摘要。
+\item \textbf{候选步骤}（\texttt{candidate\_steps}）：来自程序包的合格步骤标识符。
+\item \textbf{确定性步骤提示}（\texttt{deterministic\_step\_hint}）：来自基于规则推理的本地计算的降级建议，同时用作提示指导和模型输出不可用时的降级方案。
+\item \textbf{叠加目标允许列表}（\texttt{overlay\_target\_allowlist}）：模型被允许引用的 UI 元素集合。
+\item \textbf{知识片段}（\texttt{rag\_topk}，可选）：top-$k$ BM25 检索结果，仅在存在知识索引时包含。
+\end{itemize}
+% 证据：adapters/prompting.py, adapters/telemetry_pipeline.py, help_flow_en.md §3
+
+\subsection{模型推理（可选）}
+如果 ModelPort 实现可用，组装后的上下文将被格式化为提示并发送给语言模型。模型返回一个符合 HelpResponse 模式的 JSON 结构化对象，该模式在运行时从程序包、UI 映射和分类法动态生成。
+% 证据：core/llm_schema.py:get_help_response_schema
+
+\subsection{响应验证与映射}
+原始模型输出通过验证流水线：(1) 带最小修复的 JSON 提取，(2) 模式验证，(3) 对诊断步骤 ID、下一步步骤 ID 和叠加目标的允许列表检查，(4) 证据溯源验证。如果验证成功，帮助对象被映射为 \texttt{TutorResponse}，叠加操作通过 UI 映射解析。如果验证失败，或没有可用模型，系统进入确定性降级。
+% 证据：adapters/json_extract.py, adapters/response_mapping.py, help_flow_en.md §4--5
+
+\subsection{操作执行}
+教学响应可能包含针对特定座舱元素的叠加操作（高亮、清除或脉冲）。操作执行器根据 UI 目标允许列表验证每个操作，限制并发高亮数量（默认：一个），并通过 UDP 将命令分发到仿真器。自动点击和控件注入操作在设计上被禁止。
+% 证据：adapters/action_executor.py, adapters/dcs_adapter.py, help_flow_en.md §7
+
+\subsection{事件日志记录}
+帮助循环的每个阶段被记录为带版本号和时间戳的 \texttt{Event} 对象，并追加到 JSONL 事件日志中，该日志作为所有下游分析、回放和评分的权威记录。
+% 证据：core/event_store.py, core/types.py:Event
+
+% ===========================================================================
+\section{遥测处理}\label{sec:design-telemetry}
+
+% 证据：adapters/telemetry_pipeline.py, adapters/delta_sanitizer.py,
+%       adapters/delta_aggregator.py, core/vars.py
+% 声明：C-TELEM-01
+
+遥测处理子系统通过四个阶段将原始仿真器数据转换为规范化状态表示：
+
+\begin{enumerate}
+\item \textbf{原始数据摄入。}
+DCS-BIOS 接收器在 UDP 套接字上监听二进制 DCS-BIOS 导出帧，将每帧解码为结构化 JSON 对象，附带挂钟时间戳和单调递增的序列号。
+% 证据：adapters/dcs_bios/receiver.py
+
+\item \textbf{变量解析。}
+遥测映射规定原始 BIOS 字段如何投影到规范化状态变量上。变量解析器生成一个扁平的键值对字典，并在 \texttt{vars\_source\_missing} 集合中跟踪不可用或未知的来源，使下游组件能够区分"值为零"和"值未知"。
+% 证据：core/vars.py, packs/fa18c_startup/telemetry_map.yaml
+
+\item \textbf{增量去噪处理。}
+可配置的策略（阈值、防抖动窗口、逐变量过滤规则）抑制由开关回弹、传感器漂移和 UDP 乱序传递引起的虚假变化。
+% 证据：adapters/delta_sanitizer.py, packs/fa18c_startup/delta_policy.yaml
+
+\item \textbf{增量聚合。}
+去噪后的增量在可配置时间窗口内累积并被压缩为紧凑摘要以供提示上下文使用。
+% 证据：adapters/delta_aggregator.py
+\end{enumerate}
+
+遥测流水线持续运行，独立于帮助循环。
+
+% ===========================================================================
+\section{程序引擎与门控规则引擎}\label{sec:design-procedure}
+
+% 证据：core/procedure.py, core/gating.py, core/step_hint.py
+% 声明：C-PROC-01, C-PROC-02
+
+\subsection{程序引擎}
+程序引擎在步骤有序序列上维护一个有限状态机。每个步骤处于四种状态之一：\texttt{pending}、\texttt{active}（最多一个）、\texttt{done} 或 \texttt{blocked}。操作包括 \texttt{activate\_next}、\texttt{complete\_active}、\texttt{block\_active}、\texttt{rewind} 和 \texttt{check\_timeout}。所有转换被记录为内部事件并传播到事件日志。
+% 证据：core/procedure.py:ProcedureEngine
+
+\subsection{门控规则引擎}
+门控规则引擎使用具有四个操作符的 v1 DSL 评估前提门控和完成门控：\texttt{var\_gte}、\texttt{arg\_in\_range}、\texttt{flag\_true} 和 \texttt{time\_since}。评估器包含显式的未知值处理：缺失、来源缺失或哨兵值变量会导致规则失败并附诊断原因，而非静默地视为 false。规则在首次失败时短路；失败索引和原因被输入确定性步骤提示。
+% 证据：core/gating.py
+
+\subsection{确定性步骤推理}
+当没有模型可用或模型输出验证失败时，系统降级到确定性步骤推理，该推理检查活跃步骤、未满足的门控规则和最近的 UI 目标，以产生限制在当前活跃步骤的文本提示。默认情况下，除非本地规则能够根据当前遥测状态证明一个唯一、有效的目标，否则在降级模式下不发送叠加高亮。
+% 证据：core/step_hint.py, adapters/step_inference.py, help_flow_en.md §5
+
+\subsection{程序包结构}
+程序包是驱动整个教学运行时的声明式配置。每个步骤按主要证据来源分类：
+\begin{itemize}
+\item \textbf{BIOS 优先步骤}（S01, S03--S07, S09--S13, S21）：完成证据主要在遥测变量中。
+\item \textbf{视觉优先步骤}（S08, S15, S18）：需要通过座舱显示器进行视觉确认。
+\item \textbf{手动或超出布局步骤}（S02, S14, S16, S17, S19, S20, S22--S25）：无法通过遥测或当前视觉布局完全观测。
+\end{itemize}
+包还定义了每个步骤的门控规则、UI 目标、教学提示和配置文件覆盖（陆基 vs.\ 航母）。
+% 证据：packs/fa18c_startup/pack.yaml
+% 声明：C-PROC-01, C-PROC-02
+
+% ===========================================================================
+\section{仿真器适配层}\label{sec:design-adapters}
+
+% 证据：adapters/dcs_adapter.py, adapters/dcs_bios/, DCS/Scripts/
+% 声明：C-ARCH-01, C-ARCH-02
+
+\subsection{遥测输入适配器}
+通过 UDP 接收 DCS-BIOS 状态数据。Python 端 \texttt{DcsBiosRawReceiver} 解析二进制协议并发射原始帧作为 JSONL 记录，供给遥测增强流水线。
+% 证据：adapters/dcs_bios/receiver.py
+
+\subsection{叠加输出适配器}
+通过纯文本 UDP 消息向 DCS 发送高亮、清除和脉冲命令。DCS 内的 Lua 脚本（\texttt{VRHilite.lua}）在座舱元素上渲染图形叠加。适配器使用程序包的 UI 映射将抽象目标名称映射到 DCS 内部点代码。
+% 证据：adapters/dcs_adapter.py, DCS/Scripts/Hooks/VRHilite.lua
+
+\subsection{视觉输入适配器}
+通过基于 UDP 的捕获触发器触发 DCS 中的截图捕获。Lua 端 \texttt{SimTutor.lua} 将三个主要座舱显示器渲染到单个复合图像中。Python 端适配器选择预触发帧和触发帧，并将它们传递给视觉事实提取器。
+% 证据：adapters/vision_capture_trigger.py, DCS/Scripts/SimTutor/SimTutor.lua
+
+\subsection{Lua 端集成}
+三类 Lua 脚本在 DCS 内执行：
+\begin{itemize}
+\item \textbf{状态导出}（\texttt{Export.lua}）：配置 DCS-BIOS 导出。
+\item \textbf{叠加渲染}（\texttt{Hooks/VRHilite.lua}、\texttt{Hooks/SimTutorHighlight.lua}）：接收并渲染高亮命令。
+\item \textbf{SimTutor 集成}（\texttt{SimTutor/SimTutor.lua}、\texttt{SimTutor/SimTutor Function.lua}、\texttt{SimTutor/SimTutorDcsBiosHub.lua}）：处理捕获和复合面板渲染。
+\end{itemize}
+% 证据：DCS/Scripts/Export.lua, DCS/Scripts/Hooks/VRHilite.lua,
+%       DCS/Scripts/SimTutor/SimTutor.lua
+
+\subsection{计划中及部分实现的适配器}
+当前代码仓库包含一个 \texttt{MockEnvAdapter}，用于无需运行仿真器的确定性测试。
+% 证据：adapters/mock_env.py
+原始论文研究计划设想了一个 Meta Quest 3 VR 适配器。该适配器尚未实现；VR 部署仍为计划阶段（第\ref{sec:eval-planned}节）。
+% 证据：system_delta_from_proposal.md §4
+
+% ===========================================================================
+\section{事件日志与回放}\label{sec:design-replay}
+
+% 证据：core/event_store.py, simtutor/runner.py, core/scoring.py,
+%       core/interaction_metrics.py
+% 声明：C-RUNTIME-01
+
+\subsection{事件模型}
+所有运行时事件均表示为具有固定模式的 \texttt{Event} 对象：唯一标识符、挂钟时间戳、会话标识符、事件类型（\texttt{observation}、\texttt{tutor\_request}、\texttt{tutor\_response}、\texttt{overlay\_requested}、\texttt{overlay\_applied}、\texttt{overlay\_failed}）、类型化负载、模式版本和可扩展元数据。
+% 证据：core/types.py:Event, help_flow_en.md §6
+
+\subsection{JSONL 事件存储}
+事件通过 \texttt{JsonlEventStore} 以 JSONL 格式持久化，支持仅追加写入和全文件加载。
+% 证据：core/event_store.py
+
+\subsection{回放与验证}
+录制的事件日志可离线回放，以验证步骤顺序和状态机一致性。遥测日志经过独立验证以确保单调序列号和时间戳。回放基础设施已在代码层面实现并使用录制的遥测追踪进行了演练；尚未通过端到端的人在环会话进行验证。
+% 证据：simtutor/runner.py
+
+\subsection{评分与交互度量}
+评分引擎使用可配置的逐类别权重和关键步骤乘数计算遗漏和状态违反。交互度量刻画学习者行为：停滞时间、帮助请求、LLM 触发、UI 点击次数以及叠加请求/确认次数。
+% 证据：core/scoring.py, core/interaction_metrics.py
+
+\subsection{当前局限}
+回放基础设施当前支持遥测层面的合成回归回放，包括带视觉帧副文件的场景（\texttt{replay\_eval/fa18c\_startup\_v04/}）。来自真人运行的带同步视觉帧的完整多模态会话的端到端回放尚未验证。
+
+% ===========================================================================
+\section{用于视觉状态理解的可选 VLM 适配}\label{sec:design-vlm}
+
+% 证据：adapters/vision_fact_extractor.py, adapters/vision_fact_prompting.py,
+%       packs/fa18c_startup/vision_facts.yaml, tools/train_qwen35_vlm_unsloth.py
+% 声明：C-VLM-01, C-VLM-02
+
+SimTutor 中的视觉感知是一个\emph{可选的、可独立运行的}子系统。
+
+\subsection{VLM 组件的角色}
+VLM 组件从座舱截图中提取结构化\emph{视觉事实}——关于可见显示内容的中间命题。视觉事实不是最终的教学决策；它们提供视觉证据，教学运行时将其与遥测、程序状态和文档相结合。这种分解使每个组件能够独立开发、测试和评估。
+% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §2
+
+\subsection{视觉事实本体}
+当前本体（v2）定义了跨三个显示区域的 13 个事实：
+\begin{itemize}
+\item \textbf{左 DDI}: \texttt{tac\_page\_visible}、\texttt{supt\_page\_visible}、\texttt{fcs\_page\_visible}、\texttt{fcs\_page\_x\_marks\_visible}。
+\item \textbf{右 DDI}: \texttt{bit\_root\_page\_visible}、\texttt{fcsmc\_page\_visible}、\texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible}、\texttt{fcsmc\_final\_go\_result\_visible}。
+\item \textbf{AMPCD}: \texttt{hsi\_page\_visible}、\texttt{hsi\_map\_layer\_visible}、\texttt{ins\_grnd\_alignment\_text\_visible}、\texttt{ins\_ok\_text\_visible}。
+\end{itemize}
+% 证据：packs/fa18c_startup/vision_facts.yaml; core/vision_facts.py:VISION_FACT_IDS
+
+每个事实具有三值状态（\texttt{seen}、\texttt{not\_seen}、\texttt{uncertain}）、生存时间、可选的 \texttt{sticky} 标志，以及通过 \texttt{all\_of} / \texttt{any\_of} 条件实现的步骤绑定。
+% 证据：packs/fa18c_startup/vision_facts.yaml; core/vision_facts.py
+
+\subsection{VLM 在帮助循环中的集成}
+当帮助请求到达且活跃步骤为视觉优先（S08、S15、S18）时，向 DCS 发送捕获触发器。预触发帧和触发帧被渲染并发送给 VLM。返回的事实被合并到视觉事实快照中（具有粘性和 TTL 语义），并包含在帮助循环上下文中。如果视觉适配器不可用或多模态请求失败，帮助循环仅使用遥测和知识继续。
+% 证据：adapters/vision_fact_extractor.py:extract, adapters/vision_sync.py
+
+\subsection{VLM 适配流水线}
+运行时使用的 VLM 经过微调。适配流水线——详见第\ref{ch:methodology}章——包括截图捕获、由大型 VLM 进行预标注、在 Label Studio 中进行人工审查、双语 SFT 导出、LoRA 微调（Unsloth + PEFT + TRL），以及在独立留出会话上进行基础模型与 LoRA 对比基准测试。该流水线构成一个自成一体的贡献，涵盖从数据捕获到基准测试评估的全过程。
+% 证据：tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
+%       tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py,
+%       tools/benchmark_qwen35_vlm_facts.py
+
+\subsection{与基于规则的状态门控的区别}
+基于规则的门控确定性地评估遥测变量；它是确定性的和可审计的，但限于遥测可表示的条件。基于 VLM 的视觉事实提取解释没有遥测表示的显示内容。这两种机制是互补的：门控引擎提供主要的程序跟踪骨干；视觉事实为那些无法仅从遥测推断完成情况的步骤提供补充证据。
+% 证据：packs/fa18c_startup/pack.yaml（vision_priority_steps, bios_priority_steps）
+% 声明：C-PROC-02
+
+% ===========================================================================
+\section{与原始研究计划的差异}\label{sec:design-delta}
+
+% 证据：system_delta_from_proposal.md
+% 声明：C-PROPOSAL-01（TODO — 计划中，未完成）
+
+本章描述的系统在若干重要方面与原论文研究计划中设想的系统有所不同。我们记录这些差异以在原始研究愿景和当前实现的系统之间建立清晰的边界。
+
+\subsection{从 VR 优先到桌面优先运行时}
+原计划描述了一个带有头显内步骤卡片的 Meta Quest 3 VR 教学系统。当前实现是一个桌面/DCS 运行时，以座舱叠加高亮作为主要输出模态。这一转变是由于构建一个具有增量去噪、确定性降级和自动化测试的基于遥测证据的运行时被证明是 VR 部署的实质性前提条件，而桌面配置为系统性基准测试提供了更受控的环境。VR 部署仍为计划的下一阶段（第\ref{sec:eval-planned}节）。
+% 证据：system_delta_from_proposal.md §1, §4
+
+\subsection{新增 VLM 适配流水线}
+原计划设想了一个纯文本 RAG+LLM 导师。VLM 视觉事实提取流水线是在发现若干关键程序步骤需要无法仅从遥测推断的视觉确认后添加的。VLM 流水线发展成为一个适配和基准测试循环，现在构成了一项实质性的技术贡献。
+% 证据：system_delta_from_proposal.md §3, §6
+
+\subsection{扩展的遥测数据基础}
+当前实现包含一个比原计划更为精细的遥测子系统：原始 DCS-BIOS UDP 接收、带源丢失跟踪的变量解析、增量去噪处理和增量聚合。这一扩展是由处理嘈杂、高频仿真器遥测数据的实际工程需求所驱动的。
+% 证据：system_delta_from_proposal.md §3
+
+\subsection{新增程序性、回放和基准测试基础设施}
+原计划未描述形式化的程序引擎、门控规则引擎、错误分类法、事件日志记录、回放或自动化基准测试。这些是在实现过程中作为系统性评估所需的必要基础设施而开发的。
+% 证据：system_delta_from_proposal.md §3
+
+\subsection{推迟的人因评估}
+原计划规划了一项三条件人因研究，但尚未实施。当前代码仓库包含了支持此类研究的技术基础设施，但没有参与者数据。人因评估仍是计划的核心组成部分（第\ref{sec:eval-planned}节）。
+% 证据：system_delta_from_proposal.md §4, §5
+
+\subsection{设计演进摘要}
+表\ref{tab:design-delta}总结了关键差异。
+
+\begin{table}[htbp]
+  \centering
+  \caption{从研究计划到实现系统的设计演进。}
+  \label{tab:design-delta}
+  \small
+  \begin{tabular}{@{}p{0.28\textwidth}p{0.32\textwidth}p{0.32\textwidth}@{}}
+  \toprule
+  \textbf{方面} & \textbf{原始计划} & \textbf{实现的系统} \\
+  \midrule
+  平台 & Meta Quest 3 VR & 桌面 / DCS \\
+  输出模态 & 头显内步骤卡片 & 座舱叠加高亮 \\
+  状态输入 & 只读 DCS 状态标志 & 完整 DCS-BIOS 遥测 + 增量去噪 \\
+  视觉感知 & 无（纯文本 RAG） & 可选 VLM 视觉事实提取（13-fact v2） \\
+  模型适配 & 未涉及 & LoRA 微调流水线（主线：Qwen3.5-9B；补充：Gemma-4-31B）\footnotemark \\
+  程序表示 & 提示中隐式表示 & 显式程序包驱动配置 + 门控规则 \\
+  错误处理 & 未规定 & 结构化分类法、确定性降级和操作限制 \\
+  评估基础设施 & 未规定 & 事件日志、回放验证、自动化评分、基准测试流水线 \\
+  人因研究 & 计划作为主要评估 & 推迟；基础设施已准备 \\
+  \bottomrule
+  \end{tabular}
+\end{table}
+\footnotetext{Qwen3.5-9B（Qwen/Qwen3.5-9B-Base）微调和基准测试结果是主要的已验证实验线（C-VLM-04, C-VLM-05）。Gemma-4-31B（google/gemma-4-31B）结果是补充性的（C-VLM-06, \emph{likely}）。}
+
+这一演进并不使原计划失效。相反，实现的系统提供了一个具体的技术基础——包含可运行代码、自动化测试和基准测试工件——计划的 VR 部署和人因评估可在此基础上进行构建。
+% 证据：system_delta_from_proposal.md §8, §9
