@@ -52,6 +52,13 @@ python -m tools.install_dcs_monitor_setup \
   --saved-games-dir "<saved-games-dir>"
 ```
 
+VR note:
+
+- The generated monitor setup now includes a `VR_MIRROR` block constrained to the main viewport rectangle.
+- It also enables `VR_allow_MFD_out_of_HMD = true` so native MFD/DDI exports can remain on the desktop canvas while VR is active.
+- In DCS itself, enable `Options -> VR -> VR Mirror Options -> Use DCS System Resolution`.
+- Keep the DCS resolution set to the full recommended canvas size shown in the generated monitor setup comment.
+
 ## Run Live Loop
 
 ```bash

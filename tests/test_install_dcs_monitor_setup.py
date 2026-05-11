@@ -38,10 +38,16 @@ def test_monitor_setup_lua_contains_extended_canvas_viewports() -> None:
     lua_text = plan.lua_text
 
     assert "Viewports.Center =" in lua_text
+    assert "VR_MIRROR =" in lua_text
+    assert "VR_allow_MFD_out_of_HMD = true" in lua_text
     assert "_  = function(p) return p; end;" in lua_text
     assert "UIMainView = Viewports.Center" in lua_text
     assert "GU_MAIN_VIEWPORT = UIMainView" in lua_text
     assert "-- Recommended DCS resolution: 5120x1440" in lua_text
+    assert "    x = 0;" in lua_text
+    assert "    y = 0;" in lua_text
+    assert "    width = 2560;" in lua_text
+    assert "    height = 1440;" in lua_text
     assert "LEFT_MFCD =" in lua_text
     assert "CENTER_MFCD =" in lua_text
     assert "RIGHT_MFCD =" in lua_text
@@ -72,6 +78,8 @@ def test_single_monitor_lua_places_main_view_on_right_of_left_stack() -> None:
 
     assert "-- Recommended DCS resolution: 1920x1080" in lua_text
     assert "Description = 'SimTutor F/A-18C composite panel viewport PoC (single monitor normalized left-stack layout)'" in lua_text
+    assert "VR_MIRROR =" in lua_text
+    assert "VR_allow_MFD_out_of_HMD = true" in lua_text
     assert "    x = 660;" in lua_text
     assert "    y = 0;" in lua_text
     assert "    width = 1260;" in lua_text
@@ -101,6 +109,8 @@ def test_ultrawide_left_stack_lua_places_main_view_on_right() -> None:
 
     assert "-- Recommended DCS resolution: 3440x1440" in lua_text
     assert "Description = 'SimTutor F/A-18C composite panel viewport PoC (ultrawide normalized left-stack layout)'" in lua_text
+    assert "VR_MIRROR =" in lua_text
+    assert "VR_allow_MFD_out_of_HMD = true" in lua_text
     assert "    x = 880;" in lua_text
     assert "    width = 2560;" in lua_text
     assert "CENTER_MFCD =" in lua_text
