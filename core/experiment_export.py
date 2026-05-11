@@ -8,7 +8,7 @@ behavior traces, system response metadata, and experiment-layer annotations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Mapping, Sequence
 
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
@@ -158,7 +158,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
     cycle_order: list[str] = []
 
     for ev in events:
-        kind = ev.get("kind") or ev.get("type") or ""
+        kind = ev.get("kind") or ""
         ev_meta = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
         payload = ev.get("payload") if isinstance(ev.get("payload"), Mapping) else {}
 
@@ -232,26 +232,43 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
                                 if isinstance(t, str) and t and t not in overlay_targets:
                                     overlay_targets.append(t)
 
-        # overlay report from response_mapping (payload metadata)
+        # Overlay execution counts.
+        # Production event logs carry execution results in two places:
+        # 1. payload.actions — all actions the tutor response attempted
+        # 2. payload.metadata.response_mapping — rejected/dropped targets
+        #    (keys: rejected_targets, dropped_targets — both list[str])
+        # There is no "executed" key in response_mapping; actions that
+        # passed are counted as (len(actions) - rejected - dropped).
         response_mapping = response_meta.get("response_mapping")
-        if isinstance(response_mapping, Mapping):
-            report = response_mapping
-        else:
-            report = {}
-        overlay_exec = len(report.get("executed", [])) if isinstance(report.get("executed"), list) else 0
-        overlay_rej = len(report.get("rejected", [])) if isinstance(report.get("rejected"), list) else 0
-        overlay_drop = len(report.get("dropped", [])) if isinstance(report.get("dropped"), list) else 0
+        if not isinstance(response_mapping, Mapping):
+            response_mapping = {}
+        actions = response_payload.get("actions")
+        total_actions = len(actions) if isinstance(actions, list) else 0
+        overlay_rej = len(response_mapping.get("rejected_targets", [])) if isinstance(response_mapping.get("rejected_targets"), list) else 0
+        overlay_drop = len(response_mapping.get("dropped_targets", [])) if isinstance(response_mapping.get("dropped_targets"), list) else 0
+        overlay_exec = max(0, total_actions - overlay_rej - overlay_drop)
 
-        # Fallback: if response_mapping report is empty, use overlay_rejected_list count
+        # Fallback: if response_mapping is empty, use overlay_rejected_list
         if overlay_rej == 0 and overlay_exec == 0 and overlay_drop == 0:
             rejected_list = bucket.get("overlay_rejected_list", [])
             if rejected_list:
-                overlay_rej = len(rejected_list)
+                fallback_rej = 0
                 for rj_ev in rejected_list:
                     rj_payload = rj_ev.get("payload") if isinstance(rj_ev.get("payload"), Mapping) else {}
-                    rj_target = rj_payload.get("target")
-                    if isinstance(rj_target, str) and rj_target and rj_target not in overlay_targets:
-                        overlay_targets.append(rj_target)
+                    rj_targets = rj_payload.get("rejected_targets")
+                    if isinstance(rj_targets, list):
+                        for t in rj_targets:
+                            if isinstance(t, str) and t:
+                                fallback_rej += 1
+                                if t not in overlay_targets:
+                                    overlay_targets.append(t)
+                    else:
+                        rj_target = rj_payload.get("target")
+                        if isinstance(rj_target, str) and rj_target:
+                            fallback_rej += 1
+                            if rj_target not in overlay_targets:
+                                overlay_targets.append(rj_target)
+                overlay_rej = fallback_rej
 
         # audit fields
         audit = normalize_help_cycle_audit_fields({**response_meta, **request_meta})
@@ -328,14 +345,16 @@ def _build_timeline(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     vision_frames_seen = 0
 
     for ev in events:
-        kind = ev.get("kind") or ev.get("type") or ""
+        kind = ev.get("kind") or ""
         payload = ev.get("payload")
         if not isinstance(payload, Mapping):
             payload = {}
 
         t_wall = _opt_float(ev.get("t_wall"))
         if t_wall is None:
-            continue
+            # Fall back to sequential ordering for events without wall-clock
+            # time (e.g. procedure-engine step events produced by mock run).
+            t_wall = float(len(snapshots))
 
         state_changed = False
 

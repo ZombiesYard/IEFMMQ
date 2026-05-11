@@ -431,7 +431,7 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
             "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
             "fused_step_id", "fused_missing_conditions", "model_next_step_id",
             "overlay_targets", "overlay_executed", "overlay_rejected",
-            "overlay_dropped", "response_status", "fallback_overlay_used",
+            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
             "observability_status", "requires_visual_confirmation",
             "scenario_profile",
         ]
