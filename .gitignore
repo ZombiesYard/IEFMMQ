@@ -57,16 +57,7 @@ docs/dev_notes/dev_tunnel_vllm.md
 # Local Label Studio state
 .label_studio/
 
-# Track thesis source files in the private thesis repo,
-# but ignore common LaTeX build artifacts.
-paperwork/**/*.aux
-paperwork/**/*.bbl
-paperwork/**/*.bcf
-paperwork/**/*.blg
-paperwork/**/*.fdb_latexmk
-paperwork/**/*.fls
-paperwork/**/*.log
-paperwork/**/*.out
-paperwork/**/*.run.xml
-paperwork/**/*.synctex.gz
-paperwork/**/*.toc
+# Thesis content lives only on the private paper branch/repo.
+paper/
+paper_zh/
+paperwork/
