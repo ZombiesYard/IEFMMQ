@@ -232,8 +232,13 @@ class VisionFactExtractor:
             lang=self.lang,
             config=self._config,
         )
+        system_content = (
+            "你是 SimTutor 的视觉事实抽取器。只能输出 JSON。"
+            if self.lang == "zh"
+            else "You are SimTutor visual fact extractor. Reply with JSON only."
+        )
         messages = [
-            {"role": "system", "content": "You are SimTutor visual fact extractor. Reply with JSON only."},
+            {"role": "system", "content": system_content},
             {
                 "role": "user",
                 "content": [
@@ -555,7 +560,8 @@ class VisionFactExtractor:
         return self._is_qwen35_model()
 
     def _is_qwen35_model(self) -> bool:
-        return "qwen3.5" in self.model_name.lower()
+        name = self.model_name.lower()
+        return "qwen3" in name or "simtutor" in name
 
     def _is_dashscope_compatible(self) -> bool:
         normalized = self.base_url.lower()

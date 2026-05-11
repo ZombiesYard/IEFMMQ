@@ -513,7 +513,8 @@ class OpenAICompatModel(BaseHelpModel):
         return self._is_qwen35_model()
 
     def _is_qwen35_model(self) -> bool:
-        return "qwen3.5" in self.model_name.lower()
+        name = self.model_name.lower()
+        return "qwen3" in name or "simtutor" in name
 
     def _is_dashscope_compatible(self) -> bool:
         normalized = self.base_url.lower()

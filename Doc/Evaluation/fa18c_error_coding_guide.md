@@ -4,7 +4,7 @@ generator: tools/regenerate_eval_docs.py
 source_index: Doc/Evaluation/index.json
 policy_id: fa18c_cold_start_whitelist_v1
 policy_version: v2
-version_stamp: 6a65d3427f4de2ce
+version_stamp: 2bf9cb39647cc52b
 source_chunks:
 - fa18c_error_coding_guide/fa18c_error_coding_guide_0:1-8
 - fa18c_error_coding_guide/fa18c_error_coding_guide_1:1-12
