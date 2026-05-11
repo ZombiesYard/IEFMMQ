@@ -93,6 +93,8 @@
 
 - `single-monitor` 与 `ultrawide-left-stack` 共享同一套 normalized left-stack solver
 - `extended-right` 保留为调试模式，但其 3 块视口也由同一套 normalized region 几何求解
+- 生成的 Monitor Setup 现在会额外写入 `VR_MIRROR`，并把它限制在主视口矩形内，避免 VR 镜像覆盖左侧导出带
+- 生成的 Monitor Setup 还会写入 `VR_allow_MFD_out_of_HMD = true`，用于在 VR 启用时继续允许原生 MFD/DDI 导出到桌面视口
 - 这意味着后续采帧、切图、VLM 引用都只需要维护一套几何逻辑
 
 ## DCS 侧最小配置模板
@@ -107,6 +109,12 @@ python -m tools.install_dcs_hook \
 ```
 
 若不传 `--main-width` / `--main-height`，安装器只会在 Windows 上自动探测当前主屏分辨率并据此生成 Monitor Setup；非 Windows shell 需要手工显式传入宽高。
+
+VR 使用补充：
+
+- 在 DCS 里启用 `Options -> VR -> VR Mirror Options -> Use DCS System Resolution`
+- DCS 分辨率保持为生成文件注释里给出的 `Recommended DCS resolution`
+- `VR_MIRROR` 的目标是把桌面镜像限制回主视口区域，而不是让单眼镜像铺满整个 composite-panel 画布
 
 执行后，最少会涉及这些位置：
 
