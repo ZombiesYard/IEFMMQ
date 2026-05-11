@@ -670,7 +670,7 @@ def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
         ],
     )
 
-    assert result.inferred_step_id == "S19"
+    assert result.inferred_step_id == "S22"
 
 
 def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(

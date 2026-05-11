@@ -147,6 +147,10 @@ def _set_flap_auto(bios: dict[str, Any], desired: Any) -> None:
     bios["FLAP_SW"] = 0 if _bool_like(desired) else 1
 
 
+def _set_flap_configured(bios: dict[str, Any], desired: Any) -> None:
+    bios["FLAP_SW"] = 0 if _bool_like(desired) else 2
+
+
 def _set_parking_brake_released(bios: dict[str, Any], desired: Any) -> None:
     bios["EMERGENCY_PARKING_BRAKE_PULL"] = 0 if _bool_like(desired) else 1
 
@@ -180,6 +184,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "engine_crank_right": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "engine_crank_right_complete": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
+    "flap_configured": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_configured),
     "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
     # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered
     # and either held side (0/2) counts as active/complete evidence.
@@ -194,6 +199,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
         primary_bios_key="EMERGENCY_PARKING_BRAKE_PULL",
         setter=_set_parking_brake_released,
     ),
+    "pitot_heat_on": _set_enum("PITOT_HEAT_SW", true_value=1, false_value=0),
     "power_available": _VarBinding(primary_bios_key="BATTERY_SW", setter=_set_power_available),
     "r_gen_on": _set_enum("R_GEN_SW", true_value=1, false_value=0),
     "radar_altimeter_bug_value": _set_numeric("RADALT_MIN_HEIGHT_PTR"),
