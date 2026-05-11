@@ -387,6 +387,8 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
                 scoring = json.loads(scoring_path.read_text(encoding="utf-8"))
             except Exception as exc:
                 print(f"[EXPERIMENT_EXPORT] warning: failed to load scoring file: {exc}")
+        else:
+            print(f"[EXPERIMENT_EXPORT] warning: --scoring path not found: {scoring_path}")
 
     meta_overrides = {
         "participant_id": args.participant_id,

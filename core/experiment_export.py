@@ -271,7 +271,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
                 overlay_rej = fallback_rej
 
         # audit fields
-        audit = normalize_help_cycle_audit_fields({**response_meta, **request_meta})
+        audit = normalize_help_cycle_audit_fields({**request_meta, **response_meta})
 
         # model next step from help_response
         model_next = None
