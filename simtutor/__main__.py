@@ -348,6 +348,121 @@ def _run_replay_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sanitize_participant_slug(raw: str) -> str:
+    """Return a safe directory name from a participant identifier."""
+    # Discard any path component; only use the terminal name.
+    slug = Path(raw).name.strip()
+    if not slug or slug in (".", ".."):
+        raise ValueError(f"participant_id resolves to unsafe or empty path component: {raw!r}")
+    # Restrict to alphanumeric + underscore + hyphen for filesystem safety.
+    if not slug.replace("_", "").replace("-", "").isalnum():
+        raise ValueError(
+            f"participant_id must contain only letters, digits, underscores, and hyphens: {slug!r}"
+        )
+    return slug
+
+
+def _run_experiment_export(args: argparse.Namespace) -> int:
+    import csv
+
+    from core.event_store import JsonlEventStore
+    from core.experiment_export import build_experiment_export
+
+    input_path = Path(args.file)
+    if not input_path.exists():
+        print(f"[EXPERIMENT_EXPORT] file not found: {input_path}")
+        return 1
+
+    try:
+        events = JsonlEventStore.load(input_path)
+    except Exception as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to load event log: {exc}")
+        return 1
+
+    scoring = None
+    if args.scoring:
+        scoring_path = Path(args.scoring)
+        if scoring_path.exists():
+            try:
+                scoring = json.loads(scoring_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                print(f"[EXPERIMENT_EXPORT] warning: failed to load scoring file: {exc}")
+        else:
+            print(f"[EXPERIMENT_EXPORT] warning: --scoring path not found: {scoring_path}")
+
+    meta_overrides = {
+        "participant_id": args.participant_id,
+        "condition": args.condition,
+        "group": args.group,
+        "questionnaire_ref": args.questionnaire,
+        "experimenter_notes": args.notes,
+    }
+
+    export = build_experiment_export(events, meta_overrides=meta_overrides, scoring=scoring)
+    out_dir = Path(args.output_dir)
+    if args.participant_id:
+        try:
+            safe_id = _sanitize_participant_slug(args.participant_id)
+        except ValueError as exc:
+            print(f"[EXPERIMENT_EXPORT] invalid participant_id: {exc}")
+            return 1
+        out_dir = out_dir / safe_id
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to create output directory: {exc}")
+        return 1
+
+    # session.json
+    session_path = out_dir / "session.json"
+    try:
+        session_path.write_text(
+            json.dumps(export.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to write session.json: {exc}")
+        return 1
+    print(f"[EXPERIMENT_EXPORT] wrote {session_path}")
+
+    # help_cycles.csv
+    if export.help_cycles:
+        csv_path = out_dir / "help_cycles.csv"
+        cycle_fields = [
+            "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
+            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
+            "fused_step_id", "fused_missing_conditions", "model_next_step_id",
+            "overlay_targets", "overlay_executed", "overlay_rejected",
+            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
+            "observability_status", "requires_visual_confirmation",
+            "scenario_profile",
+        ]
+        with csv_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=cycle_fields, extrasaction="ignore")
+            writer.writeheader()
+            for c in export.help_cycles:
+                row = c.to_dict()
+                # flatten list fields for CSV
+                row["fused_missing_conditions"] = ";".join(c.fused_missing_conditions)
+                row["overlay_targets"] = ";".join(c.overlay_targets)
+                writer.writerow(row)
+        print(f"[EXPERIMENT_EXPORT] wrote {csv_path} ({len(export.help_cycles)} cycles)")
+
+    # summary.json
+    summary_path = out_dir / "summary.json"
+    try:
+        summary_path.write_text(
+            json.dumps(export.summary.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to write summary.json: {exc}")
+        return 1
+    print(f"[EXPERIMENT_EXPORT] wrote {summary_path}")
+
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="simtutor", description="SimTutor CLI utilities")
     sub = parser.add_subparsers(dest="command")
@@ -381,6 +496,19 @@ def main() -> int:
     batch.add_argument("--taxonomy", default="packs/fa18c_startup/taxonomy.yaml", help="Path to taxonomy.yaml")
     batch.add_argument("--scenarios", nargs="*", help="Scenario JSON files (default: mock_scenarios/*.json)")
     batch.add_argument("--output-dir", default="logs", help="Directory to store logs/results.csv")
+
+    exp_export = sub.add_parser(
+        "experiment-export",
+        help="Export runtime event log as study-ready experiment artifacts",
+    )
+    exp_export.add_argument("file", help="Event log JSONL")
+    exp_export.add_argument("--participant-id", default=None, help="Participant identifier")
+    exp_export.add_argument("--condition", default=None, help="Experimental condition (e.g. with_tutor, without_tutor)")
+    exp_export.add_argument("--group", default=None, help="Participant group (e.g. novice, expert)")
+    exp_export.add_argument("--questionnaire", default=None, help="Path to linked questionnaire YAML/JSON")
+    exp_export.add_argument("--notes", default=None, help="Free-text experimenter notes")
+    exp_export.add_argument("--output-dir", default="artifacts/experiments", help="Output directory")
+    exp_export.add_argument("--scoring", default=None, help="Optional scoring JSON to embed (from simtutor score)")
 
     sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
 
@@ -609,6 +737,8 @@ def main() -> int:
             csv_path.write_text("", encoding="utf-8")
             print(f"[BATCH] no scenarios; wrote empty {csv_path}")
         return 0
+    if args.command == "experiment-export":
+        return _run_experiment_export(args)
     if args.command == "model-config":
         from simtutor.config import ModelConfigError, load_model_access_config
 
