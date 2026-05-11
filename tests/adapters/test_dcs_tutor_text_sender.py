@@ -71,3 +71,91 @@ def test_sender_reports_disabled_without_sending(monkeypatch) -> None:
     assert result["status"] == "failed"
     assert result["failure_class"] == "sender_disabled"
     assert dummy.sent == []
+
+
+def test_sender_skip_ack_when_expect_ack_false(monkeypatch) -> None:
+    dummy = AckingSocket([])
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
+
+    result = sender.send_text("Tutor: turn on APU.", expect_ack=False)
+
+    assert result["status"] == "ok"
+    assert result["ack_skipped"] is True
+    assert len(dummy.sent) == 1
+
+
+def test_sender_reports_transport_error_on_send(monkeypatch) -> None:
+    class SendFailingSocket(DummySocket):
+        def sendto(self, data, server):
+            raise OSError("send failed")
+
+    dummy = SendFailingSocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
+
+    result = sender.send_text("Tutor: turn on APU.")
+
+    assert result["status"] == "failed"
+    assert result["failure_class"] == "transport_error"
+    assert "send failed" in result["reason"]
+
+
+def test_sender_reports_transport_error_on_recv(monkeypatch) -> None:
+    class RecvFailingSocket(DummySocket):
+        def recvfrom(self, _size: int):
+            raise OSError("recv failed")
+
+    dummy = RecvFailingSocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
+
+    result = sender.send_text("Tutor: turn on APU.")
+
+    assert result["status"] == "failed"
+    assert result["failure_class"] == "transport_error"
+    assert "recv failed" in result["reason"]
+
+
+def test_sender_reports_invalid_ack_on_malformed_response(monkeypatch) -> None:
+    dummy = AckingSocket([b"not valid json"])
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
+
+    result = sender.send_text("Tutor: turn on APU.")
+
+    assert result["status"] == "failed"
+    assert result["failure_class"] == "invalid_ack"
+
+
+def test_sender_reports_remote_failure(monkeypatch) -> None:
+    ack_payload = {
+        "schema_version": "v2",
+        "cmd_id": "123e4567-e89b-12d3-a456-426614174000",
+        "status": "failed",
+        "reason": "DCS internal error",
+    }
+    dummy = AckingSocket([json.dumps(ack_payload).encode("utf-8")])
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
+
+    result = sender.send_text("Tutor: turn on APU.")
+
+    assert result["status"] == "failed"
+    assert result["failure_class"] == "remote_failure"
+    assert result["reason"] == "DCS internal error"
+
+
+def test_sender_close(monkeypatch) -> None:
+    close_called = []
+
+    class CloseTrackingSocket(DummySocket):
+        def close(self):
+            close_called.append(True)
+
+    dummy = CloseTrackingSocket()
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender()
+    sender.close()
+
+    assert close_called == [True]

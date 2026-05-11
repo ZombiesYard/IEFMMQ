@@ -137,6 +137,7 @@ def test_build_composite_panel_config_enables_vlm_frame_and_frames_root(tmp_path
     )
 
     assert 'vlm_frame = true' in config
+    assert 'tutor_text = true' in config
     assert f'monitor_setup = "{MONITOR_SETUP_BASENAME}"' in config
     assert 'layout_id = "fa18c_composite_panel_v2"' in config
     assert 'channel = "composite_panel"' in config

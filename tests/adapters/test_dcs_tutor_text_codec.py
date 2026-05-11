@@ -79,3 +79,45 @@ def test_decode_invalid_ack_raises() -> None:
     data = json.dumps(payload).encode("utf-8")
     with pytest.raises(ValueError, match="dcs_tutor_text_ack invalid"):
         decode_ack(data)
+
+
+def test_command_from_message_rejects_zero_display_time() -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        command_from_message("hello", display_time_s=0.0)
+
+
+def test_command_from_message_rejects_negative_display_time() -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        command_from_message("hello", display_time_s=-1.0)
+
+
+def test_command_from_message_rejects_inf_display_time() -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        command_from_message("hello", display_time_s=float("inf"))
+
+
+def test_command_from_message_rejects_nan_display_time() -> None:
+    with pytest.raises(ValueError, match="finite positive"):
+        command_from_message("hello", display_time_s=float("nan"))
+
+
+def test_decode_command_rejects_non_object_json() -> None:
+    data = json.dumps(["not", "an", "object"]).encode("utf-8")
+    with pytest.raises(ValueError, match="Command payload must be a JSON object"):
+        decode_command(data)
+
+
+def test_decode_ack_rejects_non_object_json() -> None:
+    data = json.dumps(["not", "an", "object"]).encode("utf-8")
+    with pytest.raises(ValueError, match="Ack payload must be a JSON object"):
+        decode_ack(data)
+
+
+def test_decode_command_rejects_malformed_bytes() -> None:
+    with pytest.raises(ValueError, match="Invalid JSON payload"):
+        decode_command(b"not json")
+
+
+def test_decode_ack_rejects_malformed_bytes() -> None:
+    with pytest.raises(ValueError, match="Invalid JSON payload"):
+        decode_ack(b"not json")

@@ -34,7 +34,7 @@ class DcsTutorTextSender:
         reason: str,
     ) -> dict[str, Any]:
         return {
-            "cmd_id": cmd["cmd_id"] if isinstance(cmd, dict) else None,
+            "cmd_id": cmd.get("cmd_id") if isinstance(cmd, dict) else None,
             "status": "failed",
             "failure_class": failure_class,
             "reason": reason,

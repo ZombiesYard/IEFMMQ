@@ -367,6 +367,14 @@ local function parse_json(data)
   return obj, nil
 end
 
+local function extract_cmd_id(raw_data)
+  if type(raw_data) ~= "string" then
+    return nil
+  end
+  local cmd_id = raw_data:match('"cmd_id"%s*:%s*"([^"]+)"')
+  return cmd_id
+end
+
 local function send_tutor_text_ack(cmd_id, status, reason, addr, port)
   local payload = {
     schema_version = "v2",
@@ -381,15 +389,22 @@ local function send_tutor_text_ack(cmd_id, status, reason, addr, port)
     loge("Failed to encode tutor text ack: " .. tostring(json_str))
     return
   end
-  pcall(function()
+  local ok, send_err = pcall(function()
     udp_text:sendto(json_str, addr, port)
   end)
+  if not ok then
+    loge("Failed to send tutor text ack: " .. tostring(send_err))
+  end
 end
 
 local function handle_tutor_text_command(cmd, addr, port)
   local cmd_id = cmd.cmd_id
   if type(cmd_id) ~= "string" or cmd_id == "" then
     loge("Invalid tutor text command: missing/invalid cmd_id")
+    return
+  end
+  if cmd.schema_version ~= "v2" then
+    send_tutor_text_ack(cmd_id, "failed", "unsupported schema_version: " .. tostring(cmd.schema_version), addr, port)
     return
   end
   local text = cmd.text
@@ -402,7 +417,7 @@ local function handle_tutor_text_command(cmd, addr, port)
     send_tutor_text_ack(cmd_id, "failed", "invalid display_time_s", addr, port)
     return
   end
-  local clear_view = cmd.clear_view and true or false
+  local clear_view = cmd.clear_view == true
   local script = ("trigger.action.outText(%s, %s, %s)"):format(
     as_lua_string(text),
     tostring(display_time_s),
@@ -437,6 +452,10 @@ function callbacks.onSimulationFrame()
       handle_tutor_text_command(cmd, addr, port)
     else
       loge("Invalid tutor text command: " .. tostring(err))
+      local extracted_id = extract_cmd_id(data)
+      if extracted_id then
+        send_tutor_text_ack(extracted_id, "failed", "invalid_json: " .. tostring(err), addr, port)
+      end
     end
   end
 end

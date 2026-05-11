@@ -1,27 +1,15 @@
 from __future__ import annotations
 
 import json
-from importlib import resources
 from typing import Any, Mapping
 from uuid import uuid4
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-_SCHEMA_PACKAGE = "simtutor.schemas.v2"
-_CMD_SCHEMA = "dcs_tutor_text_command.json"
-_ACK_SCHEMA = "dcs_tutor_text_ack.json"
+from simtutor.schemas import load_schema
 
-
-def _load_schema(name: str) -> Mapping[str, Any]:
-    schema_path = resources.files(_SCHEMA_PACKAGE) / name
-    if not schema_path.is_file():
-        raise FileNotFoundError(f"Schema not found: {schema_path}")
-    with schema_path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-_CMD_VALIDATOR = Draft202012Validator(_load_schema(_CMD_SCHEMA), format_checker=FormatChecker())
-_ACK_VALIDATOR = Draft202012Validator(_load_schema(_ACK_SCHEMA), format_checker=FormatChecker())
+_CMD_VALIDATOR = Draft202012Validator(load_schema("dcs_tutor_text_command"), format_checker=FormatChecker())
+_ACK_VALIDATOR = Draft202012Validator(load_schema("dcs_tutor_text_ack"), format_checker=FormatChecker())
 
 
 def validate_command(payload: Mapping[str, Any]) -> None:
@@ -49,11 +37,14 @@ def command_from_message(
 ) -> dict[str, Any]:
     if not isinstance(text, str) or not text.strip():
         raise ValueError("text must be a non-empty string")
+    display = float(display_time_s)
+    if not (0.0 < display < float("inf")):
+        raise ValueError(f"display_time_s must be a finite positive number, got {display}")
     payload = {
         "schema_version": "v2",
         "cmd_id": cmd_id or str(uuid4()),
         "text": text.strip(),
-        "display_time_s": float(display_time_s),
+        "display_time_s": display,
         "clear_view": bool(clear_view),
     }
     validate_command(payload)

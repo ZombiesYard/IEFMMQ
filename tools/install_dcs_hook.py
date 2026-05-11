@@ -179,6 +179,7 @@ def build_composite_panel_config(
         "        overlay_ack = false,",
         "        clickable_actions = false,",
         "        vlm_frame = true,",
+        "        tutor_text = true,",
         "    },",
         "    overlay = {",
         f'        command_host = "{overlay_command_host}",',

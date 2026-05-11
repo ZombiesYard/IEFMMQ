@@ -3996,6 +3996,10 @@ class LiveDcsTutorLoop:
 
     def _send_tutor_text(self, response: TutorResponse) -> None:
         if self.tutor_text_sender is None:
+            response.metadata["dcs_tutor_text"] = {
+                "status": "skipped",
+                "reason": "sender_unavailable",
+            }
             return
         sanitized_message = sanitize_public_model_text(response.message, lang=self.lang)
         if not isinstance(sanitized_message, str) or not sanitized_message.strip():
@@ -4011,8 +4015,13 @@ class LiveDcsTutorLoop:
                 clear_view=self.tutor_text_clear_view,
                 expect_ack=True,
             )
+            response.metadata["dcs_tutor_text"] = dict(result) if isinstance(result, Mapping) else {
+                "status": "failed",
+                "failure_class": "invalid_sender_result",
+                "reason": "Tutor text sender returned a non-mapping result",
+            }
         except Exception as exc:
-            result = {
+            response.metadata["dcs_tutor_text"] = {
                 "status": "failed",
                 "failure_class": "sender_exception",
                 "reason": f"{type(exc).__name__}: {exc}",
@@ -4020,11 +4029,6 @@ class LiveDcsTutorLoop:
                 "display_time_s": self.tutor_text_display_time_s,
                 "clear_view": self.tutor_text_clear_view,
             }
-        response.metadata["dcs_tutor_text"] = dict(result) if isinstance(result, Mapping) else {
-            "status": "failed",
-            "failure_class": "invalid_sender_result",
-            "reason": "Tutor text sender returned a non-mapping result",
-        }
 
     def run_help_cycle(self, *, trigger_t_wall: float | None = None) -> tuple[TutorResponse | None, dict[str, Any] | None]:
         obs = self._latest_enriched_obs
