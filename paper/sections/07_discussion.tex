@@ -44,7 +44,7 @@ The original proposal envisioned a VR-first tutoring system: Meta Quest~3
 deployment, in-headset step cards, gaze and hand interaction, and a
 between-subjects human evaluation as the primary source of evidence.
 The current implementation is instead a desktop/DCS runtime with telemetry
-grounding, structured help generation, and an optional VLM visual fact extraction
+grounding, structured help generation, and a VLM visual fact extraction
 pipeline.
 
 This shift occurred for three interrelated reasons.
@@ -95,7 +95,7 @@ In practical terms, the current state of the project can be summarised as
 follows: the instrumentation, procedure representation, and perception
 subsystems needed for a grounded tutoring system have been built, validated
 through automated benchmarks, and packaged in a replayable architecture.
-What remains is to complete the VR deployment and to conduct the human-subject
+What remains is to conduct the human-subject
 evaluation that will determine whether these subsystems, operating together,
 produce measurable improvements in procedural learning.
 
@@ -384,14 +384,9 @@ cockpit types or new simulators).
 
 \subsection{Limitations of the System}
 
-\textbf{No real-time VR deployment.}
-The system operates as a desktop/DCS runtime.
-It has not been deployed on Meta Quest~3 or any other VR headset, and the VR
-overlay rendering, in-headset interaction, and latency characteristics have not
-been tested.
-The transition from desktop to VR involves non-trivial engineering challenges
-(rendering pipeline integration, input handling, comfort and latency
-requirements) that may require architectural changes.
+\textbf{VR code path not yet validated with human subjects.}
+The VR runtime code path is implemented (VR\_MIRROR, tutor text display, composite-panel capture in VR mode) but has not been validated through controlled human-subject experiments.
+In-headset interaction, overlay rendering in VR, and latency characteristics under study conditions have not been tested with participants.
 
 \textbf{No human-subject evaluation.}
 This is the most significant limitation of the current work.
@@ -454,13 +449,13 @@ most immediate technical extensions to the longer-term thesis objectives.
 
 \subsection{VR Runtime Integration}
 
-The most direct path toward the original thesis vision is the integration of the
-current desktop runtime with the DCS-VR platform on Meta Quest~3.
-This involves porting the overlay rendering pipeline from the desktop DCS Lua
-hooks to the VR rendering context, adapting the help trigger mechanism (from
-desktop hotkey to VR controller or gaze-based interaction), and validating that
-the telemetry pipeline and VLM inference operate within acceptable latency bounds
-under VR rendering loads.
+The most direct path toward the original thesis vision is the experimental
+validation of the VR runtime code path with human subjects.
+The VR code path is already implemented (VR\_MIRROR configuration, tutor text UDP
+injection, composite-panel capture in VR mode); what remains is to validate the
+telemetry pipeline and VLM inference under VR rendering loads with study
+participants, and to adapt the help trigger mechanism from desktop hotkey to VR
+controller or gaze-based interaction.
 The modular architecture described in Chapter~\ref{ch:system-design} is designed
 to support this transition: the core tutoring logic, procedure engine, and VLM
 pipeline are simulator-platform-agnostic, and only the input/output adapters
@@ -564,8 +559,8 @@ current status.
   \textbf{Direction} & \textbf{Current status} & \textbf{Key challenge} \\
   \midrule
   VR runtime integration &
-    Desktop runtime operational; VR adapter not implemented &
-    Rendering pipeline, latency, input handling \\
+    VR code path implemented; not validated with human subjects &
+    Experimental validation, latency under study conditions \\
 
   Human-subject evaluation &
     Design specified; infrastructure upgrades pending &

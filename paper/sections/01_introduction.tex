@@ -88,16 +88,17 @@ transfer tests administered after a 2--4 week interval.
 
 This vision defines the long-term research agenda of the thesis. However, the work
 completed to date represents a technical baseline rather than a realisation of the full
-VR tutoring system. The current implementation operates on a desktop/DCS runtime, uses
-cockpit overlay highlighting rather than in-headset step cards as its primary output
-modality, and has been validated through automated benchmarks rather than human-subject
-experiments. The VR deployment and the human-subject evaluation remain planned next phases
+VR tutoring system validated through human-subject experiments. The current
+implementation supports both desktop/DCS and VR (Quest~3) configurations, uses
+cockpit overlay highlighting as its primary output modality, and has been validated
+through automated benchmarks rather than human-subject experiments. The human-subject
+evaluation remains the planned next phase
 (see Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-planned}).
 
 We document this gap explicitly at the outset to establish a clear boundary between the
 original research vision and the completed technical contributions. The thesis should be
 read as: a system and methodology contribution that lays the technical foundation---runtime,
-instrumentation, VLM adaptation pipeline, benchmark infrastructure---on which the VR and
+instrumentation, VLM adaptation pipeline, benchmark infrastructure---on which the
 human-subject evaluation can be built.
 
 % ===========================================================================
@@ -109,10 +110,13 @@ appears in Section~\ref{sec:design-delta}; we summarise the key differences here
 the reader.
 
 \paragraph{Platform.}
-The current system operates on a desktop/DCS (non-VR) configuration. Displays are standard
-monitors; input is through keyboard and HOTAS (hands-on-throttle-and-stick); output is
-rendered as cockpit overlay highlights on the DCS screen rather than as in-headset step
-cards. The Meta Quest~3 VR adapter has not been implemented.
+The current system supports both desktop/DCS and VR (Quest~3) configurations. VR support is
+provided through VR\_MIRROR and VR\_allow\_MFD\_out\_of\_HMD configurations, tutor text UDP
+injection into the DCS in-game text area, and composite-panel capture compatibility
+validation in VR mode. On desktop, displays are standard monitors; input is through
+keyboard and HOTAS (hands-on-throttle-and-stick); output is rendered as cockpit overlay
+highlights on the DCS screen. The VR runtime code path has been implemented but has not
+yet been validated through human-subject experiments.
 
 \paragraph{Telemetry grounding.}
 The current implementation includes a substantially more elaborate telemetry subsystem than
@@ -158,7 +162,7 @@ ports-and-adapters (hexagonal) architecture that separates simulator-agnostic co
 adapters (DCS-BIOS telemetry, overlay rendering, vision capture). The system supports
 live help cycles in which the runtime assembles a structured context from normalised
 telemetry variables, delta summaries, candidate procedure steps, a deterministic step
-hint, an overlay-target allowlist, retrieved knowledge snippets, and optional visual
+hint, an overlay-target allowlist, retrieved knowledge snippets, and visual
 fact observations; passes this context to an LLM for structured help response generation;
 validates the response against schema, allowlist, and evidence-grounding constraints; and
 executes the validated overlay actions while logging every stage for downstream replay
@@ -244,7 +248,7 @@ and explainable AI assistance in AR/VR contexts.
 goals from the problem statement, describes the ports-and-adapters architecture, traces
 the runtime data flow through a complete help cycle, and details the design of the
 telemetry processing pipeline, the procedure and gating rule engines, the simulator
-adapter layer, the event logging and replay infrastructure, and the optional VLM
+adapter layer, the event logging and replay infrastructure, and the VLM
 adaptation component. The chapter closes with a systematic comparison to the original
 thesis proposal, documenting how the design evolved during implementation.
 

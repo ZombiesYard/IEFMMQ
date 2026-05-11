@@ -30,7 +30,7 @@ receiver, telemetry enrichment and delta-sanitisation pipeline, overlay action e
 vision capture trigger). The runtime orchestrates a complete help cycle: it assembles a
 structured context from normalised telemetry variables, delta summaries, candidate
 procedure steps, a deterministic step hint, an overlay-target allowlist, retrieved
-knowledge snippets, and optional visual fact observations; passes this context to an LLM
+knowledge snippets, and visual fact observations; passes this context to an LLM
 for structured help response generation; validates the response against schema, allowlist,
 and evidence-grounding constraints; executes validated overlay actions in the cockpit;
 and logs every stage as versioned, timestamped events for offline replay and analysis.
@@ -80,16 +80,17 @@ plan remains at the design stage; no participant data has been collected.
 % Evidence: C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01 (all planned)
 
 \paragraph{What the system is.}
-The SimTutor system, as delivered, is a working desktop/DCS tutoring runtime with
-automated tests, a fine-tuned VLM adapter with benchmark evidence, a replay and scoring
-infrastructure for offline analysis, and a documented extension path to VR deployment and
+The SimTutor system, as delivered, is a working desktop/DCS and VR (Quest~3) tutoring
+runtime with automated tests, a fine-tuned VLM adapter with benchmark evidence, a replay
+and scoring infrastructure for offline analysis, and a documented extension path to
 human-subject evaluation. It demonstrates that a tutoring system can enforce explicit
 evidence grounding---every overlay target and step recommendation must be traceable to
 a telemetry variable, a gating rule, a retrieved document snippet, or a visual fact
 observation---in a working, testable implementation.
 
 \paragraph{What the system is not.}
-The system has not been deployed in VR. It has not been evaluated with human subjects.
+The VR runtime code path is implemented (VR\_MIRROR, tutor text display,
+composite-panel capture) but has not yet been validated with human subjects.
 It has not been shown to improve learning outcomes, reduce workload, or accelerate
 procedural skill acquisition. These remain open questions for the next phase of the
 research programme. The current system provides the runtime, instrumentation, and
@@ -101,14 +102,15 @@ benchmark infrastructure that makes addressing those questions feasible.
 The contributions of this thesis open several directions for future work, each of which
 builds directly on the completed technical baseline.
 
-\paragraph{VR runtime integration.}
-The most immediate extension is the implementation of the Meta Quest~3 VR adapter
-envisioned in the original proposal. This involves porting the overlay rendering to
-in-headset step cards, integrating gaze and hand-tracking inputs for help triggering, and
-validating that the telemetry pipeline and help cycle function correctly in the DCS-VR
-environment. The existing ports-and-adapters architecture is designed to accommodate this
-extension: a new VR adapter implementing the existing overlay and telemetry ports would
-replace the current desktop adapters without changes to the core tutoring logic.
+\paragraph{VR experimental validation.}
+The most immediate extension is the experimental validation of the VR runtime code path
+with human subjects. The VR code path is already implemented (VR\_MIRROR configuration,
+tutor text UDP injection, composite-panel capture in VR mode); what remains is to validate
+the telemetry pipeline and help cycle with study participants in the DCS-VR environment,
+and to integrate gaze and hand-tracking inputs for help triggering. The existing
+ports-and-adapters architecture supports this: the core tutoring logic is
+platform-agnostic, and the VR input/output adapters can be validated without changes to
+the core.
 
 \paragraph{Human-subject evaluation.}
 The planned evaluation design described in Section~\ref{sec:eval-planned} should be

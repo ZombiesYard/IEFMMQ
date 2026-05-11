@@ -334,7 +334,7 @@ The proposal envisions a between-subjects comparison of three conditions:
 \end{enumerate}
 
 The original target platform is the Meta Quest 3 with DCS-VR, providing in-headset guidance through step cards or overlay annotations.
-The current system operates on the desktop/DCS (non-VR) configuration, so a VR deployment would need to be completed before this evaluation can proceed.
+The VR runtime code path is implemented; experimental validation through human-subject study is the next step before this evaluation can proceed.
 Target sample size is approximately $n = 5$--$10$ participants per condition, drawn from a beginner-to-intermediate population with limited prior F/A-18C cold-start experience.
 
 % ---------------------------------------------------------------------------
@@ -376,7 +376,7 @@ To support the planned human-subject evaluation, the current runtime data collec
 
   \item \textbf{Anonymisation pipeline.} All participant-identifiable data must pass through an anonymisation step before storage, in compliance with standard research ethics requirements for human-subject data.
 
-  \item \textbf{VR deployment.} The runtime must be ported from the current desktop/DCS configuration to the Quest~3 / DCS-VR platform, including the in-headset overlay rendering and interaction handling described in the proposal.
+  \item \textbf{VR experimental validation.} The VR runtime code path has been implemented but must be validated with human subjects, including evaluation of in-headset overlay rendering and interaction handling under study conditions.
 \end{enumerate}
 
 None of these upgrades have been implemented at the time of writing.
@@ -412,8 +412,8 @@ This design has been specified at the proposal level but has not been piloted or
 Several threats to validity can be identified at the design stage, prior to any data collection:
 
 \begin{enumerate}
-  \item \textbf{Desktop vs.\ VR platform gap.}
-  The current system operates on desktop DCS, not DCS-VR on Quest~3 as envisioned in the proposal.
+  \item \textbf{VR code path not yet validated with human subjects.}
+  The VR runtime code path has been implemented but has not been validated through controlled human-subject experiments.
   Results obtained in either platform may not generalise to the other without additional validation.
 
   \item \textbf{Benchmark performance does not imply learning outcomes.}

@@ -248,7 +248,7 @@ A configurable acknowledgement receiver (\texttt{DcsOverlayAckReceiver}) can opt
 %           adapters/vision_capture_trigger.py, core/vision_facts.py
 % Claims: C-VLM-01, C-VLM-02
 
-The VLM visual fact extraction runtime is implemented as an optional, independently operable subsystem that communicates with the tutoring runtime through structured observations.
+The VLM visual fact extraction runtime is implemented as a core, independently operable subsystem that communicates with the tutoring runtime through structured observations.
 
 \subsection{Capture Trigger and Frame Selection}
 
@@ -290,10 +290,11 @@ The VLM backend compatibility layer in \texttt{adapters/openai\_compat\_multimod
 When the VLM is unavailable or the multimodal request fails, the help cycle proceeds with telemetry and knowledge only, recording the reason in the vision fallback metadata.
 % Evidence: adapters/openai_compat_multimodal.py lines 1-30
 
-\subsection{Planned Extensions}
+\subsection{VR Compatibility}
 
 The current VLM runtime extracts facts from the composite-panel layout (left DDI, AMPCD, right DDI).
-A VR headset capture path is planned but not yet implemented; the vision port abstraction supports alternative frame sources without changes to the extraction or merging logic.
+Composite-panel capture has been validated for compatibility in VR mode (Quest~3), using VR\_MIRROR and VR\_allow\_MFD\_out\_of\_HMD configurations.
+The vision port abstraction supports alternative frame sources without changes to the extraction or merging logic.
 % Evidence: ports/vision_port.py
 
 % ===========================================================================

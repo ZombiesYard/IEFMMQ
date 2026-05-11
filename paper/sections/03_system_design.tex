@@ -16,7 +16,7 @@ Section~\ref{sec:design-dataflow} describes the runtime data flow through the ma
 Sections~\ref{sec:design-telemetry} and~\ref{sec:design-procedure} cover the telemetry processing pipeline and the procedure and gating rule engines.
 Section~\ref{sec:design-adapters} details the simulator adapter layer and Lua-side integration.
 Section~\ref{sec:design-replay} describes the event logging, replay, and scoring infrastructure.
-Section~\ref{sec:design-vlm} presents the optional VLM adaptation component for visual state understanding.
+Section~\ref{sec:design-vlm} presents the VLM adaptation component for visual state understanding.
 Section~\ref{sec:design-delta} concludes with a systematic comparison to the original thesis proposal, documenting how the design evolved during implementation.
 
 % ===========================================================================
@@ -53,11 +53,11 @@ These event logs must support offline replay for debugging, automated scoring ag
 They must also support replay of telemetry captures and benchmark traces for the VLM adaptation pipeline.
 % Evidence: core/event_store.py, simtutor/runner.py
 
-\item[G5 -- Optional foundation-model and VLM support.]
+\item[G5 -- Foundation-model and VLM-based visual fact extraction.]
 The system must be able to operate with or without a large language model.
-When a model is available, it may provide richer diagnoses and explanations.
+When a model is available, it provides richer diagnoses and explanations.
 When unavailable or when its output fails validation, the system must degrade gracefully to deterministic, rule-based fallback behaviour.
-Vision-language model (VLM) support for visual fact extraction from cockpit screenshots must be an optional, independently operable component.
+Vision-language model (VLM) based visual fact extraction from cockpit screenshots is a core system component that complements telemetry gating by providing structured visual evidence for display-page states not exported through DCS-BIOS.
 % Evidence: help_flow_en.md §5, model_access.md
 
 \item[G6 -- Extensibility to different simulators and procedures.]
@@ -112,7 +112,7 @@ The current repository contains one pack: \texttt{fa18c\_startup}, covering the 
 
 \item[CLI and runtime entrypoints (\texttt{simtutor/}, \texttt{live\_dcs.py}).]
 The \texttt{simtutor} package provides a command-line interface for running mock scenarios, replaying and validating event logs, scoring runs, recording VLM predictions for benchmarking, and replaying DCS-BIOS raw captures.
-The \texttt{live\_dcs.py} module orchestrates the full live runtime loop: it wires together a DCS-BIOS receiver, the telemetry enrichment pipeline, knowledge retrieval, model-based help generation, optional VLM visual fact extraction, overlay action execution, and event logging into a single long-running process.
+The \texttt{live\_dcs.py} module orchestrates the full live runtime loop: it wires together a DCS-BIOS receiver, the telemetry enrichment pipeline, knowledge retrieval, model-based help generation, VLM visual fact extraction, overlay action execution, and event logging into a single long-running process.
 % Evidence: simtutor/__main__.py, live_dcs.py
 \end{description}
 
@@ -196,7 +196,7 @@ The runtime orchestrator assembles a context for the help cycle by gathering:
 \end{itemize}
 % Evidence: adapters/prompting.py, adapters/telemetry_pipeline.py, help_flow_en.md §3
 
-\subsection{Model Inference (Optional)}
+\subsection{Model Inference}
 If a ModelPort implementation is available, the assembled context is formatted into a prompt and sent to the language model.
 The model returns a structured JSON object conforming to the HelpResponse schema, which is generated dynamically at runtime from the procedure pack, UI map, and taxonomy.
 % Evidence: core/llm_schema.py:get_help_response_schema
@@ -318,8 +318,11 @@ Three categories of Lua scripts execute inside DCS:
 \subsection{Planned and Partially Implemented Adapters}
 The current repository includes a \texttt{MockEnvAdapter} for deterministic testing without a running simulator.
 % Evidence: adapters/mock_env.py
-The original thesis proposal envisioned a Meta Quest 3 VR adapter.
-This adapter has not been implemented; the VR deployment remains planned (Section~\ref{sec:eval-planned}).
+The VR runtime code path is implemented, including VR\_MIRROR and
+VR\_allow\_MFD\_out\_of\_HMD configuration for Quest~3 VR mode, tutor text UDP injection
+into the DCS in-game text area, and composite-panel capture compatibility validation in
+VR mode. The VR code path has not yet been validated through controlled human-subject
+experiments (Section~\ref{sec:eval-planned}).
 % Evidence: system_delta_from_proposal.md §4
 
 % ===========================================================================
@@ -353,13 +356,13 @@ The replay infrastructure currently supports synthetic regression replay at the 
 End-to-end replay of full multimodal sessions with synchronised vision frames from live human runs has not yet been validated.
 
 % ===========================================================================
-\section{Optional VLM Adaptation for Visual State Understanding}\label{sec:design-vlm}
+\section{VLM Adaptation for Visual State Understanding}\label{sec:design-vlm}
 
 % Evidence: adapters/vision_fact_extractor.py, adapters/vision_fact_prompting.py,
 %           packs/fa18c_startup/vision_facts.yaml, tools/train_qwen35_vlm_unsloth.py
 % Claims: C-VLM-01, C-VLM-02
 
-Visual perception in SimTutor is an \emph{optional, independently operable} subsystem.
+Visual perception in SimTutor is a core, independently operable subsystem.
 
 \subsection{Role of the VLM Component}
 The VLM component extracts structured \emph{visual facts} from cockpit screenshots---intermediate propositions about visible display content.
@@ -410,11 +413,11 @@ The two mechanisms are complementary: the gating engine provides the primary pro
 The system described in this chapter differs in several important respects from the system envisioned in the original thesis proposal.
 We document these differences to establish a clear boundary between the original research vision and the current implemented system.
 
-\subsection{From VR-First to Desktop-First Runtime}
+\subsection{From VR-First to Dual-Platform Runtime}
 The original proposal described a Meta Quest 3 VR tutoring system with in-headset step cards.
-The current implementation is a desktop/DCS runtime with cockpit overlay highlighting as the primary output modality.
-This shift occurred because building a telemetry-grounded runtime with delta sanitisation, deterministic fallback, and automated tests proved a substantial prerequisite for VR deployment, and the desktop configuration provides a more controlled environment for systematic benchmarking.
-The VR deployment remains a planned next phase (Section~\ref{sec:eval-planned}).
+The current implementation supports both desktop/DCS and VR (Quest~3) configurations, with cockpit overlay highlighting as the primary output modality.
+The VR runtime code path is implemented (VR\_MIRROR configuration, tutor text UDP injection, composite-panel capture in VR mode) and the desktop configuration provides a controlled environment for systematic benchmarking.
+The gap between proposal and current work is that the VR code path has not yet been validated through controlled human-subject experiments (Section~\ref{sec:eval-planned}).
 % Evidence: system_delta_from_proposal.md §1, §4
 
 \subsection{Added VLM Adaptation Pipeline}
@@ -451,10 +454,10 @@ Table~\ref{tab:design-delta} summarises the key differences.
   \toprule
   \textbf{Aspect} & \textbf{Original Proposal} & \textbf{Implemented System} \\
   \midrule
-  Platform & Meta Quest 3 VR & Desktop / DCS \\
+  Platform & Meta Quest 3 VR & Desktop / DCS and VR (Quest~3) \\
   Output modality & In-headset step cards & Cockpit overlay highlights \\
   State input & Read-only DCS state flags & Full DCS-BIOS telemetry with delta sanitisation \\
-  Visual perception & None (text-only RAG) & Optional VLM visual fact extraction (13-fact v2) \\
+  Visual perception & None (text-only RAG) & VLM visual fact extraction (13-fact v2) \\
   Model adaptation & Not addressed & LoRA fine-tuning pipeline (primary line: Qwen3.5-9B; supplementary: Gemma-4-31B)\footnotemark \\
   Procedure representation & Implicit in prompts & Explicit pack-driven configuration with gating rules \\
   Error handling & Not specified & Structured taxonomy, deterministic fallback, and action restrictions \\
@@ -466,5 +469,5 @@ Table~\ref{tab:design-delta} summarises the key differences.
 \footnotetext{Qwen3.5-9B (Qwen/Qwen3.5-9B-Base) fine-tuning and benchmark results are the primary verified experimental line (C-VLM-04, C-VLM-05). Gemma-4-31B (google/gemma-4-31B) results are supplementary (C-VLM-06, \emph{likely}).}
 
 This evolution does not invalidate the original proposal.
-Rather, the implemented system provides a concrete technical foundation---with running code, automated tests, and benchmark artifacts---on which the planned VR deployment and human-subject evaluation can be built.
+Rather, the implemented system provides a concrete technical foundation---with running code, automated tests, and benchmark artifacts---on which the planned human-subject evaluation can be built.
 % Evidence: system_delta_from_proposal.md §8, §9
