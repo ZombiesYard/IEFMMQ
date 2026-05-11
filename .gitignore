@@ -47,6 +47,13 @@ contractV04.md
 .vscode/
 .claude
 CLAUDE.md
+
+# Dev tunnel scripts (sensitive: expose server topology)
+tools/dev_tunnel_vllm.ps1
+tools/dev_tunnel_vllm.sh
+
+# Dev tunnel documentation (sensitive)
+docs/dev_notes/dev_tunnel_vllm.md
 # Local Label Studio state
 .label_studio/
 

@@ -123,6 +123,15 @@ class DcsTutorTextSender:
                 failure_class="invalid_ack",
                 reason=str(exc),
             )
+        if ack.get("cmd_id") != cmd["cmd_id"]:
+            return self._failed_result(
+                cmd=cmd,
+                text=normalized_text,
+                display_time_s=display_time_s,
+                clear_view=clear_view,
+                failure_class="invalid_ack",
+                reason=f"cmd_id mismatch: expected {cmd['cmd_id']}, got {ack.get('cmd_id')}",
+            )
         result = {
             "cmd_id": ack.get("cmd_id"),
             "status": ack.get("status"),

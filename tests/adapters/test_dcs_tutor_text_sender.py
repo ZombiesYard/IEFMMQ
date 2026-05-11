@@ -139,11 +139,34 @@ def test_sender_reports_remote_failure(monkeypatch) -> None:
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
     sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
 
-    result = sender.send_text("Tutor: turn on APU.")
+    result = sender.send_text(
+        "Tutor: turn on APU.",
+        cmd_id="123e4567-e89b-12d3-a456-426614174000",
+    )
 
     assert result["status"] == "failed"
     assert result["failure_class"] == "remote_failure"
     assert result["reason"] == "DCS internal error"
+
+
+def test_sender_rejects_mismatched_ack_cmd_id(monkeypatch) -> None:
+    ack_payload = {
+        "schema_version": "v2",
+        "cmd_id": "00000000-0000-0000-0000-000000000000",
+        "status": "ok",
+    }
+    dummy = AckingSocket([json.dumps(ack_payload).encode("utf-8")])
+    monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
+    sender = DcsTutorTextSender(host="127.0.0.1", port=7783)
+
+    result = sender.send_text(
+        "Tutor: turn on APU.",
+        cmd_id="123e4567-e89b-12d3-a456-426614174000",
+    )
+
+    assert result["status"] == "failed"
+    assert result["failure_class"] == "invalid_ack"
+    assert "cmd_id mismatch" in result["reason"]
 
 
 def test_sender_close(monkeypatch) -> None:

@@ -151,6 +151,9 @@ def test_build_composite_panel_config_enables_vlm_frame_and_frames_root(tmp_path
     assert "hilite_ids = {9101, 9102}" in config
     assert 'host = "127.0.0.1"' in config
     assert "port = 7783" in config
+    # Verify these host/port assertions are scoped to the tutor_text block,
+    # not the telemetry/handshake/overlay sections which also use 127.0.0.1.
+    assert '    tutor_text = {\n        host = "127.0.0.1",\n        port = 7783,\n    },' in config
     assert "width = 4480" in config
     assert "height = 1440" in config
 
