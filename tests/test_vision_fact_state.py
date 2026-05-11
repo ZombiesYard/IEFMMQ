@@ -178,7 +178,7 @@ def test_merge_vision_fact_observation_downgrades_nonfinal_s18_go_claim_from_see
     )
 
     assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "other"
-    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "uncertain"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "seen"
     assert "confidence" not in snapshot["fcsmc_final_go_result_visible"]
 
 
@@ -599,7 +599,7 @@ def test_extract_vision_fact_snapshot_does_not_backfill_final_go_from_only_fcsa_
     )
 
     assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "other"
-    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "uncertain"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "seen"
 
 
 def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_cannot_backfill() -> None:

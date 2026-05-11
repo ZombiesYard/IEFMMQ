@@ -302,7 +302,7 @@ def _coerce_s18_result_fact_state(
         return state
     if result_kind in {"intermediate_go", "in_test", "not_ready"}:
         return "not_seen"
-    return "uncertain"
+    return state
 
 
 def normalize_vision_fact(

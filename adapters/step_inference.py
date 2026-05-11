@@ -894,7 +894,10 @@ def _vision_fact_state_is_seen(fact: Mapping[str, Any] | None) -> bool:
 
 
 def _is_s18_final_go_result_fact(fact: Mapping[str, Any]) -> bool:
-    return fact.get("result_kind") == "final_go"
+    kind = fact.get("result_kind")
+    if kind is None:
+        return fact.get("state") == "seen"
+    return kind == "final_go"
 
 
 def _is_soft_block_from_rule(
