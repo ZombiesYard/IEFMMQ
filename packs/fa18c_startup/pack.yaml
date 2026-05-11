@@ -352,7 +352,15 @@ completion_gates:
       reason_code: s17_requires_takeoff_trim_pressed
       reason: "TAKEOFF TRIM button must be pressed."
   S18: []
-  S19: []
+  S19:
+    - op: flag_true
+      var: vars.flap_configured
+      reason_code: s19_requires_flaps_configured
+      reason: "Flaps must be set to AUTO or HALF as part of four-down checks."
+    - op: flag_true
+      var: vars.pitot_heat_on
+      reason_code: s19_requires_pitot_heat_on
+      reason: "Pitot heat must be ON as part of four-down checks."
   S20:
     - op: flag_true
       var: vars.parking_brake_released

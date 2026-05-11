@@ -2177,6 +2177,7 @@ class LiveDcsTutorLoop:
         self._latest_enriched_obs: Observation | None = None
         self._help_cache: HelpCacheEntry | None = None
         self._vision_fact_snapshot: dict[str, dict[str, Any]] = {}
+        self._accumulated_vars: dict[str, Any] = {}
         self._step_order_index = {
             step_id: idx for idx, step_id in enumerate(self.candidate_steps) if isinstance(step_id, str) and step_id
         }
@@ -2360,6 +2361,11 @@ class LiveDcsTutorLoop:
         )
         self._latest_enriched_obs = enriched
 
+        enriched_payload = enriched.payload if isinstance(enriched.payload, Mapping) else {}
+        enriched_vars = enriched_payload.get("vars")
+        if isinstance(enriched_vars, Mapping):
+            self._accumulated_vars.update(enriched_vars)
+
         payload = raw_obs.payload if isinstance(raw_obs.payload, Mapping) else {}
         delta = payload.get("delta")
         t_wall = _coerce_float(payload.get("t_wall"))
@@ -2542,7 +2548,8 @@ class LiveDcsTutorLoop:
         vars_map = payload.get("vars")
         if not isinstance(vars_map, Mapping):
             vars_map = {}
-        vars_selected = dict(vars_map)
+        vars_selected = dict(self._accumulated_vars)
+        vars_selected.update(vars_map)
         vision_context = vision_selection.to_dict()
 
         now_t_wall = _coerce_float(payload.get("t_wall"))

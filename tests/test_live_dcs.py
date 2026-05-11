@@ -6494,8 +6494,8 @@ def test_live_loop_does_not_advance_s18_from_structured_fact_when_evidence_lacks
 
     assert response is not None
     assert response.metadata.get("s18_visual_completion_rewritten") is not True
-    assert response.metadata["vision_fact_summary"]["seen_fact_ids"] == []
-    assert response.metadata["vision_fact_summary"]["uncertain_fact_ids"] == ["fcsmc_final_go_result_visible"]
+    assert response.metadata["vision_fact_summary"]["seen_fact_ids"] == ["fcsmc_final_go_result_visible"]
+    assert response.metadata["vision_fact_summary"]["uncertain_fact_ids"] == []
     assert response.metadata.get("fallback_overlay_reason") != "deterministic_step:S19"
 
 
