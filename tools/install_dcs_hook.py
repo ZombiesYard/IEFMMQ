@@ -28,6 +28,8 @@ DEFAULT_OVERLAY_COMMAND_HOST = "127.0.0.1"
 DEFAULT_OVERLAY_COMMAND_PORT = 7781
 DEFAULT_OVERLAY_ACK_HOST = "127.0.0.1"
 DEFAULT_OVERLAY_ACK_PORT = 7782
+DEFAULT_TUTOR_TEXT_HOST = "127.0.0.1"
+DEFAULT_TUTOR_TEXT_PORT = 7783
 
 
 @dataclass(frozen=True)
@@ -177,6 +179,7 @@ def build_composite_panel_config(
         "        overlay_ack = false,",
         "        clickable_actions = false,",
         "        vlm_frame = true,",
+        "        tutor_text = true,",
         "    },",
         "    overlay = {",
         f'        command_host = "{overlay_command_host}",',
@@ -186,6 +189,10 @@ def build_composite_panel_config(
         f"        auto_clear = {'true' if overlay_auto_clear else 'false'},",
         f"        hilite_id = {int(overlay_hilite_id)},",
         f"        hilite_ids = {{{int(overlay_hilite_id)}, {int(overlay_hilite_id) + 1}}},",
+        "    },",
+        "    tutor_text = {",
+        f'        host = "{DEFAULT_TUTOR_TEXT_HOST}",',
+        f"        port = {DEFAULT_TUTOR_TEXT_PORT},",
         "    },",
         "    vision = {",
         "        enabled = true,",

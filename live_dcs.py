@@ -363,6 +363,22 @@ class ActionExecutorLike(Protocol):
         ...
 
 
+class TutorTextSenderLike(Protocol):
+    def send_text(
+        self,
+        text: str,
+        *,
+        display_time_s: float = 12.0,
+        clear_view: bool = False,
+        expect_ack: bool = True,
+        cmd_id: str | None = None,
+    ) -> Any:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
 class HelpTriggerLike(Protocol):
     def poll(self) -> bool:
         ...
@@ -2041,6 +2057,9 @@ class LiveDcsTutorLoop:
         vision_trigger_wait_ms: int | None = None,
         vision_fact_extractor: Any | None = None,
         max_overlay_targets: int = 1,
+        tutor_text_sender: TutorTextSenderLike | None = None,
+        tutor_text_display_time_s: float = 12.0,
+        tutor_text_clear_view: bool = False,
     ) -> None:
         self.source = source
         self.model = model
@@ -2053,6 +2072,9 @@ class LiveDcsTutorLoop:
         self.dry_run_overlay = dry_run_overlay
         self.vision_mode = _normalize_vision_mode(vision_mode)
         self.max_overlay_targets = max(0, int(max_overlay_targets))
+        self.tutor_text_sender = tutor_text_sender
+        self.tutor_text_display_time_s = max(0.1, float(tutor_text_display_time_s))
+        self.tutor_text_clear_view = bool(tutor_text_clear_view)
 
         self.pack_path = Path(pack_path) if pack_path else _default_pack_path()
         self.ui_map_path = Path(ui_map_path) if ui_map_path else _default_ui_map_path()
@@ -2172,6 +2194,8 @@ class LiveDcsTutorLoop:
             self._vision_session.close()
         if self.vision_fact_extractor is not None and hasattr(self.vision_fact_extractor, "close"):
             self.vision_fact_extractor.close()
+        if self.tutor_text_sender is not None and hasattr(self.tutor_text_sender, "close"):
+            self.tutor_text_sender.close()
         if hasattr(self.action_executor, "close"):
             self.action_executor.close()
         if hasattr(self.source, "close"):
@@ -3970,6 +3994,42 @@ class LiveDcsTutorLoop:
         overlay_raw_report = self.action_executor.execute_actions(actions)
         return _normalize_help_report(overlay_raw_report)
 
+    def _send_tutor_text(self, response: TutorResponse) -> None:
+        if self.tutor_text_sender is None:
+            response.metadata["dcs_tutor_text"] = {
+                "status": "skipped",
+                "reason": "sender_unavailable",
+            }
+            return
+        sanitized_message = sanitize_public_model_text(response.message, lang=self.lang)
+        if not isinstance(sanitized_message, str) or not sanitized_message.strip():
+            response.metadata["dcs_tutor_text"] = {
+                "status": "skipped",
+                "reason": "empty_message",
+            }
+            return
+        try:
+            result = self.tutor_text_sender.send_text(
+                sanitized_message,
+                display_time_s=self.tutor_text_display_time_s,
+                clear_view=self.tutor_text_clear_view,
+                expect_ack=True,
+            )
+            response.metadata["dcs_tutor_text"] = dict(result) if isinstance(result, Mapping) else {
+                "status": "failed",
+                "failure_class": "invalid_sender_result",
+                "reason": "Tutor text sender returned a non-mapping result",
+            }
+        except Exception as exc:
+            response.metadata["dcs_tutor_text"] = {
+                "status": "failed",
+                "failure_class": "sender_exception",
+                "reason": f"{type(exc).__name__}: {exc}",
+                "text": sanitized_message,
+                "display_time_s": self.tutor_text_display_time_s,
+                "clear_view": self.tutor_text_clear_view,
+            }
+
     def run_help_cycle(self, *, trigger_t_wall: float | None = None) -> tuple[TutorResponse | None, dict[str, Any] | None]:
         obs = self._latest_enriched_obs
         if obs is None:
@@ -4313,6 +4373,7 @@ class LiveDcsTutorLoop:
                 vision_refs=vision_selection.frame_ids,
             )
 
+        self._send_tutor_text(response)
         self._emit_event(
             kind="tutor_response",
             payload=_sanitize_response_payload_for_event(response, lang=self.lang),

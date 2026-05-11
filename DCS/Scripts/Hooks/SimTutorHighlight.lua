@@ -33,6 +33,10 @@ local DEFAULT_OVERLAY = {
   hilite_id = 9101,
   hilite_ids = nil,
 }
+local DEFAULT_TUTOR_TEXT = {
+  host = "127.0.0.1",
+  port = 7783,
+}
 
 local function string_or_default(value, fallback)
   if type(value) == "string" and value ~= "" then
@@ -123,9 +127,39 @@ local function load_overlay_config()
   return overlay
 end
 
+local function load_tutor_text_config()
+  local tutor_text = {}
+  for key, value in pairs(DEFAULT_TUTOR_TEXT) do
+    tutor_text[key] = value
+  end
+
+  if not ok_lfs or not lfs or not lfs.writedir then
+    return tutor_text
+  end
+
+  local cfg_path = lfs.writedir() .. "Scripts\\SimTutor\\SimTutorConfig.lua"
+  local ok_cfg, cfg = pcall(function()
+    return dofile(cfg_path)
+  end)
+  if not ok_cfg then
+    logi("SimTutorConfig.lua not loaded for tutor text settings: " .. tostring(cfg))
+    return tutor_text
+  end
+  if type(cfg) ~= "table" or type(cfg.tutor_text) ~= "table" then
+    return tutor_text
+  end
+
+  local loaded = cfg.tutor_text
+  tutor_text.host = string_or_default(loaded.host, tutor_text.host)
+  tutor_text.port = number_or_default(loaded.port, tutor_text.port)
+  return tutor_text
+end
+
 local OVERLAY = load_overlay_config()
+local TUTOR_TEXT = load_tutor_text_config()
 local CMD_HOST, CMD_PORT = OVERLAY.command_host, OVERLAY.command_port
 local ACK_HOST, ACK_PORT = OVERLAY.ack_host, OVERLAY.ack_port
+local TUTOR_TEXT_HOST, TUTOR_TEXT_PORT = TUTOR_TEXT.host, TUTOR_TEXT.port
 -- AUTO_CLEAR only matters when no free highlight slot exists for a new target.
 local AUTO_CLEAR = OVERLAY.auto_clear
 local HILITE_ID = OVERLAY.hilite_id
@@ -136,6 +170,10 @@ local ACTIVE_ORDER = {}
 local udp_cmd = assert(socket.udp())
 assert(udp_cmd:setsockname(CMD_HOST, CMD_PORT))
 udp_cmd:settimeout(0)
+
+local udp_text = assert(socket.udp())
+assert(udp_text:setsockname(TUTOR_TEXT_HOST, TUTOR_TEXT_PORT))
+udp_text:settimeout(0)
 
 local udp_ack = assert(socket.udp())
 udp_ack:settimeout(0)
@@ -150,6 +188,7 @@ logi(
     table.concat(HILITE_IDS, ",")
   )
 )
+logi(("Listening tutor text UDP on %s:%d"):format(TUTOR_TEXT_HOST, TUTOR_TEXT_PORT))
 
 local function missionEval(chunk)
   if not net or not net.dostring_in then
@@ -160,6 +199,15 @@ local function missionEval(chunk)
     return nil, tostring(res)
   end
   return res, nil
+end
+
+local function missionDoScript(chunk)
+  local wrapped = ("return a_do_script(%s)"):format(as_lua_string(chunk))
+  local res, err = missionEval(wrapped)
+  if err == nil then
+    return res, nil
+  end
+  return missionEval(chunk)
 end
 
 local function as_lua_string(value)
@@ -319,6 +367,70 @@ local function parse_json(data)
   return obj, nil
 end
 
+local function extract_cmd_id(raw_data)
+  if type(raw_data) ~= "string" then
+    return nil
+  end
+  local cmd_id = raw_data:match('"cmd_id"%s*:%s*"([^"]+)"')
+  return cmd_id
+end
+
+local function send_tutor_text_ack(cmd_id, status, reason, addr, port)
+  local payload = {
+    schema_version = "v2",
+    cmd_id = cmd_id,
+    status = status,
+  }
+  if reason ~= nil then
+    payload.reason = reason
+  end
+  local ok, json_str = pcall(function() return JSON:encode(payload) end)
+  if not ok then
+    loge("Failed to encode tutor text ack: " .. tostring(json_str))
+    return
+  end
+  local ok, send_err = pcall(function()
+    udp_text:sendto(json_str, addr, port)
+  end)
+  if not ok then
+    loge("Failed to send tutor text ack: " .. tostring(send_err))
+  end
+end
+
+local function handle_tutor_text_command(cmd, addr, port)
+  local cmd_id = cmd.cmd_id
+  if type(cmd_id) ~= "string" or cmd_id == "" then
+    loge("Invalid tutor text command: missing/invalid cmd_id")
+    return
+  end
+  if cmd.schema_version ~= "v2" then
+    send_tutor_text_ack(cmd_id, "failed", "unsupported schema_version: " .. tostring(cmd.schema_version), addr, port)
+    return
+  end
+  local text = cmd.text
+  if type(text) ~= "string" or text == "" then
+    send_tutor_text_ack(cmd_id, "failed", "invalid text", addr, port)
+    return
+  end
+  local display_time_s = tonumber(cmd.display_time_s)
+  if not display_time_s or display_time_s <= 0 then
+    send_tutor_text_ack(cmd_id, "failed", "invalid display_time_s", addr, port)
+    return
+  end
+  local clear_view = cmd.clear_view == true
+  local script = ("trigger.action.outText(%s, %s, %s)"):format(
+    as_lua_string(text),
+    tostring(display_time_s),
+    tostring(clear_view)
+  )
+  local _, err = missionDoScript(script)
+  if err then
+    send_tutor_text_ack(cmd_id, "failed", err, addr, port)
+    return
+  end
+  send_tutor_text_ack(cmd_id, "ok", nil, addr, port)
+end
+
 local callbacks = {}
 
 function callbacks.onSimulationFrame()
@@ -330,6 +442,20 @@ function callbacks.onSimulationFrame()
       handle_command(cmd)
     else
       loge("Invalid command: " .. tostring(err))
+    end
+  end
+  while true do
+    local data, addr, port = udp_text:receivefrom()
+    if not data then break end
+    local cmd, err = parse_json(data)
+    if cmd then
+      handle_tutor_text_command(cmd, addr, port)
+    else
+      loge("Invalid tutor text command: " .. tostring(err))
+      local extracted_id = extract_cmd_id(data)
+      if extracted_id then
+        send_tutor_text_ack(extracted_id, "failed", "invalid_json: " .. tostring(err), addr, port)
+      end
     end
   end
 end

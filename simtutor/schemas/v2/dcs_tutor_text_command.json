@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://simtutor.dev/schemas/v2/dcs_tutor_text_command.json",
+  "title": "DCS Tutor Text Command v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cmd_id", "text", "display_time_s", "clear_view"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "cmd_id": { "type": "string", "format": "uuid" },
+    "text": { "type": "string", "minLength": 1 },
+    "display_time_s": { "type": "number", "exclusiveMinimum": 0 },
+    "clear_view": { "type": "boolean" }
+  }
+}

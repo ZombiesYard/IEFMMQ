@@ -256,6 +256,42 @@ class RecordingExecutor:
         return
 
 
+class RecordingTutorTextSender:
+    def __init__(self, *, result: dict[str, Any] | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.result = result or {
+            "status": "ok",
+            "cmd_id": "123e4567-e89b-12d3-a456-426614174000",
+        }
+
+    def send_text(
+        self,
+        text: str,
+        *,
+        display_time_s: float = 12.0,
+        clear_view: bool = False,
+        expect_ack: bool = True,
+        cmd_id: str | None = None,
+    ) -> dict[str, Any]:
+        self.calls.append(
+            {
+                "text": text,
+                "display_time_s": display_time_s,
+                "clear_view": clear_view,
+                "expect_ack": expect_ack,
+                "cmd_id": cmd_id,
+            }
+        )
+        payload = dict(self.result)
+        payload.setdefault("text", text)
+        payload.setdefault("display_time_s", display_time_s)
+        payload.setdefault("clear_view", clear_view)
+        return payload
+
+    def close(self) -> None:  # pragma: no cover
+        return
+
+
 def _make_evented_overlay_executor(monkeypatch, events: list[dict[str, Any]], *, session_id: str) -> OverlayActionExecutor:
     dummy = DummySocket()
     monkeypatch.setattr(socket, "socket", lambda *args, **kwargs: dummy)
@@ -666,6 +702,175 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
     assert executor.calls[0][0]["target"] == "apu_switch"
+
+
+def test_live_loop_sends_final_tutor_message_to_dcs_text_channel(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_one.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    tutor_text_sender = RecordingTutorTextSender()
+    events = []
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        tutor_text_sender=tutor_text_sender,
+        tutor_text_display_time_s=9.0,
+        tutor_text_clear_view=True,
+        cooldown_s=5.0,
+        lang="zh",
+        event_sink=events.append,
+    )
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 1
+    assert tutor_text_sender.calls == [
+        {
+            "text": "Turn on APU.",
+            "display_time_s": 9.0,
+            "clear_view": True,
+            "expect_ack": True,
+            "cmd_id": None,
+        }
+    ]
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    assert tutor_response_payload["metadata"]["dcs_tutor_text"]["status"] == "ok"
+
+
+def test_live_loop_records_tutor_text_failure_in_response_metadata(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_one.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    source = ReplayBiosReceiver(replay_path)
+    model = RecordingModel()
+    executor = RecordingExecutor()
+    events = []
+    tutor_text_sender = RecordingTutorTextSender(
+        result={
+            "status": "failed",
+            "failure_class": "ack_timeout",
+            "reason": "timed out waiting for DCS tutor text ack",
+        }
+    )
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=executor,
+        tutor_text_sender=tutor_text_sender,
+        cooldown_s=5.0,
+        lang="zh",
+        event_sink=events.append,
+    )
+    try:
+        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+    finally:
+        loop.close()
+
+    assert stats["help_cycles"] == 1
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    assert tutor_response_payload["metadata"]["dcs_tutor_text"]["status"] == "failed"
+    assert tutor_response_payload["metadata"]["dcs_tutor_text"]["failure_class"] == "ack_timeout"
+
+
+def _make_tutor_text_loop(*, sender=None, lang="zh", display_time_s=12.0, clear_view=False):
+    loop = LiveDcsTutorLoop.__new__(LiveDcsTutorLoop)
+    loop.tutor_text_sender = sender
+    loop.lang = lang
+    loop.tutor_text_display_time_s = display_time_s
+    loop.tutor_text_clear_view = clear_view
+    return loop
+
+
+def _make_tutor_response(*, message=None, status="ok", in_reply_to="req-1"):
+    return TutorResponse(
+        status=status,
+        in_reply_to=in_reply_to,
+        message=message,
+        actions=[],
+        explanations=[],
+        metadata={},
+    )
+
+
+def test_send_tutor_text_skips_when_message_is_none() -> None:
+    sender = RecordingTutorTextSender()
+    response = _make_tutor_response(message=None)
+    loop = _make_tutor_text_loop(sender=sender)
+
+    loop._send_tutor_text(response)
+
+    assert response.metadata["dcs_tutor_text"]["status"] == "skipped"
+    assert response.metadata["dcs_tutor_text"]["reason"] == "empty_message"
+    assert sender.calls == []
+
+
+def test_send_tutor_text_skips_when_message_is_empty_string() -> None:
+    sender = RecordingTutorTextSender()
+    response = _make_tutor_response(message="")
+    loop = _make_tutor_text_loop(sender=sender)
+
+    loop._send_tutor_text(response)
+
+    assert response.metadata["dcs_tutor_text"]["status"] == "skipped"
+    assert response.metadata["dcs_tutor_text"]["reason"] == "empty_message"
+    assert sender.calls == []
+
+
+def test_send_tutor_text_skips_when_message_is_whitespace_only() -> None:
+    sender = RecordingTutorTextSender()
+    response = _make_tutor_response(message="   ")
+    loop = _make_tutor_text_loop(sender=sender)
+
+    loop._send_tutor_text(response)
+
+    assert response.metadata["dcs_tutor_text"]["status"] == "skipped"
+    assert response.metadata["dcs_tutor_text"]["reason"] == "empty_message"
+    assert sender.calls == []
+
+
+def test_send_tutor_text_records_sender_unavailable_when_none() -> None:
+    response = _make_tutor_response(message="Hello")
+    loop = _make_tutor_text_loop(sender=None)
+
+    loop._send_tutor_text(response)
+
+    assert response.metadata["dcs_tutor_text"]["status"] == "skipped"
+    assert response.metadata["dcs_tutor_text"]["reason"] == "sender_unavailable"
+
+
+def test_send_tutor_text_handles_non_mapping_sender_result() -> None:
+    class NonMappingSender:
+        def send_text(self, text, **kwargs):
+            return ["not", "a", "mapping"]
+
+    response = _make_tutor_response(message="Hello world")
+    loop = _make_tutor_text_loop(sender=NonMappingSender())
+
+    loop._send_tutor_text(response)
+
+    assert response.metadata["dcs_tutor_text"]["status"] == "failed"
+    assert response.metadata["dcs_tutor_text"]["failure_class"] == "invalid_sender_result"
+
+
+def test_send_tutor_text_catches_sender_exception() -> None:
+    class ThrowingSender:
+        def send_text(self, text, **kwargs):
+            raise RuntimeError("socket unexpectedly closed")
+
+    response = _make_tutor_response(message="Hello world")
+    loop = _make_tutor_text_loop(sender=ThrowingSender())
+
+    loop._send_tutor_text(response)
+
+    assert response.metadata["dcs_tutor_text"]["status"] == "failed"
+    assert response.metadata["dcs_tutor_text"]["failure_class"] == "sender_exception"
+    assert "RuntimeError" in response.metadata["dcs_tutor_text"]["reason"]
 
 
 def test_live_auto_help_uses_help_action_wall_time_for_live_vision(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
