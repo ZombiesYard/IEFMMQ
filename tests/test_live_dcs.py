@@ -6589,3 +6589,86 @@ def test_build_vision_selection_falls_back_when_trigger_time_is_non_finite(
     assert selection.observation_t_wall_s == 42.5
     assert selection.observation_t_wall_ms == 42500
     assert selection.trigger_wall_ms == 42500
+
+
+def test_fallback_overlay_skips_interacted_targets_for_s19(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s19_remaining.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        loop._step_interacted_targets = {"launch_bar_switch", "refuel_probe_switch"}
+
+        s19_targets = loop.step_signal_profiles.get("S19", {}).get("ui_targets", [])
+        assert "launch_bar_switch" in s19_targets
+        assert "flap_switch" in s19_targets
+
+        hint: dict[str, Any] = {
+            "inferred_step_id": "S19",
+            "overlay_step_id": "S19",
+            "missing_conditions": [],
+            "gate_blockers": [],
+            "recent_ui_targets": [],
+            "requires_visual_confirmation": False,
+            "step_evidence_requirements": ["gate"],
+            "observability": "partial",
+        }
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "deterministic_step_hint": hint,
+                "rag_topk": [],
+                "gates": [
+                    {"gate_id": "S19.completion", "status": "blocked"},
+                    {"gate_id": "S19.precondition", "status": "allowed"},
+                ],
+            },
+        )
+
+        help_obj, reason = loop._build_safe_fallback_overlay_help_obj(request)
+
+        assert help_obj is not None, f"expected overlay help_obj, got reason={reason}"
+        actions = help_obj.get("overlay", {}).get("targets", [])
+        assert len(actions) >= 1
+        chosen = actions[0]
+        assert chosen not in {"launch_bar_switch", "refuel_probe_switch"}, (
+            f"expected non-interacted target, got {chosen}"
+        )
+        assert chosen in {"flap_switch", "arresting_hook_handle", "pitot_heater_switch", "throttle_quadrant_reference"}
+    finally:
+        loop.close()
+
+
+def test_step_interacted_targets_reset_on_step_change(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_step_reset.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        assert loop._step_interacted_targets == set()
+        assert loop._last_inferred_step_id is None
+
+        loop._step_interacted_targets.add("launch_bar_switch")
+        loop._last_inferred_step_id = "S19"
+
+        loop._step_interacted_targets = set()
+        loop._last_inferred_step_id = "S08"
+        assert loop._step_interacted_targets == set()
+        assert loop._last_inferred_step_id == "S08"
+    finally:
+        loop.close()
