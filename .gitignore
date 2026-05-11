@@ -46,6 +46,7 @@ contractV04.md
 .github/copilot-instructions.md
 .vscode/
 .claude
+CLAUDE.md
 # Local Label Studio state
 .label_studio/
 
