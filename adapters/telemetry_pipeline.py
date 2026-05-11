@@ -89,6 +89,7 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "fcs_reset_pressed",
     "fcs_reset_complete",
     "flap_auto",
+    "flap_configured",
     "takeoff_trim_pressed",
     "takeoff_trim_set",
     "fcs_bit_switch_up",

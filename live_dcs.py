@@ -2178,6 +2178,8 @@ class LiveDcsTutorLoop:
         self._help_cache: HelpCacheEntry | None = None
         self._vision_fact_snapshot: dict[str, dict[str, Any]] = {}
         self._accumulated_vars: dict[str, Any] = {}
+        self._step_interacted_targets: set[str] = set()
+        self._last_inferred_step_id: str | None = None
         self._step_order_index = {
             step_id: idx for idx, step_id in enumerate(self.candidate_steps) if isinstance(step_id, str) and step_id
         }
@@ -2578,6 +2580,15 @@ class LiveDcsTutorLoop:
             vision_facts=vision_fact_context.get("vision_facts"),
         )
         inference = self._stabilize_live_inference(inference, vars_selected)
+
+        new_step_id = inference.inferred_step_id
+        if new_step_id != self._last_inferred_step_id:
+            self._step_interacted_targets = set()
+            self._last_inferred_step_id = new_step_id if isinstance(new_step_id, str) else None
+        for target in recent_buttons:
+            if isinstance(target, str) and target:
+                self._step_interacted_targets.add(target)
+
         gates = _select_gates_for_context(
             all_gates,
             inferred_step_id=inference.inferred_step_id,
@@ -2645,9 +2656,14 @@ class LiveDcsTutorLoop:
                     ]
                 step_ui_targets = step_signal_profile.get("ui_targets")
                 if isinstance(step_ui_targets, list):
-                    deterministic_hint["step_ui_targets"] = [
+                    normalized_targets = [
                         item for item in step_ui_targets if isinstance(item, str) and item
                     ]
+                    deterministic_hint["step_ui_targets"] = list(normalized_targets)
+                    interacted = [t for t in normalized_targets if t in self._step_interacted_targets]
+                    remaining_targets = [t for t in normalized_targets if t not in self._step_interacted_targets]
+                    deterministic_hint["step_interacted_targets"] = interacted
+                    deterministic_hint["step_remaining_targets"] = remaining_targets
                 requires_visual_confirmation = step_signal_profile.get("requires_visual_confirmation")
                 if isinstance(requires_visual_confirmation, bool):
                     deterministic_hint["requires_visual_confirmation"] = requires_visual_confirmation
@@ -3578,6 +3594,9 @@ class LiveDcsTutorLoop:
         candidate_targets = [target for target in candidate_targets if target in self.overlay_allowset]
         if not candidate_targets:
             return None, f"target_not_in_runtime_allowlist:{declared_fallback_target}"
+        remaining = [t for t in candidate_targets if t not in self._step_interacted_targets]
+        if remaining:
+            candidate_targets = remaining
         fallback_target = candidate_targets[0]
 
         candidate_refs: list[str] = []
