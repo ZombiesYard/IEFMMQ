@@ -463,10 +463,10 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
         if value is not None:
             sanitized[key] = value
     missing_conditions = raw.get("missing_conditions")
-    if isinstance(missing_conditions, list):
+    if isinstance(missing_conditions, (list, tuple)):
         sanitized["missing_conditions_count"] = len([item for item in missing_conditions if isinstance(item, str) and item])
     gate_blockers = raw.get("gate_blockers")
-    if isinstance(gate_blockers, list):
+    if isinstance(gate_blockers, (list, tuple)):
         sanitized["gate_blocker_count"] = len(gate_blockers)
     recent_ui_targets = raw.get("recent_ui_targets")
     if isinstance(recent_ui_targets, list):
@@ -2452,7 +2452,7 @@ class LiveDcsTutorLoop:
         missing_conditions_raw = deterministic_hint.get("missing_conditions", [])
         missing_conditions = (
             [item for item in missing_conditions_raw if isinstance(item, str) and item]
-            if isinstance(missing_conditions_raw, list)
+            if isinstance(missing_conditions_raw, (list, tuple))
             else []
         )
         recent_targets_raw = deterministic_hint.get("recent_ui_targets", [])
@@ -3077,7 +3077,7 @@ class LiveDcsTutorLoop:
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
             item for item in missing_conditions if isinstance(item, str) and item
-        ] if isinstance(missing_conditions, list) else []
+        ] if isinstance(missing_conditions, (list, tuple)) else []
         normalized = self._fallback_message(inferred_step_id, normalized_missing)
         response.message = normalized
         response.explanations = [normalized]
@@ -3098,7 +3098,7 @@ class LiveDcsTutorLoop:
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
             item for item in missing_conditions if isinstance(item, str) and item
-        ] if isinstance(missing_conditions, list) else []
+        ] if isinstance(missing_conditions, (list, tuple)) else []
         if not normalized_missing:
             return False
 
@@ -3204,13 +3204,13 @@ class LiveDcsTutorLoop:
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
             item for item in missing_conditions if isinstance(item, str) and item
-        ] if isinstance(missing_conditions, list) else []
+        ] if isinstance(missing_conditions, (list, tuple)) else []
         if normalized_missing:
             return False
         gate_blockers_raw = hint.get("gate_blockers")
         gate_blockers = [
             item for item in gate_blockers_raw if isinstance(item, Mapping) and item
-        ] if isinstance(gate_blockers_raw, list) else []
+        ] if isinstance(gate_blockers_raw, (list, tuple)) else []
         if gate_blockers:
             return False
 
@@ -3312,7 +3312,7 @@ class LiveDcsTutorLoop:
             if isinstance(action_target, str) and action_target:
                 return True
         missing_conditions = hint.get("missing_conditions")
-        return isinstance(missing_conditions, list) and any(
+        return isinstance(missing_conditions, (list, tuple)) and any(
             isinstance(item, str) and item for item in missing_conditions
         )
 
@@ -3477,7 +3477,7 @@ class LiveDcsTutorLoop:
         missing_set = {
             item for item in missing_conditions
             if isinstance(item, str) and item
-        } if isinstance(missing_conditions, list) else set()
+        } if isinstance(missing_conditions, (list, tuple)) else set()
         if inferred_step_id == "S05" and "vars.throttle_r_not_off==true" not in missing_set:
             return False, "missing_condition_not_right_throttle"
         if inferred_step_id == "S11" and "vars.throttle_l_not_off==true" not in missing_set:
@@ -3717,11 +3717,11 @@ class LiveDcsTutorLoop:
         missing_conditions_raw = hint.get("missing_conditions")
         missing_conditions = [
             item for item in missing_conditions_raw if isinstance(item, str) and item
-        ] if isinstance(missing_conditions_raw, list) else []
+        ] if isinstance(missing_conditions_raw, (list, tuple)) else []
         gate_blockers_raw = hint.get("gate_blockers")
         gate_blockers = [
             item for item in gate_blockers_raw if isinstance(item, Mapping) and item
-        ] if isinstance(gate_blockers_raw, list) else []
+        ] if isinstance(gate_blockers_raw, (list, tuple)) else []
 
         if inferred_step_id == "S25" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
@@ -3769,7 +3769,7 @@ class LiveDcsTutorLoop:
 
         candidate_refs: list[str] = []
         gate_blockers = hint.get("gate_blockers")
-        if isinstance(gate_blockers, list):
+        if isinstance(gate_blockers, (list, tuple)):
             for blocker in gate_blockers:
                 if not isinstance(blocker, Mapping):
                     continue
@@ -3827,7 +3827,7 @@ class LiveDcsTutorLoop:
         selected_ref, evidence_type = selected
 
         reason_text = None
-        if isinstance(gate_blockers, list):
+        if isinstance(gate_blockers, (list, tuple)):
             for blocker in gate_blockers:
                 if not isinstance(blocker, Mapping):
                     continue
@@ -4346,10 +4346,10 @@ class LiveDcsTutorLoop:
             hint = request.context.get("deterministic_step_hint", {})
             inferred_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
             missing_conditions = hint.get("missing_conditions", []) if isinstance(hint, Mapping) else []
-            if not isinstance(missing_conditions, list):
+            if not isinstance(missing_conditions, (list, tuple)):
                 missing_conditions = []
             gate_blockers = hint.get("gate_blockers", []) if isinstance(hint, Mapping) else []
-            if not isinstance(gate_blockers, list):
+            if not isinstance(gate_blockers, (list, tuple)):
                 gate_blockers = []
             gate_blocker_conditions: list[str] = []
             for item in gate_blockers:
