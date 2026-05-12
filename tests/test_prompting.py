@@ -880,11 +880,10 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None
 
     result = build_help_prompt_result(ctx, "zh")
 
-    assert "不要把 tac_page_visible 或 supt_page_visible 误判成 fcs_page_visible" in result.prompt
-    assert "LEF/TEF/AIL/RUD" in result.prompt
-    assert "SV1/SV2" in result.prompt
-    assert "大量 X/故障填充" in result.prompt
+    assert "直接信任 VLM 的页面类型标注" in result.prompt
+    assert "不得将其推翻或重新分类" in result.prompt
     assert "先按 PB18 切到 SUPT 页，再找 FCS" in result.prompt
+    assert "信任 VLM 返回的 seen/not_seen 判断" in result.prompt
 
 
 def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> None:
@@ -914,16 +913,16 @@ def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> 
     assert "若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC" in zh_result.prompt
     assert "若已经进入 FCS-MC 页面但还未开始测试，且当前系统允许多目标" in zh_result.prompt
     assert "若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO" in zh_result.prompt
-    assert "FCSA/FCSB PBIT GO 不等于最终 GO" in zh_result.prompt
-    assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段" in zh_result.prompt
+    assert "fcsmc_intermediate_result_visible 表示中间结果" in zh_result.prompt
+    assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释" in zh_result.prompt
     assert "overlay.targets 必须同时返回 fcs_bit_switch 与 right_mdi_pb5，不能只返回其中一个" in zh_result.prompt
     assert "不得写“持续按住直到测试完成”" in zh_result.prompt
 
     assert "if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC" in en_result.prompt
     assert "only after the right DDI has entered the FCS-MC page but before the BIT has started, and multi-target overlay is allowed" in en_result.prompt
     assert "if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO" in en_result.prompt
-    assert "FCSA/FCSB PBIT GO is not the same as the final GO result" in en_result.prompt
-    assert "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on" in en_result.prompt
+    assert "fcsmc_intermediate_result_visible means intermediate results" in en_result.prompt
+    assert "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on. Combine it with the VLM visual fact labels" in en_result.prompt
     assert "overlay.targets must include both fcs_bit_switch and right_mdi_pb5 together" in en_result.prompt
     assert "never say 'hold it until the test completes'" in en_result.prompt
 
@@ -948,9 +947,11 @@ def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
     zh_result = build_help_prompt_result(ctx, "zh")
     en_result = build_help_prompt_result(ctx, "en")
 
-    assert "必须同时明确读到 MC1=GO、MC2=GO、FCSA=GO、FCSB=GO" in zh_result.prompt
-    assert "Treat S18 as complete only when the right DDI clearly shows MC1=GO, MC2=GO, FCSA=GO, and FCSB=GO together" in en_result.prompt
-    assert "partial GO evidence is not enough either" in en_result.prompt
+    assert "信任 VLM 的 fcsmc_final_go_result_visible 标注" in zh_result.prompt
+    assert "fcsmc_final_go_result_visible=seen 说明最终 GO 已显示" in zh_result.prompt
+    assert "fcsmc_intermediate_result_visible 表示中间结果" in zh_result.prompt
+    assert "Trust the VLM's fcsmc_final_go_result_visible label" in en_result.prompt
+    assert "fcsmc_intermediate_result_visible means intermediate results" in en_result.prompt
 
 
 def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:
@@ -981,11 +982,10 @@ def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -
 
     result = build_help_prompt_result(ctx, "en")
 
-    assert "Do not mistake tac_page_visible or supt_page_visible for fcs_page_visible" in result.prompt
-    assert "LEF/TEF/AIL/RUD" in result.prompt
-    assert "SV1/SV2" in result.prompt
-    assert "many X/fault fills" in result.prompt
+    assert "The VLM reliably distinguishes" in result.prompt
+    assert "Trust its page-type classification directly" in result.prompt
     assert "press PB18 first to reach the SUPT page, then select FCS" in result.prompt
+    assert "Do not second-guess or challenge them" in result.prompt
 
 
 def test_prompt_omits_page_or_heading_when_non_scalar() -> None:
