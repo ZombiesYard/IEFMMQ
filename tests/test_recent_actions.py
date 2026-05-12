@@ -190,3 +190,24 @@ def test_project_recent_ui_targets_replay_keys_enriched_and_backward_compatible(
         "battery_switch",
         "generator_left_switch",
     ]
+
+
+def test_project_recent_ui_targets_maps_hook_aux_keys_to_arresting_hook_handle() -> None:
+    mapper = BiosUiMapper.from_yaml(BIOS_TO_UI_PATH, UI_MAP_PATH)
+    recent = [
+        {
+            "t_wall": 10.0,
+            "seq": 1,
+            "delta": {
+                "EXT_HOOK": 222,
+                "ARRESTING_HOOK_LT": 0,
+            },
+        },
+    ]
+
+    targets = project_recent_ui_targets(recent, mapper, max_items=8)
+    signal = build_recent_button_signal(recent, mapper, max_items=8)
+
+    assert targets == ["arresting_hook_handle"]
+    assert signal["current_button"] == "arresting_hook_handle"
+    assert signal["recent_buttons"] == ["arresting_hook_handle"]

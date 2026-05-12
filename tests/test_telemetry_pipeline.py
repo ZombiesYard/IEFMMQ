@@ -113,7 +113,7 @@ def test_enrich_bios_observation_includes_pack_gate_vars_used_by_live_inference(
     enriched = enrich_bios_observation(obs, _resolver(), mapper=_mapper())
 
     assert enriched.payload["vars"]["apu_start_support_complete"] is True
-    assert enriched.payload["vars"]["radar_altimeter_bug_value"] == 12000
+    assert enriched.payload["vars"]["radar_altimeter_bug_value"] == 120.0
 
 
 def test_enrich_bios_observation_includes_probe_state_for_s19_progression() -> None:

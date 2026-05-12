@@ -1,4 +1,4 @@
-﻿"""
+"""
 Shared base implementation for HelpResponse-capable model adapters.
 """
 
@@ -459,6 +459,12 @@ class BaseHelpModel(ModelPort):
                 allowlist = narrowed_allowlist
         if scenario_profile is not None and "scenario_profile" not in hint_payload:
             hint_payload["scenario_profile"] = scenario_profile
+        if "missing_conditions_count" not in hint_payload:
+            mc = hint_payload.get("missing_conditions")
+            hint_payload["missing_conditions_count"] = len(mc) if isinstance(mc, (list, tuple)) else 0
+        if "gate_blocker_count" not in hint_payload:
+            gb = hint_payload.get("gate_blockers")
+            hint_payload["gate_blocker_count"] = len(gb) if isinstance(gb, (list, tuple)) else 0
 
         prompt_context = {
             "intent": request.intent if request else "help",
@@ -765,6 +771,8 @@ class BaseHelpModel(ModelPort):
         if self.lang == "zh":
             if inferred_step_id and missing_conditions:
                 return f"你大概率卡在 {inferred_step_id}，下一步请先满足：{'; '.join(missing_conditions)}。"
+            if inferred_step_id and inferred_step_id == "S25" and not missing_conditions:
+                return "所有冷启动步骤已完成，无需进一步操作。"
             if inferred_step_id:
                 return f"你大概率卡在 {inferred_step_id}，下一步请按该步骤检查并执行。"
             return "无法生成模型答复，请先检查当前步骤前置条件后再触发 Help。"
@@ -773,6 +781,8 @@ class BaseHelpModel(ModelPort):
                 f"You are likely stuck at {inferred_step_id}. "
                 f"Please satisfy: {'; '.join(missing_conditions)}."
             )
+        if inferred_step_id and inferred_step_id == "S25" and not missing_conditions:
+            return "All cold-start steps are complete. No further action is needed."
         if inferred_step_id:
             return f"You are likely stuck at {inferred_step_id}. Please re-check and execute that step."
         return "Unable to generate help response, please check the current system status and try again."

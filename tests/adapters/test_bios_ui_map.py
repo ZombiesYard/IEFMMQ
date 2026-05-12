@@ -62,6 +62,8 @@ def test_pack_bios_to_ui_covers_cold_start_step_keys() -> None:
         "PROBE_SW": ["refuel_probe_switch"],
         "LAUNCH_BAR_SW": ["launch_bar_switch"],
         "HOOK_LEVER": ["arresting_hook_handle"],
+        "EXT_HOOK": ["arresting_hook_handle"],
+        "ARRESTING_HOOK_LT": ["arresting_hook_handle"],
         "PITOT_HEAT_SW": ["pitot_heater_switch"],
         "EMERGENCY_PARKING_BRAKE_PULL": ["parking_brake_handle"],
         "EMERGENCY_PARKING_BRAKE_ROTATE": ["parking_brake_handle"],

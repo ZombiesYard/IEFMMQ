@@ -3553,7 +3553,12 @@ def test_build_procedural_action_hint_for_s18_prefers_right_ddi_pb5() -> None:
 
 
 def test_build_procedural_action_hint_for_s19_advances_after_probe_extends() -> None:
-    allowed = ["refuel_probe_switch", "launch_bar_switch", "pitot_heater_switch"]
+    allowed = [
+        "refuel_probe_switch",
+        "launch_bar_switch",
+        "arresting_hook_handle",
+        "pitot_heater_switch",
+    ]
 
     assert _build_procedural_action_hint(
         inferred_step_id="S19",
@@ -3570,6 +3575,28 @@ def test_build_procedural_action_hint_for_s19_advances_after_probe_extends() -> 
     ) == {
         "target": "launch_bar_switch",
         "reason": "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S19",
+        vars_selected={"probe_extended": False, "probe_cycle_complete": True, "pitot_heat_on": False},
+        allowed_targets=allowed,
+        step_interacted_targets=["refuel_probe_switch", "launch_bar_switch"],
+    ) == {
+        "target": "arresting_hook_handle",
+        "reason": "The launch bar has already been cycled in this startup session; continue the four-down checklist with the arresting hook next.",
+    }
+    assert _build_procedural_action_hint(
+        inferred_step_id="S19",
+        vars_selected={"probe_extended": False, "probe_cycle_complete": True, "pitot_heat_on": False},
+        allowed_targets=allowed,
+        step_interacted_targets=[
+            "refuel_probe_switch",
+            "launch_bar_switch",
+            "arresting_hook_handle",
+        ],
+    ) == {
+        "target": "pitot_heater_switch",
+        "reason": "The launch bar and arresting hook have already been checked; continue the four-down checklist by turning pitot heat ON.",
     }
 
 
@@ -5485,6 +5512,151 @@ def test_live_loop_marks_vision_conflict_unresolved_when_model_disagrees_with_fu
     assert "vision_conflict_unresolved" in response.metadata["failure_codes"]
 
 
+def test_live_loop_uses_deterministic_fallback_when_visual_model_disagrees_with_s22_and_returns_no_overlay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s22_visual_conflict.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-s22-visual-conflict"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000125",
+                    capture_wall_ms=10000,
+                    frame_seq=125,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000125.png"),
+                )
+            ]
+
+    class StaticVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcs_page_visible",
+                                state="seen",
+                                source_frame_id="10000_000125",
+                                expires_after_ms=2000,
+                                evidence_note="FCS page visible.",
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_page_visible",
+                                state="seen",
+                                source_frame_id="10000_000125",
+                                expires_after_ms=2000,
+                                evidence_note="FCS-MC page visible.",
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_final_go_result_visible",
+                                state="seen",
+                                source_frame_id="10000_000125",
+                                expires_after_ms=600000,
+                                evidence_note="Final GO visible.",
+                            ),
+                            VisionFact(
+                                fact_id="hsi_page_visible",
+                                state="seen",
+                                source_frame_id="10000_000125",
+                                expires_after_ms=2000,
+                                evidence_note="HSI visible.",
+                            ),
+                        ],
+                    ),
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    class WrongS18CompletionModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message=(
+                    "FCS-MC final GO is visible, so S18 is complete. "
+                    "Current visual evidence does not support more highlighting."
+                ),
+                actions=[],
+                explanations=[
+                    "FCS-MC final GO is visible, so S18 is complete. Current visual evidence does not support more highlighting."
+                ],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {"targets": [], "evidence": []},
+                        "explanations": [
+                            "FCS-MC final GO is visible, so S18 is complete. Current visual evidence does not support more highlighting."
+                        ],
+                    },
+                },
+            )
+
+        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
+            return self.explain_error(observation, request)
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S22", missing_conditions=()),
+    )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=WrongS18CompletionModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s22-visual-conflict",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-s22-visual-conflict",
+        vision_mode="replay",
+        vision_fact_extractor=StaticVisionFactExtractor(),
+        lang="en",
+    )
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.actions
+    assert response.actions[0]["target"] == "standby_altimeter_pressure_knob"
+    assert response.metadata["fallback_overlay_used"] is True
+    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S22"
+    assert response.metadata["vision_fallback_reason"] == "vision_conflict_unresolved"
+    assert response.metadata["final_public_response"]["actions"][0]["target"] == "standby_altimeter_pressure_knob"
+
+
 def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigation_target(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_false_s08_complete.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
@@ -5634,6 +5806,294 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
     ]
     assert response.metadata["final_public_response"]["message"] == response.message
     assert response.metadata["final_public_response"]["explanations"] == [response.message]
+
+
+def test_live_loop_short_circuits_terminal_state_without_calling_model(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    replay_path = tmp_path / "bios_s25_terminal_s18_model.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-s25-terminal-rewrite"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000160",
+                    capture_wall_ms=10000,
+                    frame_seq=160,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000160.png"),
+                )
+            ]
+
+    class MenuStateVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):
+            return type(
+                "Result",
+                (),
+                {
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcsmc_final_go_result_visible",
+                                state="seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=600000,
+                                sticky=True,
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_intermediate_result_visible",
+                                state="not_seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=2000,
+                                sticky=False,
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_in_test_visible",
+                                state="not_seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=2000,
+                                sticky=False,
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_page_visible",
+                                state="seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=2000,
+                                sticky=False,
+                            ),
+                        ],
+                    ),
+                    "raw_text": "",
+                    "parse_success": True,
+                },
+            )()
+
+        def close(self) -> None:
+            return
+
+    model = RecordingModel()
+    model.print_model_io = True
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-s25-terminal-rewrite",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-s25-terminal-rewrite",
+        vision_mode="replay",
+        vision_fact_extractor=MenuStateVisionFactExtractor(),
+        lang="zh",
+    )
+    try:
+        original_build_request = loop._build_request
+
+        def patched_build_request(obs, *, vision_selection, vision_fact_context, **kwargs):
+            request, prompt_meta, state_key = original_build_request(
+                obs,
+                vision_selection=vision_selection,
+                vision_fact_context=vision_fact_context,
+                **kwargs,
+            )
+            hint = dict(request.context.get("deterministic_step_hint", {}))
+            hint["inferred_step_id"] = "S25"
+            hint["missing_conditions"] = []
+            hint["missing_conditions_count"] = 0
+            hint["gate_blockers"] = []
+            hint["gate_blocker_count"] = 0
+            request.context["deterministic_step_hint"] = hint
+            return request, prompt_meta, state_key
+
+        loop._build_request = patched_build_request
+
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert model.calls == []
+    assert response.metadata["terminal_state_rewritten"] is True
+    assert response.message == "当前冷启动流程已完成，无需继续操作。"
+    assert response.explanations == ["当前冷启动流程已完成，无需继续操作。"]
+    assert response.metadata["diagnosis"]["step_id"] == "S25"
+    assert response.metadata["next"] == {"step_id": "S25"}
+    assert response.actions == []
+    assert response.metadata["fallback_overlay_used"] is False
+    assert response.metadata["fallback_overlay_reason"] == "all_steps_complete"
+    out = capsys.readouterr().out
+    assert "[MODEL_IO][FINAL_PUBLIC_RESPONSE]" in out
+    assert "当前冷启动流程已完成，无需继续操作。" in out
+
+
+def test_rewrite_terminal_state_conflict_response_skips_when_gate_blockers_exist(tmp_path: Path) -> None:
+    replay_path = tmp_path / "empty.jsonl"
+    _write_replay(replay_path, [])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        response = TutorResponse(
+            status="ok",
+            message="FCS-MC 页面可见，最终 GO 结果可见。",
+            actions=[],
+            explanations=["FCS-MC 页面可见，最终 GO 结果可见。"],
+            metadata={
+                "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                "next": {"step_id": "S18"},
+                "help_response": {
+                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                    "next": {"step_id": "S18"},
+                },
+            },
+        )
+        request = TutorRequest(
+            request_id="terminal-gate-blocked",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S25",
+                    "missing_conditions": [],
+                    "gate_blockers": [{"ref": "GATES.S25.precondition", "reason": "blocked"}],
+                }
+            },
+        )
+
+        rewritten = loop._rewrite_terminal_state_conflict_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is False
+    assert response.message == "FCS-MC 页面可见，最终 GO 结果可见。"
+    assert response.metadata["diagnosis"] == {"step_id": "S18", "error_category": "OM"}
+    assert response.metadata["next"] == {"step_id": "S18"}
+
+
+def test_rewrite_terminal_state_conflict_response_skips_short_circuit_response_without_model_payload(
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "empty.jsonl"
+    _write_replay(replay_path, [])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            request_id="terminal-short-circuit",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S25",
+                    "missing_conditions": [],
+                    "gate_blockers": [],
+                }
+            },
+        )
+        response = loop._build_terminal_state_response(request)
+
+        rewritten = loop._rewrite_terminal_state_conflict_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is False
+    assert response.message == "当前冷启动流程已完成，无需继续操作。"
+    assert response.explanations == ["当前冷启动流程已完成，无需继续操作。"]
+    assert response.metadata["diagnosis"] == {"step_id": "S25"}
+    assert response.metadata["next"] == {"step_id": "S25"}
+    assert response.metadata["terminal_state_original_message"] == "当前冷启动流程已完成，无需继续操作。"
+    assert response.metadata["terminal_state_original_explanations"] == []
+
+
+def test_rewrite_terminal_state_conflict_response_clears_stale_actions(tmp_path: Path) -> None:
+    replay_path = tmp_path / "empty.jsonl"
+    _write_replay(replay_path, [])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        response = TutorResponse(
+            status="ok",
+            message="请继续按 FCS BIT 开关。",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "fcs_bit_switch",
+                    "element_id": "pnt_999",
+                }
+            ],
+            explanations=["请继续按 FCS BIT 开关。"],
+            metadata={
+                "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                "next": {"step_id": "S18"},
+                "help_response": {
+                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                    "next": {"step_id": "S18"},
+                },
+            },
+        )
+        request = TutorRequest(
+            request_id="terminal-clear-actions",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S25",
+                    "missing_conditions": [],
+                    "gate_blockers": [],
+                }
+            },
+        )
+
+        rewritten = loop._rewrite_terminal_state_conflict_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is True
+    assert response.message == "当前冷启动流程已完成，无需继续操作。"
+    assert response.actions == []
+    assert response.metadata["terminal_state_original_actions"] == [
+        {
+            "type": "overlay",
+            "intent": "highlight",
+            "target": "fcs_bit_switch",
+            "element_id": "pnt_999",
+        }
+    ]
+    assert response.metadata["diagnosis"] == {"step_id": "S25", "error_category": "OM"}
+    assert response.metadata["next"] == {"step_id": "S25"}
 
 
 def test_live_loop_replaces_stale_s08_overlay_with_s09_action_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -6672,3 +7132,134 @@ def test_step_interacted_targets_reset_on_step_change(tmp_path: Path) -> None:
         assert loop._last_inferred_step_id == "S08"
     finally:
         loop.close()
+
+
+def test_ingest_observation_clears_live_progress_state_on_power_loss(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_power_reset.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        loop._vision_fact_snapshot = {
+            "fcsmc_final_go_result_visible": {
+                "fact_id": "fcsmc_final_go_result_visible",
+                "state": "seen",
+                "source_frame_id": "1778572608745_000109",
+                "expires_after_ms": 600000,
+                "observed_at_wall_ms": 1778572608667,
+                "expires_at_wall_ms": 1778573208667,
+                "evidence_note": "",
+                "sticky": True,
+            }
+        }
+        loop._sticky_inference_step_id = "S19"
+        loop._sticky_inference_missing_conditions = ("vars.pitot_heat_on==true",)
+        loop._last_inferred_step_id = "S19"
+        loop._step_interacted_targets = {"launch_bar_switch"}
+
+        loop._ingest_observation(
+            Observation(
+                source="mock",
+                payload={
+                    "seq": 1,
+                    "t_wall": 10.0,
+                    "vars": {
+                        "battery_on": False,
+                        "power_available": False,
+                    },
+                },
+            )
+        )
+    finally:
+        loop.close()
+
+    assert loop._vision_fact_snapshot == {}
+    assert loop._sticky_inference_step_id is None
+    assert loop._sticky_inference_missing_conditions == ()
+    assert loop._last_inferred_step_id is None
+    assert loop._step_interacted_targets == set()
+
+
+def test_build_request_remembers_launch_bar_interaction_before_next_help(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_launch_bar_memory.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(
+            inferred_step_id="S19",
+            missing_conditions=("vars.pitot_heat_on==true",),
+        ),
+    )
+    monkeypatch.setattr(
+        "live_dcs.enrich_bios_observation",
+        lambda obs, *args, **kwargs: obs,
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        loop._last_inferred_step_id = "S19"
+        loop._ingest_observation(
+            Observation(
+                source="dcs_bios_raw",
+                payload={
+                    "schema_version": "v2",
+                    "seq": 1,
+                    "t_wall": 10.0,
+                    "aircraft": "FA-18C_hornet",
+                    "bios": {
+                        "LAUNCH_BAR_SW": 1,
+                    },
+                    "delta": {
+                        "LAUNCH_BAR_SW": 1,
+                    },
+                    "vars": {
+                        "battery_on": True,
+                        "power_available": True,
+                    },
+                },
+            )
+        )
+
+        obs = Observation(
+            source="mock",
+            payload={
+                "seq": 2,
+                "t_wall": 30.0,
+                "vars": {
+                    "battery_on": True,
+                    "power_available": True,
+                    "probe_cycle_complete": True,
+                    "pitot_heat_on": False,
+                },
+            },
+        )
+        vision_selection = loop._build_vision_selection(observation=obs, trigger_t_wall=30.0)
+        vision_fact_context = loop._extract_vision_fact_context(vision_selection=vision_selection)
+        request, _prompt_meta, _state_key = loop._build_request(
+            obs,
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
+        )
+    finally:
+        loop.close()
+
+    hint = request.context["deterministic_step_hint"]
+    assert hint["recent_ui_targets"] == []
+    assert hint["step_interacted_targets"] == ["launch_bar_switch"]
+    assert hint["action_hint"]["target"] == "arresting_hook_handle"

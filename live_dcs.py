@@ -42,6 +42,7 @@ from adapters.recent_actions import (
     RecentDeltaRingBuffer,
     build_prompt_recent_deltas,
     build_recent_button_signal,
+    project_recent_ui_targets,
 )
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
@@ -462,10 +463,10 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
         if value is not None:
             sanitized[key] = value
     missing_conditions = raw.get("missing_conditions")
-    if isinstance(missing_conditions, list):
+    if isinstance(missing_conditions, (list, tuple)):
         sanitized["missing_conditions_count"] = len([item for item in missing_conditions if isinstance(item, str) and item])
     gate_blockers = raw.get("gate_blockers")
-    if isinstance(gate_blockers, list):
+    if isinstance(gate_blockers, (list, tuple)):
         sanitized["gate_blocker_count"] = len(gate_blockers)
     recent_ui_targets = raw.get("recent_ui_targets")
     if isinstance(recent_ui_targets, list):
@@ -1186,6 +1187,24 @@ def _extract_selected_layout_id(vision_selection: HelpCycleVisionSelection) -> s
     return None
 
 
+def _is_terminal_step_hint_complete(hint: Mapping[str, Any] | None) -> bool:
+    if not isinstance(hint, Mapping):
+        return False
+    if hint.get("inferred_step_id") != "S25":
+        return False
+    missing_conditions = hint.get("missing_conditions")
+    normalized_missing = [
+        item for item in missing_conditions if isinstance(item, str) and item
+    ] if isinstance(missing_conditions, (list, tuple)) else []
+    if normalized_missing:
+        return False
+    gate_blockers = hint.get("gate_blockers")
+    normalized_gate_blockers = [
+        item for item in gate_blockers if isinstance(item, Mapping) and item
+    ] if isinstance(gate_blockers, (list, tuple)) else []
+    return not normalized_gate_blockers
+
+
 def _extract_fused_step_audit(request: TutorRequest) -> tuple[str | None, list[str]]:
     context = request.context if isinstance(request.context, Mapping) else {}
     hint = context.get("deterministic_step_hint")
@@ -1489,12 +1508,16 @@ def _build_procedural_action_hint(
     inferred_step_id: str | None,
     vars_selected: Mapping[str, Any],
     allowed_targets: Sequence[str],
+    step_interacted_targets: Sequence[str] | None = None,
     vision_fact_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if inferred_step_id == "S19":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
+        interacted_targets = {
+            item for item in (step_interacted_targets or ()) if isinstance(item, str) and item
+        }
 
         def _hint(target: str, reason: str) -> dict[str, Any] | None:
             if target not in allowed:
@@ -1506,10 +1529,22 @@ def _build_procedural_action_hint(
                 "refuel_probe_switch",
                 "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
             )
-        return _hint(
-            "launch_bar_switch",
-            "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
-        )
+        if "launch_bar_switch" not in interacted_targets:
+            return _hint(
+                "launch_bar_switch",
+                "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
+            )
+        if "arresting_hook_handle" not in interacted_targets:
+            return _hint(
+                "arresting_hook_handle",
+                "The launch bar has already been cycled in this startup session; continue the four-down checklist with the arresting hook next.",
+            )
+        if vars_selected.get("pitot_heat_on") is not True:
+            return _hint(
+                "pitot_heater_switch",
+                "The launch bar and arresting hook have already been checked; continue the four-down checklist by turning pitot heat ON.",
+            )
+        return None
 
     if inferred_step_id == "S14":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
@@ -2206,6 +2241,20 @@ class LiveDcsTutorLoop:
         if hasattr(self.model, "close"):
             self.model.close()
 
+    def _clear_live_progress_state(self) -> None:
+        self._vision_fact_snapshot = {}
+        self._step_interacted_targets = set()
+        self._last_inferred_step_id = None
+        self._sticky_inference_step_id = None
+        self._sticky_inference_missing_conditions = ()
+
+    def _remember_step_interactions(self, targets: Sequence[str] | None) -> None:
+        if not isinstance(self._last_inferred_step_id, str) or not self._last_inferred_step_id:
+            return
+        for target in targets or ():
+            if isinstance(target, str) and target:
+                self._step_interacted_targets.add(target)
+
     def _ensure_knowledge(self) -> KnowledgePort:
         if self.knowledge is None:
             self.knowledge = LocalKnowledgeAdapter(
@@ -2367,11 +2416,20 @@ class LiveDcsTutorLoop:
         enriched_vars = enriched_payload.get("vars")
         if isinstance(enriched_vars, Mapping):
             self._accumulated_vars.update(enriched_vars)
+            if self._should_reset_sticky_inference(self._accumulated_vars):
+                self._clear_live_progress_state()
 
         payload = raw_obs.payload if isinstance(raw_obs.payload, Mapping) else {}
         delta = payload.get("delta")
         t_wall = _coerce_float(payload.get("t_wall"))
         seq = _coerce_int(payload.get("seq"))
+        if isinstance(delta, Mapping):
+            current_delta_targets = project_recent_ui_targets(
+                [{"t_wall": t_wall, "seq": seq, "delta": delta}],
+                self.mapper,
+                max_items=8,
+            )
+            self._remember_step_interactions(current_delta_targets)
         if isinstance(delta, Mapping) and t_wall is not None:
             self.recent_ring.add_delta(delta, t_wall=t_wall, seq=seq)
 
@@ -2394,7 +2452,7 @@ class LiveDcsTutorLoop:
         missing_conditions_raw = deterministic_hint.get("missing_conditions", [])
         missing_conditions = (
             [item for item in missing_conditions_raw if isinstance(item, str) and item]
-            if isinstance(missing_conditions_raw, list)
+            if isinstance(missing_conditions_raw, (list, tuple))
             else []
         )
         recent_targets_raw = deterministic_hint.get("recent_ui_targets", [])
@@ -2585,9 +2643,7 @@ class LiveDcsTutorLoop:
         if new_step_id != self._last_inferred_step_id:
             self._step_interacted_targets = set()
             self._last_inferred_step_id = new_step_id if isinstance(new_step_id, str) else None
-        for target in recent_buttons:
-            if isinstance(target, str) and target:
-                self._step_interacted_targets.add(target)
+        self._remember_step_interactions(recent_buttons)
 
         gates = _select_gates_for_context(
             all_gates,
@@ -2689,6 +2745,7 @@ class LiveDcsTutorLoop:
             inferred_step_id=overlay_step_id,
             vars_selected=vars_selected,
             allowed_targets=overlay_target_allowlist,
+            step_interacted_targets=deterministic_hint.get("step_interacted_targets"),
             vision_fact_summary=vision_fact_context.get("vision_fact_summary", {}),
         )
         if isinstance(action_hint, Mapping):
@@ -2808,8 +2865,7 @@ class LiveDcsTutorLoop:
         vars_selected: Mapping[str, Any],
     ) -> StepInferenceResult:
         if self._should_reset_sticky_inference(vars_selected):
-            self._sticky_inference_step_id = None
-            self._sticky_inference_missing_conditions = ()
+            self._clear_live_progress_state()
             return inference
         current_step_id = inference.inferred_step_id
         if not isinstance(current_step_id, str) or not current_step_id:
@@ -2924,6 +2980,31 @@ class LiveDcsTutorLoop:
             return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
         return "Fallback: unable to infer current blocked step."
 
+    def _build_terminal_state_response(self, request: TutorRequest | None) -> TutorResponse:
+        if self.lang == "zh":
+            message = "当前冷启动流程已完成，无需继续操作。"
+        else:
+            message = "The cold-start procedure is complete. No further action is needed."
+        request_id = request.request_id if request is not None else None
+        return TutorResponse(
+            status="ok",
+            in_reply_to=request_id,
+            message=message,
+            actions=[],
+            explanations=[message],
+            metadata={
+                "provider": "fallback",
+                "generation_mode": "fallback",
+                "diagnosis": {"step_id": "S25"},
+                "next": {"step_id": "S25"},
+                "terminal_state_rewritten": True,
+                "terminal_state_original_message": message,
+                "terminal_state_original_explanations": [],
+                "fallback_overlay_used": False,
+                "fallback_overlay_reason": "all_steps_complete",
+            },
+        )
+
     def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
         metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
         raw_help_response = metadata.get("help_response")
@@ -2996,7 +3077,7 @@ class LiveDcsTutorLoop:
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
             item for item in missing_conditions if isinstance(item, str) and item
-        ] if isinstance(missing_conditions, list) else []
+        ] if isinstance(missing_conditions, (list, tuple)) else []
         normalized = self._fallback_message(inferred_step_id, normalized_missing)
         response.message = normalized
         response.explanations = [normalized]
@@ -3017,7 +3098,7 @@ class LiveDcsTutorLoop:
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
             item for item in missing_conditions if isinstance(item, str) and item
-        ] if isinstance(missing_conditions, list) else []
+        ] if isinstance(missing_conditions, (list, tuple)) else []
         if not normalized_missing:
             return False
 
@@ -3105,6 +3186,71 @@ class LiveDcsTutorLoop:
             response.metadata["completion_conflict_original_actions"] = copy.deepcopy(original_actions)
         return True
 
+    def _rewrite_terminal_state_conflict_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> bool:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False
+        help_response = response.metadata.get("help_response")
+        if not isinstance(help_response, Mapping):
+            return False
+        inferred_step_id = hint.get("inferred_step_id")
+        if inferred_step_id != "S25":
+            return False
+        missing_conditions = hint.get("missing_conditions")
+        normalized_missing = [
+            item for item in missing_conditions if isinstance(item, str) and item
+        ] if isinstance(missing_conditions, (list, tuple)) else []
+        if normalized_missing:
+            return False
+        gate_blockers_raw = hint.get("gate_blockers")
+        gate_blockers = [
+            item for item in gate_blockers_raw if isinstance(item, Mapping) and item
+        ] if isinstance(gate_blockers_raw, (list, tuple)) else []
+        if gate_blockers:
+            return False
+
+        model_next_step_id = _extract_model_next_step_id(response.metadata)
+        if model_next_step_id == "S25":
+            return False
+
+        response.metadata["terminal_state_rewritten"] = True
+        response.metadata["terminal_state_original_message"] = response.message
+        response.metadata["terminal_state_original_explanations"] = list(response.explanations)
+        if isinstance(response.metadata.get("diagnosis"), Mapping):
+            response.metadata["terminal_state_original_diagnosis"] = dict(response.metadata["diagnosis"])
+        if isinstance(response.metadata.get("next"), Mapping):
+            response.metadata["terminal_state_original_next"] = dict(response.metadata["next"])
+        if response.actions:
+            response.metadata["terminal_state_original_actions"] = copy.deepcopy(response.actions)
+
+        if self.lang == "zh":
+            rewritten = "当前冷启动流程已完成，无需继续操作。"
+        else:
+            rewritten = "The cold-start procedure is complete. No further action is needed."
+
+        response.message = rewritten
+        response.explanations = [rewritten]
+        if response.actions:
+            response.actions = []
+        original_diagnosis = (
+            dict(response.metadata["diagnosis"])
+            if isinstance(response.metadata.get("diagnosis"), Mapping)
+            else {}
+        )
+        rewritten_diagnosis = {"step_id": "S25"}
+        error_category = original_diagnosis.get("error_category")
+        if isinstance(error_category, str) and error_category:
+            rewritten_diagnosis["error_category"] = error_category
+        response.metadata["diagnosis"] = rewritten_diagnosis
+        response.metadata["next"] = {"step_id": "S25"}
+
+        return True
+
     def _should_use_deterministic_overlay_fallback(
         self,
         response: TutorResponse,
@@ -3124,6 +3270,21 @@ class LiveDcsTutorLoop:
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
             return False
+        inferred_step_id = hint.get("inferred_step_id")
+        if (
+            isinstance(inferred_step_id, str)
+            and inferred_step_id
+        ):
+            model_next_step_id = _extract_model_next_step_id(response.metadata)
+            vision_context = context.get("vision")
+            vision_used = isinstance(vision_context, Mapping) and bool(vision_context.get("vision_used"))
+            if (
+                isinstance(model_next_step_id, str)
+                and model_next_step_id
+                and model_next_step_id != inferred_step_id
+                and vision_used
+            ):
+                return True
         if bool(hint.get("requires_visual_confirmation")):
             action_hint = hint.get("action_hint")
             if not isinstance(action_hint, Mapping):
@@ -3151,7 +3312,7 @@ class LiveDcsTutorLoop:
             if isinstance(action_target, str) and action_target:
                 return True
         missing_conditions = hint.get("missing_conditions")
-        return isinstance(missing_conditions, list) and any(
+        return isinstance(missing_conditions, (list, tuple)) and any(
             isinstance(item, str) and item for item in missing_conditions
         )
 
@@ -3316,7 +3477,7 @@ class LiveDcsTutorLoop:
         missing_set = {
             item for item in missing_conditions
             if isinstance(item, str) and item
-        } if isinstance(missing_conditions, list) else set()
+        } if isinstance(missing_conditions, (list, tuple)) else set()
         if inferred_step_id == "S05" and "vars.throttle_r_not_off==true" not in missing_set:
             return False, "missing_condition_not_right_throttle"
         if inferred_step_id == "S11" and "vars.throttle_l_not_off==true" not in missing_set:
@@ -3556,7 +3717,14 @@ class LiveDcsTutorLoop:
         missing_conditions_raw = hint.get("missing_conditions")
         missing_conditions = [
             item for item in missing_conditions_raw if isinstance(item, str) and item
-        ] if isinstance(missing_conditions_raw, list) else []
+        ] if isinstance(missing_conditions_raw, (list, tuple)) else []
+        gate_blockers_raw = hint.get("gate_blockers")
+        gate_blockers = [
+            item for item in gate_blockers_raw if isinstance(item, Mapping) and item
+        ] if isinstance(gate_blockers_raw, (list, tuple)) else []
+
+        if inferred_step_id == "S25" and not missing_conditions and not gate_blockers:
+            return None, "all_steps_complete"
 
         request_allowlist = context.get("overlay_target_allowlist")
         candidate_targets = list(fallback_targets)
@@ -3601,7 +3769,7 @@ class LiveDcsTutorLoop:
 
         candidate_refs: list[str] = []
         gate_blockers = hint.get("gate_blockers")
-        if isinstance(gate_blockers, list):
+        if isinstance(gate_blockers, (list, tuple)):
             for blocker in gate_blockers:
                 if not isinstance(blocker, Mapping):
                     continue
@@ -3659,7 +3827,7 @@ class LiveDcsTutorLoop:
         selected_ref, evidence_type = selected
 
         reason_text = None
-        if isinstance(gate_blockers, list):
+        if isinstance(gate_blockers, (list, tuple)):
             for blocker in gate_blockers:
                 if not isinstance(blocker, Mapping):
                     continue
@@ -4178,10 +4346,10 @@ class LiveDcsTutorLoop:
             hint = request.context.get("deterministic_step_hint", {})
             inferred_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
             missing_conditions = hint.get("missing_conditions", []) if isinstance(hint, Mapping) else []
-            if not isinstance(missing_conditions, list):
+            if not isinstance(missing_conditions, (list, tuple)):
                 missing_conditions = []
             gate_blockers = hint.get("gate_blockers", []) if isinstance(hint, Mapping) else []
-            if not isinstance(gate_blockers, list):
+            if not isinstance(gate_blockers, (list, tuple)):
                 gate_blockers = []
             gate_blocker_conditions: list[str] = []
             for item in gate_blockers:
@@ -4208,24 +4376,30 @@ class LiveDcsTutorLoop:
                     if isinstance(item, str) and item
                 ]
             )
-            self._stats.model_calls += 1
-            try:
-                response = self.model.explain_error(obs, request)
-            except Exception as exc:
-                response = TutorResponse(
-                    status="error",
-                    in_reply_to=request.request_id,
-                    message=self._fallback_message(
-                        inferred_step_id if isinstance(inferred_step_id, str) else None,
-                        fallback_conditions,
-                    ),
-                    actions=[],
-                    metadata={
-                        "provider": "fallback",
-                        "error_type": type(exc).__name__,
-                        "error": str(exc),
-                    },
-                )
+            terminal_state_short_circuited = _is_terminal_step_hint_complete(
+                hint if isinstance(hint, Mapping) else None
+            )
+            if terminal_state_short_circuited:
+                response = self._build_terminal_state_response(request)
+            else:
+                self._stats.model_calls += 1
+                try:
+                    response = self.model.explain_error(obs, request)
+                except Exception as exc:
+                    response = TutorResponse(
+                        status="error",
+                        in_reply_to=request.request_id,
+                        message=self._fallback_message(
+                            inferred_step_id if isinstance(inferred_step_id, str) else None,
+                            fallback_conditions,
+                        ),
+                        actions=[],
+                        metadata={
+                            "provider": "fallback",
+                            "error_type": type(exc).__name__,
+                            "error": str(exc),
+                        },
+                    )
 
             response.metadata = dict(response.metadata)
             response.metadata.setdefault("provider", "fallback" if response.status == "error" else "unknown")
@@ -4261,12 +4435,13 @@ class LiveDcsTutorLoop:
                 response.metadata["response_mapping"] = mapped_meta
             self._normalize_observable_text_only_response(response, request)
             self._rewrite_conflicting_step_completion_response(response, request)
+            self._rewrite_terminal_state_conflict_response(response, request)
             s18_structured_completion_advanced, s18_structured_completion_reason = (
                 self._rewrite_s18_structured_fact_completion_to_s19(response, request)
             )
 
             fallback_overlay_used = False
-            fallback_overlay_reason = "not_needed"
+            fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
             s18_completion_advanced = False
             s18_completion_reason = "not_needed"
             if not s18_structured_completion_advanced:
@@ -4400,6 +4575,13 @@ class LiveDcsTutorLoop:
             )
 
         self._send_tutor_text(response)
+        if bool(getattr(self.model, "print_model_io", False)):
+            final_public_response = response.metadata.get("final_public_response")
+            if isinstance(final_public_response, Mapping):
+                header = f"[MODEL_IO][FINAL_PUBLIC_RESPONSE][request_id={request.request_id}]"
+                print(header)
+                print(json.dumps(final_public_response, ensure_ascii=False, sort_keys=True))
+                print(f"{header}[END]")
         self._emit_event(
             kind="tutor_response",
             payload=_sanitize_response_payload_for_event(response, lang=self.lang),
