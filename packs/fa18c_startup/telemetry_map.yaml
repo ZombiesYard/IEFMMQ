@@ -156,8 +156,8 @@ vars:
   standby_pressure_set_2: "derived(num(bios.STBY_PRESS_SET_2))"
   standby_altimeter_set: "derived(num(bios.STBY_PRESS_SET_0) > 10000 and num(bios.STBY_PRESS_SET_0) < 17000 and num(bios.STBY_PRESS_SET_1) > 55000 and num(bios.STBY_PRESS_SET_2) > 35000 and num(bios.STBY_PRESS_SET_2) < 45000)"
 
-  radar_altimeter_bug_value: "derived(num(bios.RADALT_MIN_HEIGHT_PTR))"
-  radar_altimeter_bug_set: "derived(vars.radar_altimeter_bug_value > 0)"
+  radar_altimeter_bug_value: "derived(num(bios.RADALT_MIN_HEIGHT_PTR) / 100)"
+  radar_altimeter_bug_set: "derived(vars.radar_altimeter_bug_value > 5 and vars.radar_altimeter_bug_value < 600)"
 
   sai_cage_value: "derived(num(bios.SAI_CAGE))"
   standby_attitude_uncaged: "bios.SAI_ATT_WARNING_FLAG == 0"

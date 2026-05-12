@@ -1198,6 +1198,7 @@ def build_help_prompt_result(
             "VLM 经过 LoRA 微调后对 13 个视觉事实的标注高度准确。必须信任 VLM 返回的 seen/not_seen 判断，不得进行二次猜测或质疑。仅当 VLM 返回 state='uncertain' 时，才结合其他证据（VARS、gates_summary、recent_deltas_summary）进行推理。",
             "VLM 已能可靠区分 tac_page_visible、supt_page_visible、fcs_page_visible 等页面类型。直接信任 VLM 的页面类型标注，不得将其推翻或重新分类。",
             "vision_fact_summary 只能辅助 diagnosis/next/explanations；若使用视觉证据，高亮必须引用 allowed_evidence_refs 中的 VISION_FACTS.* ref，并与实际 frame_id 可追溯。",
+            "视觉事实 ID（如 fcs_page_visible、fcsmc_page_visible、bit_root_page_visible 等 VISION_FACTS 中的 fact_id）是 VLM 对页面状态的标注，不是座舱可高亮的 UI 控件。overlay.targets 只能选择 allowed_overlay_targets 中的 UI 控件名（如 fcs_bit_switch、right_mdi_pb5、left_mdi_pb15 等），严禁将视觉事实 ID 作为 overlay target。",
             "使用视觉证据时，ref 必须逐字匹配 allowed_evidence_refs 里的完整条目；若 allowed_evidence_refs 给的是带 @frame_id 的 VISION_FACTS.fact_id@frame_id，就必须原样引用，不能省略 @frame_id。",
             "不得自造新的 visual fact 名称或同义词；例如右 DDI 的 BIT FAILURES/root 页面只能使用 bit_root_page_visible，不能写 right_ddi_bit_failures_page_visible 一类别名。",
             "若 multimodal_input.attached=true 且 vision_fact_summary.status=vision_unavailable，可直接依据已附带图像判断 diagnosis/next 与单目标 overlay；若当前没有 VISION_FACTS.* ref，可改用 gate/rag 作为 evidence，不得仅因“缺少视觉 refs”就拒绝给出可操作目标。",
@@ -1219,6 +1220,7 @@ def build_help_prompt_result(
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
+            "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应留空，不应猜测任何步骤。",
             "若 deterministic_step_hint.requires_visual_confirmation=false 且 deterministic_step_hint.observability_status=observable，不得把“视觉不可用”或“缺乏变量证据”当作主要理由；应优先依据 gates_summary、current_vars_selected 与 missing_conditions 解释当前缺失条件。",
             (
                 "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认；当前系统禁用 overlay，因此仍必须返回空 targets 与空 evidence。"
@@ -1261,6 +1263,7 @@ def build_help_prompt_result(
             "The VLM has been LoRA fine-tuned and is highly accurate on the 13 visual facts. You MUST trust the VLM's seen/not_seen labels. Do not second-guess or challenge them. Only when the VLM returns state='uncertain' should you reason from other evidence (VARS, gates_summary, recent_deltas_summary).",
             "The VLM reliably distinguishes tac_page_visible, supt_page_visible, fcs_page_visible, and other page types. Trust its page-type classification directly; do not override or reclassify it.",
             "vision_fact_summary may support diagnosis/next/explanations. If you use visual evidence for overlay, cite an allowed VISION_FACTS.* ref that remains traceable to the frame_id.",
+            "Visual fact IDs (such as fcs_page_visible, fcsmc_page_visible, bit_root_page_visible) are VLM page-state labels, NOT cockpit UI controls. overlay.targets must only use UI control names from allowed_overlay_targets (e.g., fcs_bit_switch, right_mdi_pb5, left_mdi_pb15). Never use a visual fact ID as an overlay target.",
             "When using visual evidence, the ref must exactly match a full entry from allowed_evidence_refs. If the allowed VISION_FACTS ref includes an @frame_id suffix, copy that exact suffix and do not omit it.",
             "Do not invent new visual fact names or synonyms. For example, the right-DDI BIT FAILURES/root page must use bit_root_page_visible, not aliases such as right_ddi_bit_failures_page_visible.",
             "If multimodal_input.attached=true and vision_fact_summary.status=vision_unavailable, you may still use the attached image for diagnosis/next and a single overlay target. When no VISION_FACTS.* ref is available, support the overlay with the strongest gate/rag ref instead of refusing solely because visual refs are missing.",
@@ -1282,6 +1285,7 @@ def build_help_prompt_result(
             "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on. Combine it with the VLM visual fact labels.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
+            "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Leave diagnosis.step_id and next.step_id empty; do not guess any step.",
             "If deterministic_step_hint.requires_visual_confirmation=false and deterministic_step_hint.observability_status=observable, do not use 'vision unavailable' or 'missing variable evidence' as the main reason; explain the missing condition from gates_summary, current_vars_selected, and missing_conditions instead.",
             (
                 "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation; overlay is disabled, so keep overlay.targets=[] and overlay.evidence=[]."
