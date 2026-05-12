@@ -211,8 +211,12 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "flap_configured": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_configured),
     "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
     # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered.
-    # A=0, B=2 directions are latched independently; fire_test_complete
-    # requires both to have been observed (single-frame approximation: A only).
+    # In production the telemetry_pipeline latches A=0 and B=2 independently;
+    # fire_test_complete is derived from both latches (requires A AND B).
+    # The single-frame state-matrix model cannot represent dual-latch
+    # accumulation: fire_test_a_complete and fire_test_b_complete both write
+    # FIRE_TEST_SW and the later setter wins. fire_test_complete is a
+    # single-frame approximation that sets A only.
     "fire_test_a_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
     "fire_test_b_complete": _set_enum("FIRE_TEST_SW", true_value=2, false_value=1),
     "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
