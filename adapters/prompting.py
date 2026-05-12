@@ -1226,7 +1226,7 @@ def build_help_prompt_result(
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S18 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释。",
             "每个 target 至少要有一条 evidence；若证据不足，返回空 targets 和空 evidence，并解释“需要更多信息/请确认XX”。",
             "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
-            "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应留空，不应猜测任何步骤。",
+            "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应使用 deterministic_step_hint.inferred_step_id（通常为 S25），不要猜测别的步骤；overlay 应为空，explanation 应明确说明流程已完成。",
             "若 deterministic_step_hint.requires_visual_confirmation=false 且 deterministic_step_hint.observability_status=observable，不得把“视觉不可用”或“缺乏变量证据”当作主要理由；应优先依据 gates_summary、current_vars_selected 与 missing_conditions 解释当前缺失条件。",
             (
                 "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认；当前系统禁用 overlay，因此仍必须返回空 targets 与空 evidence。"
@@ -1291,7 +1291,7 @@ def build_help_prompt_result(
             "Never use VARS.fcs_bit_switch_up by itself to decide which S18 page/state the user is on. Combine it with the VLM visual fact labels.",
             "Each target must have at least one evidence item; if not enough evidence, return empty targets and empty evidence, then explain what to confirm.",
             "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
-            "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Leave diagnosis.step_id and next.step_id empty; do not guess any step.",
+            "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Use deterministic_step_hint.inferred_step_id (typically S25) for diagnosis.step_id and next.step_id, do not guess a different step, keep overlay empty, and make the explanation explicitly say the procedure is complete.",
             "If deterministic_step_hint.requires_visual_confirmation=false and deterministic_step_hint.observability_status=observable, do not use 'vision unavailable' or 'missing variable evidence' as the main reason; explain the missing condition from gates_summary, current_vars_selected, and missing_conditions instead.",
             (
                 "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation; overlay is disabled, so keep overlay.targets=[] and overlay.evidence=[]."

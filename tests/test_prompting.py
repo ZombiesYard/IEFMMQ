@@ -135,6 +135,13 @@ def test_prompt_explicitly_disables_overlay_when_max_targets_zero() -> None:
     assert "overlay.targets=[] and overlay.evidence=[]" in result.prompt
 
 
+def test_prompt_terminal_state_rule_uses_inferred_step_id_instead_of_empty_step_ids() -> None:
+    result = build_help_prompt_result(_base_context(), "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+
+    assert "Leave diagnosis.step_id and next.step_id empty" not in result.prompt
+    assert "Use deterministic_step_hint.inferred_step_id (typically S25)" in result.prompt
+
+
 def test_prompt_includes_explicit_interaction_policy_and_target_hints() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S05"]

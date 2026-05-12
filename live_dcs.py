@@ -1187,6 +1187,24 @@ def _extract_selected_layout_id(vision_selection: HelpCycleVisionSelection) -> s
     return None
 
 
+def _is_terminal_step_hint_complete(hint: Mapping[str, Any] | None) -> bool:
+    if not isinstance(hint, Mapping):
+        return False
+    if hint.get("inferred_step_id") != "S25":
+        return False
+    missing_conditions = hint.get("missing_conditions")
+    normalized_missing = [
+        item for item in missing_conditions if isinstance(item, str) and item
+    ] if isinstance(missing_conditions, list) else []
+    if normalized_missing:
+        return False
+    gate_blockers = hint.get("gate_blockers")
+    normalized_gate_blockers = [
+        item for item in gate_blockers if isinstance(item, Mapping) and item
+    ] if isinstance(gate_blockers, list) else []
+    return not normalized_gate_blockers
+
+
 def _extract_fused_step_audit(request: TutorRequest) -> tuple[str | None, list[str]]:
     context = request.context if isinstance(request.context, Mapping) else {}
     hint = context.get("deterministic_step_hint")
@@ -2962,6 +2980,31 @@ class LiveDcsTutorLoop:
             return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
         return "Fallback: unable to infer current blocked step."
 
+    def _build_terminal_state_response(self, request: TutorRequest | None) -> TutorResponse:
+        if self.lang == "zh":
+            message = "当前冷启动流程已完成，无需继续操作。"
+        else:
+            message = "The cold-start procedure is complete. No further action is needed."
+        request_id = request.request_id if request is not None else None
+        return TutorResponse(
+            status="ok",
+            in_reply_to=request_id,
+            message=message,
+            actions=[],
+            explanations=[message],
+            metadata={
+                "provider": "fallback",
+                "generation_mode": "fallback",
+                "diagnosis": {"step_id": "S25"},
+                "next": {"step_id": "S25"},
+                "terminal_state_rewritten": True,
+                "terminal_state_original_message": message,
+                "terminal_state_original_explanations": [],
+                "fallback_overlay_used": False,
+                "fallback_overlay_reason": "all_steps_complete",
+            },
+        )
+
     def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
         metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
         raw_help_response = metadata.get("help_response")
@@ -3161,6 +3204,12 @@ class LiveDcsTutorLoop:
         ] if isinstance(missing_conditions, list) else []
         if normalized_missing:
             return False
+        gate_blockers_raw = hint.get("gate_blockers")
+        gate_blockers = [
+            item for item in gate_blockers_raw if isinstance(item, Mapping) and item
+        ] if isinstance(gate_blockers_raw, list) else []
+        if gate_blockers:
+            return False
 
         model_next_step_id = _extract_model_next_step_id(response.metadata)
         if model_next_step_id == "S25":
@@ -3173,6 +3222,8 @@ class LiveDcsTutorLoop:
             response.metadata["terminal_state_original_diagnosis"] = dict(response.metadata["diagnosis"])
         if isinstance(response.metadata.get("next"), Mapping):
             response.metadata["terminal_state_original_next"] = dict(response.metadata["next"])
+        if response.actions:
+            response.metadata["terminal_state_original_actions"] = copy.deepcopy(response.actions)
 
         if self.lang == "zh":
             rewritten = "当前冷启动流程已完成，无需继续操作。"
@@ -3181,10 +3232,19 @@ class LiveDcsTutorLoop:
 
         response.message = rewritten
         response.explanations = [rewritten]
-        if isinstance(response.metadata.get("diagnosis"), Mapping):
-            response.metadata["diagnosis"] = {}
-        if isinstance(response.metadata.get("next"), Mapping):
-            response.metadata["next"] = {}
+        if response.actions:
+            response.actions = []
+        original_diagnosis = (
+            dict(response.metadata["diagnosis"])
+            if isinstance(response.metadata.get("diagnosis"), Mapping)
+            else {}
+        )
+        rewritten_diagnosis = {"step_id": "S25"}
+        error_category = original_diagnosis.get("error_category")
+        if isinstance(error_category, str) and error_category:
+            rewritten_diagnosis["error_category"] = error_category
+        response.metadata["diagnosis"] = rewritten_diagnosis
+        response.metadata["next"] = {"step_id": "S25"}
 
         return True
 
@@ -4313,24 +4373,30 @@ class LiveDcsTutorLoop:
                     if isinstance(item, str) and item
                 ]
             )
-            self._stats.model_calls += 1
-            try:
-                response = self.model.explain_error(obs, request)
-            except Exception as exc:
-                response = TutorResponse(
-                    status="error",
-                    in_reply_to=request.request_id,
-                    message=self._fallback_message(
-                        inferred_step_id if isinstance(inferred_step_id, str) else None,
-                        fallback_conditions,
-                    ),
-                    actions=[],
-                    metadata={
-                        "provider": "fallback",
-                        "error_type": type(exc).__name__,
-                        "error": str(exc),
-                    },
-                )
+            terminal_state_short_circuited = _is_terminal_step_hint_complete(
+                hint if isinstance(hint, Mapping) else None
+            )
+            if terminal_state_short_circuited:
+                response = self._build_terminal_state_response(request)
+            else:
+                self._stats.model_calls += 1
+                try:
+                    response = self.model.explain_error(obs, request)
+                except Exception as exc:
+                    response = TutorResponse(
+                        status="error",
+                        in_reply_to=request.request_id,
+                        message=self._fallback_message(
+                            inferred_step_id if isinstance(inferred_step_id, str) else None,
+                            fallback_conditions,
+                        ),
+                        actions=[],
+                        metadata={
+                            "provider": "fallback",
+                            "error_type": type(exc).__name__,
+                            "error": str(exc),
+                        },
+                    )
 
             response.metadata = dict(response.metadata)
             response.metadata.setdefault("provider", "fallback" if response.status == "error" else "unknown")
@@ -4372,7 +4438,7 @@ class LiveDcsTutorLoop:
             )
 
             fallback_overlay_used = False
-            fallback_overlay_reason = "not_needed"
+            fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
             s18_completion_advanced = False
             s18_completion_reason = "not_needed"
             if not s18_structured_completion_advanced:
@@ -4506,6 +4572,13 @@ class LiveDcsTutorLoop:
             )
 
         self._send_tutor_text(response)
+        if bool(getattr(self.model, "print_model_io", False)):
+            final_public_response = response.metadata.get("final_public_response")
+            if isinstance(final_public_response, Mapping):
+                header = f"[MODEL_IO][FINAL_PUBLIC_RESPONSE][request_id={request.request_id}]"
+                print(header)
+                print(json.dumps(final_public_response, ensure_ascii=False, sort_keys=True))
+                print(f"{header}[END]")
         self._emit_event(
             kind="tutor_response",
             payload=_sanitize_response_payload_for_event(response, lang=self.lang),

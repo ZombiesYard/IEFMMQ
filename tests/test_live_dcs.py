@@ -5808,9 +5808,9 @@ def test_live_loop_rewrites_false_s08_completion_claim_while_preserving_navigati
     assert response.metadata["final_public_response"]["explanations"] == [response.message]
 
 
-def test_live_loop_rewrites_s18_to_terminal_when_s25_has_no_missing_conditions(
+def test_live_loop_short_circuits_terminal_state_without_calling_model(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     replay_path = tmp_path / "bios_s25_terminal_s18_model.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
@@ -5846,36 +5846,44 @@ def test_live_loop_rewrites_s18_to_terminal_when_s25_has_no_missing_conditions(
                 "Result",
                 (),
                 {
-                    "facts": [
-                        VisionFact(
-                            fact_id="fcsmc_final_go_result_visible",
-                            state="seen",
-                            source_frame_id="10000_000160",
-                            expires_after_ms=600000,
-                            sticky=True,
-                        ),
-                        VisionFact(
-                            fact_id="fcsmc_intermediate_result_visible",
-                            state="not_seen",
-                            source_frame_id="10000_000160",
-                            expires_after_ms=2000,
-                            sticky=False,
-                        ),
-                        VisionFact(
-                            fact_id="fcsmc_in_test_visible",
-                            state="not_seen",
-                            source_frame_id="10000_000160",
-                            expires_after_ms=2000,
-                            sticky=False,
-                        ),
-                        VisionFact(
-                            fact_id="fcsmc_page_visible",
-                            state="seen",
-                            source_frame_id="10000_000160",
-                            expires_after_ms=2000,
-                            sticky=False,
-                        ),
-                    ],
+                    "status": "available",
+                    "error": None,
+                    "metadata": {},
+                    "observation": VisionFactObservation(
+                        session_id=session_id,
+                        trigger_wall_ms=trigger_wall_ms,
+                        frame_ids=list(vision["frame_ids"]),
+                        facts=[
+                            VisionFact(
+                                fact_id="fcsmc_final_go_result_visible",
+                                state="seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=600000,
+                                sticky=True,
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_intermediate_result_visible",
+                                state="not_seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=2000,
+                                sticky=False,
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_in_test_visible",
+                                state="not_seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=2000,
+                                sticky=False,
+                            ),
+                            VisionFact(
+                                fact_id="fcsmc_page_visible",
+                                state="seen",
+                                source_frame_id="10000_000160",
+                                expires_after_ms=2000,
+                                sticky=False,
+                            ),
+                        ],
+                    ),
                     "raw_text": "",
                     "parse_success": True,
                 },
@@ -5884,44 +5892,13 @@ def test_live_loop_rewrites_s18_to_terminal_when_s25_has_no_missing_conditions(
         def close(self) -> None:
             return
 
-    class S18ModelAtTerminalState:
-        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
-            return TutorResponse(
-                status="ok",
-                in_reply_to=request.request_id if request else None,
-                message="FCS-MC 页面可见，中间结果和 IN TEST 均不可见，最终 GO 结果可见，表明 FCS-MC BIT 已完成。",
-                actions=[],
-                explanations=[
-                    "FCS-MC 页面可见，中间结果和 IN TEST 均不可见，最终 GO 结果可见，表明 FCS-MC BIT 已完成。"
-                ],
-                metadata={
-                    "provider": "mock_qwen",
-                    "help_response": {
-                        "diagnosis": {"step_id": "S18", "error_category": "OM"},
-                        "next": {"step_id": "S18"},
-                        "overlay": {"targets": [], "evidence": []},
-                        "explanations": [
-                            "FCS-MC 页面可见，中间结果和 IN TEST 均不可见，最终 GO 结果可见，表明 FCS-MC BIT 已完成。"
-                        ],
-                    },
-                },
-            )
-
-        def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
-            return self.explain_error(observation, request)
-
-    monkeypatch.setattr(
-        "live_dcs.infer_step_id",
-        lambda *args, **kwargs: StepInferenceResult(
-            inferred_step_id="S25",
-            missing_conditions=(),
-        ),
-    )
+    model = RecordingModel()
+    model.print_model_io = True
 
     source = ReplayBiosReceiver(replay_path, speed=0.0)
     loop = LiveDcsTutorLoop(
         source=source,
-        model=S18ModelAtTerminalState(),
+        model=model,
         action_executor=RecordingExecutor(),
         session_id="sess-s25-terminal-rewrite",
         vision_port=StaticVisionPort(),
@@ -5931,6 +5908,26 @@ def test_live_loop_rewrites_s18_to_terminal_when_s25_has_no_missing_conditions(
         lang="zh",
     )
     try:
+        original_build_request = loop._build_request
+
+        def patched_build_request(obs, *, vision_selection, vision_fact_context, **kwargs):
+            request, prompt_meta, state_key = original_build_request(
+                obs,
+                vision_selection=vision_selection,
+                vision_fact_context=vision_fact_context,
+                **kwargs,
+            )
+            hint = dict(request.context.get("deterministic_step_hint", {}))
+            hint["inferred_step_id"] = "S25"
+            hint["missing_conditions"] = []
+            hint["missing_conditions_count"] = 0
+            hint["gate_blockers"] = []
+            hint["gate_blocker_count"] = 0
+            request.context["deterministic_step_hint"] = hint
+            return request, prompt_meta, state_key
+
+        loop._build_request = patched_build_request
+
         obs = source.get_observation()
         assert obs is not None
         loop._ingest_observation(obs)
@@ -5939,17 +5936,126 @@ def test_live_loop_rewrites_s18_to_terminal_when_s25_has_no_missing_conditions(
         loop.close()
 
     assert response is not None
+    assert model.calls == []
     assert response.metadata["terminal_state_rewritten"] is True
-    assert response.metadata["terminal_state_original_message"] == (
-        "FCS-MC 页面可见，中间结果和 IN TEST 均不可见，最终 GO 结果可见，表明 FCS-MC BIT 已完成。"
-    )
     assert response.message == "当前冷启动流程已完成，无需继续操作。"
     assert response.explanations == ["当前冷启动流程已完成，无需继续操作。"]
-    assert response.metadata["diagnosis"] == {}
-    assert response.metadata["next"] == {}
+    assert response.metadata["diagnosis"]["step_id"] == "S25"
+    assert response.metadata["next"] == {"step_id": "S25"}
     assert response.actions == []
     assert response.metadata["fallback_overlay_used"] is False
     assert response.metadata["fallback_overlay_reason"] == "all_steps_complete"
+    out = capsys.readouterr().out
+    assert "[MODEL_IO][FINAL_PUBLIC_RESPONSE]" in out
+    assert "当前冷启动流程已完成，无需继续操作。" in out
+
+
+def test_rewrite_terminal_state_conflict_response_skips_when_gate_blockers_exist(tmp_path: Path) -> None:
+    replay_path = tmp_path / "empty.jsonl"
+    _write_replay(replay_path, [])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        response = TutorResponse(
+            status="ok",
+            message="FCS-MC 页面可见，最终 GO 结果可见。",
+            actions=[],
+            explanations=["FCS-MC 页面可见，最终 GO 结果可见。"],
+            metadata={
+                "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                "next": {"step_id": "S18"},
+                "help_response": {
+                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                    "next": {"step_id": "S18"},
+                },
+            },
+        )
+        request = TutorRequest(
+            request_id="terminal-gate-blocked",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S25",
+                    "missing_conditions": [],
+                    "gate_blockers": [{"ref": "GATES.S25.precondition", "reason": "blocked"}],
+                }
+            },
+        )
+
+        rewritten = loop._rewrite_terminal_state_conflict_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is False
+    assert response.message == "FCS-MC 页面可见，最终 GO 结果可见。"
+    assert response.metadata["diagnosis"] == {"step_id": "S18", "error_category": "OM"}
+    assert response.metadata["next"] == {"step_id": "S18"}
+
+
+def test_rewrite_terminal_state_conflict_response_clears_stale_actions(tmp_path: Path) -> None:
+    replay_path = tmp_path / "empty.jsonl"
+    _write_replay(replay_path, [])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        response = TutorResponse(
+            status="ok",
+            message="请继续按 FCS BIT 开关。",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "fcs_bit_switch",
+                    "element_id": "pnt_999",
+                }
+            ],
+            explanations=["请继续按 FCS BIT 开关。"],
+            metadata={
+                "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                "next": {"step_id": "S18"},
+                "help_response": {
+                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                    "next": {"step_id": "S18"},
+                },
+            },
+        )
+        request = TutorRequest(
+            request_id="terminal-clear-actions",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S25",
+                    "missing_conditions": [],
+                    "gate_blockers": [],
+                }
+            },
+        )
+
+        rewritten = loop._rewrite_terminal_state_conflict_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is True
+    assert response.message == "当前冷启动流程已完成，无需继续操作。"
+    assert response.actions == []
+    assert response.metadata["terminal_state_original_actions"] == [
+        {
+            "type": "overlay",
+            "intent": "highlight",
+            "target": "fcs_bit_switch",
+            "element_id": "pnt_999",
+        }
+    ]
+    assert response.metadata["diagnosis"] == {"step_id": "S25", "error_category": "OM"}
+    assert response.metadata["next"] == {"step_id": "S25"}
 
 
 def test_live_loop_replaces_stale_s08_overlay_with_s09_action_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
