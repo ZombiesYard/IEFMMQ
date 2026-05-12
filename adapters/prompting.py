@@ -974,6 +974,12 @@ def _build_evidence_sources(
                 "fact_id": fact_id,
                 "state": item.get("state"),
             }
+            sticky = item.get("sticky")
+            if isinstance(sticky, bool):
+                visual_entry["sticky"] = sticky
+            expires_after_ms = item.get("expires_after_ms")
+            if isinstance(expires_after_ms, (int, float)) and expires_after_ms is not None:
+                visual_entry["expires_after_ms"] = expires_after_ms
             if isinstance(source_frame_id, str) and source_frame_id:
                 visual_entry["source_frame_id"] = source_frame_id
             evidence_note = item.get("evidence_note")
@@ -1206,7 +1212,7 @@ def build_help_prompt_result(
             "若当前步骤是把左右油门杆从 OFF 推到 IDLE（如 S05/S11），不要把 throttle_quadrant_reference 当成可点击的真实操纵杆，也不要指导用户操作油门阻力调节杆；该参考点只能表示油门区域。若无法高亮真实油门杆，应直接用文字说明键位：左油门 Right Alt+Home，右油门 Right Shift+Home。",
             "S08 与 S18 的页面阶段由 VLM 的视觉事实标注区分：bit_root_page_visible 对应 S08 BIT 页面，fcsmc_page_visible/fcsmc_in_test_visible/fcsmc_intermediate_result_visible/fcsmc_final_go_result_visible 对应 S18 FCS-MC BIT 各阶段。信任 VLM 的标注；当 VLM 返回 state='uncertain' 时，结合 VARS 与 gates_summary 判断。",
             "对于 FCS RESET：信任 VLM 的 fcs_page_x_marks_visible 标注来判断 FCS 页面内 X/故障填充状态。若 fcs_page_x_marks_visible=seen 且 fcs_page_visible=seen，说明 FCS 页面仍有 X 填充，reset 可能未完成。同时可用 fcs_page_x_marks_visible 辅助区分 S08 与后续 FCS BIT 阶段：若 fcs_page_x_marks_visible=seen 且 fcsmc_final_go_result_visible=not_seen，说明可能仍在 S08 阶段。",
-            "对于 S18，流程阶段由 VLM 的视觉事实标注区分。VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持。信任 VLM 的 fcsmc_final_go_result_visible 标注来判断 S18 是否完成；若 fcsmc_final_go_result_visible=seen 说明最终 GO 已显示。fcsmc_intermediate_result_visible 或 FCSA/FCSB PBIT GO 仅为中间结果，不等于 final GO。",
+            "对于 S18，流程阶段由 VLM 的视觉事实标注区分。VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持。信任 VLM 的 fcsmc_final_go_result_visible 标注来判断 S18 是否完成；若 fcsmc_final_go_result_visible=seen 说明最终 GO 已显示，S18 已完成。fcsmc_final_go_result_visible 是粘性事实 (sticky=true, expires_after_ms=600000)，在 BIT 测试完成后会长时间保持 seen；fcsmc_intermediate_result_visible 和 fcsmc_in_test_visible 是非粘性事实 (sticky=false, expires_after_ms=2000)，测试通过后很快过期变为 not_seen。因此当 fcsmc_final_go_result_visible=seen 但 fcsmc_intermediate_result_visible=not_seen 时，说明 S18 已完成且中间测试画面已自然过期，不得因此认为 S18 未完成或要求继续观察。fcsmc_intermediate_result_visible 或 FCSA/FCSB PBIT GO 仅为中间结果，不等于 final GO。",
             "S18 分阶段判断时必须遵守：若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC，不得要求先按住 FCS BIT 开关，也不要把 fcs_bit_switch 当成主高亮。",
             (
                 "S18 分阶段判断时必须遵守：当前系统禁用 overlay，因此即使识别出可操作目标，也必须返回空的 overlay.targets 与 overlay.evidence，并仅在 explanation 中说明动作。"
@@ -1271,7 +1277,7 @@ def build_help_prompt_result(
             "If the current step is moving a throttle from OFF to IDLE (such as S05/S11), do not treat throttle_quadrant_reference as the actual throttle lever and do not instruct the user to operate the friction-adjusting lever. It is only a region reference. If the real throttle lever cannot be highlighted, give explicit keyboard guidance instead: left throttle Right Alt+Home, right throttle Right Shift+Home.",
             "S08 and S18 page stages are distinguished by the VLM's visual fact labels: bit_root_page_visible for the S08 BIT page, and fcsmc_page_visible/fcsmc_in_test_visible/fcsmc_intermediate_result_visible/fcsmc_final_go_result_visible for the S18 FCS-MC BIT stages. Trust the VLM's labels; when the VLM returns state='uncertain', reason from VARS and gates_summary.",
             "For FCS RESET: trust the VLM's fcs_page_x_marks_visible label to judge X/fault-fill status inside the FCS page. If fcs_page_x_marks_visible=seen and fcs_page_visible=seen, the FCS page still shows X fills and reset may be incomplete. Also use fcs_page_x_marks_visible to help distinguish S08 from later FCS BIT stages: if fcs_page_x_marks_visible=seen and fcsmc_final_go_result_visible=not_seen, the user may still be in S08.",
-            "For S18, page stages are distinguished by the VLM's visual fact labels. VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up. Trust the VLM's fcsmc_final_go_result_visible label to decide whether S18 is complete; if fcsmc_final_go_result_visible=seen, the final GO is visible. fcsmc_intermediate_result_visible or FCSA/FCSB PBIT GO means intermediate results, not final GO.",
+            "For S18, page stages are distinguished by the VLM's visual fact labels. VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up. Trust the VLM's fcsmc_final_go_result_visible label to decide whether S18 is complete; if fcsmc_final_go_result_visible=seen, the final GO is visible and S18 is complete. fcsmc_final_go_result_visible is sticky (sticky=true, expires_after_ms=600000), so it persists long after the BIT completes; fcsmc_intermediate_result_visible and fcsmc_in_test_visible are non-sticky (sticky=false, expires_after_ms=2000), so they naturally expire to not_seen after the test passes. When fcsmc_final_go_result_visible=seen but fcsmc_intermediate_result_visible=not_seen, S18 is complete and the intermediate screens have simply expired — do not treat this as S18 being incomplete. fcsmc_intermediate_result_visible or FCSA/FCSB PBIT GO means intermediate results, not final GO.",
             "When reasoning about S18, obey this stage split: if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC. Do not ask the user to hold the FCS BIT switch first, and do not make fcs_bit_switch the primary overlay on the root page.",
             (
                 "When reasoning about S18, overlay is disabled for this request. Even if you identify the next control correctly, keep overlay.targets=[] and overlay.evidence=[] and explain the action in text only."

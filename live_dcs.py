@@ -3610,6 +3610,13 @@ class LiveDcsTutorLoop:
         missing_conditions = [
             item for item in missing_conditions_raw if isinstance(item, str) and item
         ] if isinstance(missing_conditions_raw, list) else []
+        gate_blockers_raw = hint.get("gate_blockers")
+        gate_blockers = [
+            item for item in gate_blockers_raw if isinstance(item, Mapping) and item
+        ] if isinstance(gate_blockers_raw, list) else []
+
+        if inferred_step_id == "S25" and not missing_conditions and not gate_blockers:
+            return None, "all_steps_complete"
 
         request_allowlist = context.get("overlay_target_allowlist")
         candidate_targets = list(fallback_targets)
