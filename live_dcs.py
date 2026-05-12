@@ -99,6 +99,8 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "engine_crank_left": ("eng_crank_switch",),
     "engine_crank_right": ("eng_crank_switch",),
     "engine_crank_right_complete": ("eng_crank_switch",),
+    "fire_test_a_complete": ("fire_test_switch",),
+    "fire_test_b_complete": ("fire_test_switch",),
     "fire_test_complete": ("fire_test_switch",),
     "hud_on": ("hud_symbology_brightness_knob",),
     "left_ddi_on": ("left_mdi_brightness_selector",),

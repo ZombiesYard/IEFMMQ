@@ -210,8 +210,19 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
     "flap_configured": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_configured),
     "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
-    # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered
-    # and either held side (0/2) counts as active/complete evidence.
+    # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered.
+    # Production latch behaviour:
+    #   fire_test_complete      ← fire_test_active (either direction, OR)
+    #   fire_test_a_complete    ← fire_test_a_active (A=0 only)
+    #   fire_test_b_complete    ← fire_test_b_active (B=2 only)
+    # S02 gate requires fire_test_a_complete AND fire_test_b_complete.
+    # The single-frame state-matrix model cannot represent dual-latch
+    # accumulation (both setters write FIRE_TEST_SW, last write wins).
+    # fire_test_complete here is a single-frame approximation (A only);
+    # full A+B AND semantics are enforced by telemetry_pipeline across
+    # multiple frames in production.
+    "fire_test_a_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
+    "fire_test_b_complete": _set_enum("FIRE_TEST_SW", true_value=2, false_value=1),
     "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),

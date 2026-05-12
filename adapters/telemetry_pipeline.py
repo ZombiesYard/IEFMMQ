@@ -65,6 +65,10 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "radar_on",
     "right_engine_nominal_start_params",
     "fire_test_active",
+    "fire_test_a_active",
+    "fire_test_b_active",
+    "fire_test_a_complete",
+    "fire_test_b_complete",
     "fire_test_complete",
     "lights_test_active",
     "annunciator_panel_activity",
@@ -116,6 +120,8 @@ _POLICY_SCOPED_SANITIZERS: OrderedDict[tuple[DeltaPolicy, str], DeltaSanitizer] 
 _MAX_POLICY_SCOPED_SANITIZERS = 256
 _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "fire_test_complete",
+    "fire_test_a_complete",
+    "fire_test_b_complete",
     "lights_test_complete",
     "fcs_reset_complete",
     "takeoff_trim_set",
@@ -123,6 +129,8 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
 )
 _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
     "fire_test_complete": "fire_test_active",
+    "fire_test_a_complete": "fire_test_a_active",
+    "fire_test_b_complete": "fire_test_b_active",
     "lights_test_complete": "lights_test_active",
     "fcs_reset_complete": "fcs_reset_pressed",
     "takeoff_trim_set": "takeoff_trim_pressed",
