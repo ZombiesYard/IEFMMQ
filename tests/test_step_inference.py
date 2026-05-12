@@ -366,7 +366,7 @@ def test_infer_step_blocks_at_s02_when_fire_test_not_performed(
     )
 
     assert result.inferred_step_id == "S02"
-    assert "vars.fire_test_complete==true" in result.missing_conditions
+    assert "vars.fire_test_a_complete==true" in result.missing_conditions
 
 
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
@@ -445,7 +445,7 @@ def test_infer_step_blocks_at_s02_even_when_later_engine_signals_are_ready(
     )
 
     assert result.inferred_step_id == "S02"
-    assert "vars.fire_test_complete==true" in result.missing_conditions
+    assert "vars.fire_test_a_complete==true" in result.missing_conditions
 
 
 def test_infer_step_does_not_regress_to_s04_after_apu_auto_shutdown(

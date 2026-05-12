@@ -122,10 +122,10 @@ def test_evaluate_pack_gates_allows_s03_precondition_without_fire_test_gate() ->
     assert s03_pre["reason_code"] == "ok"
 
 
-def test_evaluate_pack_gates_blocks_s02_completion_when_fire_test_not_performed() -> None:
+def test_evaluate_pack_gates_blocks_s02_completion_when_fire_test_a_not_performed() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(fire_test_complete=False)],
+        observations=[_obs_with_vars(fire_test_a_complete=False, fire_test_b_complete=False)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -133,13 +133,13 @@ def test_evaluate_pack_gates_blocks_s02_completion_when_fire_test_not_performed(
     s02_comp = gates["S02.completion"]
     assert s02_comp["status"] == "blocked"
     assert s02_comp["allowed"] is False
-    assert s02_comp["reason_code"] == "s02_requires_fire_test_complete"
+    assert s02_comp["reason_code"] == "s02_requires_fire_test_a"
 
 
-def test_evaluate_pack_gates_allows_s02_completion_when_fire_test_performed() -> None:
+def test_evaluate_pack_gates_allows_s02_completion_when_both_a_and_b_performed() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(fire_test_complete=True)],
+        observations=[_obs_with_vars(fire_test_a_complete=True, fire_test_b_complete=True)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
@@ -148,6 +148,19 @@ def test_evaluate_pack_gates_allows_s02_completion_when_fire_test_performed() ->
     assert s02_comp["status"] == "allowed"
     assert s02_comp["allowed"] is True
     assert s02_comp["reason_code"] == "ok"
+
+
+def test_evaluate_pack_gates_blocks_s02_completion_when_only_a_performed() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(fire_test_a_complete=True, fire_test_b_complete=False)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+
+    s02_comp = gates["S02.completion"]
+    assert s02_comp["status"] == "blocked"
+    assert s02_comp["reason_code"] == "s02_requires_fire_test_b"
 
 
 def test_evaluate_pack_gates_allows_s04_precondition_when_apu_ready_true() -> None:

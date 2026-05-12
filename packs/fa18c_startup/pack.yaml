@@ -256,9 +256,13 @@ completion_gates:
       reason: "Right generator must be ON."
   S02:
     - op: flag_true
-      var: vars.fire_test_complete
-      reason_code: s02_requires_fire_test_complete
-      reason: "Fire test A and B must be performed before advancing to APU start."
+      var: vars.fire_test_a_complete
+      reason_code: s02_requires_fire_test_a
+      reason: "Move fire test switch to TEST A and verify fire warning light and aural tones."
+    - op: flag_true
+      var: vars.fire_test_b_complete
+      reason_code: s02_requires_fire_test_b
+      reason: "Move fire test switch to TEST B and verify fire warning light and aural tones."
   S03:
     - op: flag_true
       var: vars.apu_start_support_complete

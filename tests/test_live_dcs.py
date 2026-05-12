@@ -72,6 +72,26 @@ def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
     }
 
 
+def _bios_frame_fire_test_b_pre(seq: int, t_wall: float) -> dict[str, Any]:
+    """Pre-frame to latch fire test B before the main interaction frame."""
+    return {
+        "schema_version": "v2",
+        "seq": seq,
+        "t_wall": t_wall,
+        "aircraft": "FA-18C_hornet",
+        "bios": {
+            "BATTERY_SW": 2,
+            "L_GEN_SW": 1,
+            "R_GEN_SW": 1,
+            "FIRE_TEST_SW": 2,
+            "APU_CONTROL_SW": 0,
+            "APU_READY_LT": 0,
+            "ENGINE_CRANK_SW": 1,
+        },
+        "delta": {},
+    }
+
+
 class RecordingModel:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -653,7 +673,10 @@ class MixedAllowlistTargetsWithInvalidEvidenceItemModel:
 
 def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_one.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 10.0, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     model = RecordingModel()
@@ -668,11 +691,11 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
         lang="zh",
     )
     try:
-        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+        stats = loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
-    assert stats["frames"] == 1
+    assert stats["frames"] == 2
     assert stats["help_cycles"] == 1
     assert stats["model_calls"] == 1
     assert len(model.calls) == 1
@@ -707,7 +730,10 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
 
 def test_live_loop_sends_final_tutor_message_to_dcs_text_channel(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_one.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 10.0, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     model = RecordingModel()
@@ -726,7 +752,7 @@ def test_live_loop_sends_final_tutor_message_to_dcs_text_channel(tmp_path: Path)
         event_sink=events.append,
     )
     try:
-        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+        stats = loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
@@ -2077,7 +2103,10 @@ def test_live_loop_emits_overlay_rejected_event_for_evidence_failure(tmp_path: P
             )
 
     replay_path = tmp_path / "bios_evidence_rejected.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 10.0, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     executor = RecordingExecutor()
@@ -2091,7 +2120,7 @@ def test_live_loop_emits_overlay_rejected_event_for_evidence_failure(tmp_path: P
         event_sink=events.append,
     )
     try:
-        loop.run(max_frames=1, auto_help_on_first_frame=True)
+        loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
@@ -2149,7 +2178,10 @@ def test_live_loop_allowlist_filter_drops_non_mapping_evidence_items(tmp_path: P
 
 def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys) -> None:
     replay_path = tmp_path / "bios_dry_run.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 11.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 11.0, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     model = RecordingModel()
@@ -2163,7 +2195,7 @@ def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys
         dry_run_overlay=True,
     )
     try:
-        loop.run(max_frames=1, auto_help_on_first_frame=True)
+        loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
@@ -2175,7 +2207,10 @@ def test_live_loop_dry_run_overlay_prints_planned_actions(tmp_path: Path, capsys
 
 def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_path: Path, capsys) -> None:
     replay_path = tmp_path / "bios_dry_run_exec.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 11.5, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 11.5, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     model = RecordingModel()
@@ -2189,7 +2224,7 @@ def test_live_loop_dry_run_overlay_uses_executor_when_executor_is_dry_run(tmp_pa
         dry_run_overlay=True,
     )
     try:
-        loop.run(max_frames=1, auto_help_on_first_frame=True)
+        loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
@@ -2639,7 +2674,10 @@ def test_load_step_signal_profiles_rejects_invalid_ui_target(tmp_path: Path) -> 
 
 def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_model_error.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 13.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 13.0, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     model = FailingModel()
@@ -2652,7 +2690,7 @@ def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> Non
         lang="en",
     )
     try:
-        stats = loop.run(max_frames=1, auto_help_on_first_frame=True)
+        stats = loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
@@ -2666,7 +2704,10 @@ def test_live_loop_counts_model_attempt_when_model_raises(tmp_path: Path) -> Non
 
 def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_model_error_fallback_overlay.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 19.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 19.0, apu_switch=0),
+    ])
 
     source = ReplayBiosReceiver(replay_path)
     model = FailingModel()
@@ -2681,7 +2722,7 @@ def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_p
         event_sink=events.append,
     )
     try:
-        loop.run(max_frames=1, auto_help_on_first_frame=True)
+        loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 
@@ -2700,7 +2741,10 @@ def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_p
 
 def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_overlay(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_wrong_future_overlay.jsonl"
-    _write_replay(replay_path, [_bios_frame(1, 19.0, apu_switch=0)])
+    _write_replay(replay_path, [
+        _bios_frame_fire_test_b_pre(0, 9.0),
+        _bios_frame(1, 19.0, apu_switch=0),
+    ])
 
     class WrongFutureStepModel:
         def plan_next_step(self, observation: Observation, request=None) -> TutorResponse:  # pragma: no cover
@@ -2747,7 +2791,7 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
         event_sink=events.append,
     )
     try:
-        loop.run(max_frames=1, auto_help_on_first_frame=True)
+        loop.run(max_frames=2, auto_help_every_n_frames=2)
     finally:
         loop.close()
 

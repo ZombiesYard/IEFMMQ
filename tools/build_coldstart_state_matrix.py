@@ -210,8 +210,11 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
     "flap_configured": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_configured),
     "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
-    # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered
-    # and either held side (0/2) counts as active/complete evidence.
+    # FIRE_TEST_SW is a spring-loaded 3-position rocker where 1 is centered.
+    # A=0, B=2 directions are latched independently; fire_test_complete
+    # requires both to have been observed (single-frame approximation: A only).
+    "fire_test_a_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
+    "fire_test_b_complete": _set_enum("FIRE_TEST_SW", true_value=2, false_value=1),
     "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
