@@ -1464,3 +1464,100 @@ def test_infer_step_preserves_caller_precondition_map_when_completion_is_missing
 
     assert result.inferred_step_id == "S01"
     assert "vars.custom_ready==true" in result.missing_conditions
+
+
+def test_infer_step_blocks_at_s06_precondition_when_rpm_below_60(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    """S06 precondition should block when RPM < 60%, not bleed_air_cycle_complete."""
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = {
+        "battery_on": True,
+        "ext_pwr_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
+        "power_available": True,
+        "apu_on": True,
+        "apu_ready": True,
+        "apu_start_support_complete": True,
+        "fire_test_a_complete": True,
+        "fire_test_b_complete": True,
+        "fire_test_complete": True,
+        "engine_crank_right": True,
+        "engine_crank_right_complete": True,
+        # S05 complete: RPM >= 25, throttle idle
+        "rpm_r": 45,
+        "rpm_r_gte_25": True,
+        "rpm_r_gte_60": False,
+        "throttle_r_not_off": True,
+        "throttle_r_idle_complete": True,
+        # bleed_air is NOT at norm (not yet cycled)
+        "bleed_air_norm": False,
+        "bleed_air_cycle_complete": False,
+    }
+    recent_ui_targets = ["eng_crank_switch", "throttle_quadrant_reference"]
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    # Engine should report S06 blocked on RPM precondition, not bleed air
+    assert result.inferred_step_id == "S06"
+    assert "vars.rpm_r_gte_60==true" in result.missing_conditions
+    # bleed_air_cycle_complete should NOT be the primary missing condition at this point
+    assert "vars.bleed_air_cycle_complete==true" not in result.missing_conditions
+
+
+def test_infer_step_blocks_at_s06_completion_when_rpm_above_60_and_bleed_air_not_cycled(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    """S06 should block on bleed_air_cycle_complete when RPM >= 60% and bleed not cycled."""
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = {
+        "battery_on": True,
+        "ext_pwr_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
+        "power_available": True,
+        "apu_on": True,
+        "apu_ready": True,
+        "apu_start_support_complete": True,
+        "engine_crank_right": True,
+        "engine_crank_right_complete": True,
+        # S05 complete
+        "rpm_r": 66,
+        "rpm_r_gte_25": True,
+        "rpm_r_gte_60": True,
+        "throttle_r_not_off": True,
+        "throttle_r_idle_complete": True,
+        # bleed_air NOT yet cycled
+        "bleed_air_norm": False,
+        "bleed_air_cycle_complete": False,
+        "fire_test_a_complete": True,
+        "fire_test_b_complete": True,
+        "fire_test_complete": True,
+        "fire_test_a_active": False,
+        "fire_test_b_active": False,
+        "fire_test_active": False,
+    }
+    recent_ui_targets = ["eng_crank_switch", "throttle_quadrant_reference"]
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        recent_ui_targets,
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    # Engine should report S06 blocked on bleed air completion
+    assert result.inferred_step_id == "S06"
+    assert "vars.bleed_air_cycle_complete==true" in result.missing_conditions

@@ -110,6 +110,7 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "right_ddi_on": ("right_mdi_brightness_selector",),
     "rpm_r": ("eng_crank_switch", "throttle_quadrant_reference"),
     "rpm_r_gte_25": ("eng_crank_switch", "throttle_quadrant_reference"),
+    "rpm_r_gte_60": (),
     "throttle_r_idle_complete": ("throttle_quadrant_reference",),
 }
 from core.types import Event, Observation, TutorRequest, TutorResponse
@@ -3728,6 +3729,12 @@ class LiveDcsTutorLoop:
         if inferred_step_id == "S25" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
 
+        _precondition_blocked = any(
+            isinstance(b, Mapping)
+            and str(b.get("ref", "")).endswith(".precondition")
+            for b in gate_blockers
+        )
+
         request_allowlist = context.get("overlay_target_allowlist")
         candidate_targets = list(fallback_targets)
         action_hint = hint.get("action_hint")
@@ -3755,6 +3762,35 @@ class LiveDcsTutorLoop:
         )
         if hinted_targets:
             candidate_targets = [*hinted_targets, *[target for target in candidate_targets if target not in set(hinted_targets)]]
+
+        # When the step's PRECONDITION gate is blocked and its missing condition
+        # does not map to any UI target, remove the step's completion-related
+        # fallback targets to avoid misleading highlights.
+        # (e.g., RPM < 60% → precondition "rpm_r_gte_60" has no UI target,
+        # but step completion target "bleed_air_knob" should not be highlighted yet.)
+        _precondition_var_blocked = False
+        if _precondition_blocked and not hinted_targets and missing_conditions:
+            step_pre_gates = self.precondition_gates.get(inferred_step_id)
+            if isinstance(step_pre_gates, (list, tuple)) and step_pre_gates:
+                _pre_vars: set[str] = set()
+                for rule in step_pre_gates:
+                    if isinstance(rule, Mapping):
+                        raw_var = rule.get("var")
+                        if isinstance(raw_var, str):
+                            key = raw_var.replace("payload.vars.", "").replace("vars.", "")
+                            _pre_vars.add(key)
+                for item in missing_conditions:
+                    if isinstance(item, str):
+                        m = _MISSING_CONDITION_VAR_RE.search(item)
+                        if m and m.group(1) in _pre_vars:
+                            _precondition_var_blocked = True
+                            break
+        if _precondition_var_blocked:
+            candidate_targets = [
+                t for t in candidate_targets
+                if t not in set(fallback_targets)
+            ]
+
         if (not ignore_request_allowlist) and isinstance(request_allowlist, list):
             allowset = {item for item in request_allowlist if isinstance(item, str) and item}
             if allowset:
