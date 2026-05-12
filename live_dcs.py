@@ -42,6 +42,7 @@ from adapters.recent_actions import (
     RecentDeltaRingBuffer,
     build_prompt_recent_deltas,
     build_recent_button_signal,
+    project_recent_ui_targets,
 )
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
@@ -1489,12 +1490,16 @@ def _build_procedural_action_hint(
     inferred_step_id: str | None,
     vars_selected: Mapping[str, Any],
     allowed_targets: Sequence[str],
+    step_interacted_targets: Sequence[str] | None = None,
     vision_fact_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     if inferred_step_id == "S19":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
+        interacted_targets = {
+            item for item in (step_interacted_targets or ()) if isinstance(item, str) and item
+        }
 
         def _hint(target: str, reason: str) -> dict[str, Any] | None:
             if target not in allowed:
@@ -1506,10 +1511,22 @@ def _build_procedural_action_hint(
                 "refuel_probe_switch",
                 "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
             )
-        return _hint(
-            "launch_bar_switch",
-            "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
-        )
+        if "launch_bar_switch" not in interacted_targets:
+            return _hint(
+                "launch_bar_switch",
+                "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
+            )
+        if "arresting_hook_handle" not in interacted_targets:
+            return _hint(
+                "arresting_hook_handle",
+                "The launch bar has already been cycled in this startup session; continue the four-down checklist with the arresting hook next.",
+            )
+        if vars_selected.get("pitot_heat_on") is not True:
+            return _hint(
+                "pitot_heater_switch",
+                "The launch bar and arresting hook have already been checked; continue the four-down checklist by turning pitot heat ON.",
+            )
+        return None
 
     if inferred_step_id == "S14":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
@@ -2206,6 +2223,20 @@ class LiveDcsTutorLoop:
         if hasattr(self.model, "close"):
             self.model.close()
 
+    def _clear_live_progress_state(self) -> None:
+        self._vision_fact_snapshot = {}
+        self._step_interacted_targets = set()
+        self._last_inferred_step_id = None
+        self._sticky_inference_step_id = None
+        self._sticky_inference_missing_conditions = ()
+
+    def _remember_step_interactions(self, targets: Sequence[str] | None) -> None:
+        if not isinstance(self._last_inferred_step_id, str) or not self._last_inferred_step_id:
+            return
+        for target in targets or ():
+            if isinstance(target, str) and target:
+                self._step_interacted_targets.add(target)
+
     def _ensure_knowledge(self) -> KnowledgePort:
         if self.knowledge is None:
             self.knowledge = LocalKnowledgeAdapter(
@@ -2367,11 +2398,20 @@ class LiveDcsTutorLoop:
         enriched_vars = enriched_payload.get("vars")
         if isinstance(enriched_vars, Mapping):
             self._accumulated_vars.update(enriched_vars)
+            if self._should_reset_sticky_inference(self._accumulated_vars):
+                self._clear_live_progress_state()
 
         payload = raw_obs.payload if isinstance(raw_obs.payload, Mapping) else {}
         delta = payload.get("delta")
         t_wall = _coerce_float(payload.get("t_wall"))
         seq = _coerce_int(payload.get("seq"))
+        if isinstance(delta, Mapping):
+            current_delta_targets = project_recent_ui_targets(
+                [{"t_wall": t_wall, "seq": seq, "delta": delta}],
+                self.mapper,
+                max_items=8,
+            )
+            self._remember_step_interactions(current_delta_targets)
         if isinstance(delta, Mapping) and t_wall is not None:
             self.recent_ring.add_delta(delta, t_wall=t_wall, seq=seq)
 
@@ -2585,9 +2625,7 @@ class LiveDcsTutorLoop:
         if new_step_id != self._last_inferred_step_id:
             self._step_interacted_targets = set()
             self._last_inferred_step_id = new_step_id if isinstance(new_step_id, str) else None
-        for target in recent_buttons:
-            if isinstance(target, str) and target:
-                self._step_interacted_targets.add(target)
+        self._remember_step_interactions(recent_buttons)
 
         gates = _select_gates_for_context(
             all_gates,
@@ -2689,6 +2727,7 @@ class LiveDcsTutorLoop:
             inferred_step_id=overlay_step_id,
             vars_selected=vars_selected,
             allowed_targets=overlay_target_allowlist,
+            step_interacted_targets=deterministic_hint.get("step_interacted_targets"),
             vision_fact_summary=vision_fact_context.get("vision_fact_summary", {}),
         )
         if isinstance(action_hint, Mapping):
@@ -2808,8 +2847,7 @@ class LiveDcsTutorLoop:
         vars_selected: Mapping[str, Any],
     ) -> StepInferenceResult:
         if self._should_reset_sticky_inference(vars_selected):
-            self._sticky_inference_step_id = None
-            self._sticky_inference_missing_conditions = ()
+            self._clear_live_progress_state()
             return inference
         current_step_id = inference.inferred_step_id
         if not isinstance(current_step_id, str) or not current_step_id:
@@ -3124,6 +3162,21 @@ class LiveDcsTutorLoop:
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
             return False
+        inferred_step_id = hint.get("inferred_step_id")
+        if (
+            isinstance(inferred_step_id, str)
+            and inferred_step_id
+        ):
+            model_next_step_id = _extract_model_next_step_id(response.metadata)
+            vision_context = context.get("vision")
+            vision_used = isinstance(vision_context, Mapping) and bool(vision_context.get("vision_used"))
+            if (
+                isinstance(model_next_step_id, str)
+                and model_next_step_id
+                and model_next_step_id != inferred_step_id
+                and vision_used
+            ):
+                return True
         if bool(hint.get("requires_visual_confirmation")):
             action_hint = hint.get("action_hint")
             if not isinstance(action_hint, Mapping):
