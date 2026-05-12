@@ -978,7 +978,11 @@ def _build_evidence_sources(
             if isinstance(sticky, bool):
                 visual_entry["sticky"] = sticky
             expires_after_ms = item.get("expires_after_ms")
-            if isinstance(expires_after_ms, (int, float)) and expires_after_ms is not None:
+            if (
+                isinstance(expires_after_ms, (int, float))
+                and not isinstance(expires_after_ms, bool)
+                and expires_after_ms is not None
+            ):
                 visual_entry["expires_after_ms"] = expires_after_ms
             if isinstance(source_frame_id, str) and source_frame_id:
                 visual_entry["source_frame_id"] = source_frame_id

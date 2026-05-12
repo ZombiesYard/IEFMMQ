@@ -5996,6 +5996,44 @@ def test_rewrite_terminal_state_conflict_response_skips_when_gate_blockers_exist
     assert response.metadata["next"] == {"step_id": "S18"}
 
 
+def test_rewrite_terminal_state_conflict_response_skips_short_circuit_response_without_model_payload(
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "empty.jsonl"
+    _write_replay(replay_path, [])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            request_id="terminal-short-circuit",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S25",
+                    "missing_conditions": [],
+                    "gate_blockers": [],
+                }
+            },
+        )
+        response = loop._build_terminal_state_response(request)
+
+        rewritten = loop._rewrite_terminal_state_conflict_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is False
+    assert response.message == "当前冷启动流程已完成，无需继续操作。"
+    assert response.explanations == ["当前冷启动流程已完成，无需继续操作。"]
+    assert response.metadata["diagnosis"] == {"step_id": "S25"}
+    assert response.metadata["next"] == {"step_id": "S25"}
+    assert response.metadata["terminal_state_original_message"] == "当前冷启动流程已完成，无需继续操作。"
+    assert response.metadata["terminal_state_original_explanations"] == []
+
+
 def test_rewrite_terminal_state_conflict_response_clears_stale_actions(tmp_path: Path) -> None:
     replay_path = tmp_path / "empty.jsonl"
     _write_replay(replay_path, [])

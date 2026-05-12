@@ -142,6 +142,32 @@ def test_prompt_terminal_state_rule_uses_inferred_step_id_instead_of_empty_step_
     assert "Use deterministic_step_hint.inferred_step_id (typically S25)" in result.prompt
 
 
+def test_prompt_excludes_boolean_expires_after_ms_from_vision_facts() -> None:
+    ctx = _base_context()
+    ctx["vision_facts"] = [
+        {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "state": "seen",
+            "source_frame_id": "frame-001",
+            "sticky": True,
+            "expires_after_ms": True,
+        },
+        {
+            "fact_id": "fcsmc_page_visible",
+            "state": "seen",
+            "source_frame_id": "frame-001",
+            "sticky": False,
+            "expires_after_ms": 4321,
+        },
+    ]
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+    visual_facts = {item["fact_id"]: item for item in payload["EVIDENCE_SOURCES"]["VISION_FACTS"]}
+
+    assert "expires_after_ms" not in visual_facts["fcsmc_final_go_result_visible"]
+    assert visual_facts["fcsmc_page_visible"]["expires_after_ms"] == 4321
+
+
 def test_prompt_includes_explicit_interaction_policy_and_target_hints() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = ["S05"]

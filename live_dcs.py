@@ -3195,6 +3195,9 @@ class LiveDcsTutorLoop:
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
             return False
+        help_response = response.metadata.get("help_response")
+        if not isinstance(help_response, Mapping):
+            return False
         inferred_step_id = hint.get("inferred_step_id")
         if inferred_step_id != "S25":
             return False
