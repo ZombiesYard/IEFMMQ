@@ -167,6 +167,17 @@ def _set_comm1_freq_134_000(bios: dict[str, Any], desired: Any) -> None:
     bios["COMM1_FREQ"] = 13400 if _bool_like(desired) else 30500
 
 
+def _set_standby_altimeter_set(bios: dict[str, Any], desired: Any) -> None:
+    if _bool_like(desired):
+        bios["STBY_PRESS_SET_0"] = 13335     # digit 2 (hundredths)
+        bios["STBY_PRESS_SET_1"] = 58982     # digit 9 (tenths)
+        bios["STBY_PRESS_SET_2"] = 39321     # integer 29
+    else:
+        bios["STBY_PRESS_SET_0"] = 0
+        bios["STBY_PRESS_SET_1"] = 0
+        bios["STBY_PRESS_SET_2"] = 0
+
+
 _VAR_BINDINGS: dict[str, _VarBinding] = {
     "apu_on": _set_enum("APU_CONTROL_SW", true_value=1, false_value=0),
     "apu_ready": _set_enum("APU_READY_LT", true_value=1, false_value=0),
@@ -179,6 +190,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "bleed_air_cycle_complete": _set_enum("BLEED_AIR_KNOB", true_value=2, false_value=0),
     "bingo_fuel_set": _VarBinding(primary_bios_key="IFEI_BINGO", setter=_set_bingo_fuel_set),
     "comm1_freq_134_000": _VarBinding(primary_bios_key="COMM1_FREQ", setter=_set_comm1_freq_134_000),
+    "standby_altimeter_set": _VarBinding(primary_bios_key="STBY_PRESS_SET_0", setter=_set_standby_altimeter_set),
     "engine_crank_left": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
     "engine_crank_left_complete": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
     "engine_crank_right": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),

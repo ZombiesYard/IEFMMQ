@@ -371,7 +371,11 @@ completion_gates:
       var: vars.bingo_fuel_set
       reason_code: s21_requires_bingo_fuel_set
       reason: "BINGO fuel must be set on the IFEI."
-  S22: []
+  S22:
+    - op: flag_true
+      var: vars.standby_altimeter_set
+      reason_code: s22_requires_standby_altimeter_set
+      reason: "Standby barometric altimeter must be set to approximately 29.92 inHg (airfield QNH)."
   S23:
     - op: arg_in_range
       var: vars.radar_altimeter_bug_value

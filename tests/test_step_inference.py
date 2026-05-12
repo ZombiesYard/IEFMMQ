@@ -650,6 +650,9 @@ def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     vars_map = dict(real_pack_ctx["baseline_vars"])
+    # S18 is visually confirmed complete, but S22 (standby altimeter) has not
+    # been set yet — it should be the next required step.
+    vars_map["standby_altimeter_set"] = False
 
     result = infer_step_id(
         pack_steps,

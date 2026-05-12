@@ -86,7 +86,6 @@ EXPECTED_UNKNOWN_VALUE_KEYS = {
     "fcs_page_reviewed",
     "fcs_bit_complete",
     "four_down_complete",
-    "standby_altimeter_set",
 }
 
 
