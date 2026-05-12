@@ -1195,13 +1195,13 @@ def _is_terminal_step_hint_complete(hint: Mapping[str, Any] | None) -> bool:
     missing_conditions = hint.get("missing_conditions")
     normalized_missing = [
         item for item in missing_conditions if isinstance(item, str) and item
-    ] if isinstance(missing_conditions, list) else []
+    ] if isinstance(missing_conditions, (list, tuple)) else []
     if normalized_missing:
         return False
     gate_blockers = hint.get("gate_blockers")
     normalized_gate_blockers = [
         item for item in gate_blockers if isinstance(item, Mapping) and item
-    ] if isinstance(gate_blockers, list) else []
+    ] if isinstance(gate_blockers, (list, tuple)) else []
     return not normalized_gate_blockers
 
 
