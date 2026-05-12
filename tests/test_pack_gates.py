@@ -122,7 +122,7 @@ def test_evaluate_pack_gates_allows_s03_precondition_without_fire_test_gate() ->
     assert s03_pre["reason_code"] == "ok"
 
 
-def test_evaluate_pack_gates_allows_s02_completion_without_rules() -> None:
+def test_evaluate_pack_gates_blocks_s02_completion_when_fire_test_not_performed() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
         observations=[_obs_with_vars(fire_test_complete=False)],
@@ -131,9 +131,23 @@ def test_evaluate_pack_gates_allows_s02_completion_without_rules() -> None:
     )
 
     s02_comp = gates["S02.completion"]
+    assert s02_comp["status"] == "blocked"
+    assert s02_comp["allowed"] is False
+    assert s02_comp["reason_code"] == "s02_requires_fire_test_complete"
+
+
+def test_evaluate_pack_gates_allows_s02_completion_when_fire_test_performed() -> None:
+    cfg = load_pack_gate_config(PACK_PATH)
+    gates = evaluate_pack_gates(
+        observations=[_obs_with_vars(fire_test_complete=True)],
+        precondition_gates=cfg["precondition_gates"],
+        completion_gates=cfg["completion_gates"],
+    )
+
+    s02_comp = gates["S02.completion"]
     assert s02_comp["status"] == "allowed"
     assert s02_comp["allowed"] is True
-    assert s02_comp["reason_code"] == "no_rules"
+    assert s02_comp["reason_code"] == "ok"
 
 
 def test_evaluate_pack_gates_allows_s04_precondition_when_apu_ready_true() -> None:

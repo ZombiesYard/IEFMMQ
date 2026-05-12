@@ -344,7 +344,7 @@ def test_infer_step_pack_gate_driven_blocking_scenarios_cover_all_pack_steps(
             assert expected_condition in result.missing_conditions
 
 
-def test_infer_step_skips_s02_when_apu_signals_appear_without_fire_test_evidence(
+def test_infer_step_blocks_at_s02_when_fire_test_not_performed(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -365,8 +365,8 @@ def test_infer_step_skips_s02_when_apu_signals_appear_without_fire_test_evidence
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S03"
-    assert "vars.apu_start_support_complete==true" in result.missing_conditions
+    assert result.inferred_step_id == "S02"
+    assert "vars.fire_test_complete==true" in result.missing_conditions
 
 
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
@@ -419,7 +419,7 @@ def test_infer_step_accepts_mapping_recent_ui_targets(synthetic_pack_ctx: Mappin
     assert "vars.battery_on==true" in result.missing_conditions
 
 
-def test_infer_step_skips_s02_even_when_later_engine_signals_are_ready(
+def test_infer_step_blocks_at_s02_even_when_later_engine_signals_are_ready(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -444,8 +444,8 @@ def test_infer_step_skips_s02_even_when_later_engine_signals_are_ready(
         pack_path=REAL_PACK_PATH,
     )
 
-    assert result.inferred_step_id == "S05"
-    assert "vars.throttle_r_idle_complete==true" in result.missing_conditions
+    assert result.inferred_step_id == "S02"
+    assert "vars.fire_test_complete==true" in result.missing_conditions
 
 
 def test_infer_step_does_not_regress_to_s04_after_apu_auto_shutdown(

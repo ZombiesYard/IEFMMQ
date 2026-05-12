@@ -1223,6 +1223,7 @@ def test_explain_error_zh_fallback_with_inferred_step_and_missing_conditions() -
         "battery_on": True,
         "l_gen_on": True,
         "r_gen_on": True,
+        "fire_test_complete": True,
         "apu_on": True,
         "apu_ready": False,
     }
@@ -1247,6 +1248,7 @@ def test_explain_error_zh_fallback_with_inferred_step_without_missing_conditions
         "battery_on": True,
         "l_gen_on": True,
         "r_gen_on": True,
+        "fire_test_complete": True,
         "apu_ready": True,
         "engine_crank_right": True,
         "rpm_r": 65,
@@ -1343,6 +1345,7 @@ def test_explain_error_en_fallback_with_inferred_step_and_missing_conditions() -
         "battery_on": True,
         "l_gen_on": True,
         "r_gen_on": True,
+        "fire_test_complete": True,
         "apu_on": True,
         "apu_ready": False,
     }
@@ -1363,6 +1366,7 @@ def test_explain_error_en_fallback_with_inferred_step_without_missing_conditions
         "battery_on": True,
         "l_gen_on": True,
         "r_gen_on": True,
+        "fire_test_complete": True,
         "apu_ready": True,
         "engine_crank_right": True,
         "rpm_r": 65,

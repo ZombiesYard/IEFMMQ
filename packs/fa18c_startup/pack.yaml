@@ -26,7 +26,6 @@ metadata:
     - S13
     - S21
   manual_or_out_of_layout_steps:
-    - S02
     - S14
     - S16
     - S17
@@ -255,7 +254,11 @@ completion_gates:
       var: vars.r_gen_on
       reason_code: s01_requires_r_gen_on
       reason: "Right generator must be ON."
-  S02: []
+  S02:
+    - op: flag_true
+      var: vars.fire_test_complete
+      reason_code: s02_requires_fire_test_complete
+      reason: "Fire test A and B must be performed before advancing to APU start."
   S03:
     - op: flag_true
       var: vars.apu_start_support_complete
@@ -436,7 +439,7 @@ steps:
     phase: P1
     critical: true
     observability: observable
-    overlay_enabled: false
+    overlay_enabled: true
     evidence_requirements:
       - var
       - delta
@@ -446,9 +449,10 @@ steps:
     completion_conditions:
       - "Fire test A completed with correct aural/visual indications."
       - "Fire test B completed after ~10s pause."
-    ui_targets: []
+    ui_targets:
+      - fire_test_switch
     tutor_prompts:
-      - "Fire test is currently skipped in the live tutor flow; continue with APU start once aircraft power is stable."
+      - "Move and hold the fire test switch to FIRE TEST A. Verify the fire warning light and aural tones activate. Release, wait ~10 seconds, then repeat for FIRE TEST B."
 
   - id: S03
     phase: P1

@@ -63,6 +63,7 @@ def _bios_frame(seq: int, t_wall: float, *, apu_switch: int) -> dict[str, Any]:
             "BATTERY_SW": 2,
             "L_GEN_SW": 1,
             "R_GEN_SW": 1,
+            "FIRE_TEST_SW": 0,
             "APU_CONTROL_SW": apu_switch,
             "APU_READY_LT": 0,
             "ENGINE_CRANK_SW": 1,
@@ -2578,8 +2579,8 @@ def test_real_fa18c_pack_marks_non_display_partial_steps_as_non_visual() -> None
         assert profiles[step_id]["requires_visual_confirmation"] is False
 
     assert profiles["S02"]["evidence_requirements"] == ["var", "delta", "gate"]
-    assert profiles["S02"]["ui_targets"] == []
-    assert profiles["S02"]["overlay_enabled"] is False
+    assert profiles["S02"]["ui_targets"] == ["fire_test_switch"]
+    assert profiles["S02"]["overlay_enabled"] is True
     assert profiles["S07"]["evidence_requirements"] == ["var", "delta", "gate"]
     assert profiles["S07"]["ui_targets"] == []
     assert profiles["S07"]["overlay_enabled"] is False
