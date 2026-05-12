@@ -3143,6 +3143,51 @@ class LiveDcsTutorLoop:
             response.metadata["completion_conflict_original_actions"] = copy.deepcopy(original_actions)
         return True
 
+    def _rewrite_terminal_state_conflict_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> bool:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False
+        inferred_step_id = hint.get("inferred_step_id")
+        if inferred_step_id != "S25":
+            return False
+        missing_conditions = hint.get("missing_conditions")
+        normalized_missing = [
+            item for item in missing_conditions if isinstance(item, str) and item
+        ] if isinstance(missing_conditions, list) else []
+        if normalized_missing:
+            return False
+
+        model_next_step_id = _extract_model_next_step_id(response.metadata)
+        if model_next_step_id == "S25":
+            return False
+
+        response.metadata["terminal_state_rewritten"] = True
+        response.metadata["terminal_state_original_message"] = response.message
+        response.metadata["terminal_state_original_explanations"] = list(response.explanations)
+        if isinstance(response.metadata.get("diagnosis"), Mapping):
+            response.metadata["terminal_state_original_diagnosis"] = dict(response.metadata["diagnosis"])
+        if isinstance(response.metadata.get("next"), Mapping):
+            response.metadata["terminal_state_original_next"] = dict(response.metadata["next"])
+
+        if self.lang == "zh":
+            rewritten = "当前冷启动流程已完成，无需继续操作。"
+        else:
+            rewritten = "The cold-start procedure is complete. No further action is needed."
+
+        response.message = rewritten
+        response.explanations = [rewritten]
+        if isinstance(response.metadata.get("diagnosis"), Mapping):
+            response.metadata["diagnosis"] = {}
+        if isinstance(response.metadata.get("next"), Mapping):
+            response.metadata["next"] = {}
+
+        return True
+
     def _should_use_deterministic_overlay_fallback(
         self,
         response: TutorResponse,
@@ -4321,6 +4366,7 @@ class LiveDcsTutorLoop:
                 response.metadata["response_mapping"] = mapped_meta
             self._normalize_observable_text_only_response(response, request)
             self._rewrite_conflicting_step_completion_response(response, request)
+            self._rewrite_terminal_state_conflict_response(response, request)
             s18_structured_completion_advanced, s18_structured_completion_reason = (
                 self._rewrite_s18_structured_fact_completion_to_s19(response, request)
             )
