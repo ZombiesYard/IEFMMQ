@@ -37,7 +37,7 @@ def test_enrich_bios_observation_compacts_payload_and_keeps_metadata(monkeypatch
     tmp_latch.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", tmp_latch)
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", False)
-    telemetry_pipeline._COMPLETION_LATCHES.clear()
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
     obs = Observation(
         source="dcs_bios",
         payload={
