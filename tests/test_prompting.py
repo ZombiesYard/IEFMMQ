@@ -1217,7 +1217,7 @@ def test_budget_over_advisory_does_not_force_trim() -> None:
         "recent_deltas": [],
     }
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=6000, max_prompt_tokens_est=1300)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=7000, max_prompt_tokens_est=1400)
 
     assert result.metadata["prompt_trimmed"] is False
     assert result.metadata["prompt_budget_status"] == "over_advisory"

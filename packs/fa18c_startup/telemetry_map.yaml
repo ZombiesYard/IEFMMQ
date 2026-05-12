@@ -154,7 +154,7 @@ vars:
   standby_pressure_set_0: "derived(num(bios.STBY_PRESS_SET_0))"
   standby_pressure_set_1: "derived(num(bios.STBY_PRESS_SET_1))"
   standby_pressure_set_2: "derived(num(bios.STBY_PRESS_SET_2))"
-  standby_altimeter_set: "derived(num(bios.STBY_PRESS_SET_0) > 10000 and num(bios.STBY_PRESS_SET_0) < 17000 and num(bios.STBY_PRESS_SET_1) > 55000 and num(bios.STBY_PRESS_SET_2) > 35000 and num(bios.STBY_PRESS_SET_2) < 45000)"
+  standby_altimeter_set: "derived(vars.standby_pressure_set_0 > 10000 and vars.standby_pressure_set_0 < 17000 and vars.standby_pressure_set_1 > 55000 and vars.standby_pressure_set_2 > 35000 and vars.standby_pressure_set_2 < 45000)"
 
   radar_altimeter_bug_value: "derived(num(bios.RADALT_MIN_HEIGHT_PTR) / 100)"
   radar_altimeter_bug_set: "derived(vars.radar_altimeter_bug_value > 5 and vars.radar_altimeter_bug_value < 600)"
