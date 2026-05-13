@@ -4274,6 +4274,61 @@ def test_build_observation_source_from_args_requires_aircraft_for_raw() -> None:
         _build_observation_source_from_args(args)
 
 
+def test_live_dcs_main_wires_tutor_text_sender_into_loop(monkeypatch, tmp_path: Path) -> None:
+    import live_dcs
+
+    captured: dict[str, Any] = {}
+
+    class FakeStore:
+        def __init__(self, *_args, **_kwargs) -> None:
+            return
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def append(self, _event) -> None:
+            return
+
+    class FakeTutorTextSender:
+        def __init__(self, **kwargs) -> None:
+            captured["sender_kwargs"] = dict(kwargs)
+
+        def close(self) -> None:
+            return
+
+    class FakeLoop:
+        def __init__(self, **kwargs) -> None:
+            captured["loop_kwargs"] = dict(kwargs)
+
+        def run(self, **_kwargs) -> dict[str, Any]:
+            return {}
+
+        def close(self) -> None:
+            return
+
+    monkeypatch.setattr("live_dcs.JsonlEventStore", FakeStore)
+    monkeypatch.setattr("live_dcs.OverlayActionExecutor", lambda **_kwargs: object())
+    monkeypatch.setattr("live_dcs._build_observation_source_from_args", lambda _args: object())
+    monkeypatch.setattr("live_dcs._build_model_from_args", lambda _args: object())
+    monkeypatch.setattr("live_dcs._build_vision_port_from_args", lambda _args, mode: (None, None, None, None))
+    monkeypatch.setattr("live_dcs.DcsTutorTextSender", FakeTutorTextSender)
+    monkeypatch.setattr("live_dcs.LiveDcsTutorLoop", FakeLoop)
+
+    code = live_dcs.main(["--output", str(tmp_path / "events.jsonl"), "--duration", "0"])
+
+    assert code == 0
+    assert captured["sender_kwargs"] == {
+        "host": "127.0.0.1",
+        "port": 7783,
+        "timeout": 0.5,
+        "enabled": True,
+    }
+    assert isinstance(captured["loop_kwargs"]["tutor_text_sender"], FakeTutorTextSender)
+
+
 def test_live_loop_request_context_and_metadata_include_scenario_profile(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_scenario_profile.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

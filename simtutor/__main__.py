@@ -128,6 +128,7 @@ def _add_model_args(parser: argparse.ArgumentParser, *, default_provider: str, p
 
 
 def _run_replay_bios(args: argparse.Namespace) -> int:
+    from adapters.dcs.tutor_text import NoopTutorTextSender
     from adapters.action_executor import OverlayActionExecutor
     from core.event_store import JsonlEventStore
     from live_dcs import (
@@ -189,6 +190,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     vision_sync_window_ms=vision_sync_window_ms,
                     vision_trigger_wait_ms=vision_trigger_wait_ms,
                     max_overlay_targets=max(0, int(args.max_overlay_targets)),
+                    tutor_text_sender=NoopTutorTextSender(),
                 )
 
                 stdin_trigger = StdinHelpTrigger() if args.stdin_help else None

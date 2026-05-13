@@ -13,6 +13,7 @@ from simtutor.replay_eval import (
     ReplayEvalCase,
     ReplayEvalExpectation,
     ReplayEvalOracleModel,
+    ReplayEvalSuite,
     _extract_case_outcome,
     load_replay_eval_suite,
     run_replay_eval_suite,
@@ -72,6 +73,94 @@ def test_run_replay_eval_suite_does_not_print_dry_run_actions(
 
     captured = capsys.readouterr()
     assert "dry_run_actions" not in captured.out
+
+
+def test_run_replay_eval_suite_wires_noop_tutor_text_sender_into_loop(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+    suite = ReplayEvalSuite(
+        suite_path=tmp_path / "suite.yaml",
+        suite_id="issue231",
+        dataset_kind="synthetic",
+        pack_path=tmp_path / "pack.yaml",
+        ui_map_path=tmp_path / "ui_map.yaml",
+        telemetry_map_path=tmp_path / "telemetry_map.yaml",
+        bios_to_ui_path=tmp_path / "bios_to_ui.yaml",
+        knowledge_index_path=tmp_path / "index.json",
+        knowledge_source_policy_path=None,
+        lang="zh",
+        scenario_profile="cold_start",
+        cases=(
+            ReplayEvalCase(
+                case_id="case_1",
+                input_path=tmp_path / "input.jsonl",
+                session_id="sess-1",
+                scenario_profile="cold_start",
+                max_frames=1,
+                expectation=ReplayEvalExpectation(
+                    step_id="S01",
+                    overlay_target="battery_switch",
+                    requires_visual_confirmation=False,
+                    vision_status="vision_unavailable",
+                    sync_status=None,
+                    sync_delta_ms=None,
+                    frame_ids=(),
+                ),
+            ),
+        ),
+    )
+
+    class FakeLoop:
+        def __init__(self, **kwargs) -> None:
+            captured["loop_kwargs"] = dict(kwargs)
+
+        def run(self, **_kwargs) -> None:
+            return None
+
+        def close(self) -> None:
+            return
+
+    class FakeStore:
+        def __init__(self, path: Path, mode: str = "w") -> None:
+            self.path = path
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.path.write_text("[]", encoding="utf-8")
+            return None
+
+        def append(self, _event) -> None:
+            return
+
+        @staticmethod
+        def load(_path: Path) -> list[dict[str, object]]:
+            return []
+
+    monkeypatch.setattr("live_dcs.ReplayBiosReceiver", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr("live_dcs.LiveDcsTutorLoop", FakeLoop)
+    monkeypatch.setattr("simtutor.replay_eval.JsonlEventStore", FakeStore)
+    monkeypatch.setattr(
+        "simtutor.replay_eval.OverlayActionExecutor",
+        lambda **_kwargs: type(
+            "FakeExecutor",
+            (),
+            {
+                "__enter__": lambda self: self,
+                "__exit__": lambda self, exc_type, exc, tb: None,
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        "simtutor.replay_eval._extract_case_outcome",
+        lambda _events, *, case: {"case_id": case.case_id, "status": "passed"},
+    )
+
+    run_replay_eval_suite(suite, output_dir=tmp_path / "out", model_factory=lambda _case: object())
+
+    sender = captured["loop_kwargs"]["tutor_text_sender"]
+    assert sender is not None
+    assert sender.send_text("Turn on APU.")["status"] == "skipped"
 
 
 def test_replay_eval_oracle_help_response_matches_schema_without_top_level_confidence() -> None:

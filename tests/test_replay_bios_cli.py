@@ -221,6 +221,61 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
     assert "overlay_dry_run" in kinds
 
 
+def test_cli_replay_bios_wires_noop_tutor_text_sender_into_loop(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_cli_sender.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    output_path = tmp_path / "replay_sender.jsonl"
+    captured: dict[str, Any] = {}
+
+    class FakeLoop:
+        def __init__(self, **kwargs) -> None:
+            captured["loop_kwargs"] = dict(kwargs)
+
+        def run(self, **_kwargs) -> dict[str, Any]:
+            return {}
+
+        def close(self) -> None:
+            return
+
+    monkeypatch.setattr("simtutor.__main__._build_replay_model_from_args", lambda _args: object())
+    monkeypatch.setattr("live_dcs.ReplayBiosReceiver", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr("live_dcs._build_vision_port_from_args", lambda _args, mode: (None, None, None, None))
+    monkeypatch.setattr("live_dcs.LiveDcsTutorLoop", FakeLoop)
+    monkeypatch.setattr(
+        "adapters.action_executor.OverlayActionExecutor",
+        lambda **_kwargs: type(
+            "FakeExecutor",
+            (),
+            {
+                "__enter__": lambda self: self,
+                "__exit__": lambda self, exc_type, exc, tb: None,
+            },
+        )(),
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--output",
+            str(output_path),
+            "--duration",
+            "0",
+        ],
+    )
+
+    code = main()
+
+    sender = captured["loop_kwargs"]["tutor_text_sender"]
+    assert code == 0
+    assert sender is not None
+    assert sender.send_text("Turn on APU.")["status"] == "skipped"
+
+
 def test_cli_replay_bios_closes_source_when_store_enter_fails(monkeypatch, tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_cli_store_fail.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

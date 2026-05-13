@@ -143,3 +143,28 @@ class DcsTutorTextSender:
         if ack.get("status") == "failed":
             result["failure_class"] = "remote_failure"
         return result
+
+
+class NoopTutorTextSender:
+    def close(self) -> None:
+        return
+
+    def send_text(
+        self,
+        text: str,
+        *,
+        display_time_s: float = 12.0,
+        clear_view: bool = False,
+        expect_ack: bool = True,
+        cmd_id: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_text = text.strip() if isinstance(text, str) else ""
+        return {
+            "cmd_id": cmd_id,
+            "status": "skipped",
+            "reason": "sender_noop",
+            "text": normalized_text,
+            "display_time_s": display_time_s,
+            "clear_view": clear_view,
+            "ack_skipped": not expect_ack,
+        }

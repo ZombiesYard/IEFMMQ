@@ -23,6 +23,7 @@ import yaml
 from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosRawReceiver, DcsBiosReceiver
+from adapters.dcs.tutor_text import DcsTutorTextSender
 from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
 from adapters.knowledge_source_policy import KnowledgeSourcePolicy, KnowledgeSourcePolicyError
 from adapters.knowledge_local import DEFAULT_INDEX_PATH, LocalKnowledgeAdapter, build_grounding_query
@@ -4855,6 +4856,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             session_id=args.session_id,
             event_sink=store.append,
         )
+        tutor_text_sender = DcsTutorTextSender(
+            host="127.0.0.1",
+            port=7783,
+            timeout=0.5,
+            enabled=True,
+        )
         loop = LiveDcsTutorLoop(
             source=source,
             model=model,
@@ -4879,6 +4886,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             vision_sync_window_ms=vision_sync_window_ms,
             vision_trigger_wait_ms=vision_trigger_wait_ms,
             max_overlay_targets=max(0, int(args.max_overlay_targets)),
+            tutor_text_sender=tutor_text_sender,
         )
 
         stdin_trigger = StdinHelpTrigger() if args.stdin_help else None
