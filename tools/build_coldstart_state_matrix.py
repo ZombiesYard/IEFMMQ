@@ -227,6 +227,12 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
     "l_gen_on": _set_enum("L_GEN_SW", true_value=1, false_value=0),
+    # LIGHTS_TEST_SW is a momentary pushbutton (0=OFF, 1=TEST).
+    # Production latch behaviour: lights_test_complete ← lights_test_active.
+    # The single-frame state-matrix model cannot represent latch persistence,
+    # so this is a single-frame approximation; full latch semantics are
+    # enforced by telemetry_pipeline across multiple frames in production.
+    "lights_test_complete": _set_enum("LIGHTS_TEST_SW", true_value=1, false_value=0),
     "left_ddi_on": _set_enum("LEFT_DDI_BRT_CTL", true_value=1, false_value=0),
     "mpcd_on": _set_enum("AMPCD_BRT_CTL", true_value=1, false_value=0),
     "obogs_ready": _VarBinding(primary_bios_key="OBOGS_SW", setter=_set_obogs_ready),
