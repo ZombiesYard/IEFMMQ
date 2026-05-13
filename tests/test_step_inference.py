@@ -1698,9 +1698,11 @@ def test_infer_step_blocks_at_s16_when_flap_not_auto(
     )
     assert "vars.flap_auto==true" in blocked.missing_conditions
 
-    # With flap at AUTO, S16 should be satisfied and engine advances past S16.
+    # With flap at AUTO and takeoff trim set, S16 and S17 pass; engine should
+    # advance past S16 and stop at S18 on unsatisfied visual fact requirement.
     vars_auto = dict(vars_map)
     vars_auto["flap_auto"] = True
+    vars_auto["takeoff_trim_set"] = True
     advanced = infer_step_id(
         pack_steps,
         vars_auto,
@@ -1711,6 +1713,7 @@ def test_infer_step_blocks_at_s16_when_flap_not_auto(
         vision_facts=vision_facts,
     )
 
-    assert advanced.inferred_step_id != "S16", (
-        f"Expected step after S16, got {advanced.inferred_step_id}"
+    assert advanced.inferred_step_id == "S18", (
+        f"Expected S18 (blocked on visual facts), got {advanced.inferred_step_id}"
     )
+    assert "vision_facts.fcsmc_final_go_result_visible==seen" in advanced.missing_conditions
