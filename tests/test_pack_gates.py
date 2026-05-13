@@ -346,7 +346,7 @@ def test_evaluate_pack_gates_uses_takeoff_trim_button_press_for_s17() -> None:
     assert blocked["S17.completion"]["reason_code"] == "s17_requires_takeoff_trim_pressed"
 
 
-def test_evaluate_pack_gates_allows_s07_completion_without_rules() -> None:
+def test_evaluate_pack_gates_blocks_s07_when_lights_test_not_complete() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     allowed = evaluate_pack_gates(
         observations=[_obs_with_vars(lights_test_complete=True)],
@@ -354,15 +354,14 @@ def test_evaluate_pack_gates_allows_s07_completion_without_rules() -> None:
         completion_gates=cfg["completion_gates"],
     )
     assert allowed["S07.completion"]["status"] == "allowed"
-    assert allowed["S07.completion"]["reason_code"] == "no_rules"
 
     blocked = evaluate_pack_gates(
         observations=[_obs_with_vars(lights_test_complete=False)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )
-    assert blocked["S07.completion"]["status"] == "allowed"
-    assert blocked["S07.completion"]["reason_code"] == "no_rules"
+    assert blocked["S07.completion"]["status"] == "blocked"
+    assert blocked["S07.completion"]["reason_code"] == "s07_requires_lights_test"
 
 
 def test_scenario_profile_changes_prompt_gate_hints() -> None:

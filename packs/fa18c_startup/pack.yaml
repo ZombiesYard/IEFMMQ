@@ -288,7 +288,11 @@ completion_gates:
       var: vars.bleed_air_cycle_complete
       reason_code: s06_requires_bleed_air_norm
       reason: "BLEED AIR knob must return to NORM after full cycle."
-  S07: []
+  S07:
+    - op: flag_true
+      var: vars.lights_test_complete
+      reason_code: s07_requires_lights_test
+      reason: "Lights test must be executed to verify all annunciators illuminate correctly."
   S08:
     - op: flag_true
       var: vars.left_ddi_on
@@ -531,7 +535,7 @@ steps:
     phase: P2
     critical: false
     observability: observable
-    overlay_enabled: false
+    overlay_enabled: true
     evidence_requirements:
       - var
       - delta
@@ -540,9 +544,10 @@ steps:
       - "Right engine stabilized; electrical power available."
     completion_conditions:
       - "Light test executed with all annunciators verified."
-    ui_targets: []
+    ui_targets:
+      - lights_test_button
     tutor_prompts:
-      - "Lights test is currently skipped in the live tutor flow; proceed to display power-up once the right engine is stabilized."
+      - "Press and hold the LIGHTS TEST switch on the right console. Verify all warning, caution, and advisory annunciator lights illuminate, and the master caution tone sounds."
 
   - id: S08
     phase: P3

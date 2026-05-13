@@ -2617,8 +2617,8 @@ def test_real_fa18c_pack_marks_non_display_partial_steps_as_non_visual() -> None
     assert profiles["S02"]["ui_targets"] == ["fire_test_switch"]
     assert profiles["S02"]["overlay_enabled"] is True
     assert profiles["S07"]["evidence_requirements"] == ["var", "delta", "gate"]
-    assert profiles["S07"]["ui_targets"] == []
-    assert profiles["S07"]["overlay_enabled"] is False
+    assert profiles["S07"]["ui_targets"] == ["lights_test_button"]
+    assert profiles["S07"]["overlay_enabled"] is True
     assert profiles["S09"]["observability"] == "observable"
     assert profiles["S09"]["observability_status"] == "observable"
     assert profiles["S09"]["requires_visual_confirmation"] is False

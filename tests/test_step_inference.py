@@ -369,6 +369,71 @@ def test_infer_step_blocks_at_s02_when_fire_test_not_performed(
     assert "vars.fire_test_a_complete==true" in result.missing_conditions
 
 
+def test_infer_step_blocks_at_s07_when_lights_test_not_performed(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    result = infer_step_id(
+        pack_steps,
+        {
+            "power_available": True,
+            "battery_on": True,
+            "l_gen_on": True,
+            "r_gen_on": True,
+            "fire_test_a_complete": True,
+            "fire_test_b_complete": True,
+            "apu_start_support_complete": True,
+            "engine_crank_right_complete": True,
+            "throttle_r_idle_complete": True,
+            "bleed_air_cycle_complete": True,
+            "rpm_r": 65,
+            "rpm_r_gte_60": True,
+            "rpm_r_gte_25": True,
+            "lights_test_complete": False,
+        },
+        ["bleed_air_knob"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    assert result.inferred_step_id == "S07"
+    assert "vars.lights_test_complete==true" in result.missing_conditions
+
+
+def test_infer_step_advances_past_s07_when_lights_test_complete(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    result = infer_step_id(
+        pack_steps,
+        {
+            "power_available": True,
+            "battery_on": True,
+            "l_gen_on": True,
+            "r_gen_on": True,
+            "fire_test_a_complete": True,
+            "fire_test_b_complete": True,
+            "apu_start_support_complete": True,
+            "engine_crank_right_complete": True,
+            "throttle_r_idle_complete": True,
+            "bleed_air_cycle_complete": True,
+            "rpm_r": 65,
+            "rpm_r_gte_60": True,
+            "rpm_r_gte_25": True,
+            "lights_test_complete": True,
+        },
+        ["lights_test_button"],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+    )
+
+    assert result.inferred_step_id == "S08"
+
+
 def test_infer_step_accepts_iterable_recent_ui_targets(synthetic_pack_ctx: Mapping[str, Any]) -> None:
     pack_steps: list[dict[str, Any]] = synthetic_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = synthetic_pack_ctx["pack_gates"]
