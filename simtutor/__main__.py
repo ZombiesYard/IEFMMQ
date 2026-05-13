@@ -69,6 +69,11 @@ def _build_replay_model_from_args(args: argparse.Namespace) -> Any:
 def _add_model_args(parser: argparse.ArgumentParser, *, default_provider: str, provider_choices: list[str]) -> None:
     parser.add_argument("--model-provider", choices=provider_choices, default=default_provider)
     parser.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
+    parser.add_argument(
+        "--vision-model-name",
+        default=os.getenv("SIMTUTOR_VISION_MODEL_NAME", "simtutor-vision"),
+        help="Model name for vision fact extraction (LoRA-enabled).",
+    )
     parser.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
     parser.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
     parser.add_argument(
@@ -189,6 +194,7 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
                     vision_mode="replay",
                     vision_sync_window_ms=vision_sync_window_ms,
                     vision_trigger_wait_ms=vision_trigger_wait_ms,
+                    vision_model_name=getattr(args, "vision_model_name", None),
                     max_overlay_targets=max(0, int(args.max_overlay_targets)),
                     tutor_text_sender=NoopTutorTextSender(),
                 )

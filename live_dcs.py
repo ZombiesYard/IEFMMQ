@@ -314,14 +314,16 @@ def _build_vision_fact_extractor_from_model(
     model: Any,
     lang: str,
     pack_path: str | Path | None = None,
+    vision_model_name: str | None = None,
 ) -> VisionFactExtractor | None:
     if not isinstance(model, OpenAICompatModel):
         return None
     if not getattr(model, "enable_multimodal", False):
         return None
+    effective_vision_name = vision_model_name or model.model_name
     try:
         return VisionFactExtractor(
-            model_name=model.model_name,
+            model_name=effective_vision_name,
             base_url=model.base_url,
             timeout_s=model.timeout_s,
             api_key=model.api_key,
@@ -2131,6 +2133,7 @@ class LiveDcsTutorLoop:
         vision_sync_window_ms: int | None = None,
         vision_trigger_wait_ms: int | None = None,
         vision_fact_extractor: Any | None = None,
+        vision_model_name: str | None = None,
         max_overlay_targets: int = 1,
         tutor_text_sender: TutorTextSenderLike | None = None,
         tutor_text_display_time_s: float = 12.0,
@@ -2226,6 +2229,7 @@ class LiveDcsTutorLoop:
                 model=self.model,
                 lang=self.lang,
                 pack_path=self.pack_path,
+                vision_model_name=vision_model_name,
             )
         )
         self._vision_fact_config = _resolve_vision_fact_config(
@@ -4759,6 +4763,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--model-provider", choices=["stub", "openai_compat", "ollama"], default="stub")
     parser.add_argument("--model-name", default=os.getenv("SIMTUTOR_MODEL_NAME", "Qwen3-8B-Instruct"))
+    parser.add_argument(
+        "--vision-model-name",
+        default=os.getenv("SIMTUTOR_VISION_MODEL_NAME", "simtutor-vision"),
+        help="Model name for vision fact extraction (LoRA-enabled). Defaults to 'simtutor-vision'.",
+    )
     parser.add_argument("--model-base-url", default=os.getenv("SIMTUTOR_MODEL_BASE_URL", ""))
     parser.add_argument("--model-timeout-s", type=float, default=float(os.getenv("SIMTUTOR_MODEL_TIMEOUT_S", "20")))
     parser.add_argument(
@@ -4885,6 +4894,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             vision_mode="live",
             vision_sync_window_ms=vision_sync_window_ms,
             vision_trigger_wait_ms=vision_trigger_wait_ms,
+            vision_model_name=args.vision_model_name,
             max_overlay_targets=max(0, int(args.max_overlay_targets)),
             tutor_text_sender=tutor_text_sender,
         )

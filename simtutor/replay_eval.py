@@ -737,6 +737,7 @@ def run_replay_eval_suite(
                         vision_mode="replay",
                         vision_sync_window_ms=None if case.vision is None else case.vision.sync_window_ms,
                         vision_trigger_wait_ms=None if case.vision is None else case.vision.trigger_wait_ms,
+                        vision_model_name="simtutor-vision",
                         tutor_text_sender=NoopTutorTextSender(),
                     )
                     loop.run(
