@@ -244,8 +244,8 @@ def test_load_pack_gate_config_applies_carrier_profile_overrides() -> None:
 
     assert airfield["completion_gates"]["S12"][0]["reason_code"] == "s12_requires_ins_mode_gnd"
     assert carrier["completion_gates"]["S12"][0]["reason_code"] == "s12_requires_ins_mode_cv"
-    assert airfield["completion_gates"]["S23"][0]["reason_code"] == "s23_requires_radalt_bug_airfield_200"
-    assert carrier["completion_gates"]["S23"][0]["reason_code"] == "s23_requires_radalt_bug_carrier_40"
+    assert airfield["completion_gates"]["S24"][0]["reason_code"] == "s24_requires_radalt_bug_airfield_200"
+    assert carrier["completion_gates"]["S24"][0]["reason_code"] == "s24_requires_radalt_bug_carrier_40"
 
 
 def test_load_pack_gate_config_rejects_unknown_scenario_profile() -> None:
@@ -275,14 +275,14 @@ def test_evaluate_pack_gates_profile_changes_s12_and_s23_gate_results() -> None:
     )
 
     assert airfield_gates["S12.completion"]["status"] == "allowed"
-    assert airfield_gates["S23.completion"]["status"] == "allowed"
+    assert airfield_gates["S24.completion"]["status"] == "allowed"
     assert carrier_gates["S12.completion"]["status"] == "blocked"
     assert carrier_gates["S12.completion"]["reason_code"] == "s12_requires_ins_mode_cv"
-    assert carrier_gates["S23.completion"]["status"] == "blocked"
-    assert carrier_gates["S23.completion"]["reason_code"] == "s23_requires_radalt_bug_carrier_40"
+    assert carrier_gates["S24.completion"]["status"] == "blocked"
+    assert carrier_gates["S24.completion"]["reason_code"] == "s24_requires_radalt_bug_carrier_40"
 
 
-def test_evaluate_pack_gates_allows_bios_observable_steps_s14_s16_s20_s21_s24_s25() -> None:
+def test_evaluate_pack_gates_allows_bios_observable_steps_s14_s16_s21_s22_s25_s26() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     gates = evaluate_pack_gates(
         observations=[
@@ -299,7 +299,7 @@ def test_evaluate_pack_gates_allows_bios_observable_steps_s14_s16_s20_s21_s24_s2
         completion_gates=cfg["completion_gates"],
     )
 
-    for gate_id in ("S14.completion", "S16.completion", "S20.completion", "S21.completion", "S24.completion", "S25.completion"):
+    for gate_id in ("S14.completion", "S16.completion", "S21.completion", "S22.completion", "S25.completion", "S26.completion"):
         assert gates[gate_id]["status"] == "allowed"
         assert gates[gate_id]["allowed"] is True
 
@@ -323,10 +323,10 @@ def test_evaluate_pack_gates_blocks_bios_observable_steps_when_bios_state_missin
 
     assert gates["S14.completion"]["reason_code"] == "s14_requires_obogs_ready"
     assert gates["S16.completion"]["reason_code"] == "s16_requires_flap_auto"
-    assert gates["S20.completion"]["reason_code"] == "s20_requires_parking_brake_released"
-    assert gates["S21.completion"]["reason_code"] == "s21_requires_bingo_fuel_set"
-    assert gates["S24.completion"]["reason_code"] == "s24_requires_standby_attitude_uncaged"
-    assert gates["S25.completion"]["reason_code"] == "s25_requires_attitude_source_auto"
+    assert gates["S21.completion"]["reason_code"] == "s21_requires_parking_brake_released"
+    assert gates["S22.completion"]["reason_code"] == "s22_requires_bingo_fuel_set"
+    assert gates["S25.completion"]["reason_code"] == "s25_requires_standby_attitude_uncaged"
+    assert gates["S26.completion"]["reason_code"] == "s26_requires_attitude_source_auto"
 
 
 def test_evaluate_pack_gates_uses_takeoff_trim_button_press_for_s17() -> None:
@@ -385,7 +385,7 @@ def test_scenario_profile_changes_prompt_gate_hints() -> None:
     )
 
     base_context = {
-        "candidate_steps": ["S12", "S23"],
+        "candidate_steps": ["S12", "S24"],
         "overlay_target_allowlist": ["ins_mode_knob", "radar_altimeter_bug_knob"],
         "vars": {},
         "recent_deltas": [],
@@ -398,7 +398,7 @@ def test_scenario_profile_changes_prompt_gate_hints() -> None:
             "scenario_profile": "airfield",
             "gates": {
                 "S12.completion": airfield_gates["S12.completion"],
-                "S23.completion": airfield_gates["S23.completion"],
+                "S24.completion": airfield_gates["S24.completion"],
             },
         },
         "en",
@@ -409,7 +409,7 @@ def test_scenario_profile_changes_prompt_gate_hints() -> None:
             "scenario_profile": "carrier",
             "gates": {
                 "S12.completion": carrier_gates["S12.completion"],
-                "S23.completion": carrier_gates["S23.completion"],
+                "S24.completion": carrier_gates["S24.completion"],
             },
         },
         "en",

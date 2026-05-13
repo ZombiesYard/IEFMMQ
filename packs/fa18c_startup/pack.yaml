@@ -1,6 +1,6 @@
 pack_id: fa18c_startup
 version: v1
-title: "F/A-18C Cold Start (Full S01-S25)"
+title: "F/A-18C Cold Start (Full S01-S26)"
 description: >
   Cold-start to taxi-ready procedure for the F/A-18C Lot 20. Derived from
   Doc/Evaluation/fa18c_startup_master.md and Appendix - Training Task Syllabus.md.
@@ -12,6 +12,7 @@ metadata:
     - S08
     - S15
     - S18
+    - S19
   bios_priority_steps:
     - S01
     - S03
@@ -25,21 +26,21 @@ metadata:
     - S12
     - S13
     - S16
-    - S21
+    - S22
   manual_or_out_of_layout_steps:
     - S14
     - S17
-    - S19
     - S20
-    - S22
+    - S21
     - S23
     - S24
     - S25
+    - S26
   source_documents:
     - Doc/Evaluation/fa18c_startup_master.md
     - Doc/Evaluation/Appendix - Training Task Syllabus.md
   notes: >
-    Full cold-start procedure coverage for steps S01-S25 (phases P1-P6).
+    Full cold-start procedure coverage for steps S01-S26 (phases P1-P6).
     The frozen v0.4 visual contract only uses native left/right DDI plus AMPCD
     exports; UFC, IFEI, and warning/advisory evidence should come from DCS-BIOS.
 
@@ -51,9 +52,9 @@ prerequisites:
 
 completion_conditions:
   - "Both engines running and stabilized in green ranges."
-  - "Core avionics and flight-control preparation steps completed through S25."
+  - "Core avionics and flight-control preparation steps completed through S26."
   - "Taxi-ready checks configured for current scenario profile (airfield/carrier)."
-  - "Safety-critical cautions reviewed for full cold-start flow S01-S25."
+  - "Safety-critical cautions reviewed for full cold-start flow S01-S26."
 
 ui_targets:
   - battery_switch
@@ -203,41 +204,46 @@ precondition_gates:
     - op: flag_true
       var: vars.right_ddi_on
       reason_code: s18_requires_right_ddi_on
-      reason: "Right DDI must be powered before FCS BIT sequence."
+      reason: "Right DDI must be powered before entering the FCS-MC BIT page."
   S19:
     - op: flag_true
-      var: vars.radar_mode_opr
-      reason_code: s19_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before four-down checks."
+      var: vars.right_ddi_on
+      reason_code: s19_requires_right_ddi_on
+      reason: "Right DDI must remain powered before running the FCS BIT."
   S20:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s20_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before parking-brake release."
+      reason: "Radar knob should remain in OPR before four-down checks."
   S21:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s21_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before BINGO setup."
+      reason: "Radar knob should remain in OPR before parking-brake release."
   S22:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s22_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before standby altimeter setup."
+      reason: "Radar knob should remain in OPR before BINGO setup."
   S23:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s23_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before radar altimeter bug setup."
+      reason: "Radar knob should remain in OPR before standby altimeter setup."
   S24:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s24_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before standby attitude uncage."
+      reason: "Radar knob should remain in OPR before radar altimeter bug setup."
   S25:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s25_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before standby attitude uncage."
+  S26:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s26_requires_radar_mode_opr
       reason: "Radar knob should remain in OPR before attitude source AUTO selection."
 
 completion_gates:
@@ -363,46 +369,47 @@ completion_gates:
       reason_code: s17_requires_takeoff_trim_pressed
       reason: "TAKEOFF TRIM button must be pressed."
   S18: []
-  S19:
+  S19: []
+  S20:
     - op: flag_true
       var: vars.flap_configured
-      reason_code: s19_requires_flaps_configured
+      reason_code: s20_requires_flaps_configured
       reason: "Flaps must be set to AUTO or HALF as part of four-down checks."
     - op: flag_true
       var: vars.pitot_heat_on
-      reason_code: s19_requires_pitot_heat_on
+      reason_code: s20_requires_pitot_heat_on
       reason: "Pitot heat must be ON as part of four-down checks."
-  S20:
-    - op: flag_true
-      var: vars.parking_brake_released
-      reason_code: s20_requires_parking_brake_released
-      reason: "Parking brake must be released."
   S21:
     - op: flag_true
-      var: vars.bingo_fuel_set
-      reason_code: s21_requires_bingo_fuel_set
-      reason: "BINGO fuel must be set on the IFEI."
+      var: vars.parking_brake_released
+      reason_code: s21_requires_parking_brake_released
+      reason: "Parking brake must be released."
   S22:
     - op: flag_true
-      var: vars.standby_altimeter_set
-      reason_code: s22_requires_standby_altimeter_set
-      reason: "Standby barometric altimeter must be set to approximately 29.92 inHg (airfield QNH)."
+      var: vars.bingo_fuel_set
+      reason_code: s22_requires_bingo_fuel_set
+      reason: "BINGO fuel must be set on the IFEI."
   S23:
+    - op: flag_true
+      var: vars.standby_altimeter_set
+      reason_code: s23_requires_standby_altimeter_set
+      reason: "Standby barometric altimeter must be set to approximately 29.92 inHg (airfield QNH)."
+  S24:
     - op: arg_in_range
       var: vars.radar_altimeter_bug_value
       min: 180
       max: 220
-      reason_code: s23_requires_radalt_bug_airfield_200
+      reason_code: s24_requires_radalt_bug_airfield_200
       reason: "Radar altimeter bug should be near 200 ft for airfield startup."
-  S24:
-    - op: flag_true
-      var: vars.standby_attitude_uncaged
-      reason_code: s24_requires_standby_attitude_uncaged
-      reason: "Standby attitude indicator must be uncaged."
   S25:
     - op: flag_true
+      var: vars.standby_attitude_uncaged
+      reason_code: s25_requires_standby_attitude_uncaged
+      reason: "Standby attitude indicator must be uncaged."
+  S26:
+    - op: flag_true
       var: vars.attitude_source_auto
-      reason_code: s25_requires_attitude_source_auto
+      reason_code: s26_requires_attitude_source_auto
       reason: "Attitude source selector must be set to AUTO."
 
 profile_overrides:
@@ -415,12 +422,12 @@ profile_overrides:
           max: 1
           reason_code: s12_requires_ins_mode_cv
           reason: "INS mode must be set to CV for carrier startup."
-      S23:
+      S24:
         - op: arg_in_range
           var: vars.radar_altimeter_bug_value
           min: 30
           max: 60
-          reason_code: s23_requires_radalt_bug_carrier_40
+          reason_code: s24_requires_radalt_bug_carrier_40
           reason: "Radar altimeter bug should be near 40 ft for carrier operations."
 
 steps:
@@ -744,15 +751,33 @@ steps:
     preconditions:
       - "Right DDI powered and BIT/FCS page available."
     completion_conditions:
-      - "FCS BIT interaction performed and result reviewed."
+      - "Right DDI advanced from BIT root page to the FCS-MC BIT page."
     ui_targets:
-      - fcs_bit_switch
       - right_mdi_pb18
       - right_mdi_pb5
     tutor_prompts:
-      - "On the right DDI, recover to the BIT flow with PB18 MENU if needed. From the BIT top page, press PB5 FCS-MC. When the FCS-MC page is showing the FCS option on PB5, hold the right-wall FCS BIT switch and press PB5 FCS together until the page shows IN TEST."
+      - "On the right DDI, recover to the BIT flow with PB18 MENU if needed. From the BIT top page, press PB5 FCS-MC to enter the FCS-MC BIT page."
 
   - id: S19
+    phase: P5
+    critical: true
+    observability: partial
+    requires_visual_confirmation: true
+    evidence_requirements:
+      - delta
+      - gate
+      - visual
+    preconditions:
+      - "Right DDI is on the FCS-MC BIT page."
+    completion_conditions:
+      - "FCS BIT final GO result reviewed on the FCS-MC page."
+    ui_targets:
+      - fcs_bit_switch
+      - right_mdi_pb5
+    tutor_prompts:
+      - "When the right DDI is already on the FCS-MC page, hold the right-wall FCS BIT switch and press PB5 FCS together to start the BIT. Observe the page until the final GO result is shown."
+
+  - id: S20
     phase: P5
     critical: true
     observability: partial
@@ -774,7 +799,7 @@ steps:
     tutor_prompts:
       - "Execute the full four-down checklist; telemetry can observe several switch states, but the full sequence still needs confirmation."
 
-  - id: S20
+  - id: S21
     phase: P6
     critical: true
     observability: observable
@@ -790,7 +815,7 @@ steps:
     tutor_prompts:
       - "Release parking brake when taxi checklist is complete."
 
-  - id: S21
+  - id: S22
     phase: P6
     critical: true
     observability: observable
@@ -807,7 +832,7 @@ steps:
     tutor_prompts:
       - "Set BINGO fuel on the IFEI to the mission target."
 
-  - id: S22
+  - id: S23
     phase: P6
     critical: true
     observability: partial
@@ -824,7 +849,7 @@ steps:
     tutor_prompts:
       - "Adjust the standby barometric altimeter to the local field elevation/QNH reference."
 
-  - id: S23
+  - id: S24
     phase: P6
     critical: true
     observability: observable
@@ -840,7 +865,7 @@ steps:
     tutor_prompts:
       - "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier)."
 
-  - id: S24
+  - id: S25
     phase: P6
     critical: true
     observability: observable
@@ -856,7 +881,7 @@ steps:
     tutor_prompts:
       - "Uncage the standby attitude indicator."
 
-  - id: S25
+  - id: S26
     phase: P6
     critical: true
     observability: observable

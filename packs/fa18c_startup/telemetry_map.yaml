@@ -115,7 +115,7 @@ vars:
   ufc_scratchpad_string_1_display: "bios.UFC_SCRATCHPAD_STRING_1_DISPLAY"
   ufc_scratchpad_string_2_display: "bios.UFC_SCRATCHPAD_STRING_2_DISPLAY"
 
-  # S14-S25 extension vars.
+  # S14-S26 extension vars.
   # If a checklist item is currently not observable from trusted telemetry, expose it
   # as explicit "unknown" (instead of false) so gating/inference can degrade safely.
   obogs_switch_on: "bios.OBOGS_SW == 1"
