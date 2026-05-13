@@ -3790,6 +3790,13 @@ class LiveDcsTutorLoop:
                 t for t in candidate_targets
                 if t not in set(fallback_targets)
             ]
+            if not candidate_targets:
+                _precondition_reason = next(
+                    (b.get("reason", "") for b in gate_blockers
+                     if isinstance(b, Mapping) and str(b.get("ref", "")).endswith(".precondition")),
+                    "precondition_blocked",
+                )
+                return None, f"precondition_blocked:{_precondition_reason}"
 
         if (not ignore_request_allowlist) and isinstance(request_allowlist, list):
             allowset = {item for item in request_allowlist if isinstance(item, str) and item}
