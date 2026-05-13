@@ -2970,6 +2970,67 @@ def test_safe_fallback_overlay_prefers_hud_target_for_s08_hud_missing(tmp_path: 
         loop.close()
 
 
+def test_safe_fallback_overlay_enforces_ddi_before_ampcd_for_s08(tmp_path: Path) -> None:
+    """When mpcd_on is the missing condition for S08, DDI brightness selectors
+    must be highlighted before the AMPCD brightness knob.
+
+    On F/A-18C Lot 20, the AMPCD will not illuminate if no DDI has been
+    powered first. The brightness knob alone is insufficient.
+    """
+    replay_path = tmp_path / "bios_s08_ddi_before_ampcd.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {
+                    "left_ddi_on": True,
+                    "right_ddi_on": True,
+                    "mpcd_on": False,
+                },
+                "gates": {
+                    "S08.completion": {
+                        "status": "blocked",
+                        "reason_code": "s08_requires_mpcd_on",
+                        "reason": "MPCD must be powered.",
+                    }
+                },
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "missing_conditions": ["vars.mpcd_on==true"],
+                    "gate_blockers": [{"ref": "GATES.S08.completion", "reason": "MPCD must be powered."}],
+                    "recent_ui_targets": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+            },
+        )
+
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+
+        assert fallback_reason == "deterministic_step:S08"
+        assert isinstance(fallback_help_obj, dict)
+        # The first highlighted target must be a DDI brightness selector,
+        # not ampcd_off_brightness_knob, because AMPCD won't light without
+        # a powered DDI on F/A-18C Lot 20.
+        assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_brightness_selector"], (
+            f"Expected left_mdi_brightness_selector first, got {fallback_help_obj['overlay']['targets']}"
+        )
+    finally:
+        loop.close()
+
+
 def test_normalize_observable_text_only_response_rewrites_bad_visual_excuse(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_observable_text_rewrite.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])

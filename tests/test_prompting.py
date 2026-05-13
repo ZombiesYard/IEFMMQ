@@ -663,6 +663,48 @@ def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
     assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "hud_symbology_brightness_knob"
 
 
+def test_prompt_enforces_ddi_before_ampcd_for_s08_mpcd_missing() -> None:
+    """When mpcd_on is the only missing condition for S08, the prompt's
+    priority list must rank a DDI brightness selector before the AMPCD knob.
+
+    On F/A-18C Lot 20 the AMPCD won't light without at least one DDI
+    powered first, so DDI brightness selectors must come first.
+    """
+    ctx = {
+        "candidate_steps": ["S08"],
+        "overlay_target_allowlist": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+        ],
+        "vars": {
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": False,
+            "hud_on": True,
+        },
+        "recent_deltas": [],
+        "recent_actions": {"current_button": None, "recent_buttons": []},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S08",
+            "missing_conditions": ["vars.mpcd_on==true"],
+            "recent_ui_targets": [],
+            "observability_status": "observable",
+            "step_evidence_requirements": ["var", "gate", "delta"],
+        },
+    }
+
+    payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
+
+    # The preferred target must be a DDI brightness selector, not the
+    # AMPCD brightness knob, because AMPCD needs at least one DDI powered.
+    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_brightness_selector", (
+        f"Expected left_mdi_brightness_selector, got {payload['overlay_target_policy']['preferred_target']}"
+    )
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "left_mdi_brightness_selector"
+
+
 def test_prompt_keeps_visual_action_hint_for_s08_without_promoting_it_to_preferred_target() -> None:
     ctx = {
         "candidate_steps": ["S08"],

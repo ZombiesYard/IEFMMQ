@@ -1436,6 +1436,37 @@ def _missing_condition_target_hints(
     return out
 
 
+def _enforce_s08_ddi_before_ampcd(
+    candidate_targets: list[str],
+    *,
+    inferred_step_id: str | None,
+) -> list[str]:
+    """For S08, ensure DDI brightness selectors precede the AMPCD brightness knob.
+
+    On F/A-18C Lot 20 the AMPCD will not illuminate if no DDI has been
+    powered first — the brightness knob alone is insufficient.
+    When both DDI and AMPCD targets are candidates, DDIs must come first.
+    """
+    if inferred_step_id != "S08":
+        return candidate_targets
+    ddi_selectors = ("left_mdi_brightness_selector", "right_mdi_brightness_selector")
+    ampcd_target = "ampcd_off_brightness_knob"
+    if ampcd_target not in candidate_targets:
+        return candidate_targets
+    ddi_present = [t for t in ddi_selectors if t in candidate_targets]
+    if not ddi_present:
+        return candidate_targets
+    ampcd_pos = candidate_targets.index(ampcd_target)
+    first_ddi_pos = min(candidate_targets.index(t) for t in ddi_present)
+    if ampcd_pos >= first_ddi_pos:
+        return candidate_targets
+    # AMPCD is ahead of all present DDIs — move it after them.
+    reordered = [t for t in candidate_targets if t != ampcd_target]
+    insert_after = max(reordered.index(t) for t in ddi_present)
+    reordered.insert(insert_after + 1, ampcd_target)
+    return reordered
+
+
 def _prefer_navigation_target_from_vision_context(
     *,
     inferred_step_id: str,
@@ -3810,6 +3841,10 @@ class LiveDcsTutorLoop:
         remaining = [t for t in candidate_targets if t not in self._step_interacted_targets]
         if remaining:
             candidate_targets = remaining
+        candidate_targets = _enforce_s08_ddi_before_ampcd(
+            candidate_targets,
+            inferred_step_id=inferred_step_id,
+        )
         fallback_target = candidate_targets[0]
 
         candidate_refs: list[str] = []
