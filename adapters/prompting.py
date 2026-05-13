@@ -585,7 +585,11 @@ def _build_overlay_target_priority(
     # Enforce DDI-before-AMPCD ordering for S08.
     # On F/A-18C Lot 20 the AMPCD will not illuminate if no DDI has been
     # powered first — the brightness knob alone is insufficient.
-    if deterministic_step_hint.get("inferred_step_id") == "S08":
+    # Gate on overlay_step_id when present: when the overlay has advanced
+    # (e.g. S08→S09) the targets belong to the next step and should not
+    # be reordered.
+    step_id = deterministic_step_hint.get("overlay_step_id") or deterministic_step_hint.get("inferred_step_id")
+    if step_id == "S08":
         ampcd = "ampcd_off_brightness_knob"
         ddi_selectors = ("left_mdi_brightness_selector", "right_mdi_brightness_selector")
         if ampcd in ranked:

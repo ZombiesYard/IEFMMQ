@@ -3843,7 +3843,7 @@ class LiveDcsTutorLoop:
             candidate_targets = remaining
         candidate_targets = _enforce_s08_ddi_before_ampcd(
             candidate_targets,
-            inferred_step_id=inferred_step_id,
+            inferred_step_id=overlay_step_id,
         )
         fallback_target = candidate_targets[0]
 
