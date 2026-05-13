@@ -1439,7 +1439,7 @@ def _missing_condition_target_hints(
 def _enforce_s08_ddi_before_ampcd(
     candidate_targets: list[str],
     *,
-    inferred_step_id: str | None,
+    step_id: str | None,
 ) -> list[str]:
     """For S08, ensure DDI brightness selectors precede the AMPCD brightness knob.
 
@@ -1447,7 +1447,7 @@ def _enforce_s08_ddi_before_ampcd(
     powered first — the brightness knob alone is insufficient.
     When both DDI and AMPCD targets are candidates, DDIs must come first.
     """
-    if inferred_step_id != "S08":
+    if step_id != "S08":
         return candidate_targets
     ddi_selectors = ("left_mdi_brightness_selector", "right_mdi_brightness_selector")
     ampcd_target = "ampcd_off_brightness_knob"
@@ -3843,7 +3843,7 @@ class LiveDcsTutorLoop:
             candidate_targets = remaining
         candidate_targets = _enforce_s08_ddi_before_ampcd(
             candidate_targets,
-            inferred_step_id=overlay_step_id,
+            step_id=overlay_step_id,
         )
         fallback_target = candidate_targets[0]
 

@@ -664,11 +664,13 @@ def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
 
 
 def test_prompt_enforces_ddi_before_ampcd_for_s08_mpcd_missing() -> None:
-    """When mpcd_on is the only missing condition for S08, the prompt's
-    priority list must rank a DDI brightness selector before the AMPCD knob.
+    """When mpcd_on is the only missing condition for S08 (DDI vars are
+    true but AMPCD is still off), the prompt must still rank a DDI
+    brightness selector before the AMPCD knob in its priority list.
 
-    On F/A-18C Lot 20 the AMPCD won't light without at least one DDI
-    powered first, so DDI brightness selectors must come first.
+    This guards against the Lot 20 case where BIOS may report DDIs as
+    "on" from switch position but they are not actually powered, and the
+    AMPCD requires at least one DDI to be lit before its knob has effect.
     """
     ctx = {
         "candidate_steps": ["S08"],

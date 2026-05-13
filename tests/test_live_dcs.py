@@ -2971,11 +2971,13 @@ def test_safe_fallback_overlay_prefers_hud_target_for_s08_hud_missing(tmp_path: 
 
 
 def test_safe_fallback_overlay_enforces_ddi_before_ampcd_for_s08(tmp_path: Path) -> None:
-    """When mpcd_on is the missing condition for S08, DDI brightness selectors
-    must be highlighted before the AMPCD brightness knob.
+    """When mpcd_on is the only missing condition for S08 (DDI vars are
+    true but AMPCD is still off), the deterministic fallback must still
+    prefer a DDI brightness selector over the AMPCD brightness knob.
 
-    On F/A-18C Lot 20, the AMPCD will not illuminate if no DDI has been
-    powered first. The brightness knob alone is insufficient.
+    This guards against the Lot 20 case where BIOS may report DDIs as
+    "on" from switch position but they are not actually powered, and the
+    AMPCD requires at least one DDI to be lit before its knob has effect.
     """
     replay_path = tmp_path / "bios_s08_ddi_before_ampcd.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
