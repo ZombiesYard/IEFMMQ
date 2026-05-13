@@ -5,7 +5,7 @@ metadata:
     dcs_install_hint: "L:/DCS World/Mods/aircraft/FA-18C/Cockpit/Scripts/clickabledata.lua"
     ci_fixture: "tests/fixtures/fa18c_clickable_ids.txt"
   notes: >
-    Full cold-start overlay targets for S01-S25. dcs_id values align to
+    Full cold-start overlay targets for S01-S26. dcs_id values align to
     clickable element ids (pnt_*). aliases/panel_area provide stable semantic
     labels for prompt/debug/UI consumption.
 interaction_policy:

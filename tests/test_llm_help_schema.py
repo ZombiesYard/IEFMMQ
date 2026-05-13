@@ -45,7 +45,7 @@ def test_help_response_schema_injects_step_and_target_enums() -> None:
 
     assert "S01" in diagnosis_step_enum
     assert "S10" in diagnosis_step_enum
-    assert "S25" in diagnosis_step_enum
+    assert "S26" in diagnosis_step_enum
     assert diagnosis_step_enum == next_step_enum
     assert "battery_switch" in overlay_target_enum
     assert "apu_switch" in overlay_target_enum
@@ -242,7 +242,7 @@ def _bump_mtime(path: Path) -> None:
 
 def _registry_payload(first_short_explanation: str) -> dict:
     steps = []
-    for i in range(1, 26):
+    for i in range(1, 27):
         sid = f"S{i:02d}"
         short = first_short_explanation if i == 1 else f"step-{sid}"
         steps.append(
@@ -287,9 +287,9 @@ def test_help_schema_cache_invalidates_when_registry_file_removed(tmp_path: Path
         step_registry_path=registry_path,
     )
     step_ids_with_registry = schema_with_registry["properties"]["next"]["properties"]["step_id"]["enum"]
-    assert len(step_ids_with_registry) == 25
+    assert len(step_ids_with_registry) == 26
     assert step_ids_with_registry[0] == "S01"
-    assert step_ids_with_registry[-1] == "S25"
+    assert step_ids_with_registry[-1] == "S26"
 
     registry_path.unlink()
 

@@ -679,7 +679,7 @@ def test_infer_step_holds_s08_until_visual_page_facts_are_seen(real_pack_ctx: Ma
     assert advanced.inferred_step_id != "S08"
 
 
-def test_infer_step_holds_s18_when_only_fcsmc_pbit_result_page_is_seen(
+def test_infer_step_advances_to_s19_when_fcsmc_page_is_seen_but_final_go_is_not(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
@@ -705,17 +705,17 @@ def test_infer_step_holds_s18_when_only_fcsmc_pbit_result_page_is_seen(
         ],
     )
 
-    assert blocked.inferred_step_id == "S18"
+    assert blocked.inferred_step_id == "S19"
     assert blocked.missing_conditions == ("vision_facts.fcsmc_final_go_result_visible==seen",)
 
 
-def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
+def test_infer_step_advances_past_s19_when_structured_final_go_result_is_seen(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     vars_map = dict(real_pack_ctx["baseline_vars"])
-    # S18 is visually confirmed complete, but S22 (standby altimeter) has not
+    # S19 is visually confirmed complete, but S23 (standby altimeter) has not
     # been set yet — it should be the next required step.
     vars_map["standby_altimeter_set"] = False
 
@@ -738,7 +738,7 @@ def test_infer_step_advances_past_s18_when_structured_final_go_result_is_seen(
         ],
     )
 
-    assert result.inferred_step_id == "S22"
+    assert result.inferred_step_id == "S23"
 
 
 def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
@@ -940,7 +940,7 @@ def test_infer_step_advances_past_s17_without_takeoff_trim_visual_fact_when_trim
     )
 
     assert result.inferred_step_id == "S18"
-    assert "vision_facts.fcsmc_final_go_result_visible==seen" in result.missing_conditions
+    assert "vision_facts.fcsmc_page_visible==seen" in result.missing_conditions
 
 
 def test_infer_step_uses_pack_specific_vision_fact_bindings(tmp_path: Path) -> None:
@@ -1250,7 +1250,8 @@ def test_load_pack_gate_config_requires_radar_mode_opr_for_s13_and_later_steps()
     pack_gates = load_pack_gate_config(REAL_PACK_PATH, scenario_profile="airfield")
 
     assert pack_gates["completion_gates"]["S13"][0]["var"] == "vars.radar_mode_opr"
-    for step_id in ("S14", "S19", "S20", "S21", "S22", "S23", "S24", "S25"):
+    assert pack_gates["precondition_gates"]["S19"][0]["var"] == "vars.right_ddi_on"
+    for step_id in ("S14", "S20", "S21", "S22", "S23", "S24", "S25", "S26"):
         assert pack_gates["precondition_gates"][step_id][0]["var"] == "vars.radar_mode_opr"
 
 
@@ -1360,7 +1361,7 @@ def _bump_mtime(path: Path) -> None:
 
 def _registry_payload(first_short_explanation: str) -> dict:
     steps = []
-    for i in range(1, 26):
+    for i in range(1, 27):
         sid = f"S{i:02d}"
         short = first_short_explanation if i == 1 else f"step-{sid}"
         steps.append(
@@ -1716,4 +1717,4 @@ def test_infer_step_blocks_at_s16_when_flap_not_auto(
     assert advanced.inferred_step_id == "S18", (
         f"Expected S18 (blocked on visual facts), got {advanced.inferred_step_id}"
     )
-    assert "vision_facts.fcsmc_final_go_result_visible==seen" in advanced.missing_conditions
+    assert "vision_facts.fcsmc_page_visible==seen" in advanced.missing_conditions

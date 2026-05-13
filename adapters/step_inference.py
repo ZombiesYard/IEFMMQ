@@ -142,7 +142,7 @@ def _load_registry_steps_cached(
 ) -> tuple[dict[str, Any], ...]:
     del registry_mtime_ns, registry_size_bytes  # cache-key components only
     try:
-        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=25)
+        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=26)
     except (StepRegistryError, OSError, ValueError):
         return ()
     return tuple(dict(step) for step in entries)
@@ -884,7 +884,7 @@ def _vision_fact_counts_as_seen(
 ) -> bool:
     if not _vision_fact_state_is_seen(fact):
         return False
-    if step_id == "S18" and fact_id == "fcsmc_final_go_result_visible":
+    if step_id == "S19" and fact_id == "fcsmc_final_go_result_visible":
         return _is_s18_final_go_result_fact(fact)
     return True
 

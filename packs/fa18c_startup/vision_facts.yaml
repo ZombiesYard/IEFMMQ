@@ -44,27 +44,28 @@ facts:
       - right_ddi
     steps:
       - S18
+      - S19
   - fact_id: fcsmc_intermediate_result_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - right_ddi
     steps:
-      - S18
+      - S19
   - fact_id: fcsmc_in_test_visible
     sticky: false
     expires_after_ms: 2000
     intended_regions:
       - right_ddi
     steps:
-      - S18
+      - S19
   - fact_id: fcsmc_final_go_result_visible
     sticky: true
     expires_after_ms: 600000
     intended_regions:
       - right_ddi
     steps:
-      - S18
+      - S19
   - fact_id: hsi_page_visible
     sticky: false
     expires_after_ms: 2000
@@ -99,5 +100,8 @@ step_bindings:
       - fcs_page_visible
       - bit_root_page_visible
   S18:
+    all_of:
+      - fcsmc_page_visible
+  S19:
     all_of:
       - fcsmc_final_go_result_visible

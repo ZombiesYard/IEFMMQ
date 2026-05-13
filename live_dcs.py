@@ -1193,7 +1193,7 @@ def _extract_selected_layout_id(vision_selection: HelpCycleVisionSelection) -> s
 def _is_terminal_step_hint_complete(hint: Mapping[str, Any] | None) -> bool:
     if not isinstance(hint, Mapping):
         return False
-    if hint.get("inferred_step_id") != "S25":
+    if hint.get("inferred_step_id") != "S26":
         return False
     missing_conditions = hint.get("missing_conditions")
     normalized_missing = [
@@ -1545,7 +1545,7 @@ def _build_procedural_action_hint(
     step_interacted_targets: Sequence[str] | None = None,
     vision_fact_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    if inferred_step_id == "S19":
+    if inferred_step_id == "S20":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
@@ -1596,7 +1596,7 @@ def _build_procedural_action_hint(
             return _hint("obogs_flow_knob", "OBOGS control is already ON, but FLOW is not yet ON; set the OXY FLOW knob next.")
         return None
 
-    if inferred_step_id == "S18":
+    if inferred_step_id == "S19":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
@@ -1612,16 +1612,21 @@ def _build_procedural_action_hint(
 
         if "fcsmc_final_go_result_visible" in seen_fact_ids:
             return None
-        if "fcsmc_page_visible" in seen_fact_ids:
-            return _hint(
-                "fcs_bit_switch",
-                "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
-            )
-        if vars_selected.get("fcs_bit_switch_up") is True:
-            return _hint(
-                "fcs_bit_switch",
-                "Keep holding the FCS BIT switch up while you press Right DDI PB5 to start or continue the FCS-MC BIT.",
-            )
+        return _hint(
+            "fcs_bit_switch",
+            "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
+        )
+
+    if inferred_step_id == "S18":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
         return _hint(
             "right_mdi_pb5",
             "On the right DDI BIT FAILURES page, press PB5 to enter the FCS-MC BIT page before holding the FCS BIT switch.",
@@ -3029,8 +3034,8 @@ class LiveDcsTutorLoop:
             metadata={
                 "provider": "fallback",
                 "generation_mode": "fallback",
-                "diagnosis": {"step_id": "S25"},
-                "next": {"step_id": "S25"},
+                "diagnosis": {"step_id": "S26"},
+                "next": {"step_id": "S26"},
                 "terminal_state_rewritten": True,
                 "terminal_state_original_message": message,
                 "terminal_state_original_explanations": [],
@@ -3233,7 +3238,7 @@ class LiveDcsTutorLoop:
         if not isinstance(help_response, Mapping):
             return False
         inferred_step_id = hint.get("inferred_step_id")
-        if inferred_step_id != "S25":
+        if inferred_step_id != "S26":
             return False
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
@@ -3249,7 +3254,7 @@ class LiveDcsTutorLoop:
             return False
 
         model_next_step_id = _extract_model_next_step_id(response.metadata)
-        if model_next_step_id == "S25":
+        if model_next_step_id == "S26":
             return False
 
         response.metadata["terminal_state_rewritten"] = True
@@ -3276,12 +3281,12 @@ class LiveDcsTutorLoop:
             if isinstance(response.metadata.get("diagnosis"), Mapping)
             else {}
         )
-        rewritten_diagnosis = {"step_id": "S25"}
+        rewritten_diagnosis = {"step_id": "S26"}
         error_category = original_diagnosis.get("error_category")
         if isinstance(error_category, str) and error_category:
             rewritten_diagnosis["error_category"] = error_category
         response.metadata["diagnosis"] = rewritten_diagnosis
-        response.metadata["next"] = {"step_id": "S25"}
+        response.metadata["next"] = {"step_id": "S26"}
 
         return True
 
@@ -3357,8 +3362,6 @@ class LiveDcsTutorLoop:
     ) -> tuple[bool, str]:
         if not response.actions:
             return False, "missing_actions"
-        if bool(response.metadata.get("s18_visual_completion_rewritten")):
-            return False, "step_rewritten_to_s19"
         context = request.context if isinstance(request.context, Mapping) else {}
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
@@ -3388,10 +3391,10 @@ class LiveDcsTutorLoop:
                     }:
                         action_target = hinted_target
                         override_kind = "action_hint"
-                    elif inferred_step_id == "S18" and "fcsmc_page_visible" in seen_fact_ids:
+                    elif inferred_step_id == "S19" and "fcsmc_page_visible" in seen_fact_ids:
                         action_target = hinted_target
                         override_kind = "action_hint"
-        elif inferred_step_id == "S19":
+        elif inferred_step_id == "S20":
             action_hint = hint.get("action_hint")
             if isinstance(action_hint, Mapping):
                 hinted_target = action_hint.get("target")
@@ -3413,7 +3416,7 @@ class LiveDcsTutorLoop:
             return False, "missing_action_targets"
         if (
             self.max_overlay_targets > 1
-            and inferred_step_id == "S18"
+            and inferred_step_id == "S19"
             and action_target in current_targets
             and set(current_targets).issubset({"fcs_bit_switch", "right_mdi_pb5"})
         ):
@@ -3432,7 +3435,7 @@ class LiveDcsTutorLoop:
             return False, f"override_failed:{override_reason}"
 
         if (
-            inferred_step_id == "S18"
+            inferred_step_id == "S19"
             and override_kind == "action_hint"
             and action_target == "fcs_bit_switch"
             and "fcsmc_page_visible" in seen_fact_ids
@@ -3456,7 +3459,7 @@ class LiveDcsTutorLoop:
             if original_explanations and original_explanations != [rewritten]:
                 response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
         elif (
-            inferred_step_id == "S19"
+            inferred_step_id == "S20"
             and override_kind == "action_hint"
             and action_target == "launch_bar_switch"
         ):
@@ -3567,8 +3570,6 @@ class LiveDcsTutorLoop:
             return list(response.actions), {}
 
         filtered_help_obj: Mapping[str, Any] = help_obj
-        s18_backfill_applied = False
-        s18_backfill_reason = None
         rejected_by_request_allowlist: list[str] = []
         request_allowlist_raw = request.context.get("overlay_target_allowlist")
         if isinstance(request_allowlist_raw, list):
@@ -3605,11 +3606,6 @@ class LiveDcsTutorLoop:
                         filtered_help_obj = dict(help_obj)
                         filtered_help_obj["overlay"] = filtered_overlay
 
-        filtered_help_obj, s18_backfill_applied, s18_backfill_reason = self._backfill_s18_dual_overlay_targets(
-            filtered_help_obj,
-            request,
-        )
-
         mapped = map_help_response_to_tutor_response(
             filtered_help_obj,
             request=request,
@@ -3629,9 +3625,6 @@ class LiveDcsTutorLoop:
             merged_errors.append("overlay_target_not_in_request_allowlist")
             mapped_meta["mapping_errors"] = _dedupe_strings(merged_errors)
             mapped_meta.setdefault("mapping_error", "overlay_target_not_in_request_allowlist")
-        if s18_backfill_applied:
-            mapped_meta["s18_dual_overlay_backfill_applied"] = True
-            mapped_meta["s18_dual_overlay_backfill_reason"] = s18_backfill_reason
         if not response.message and mapped.message:
             response.message = mapped.message
         if (not response.explanations) and mapped.explanations:
@@ -3643,78 +3636,8 @@ class LiveDcsTutorLoop:
         help_obj: Mapping[str, Any],
         request: TutorRequest,
     ) -> tuple[Mapping[str, Any], bool, str | None]:
-        if self.max_overlay_targets <= 1:
-            return help_obj, False, "single_target_mode"
-
-        context = request.context if isinstance(request.context, Mapping) else {}
-        hint = context.get("deterministic_step_hint")
-        if not isinstance(hint, Mapping):
-            return help_obj, False, "missing_deterministic_hint"
-        if hint.get("inferred_step_id") != "S18":
-            return help_obj, False, "not_s18"
-
-        overlay = help_obj.get("overlay")
-        if not isinstance(overlay, Mapping):
-            return help_obj, False, "missing_overlay"
-        raw_targets = overlay.get("targets")
-        if not isinstance(raw_targets, list):
-            return help_obj, False, "missing_overlay_targets"
-
-        targets = [item for item in raw_targets if isinstance(item, str) and item]
-        if "fcs_bit_switch" not in targets:
-            return help_obj, False, "fcs_bit_not_targeted"
-        if "right_mdi_pb5" in targets:
-            return help_obj, False, "already_has_pb5"
-
-        request_allowlist_raw = context.get("overlay_target_allowlist")
-        if isinstance(request_allowlist_raw, list):
-            request_allowlist = {item for item in request_allowlist_raw if isinstance(item, str) and item}
-            if request_allowlist and "right_mdi_pb5" not in request_allowlist:
-                return help_obj, False, "pb5_not_in_request_allowlist"
-
-        vision_fact_summary = context.get("vision_fact_summary")
-        seen_fact_ids: set[str] = set()
-        if isinstance(vision_fact_summary, Mapping):
-            seen_fact_ids = {
-                item
-                for item in vision_fact_summary.get("seen_fact_ids", [])
-                if isinstance(item, str) and item
-            }
-        if "fcsmc_page_visible" not in seen_fact_ids:
-            return help_obj, False, "fcsmc_not_visually_confirmed"
-
-        evidence_raw = overlay.get("evidence")
-        if not isinstance(evidence_raw, list):
-            return help_obj, False, "missing_overlay_evidence"
-
-        template_item: Mapping[str, Any] | None = None
-        for item in evidence_raw:
-            if not isinstance(item, Mapping):
-                continue
-            if item.get("target") != "fcs_bit_switch":
-                continue
-            ref = item.get("ref")
-            if isinstance(ref, str) and ref.startswith("VISION_FACTS.fcsmc_page_visible"):
-                template_item = item
-                break
-        if template_item is None:
-            return help_obj, False, "missing_fcsmc_visual_evidence"
-
-        backfilled_targets = _dedupe_strings([*targets, "right_mdi_pb5"])[: self.max_overlay_targets]
-        if "right_mdi_pb5" not in backfilled_targets:
-            return help_obj, False, "backfill_trimmed_by_limit"
-
-        backfilled_evidence: list[Any] = list(evidence_raw)
-        backfilled_pb5_evidence = dict(template_item)
-        backfilled_pb5_evidence["target"] = "right_mdi_pb5"
-        backfilled_evidence.append(backfilled_pb5_evidence)
-
-        updated_overlay = dict(overlay)
-        updated_overlay["targets"] = backfilled_targets
-        updated_overlay["evidence"] = backfilled_evidence
-        updated_help_obj = dict(help_obj)
-        updated_help_obj["overlay"] = updated_overlay
-        return updated_help_obj, True, "s18_fcsmc_fcs_bit_implies_pb5"
+        del request
+        return help_obj, False, "removed_after_issue_227"
 
     def _build_safe_fallback_overlay_help_obj(
         self,
@@ -3757,7 +3680,7 @@ class LiveDcsTutorLoop:
             item for item in gate_blockers_raw if isinstance(item, Mapping) and item
         ] if isinstance(gate_blockers_raw, (list, tuple)) else []
 
-        if inferred_step_id == "S25" and not missing_conditions and not gate_blockers:
+        if inferred_step_id == "S26" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
 
         _precondition_blocked = any(
@@ -4008,215 +3931,16 @@ class LiveDcsTutorLoop:
         response: TutorResponse,
         request: TutorRequest,
     ) -> tuple[bool, str]:
-        context = request.context if isinstance(request.context, Mapping) else {}
-        hint = context.get("deterministic_step_hint")
-        if not isinstance(hint, Mapping):
-            return False, "missing_deterministic_hint"
-        inferred_step_id = hint.get("inferred_step_id")
-        if inferred_step_id != "S18":
-            return False, "not_s18"
-        if bool(hint.get("requires_visual_confirmation")) is not True:
-            return False, "visual_confirmation_not_required"
-        vision_fact_summary = context.get("vision_fact_summary")
-        vision_fact_status = None
-        if isinstance(vision_fact_summary, Mapping):
-            raw_status = vision_fact_summary.get("status")
-            if isinstance(raw_status, str) and raw_status:
-                vision_fact_status = raw_status
-        if vision_fact_status != "vision_unavailable":
-            return False, "vision_available"
-
-        text_parts = [response.message, *response.explanations]
-        combined = " ".join(part for part in text_parts if isinstance(part, str) and part).lower()
-        has_final_go_phrase = any(
-            marker in combined
-            for marker in (
-                "reporting go",
-                "reporting 'go'",
-                'reporting "go"',
-                "go result",
-                "go results",
-                "all channels reporting go",
-                "all channels reporting 'go'",
-                "all systems reporting go",
-                "all systems reporting 'go'",
-            )
-        )
-        mentions_final_go_channels = (
-            "mc1" in combined
-            and "mc2" in combined
-            and "fcsa" in combined
-            and "fcsb" in combined
-            and "go" in combined
-        )
-        mentions_intermediate_only = (
-            re.search(r"\bpbit go\b", combined) is not None
-            or re.search(r"(?<!built-)in test\b", combined) is not None
-            or re.search(r"\bnot rdy\b", combined) is not None
-            or re.search(r"\bnot ready\b", combined) is not None
-        )
-        indicates_more_s18_actions = any(
-            marker in combined
-            for marker in (
-                "hold the fcs bit switch",
-                "holding the fcs bit switch",
-                "press pb5 again",
-                "pressing pb5 again",
-                "initiate the specific fcs bit test",
-                "initiate the fcs bit test",
-                "start the fcs bit",
-                "begin the fcs bit",
-            )
-        )
-        has_go_reporting = (has_final_go_phrase or mentions_final_go_channels) and not mentions_intermediate_only
-        has_bit_complete = (
-            "successfully completed" in combined
-            or "bit has completed successfully" in combined
-            or "bit has been successfully completed" in combined
-            or "next step is to proceed" in combined
-            or "continue with s19" in combined
-            or "startup sequence" in combined
-            or "exit this maintenance page" in combined
-            or "initial bit root phase" in combined
-            or "fcs-mc page with 'go' results" in combined
-        )
-        if indicates_more_s18_actions:
-            return False, "still_mentions_pending_s18_actions"
-        if not (has_go_reporting and has_bit_complete):
-            return False, "no_s18_completion_claim"
-
-        original_message = response.message
-        original_explanations = list(response.explanations)
-        original_next = dict(response.metadata["next"]) if isinstance(response.metadata.get("next"), Mapping) else None
-        original_diagnosis = (
-            dict(response.metadata["diagnosis"]) if isinstance(response.metadata.get("diagnosis"), Mapping) else None
-        )
-        original_actions = [dict(action) for action in response.actions if isinstance(action, Mapping)]
-
-        if self.lang == "zh":
-            rewritten = "当前可视页面已显示 FCS BIT 最终 GO 结果，可视为 S18 已完成。请继续执行 S19。"
-        else:
-            rewritten = "The visible FCS BIT page shows the final GO result, so treat S18 as complete and continue with S19."
-
-        response.message = rewritten
-        response.explanations = [rewritten]
-        response.actions = []
-        response.metadata["s18_visual_completion_rewritten"] = True
-        response.metadata["s18_visual_completion_original_message"] = original_message
-        if original_explanations:
-            response.metadata["s18_visual_completion_original_explanations"] = original_explanations
-        if original_next is not None:
-            response.metadata["s18_visual_completion_original_next"] = original_next
-        if original_diagnosis is not None:
-            response.metadata["s18_visual_completion_original_diagnosis"] = original_diagnosis
-        if original_actions:
-            response.metadata["s18_visual_completion_original_actions"] = copy.deepcopy(original_actions)
-
-        response.metadata["next"] = {"step_id": "S19"}
-        response.metadata["diagnosis"] = {"step_id": "S19", "error_category": "OM"}
-        used, reason = self._apply_safe_fallback_overlay(
-            response,
-            request,
-            override_inferred_step_id="S19",
-            override_overlay_step_id="S19",
-            ignore_request_allowlist=True,
-        )
-        if used:
-            response.metadata["s18_visual_completion_overlay_advanced"] = True
-            response.metadata["s18_visual_completion_overlay_reason"] = reason
-        return True, reason if used else "rewrite_only"
+        del response, request
+        return False, "removed_after_issue_227"
 
     def _rewrite_s18_structured_fact_completion_to_s19(
         self,
         response: TutorResponse,
         request: TutorRequest,
     ) -> tuple[bool, str]:
-        context = request.context if isinstance(request.context, Mapping) else {}
-        hint = context.get("deterministic_step_hint")
-        if not isinstance(hint, Mapping):
-            return False, "missing_deterministic_hint"
-        if hint.get("inferred_step_id") != "S18":
-            return False, "not_s18"
-
-        vision_fact_summary = context.get("vision_fact_summary")
-        if not isinstance(vision_fact_summary, Mapping):
-            return False, "missing_vision_fact_summary"
-        seen_fact_ids = {
-            item for item in vision_fact_summary.get("seen_fact_ids", [])
-            if isinstance(item, str) and item
-        }
-        if "fcsmc_final_go_result_visible" not in seen_fact_ids:
-            return False, "missing_fcsmc_final_go_result_visible"
-        vision_facts = context.get("vision_facts")
-        matching_fact = None
-        if isinstance(vision_facts, list):
-            for fact in vision_facts:
-                if not isinstance(fact, Mapping):
-                    continue
-                if fact.get("fact_id") != "fcsmc_final_go_result_visible":
-                    continue
-                state = fact.get("state")
-                if state not in {"seen", "fresh"}:
-                    continue
-                matching_fact = fact
-                break
-        if not isinstance(matching_fact, Mapping):
-            return False, "missing_structured_result_fact"
-        if matching_fact.get("result_kind") != "final_go":
-            return False, "structured_result_not_final_go"
-        evidence_note = matching_fact.get("evidence_note")
-        if not isinstance(evidence_note, str) or not evidence_note:
-            return False, "missing_structured_result_evidence_note"
-        note_lower = evidence_note.lower()
-        if "pbit go" in note_lower:
-            return False, "intermediate_pbit_go_only"
-        required_channels = ("mc1", "mc2", "fcsa", "fcsb")
-        if not all(channel in note_lower for channel in required_channels) or "go" not in note_lower:
-            return False, "missing_full_final_go_channel_set"
-        if "no go" in note_lower or "not rdy" in note_lower or "not ready" in note_lower or "in test" in note_lower:
-            return False, "structured_result_contains_nonfinal_markers"
-
-        original_message = response.message
-        original_explanations = list(response.explanations)
-        original_next = dict(response.metadata["next"]) if isinstance(response.metadata.get("next"), Mapping) else None
-        original_diagnosis = (
-            dict(response.metadata["diagnosis"]) if isinstance(response.metadata.get("diagnosis"), Mapping) else None
-        )
-        original_actions = [dict(action) for action in response.actions if isinstance(action, Mapping)]
-
-        if self.lang == "zh":
-            rewritten = "当前可视页面已显示 FCS BIT 最终 GO 结果，可视为 S18 已完成。请继续执行 S19。"
-        else:
-            rewritten = "The visible FCS BIT page shows the final GO result, so treat S18 as complete and continue with S19."
-
-        response.message = rewritten
-        response.explanations = [rewritten]
-        response.actions = []
-        response.metadata["s18_visual_completion_rewritten"] = True
-        response.metadata["s18_visual_completion_from_structured_facts"] = True
-        response.metadata["s18_visual_completion_original_message"] = original_message
-        if original_explanations:
-            response.metadata["s18_visual_completion_original_explanations"] = original_explanations
-        if original_next is not None:
-            response.metadata["s18_visual_completion_original_next"] = original_next
-        if original_diagnosis is not None:
-            response.metadata["s18_visual_completion_original_diagnosis"] = original_diagnosis
-        if original_actions:
-            response.metadata["s18_visual_completion_original_actions"] = copy.deepcopy(original_actions)
-
-        response.metadata["next"] = {"step_id": "S19"}
-        response.metadata["diagnosis"] = {"step_id": "S19", "error_category": "OM"}
-        used, reason = self._apply_safe_fallback_overlay(
-            response,
-            request,
-            override_inferred_step_id="S19",
-            override_overlay_step_id="S19",
-            ignore_request_allowlist=True,
-        )
-        if used:
-            response.metadata["s18_visual_completion_overlay_advanced"] = True
-            response.metadata["s18_visual_completion_overlay_reason"] = reason
-        return True, reason if used else "rewrite_only"
+        del response, request
+        return False, "removed_after_issue_227"
 
     def _new_response_from_cached(
         self,
@@ -4516,30 +4240,14 @@ class LiveDcsTutorLoop:
             self._normalize_observable_text_only_response(response, request)
             self._rewrite_conflicting_step_completion_response(response, request)
             self._rewrite_terminal_state_conflict_response(response, request)
-            s18_structured_completion_advanced, s18_structured_completion_reason = (
-                self._rewrite_s18_structured_fact_completion_to_s19(response, request)
-            )
 
             fallback_overlay_used = False
             fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
-            s18_completion_advanced = False
-            s18_completion_reason = "not_needed"
-            if not s18_structured_completion_advanced:
-                s18_completion_advanced, s18_completion_reason = self._rewrite_s18_visual_completion_to_s19(
-                    response,
-                    request,
-                )
-            else:
-                s18_completion_advanced = True
-                s18_completion_reason = s18_structured_completion_reason
-            if s18_completion_advanced:
-                fallback_overlay_used = True
-                fallback_overlay_reason = s18_completion_reason
             action_hint_override_used, action_hint_override_reason = self._apply_action_hint_overlay_override(
                 response,
                 request,
             )
-            if action_hint_override_used and not s18_completion_advanced:
+            if action_hint_override_used:
                 fallback_overlay_used = True
                 fallback_overlay_reason = action_hint_override_reason
             should_apply_safe_fallback = self._should_use_deterministic_overlay_fallback(
@@ -4547,7 +4255,7 @@ class LiveDcsTutorLoop:
                 request,
                 mapped_meta,
             )
-            if should_apply_safe_fallback and not action_hint_override_used and not s18_completion_advanced:
+            if should_apply_safe_fallback and not action_hint_override_used:
                 fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
                     response,
                     request,

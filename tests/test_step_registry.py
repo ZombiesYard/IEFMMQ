@@ -42,11 +42,11 @@ def _single_step_payload(*, schema_version: str = "v1", short_explanation: str =
     }
 
 
-def test_default_step_registry_contains_full_s01_to_s25() -> None:
+def test_default_step_registry_contains_full_s01_to_s26() -> None:
     path = default_step_registry_path()
     steps = load_step_registry(path)
-    assert len(steps) == 25
-    assert [step.step_id for step in steps] == [f"S{i:02d}" for i in range(1, 26)]
+    assert len(steps) == 26
+    assert [step.step_id for step in steps] == [f"S{i:02d}" for i in range(1, 27)]
     assert all(step.source_chunk_refs for step in steps)
 
 

@@ -166,14 +166,22 @@ steps:
 - step_id: S18
   phase: P5
   phase_label: FCS & flight controls
-  official_description: While holding up the FCS BIT switch on the right wall, press
-    the FCS OSB on the BIT / FCS page at the same time.
-  short_explanation: 'Run the FCS BIT: hold the FCS BIT switch and press the FCS option
-    on the BIT/FCS page simultaneously.'
-  cockpit_area: Right console / right DDI
+  official_description: On the BIT / FCS page, press PB5 FCS-MC to enter the FCS-MC BIT page.
+  short_explanation: Enter the FCS-MC BIT page from the right DDI BIT root page with PB5.
+  cockpit_area: Right DDI
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:21-21
 - step_id: S19
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: While holding up the FCS BIT switch on the right wall, press
+    the FCS OSB on the FCS-MC page at the same time.
+  short_explanation: 'Run the FCS BIT: hold the FCS BIT switch and press the FCS option
+    on the FCS-MC page simultaneously.'
+  cockpit_area: Right console / right DDI
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:21-21
+- step_id: S20
   phase: P5
   phase_label: FCS & flight controls
   official_description: Four down test. Cycle/test the refueling probe, speed brake,
@@ -183,7 +191,7 @@ steps:
   cockpit_area: Multiple (consoles, throttles, quarter panels)
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:22-22
-- step_id: S20
+- step_id: S21
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Left mouse click on the hand brake to release it.
@@ -191,7 +199,7 @@ steps:
   cockpit_area: Left console (parking brake)
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:23-23
-- step_id: S21
+- step_id: S22
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set your BINGO fuel level (minimum fuel to return home) by
@@ -201,7 +209,7 @@ steps:
   cockpit_area: IFEI
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:24-24
-- step_id: S22
+- step_id: S23
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set the Standby Barometric Altimeter to airfield elevation.
@@ -210,7 +218,7 @@ steps:
   cockpit_area: Right instrument panel
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:25-25
-- step_id: S23
+- step_id: S24
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set the Radar Altimeter to 200 feet for an airfield takeoff
@@ -220,7 +228,7 @@ steps:
   cockpit_area: Right quarter panel
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:26-26
-- step_id: S24
+- step_id: S25
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Uncage the standby Attitude Indicator.
@@ -229,7 +237,7 @@ steps:
   cockpit_area: Right instrument panel
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:27-27
-- step_id: S25
+- step_id: S26
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set the Attitude Source to AUTO.
