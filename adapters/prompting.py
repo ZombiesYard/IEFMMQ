@@ -66,6 +66,8 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.r_gen_on": ("generator_right_switch",),
     "vars.right_ddi_on": ("right_mdi_brightness_selector",),
     "vars.rpm_r": ("eng_crank_switch", "throttle_quadrant_reference"),
+    "vars.rpm_r_gte_25": ("eng_crank_switch", "throttle_quadrant_reference"),
+    "vars.rpm_r_gte_60": (),
     "vars.throttle_r_idle_complete": ("throttle_quadrant_reference",),
 }
 _DEFAULT_INTERACTION_POLICY_TEXT = {
