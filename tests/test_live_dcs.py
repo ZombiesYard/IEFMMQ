@@ -145,8 +145,8 @@ class MultiTargetHelpResponseModel:
                 "provider": "fake_llm",
                 "generation_mode": "model",
                 "help_response": {
-                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
-                    "next": {"step_id": "S18"},
+                    "diagnosis": {"step_id": "S19", "error_category": "OM"},
+                    "next": {"step_id": "S19"},
                     "overlay": {
                         "targets": ["fcs_bit_switch", "right_mdi_pb5"],
                         "evidence": [
@@ -703,7 +703,7 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert request is not None
     assert request.intent == "help"
     assert "candidate_steps" in request.context
-    assert request.context["candidate_steps"] == [f"S{i:02d}" for i in range(1, 26)]
+    assert request.context["candidate_steps"] == [f"S{i:02d}" for i in range(1, 27)]
     assert "recent_deltas" in request.context
     assert "recent_actions" in request.context
     assert "deterministic_step_hint" in request.context
@@ -2604,7 +2604,7 @@ def test_real_fa18c_pack_marks_non_display_partial_steps_as_non_visual() -> None
 
     profiles = _load_step_signal_profiles(pack_path)
 
-    for step_id in ("S17", "S19", "S22"):
+    for step_id in ("S17", "S20", "S23"):
         assert profiles[step_id]["observability"] == "partial"
         assert profiles[step_id]["observability_status"] == "partial"
         assert profiles[step_id]["requires_visual_confirmation"] is False
@@ -3733,8 +3733,8 @@ def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar
             }
         ],
         metadata={
-            "next": {"step_id": "S20"},
-            "diagnosis": {"step_id": "S19", "error_category": "OM"},
+            "next": {"step_id": "S21"},
+            "diagnosis": {"step_id": "S20", "error_category": "OM"},
         },
     )
     request = TutorRequest(
@@ -3744,12 +3744,12 @@ def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar
         context={
             "overlay_target_allowlist": ["refuel_probe_switch", "launch_bar_switch"],
             "gates": [
-                {"gate_id": "S19.completion", "status": "allowed"},
-                {"gate_id": "S19.precondition", "status": "allowed"},
+                {"gate_id": "S20.completion", "status": "allowed"},
+                {"gate_id": "S20.precondition", "status": "allowed"},
             ],
             "deterministic_step_hint": {
-                "inferred_step_id": "S19",
-                "overlay_step_id": "S19",
+                "inferred_step_id": "S20",
+                "overlay_step_id": "S20",
                 "requires_visual_confirmation": False,
                 "step_evidence_requirements": ["gate", "rag", "delta"],
                 "action_hint": {"target": "launch_bar_switch"},
@@ -3771,7 +3771,7 @@ def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar
         used, reason = loop._apply_action_hint_overlay_override(response, request)
 
         assert used is True
-        assert reason == "deterministic_step:S19"
+        assert reason == "deterministic_step:S20"
         assert response.actions[0]["target"] == "launch_bar_switch"
         assert response.metadata["action_hint_overlay_override_target"] == "launch_bar_switch"
         assert "发射杆开关" in response.message
@@ -6089,8 +6089,8 @@ def test_rewrite_terminal_state_conflict_response_skips_when_gate_blockers_exist
                 "diagnosis": {"step_id": "S18", "error_category": "OM"},
                 "next": {"step_id": "S18"},
                 "help_response": {
-                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
-                    "next": {"step_id": "S18"},
+                    "diagnosis": {"step_id": "S19", "error_category": "OM"},
+                    "next": {"step_id": "S19"},
                 },
             },
         )
@@ -6180,8 +6180,8 @@ def test_rewrite_terminal_state_conflict_response_clears_stale_actions(tmp_path:
                 "diagnosis": {"step_id": "S18", "error_category": "OM"},
                 "next": {"step_id": "S18"},
                 "help_response": {
-                    "diagnosis": {"step_id": "S18", "error_category": "OM"},
-                    "next": {"step_id": "S18"},
+                    "diagnosis": {"step_id": "S19", "error_category": "OM"},
+                    "next": {"step_id": "S19"},
                 },
             },
         )
@@ -6355,9 +6355,7 @@ def test_live_loop_overrides_s18_root_menu_overlay_with_action_hint_when_vision_
     assert response.actions[0]["target"] == "right_mdi_pb5"
     assert response.metadata["fallback_overlay_used"] is True
     assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S18"
-    assert response.metadata["action_hint_overlay_override_used"] is True
-    assert response.metadata["action_hint_overlay_override_target"] == "right_mdi_pb5"
-    assert response.metadata["action_hint_overlay_override_original_targets"] == ["fcs_bit_switch"]
+    assert response.metadata.get("action_hint_overlay_override_used") is not True
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
 
 
@@ -6536,7 +6534,7 @@ def test_live_loop_executes_fake_llm_multi_target_overlay_when_enabled(
     events: list[dict[str, Any]] = []
     monkeypatch.setattr(
         "live_dcs.infer_step_id",
-        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S18", missing_conditions=()),
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S19", missing_conditions=()),
     )
     source = ReplayBiosReceiver(replay_path, speed=0.0)
     loop = LiveDcsTutorLoop(
@@ -6884,8 +6882,8 @@ def test_build_vision_selection_falls_back_when_trigger_time_is_non_finite(
     assert selection.trigger_wall_ms == 42500
 
 
-def test_fallback_overlay_skips_interacted_targets_for_s19(tmp_path: Path) -> None:
-    replay_path = tmp_path / "bios_s19_remaining.jsonl"
+def test_fallback_overlay_skips_interacted_targets_for_s20(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s20_remaining.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
 
     loop = LiveDcsTutorLoop(
@@ -6898,13 +6896,13 @@ def test_fallback_overlay_skips_interacted_targets_for_s19(tmp_path: Path) -> No
     try:
         loop._step_interacted_targets = {"launch_bar_switch", "refuel_probe_switch"}
 
-        s19_targets = loop.step_signal_profiles.get("S19", {}).get("ui_targets", [])
-        assert "launch_bar_switch" in s19_targets
-        assert "flap_switch" in s19_targets
+        s20_targets = loop.step_signal_profiles.get("S20", {}).get("ui_targets", [])
+        assert "launch_bar_switch" in s20_targets
+        assert "flap_switch" in s20_targets
 
         hint: dict[str, Any] = {
-            "inferred_step_id": "S19",
-            "overlay_step_id": "S19",
+            "inferred_step_id": "S20",
+            "overlay_step_id": "S20",
             "missing_conditions": [],
             "gate_blockers": [],
             "recent_ui_targets": [],
@@ -6921,8 +6919,8 @@ def test_fallback_overlay_skips_interacted_targets_for_s19(tmp_path: Path) -> No
                 "deterministic_step_hint": hint,
                 "rag_topk": [],
                 "gates": [
-                    {"gate_id": "S19.completion", "status": "blocked"},
-                    {"gate_id": "S19.precondition", "status": "allowed"},
+                    {"gate_id": "S20.completion", "status": "blocked"},
+                    {"gate_id": "S20.precondition", "status": "allowed"},
                 ],
             },
         )
@@ -7029,7 +7027,7 @@ def test_build_request_remembers_launch_bar_interaction_before_next_help(
     monkeypatch.setattr(
         "live_dcs.infer_step_id",
         lambda *args, **kwargs: StepInferenceResult(
-            inferred_step_id="S19",
+            inferred_step_id="S20",
             missing_conditions=("vars.pitot_heat_on==true",),
         ),
     )
@@ -7046,7 +7044,7 @@ def test_build_request_remembers_launch_bar_interaction_before_next_help(
         lang="zh",
     )
     try:
-        loop._last_inferred_step_id = "S19"
+        loop._last_inferred_step_id = "S20"
         loop._ingest_observation(
             Observation(
                 source="dcs_bios_raw",
