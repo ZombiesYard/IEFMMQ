@@ -201,6 +201,10 @@ local function missionEval(chunk)
   return res, nil
 end
 
+local function as_lua_string(value)
+  return string.format("%q", tostring(value))
+end
+
 local function missionDoScript(chunk)
   local wrapped = ("return a_do_script(%s)"):format(as_lua_string(chunk))
   local res, err = missionEval(wrapped)
@@ -208,10 +212,6 @@ local function missionDoScript(chunk)
     return res, nil
   end
   return missionEval(chunk)
-end
-
-local function as_lua_string(value)
-  return string.format("%q", tostring(value))
 end
 
 local function send_ack(cmd_id, status, reason)
