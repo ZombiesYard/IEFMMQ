@@ -1626,3 +1626,91 @@ def test_infer_step_blocks_at_s06_completion_when_rpm_above_60_and_bleed_air_not
     # Engine should report S06 blocked on bleed air completion
     assert result.inferred_step_id == "S06"
     assert "vars.bleed_air_cycle_complete==true" in result.missing_conditions
+
+
+def test_infer_step_blocks_at_s16_when_flap_not_auto(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    """S16 must block when flap is at FULL (cold start default) or HALF."""
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = {
+        "battery_on": True,
+        "ext_pwr_on": True,
+        "l_gen_on": True,
+        "r_gen_on": True,
+        "power_available": True,
+        "apu_on": True,
+        "apu_ready": True,
+        "apu_start_support_complete": True,
+        "fire_test_a_complete": True,
+        "fire_test_b_complete": True,
+        "fire_test_complete": True,
+        "engine_crank_right": True,
+        "engine_crank_right_complete": True,
+        "rpm_r": 65,
+        "rpm_r_gte_25": True,
+        "rpm_r_gte_60": True,
+        "throttle_r_not_off": True,
+        "throttle_r_idle_complete": True,
+        "right_engine_nominal_start_params": True,
+        "bleed_air_norm": True,
+        "bleed_air_cycle_complete": True,
+        "lights_test_complete": True,
+        "left_engine_idle_ready": True,
+        "left_ddi_on": True,
+        "right_ddi_on": True,
+        "mpcd_on": True,
+        "hud_on": True,
+        "comm1_freq_134_000": True,
+        "engine_crank_left": True,
+        "engine_crank_left_complete": True,
+        "rpm_l": 65,
+        "rpm_l_gte_25": True,
+        "rpm_l_gte_60": True,
+        "throttle_l_not_off": True,
+        "left_engine_nominal_start_params": True,
+        "ins_mode": 2,
+        "ins_mode_set": True,
+        "ins_mode_cv_or_gnd": True,
+        "radar_mode_opr": True,
+        "obogs_ready": True,
+        "fcs_reset_complete": True,
+        "flap_auto": False,
+    }
+    vision_facts = [
+        {"fact_id": "fcs_page_visible", "state": "seen"},
+        {"fact_id": "bit_root_page_visible", "state": "seen"},
+    ]
+
+    blocked = infer_step_id(
+        pack_steps,
+        vars_map,
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=vision_facts,
+    )
+
+    assert blocked.inferred_step_id == "S16", (
+        f"Expected S16, got {blocked.inferred_step_id}"
+    )
+    assert "vars.flap_auto==true" in blocked.missing_conditions
+
+    # With flap at AUTO, S16 should be satisfied and engine advances past S16.
+    vars_auto = dict(vars_map)
+    vars_auto["flap_auto"] = True
+    advanced = infer_step_id(
+        pack_steps,
+        vars_auto,
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=vision_facts,
+    )
+
+    assert advanced.inferred_step_id != "S16", (
+        f"Expected step after S16, got {advanced.inferred_step_id}"
+    )

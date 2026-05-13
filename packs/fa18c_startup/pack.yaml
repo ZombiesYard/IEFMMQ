@@ -24,10 +24,10 @@ metadata:
     - S11
     - S12
     - S13
+    - S16
     - S21
   manual_or_out_of_layout_steps:
     - S14
-    - S16
     - S17
     - S19
     - S20
