@@ -199,22 +199,48 @@ class BaseHelpModel(ModelPort):
                 import httpx  # local import keeps unit tests offline with fake client
             except ModuleNotFoundError as exc:
                 raise RuntimeError("httpx is required when no client is injected") from exc
-            self._client = httpx.Client(timeout=self.timeout_s)
+            self._client = self._make_http_client()
             self._owns_client = True
+            self._http_warmed = False
         else:
             self._client = client
             self._owns_client = False
+            self._http_warmed = True  # injected clients are pre-warmed by definition
+
+    def _make_http_client(self) -> Any:
+        import httpx
+        return httpx.Client(
+            timeout=httpx.Timeout(
+                connect=5.0,
+                read=self.timeout_s,
+                write=30.0,
+                pool=5.0,
+            ),
+            limits=httpx.Limits(
+                max_keepalive_connections=2,
+                max_connections=4,
+                keepalive_expiry=30.0,
+            ),
+        )
+
+    def _warm_http_connection(self) -> None:
+        if not self._owns_client:
+            return
+        try:
+            self._client.get(
+                f"{self.base_url}/health",
+                timeout=5.0,
+            )
+        except Exception:
+            pass
 
     def _reset_http_client(self) -> None:
         if not self._owns_client:
             return
         if hasattr(self._client, "close"):
             self._client.close()
-        try:
-            import httpx
-        except ModuleNotFoundError as exc:
-            raise RuntimeError("httpx is required to reset the HTTP client") from exc
-        self._client = httpx.Client(timeout=self.timeout_s)
+        self._client = self._make_http_client()
+        self._http_warmed = False
 
     def close(self) -> None:
         if self._owns_client and hasattr(self._client, "close"):

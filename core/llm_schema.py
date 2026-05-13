@@ -149,7 +149,7 @@ def build_help_response_schema(
             "target": {"type": "string", "enum": list(overlay_targets)},
             "type": {"type": "string", "enum": ["var", "gate", "rag", "delta", "visual"]},
             "ref": {"type": "string", "minLength": 1},
-            "quote": {"type": "string", "minLength": 1, "maxLength": 120},
+            "quote": {"type": "string", "minLength": 0, "maxLength": 120},
             "grounding_confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         },
     }
@@ -236,8 +236,8 @@ def build_help_response_schema(
             },
             "explanations": {
                 "type": "array",
-                "minItems": 1,
-                "items": {"type": "string", "minLength": 1},
+                "minItems": 0,
+                "items": {"type": "string", "minLength": 0},
             },
         },
     }

@@ -152,6 +152,10 @@ class OpenAICompatModel(BaseHelpModel):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
+        if not self._http_warmed:
+            self._http_warmed = True
+            self._warm_http_connection()
+
         if self._messages_contain_images(messages):
             self._runtime_metadata["multimodal_path_attempted"] = True
             try:
