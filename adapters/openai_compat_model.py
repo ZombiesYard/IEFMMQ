@@ -195,12 +195,7 @@ class OpenAICompatModel(BaseHelpModel):
                 include_request_overrides=include_request_overrides,
                 has_vision=has_vision,
             )
-            response = self._client.post(
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-                headers=headers,
-                timeout=self.timeout_s,
-            )
+            response = self._post_with_transport_retry(payload, headers)
             status_code = getattr(response, "status_code", None)
             if not isinstance(status_code, int) or status_code != 400:
                 break
@@ -220,6 +215,30 @@ class OpenAICompatModel(BaseHelpModel):
         if not isinstance(body, Mapping):
             raise ValueError("OpenAI-compatible response must be a JSON object")
         return self._extract_content_from_body(body)
+
+    def _post_with_transport_retry(self, payload: dict[str, Any], headers: Mapping[str, str]) -> Any:
+        for attempt in range(2):
+            try:
+                return self._client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    timeout=self.timeout_s,
+                )
+            except Exception as exc:
+                if attempt == 1 or not self._is_retryable_transport_error(exc):
+                    raise
+                self._reset_http_client()
+
+    @staticmethod
+    def _is_retryable_transport_error(exc: Exception) -> bool:
+        try:
+            import httpx
+        except ModuleNotFoundError:
+            httpx = None
+        if httpx is not None and isinstance(exc, httpx.RequestError):
+            return True
+        return isinstance(exc, (ConnectionError, TimeoutError))
 
     def _extract_content_from_body(self, body: Mapping[str, object]) -> str:
         if not isinstance(body, Mapping):

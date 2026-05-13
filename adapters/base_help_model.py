@@ -205,6 +205,17 @@ class BaseHelpModel(ModelPort):
             self._client = client
             self._owns_client = False
 
+    def _reset_http_client(self) -> None:
+        if not self._owns_client:
+            return
+        if hasattr(self._client, "close"):
+            self._client.close()
+        try:
+            import httpx
+        except ModuleNotFoundError as exc:
+            raise RuntimeError("httpx is required to reset the HTTP client") from exc
+        self._client = httpx.Client(timeout=self.timeout_s)
+
     def close(self) -> None:
         if self._owns_client and hasattr(self._client, "close"):
             self._client.close()

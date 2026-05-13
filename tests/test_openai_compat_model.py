@@ -775,7 +775,7 @@ def test_openai_compat_does_not_fallback_to_text_only_for_non_multimodal_transpo
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
 
     assert res.status == "error"
-    assert len(fake.calls) == 1
+    assert len(fake.calls) == 2  # 1 attempt + 1 retry for transport error
     assert res.metadata["multimodal_input_present"] is True
     assert res.metadata["multimodal_images_built"] is True
     assert res.metadata["multimodal_path_attempted"] is True
