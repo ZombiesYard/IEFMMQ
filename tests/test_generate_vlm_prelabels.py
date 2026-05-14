@@ -156,7 +156,8 @@ def test_generate_vlm_prelabels_builds_dashscope_json_object_request_and_prompt_
     assert "max_tokens" not in request_payload
     content = request_payload["messages"][1]["content"]
     assert [item["type"] for item in content] == ["image_url", "text"]
-    assert content[0]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert "data:image/" in content[0]["image_url"]["url"]
+    assert "base64," in content[0]["image_url"]["url"]
     assert "严禁输出 frame_id" in content[1]["text"]
     assert "严禁输出 source_frame_id" in content[1]["text"]
     assert "严禁输出 confidence" in content[1]["text"]
@@ -225,7 +226,8 @@ def test_generate_vlm_prelabels_normalizes_facts_and_exports_label_studio_tasks(
     tasks = json.loads((output_dir / "label_studio_tasks.json").read_text(encoding="utf-8"))
     assert len(tasks) == 1
     task = tasks[0]
-    assert task["data"]["image"].startswith("data:image/png;base64,")
+    assert "data:image/" in task["data"]["image"]
+    assert "base64," in task["data"]["image"]
     assert task["data"]["frame_id"] == "1772872445010_000123"
     assert task["data"]["fcs_page_visible"] == "seen"
     assert task["data"]["bit_root_page_visible"] == "uncertain"

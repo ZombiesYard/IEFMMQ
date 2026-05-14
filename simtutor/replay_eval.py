@@ -8,6 +8,7 @@ from typing import Any, Callable, Mapping, Sequence
 import yaml
 
 from adapters.action_executor import OverlayActionExecutor
+from adapters.dcs.tutor_text import NoopTutorTextSender
 from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
 from adapters.pack_gates import normalize_scenario_profile
 from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort
@@ -736,6 +737,8 @@ def run_replay_eval_suite(
                         vision_mode="replay",
                         vision_sync_window_ms=None if case.vision is None else case.vision.sync_window_ms,
                         vision_trigger_wait_ms=None if case.vision is None else case.vision.trigger_wait_ms,
+                        vision_model_name="simtutor-vision",
+                        tutor_text_sender=NoopTutorTextSender(),
                     )
                     loop.run(
                         max_frames=case.max_frames,

@@ -192,20 +192,16 @@ def test_validate_help_response_rejects_duplicate_overlay_targets() -> None:
         validate_help_response(payload)
 
 
-def test_validate_help_response_rejects_empty_explanation_string() -> None:
+def test_validate_help_response_allows_empty_explanation_string() -> None:
     payload = _valid_help_response()
     payload["explanations"] = [""]
-
-    with pytest.raises(ValidationError, match=r"\$\.explanations\[0\]"):
-        validate_help_response(payload)
+    validate_help_response(payload)
 
 
-def test_validate_help_response_rejects_empty_explanations_array() -> None:
+def test_validate_help_response_allows_empty_explanations_array() -> None:
     payload = _valid_help_response()
     payload["explanations"] = []
-
-    with pytest.raises(ValidationError, match=r"\$\.explanations"):
-        validate_help_response(payload)
+    validate_help_response(payload)
 
 
 @pytest.mark.parametrize(

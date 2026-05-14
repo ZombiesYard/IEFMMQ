@@ -662,8 +662,10 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     content = request_payload["messages"][1]["content"]
     assert isinstance(content, list)
     assert [item["type"] for item in content] == ["image_url", "image_url", "text"]
-    assert content[0]["image_url"]["url"].startswith("data:image/png;base64,")
-    assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert "data:image/" in content[0]["image_url"]["url"]
+    assert "base64," in content[0]["image_url"]["url"]
+    assert "data:image/" in content[1]["image_url"]["url"]
+    assert "base64," in content[1]["image_url"]["url"]
     assert "Primary visual frame: 1772872444950_000122" in content[2]["text"]
     assert "Trigger frame: 1772872445010_000123" in content[2]["text"]
 
@@ -775,7 +777,7 @@ def test_openai_compat_does_not_fallback_to_text_only_for_non_multimodal_transpo
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
 
     assert res.status == "error"
-    assert len(fake.calls) == 1
+    assert len(fake.calls) == 2  # 1 attempt + 1 retry for transport error
     assert res.metadata["multimodal_input_present"] is True
     assert res.metadata["multimodal_images_built"] is True
     assert res.metadata["multimodal_path_attempted"] is True

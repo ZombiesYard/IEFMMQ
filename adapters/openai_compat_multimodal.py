@@ -50,11 +50,44 @@ def frame_to_data_url(
     file_size = path.stat().st_size
     if file_size > max_local_image_bytes:
         raise ValueError(f"vision frame image exceeds max size {max_local_image_bytes} bytes: {label}")
-    mime_type = frame.get("mime_type")
-    if not isinstance(mime_type, str) or not mime_type:
-        mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    encoded, mime_type = _encode_image_for_vlm(path, frame.get("mime_type"))
     return f"data:{mime_type};base64,{encoded}"
+
+
+def _encode_image_for_vlm(path: Path, hint_mime_type: str | None = None) -> tuple[str, str]:
+    """Read and encode a local image for VLM consumption.
+
+    PNG screenshots are re-compressed as JPEG (85% quality) to reduce
+    the base64 payload from ~5 MB to ~200 KB while preserving enough
+    detail for vision-language models.
+
+    Returns (base64_string, mime_type).
+    """
+    raw_bytes = path.read_bytes()
+    mime = hint_mime_type if isinstance(hint_mime_type, str) and hint_mime_type else ""
+    if not mime:
+        mime = mimetypes.guess_type(path.name)[0] or "image/png"
+    is_png = "png" in mime.lower() or path.suffix.lower() == ".png"
+
+    if not is_png:
+        encoded = base64.b64encode(raw_bytes).decode("ascii")
+        return encoded, mime
+
+    try:
+        from PIL import Image
+        import io
+
+        with Image.open(path) as img:
+            img_rgb = img.convert("RGB")
+            buf = io.BytesIO()
+            img_rgb.save(buf, format="JPEG", quality=85, optimize=True)
+            compressed = buf.getvalue()
+    except Exception:
+        encoded = base64.b64encode(raw_bytes).decode("ascii")
+        return encoded, mime
+
+    encoded = base64.b64encode(compressed).decode("ascii")
+    return encoded, "image/jpeg"
 
 
 def build_multimodal_image_contents(

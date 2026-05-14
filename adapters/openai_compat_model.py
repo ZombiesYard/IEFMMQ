@@ -82,6 +82,117 @@ class OpenAICompatModel(BaseHelpModel):
     def _collect_runtime_metadata(self) -> dict[str, Any]:
         return dict(self._runtime_metadata)
 
+    def _inject_few_shot_examples(
+        self, messages: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        user_msg_idx = next(
+            (i for i, m in enumerate(messages) if m.get("role") == "user"), -1
+        )
+        if user_msg_idx < 0:
+            return messages
+
+        examples: list[dict[str, Any]]
+        if self.lang == "zh":
+            examples = [
+                {
+                    "role": "user",
+                    "content": (
+                        "当前步骤 S01 未完成。missing_conditions: vars.battery_on==true。"
+                        "优先候选目标: battery_switch。"
+                        "EVIDENCE_SOURCES: VARS.battery_on=false, GATES.S01.completion=false"
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": (
+                        '{"diagnosis":{"step_id":"S01","error_category":"OM"},'
+                        '"next":{"step_id":"S01"},'
+                        '"overlay":{"targets":["battery_switch"],'
+                        '"evidence":[{"target":"battery_switch","type":"gate",'
+                        '"ref":"GATES.S01.completion","quote":"S01 完成条件不满足",'
+                        '"grounding_confidence":0.95}]},'
+                        '"explanations":["当前 S01 尚未完成，请先操作 battery_switch 打开电瓶开关。"]}'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "左 DDI 当前显示 TAC 页面。VLM 标注: fcs_page_visible=not_seen, tac_page_visible=seen。"
+                        "当前卡在 S08，需要进入 FCS 页面。优先目标: left_mdi_pb18。"
+                        "EVIDENCE_SOURCES: VISION_FACTS.tac_page_visible@frame001=seen, "
+                        "VISION_FACTS.fcs_page_visible@frame001=not_seen"
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": (
+                        '{"diagnosis":{"step_id":"S08","error_category":"CO"},'
+                        '"next":{"step_id":"S08"},'
+                        '"overlay":{"targets":["left_mdi_pb18"],'
+                        '"evidence":[{"target":"left_mdi_pb18","type":"visual",'
+                        '"ref":"VISION_FACTS.tac_page_visible@frame001","quote":"左DDI显示TAC页面",'
+                        '"grounding_confidence":0.9}]},'
+                        '"explanations":["左 DDI 当前显示 TAC 页面，需先按左 MDI PB18 进入 SUPT 页面。"]}'
+                    ),
+                },
+            ]
+        else:
+            examples = [
+                {
+                    "role": "user",
+                    "content": (
+                        "Step S01 incomplete. missing_conditions: vars.battery_on==true. "
+                        "Preferred target: battery_switch. "
+                        "EVIDENCE_SOURCES: VARS.battery_on=false, GATES.S01.completion=false"
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": (
+                        '{"diagnosis":{"step_id":"S01","error_category":"OM"},'
+                        '"next":{"step_id":"S01"},'
+                        '"overlay":{"targets":["battery_switch"],'
+                        '"evidence":[{"target":"battery_switch","type":"gate",'
+                        '"ref":"GATES.S01.completion","quote":"S01 not complete",'
+                        '"grounding_confidence":0.95}]},'
+                        '"explanations":["S01 not complete: operate battery_switch to turn on battery."]}'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Left DDI shows TAC page. VLM: fcs_page_visible=not_seen, tac_page_visible=seen. "
+                        "Stuck at S08, need FCS page. Preferred target: left_mdi_pb18. "
+                        "EVIDENCE_SOURCES: VISION_FACTS.tac_page_visible@frame001=seen, "
+                        "VISION_FACTS.fcs_page_visible@frame001=not_seen"
+                    ),
+                },
+                {
+                    "role": "assistant",
+                    "content": (
+                        '{"diagnosis":{"step_id":"S08","error_category":"CO"},'
+                        '"next":{"step_id":"S08"},'
+                        '"overlay":{"targets":["left_mdi_pb18"],'
+                        '"evidence":[{"target":"left_mdi_pb18","type":"visual",'
+                        '"ref":"VISION_FACTS.tac_page_visible@frame001","quote":"TAC page on left DDI",'
+                        '"grounding_confidence":0.9}]},'
+                        '"explanations":["Left DDI shows TAC page. Press left MDI PB18 to enter SUPT page."]}'
+                    ),
+                },
+            ]
+
+        result = list(messages[:user_msg_idx])
+        result.extend(examples)
+        result.extend(messages[user_msg_idx:])
+        return result
+
+    def _inject_assistant_prefill(
+        self, messages: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        result = list(messages)
+        result.append({"role": "assistant", "content": "{", "prefix": True})
+        return result
+
     def _build_messages(
         self,
         observation: Any,
@@ -98,6 +209,9 @@ class OpenAICompatModel(BaseHelpModel):
             recent_ui_targets=recent_ui_targets,
             deterministic_hint=deterministic_hint,
         )
+        if self._owns_client:
+            messages = self._inject_few_shot_examples(messages)
+            messages = self._inject_assistant_prefill(messages)
         multimodal_spec = self._build_multimodal_spec(request)
         self._runtime_metadata.update(
             {
@@ -152,6 +266,10 @@ class OpenAICompatModel(BaseHelpModel):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
+        if not self._http_warmed:
+            self._http_warmed = True
+            self._warm_http_connection()
+
         if self._messages_contain_images(messages):
             self._runtime_metadata["multimodal_path_attempted"] = True
             try:
@@ -195,12 +313,7 @@ class OpenAICompatModel(BaseHelpModel):
                 include_request_overrides=include_request_overrides,
                 has_vision=has_vision,
             )
-            response = self._client.post(
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-                headers=headers,
-                timeout=self.timeout_s,
-            )
+            response = self._post_with_transport_retry(payload, headers)
             status_code = getattr(response, "status_code", None)
             if not isinstance(status_code, int) or status_code != 400:
                 break
@@ -219,7 +332,32 @@ class OpenAICompatModel(BaseHelpModel):
         body = response.json()
         if not isinstance(body, Mapping):
             raise ValueError("OpenAI-compatible response must be a JSON object")
-        return self._extract_content_from_body(body)
+        raw = self._extract_content_from_body(body)
+        return self._ensure_json_prefix(raw)
+
+    def _post_with_transport_retry(self, payload: dict[str, Any], headers: Mapping[str, str]) -> Any:
+        for attempt in range(2):
+            try:
+                return self._client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    timeout=self.timeout_s,
+                )
+            except Exception as exc:
+                if attempt == 1 or not self._is_retryable_transport_error(exc):
+                    raise
+                self._reset_http_client()
+
+    @staticmethod
+    def _is_retryable_transport_error(exc: Exception) -> bool:
+        try:
+            import httpx
+        except ModuleNotFoundError:
+            httpx = None
+        if httpx is not None and isinstance(exc, httpx.RequestError):
+            return True
+        return isinstance(exc, (ConnectionError, TimeoutError))
 
     def _extract_content_from_body(self, body: Mapping[str, object]) -> str:
         if not isinstance(body, Mapping):
@@ -235,6 +373,21 @@ class OpenAICompatModel(BaseHelpModel):
         if isinstance(message, Mapping) and isinstance(message.get("content"), str):
             return message["content"]
         raise ValueError("OpenAI-compatible response missing choices[0].message.content")
+
+    @staticmethod
+    def _ensure_json_prefix(raw: str, prefix: str = "{") -> str:
+        stripped = raw.strip()
+        if not stripped:
+            return prefix
+        if stripped[0] == prefix:
+            return stripped
+        if "{" in stripped:
+            # Let prefix/suffix repair handle wrapped JSON
+            return stripped
+        # Content looks like pure prefill continuation (e.g. "diagnosis":...)
+        if stripped[0] == '"':
+            return prefix + stripped
+        return stripped
 
     def _build_chat_payload(
         self,
