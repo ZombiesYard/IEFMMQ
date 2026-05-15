@@ -1548,6 +1548,28 @@ def _build_procedural_action_hint(
     step_interacted_targets: Sequence[str] | None = None,
     vision_fact_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
+    if inferred_step_id == "S02":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("fire_test_a_complete") is not True:
+            return _hint(
+                "fire_test_switch",
+                "Hold the fire test switch to FIRE TEST A position and observe the aural/visual indications.",
+            )
+        if vars_selected.get("fire_test_b_complete") is not True:
+            return _hint(
+                "fire_test_switch",
+                "Fire test A is complete. Now hold the fire test switch to FIRE TEST B position and wait ~10 seconds for the second set of indications.",
+            )
+        return None
+
     if inferred_step_id == "S20":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
