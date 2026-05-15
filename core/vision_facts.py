@@ -300,7 +300,7 @@ def _coerce_s18_result_fact_state(
         return state
     if result_kind == "final_go":
         return state
-    if result_kind in {"intermediate_go", "in_test", "not_ready"}:
+    if result_kind != "final_go":
         return "not_seen"
     return state
 
