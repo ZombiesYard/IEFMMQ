@@ -186,13 +186,6 @@ class OpenAICompatModel(BaseHelpModel):
         result.extend(messages[user_msg_idx:])
         return result
 
-    def _inject_assistant_prefill(
-        self, messages: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        result = list(messages)
-        result.append({"role": "assistant", "content": "{", "prefix": True})
-        return result
-
     def _build_messages(
         self,
         observation: Any,
@@ -211,7 +204,6 @@ class OpenAICompatModel(BaseHelpModel):
         )
         if self._owns_client:
             messages = self._inject_few_shot_examples(messages)
-            messages = self._inject_assistant_prefill(messages)
         multimodal_spec = self._build_multimodal_spec(request)
         self._runtime_metadata.update(
             {
@@ -332,8 +324,7 @@ class OpenAICompatModel(BaseHelpModel):
         body = response.json()
         if not isinstance(body, Mapping):
             raise ValueError("OpenAI-compatible response must be a JSON object")
-        raw = self._extract_content_from_body(body)
-        return self._ensure_json_prefix(raw)
+        return self._extract_content_from_body(body)
 
     def _post_with_transport_retry(self, payload: dict[str, Any], headers: Mapping[str, str]) -> Any:
         for attempt in range(2):
@@ -373,21 +364,6 @@ class OpenAICompatModel(BaseHelpModel):
         if isinstance(message, Mapping) and isinstance(message.get("content"), str):
             return message["content"]
         raise ValueError("OpenAI-compatible response missing choices[0].message.content")
-
-    @staticmethod
-    def _ensure_json_prefix(raw: str, prefix: str = "{") -> str:
-        stripped = raw.strip()
-        if not stripped:
-            return prefix
-        if stripped[0] == prefix:
-            return stripped
-        if "{" in stripped:
-            # Let prefix/suffix repair handle wrapped JSON
-            return stripped
-        # Content looks like pure prefill continuation (e.g. "diagnosis":...)
-        if stripped[0] == '"':
-            return prefix + stripped
-        return stripped
 
     def _build_chat_payload(
         self,
