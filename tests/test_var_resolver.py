@@ -378,6 +378,7 @@ def test_var_resolver_pack_fire_test_completion_requires_direct_switch_evidence(
             "R_GEN_SW": 1,
             "APU_CONTROL_SW": 1,
             "APU_READY_LT": 1,
+            "BLEED_AIR_KNOB": 2,
             "ENGINE_CRANK_SW": 0,
             "IFEI_RPM_R": 68,
             "IFEI_RPM_L": 65,

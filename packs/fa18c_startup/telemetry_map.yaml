@@ -66,7 +66,7 @@ vars:
   right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"
   mpcd_on: "bios.AMPCD_BRT_CTL > 0"
   hud_on: "bios.HUD_SYM_BRT > 0"
-  bleed_air_cycle_complete: "derived(vars.bleed_air_norm or vars.engine_crank_left or vars.left_ddi_on or vars.right_ddi_on or vars.rpm_l_gte_60)"
+  bleed_air_cycle_complete: "derived(vars.bleed_air_norm)"
   core_avionics_online: "derived(bios.LEFT_DDI_BRT_CTL > 0 and bios.RIGHT_DDI_BRT_CTL > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
 
   # Key switches / sensor panel
