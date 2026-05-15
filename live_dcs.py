@@ -321,6 +321,7 @@ def _build_vision_fact_extractor_from_model(
     if not getattr(model, "enable_multimodal", False):
         return None
     effective_vision_name = vision_model_name or model.model_name
+    shared_client = getattr(model, "http_client", None)
     try:
         return VisionFactExtractor(
             model_name=effective_vision_name,
@@ -333,6 +334,7 @@ def _build_vision_fact_extractor_from_model(
             log_raw_llm_text=getattr(model, "log_raw_llm_text", False),
             print_model_io=getattr(model, "print_model_io", False),
             pack_path=pack_path,
+            client=shared_client,
         )
     except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
         return None

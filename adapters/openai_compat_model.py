@@ -4,6 +4,8 @@ OpenAI-compatible ModelPort adapter (vLLM/llama.cpp/TGI compatible).
 
 from __future__ import annotations
 
+import random
+import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -327,17 +329,25 @@ class OpenAICompatModel(BaseHelpModel):
         return self._extract_content_from_body(body)
 
     def _post_with_transport_retry(self, payload: dict[str, Any], headers: Mapping[str, str]) -> Any:
-        for attempt in range(2):
+        for attempt in range(3):
             try:
-                return self._client.post(
+                t0 = time.perf_counter()
+                response = self._client.post(
                     f"{self.base_url}/v1/chat/completions",
                     json=payload,
                     headers=headers,
-                    timeout=self.timeout_s,
+                    timeout=self._adaptive_timeout.compute(),
                 )
+                elapsed_s = time.perf_counter() - t0
+                self._adaptive_timeout.record(elapsed_s)
+                response.metadata = getattr(response, "metadata", {}) or {}
+                response.metadata["latency_s"] = elapsed_s
+                return response
             except Exception as exc:
-                if attempt == 1 or not self._is_retryable_transport_error(exc):
+                if attempt == 2 or not self._is_retryable_transport_error(exc):
                     raise
+                backoff_ms = min(200 * (2 ** attempt) + random.uniform(0, 100), 2000)
+                time.sleep(backoff_ms / 1000.0)
                 self._reset_http_client()
 
     @staticmethod
