@@ -1,0 +1,16 @@
+cycle_index,help_cycle_id,trigger_wall_s,generation_mode,vision_used,vision_status,vision_fallback_reason,sync_delta_ms,fused_step_id,fused_missing_conditions,model_next_step_id,overlay_targets,overlay_executed,overlay_rejected,overlay_dropped,overlay_dry_run_count,response_status,fallback_overlay_used,observability_status,requires_visual_confirmation,scenario_profile
+0,ac802f50-bf3f-47ea-8980-d393a9957386,1778815918.5002003,model,True,partial,,104,S01,vars.battery_on==true,S01,battery_switch,1,0,0,0,ok,False,observable,False,airfield
+1,f7146062-70d4-4817-9f7f-4501d1c43002,1778815937.6307294,model,True,partial,,83,S02,vars.fire_test_a_complete==true,S02,fire_test_switch,1,0,0,0,ok,False,observable,False,airfield
+2,9bb5d27e-be93-4255-af81-63e55327f027,1778815960.2255135,model,True,partial,,70,S03,vars.apu_start_support_complete==true,S03,apu_switch,1,0,0,0,ok,False,observable,False,airfield
+3,fa2f58c7-34d6-4362-9045-951441e478ed,1778815968.6382403,model,True,partial,,82,S03,vars.apu_start_support_complete==true,S03,apu_switch,1,0,0,0,ok,False,observable,False,airfield
+4,2574da6a-af31-4cf4-b5f3-1b600882b24c,1778815982.5697384,model,True,partial,,87,S04,vars.engine_crank_right_complete==true,S04,eng_crank_switch,1,0,0,0,ok,False,observable,False,airfield
+5,22daa596-076e-478e-8b69-11a2fc834b33,1778815992.867041,model,True,partial,vision_conflict_unresolved,97,S05,vars.rpm_r>=25,S08,left_mdi_pb18,0,0,0,0,ok,False,observable,False,airfield
+6,f9db6d99-cd2f-4a34-a61f-418bd4784a04,1778816010.575135,model,True,partial,,100,S05,vars.throttle_r_idle_complete==true,S05,throttle_quadrant_reference,1,0,0,0,ok,False,observable,False,airfield
+7,8faf6524-0201-4b77-991d-9d4c1c444d64,1778816021.0253284,fallback,True,partial,,90,S06,vars.rpm_r_gte_60==true,,,0,0,0,0,error,False,observable,False,airfield
+8,e6cc4e4d-a216-4e6d-b006-3861c2913230,1778816036.8909383,model,True,partial,,100,S07,vars.lights_test_complete==true,S07,lights_test_button,1,0,0,0,ok,False,observable,False,airfield
+9,9e910042-53c9-466c-bf9d-30c1f6a145b9,1778816054.1396,model,True,partial,,80,S08,vars.mpcd_on==true,S08,left_mdi_pb18,1,0,0,0,ok,False,observable,False,airfield
+10,9b94019e-a6eb-4c96-ac4b-370cfd49b4ef,1778816077.0691612,model,True,partial,,92,S08,vars.mpcd_on==true,S08,left_mdi_pb18,1,0,0,0,ok,False,observable,False,airfield
+11,2bc24424-c869-401b-b7cc-3209b75631b6,1778816154.544243,model,True,partial,,85,S08,vars.hud_on==true,S08,left_mdi_pb18,1,0,0,0,ok,False,observable,False,airfield
+12,a022a8db-76b8-419f-90cb-abb17411d337,1778816190.7193067,model,True,partial,,104,S08,vars.hud_on==true,S08,left_mdi_pb18,1,0,0,0,ok,False,observable,False,airfield
+13,e7568c51-5824-4ad0-b364-45d07dc66d7b,1778816197.4505851,model,True,partial,,117,S08,vars.hud_on==true,S08,left_mdi_pb18,1,0,0,0,ok,False,observable,False,airfield
+14,d2364cfa-eb7c-4d8a-a143-34f92e10c70d,1778816204.8095784,model,True,partial,,87,S08,vars.hud_on==true,S08,left_mdi_pb18,1,0,0,0,ok,False,observable,False,airfield

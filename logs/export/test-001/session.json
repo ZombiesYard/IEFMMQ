@@ -1,0 +1,3705 @@
+{
+  "help_cycles": [
+    {
+      "cycle_index": 0,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778815913407_000146"
+      ],
+      "fused_missing_conditions": [
+        "vars.battery_on==true"
+      ],
+      "fused_step_id": "S01",
+      "generation_mode": "model",
+      "help_cycle_id": "ac802f50-bf3f-47ea-8980-d393a9957386",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S01",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "battery_switch"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 104,
+      "trigger_wall_s": 1778815918.5002003,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 1,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778815934812_000147"
+      ],
+      "fused_missing_conditions": [
+        "vars.fire_test_a_complete==true"
+      ],
+      "fused_step_id": "S02",
+      "generation_mode": "model",
+      "help_cycle_id": "f7146062-70d4-4817-9f7f-4501d1c43002",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S02",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "fire_test_switch"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 83,
+      "trigger_wall_s": 1778815937.6307294,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 2,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778815957370_000148"
+      ],
+      "fused_missing_conditions": [
+        "vars.apu_start_support_complete==true"
+      ],
+      "fused_step_id": "S03",
+      "generation_mode": "model",
+      "help_cycle_id": "9bb5d27e-be93-4255-af81-63e55327f027",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S03",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "apu_switch"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 70,
+      "trigger_wall_s": 1778815960.2255135,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 3,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778815965816_000149"
+      ],
+      "fused_missing_conditions": [
+        "vars.apu_start_support_complete==true"
+      ],
+      "fused_step_id": "S03",
+      "generation_mode": "model",
+      "help_cycle_id": "fa2f58c7-34d6-4362-9045-951441e478ed",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S03",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "apu_switch"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 82,
+      "trigger_wall_s": 1778815968.6382403,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 4,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778815979765_000150"
+      ],
+      "fused_missing_conditions": [
+        "vars.engine_crank_right_complete==true"
+      ],
+      "fused_step_id": "S04",
+      "generation_mode": "model",
+      "help_cycle_id": "2574da6a-af31-4cf4-b5f3-1b600882b24c",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S04",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "eng_crank_switch"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 87,
+      "trigger_wall_s": 1778815982.5697384,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 5,
+      "fallback_overlay_reason": "unsupported_step:S05",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778815990027_000151"
+      ],
+      "fused_missing_conditions": [
+        "vars.rpm_r>=25"
+      ],
+      "fused_step_id": "S05",
+      "generation_mode": "model",
+      "help_cycle_id": "22daa596-076e-478e-8b69-11a2fc834b33",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 0,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 97,
+      "trigger_wall_s": 1778815992.867041,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": "vision_conflict_unresolved",
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 6,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816007737_000152"
+      ],
+      "fused_missing_conditions": [
+        "vars.throttle_r_idle_complete==true"
+      ],
+      "fused_step_id": "S05",
+      "generation_mode": "model",
+      "help_cycle_id": "f9db6d99-cd2f-4a34-a61f-418bd4784a04",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S05",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "throttle_quadrant_reference"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 100,
+      "trigger_wall_s": 1778816010.575135,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 7,
+      "fallback_overlay_reason": "precondition_blocked:Right engine RPM must be above 60 before BLEED AIR cycle.",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816018205_000153"
+      ],
+      "fused_missing_conditions": [
+        "vars.rpm_r_gte_60==true"
+      ],
+      "fused_step_id": "S06",
+      "generation_mode": "fallback",
+      "help_cycle_id": "8faf6524-0201-4b77-991d-9d4c1c444d64",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": null,
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 0,
+      "overlay_rejected": 0,
+      "overlay_targets": [],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "error",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 90,
+      "trigger_wall_s": 1778816021.0253284,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 8,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816034022_000154"
+      ],
+      "fused_missing_conditions": [
+        "vars.lights_test_complete==true"
+      ],
+      "fused_step_id": "S07",
+      "generation_mode": "model",
+      "help_cycle_id": "e6cc4e4d-a216-4e6d-b006-3861c2913230",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S07",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "lights_test_button"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 100,
+      "trigger_wall_s": 1778816036.8909383,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 9,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816051273_000155"
+      ],
+      "fused_missing_conditions": [
+        "vars.mpcd_on==true"
+      ],
+      "fused_step_id": "S08",
+      "generation_mode": "model",
+      "help_cycle_id": "9e910042-53c9-466c-bf9d-30c1f6a145b9",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 80,
+      "trigger_wall_s": 1778816054.1396,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 10,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816074248_000156"
+      ],
+      "fused_missing_conditions": [
+        "vars.mpcd_on==true"
+      ],
+      "fused_step_id": "S08",
+      "generation_mode": "model",
+      "help_cycle_id": "9b94019e-a6eb-4c96-ac4b-370cfd49b4ef",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 92,
+      "trigger_wall_s": 1778816077.0691612,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 11,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816151466_000157"
+      ],
+      "fused_missing_conditions": [
+        "vars.hud_on==true"
+      ],
+      "fused_step_id": "S08",
+      "generation_mode": "model",
+      "help_cycle_id": "2bc24424-c869-401b-b7cc-3209b75631b6",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 85,
+      "trigger_wall_s": 1778816154.544243,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 12,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816187614_000158"
+      ],
+      "fused_missing_conditions": [
+        "vars.hud_on==true"
+      ],
+      "fused_step_id": "S08",
+      "generation_mode": "model",
+      "help_cycle_id": "a022a8db-76b8-419f-90cb-abb17411d337",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 104,
+      "trigger_wall_s": 1778816190.7193067,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 13,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816194395_000159"
+      ],
+      "fused_missing_conditions": [
+        "vars.hud_on==true"
+      ],
+      "fused_step_id": "S08",
+      "generation_mode": "model",
+      "help_cycle_id": "e7568c51-5824-4ad0-b364-45d07dc66d7b",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 117,
+      "trigger_wall_s": 1778816197.4505851,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    },
+    {
+      "cycle_index": 14,
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "frame_ids": [
+        "1778816201790_000160"
+      ],
+      "fused_missing_conditions": [
+        "vars.hud_on==true"
+      ],
+      "fused_step_id": "S08",
+      "generation_mode": "model",
+      "help_cycle_id": "d2364cfa-eb7c-4d8a-a143-34f92e10c70d",
+      "layout_id": "fa18c_composite_panel_v2",
+      "model_next_step_id": "S08",
+      "observability_status": "observable",
+      "overlay_dropped": 0,
+      "overlay_dry_run_count": 0,
+      "overlay_executed": 1,
+      "overlay_rejected": 0,
+      "overlay_targets": [
+        "left_mdi_pb18"
+      ],
+      "requires_visual_confirmation": false,
+      "response_mapping_failure_codes": [],
+      "response_status": "ok",
+      "scenario_profile": "airfield",
+      "sync_delta_ms": 87,
+      "trigger_wall_s": 1778816204.8095784,
+      "vision_fact_status": "available",
+      "vision_fallback_reason": null,
+      "vision_status": "partial",
+      "vision_used": true
+    }
+  ],
+  "meta": {
+    "condition": "with_tutor",
+    "ended_at": "2026-05-15T03:36:49.387328+00:00",
+    "experimenter_notes": null,
+    "group": "",
+    "participant_id": "test-001",
+    "questionnaire_ref": null,
+    "session_id": "sess-live",
+    "started_at": "2026-05-15T03:31:50.830418+00:00"
+  },
+  "scoring": null,
+  "summary": {
+    "clear_acks": 0,
+    "clear_requests": 0,
+    "help_requests": 15,
+    "highlight_acks": 0,
+    "highlight_requests": 0,
+    "llm_triggers": 15,
+    "stall_time_max_s": 0.0,
+    "stall_time_total_s": 0.0,
+    "ui_click_failures": 0,
+    "ui_clicks": 0
+  },
+  "timeline": [
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 1,
+      "wall_s": 1778485629.998
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 2,
+      "wall_s": 1778485643.006
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 3,
+      "wall_s": 1778485652.68
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 4,
+      "wall_s": 1778485662.566
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 5,
+      "wall_s": 1778485679.123
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 6,
+      "wall_s": 1778485692.569
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 7,
+      "wall_s": 1778485731.596
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 8,
+      "wall_s": 1778485744.797
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 9,
+      "wall_s": 1778485752.262
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 10,
+      "wall_s": 1778485759.727
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 11,
+      "wall_s": 1778485767.736
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 12,
+      "wall_s": 1778485784.34
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 13,
+      "wall_s": 1778485793.51
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 14,
+      "wall_s": 1778485888.933
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 15,
+      "wall_s": 1778487093.023
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 16,
+      "wall_s": 1778487115.688
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 17,
+      "wall_s": 1778487130.624
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 18,
+      "wall_s": 1778487156.837
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 19,
+      "wall_s": 1778487204.606
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 20,
+      "wall_s": 1778487223.148
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 21,
+      "wall_s": 1778487235.862
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 22,
+      "wall_s": 1778487252.336
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 23,
+      "wall_s": 1778487262.786
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 24,
+      "wall_s": 1778487279.843
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 25,
+      "wall_s": 1778487329.571
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 26,
+      "wall_s": 1778487373.318
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 27,
+      "wall_s": 1778487471.438
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 28,
+      "wall_s": 1778494587.206
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 29,
+      "wall_s": 1778494834.823
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 30,
+      "wall_s": 1778494847.283
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 31,
+      "wall_s": 1778494860.149
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 32,
+      "wall_s": 1778494908.763
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 33,
+      "wall_s": 1778494921.745
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 34,
+      "wall_s": 1778494929.123
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 35,
+      "wall_s": 1778494938.279
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 36,
+      "wall_s": 1778494947.297
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 37,
+      "wall_s": 1778494957.006
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 38,
+      "wall_s": 1778494967.727
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 39,
+      "wall_s": 1778494984.201
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 40,
+      "wall_s": 1778495032.44
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 41,
+      "wall_s": 1778495051.873
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 42,
+      "wall_s": 1778495069.723
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 43,
+      "wall_s": 1778495082.212
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 44,
+      "wall_s": 1778495097.086
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 45,
+      "wall_s": 1778495113.711
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 46,
+      "wall_s": 1778495136.126
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 47,
+      "wall_s": 1778495163.486
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 48,
+      "wall_s": 1778495175.192
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 49,
+      "wall_s": 1778495193.589
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 50,
+      "wall_s": 1778499961.349
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 51,
+      "wall_s": 1778499968.311
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 52,
+      "wall_s": 1778499989.74
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 53,
+      "wall_s": 1778500019.49
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 54,
+      "wall_s": 1778500032.568
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 55,
+      "wall_s": 1778500045.431
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 56,
+      "wall_s": 1778500055.409
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 57,
+      "wall_s": 1778500066.64
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 58,
+      "wall_s": 1778500076.726
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 59,
+      "wall_s": 1778500092.592
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 60,
+      "wall_s": 1778500112.337
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 61,
+      "wall_s": 1778500137.825
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 62,
+      "wall_s": 1778500156.536
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 63,
+      "wall_s": 1778500174.11
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 64,
+      "wall_s": 1778500256.15
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 65,
+      "wall_s": 1778500272.217
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 66,
+      "wall_s": 1778500327.569
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 67,
+      "wall_s": 1778501441.299
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 68,
+      "wall_s": 1778501461.703
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 69,
+      "wall_s": 1778501473.432
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 70,
+      "wall_s": 1778501488.3
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 71,
+      "wall_s": 1778501500.093
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 72,
+      "wall_s": 1778502990.903
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 73,
+      "wall_s": 1778503003.6
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 74,
+      "wall_s": 1778503035.249
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 75,
+      "wall_s": 1778503058.786
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 76,
+      "wall_s": 1778503072.102
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 77,
+      "wall_s": 1778506014.04
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 78,
+      "wall_s": 1778506034.276
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 79,
+      "wall_s": 1778506045.113
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 80,
+      "wall_s": 1778506062.732
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 81,
+      "wall_s": 1778506079.556
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 82,
+      "wall_s": 1778506588.86
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 83,
+      "wall_s": 1778506650.196
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 84,
+      "wall_s": 1778506658.577
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 85,
+      "wall_s": 1778506674.313
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 86,
+      "wall_s": 1778506690.815
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 87,
+      "wall_s": 1778506723.645
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 88,
+      "wall_s": 1778506745.534
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 89,
+      "wall_s": 1778506759.174
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 90,
+      "wall_s": 1778506814.646
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 91,
+      "wall_s": 1778506840.086
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 92,
+      "wall_s": 1778506871.004
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 93,
+      "wall_s": 1778506881.434
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 94,
+      "wall_s": 1778506892.597
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 95,
+      "wall_s": 1778506908.863
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 96,
+      "wall_s": 1778506927.592
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 97,
+      "wall_s": 1778506938.737
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 98,
+      "wall_s": 1778506949.017
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 99,
+      "wall_s": 1778506958.346
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 100,
+      "wall_s": 1778506968.017
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 101,
+      "wall_s": 1778554264.166
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 102,
+      "wall_s": 1778554303.052
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 103,
+      "wall_s": 1778554356.897
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 104,
+      "wall_s": 1778554373.218
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 105,
+      "wall_s": 1778554380.784
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 106,
+      "wall_s": 1778554392.083
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 107,
+      "wall_s": 1778554407.364
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 108,
+      "wall_s": 1778554420.463
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 109,
+      "wall_s": 1778554445.59
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 110,
+      "wall_s": 1778554463.674
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 111,
+      "wall_s": 1778554490.804
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 112,
+      "wall_s": 1778554631.217
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 113,
+      "wall_s": 1778554661.03
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 114,
+      "wall_s": 1778554686.629
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 115,
+      "wall_s": 1778554739.807
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 116,
+      "wall_s": 1778554750.91
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 117,
+      "wall_s": 1778554803.013
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 118,
+      "wall_s": 1778554815.499
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 119,
+      "wall_s": 1778554830.103
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 120,
+      "wall_s": 1778554902.102
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 121,
+      "wall_s": 1778554965.154
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 122,
+      "wall_s": 1778569153.668
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 123,
+      "wall_s": 1778569168.065
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 124,
+      "wall_s": 1778569183.695
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 125,
+      "wall_s": 1778569266.494
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 126,
+      "wall_s": 1778569285.177
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 127,
+      "wall_s": 1778569303.872
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 128,
+      "wall_s": 1778569507.212
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 129,
+      "wall_s": 1778569530.414
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 130,
+      "wall_s": 1778569545.074
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 131,
+      "wall_s": 1778571696.425
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 132,
+      "wall_s": 1778571717.212
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 133,
+      "wall_s": 1778571745.311
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 134,
+      "wall_s": 1778571764.615
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 135,
+      "wall_s": 1778572571.92
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 136,
+      "wall_s": 1778572590.601
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 137,
+      "wall_s": 1778572608.745
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 138,
+      "wall_s": 1778572791.664
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 139,
+      "wall_s": 1778576222.397
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 140,
+      "wall_s": 1778576245.082
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 141,
+      "wall_s": 1778576282.79
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 142,
+      "wall_s": 1778576309.6
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 143,
+      "wall_s": 1778576434.467
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 144,
+      "wall_s": 1778576456.098
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 145,
+      "wall_s": 1778576559.94
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 146,
+      "wall_s": 1778576586.996
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 147,
+      "wall_s": 1778576604.317
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 148,
+      "wall_s": 1778576630.421
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 149,
+      "wall_s": 1778576644.117
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 150,
+      "wall_s": 1778576685.538
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 151,
+      "wall_s": 1778576701.173
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 152,
+      "wall_s": 1778576929.867
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 153,
+      "wall_s": 1778576977.992
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 154,
+      "wall_s": 1778578255.683
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 155,
+      "wall_s": 1778578268.25
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 156,
+      "wall_s": 1778578284.374
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 157,
+      "wall_s": 1778578294.514
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 158,
+      "wall_s": 1778578310.36
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 159,
+      "wall_s": 1778578338.507
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 160,
+      "wall_s": 1778580059.38
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 161,
+      "wall_s": 1778580202.249
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 162,
+      "wall_s": 1778580225.638
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 163,
+      "wall_s": 1778580275.28
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 164,
+      "wall_s": 1778580305.569
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 165,
+      "wall_s": 1778582300.903
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 166,
+      "wall_s": 1778582334.759
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 167,
+      "wall_s": 1778582381.903
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 168,
+      "wall_s": 1778582396.77
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 169,
+      "wall_s": 1778583514.852
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 170,
+      "wall_s": 1778583527.286
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 171,
+      "wall_s": 1778584398.25
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 172,
+      "wall_s": 1778584406.145
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 173,
+      "wall_s": 1778584434.194
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 174,
+      "wall_s": 1778584448.369
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 175,
+      "wall_s": 1778584666.029
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 176,
+      "wall_s": 1778585749.252
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 177,
+      "wall_s": 1778585761.04
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 178,
+      "wall_s": 1778585792.459
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 179,
+      "wall_s": 1778585907.236
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 180,
+      "wall_s": 1778585944.335
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 181,
+      "wall_s": 1778585963.647
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 182,
+      "wall_s": 1778586036.012
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 183,
+      "wall_s": 1778587018.897
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 184,
+      "wall_s": 1778587029.934
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 185,
+      "wall_s": 1778587039.817
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 186,
+      "wall_s": 1778587101.082
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 187,
+      "wall_s": 1778587140.194
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 188,
+      "wall_s": 1778587173.954
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 189,
+      "wall_s": 1778589053.989
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 190,
+      "wall_s": 1778589066.705
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 191,
+      "wall_s": 1778589080.845
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 192,
+      "wall_s": 1778589108.373
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 193,
+      "wall_s": 1778589162.66
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 194,
+      "wall_s": 1778591668.423
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 195,
+      "wall_s": 1778591680.506
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 196,
+      "wall_s": 1778591697.561
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 197,
+      "wall_s": 1778591720.098
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 198,
+      "wall_s": 1778594270.486
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 199,
+      "wall_s": 1778594284.708
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 200,
+      "wall_s": 1778594304.349
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 201,
+      "wall_s": 1778594349.392
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 202,
+      "wall_s": 1778595329.192
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 203,
+      "wall_s": 1778595343.159
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 204,
+      "wall_s": 1778602335.092
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 205,
+      "wall_s": 1778614176.689
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 206,
+      "wall_s": 1778698382.058
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 207,
+      "wall_s": 1778698398.348
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 208,
+      "wall_s": 1778698430.336
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 209,
+      "wall_s": 1778698484.238
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 210,
+      "wall_s": 1778699664.29
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 211,
+      "wall_s": 1778699679.151
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 212,
+      "wall_s": 1778699687.599
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 213,
+      "wall_s": 1778699708.521
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 214,
+      "wall_s": 1778699727.401
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 215,
+      "wall_s": 1778699736.897
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 216,
+      "wall_s": 1778699746.356
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 217,
+      "wall_s": 1778699754.535
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 218,
+      "wall_s": 1778699764.638
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 219,
+      "wall_s": 1778699778.808
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 220,
+      "wall_s": 1778699794.188
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 221,
+      "wall_s": 1778699808.336
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 222,
+      "wall_s": 1778699818.017
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 223,
+      "wall_s": 1778699828.755
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 224,
+      "wall_s": 1778699852.579
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 225,
+      "wall_s": 1778699950.695
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 226,
+      "wall_s": 1778700031.552
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 227,
+      "wall_s": 1778700907.981
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 228,
+      "wall_s": 1778700923.784
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 229,
+      "wall_s": 1778700940.979
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 230,
+      "wall_s": 1778700963.771
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 231,
+      "wall_s": 1778700980.782
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 232,
+      "wall_s": 1778700989.807
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 233,
+      "wall_s": 1778701000.739
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 234,
+      "wall_s": 1778701022.888
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 235,
+      "wall_s": 1778701034.478
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 236,
+      "wall_s": 1778701071.228
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 237,
+      "wall_s": 1778701095.751
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 238,
+      "wall_s": 1778701110.515
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 239,
+      "wall_s": 1778701130.214
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 240,
+      "wall_s": 1778701146.055
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 241,
+      "wall_s": 1778701171.374
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 242,
+      "wall_s": 1778701196.662
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 243,
+      "wall_s": 1778701224.926
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 244,
+      "wall_s": 1778701248.369
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 245,
+      "wall_s": 1778701401.497
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 246,
+      "wall_s": 1778701419.818
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 247,
+      "wall_s": 1778701428.935
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 248,
+      "wall_s": 1778701455.053
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 249,
+      "wall_s": 1778701473.185
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 250,
+      "wall_s": 1778701487.877
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 251,
+      "wall_s": 1778701502.484
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 252,
+      "wall_s": 1778701619.775
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 253,
+      "wall_s": 1778701651.362
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 254,
+      "wall_s": 1778701670.947
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 255,
+      "wall_s": 1778701692.821
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 256,
+      "wall_s": 1778701705.12
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 257,
+      "wall_s": 1778701717.817
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 258,
+      "wall_s": 1778701733.391
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 259,
+      "wall_s": 1778701757.023
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 260,
+      "wall_s": 1778701783.549
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 261,
+      "wall_s": 1778701793.133
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 262,
+      "wall_s": 1778705553.019
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 263,
+      "wall_s": 1778705561.598
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 264,
+      "wall_s": 1778705604.495
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 265,
+      "wall_s": 1778705620.103
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 266,
+      "wall_s": 1778705629.417
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 267,
+      "wall_s": 1778705642.177
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 268,
+      "wall_s": 1778705651.169
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 269,
+      "wall_s": 1778705659.898
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 270,
+      "wall_s": 1778705666.321
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 271,
+      "wall_s": 1778705676.278
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 272,
+      "wall_s": 1778705687.462
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 273,
+      "wall_s": 1778705705.626
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 274,
+      "wall_s": 1778705718.384
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 275,
+      "wall_s": 1778705730.336
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 276,
+      "wall_s": 1778705740.245
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 277,
+      "wall_s": 1778705751.148
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 278,
+      "wall_s": 1778705761.607
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 279,
+      "wall_s": 1778705773.643
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 280,
+      "wall_s": 1778705791.172
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 281,
+      "wall_s": 1778705805.424
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 282,
+      "wall_s": 1778705815.999
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 283,
+      "wall_s": 1778705838.833
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 284,
+      "wall_s": 1778705862.054
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 285,
+      "wall_s": 1778705878.525
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 286,
+      "wall_s": 1778705890.786
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 287,
+      "wall_s": 1778705904.392
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 288,
+      "wall_s": 1778705921.883
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 289,
+      "wall_s": 1778706082.864
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 290,
+      "wall_s": 1778706090.599
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 291,
+      "wall_s": 1778706098.855
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 292,
+      "wall_s": 1778706156.229
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 293,
+      "wall_s": 1778706171.49
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 294,
+      "wall_s": 1778706188.172
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 295,
+      "wall_s": 1778706198.343
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 296,
+      "wall_s": 1778706223.678
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 297,
+      "wall_s": 1778706234.617
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 298,
+      "wall_s": 1778706256.696
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 299,
+      "wall_s": 1778706272.388
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 300,
+      "wall_s": 1778706284.38
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 301,
+      "wall_s": 1778706293.361
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 302,
+      "wall_s": 1778706304.129
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 303,
+      "wall_s": 1778706312.572
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 304,
+      "wall_s": 1778707999.238
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 305,
+      "wall_s": 1778708012.755
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 306,
+      "wall_s": 1778708019.464
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 307,
+      "wall_s": 1778708035.15
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 308,
+      "wall_s": 1778709528.125
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 309,
+      "wall_s": 1778709573.292
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 310,
+      "wall_s": 1778709597.994
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 311,
+      "wall_s": 1778709638.394
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 312,
+      "wall_s": 1778709659.21
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 313,
+      "wall_s": 1778709701.544
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 314,
+      "wall_s": 1778709725.618
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 315,
+      "wall_s": 1778709773.524
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 316,
+      "wall_s": 1778709790.314
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 317,
+      "wall_s": 1778709814.76
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 318,
+      "wall_s": 1778709843.651
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 319,
+      "wall_s": 1778709875.682
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 320,
+      "wall_s": 1778709913.865
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 321,
+      "wall_s": 1778709945.036
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 322,
+      "wall_s": 1778709968.221
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 323,
+      "wall_s": 1778709991.867
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 324,
+      "wall_s": 1778710014.179
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 325,
+      "wall_s": 1778710039.745
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 326,
+      "wall_s": 1778710059.773
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 327,
+      "wall_s": 1778710082.006
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 328,
+      "wall_s": 1778710106.322
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 329,
+      "wall_s": 1778710126.141
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 330,
+      "wall_s": 1778710150.363
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 331,
+      "wall_s": 1778710177.172
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 332,
+      "wall_s": 1778710206.83
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 333,
+      "wall_s": 1778710225.51
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 334,
+      "wall_s": 1778710248.761
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 335,
+      "wall_s": 1778710273.329
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 336,
+      "wall_s": 1778710290.52
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 337,
+      "wall_s": 1778710314.465
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 338,
+      "wall_s": 1778710338.874
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 339,
+      "wall_s": 1778710352.872
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 340,
+      "wall_s": 1778710379.905
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 341,
+      "wall_s": 1778710403.816
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 342,
+      "wall_s": 1778710427.819
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 343,
+      "wall_s": 1778710449.333
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 344,
+      "wall_s": 1778710468.549
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 345,
+      "wall_s": 1778710486.207
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 346,
+      "wall_s": 1778710507.958
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 347,
+      "wall_s": 1778810306.23
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 348,
+      "wall_s": 1778810359.113
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 349,
+      "wall_s": 1778813028.126
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 350,
+      "wall_s": 1778813059.91
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 351,
+      "wall_s": 1778813074.542
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 352,
+      "wall_s": 1778815913.407
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 0,
+      "vision_frames_seen": 353,
+      "wall_s": 1778815913.303
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 1,
+      "vision_frames_seen": 353,
+      "wall_s": 1778815918.5002003
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 1,
+      "vision_frames_seen": 354,
+      "wall_s": 1778815934.812
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 1,
+      "vision_frames_seen": 355,
+      "wall_s": 1778815934.729
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 2,
+      "vision_frames_seen": 355,
+      "wall_s": 1778815937.6307294
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 2,
+      "vision_frames_seen": 356,
+      "wall_s": 1778815957.37
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 2,
+      "vision_frames_seen": 357,
+      "wall_s": 1778815957.3
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 3,
+      "vision_frames_seen": 357,
+      "wall_s": 1778815960.2255135
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 3,
+      "vision_frames_seen": 358,
+      "wall_s": 1778815965.816
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 3,
+      "vision_frames_seen": 359,
+      "wall_s": 1778815965.734
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 4,
+      "vision_frames_seen": 359,
+      "wall_s": 1778815968.6382403
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 4,
+      "vision_frames_seen": 360,
+      "wall_s": 1778815979.765
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 4,
+      "vision_frames_seen": 361,
+      "wall_s": 1778815979.678
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 5,
+      "vision_frames_seen": 361,
+      "wall_s": 1778815982.5697384
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 5,
+      "vision_frames_seen": 362,
+      "wall_s": 1778815990.027
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 5,
+      "vision_frames_seen": 363,
+      "wall_s": 1778815989.93
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 6,
+      "vision_frames_seen": 363,
+      "wall_s": 1778815992.867041
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 6,
+      "vision_frames_seen": 364,
+      "wall_s": 1778816007.737
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 6,
+      "vision_frames_seen": 365,
+      "wall_s": 1778816007.637
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 7,
+      "vision_frames_seen": 365,
+      "wall_s": 1778816010.575135
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 7,
+      "vision_frames_seen": 366,
+      "wall_s": 1778816018.205
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 7,
+      "vision_frames_seen": 367,
+      "wall_s": 1778816018.115
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 8,
+      "vision_frames_seen": 367,
+      "wall_s": 1778816021.0253284
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 8,
+      "vision_frames_seen": 368,
+      "wall_s": 1778816034.022
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 8,
+      "vision_frames_seen": 369,
+      "wall_s": 1778816033.922
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 9,
+      "vision_frames_seen": 369,
+      "wall_s": 1778816036.8909383
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 9,
+      "vision_frames_seen": 370,
+      "wall_s": 1778816051.273
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 9,
+      "vision_frames_seen": 371,
+      "wall_s": 1778816051.193
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 10,
+      "vision_frames_seen": 371,
+      "wall_s": 1778816054.1396
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 10,
+      "vision_frames_seen": 372,
+      "wall_s": 1778816074.248
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 10,
+      "vision_frames_seen": 373,
+      "wall_s": 1778816074.156
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 11,
+      "vision_frames_seen": 373,
+      "wall_s": 1778816077.0691612
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 11,
+      "vision_frames_seen": 374,
+      "wall_s": 1778816151.466
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 11,
+      "vision_frames_seen": 375,
+      "wall_s": 1778816151.381
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 12,
+      "vision_frames_seen": 375,
+      "wall_s": 1778816154.544243
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 12,
+      "vision_frames_seen": 376,
+      "wall_s": 1778816187.614
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 12,
+      "vision_frames_seen": 377,
+      "wall_s": 1778816187.51
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 13,
+      "vision_frames_seen": 377,
+      "wall_s": 1778816190.7193067
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 13,
+      "vision_frames_seen": 378,
+      "wall_s": 1778816194.395
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 13,
+      "vision_frames_seen": 379,
+      "wall_s": 1778816194.278
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 14,
+      "vision_frames_seen": 379,
+      "wall_s": 1778816197.4505851
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 14,
+      "vision_frames_seen": 380,
+      "wall_s": 1778816201.79
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 14,
+      "vision_frames_seen": 381,
+      "wall_s": 1778816201.703
+    },
+    {
+      "active_step_id": null,
+      "blocked_step_ids": [],
+      "completed_step_ids": [],
+      "help_request_count": 15,
+      "vision_frames_seen": 381,
+      "wall_s": 1778816204.8095784
+    }
+  ]
+}
