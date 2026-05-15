@@ -340,8 +340,6 @@ class OpenAICompatModel(BaseHelpModel):
                 )
                 elapsed_s = time.perf_counter() - t0
                 self._adaptive_timeout.record(elapsed_s)
-                response.metadata = getattr(response, "metadata", {}) or {}
-                response.metadata["latency_s"] = elapsed_s
                 return response
             except Exception as exc:
                 if attempt == 2 or not self._is_retryable_transport_error(exc):

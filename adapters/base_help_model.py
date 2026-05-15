@@ -233,6 +233,12 @@ class BaseHelpModel(ModelPort):
 
     def _make_http_client(self) -> Any:
         import httpx
+        http2_enabled = False
+        try:
+            import h2  # noqa: F401
+            http2_enabled = True
+        except ModuleNotFoundError:
+            pass
         return httpx.Client(
             timeout=httpx.Timeout(
                 connect=5.0,
@@ -245,7 +251,7 @@ class BaseHelpModel(ModelPort):
                 max_connections=8,
                 keepalive_expiry=60.0,
             ),
-            http2=True,
+            http2=http2_enabled,
         )
 
     @property
