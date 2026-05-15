@@ -3508,20 +3508,25 @@ class LiveDcsTutorLoop:
                 response.metadata["action_hint_overlay_override_original_message"] = original_message
             if original_explanations and original_explanations != [rewritten]:
                 response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
-        elif (
-            inferred_step_id == "S20"
-            and override_kind == "action_hint"
-            and action_target == "launch_bar_switch"
-        ):
+        elif inferred_step_id == "S20" and override_kind == "action_hint":
             original_message = response.message
             original_explanations = list(response.explanations)
-            if self.lang == "zh":
-                rewritten = "加油管在本次启动中已经完成伸出检查。下一步请继续四落检查，操作发射杆开关。"
+            if action_target == "launch_bar_switch":
+                if self.lang == "zh":
+                    rewritten = "加油管在本次启动中已经完成伸出检查。下一步请继续四落检查，操作发射杆开关。"
+                else:
+                    rewritten = (
+                        "The refueling probe has already been cycled during this startup. "
+                        "Continue the four-down checklist with the launch bar switch next."
+                    )
             else:
-                rewritten = (
-                    "The refueling probe has already been cycled during this startup. "
-                    "Continue the four-down checklist with the launch bar switch next."
-                )
+                hint_reason = action_hint.get("reason") if isinstance(action_hint, Mapping) else None
+                if isinstance(hint_reason, str) and hint_reason:
+                    rewritten = hint_reason
+                elif self.lang == "zh":
+                    rewritten = "请按系统提示操作当前高亮目标，继续完成四落检查。"
+                else:
+                    rewritten = "Follow the highlighted target to continue the four-down checklist."
             response.message = rewritten
             response.explanations = [rewritten]
             if original_message != rewritten:
