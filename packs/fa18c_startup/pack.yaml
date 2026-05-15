@@ -74,6 +74,7 @@ ui_targets:
   - left_mdi_pb18
   - right_mdi_pb5
   - right_mdi_pb18
+  - ampcd_pb19
   - ufc_comm1_channel_selector_pull
   - ufc_comm1_channel_selector_rotate
   - ufc_key_1
@@ -650,8 +651,9 @@ steps:
       - "INS knob set to GND (airfield) or CV (carrier)."
     ui_targets:
       - ins_mode_knob
+      - ampcd_pb19
     tutor_prompts:
-      - "When left engine RPM exceeds 60%, set INS knob to GND or CV for alignment."
+      - "When left engine RPM exceeds 60%, set INS knob to GND or CV for alignment. Then press AMPCD PB19 to speed up INS self-test."
 
   - id: S13
     phase: P4

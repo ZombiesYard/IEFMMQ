@@ -772,6 +772,14 @@ def _resolve_step_completion_evidence(
         config=vision_fact_config,
     )
     has_visual_requirements = len(visual_missing) > 0 or step_id in vision_fact_config.get("step_bindings", {})
+    # S19 unconditional trust: VLM final_go overrides everything.
+    if step_id == "S19" and _s19_final_go_confirmed(vision_fact_snapshot):
+        return _StepCompletionEvidence(
+            has_gate_rules=bool(completion_rules),
+            has_visual_requirements=True,
+            visual_satisfied=True,
+            missing_conditions=(),
+        )
     return _StepCompletionEvidence(
         has_gate_rules=bool(completion_rules),
         has_visual_requirements=has_visual_requirements,
@@ -830,6 +838,9 @@ def _vision_binding_missing_conditions(
     vision_fact_snapshot: Mapping[str, Mapping[str, Any]],
     config: Mapping[str, Any],
 ) -> tuple[str, ...]:
+    # S19 unconditional trust: if VLM reports final_go, visual requirements are satisfied.
+    if step_id == "S19" and _s19_final_go_confirmed(vision_fact_snapshot):
+        return ()
     binding = config.get("step_bindings", {}).get(step_id, {})
     if not isinstance(binding, Mapping):
         return ()
@@ -898,6 +909,14 @@ def _is_s18_final_go_result_fact(fact: Mapping[str, Any]) -> bool:
     if kind is None:
         return False
     return kind == "final_go"
+
+
+def _s19_final_go_confirmed(vision_fact_snapshot: Mapping[str, Mapping[str, Any]]) -> bool:
+    """S19 unconditional trust: VLM final_go means S19 is complete, no override possible."""
+    fact = vision_fact_snapshot.get("fcsmc_final_go_result_visible")
+    if not _vision_fact_state_is_seen(fact):
+        return False
+    return _is_s18_final_go_result_fact(fact)
 
 
 def _is_soft_block_from_rule(
