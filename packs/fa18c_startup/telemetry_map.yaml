@@ -155,6 +155,7 @@ vars:
 
   ifei_up_pressed: "bios.IFEI_UP_BTN == 1"
   ifei_down_pressed: "bios.IFEI_DWN_BTN == 1"
+  ifei_up_or_down_pressed: "derived(vars.ifei_up_pressed or vars.ifei_down_pressed)"
   bingo_fuel_set: "derived(num(bios.IFEI_BINGO) > 0)"
 
   standby_pressure_set_0: "derived(num(bios.STBY_PRESS_SET_0))"

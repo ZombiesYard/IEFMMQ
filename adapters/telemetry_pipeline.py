@@ -126,6 +126,7 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "fcs_reset_complete",
     "takeoff_trim_set",
     "probe_cycle_complete",
+    "bingo_fuel_set",
 )
 _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
     "fire_test_complete": "fire_test_active",
@@ -135,6 +136,7 @@ _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
     "fcs_reset_complete": "fcs_reset_pressed",
     "takeoff_trim_set": "takeoff_trim_pressed",
     "probe_cycle_complete": "probe_extended",
+    "bingo_fuel_set": "ifei_up_or_down_pressed",
 }
 _COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
 _COMPLETION_LATCHES_LOADED = False

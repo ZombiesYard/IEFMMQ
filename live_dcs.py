@@ -1657,6 +1657,29 @@ def _build_procedural_action_hint(
             "On the right DDI BIT FAILURES page, press PB5 to enter the FCS-MC BIT page before holding the FCS BIT switch.",
         )
 
+    if inferred_step_id == "S22":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("bingo_fuel_set") is True:
+            return None
+        if vars_selected.get("ifei_up_pressed") is True or vars_selected.get("ifei_down_pressed") is True:
+            return _hint(
+                "ifei_up_button",
+                "IFEI button press detected — the BINGO fuel value has been set; wait a moment for the updated value to register.",
+            )
+        return _hint(
+            "ifei_up_button",
+            "Press the IFEI UP button to set the BINGO fuel value for the mission.",
+        )
+
+
     if inferred_step_id != "S09":
         return None
     if vars_selected.get("comm1_freq_134_000") is True:

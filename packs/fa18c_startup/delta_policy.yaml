@@ -18,6 +18,7 @@ ignore_bios_keys:
 debounce_ms_by_key:
   SAI_PITCH: 300
   SAI_RATE_OF_TURN: 300
+  IFEI_BINGO: 300
 
 epsilon_by_key:
   SAI_PITCH: 8.0
