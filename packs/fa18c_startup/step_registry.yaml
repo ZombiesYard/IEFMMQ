@@ -119,7 +119,7 @@ steps:
   official_description: Once the left engine has an RPM greater than 60%, rotate the
     INS knob to GND (ground) or CV (carrier), depending on your parking location.
   short_explanation: After the left engine stabilizes above 60% RPM, set the INS knob
-    to GND (airfield) or CV (carrier) to start alignment.
+    to GND (airfield) or CV (carrier) to start alignment. Press AMPCD PB19 to speed up INS self-test.
   cockpit_area: Right console
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:15-15

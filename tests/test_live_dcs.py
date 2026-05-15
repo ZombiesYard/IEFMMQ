@@ -3661,8 +3661,8 @@ def test_build_procedural_action_hint_for_s19_prefers_fcs_bit_switch_on_fcsmc_pa
         allowed_targets=allowed,
         vision_fact_summary={"seen_fact_ids": ["fcsmc_page_visible"]},
     ) == {
-        "target": "fcs_bit_switch",
-        "reason": "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
+        "targets": ["fcs_bit_switch", "right_mdi_pb5"],
+        "reason": "Hold the FCS BIT switch up (Y) while pressing Right DDI PB5 to start the FCS BIT.",
     }
     assert _build_procedural_action_hint(
         inferred_step_id="S19",

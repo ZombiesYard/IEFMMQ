@@ -1572,6 +1572,42 @@ def _build_procedural_action_hint(
             )
         return None
 
+    if inferred_step_id == "S03":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("apu_on") is not True:
+            return _hint("apu_switch", "Set the APU switch to ON first.")
+        if vars_selected.get("apu_ready") is not True:
+            return _hint(
+                "apu_switch",
+                "APU switch is already ON — wait for the green APU READY light to illuminate before proceeding.",
+            )
+        return None
+
+    if inferred_step_id == "S06":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("bleed_air_cycle_complete") is True:
+            return None
+        return _hint(
+            "bleed_air_knob",
+            "Rotate the BLEED AIR knob 360° clockwise (right-click 4 times) from NORM back to NORM.",
+        )
+
     if inferred_step_id == "S20":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
@@ -1662,6 +1698,11 @@ def _build_procedural_action_hint(
 
         if "fcsmc_final_go_result_visible" in seen_fact_ids:
             return None
+        if "right_mdi_pb5" in allowed and "fcs_bit_switch" in allowed:
+            return {
+                "targets": ["fcs_bit_switch", "right_mdi_pb5"],
+                "reason": "Hold the FCS BIT switch up (Y) while pressing Right DDI PB5 to start the FCS BIT.",
+            }
         return _hint(
             "fcs_bit_switch",
             "The right DDI is already on the FCS-MC page. Hold the FCS BIT switch up while pressing Right DDI PB5 to run the BIT.",
@@ -3424,6 +3465,13 @@ class LiveDcsTutorLoop:
         if isinstance(action_hint, Mapping):
             action_target = action_hint.get("target")
             if isinstance(action_target, str) and action_target:
+                if (
+                    inferred_step_id == "S09"
+                    and response.actions
+                    and isinstance(model_next_step_id, str)
+                    and model_next_step_id == inferred_step_id
+                ):
+                    return False
                 return True
         missing_conditions = hint.get("missing_conditions")
         return isinstance(missing_conditions, (list, tuple)) and any(
@@ -3476,9 +3524,6 @@ class LiveDcsTutorLoop:
                 if isinstance(hinted_target, str) and hinted_target:
                     action_target = hinted_target
                     override_kind = "action_hint"
-        if not isinstance(action_target, str) or not action_target:
-            return False, "missing_override_target"
-
         current_targets = [
             target
             for target in (
@@ -3489,6 +3534,18 @@ class LiveDcsTutorLoop:
         ]
         if not current_targets:
             return False, "missing_action_targets"
+        if not isinstance(action_target, str) or not action_target:
+            # Check for multi-target action hint (targets field)
+            action_hint_for_targets = hint.get("action_hint")
+            if isinstance(action_hint_for_targets, Mapping):
+                hinted_targets_list = action_hint_for_targets.get("targets")
+                if isinstance(hinted_targets_list, list) and hinted_targets_list:
+                    if set(current_targets) == set(hinted_targets_list):
+                        return False, "already_aligned_multi"
+                    action_target = hinted_targets_list[0]
+                    override_kind = "action_hint"
+        if not isinstance(action_target, str) or not action_target:
+            return False, "missing_override_target"
         if (
             self.max_overlay_targets > 1
             and inferred_step_id == "S19"
@@ -3779,6 +3836,13 @@ class LiveDcsTutorLoop:
                     action_target,
                     *[target for target in candidate_targets if target != action_target],
                 ]
+            elif isinstance(action_hint.get("targets"), list):
+                hinted_targets_list = [t for t in action_hint["targets"] if isinstance(t, str) and t in candidate_targets]
+                if hinted_targets_list:
+                    candidate_targets = [
+                        *hinted_targets_list,
+                        *[target for target in candidate_targets if target not in set(hinted_targets_list)],
+                    ]
         navigation_targets = _prefer_navigation_target_from_vision_context(
             inferred_step_id=inferred_step_id,
             missing_conditions=missing_conditions,
@@ -3848,7 +3912,26 @@ class LiveDcsTutorLoop:
             candidate_targets,
             step_id=overlay_step_id,
         )
-        fallback_target = candidate_targets[0]
+        if overlay_step_id == "S08":
+            s08_power_vars = {"left_ddi_on", "right_ddi_on", "mpcd_on"}
+            s08_power_missing_count = sum(
+                1 for item in missing_conditions
+                if isinstance(item, str) and any(
+                    item.startswith(f"vars.{v}==") for v in s08_power_vars
+                )
+            )
+            if s08_power_missing_count > 1:
+                s08_power_set = {"left_mdi_brightness_selector", "right_mdi_brightness_selector", "ampcd_off_brightness_knob"}
+                s08_power_candidates = [t for t in candidate_targets if t in s08_power_set]
+                if len(s08_power_candidates) > 1:
+                    fallback_targets_list = s08_power_candidates[:3]
+                else:
+                    fallback_targets_list = [candidate_targets[0]]
+            else:
+                fallback_targets_list = [candidate_targets[0]]
+        else:
+            fallback_targets_list = [candidate_targets[0]]
+        fallback_target = fallback_targets_list[0]
 
         candidate_refs: list[str] = []
         gate_blockers = hint.get("gate_blockers")
@@ -3938,22 +4021,23 @@ class LiveDcsTutorLoop:
                 "step_id": inferred_step_id,
             },
             "overlay": {
-                "targets": [fallback_target],
+                "targets": list(fallback_targets_list),
                 "evidence": [
                     {
-                        "target": fallback_target,
+                        "target": t,
                         "type": evidence_type,
                         "ref": selected_ref,
                         "quote": quote,
                         "grounding_confidence": 0.51,
                     }
+                    for t in fallback_targets_list
                 ],
             },
             "explanations": [
                 (
-                    f"请先操作 {fallback_target}。"
+                    f"请先操作 {', '.join(fallback_targets_list)}。"
                     if self.lang == "zh"
-                    else f"Please operate {fallback_target} first."
+                    else f"Please operate {', '.join(fallback_targets_list)} first."
                 )
             ],
         }

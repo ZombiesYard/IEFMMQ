@@ -194,6 +194,16 @@ cockpit_elements:
     interaction_hint:
       zh: "DDI/AMPCD 的 PB 按钮都用左键点击。"
       en: "Use left-click for DDI/AMPCD pushbuttons."
+  ampcd_pb19:
+    description: "AMPCD PB 19"
+    dcs_id: "pnt_201"
+    aliases: ["AMPCD PB 19", "AMPCD Pushbutton 19"]
+    panel_area: "center_instrument_panel"
+    interaction:
+      click_type: "left"
+    interaction_hint:
+      zh: "AMPCD PB 按钮左键点击。"
+      en: "Left-click for AMPCD pushbuttons."
   fcs_reset_button:
     description: "FCS RESET button"
     dcs_id: "pnt_349"
