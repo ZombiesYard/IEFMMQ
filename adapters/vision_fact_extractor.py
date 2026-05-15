@@ -170,6 +170,7 @@ class VisionFactExtractor:
 
             self._client = httpx.Client(timeout=self.timeout_s)
             self._owns_client = True
+            self._warm_http_connection()
         else:
             self._client = client
             self._owns_client = False
@@ -177,6 +178,17 @@ class VisionFactExtractor:
     def close(self) -> None:
         if self._owns_client and hasattr(self._client, "close"):
             self._client.close()
+
+    def _warm_http_connection(self) -> None:
+        if not self._owns_client:
+            return
+        try:
+            self._client.get(
+                f"{self.base_url}/health",
+                timeout=5.0,
+            )
+        except Exception:
+            pass
 
     @property
     def config(self) -> Mapping[str, Any]:

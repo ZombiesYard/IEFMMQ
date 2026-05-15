@@ -170,6 +170,29 @@ def _repair_visual_evidence_ref(
     return ref, None
 
 
+class _AdaptiveTimeout:
+    """Sliding-window adaptive timeout based on P95 latency."""
+
+    def __init__(self, fixed_timeout_s: float, window_size: int = 10) -> None:
+        self._fixed = float(fixed_timeout_s)
+        self._window_size = max(1, int(window_size))
+        self._latencies: list[float] = []
+
+    def record(self, latency_s: float) -> None:
+        self._latencies.append(float(latency_s))
+        if len(self._latencies) > self._window_size:
+            self._latencies.pop(0)
+
+    def compute(self) -> float:
+        if len(self._latencies) < 3:
+            return self._fixed
+        sorted_lats = sorted(self._latencies)
+        p95_idx = max(0, int(len(sorted_lats) * 0.95) - 1)
+        p95 = sorted_lats[p95_idx]
+        adaptive = max(p95 * 2.5, self._fixed * 0.5)
+        return min(adaptive, self._fixed * 3.0)
+
+
 class BaseHelpModel(ModelPort):
     provider: str = "unknown"
 
@@ -193,6 +216,7 @@ class BaseHelpModel(ModelPort):
         self.log_raw_llm_text = bool(log_raw_llm_text)
         self.print_model_io = bool(print_model_io)
         self.telemetry_map_path = _normalize_telemetry_map_path(telemetry_map_path)
+        self._adaptive_timeout = _AdaptiveTimeout(timeout_s)
 
         if client is None:
             try:
@@ -209,6 +233,12 @@ class BaseHelpModel(ModelPort):
 
     def _make_http_client(self) -> Any:
         import httpx
+        http2_enabled = False
+        try:
+            import h2  # noqa: F401
+            http2_enabled = True
+        except ModuleNotFoundError:
+            pass
         return httpx.Client(
             timeout=httpx.Timeout(
                 connect=5.0,
@@ -217,11 +247,17 @@ class BaseHelpModel(ModelPort):
                 pool=5.0,
             ),
             limits=httpx.Limits(
-                max_keepalive_connections=2,
-                max_connections=4,
-                keepalive_expiry=30.0,
+                max_keepalive_connections=4,
+                max_connections=8,
+                keepalive_expiry=60.0,
             ),
+            http2=http2_enabled,
         )
+
+    @property
+    def http_client(self) -> Any:
+        """Public accessor for sharing the HTTP client with co-located services."""
+        return self._client
 
     def _warm_http_connection(self) -> None:
         if not self._owns_client:
