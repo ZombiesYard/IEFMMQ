@@ -1130,10 +1130,8 @@ def test_prompt_sanitizes_non_finite_float_vars_to_strict_json_scalars() -> None
 
 def test_prompt_contains_strict_json_output_constraints() -> None:
     prompt = build_help_prompt(_base_context(), "en")
-    assert "must output exactly one strict JSON object" in prompt
-    assert "no prose, no markdown, no code fences" in prompt
-    assert "diagnosis.error_category must be chosen from allowed_error_categories." in prompt
-    assert "Each target must have at least one evidence item" in prompt
+    # P2 removed enum rules; P3 merged evidence rules
+    assert "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence" in prompt
     assert '"diagnosis":{"step_id":"...","error_category":"..."}' in prompt
     assert (
         '"overlay":{"targets":["..."],"evidence":[{"target":"...","type":"...",'
