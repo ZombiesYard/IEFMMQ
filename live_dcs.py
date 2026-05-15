@@ -1601,6 +1601,8 @@ def _build_procedural_action_hint(
                 return None
             return {"target": target, "reason": reason}
 
+        if vars_selected.get("bleed_air_cycle_complete") is True:
+            return None
         return _hint(
             "bleed_air_knob",
             "Rotate the BLEED AIR knob 360° clockwise (right-click 4 times) from NORM back to NORM.",
