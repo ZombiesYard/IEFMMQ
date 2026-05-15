@@ -497,7 +497,11 @@ def build_vision_fact_summary(
     }
 
 
-def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
+def extract_vision_fact_snapshot(
+    raw: Any,
+    *,
+    vision_facts_config: Mapping[str, Any] | None = None,
+) -> dict[str, dict[str, Any]]:
     if isinstance(raw, Mapping):
         if "snapshot" in raw and isinstance(raw.get("snapshot"), list):
             raw = raw.get("snapshot")
@@ -505,6 +509,11 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
             raw = raw.get("vision_facts")
     if not isinstance(raw, list):
         return {}
+    facts_by_id = (
+        vision_facts_config.get("facts_by_id", {})
+        if isinstance(vision_facts_config, Mapping)
+        else {}
+    )
     out: dict[str, dict[str, Any]] = {}
     for item in raw:
         if not isinstance(item, Mapping):
@@ -531,6 +540,19 @@ def extract_vision_fact_snapshot(raw: Any) -> dict[str, dict[str, Any]]:
             )
             normalized_item["state"] = coerced_state
             normalized_item.pop("confidence", None)
+            if facts_by_id:
+                fact_def = facts_by_id.get(fact_id)
+                if isinstance(fact_def, Mapping):
+                    intended_regions = fact_def.get("intended_regions")
+                    if isinstance(intended_regions, list) and intended_regions:
+                        source_region = normalized_item.get("source_region")
+                        if (
+                            isinstance(source_region, str)
+                            and source_region
+                            and source_region not in intended_regions
+                            and normalized_item["state"] == "seen"
+                        ):
+                            normalized_item["state"] = "uncertain"
             out[fact_id] = normalized_item
     return out
 
