@@ -333,7 +333,7 @@ def infer_step_id(
         vision_fact_config = load_vision_facts_config(pack_path=effective_pack_path)
     except (FileNotFoundError, OSError, ValueError, VisionFactsConfigError):
         vision_fact_config = _empty_vision_fact_config()
-    vision_fact_snapshot = extract_vision_fact_snapshot(vision_facts)
+    vision_fact_snapshot = extract_vision_fact_snapshot(vision_facts, vision_facts_config=vision_fact_config)
     vars_source_missing = _extract_source_missing_vars(vars_safe)
     pre_map, comp_map = _resolve_gate_maps(
         precondition_gates=precondition_gates,
