@@ -2,11 +2,14 @@
 
 Use separate entry points for Qwen and Gemma experiments.
 
-## Qwen3.5
+## Qwen3.x
 
 - Training: `tools/train_qwen35_vlm_unsloth.py`
 - Benchmark: `tools/benchmark_qwen35_vlm_facts.py`
-- Defaults remain tuned for `Qwen/Qwen3.5-9B-Base`.
+- Historical defaults remain tuned for `Qwen/Qwen3.5-9B-Base`.
+- The current `Qwen/Qwen3.6-27B` run on cloud-247 reuses the same benchmark script
+  with an explicit `--base-model Qwen/Qwen3.6-27B` override and a dedicated remote
+  launcher under `/scratch/yz50/iefmmq_vlm_ft_unsloth/work/`.
 
 ## Gemma 4
 
