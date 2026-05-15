@@ -92,6 +92,7 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "obogs_ready",
     "fcs_reset_pressed",
     "fcs_reset_complete",
+    "flap_mode_value",
     "flap_auto",
     "flap_configured",
     "takeoff_trim_pressed",

@@ -1623,6 +1623,29 @@ def _build_procedural_action_hint(
             return _hint("obogs_flow_knob", "OBOGS control is already ON, but FLOW is not yet ON; set the OXY FLOW knob next.")
         return None
 
+    if inferred_step_id == "S16":
+        allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+        if not allowed:
+            return None
+
+        def _hint(target: str, reason: str) -> dict[str, Any] | None:
+            if target not in allowed:
+                return None
+            return {"target": target, "reason": reason}
+
+        if vars_selected.get("flap_auto") is True:
+            return None
+        flap_mode = vars_selected.get("flap_mode_value")
+        if isinstance(flap_mode, (int, float)) and int(flap_mode) == 2:
+            return _hint(
+                "flap_switch",
+                "Flap switch is at FULL (cold-start default). Move the flap switch to AUTO.",
+            )
+        return _hint(
+            "flap_switch",
+            "Set the flap switch to AUTO before continuing.",
+        )
+
     if inferred_step_id == "S19":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
