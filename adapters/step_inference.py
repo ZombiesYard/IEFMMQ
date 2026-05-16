@@ -142,7 +142,7 @@ def _load_registry_steps_cached(
 ) -> tuple[dict[str, Any], ...]:
     del registry_mtime_ns, registry_size_bytes  # cache-key components only
     try:
-        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=26)
+        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=33)
     except (StepRegistryError, OSError, ValueError):
         return ()
     return tuple(dict(step) for step in entries)
@@ -907,7 +907,7 @@ def _vision_fact_state_is_seen(fact: Mapping[str, Any] | None) -> bool:
 def _is_s18_final_go_result_fact(fact: Mapping[str, Any]) -> bool:
     kind = fact.get("result_kind")
     if kind is None:
-        return False
+        return True
     return kind == "final_go"
 
 

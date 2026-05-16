@@ -95,6 +95,8 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "fcs_reset_pressed",
     "fcs_reset_complete",
     "flap_mode_value",
+    "flap_full",
+    "flap_half",
     "flap_auto",
     "flap_configured",
     "takeoff_trim_pressed",
@@ -103,10 +105,15 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "probe_switch_value",
     "ext_refuel_probe_value",
     "probe_extended",
+    "probe_retracted",
     "probe_cycle_complete",
     "pitot_heat_on",
     "launch_bar_switch_value",
+    "launch_bar_extended",
+    "launch_bar_retracted",
     "hook_handle_value",
+    "hook_extended",
+    "hook_retracted",
     "parking_brake_released",
     "bingo_fuel_set",
     "standby_altimeter_set",
@@ -129,7 +136,6 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "fcs_reset_complete",
     "ins_fast_align_complete",
     "takeoff_trim_set",
-    "probe_cycle_complete",
     "bingo_fuel_set",
 )
 _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
@@ -140,7 +146,6 @@ _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
     "fcs_reset_complete": "fcs_reset_pressed",
     "ins_fast_align_complete": "ins_fast_align_pressed",
     "takeoff_trim_set": "takeoff_trim_pressed",
-    "probe_cycle_complete": "probe_extended",
     "bingo_fuel_set": "ifei_up_or_down_pressed",
 }
 _BLEED_AIR_CYCLE_COMPLETE_KEY = "bleed_air_cycle_complete"

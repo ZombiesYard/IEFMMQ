@@ -14,7 +14,7 @@ UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
 DEFAULT_CLICKABLEDATA_PATH = BASE_DIR / "CockpitScripts" / "clickabledata.lua"
 CLICKABLE_IDS_FIXTURE_PATH = BASE_DIR / "tests" / "fixtures" / "fa18c_clickable_ids.txt"
 CLICKABLEDATA_ENV_VAR = "SIMTUTOR_FA18C_CLICKABLEDATA_PATH"
-REQUIRED_STEP_IDS = tuple(f"S{i:02d}" for i in range(1, 27))
+REQUIRED_STEP_IDS = tuple(f"S{i:02d}" for i in range(1, 34))
 _PNT_ID_PATTERN = re.compile(r"^pnt_[0-9]+(?:_[0-9]+)?$")
 _CLICKABLE_ID_PATTERN = re.compile(r'^\s*elements\["(?P<id>pnt_[0-9_]+)"\]\s*=', re.MULTILINE)
 _ALLOWED_MULTI_ACTION_DCS_IDS = {"pnt_124", "pnt_126"}

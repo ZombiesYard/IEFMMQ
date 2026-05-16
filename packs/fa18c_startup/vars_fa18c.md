@@ -1,4 +1,4 @@
-# FA-18C Stable Vars (S01-S26)
+# FA-18C Stable Vars (S01-S33)
 
 This document records the startup vars resolved from `telemetry_map.yaml`,
 their DCS-BIOS source keys, and operating-range assumptions used by SimTutor.
@@ -39,7 +39,7 @@ their DCS-BIOS source keys, and operating-range assumptions used by SimTutor.
 - Intended use: prompt `missing_conditions` and deterministic fallback when data is
   unavailable (avoid LLM guessing from raw/incomplete telemetry).
 
-## Tri-state unknown convention (S14-S26)
+## Tri-state unknown convention (S14-S33)
 
 - For checklist items that are not yet reliably observable from trusted telemetry,
   resolver emits string `"unknown"` instead of coercing to `false`.

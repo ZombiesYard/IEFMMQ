@@ -10,6 +10,7 @@ HELP_CYCLE_AUDIT_FIELDS: tuple[str, ...] = (
     "help_cycle_id",
     "generation_mode",
     "vision_used",
+    "vision_fact_extractor_used",
     "frame_id",
     "sync_delta_ms",
     "vision_fact_summary",

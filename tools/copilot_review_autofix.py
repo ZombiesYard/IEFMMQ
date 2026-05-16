@@ -8,6 +8,7 @@ import argparse
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 from typing import Sequence
 
@@ -212,7 +213,10 @@ def build_codex_exec_command(
 
 def _is_executable_file(path_text: str) -> bool:
     path = Path(path_text)
-    return path.is_file() and os.access(path, os.X_OK)
+    if not path.is_file():
+        return False
+    mode = path.stat().st_mode
+    return bool(mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)) and os.access(path, os.X_OK)
 
 
 def resolve_codex_binary(explicit_path: str) -> str:

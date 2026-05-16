@@ -34,8 +34,8 @@ def test_prompt_defaults_to_registry_backed_step_ids() -> None:
     payload = _extract_prompt_constraints_json(result.prompt)
 
     assert payload["allowed_step_ids"][0] == "S01"
-    assert payload["allowed_step_ids"][-1] == "S26"
-    assert len(payload["allowed_step_ids"]) == 26
+    assert payload["allowed_step_ids"][-1] == "S33"
+    assert len(payload["allowed_step_ids"]) == 33
 
 
 def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -> None:
@@ -139,7 +139,42 @@ def test_prompt_terminal_state_rule_uses_inferred_step_id_instead_of_empty_step_
     result = build_help_prompt_result(_base_context(), "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
 
     assert "Leave diagnosis.step_id and next.step_id empty" not in result.prompt
-    assert "Use deterministic_step_hint.inferred_step_id (typically S26)" in result.prompt
+    assert "Use deterministic_step_hint.inferred_step_id (typically S33)" in result.prompt
+
+
+def test_prompt_state_harness_marks_late_vlm_vs_early_telemetry_conflict() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S01", "S02", "S03", "S08", "S09"]
+    ctx["overlay_target_allowlist"] = ["battery_switch", "left_mdi_pb18", "left_mdi_pb15"]
+    ctx["vars"] = {
+        "battery_on": False,
+        "power_available": False,
+        "fire_test_a_complete": False,
+        "fire_test_b_complete": False,
+        "vars_source_missing": ["battery_on", *[f"missing_{idx}" for idx in range(40)]],
+    }
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S01",
+        "overlay_step_id": "S01",
+        "missing_conditions": ["vars.battery_on==true"],
+        "step_ui_targets": ["battery_switch"],
+    }
+    ctx["vision_fact_summary"] = {
+        "status": "available",
+        "fresh_fact_ids": ["tac_page_visible", "bit_root_page_visible", "hsi_page_visible"],
+        "seen_fact_ids": ["tac_page_visible", "bit_root_page_visible", "hsi_page_visible"],
+        "not_seen_fact_ids": ["fcs_page_visible"],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert "early_step_from_telemetry_vs_late_display_from_vlm" in payload["state_harness"]["conflicts"]
+    assert payload["state_harness"]["telemetry_evidence"]["source_status"] == "low_confidence_bootstrap"
+    assert payload["state_harness"]["deterministic_candidate"]["role"] == "candidate_not_authoritative"
+    assert payload["allowed_step_ids"].index("S08") < payload["allowed_step_ids"].index("S01")
+    assert "Prefer deterministic_step_hint when evidence does not conflict" not in result.prompt
+    assert "state_harness" in result.prompt
 
 
 def test_prompt_excludes_boolean_expires_after_ms_from_vision_facts() -> None:
@@ -384,7 +419,7 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
         }
     ]
     assert payload["decision_priority"][:3] == [
-        "deterministic_step_hint",
+        "state_harness",
         "gates_summary",
         "vision_fact_summary",
     ]
@@ -904,7 +939,7 @@ def test_prompt_trim_no_longer_forces_s08_navigation_target_ahead_of_recent_sign
     assert payload["multimodal_input"]["attached"] is True
 
 
-def test_prompt_explicitly_allows_multimodal_guidance_without_vision_fact_refs() -> None:
+def test_prompt_treats_live_help_as_text_only_when_main_help_image_flag_is_false() -> None:
     ctx = {
         "candidate_steps": ["S08"],
         "overlay_target_allowlist": ["left_mdi_pb15", "left_mdi_pb18"],
@@ -913,8 +948,9 @@ def test_prompt_explicitly_allows_multimodal_guidance_without_vision_fact_refs()
         "vision": {
             "vision_used": True,
             "frame_ids": ["1773401766789_000003"],
+            "main_help_multimodal_attached": False,
         },
-        "vision_fact_summary": {"status": "vision_unavailable"},
+        "vision_fact_summary": {"status": "vision_not_required"},
         "deterministic_step_hint": {
             "inferred_step_id": "S08",
             "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
@@ -925,8 +961,9 @@ def test_prompt_explicitly_allows_multimodal_guidance_without_vision_fact_refs()
     result = build_help_prompt_result(ctx, "zh")
     payload = _extract_prompt_constraints_json(result.prompt)
 
-    assert payload["multimodal_input"]["attached"] is True
-    assert "可直接依据已附带图像判断 diagnosis/next 与单目标 overlay" in result.prompt
+    assert payload["multimodal_input"]["attached"] is False
+    assert "主 help LLM 默认不直接接收图像" in result.prompt
+    assert "vision_not_required" in result.prompt
 
 
 def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page() -> None:
@@ -989,8 +1026,9 @@ def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> 
 
     assert "对于 S18：若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC" in zh_result.prompt
     assert "对于 S19：若已经进入 FCS-MC 页面但还未开始测试，当前系统允许多目标" in zh_result.prompt
-    assert "对于 S19：若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO" in zh_result.prompt
-    assert "仅为中间结果" in zh_result.prompt
+    assert "fcsmc_intermediate_result_visible=seen 表示 FCSA/FCSB PBIT GO 页面" in zh_result.prompt
+    assert "fcsmc_in_test_visible=seen 表示自检已开始运行" in zh_result.prompt
+    assert "fcsmc_final_go_result_visible=seen 表示最终 GO 已显示，S19 已完成" in zh_result.prompt
     assert "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S19 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释" in zh_result.prompt
     assert "overlay.targets 可同时返回 fcs_bit_switch 与 right_mdi_pb5" in zh_result.prompt
     assert "不得写\u201c持续按住直到测试完成\u201d" in zh_result.prompt
@@ -998,8 +1036,9 @@ def test_help_prompt_explicitly_stages_s18_root_fcsmc_in_test_and_final_go() -> 
 
     assert "For S18, if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC" in en_result.prompt
     assert "For S19, once the right DDI has entered the FCS-MC page but before the BIT has started, multi-target overlay is allowed" in en_result.prompt
-    assert "For S19, if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO" in en_result.prompt
-    assert "intermediate results, not final GO" in en_result.prompt
+    assert "fcsmc_intermediate_result_visible=seen means the FCSA/FCSB PBIT GO page is visible" in en_result.prompt
+    assert "fcsmc_in_test_visible=seen means the BIT is running" in en_result.prompt
+    assert "fcsmc_final_go_result_visible=seen means the final GO is visible and S19 is complete" in en_result.prompt
     assert "Never use VARS.fcs_bit_switch_up by itself to decide which S19 page/state the user is on. Combine it with the VLM visual fact labels" in en_result.prompt
     assert "overlay.targets may include both fcs_bit_switch and right_mdi_pb5 together" in en_result.prompt
     assert "never say 'hold it until the test completes'" in en_result.prompt
@@ -1026,12 +1065,12 @@ def test_help_prompt_treats_fcsa_and_fcsb_go_as_final_s18_go_evidence() -> None:
     zh_result = build_help_prompt_result(ctx, "zh")
     en_result = build_help_prompt_result(ctx, "en")
 
-    assert "信任 VLM 的 fcsmc_final_go_result_visible 标注" in zh_result.prompt
-    assert "fcsmc_final_go_result_visible=seen 说明最终 GO 已显示，S19 已完成" in zh_result.prompt
-    assert "仅为中间结果" in zh_result.prompt
-    assert "Trust the VLM's fcsmc_final_go_result_visible label" in en_result.prompt
-    assert "if fcsmc_final_go_result_visible=seen, the final GO is visible and S19 is complete" in en_result.prompt
-    assert "intermediate results, not final GO" in en_result.prompt
+    assert "fcsmc_final_go_result_visible=seen 表示最终 GO 已显示，S19 已完成" in zh_result.prompt
+    assert "当 VLM 报告 fcsmc_final_go_result_visible=seen 时，S19 无条件完成" in zh_result.prompt
+    assert "fcsmc_intermediate_result_visible=seen 表示 FCSA/FCSB PBIT GO 页面" in zh_result.prompt
+    assert "fcsmc_final_go_result_visible=seen means the final GO is visible and S19 is complete" in en_result.prompt
+    assert "When VLM reports fcsmc_final_go_result_visible=seen, S19 is COMPLETE unconditionally" in en_result.prompt
+    assert "fcsmc_intermediate_result_visible=seen means the FCSA/FCSB PBIT GO page is visible" in en_result.prompt
 
 
 def test_help_prompt_explicitly_distinguishes_fcs_button_from_fcs_page_in_en() -> None:

@@ -1,6 +1,6 @@
 pack_id: fa18c_startup
 version: v1
-title: "F/A-18C Cold Start (Full S01-S26)"
+title: "F/A-18C Cold Start (Full S01-S33)"
 description: >
   Cold-start to taxi-ready procedure for the F/A-18C Lot 20. Derived from
   Doc/Evaluation/fa18c_startup_master.md and Appendix - Training Task Syllabus.md.
@@ -26,21 +26,28 @@ metadata:
     - S12
     - S13
     - S16
-    - S22
-  manual_or_out_of_layout_steps:
-    - S14
-    - S17
     - S20
     - S21
+    - S22
     - S23
     - S24
     - S25
     - S26
+    - S27
+    - S28
+    - S29
+    - S30
+    - S31
+    - S32
+    - S33
+  manual_or_out_of_layout_steps:
+    - S14
+    - S17
   source_documents:
     - Doc/Evaluation/fa18c_startup_master.md
     - Doc/Evaluation/Appendix - Training Task Syllabus.md
   notes: >
-    Full cold-start procedure coverage for steps S01-S26 (phases P1-P6).
+    Full cold-start procedure coverage for steps S01-S33 (phases P1-P6).
     The frozen v0.4 visual contract only uses native left/right DDI plus AMPCD
     exports; UFC, IFEI, and warning/advisory evidence should come from DCS-BIOS.
 
@@ -52,9 +59,9 @@ prerequisites:
 
 completion_conditions:
   - "Both engines running and stabilized in green ranges."
-  - "Core avionics and flight-control preparation steps completed through S26."
+  - "Core avionics and flight-control preparation steps completed through S33."
   - "Taxi-ready checks configured for current scenario profile (airfield/carrier)."
-  - "Safety-critical cautions reviewed for full cold-start flow S01-S26."
+  - "Safety-critical cautions reviewed for full cold-start flow S01-S33."
 
 ui_targets:
   - battery_switch
@@ -215,36 +222,71 @@ precondition_gates:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s20_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before four-down checks."
+      reason: "Radar knob should remain in OPR before extending the refueling probe."
   S21:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s21_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before parking-brake release."
+      reason: "Radar knob should remain in OPR before retracting the refueling probe."
   S22:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s22_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before BINGO setup."
+      reason: "Radar knob should remain in OPR before extending the launch bar."
   S23:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s23_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before standby altimeter setup."
+      reason: "Radar knob should remain in OPR before retracting the launch bar."
   S24:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s24_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before radar altimeter bug setup."
+      reason: "Radar knob should remain in OPR before lowering the arresting hook."
   S25:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s25_requires_radar_mode_opr
-      reason: "Radar knob should remain in OPR before standby attitude uncage."
+      reason: "Radar knob should remain in OPR before raising the arresting hook."
   S26:
     - op: flag_true
       var: vars.radar_mode_opr
       reason_code: s26_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before pitot heat setup."
+  S27:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s27_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before flap AUTO setup."
+  S28:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s28_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before parking-brake release."
+  S29:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s29_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before BINGO setup."
+  S30:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s30_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before standby altimeter setup."
+  S31:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s31_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before radar altimeter bug setup."
+  S32:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s32_requires_radar_mode_opr
+      reason: "Radar knob should remain in OPR before standby attitude uncage."
+  S33:
+    - op: flag_true
+      var: vars.radar_mode_opr
+      reason_code: s33_requires_radar_mode_opr
       reason: "Radar knob should remain in OPR before attitude source AUTO selection."
 
 completion_gates:
@@ -376,45 +418,88 @@ completion_gates:
   S18: []
   S19: []
   S20:
-    - op: flag_true
-      var: vars.flap_configured
-      reason_code: s20_requires_flaps_configured
-      reason: "Flaps must be set to AUTO or HALF as part of four-down checks."
+    - op: arg_in_range
+      var: vars.ext_refuel_probe_value
+      min: 60000
+      max: 65535
+      reason_code: s20_requires_probe_extended
+      reason: "Refueling probe must be fully extended."
+  S21:
+    - op: arg_in_range
+      var: vars.ext_refuel_probe_value
+      min: 0
+      max: 5000
+      reason_code: s21_requires_probe_retracted
+      reason: "Refueling probe must be fully retracted."
+  S22:
+    - op: arg_in_range
+      var: vars.launch_bar_switch_value
+      min: 1
+      max: 1
+      reason_code: s22_requires_launch_bar_extended
+      reason: "Launch bar switch must be extended."
+  S23:
+    - op: arg_in_range
+      var: vars.launch_bar_switch_value
+      min: 0
+      max: 0
+      reason_code: s23_requires_launch_bar_retracted
+      reason: "Launch bar switch must be retracted."
+  S24:
+    - op: arg_in_range
+      var: vars.hook_handle_value
+      min: 1
+      max: 1
+      reason_code: s24_requires_hook_down
+      reason: "Arresting hook handle must be down."
+  S25:
+    - op: arg_in_range
+      var: vars.hook_handle_value
+      min: 0
+      max: 0
+      reason_code: s25_requires_hook_up
+      reason: "Arresting hook handle must be up."
+  S26:
     - op: flag_true
       var: vars.pitot_heat_on
-      reason_code: s20_requires_pitot_heat_on
-      reason: "Pitot heat must be ON as part of four-down checks."
-  S21:
+      reason_code: s26_requires_pitot_heat_on
+      reason: "Pitot heat must be ON."
+  S27:
+    - op: flag_true
+      var: vars.flap_auto
+      reason_code: s27_requires_flap_auto
+      reason: "Flap switch must be set to AUTO."
+  S28:
     - op: flag_true
       var: vars.parking_brake_released
-      reason_code: s21_requires_parking_brake_released
+      reason_code: s28_requires_parking_brake_released
       reason: "Parking brake must be released."
-  S22:
+  S29:
     - op: flag_true
       var: vars.bingo_fuel_set
-      reason_code: s22_requires_bingo_fuel_set
+      reason_code: s29_requires_bingo_fuel_set
       reason: "BINGO fuel must be set on the IFEI."
-  S23:
+  S30:
     - op: flag_true
       var: vars.standby_altimeter_set
-      reason_code: s23_requires_standby_altimeter_set
+      reason_code: s30_requires_standby_altimeter_set
       reason: "Standby barometric altimeter must be set to approximately 29.92 inHg (airfield QNH)."
-  S24:
+  S31:
     - op: arg_in_range
       var: vars.radar_altimeter_bug_value
       min: 180
       max: 220
-      reason_code: s24_requires_radalt_bug_airfield_200
+      reason_code: s31_requires_radalt_bug_airfield_200
       reason: "Radar altimeter bug should be near 200 ft for airfield startup."
-  S25:
+  S32:
     - op: flag_true
       var: vars.standby_attitude_uncaged
-      reason_code: s25_requires_standby_attitude_uncaged
+      reason_code: s32_requires_standby_attitude_uncaged
       reason: "Standby attitude indicator must be uncaged."
-  S26:
+  S33:
     - op: flag_true
       var: vars.attitude_source_auto
-      reason_code: s26_requires_attitude_source_auto
+      reason_code: s33_requires_attitude_source_auto
       reason: "Attitude source selector must be set to AUTO."
 
 profile_overrides:
@@ -431,12 +516,12 @@ profile_overrides:
           var: vars.ins_fast_align_complete
           reason_code: s12_requires_ampcd_pb19_fast_align
           reason: "AMPCD PB19 must be pressed to start fast INS alignment."
-      S24:
+      S31:
         - op: arg_in_range
           var: vars.radar_altimeter_bug_value
           min: 30
           max: 60
-          reason_code: s24_requires_radalt_bug_carrier_40
+          reason_code: s31_requires_radalt_bug_carrier_40
           reason: "Radar altimeter bug should be near 40 ft for carrier operations."
 
 steps:
@@ -790,26 +875,132 @@ steps:
   - id: S20
     phase: P5
     critical: true
-    observability: partial
+    observability: observable
     evidence_requirements:
-      - delta
-      - rag
+      - var
       - gate
     preconditions:
       - "Core avionics and FCS BIT checks complete."
     completion_conditions:
-      - "Four-down checklist completed and all items cross-checked."
+      - "Refueling probe fully extended."
     ui_targets:
       - refuel_probe_switch
-      - throttle_quadrant_reference
-      - launch_bar_switch
-      - arresting_hook_handle
-      - pitot_heater_switch
-      - flap_switch
     tutor_prompts:
-      - "Execute the full four-down checklist; telemetry can observe several switch states, but the full sequence still needs confirmation."
+      - "Extend the refueling probe for the four-down check."
 
   - id: S21
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Refueling probe extension checked."
+    completion_conditions:
+      - "Refueling probe fully retracted."
+    ui_targets:
+      - refuel_probe_switch
+    tutor_prompts:
+      - "Retract the refueling probe after confirming extension."
+
+  - id: S22
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Refueling probe cycle complete."
+    completion_conditions:
+      - "Launch bar extended."
+    ui_targets:
+      - launch_bar_switch
+    tutor_prompts:
+      - "Extend the launch bar for the four-down check."
+
+  - id: S23
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Launch bar extension checked."
+    completion_conditions:
+      - "Launch bar retracted."
+    ui_targets:
+      - launch_bar_switch
+    tutor_prompts:
+      - "Retract the launch bar after confirming extension."
+
+  - id: S24
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Launch bar cycle complete."
+    completion_conditions:
+      - "Arresting hook lowered."
+    ui_targets:
+      - arresting_hook_handle
+    tutor_prompts:
+      - "Lower the arresting hook for the four-down check."
+
+  - id: S25
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Arresting hook down indication checked."
+    completion_conditions:
+      - "Arresting hook raised."
+    ui_targets:
+      - arresting_hook_handle
+    tutor_prompts:
+      - "Raise the arresting hook after confirming it is down."
+
+  - id: S26
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Hook cycle complete."
+    completion_conditions:
+      - "Pitot heat switch ON."
+    ui_targets:
+      - pitot_heater_switch
+    tutor_prompts:
+      - "Turn pitot heat ON."
+
+  - id: S27
+    phase: P5
+    critical: true
+    observability: observable
+    evidence_requirements:
+      - var
+      - gate
+    preconditions:
+      - "Pitot heat is on."
+    completion_conditions:
+      - "Flap switch set to AUTO."
+    ui_targets:
+      - flap_switch
+    tutor_prompts:
+      - "Move the flap switch to AUTO."
+
+  - id: S28
     phase: P6
     critical: true
     observability: observable
@@ -825,7 +1016,7 @@ steps:
     tutor_prompts:
       - "Release parking brake when taxi checklist is complete."
 
-  - id: S22
+  - id: S29
     phase: P6
     critical: true
     observability: observable
@@ -842,7 +1033,7 @@ steps:
     tutor_prompts:
       - "Set BINGO fuel on the IFEI to the mission target."
 
-  - id: S23
+  - id: S30
     phase: P6
     critical: true
     observability: partial
@@ -859,7 +1050,7 @@ steps:
     tutor_prompts:
       - "Adjust the standby barometric altimeter to the local field elevation/QNH reference."
 
-  - id: S24
+  - id: S31
     phase: P6
     critical: true
     observability: observable
@@ -875,7 +1066,7 @@ steps:
     tutor_prompts:
       - "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier)."
 
-  - id: S25
+  - id: S32
     phase: P6
     critical: true
     observability: observable
@@ -891,7 +1082,7 @@ steps:
     tutor_prompts:
       - "Uncage the standby attitude indicator."
 
-  - id: S26
+  - id: S33
     phase: P6
     critical: true
     observability: observable
