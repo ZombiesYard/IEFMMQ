@@ -56,6 +56,7 @@ class StepHarnessSpec:
     signal_quality: SignalQualityRequirement
     requires_visual_confirmation: bool
     declared_ui_targets: tuple[str, ...] = ()
+    overlay_enabled: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -74,6 +75,7 @@ class StepHarnessSpec:
             "signal_quality": self.signal_quality.to_dict(),
             "requires_visual_confirmation": self.requires_visual_confirmation,
             "declared_ui_targets": list(self.declared_ui_targets),
+            "overlay_enabled": self.overlay_enabled,
         }
 
 

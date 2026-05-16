@@ -2031,6 +2031,62 @@ def test_resolve_step_overlay_allowlist_returns_empty_for_overlay_disabled_step(
     assert allowlist == []
 
 
+def test_safe_fallback_overlay_respects_overlay_disabled_with_declared_targets(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_overlay_disabled.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: observable\n"
+        "    overlay_enabled: false\n"
+        "    evidence_requirements: [delta]\n"
+        "    ui_targets: [apu_switch]\n"
+        "precondition_gates:\n"
+        "  S01: []\n"
+        "completion_gates:\n"
+        "  S01: []\n",
+        encoding="utf-8",
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+        pack_path=pack,
+        ui_map_path=Path(_default_pack_path()).parent / "ui_map.yaml",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {},
+                "gates": {},
+                "recent_deltas": [{"ui_target": "apu_switch", "k": "APU_CONTROL_SW"}],
+                "overlay_target_allowlist": [],
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S01",
+                    "overlay_step_id": "S01",
+                    "missing_conditions": ["vars.apu_on==true"],
+                    "recent_ui_targets": ["apu_switch"],
+                    "step_evidence_requirements": ["delta"],
+                },
+            },
+        )
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+    finally:
+        loop.close()
+
+    assert fallback_help_obj is None
+    assert fallback_reason == "overlay_disabled:S01"
+
+
 def test_live_loop_allowlist_filter_keeps_actions_for_remaining_targets_with_evidence(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_allowlist_partial_filter.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

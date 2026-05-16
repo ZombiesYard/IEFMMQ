@@ -60,7 +60,7 @@ def step_signal_profiles_from_specs(
             "observability": spec.observability_status,
             "observability_status": spec.observability_status,
             "ui_targets": list(spec.declared_ui_targets),
-            "overlay_enabled": bool(spec.allowed_overlay_targets),
+            "overlay_enabled": spec.overlay_enabled,
             "requires_visual_confirmation": spec.requires_visual_confirmation,
             "step_harness_spec": spec,
         }
@@ -78,7 +78,7 @@ def step_fallback_profiles_from_specs(
         profiles[step_id] = {
             "ui_targets": list(spec.declared_ui_targets),
             "gate_var_refs": list(spec.telemetry_facts),
-            "overlay_enabled": bool(spec.allowed_overlay_targets),
+            "overlay_enabled": spec.overlay_enabled,
             "step_harness_spec": spec,
         }
     return profiles
@@ -164,6 +164,7 @@ def _build_step_harness_spec(
         signal_quality=signal_quality,
         requires_visual_confirmation=requires_visual_confirmation,
         declared_ui_targets=raw_targets,
+        overlay_enabled=overlay_enabled,
     )
 
 

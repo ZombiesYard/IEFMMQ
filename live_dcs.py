@@ -4627,6 +4627,8 @@ class LiveDcsTutorLoop:
         step_fallback_profile = self.step_fallback_profiles.get(overlay_step_id)
         if not isinstance(step_fallback_profile, Mapping):
             return None, f"unsupported_step:{overlay_step_id}"
+        if step_fallback_profile.get("overlay_enabled") is False:
+            return None, f"overlay_disabled:{overlay_step_id}"
         fallback_targets_raw = step_fallback_profile.get("ui_targets")
         fallback_targets = _normalize_step_ui_targets(fallback_targets_raw)
         if not fallback_targets:
