@@ -298,3 +298,235 @@ def test_step_candidates_include_recent_action_matches_from_harness_specs() -> N
     assert candidates[0]["source"] == "recent_action"
     assert candidates[0]["supporting_evidence_refs"] == ["RECENT_ACTIONS.left_mdi_pb18"]
     assert candidates[0]["proposed_next_action_target_ids"] == ["left_mdi_pb18"]
+
+
+def test_telemetry_window_digest_marks_first_frame_bootstrap_refuted_by_later_power() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "power_available": True,
+                "left_ddi_on": True,
+                "battery_on": None,
+                "vars_source_missing": ["battery_on"],
+            },
+            "telemetry_window_frames": [
+                {
+                    "seq": 1,
+                    "t_wall": 10.0,
+                    "vars": {"battery_on": False, "power_available": False},
+                },
+                {
+                    "seq": 2,
+                    "t_wall": 13.0,
+                    "vars": {"power_available": True, "left_ddi_on": True},
+                },
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S01",
+                "missing_conditions": ["vars.battery_on==true"],
+            },
+        }
+    )
+
+    payload = packet.to_dict()
+    digest = payload["telemetry_window_digest"]
+
+    assert digest["window_duration_s"] == 3.0
+    assert digest["frame_count"] == 2
+    assert digest["latest_seq"] == 2
+    assert digest["first_frame_only_values"] == [{"var": "battery_on", "value": False}]
+    assert any(
+        item["var"] == "power_available" and item["last_value"] is True
+        for item in digest["changed_vars"]
+    )
+    assert "left_ddi_on" in digest["stable_true_vars"]
+    assert "battery_on" in digest["unknown_or_missing_vars"]
+    assert "battery_on=false only in first frame but later downstream avionics evidence is present" in digest["contradictions"]
+    assert "telemetry_window_conflicts_with_single_frame_hint" in packet.to_state_harness_dict()["conflicts"]
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_candidate = next(item for item in candidates if item["source"] == "telemetry_window")
+    assert telemetry_candidate["step_id"] == "S08"
+    assert telemetry_candidate["refuting_evidence_refs"] == ["TELEMETRY_WINDOW.first_frame_only_values.battery_on"]
+
+
+def test_telemetry_window_candidate_handles_missing_early_latch_with_later_evidence() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "power_available": True,
+                "left_ddi_on": True,
+                "fire_test_a_complete": None,
+                "vars_source_missing": ["fire_test_a_complete"],
+            },
+            "telemetry_window_frames": [
+                {"seq": 5, "t_wall": 20.0, "vars": {"power_available": True}},
+                {"seq": 6, "t_wall": 21.5, "vars": {"left_ddi_on": True}},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S02",
+                "missing_conditions": ["vars.fire_test_a_complete==true"],
+            },
+        }
+    )
+
+    payload = packet.to_dict()
+    digest = payload["telemetry_window_digest"]
+
+    assert "fire_test_a_complete" in digest["unknown_or_missing_vars"]
+    assert "fire_test latch missing while later-stage telemetry evidence is present" in digest["contradictions"]
+    assert CONFLICT_LATCH_MISSING_VS_LATER_STAGE_EVIDENCE in payload["conflicts"]
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_candidate = next(item for item in candidates if item["source"] == "telemetry_window")
+    assert telemetry_candidate["step_id"] == "S08"
+    assert "TELEMETRY_WINDOW.stable_true_vars.left_ddi_on" in telemetry_candidate["supporting_evidence_refs"]
+
+
+def test_telemetry_window_candidate_exposes_recent_transition_when_gate_still_blocked() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {"fcs_bit_switch_up": False},
+            "telemetry_window_frames": [
+                {"seq": 8, "t_wall": 30.0, "vars": {"fcs_bit_switch_up": False}},
+                {"seq": 9, "t_wall": 31.0, "vars": {"fcs_bit_switch_up": True}},
+            ],
+            "gates": {
+                "S19.completion": {
+                    "status": "blocked",
+                    "step_id": "S19",
+                    "reason_code": "fcs_bit_switch_up_missing",
+                    "reason": "vars.fcs_bit_switch_up==true",
+                }
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S19",
+                "missing_conditions": ["vars.fcs_bit_switch_up==true"],
+            },
+        }
+    )
+
+    digest = packet.to_dict()["telemetry_window_digest"]
+
+    assert digest["changed_vars"][0]["var"] == "fcs_bit_switch_up"
+    assert digest["changed_vars"][0]["first_value"] is False
+    assert digest["changed_vars"][0]["last_value"] is True
+    assert "recent telemetry transition conflicts with current blocked gate" in digest["contradictions"]
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_candidate = next(item for item in candidates if item["source"] == "telemetry_window")
+    assert telemetry_candidate["step_id"] == "S19"
+    assert "TELEMETRY_WINDOW.changed_vars.fcs_bit_switch_up" in telemetry_candidate["supporting_evidence_refs"]
+
+
+def test_telemetry_window_candidates_cover_four_down_progression_from_telemetry_only() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "ext_refuel_probe_value": 65000,
+                "launch_bar_switch_value": 1,
+                "hook_handle_value": 1,
+                "pitot_heat_on": True,
+                "flap_auto": False,
+            },
+            "telemetry_window_frames": [
+                {
+                    "seq": 20,
+                    "t_wall": 40.0,
+                    "vars": {
+                        "ext_refuel_probe_value": 0,
+                        "launch_bar_switch_value": 0,
+                        "hook_handle_value": 0,
+                        "pitot_heat_on": False,
+                    },
+                },
+                {
+                    "seq": 21,
+                    "t_wall": 44.0,
+                    "vars": {
+                        "ext_refuel_probe_value": 65000,
+                        "launch_bar_switch_value": 1,
+                        "hook_handle_value": 1,
+                        "pitot_heat_on": True,
+                    },
+                },
+            ],
+        }
+    )
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_steps = [item["step_id"] for item in candidates if item["source"] == "telemetry_window"]
+
+    assert telemetry_steps[:4] == ["S21", "S23", "S25", "S27"]
+    assert all(item["supporting_evidence_refs"][0].startswith("TELEMETRY_WINDOW.") for item in candidates if item["source"] == "telemetry_window")
+
+
+def test_telemetry_window_sparse_delta_does_not_mark_first_frame_only_value() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {"power_available": True, "left_ddi_on": True},
+            "telemetry_window_frames": [
+                {"seq": 1, "t_wall": 1.0, "delta": {"battery_on": False}},
+                {"seq": 2, "t_wall": 2.0, "delta": {"left_ddi_on": True}},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S01",
+                "missing_conditions": ["vars.battery_on==true"],
+            },
+        }
+    )
+
+    digest = packet.to_dict()["telemetry_window_digest"]
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+
+    assert digest["first_frame_only_values"] == []
+    assert "battery_on=false only in first frame but later downstream avionics evidence is present" not in digest["contradictions"]
+    assert not any(item["source"] == "telemetry_window" and item["step_id"] == "S08" for item in candidates)
+
+
+def test_telemetry_window_full_snapshot_none_counts_as_missing_not_stable_true() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {"power_available": True, "left_ddi_on": True, "battery_on": None},
+            "telemetry_window_frames": [
+                {
+                    "seq": 1,
+                    "t_wall": 1.0,
+                    "vars": {"battery_on": False, "power_available": False},
+                    "vars_is_full_snapshot": True,
+                },
+                {
+                    "seq": 2,
+                    "t_wall": 2.0,
+                    "vars": {"battery_on": None, "power_available": True, "left_ddi_on": True},
+                    "vars_is_full_snapshot": True,
+                },
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S01",
+                "missing_conditions": ["vars.battery_on==true"],
+            },
+        }
+    )
+
+    digest = packet.to_dict()["telemetry_window_digest"]
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+
+    assert digest["first_frame_only_values"] == [{"var": "battery_on", "value": False}]
+    assert "battery_on" not in digest["stable_false_vars"]
+    assert any(item["source"] == "telemetry_window" and item["step_id"] == "S08" for item in candidates)
+
+
+def test_telemetry_window_fcs_bit_release_does_not_generate_s19_candidate() -> None:
+    packet = build_evidence_packet(
+        {
+            "telemetry_window_frames": [
+                {"seq": 1, "t_wall": 1.0, "vars": {"fcs_bit_switch_up": True}},
+                {"seq": 2, "t_wall": 2.0, "vars": {"fcs_bit_switch_up": False}},
+            ],
+        }
+    )
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+
+    assert not any(item["source"] == "telemetry_window" and item["step_id"] == "S19" for item in candidates)

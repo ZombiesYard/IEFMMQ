@@ -690,7 +690,159 @@ def _sanitize_state_harness_for_event(raw: Any) -> dict[str, Any]:
         value = raw.get(key)
         if isinstance(value, Mapping):
             sanitized[key] = dict(value)
+    telemetry_window_digest = _sanitize_telemetry_window_digest_for_event(raw.get("telemetry_window_digest"))
+    if telemetry_window_digest:
+        sanitized["telemetry_window_digest"] = telemetry_window_digest
     return sanitized
+
+
+def _sanitize_digest_scalar(raw: Any) -> Any:
+    if raw is None or isinstance(raw, bool) or isinstance(raw, (int, float)):
+        return raw
+    if isinstance(raw, str):
+        return raw if len(raw) <= 80 else raw[:80] + "..."
+    return None
+
+
+def _sanitize_telemetry_window_digest_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    sanitized: dict[str, Any] = {}
+    for key in ("window_duration_s", "latest_t_wall"):
+        value = raw.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            sanitized[key] = value
+        elif value is None:
+            sanitized[key] = None
+    for key in ("frame_count", "latest_seq"):
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            sanitized[key] = value
+        elif value is None:
+            sanitized[key] = None
+    for key in ("stable_true_vars", "stable_false_vars", "unknown_or_missing_vars", "contradictions"):
+        values = raw.get(key)
+        if isinstance(values, list):
+            sanitized[key] = [item for item in values if isinstance(item, str) and len(item) <= 120][:16]
+    for key in ("changed_vars", "first_frame_only_values", "last_seen_true"):
+        values = raw.get(key)
+        if not isinstance(values, list):
+            continue
+        items: list[dict[str, Any]] = []
+        for item in values:
+            if not isinstance(item, Mapping):
+                continue
+            entry: dict[str, Any] = {}
+            for field in (
+                "var",
+                "first_value",
+                "last_value",
+                "value",
+                "transition_count",
+                "latest_transition_age_s",
+                "seq",
+                "age_s",
+            ):
+                if field not in item:
+                    continue
+                value = _sanitize_digest_scalar(item.get(field))
+                if value is not None:
+                    entry[field] = value
+            if entry:
+                items.append(entry)
+            if len(items) >= 8:
+                break
+        sanitized[key] = items
+    return sanitized
+
+
+def _telemetry_window_frames_from_var_snapshots(frames: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in frames:
+        if not isinstance(item, Mapping):
+            continue
+        delta = item.get("delta")
+        if not isinstance(delta, Mapping):
+            continue
+        out.append(
+            {
+                "seq": item.get("seq"),
+                "t_wall": item.get("t_wall"),
+                "vars": dict(delta),
+                "vars_is_full_snapshot": True,
+            }
+        )
+    return out
+
+
+_TELEMETRY_WINDOW_SIGNATURE_VARS = {
+    "battery_on",
+    "power_available",
+    "left_ddi_on",
+    "right_ddi_on",
+    "mpcd_on",
+    "hud_on",
+    "fire_test_a_complete",
+    "fire_test_b_complete",
+    "fire_test_complete",
+    "fcs_bit_switch_up",
+    "ext_refuel_probe_value",
+    "launch_bar_switch_value",
+    "hook_handle_value",
+    "pitot_heat_on",
+    "flap_auto",
+}
+
+
+def _telemetry_window_signature(state_harness: Mapping[str, Any]) -> dict[str, Any]:
+    raw = state_harness.get("telemetry_window_digest")
+    digest = raw if isinstance(raw, Mapping) else {}
+    changed: list[dict[str, Any]] = []
+    for item in digest.get("changed_vars", []):
+        if not isinstance(item, Mapping):
+            continue
+        var_name = item.get("var")
+        if not isinstance(var_name, str) or not var_name:
+            continue
+        if var_name not in _TELEMETRY_WINDOW_SIGNATURE_VARS:
+            continue
+        changed.append(
+            {
+                "var": var_name,
+                "first_value": _sanitize_digest_scalar(item.get("first_value")),
+                "last_value": _sanitize_digest_scalar(item.get("last_value")),
+                "transition_count": item.get("transition_count"),
+            }
+        )
+    first_frame_only: list[dict[str, Any]] = []
+    for item in digest.get("first_frame_only_values", []):
+        if not isinstance(item, Mapping):
+            continue
+        var_name = item.get("var")
+        if not isinstance(var_name, str) or not var_name:
+            continue
+        if var_name not in _TELEMETRY_WINDOW_SIGNATURE_VARS:
+            continue
+        first_frame_only.append(
+            {
+                "var": var_name,
+                "value": _sanitize_digest_scalar(item.get("value")),
+            }
+        )
+    contradictions = [
+        item for item in digest.get("contradictions", []) if isinstance(item, str)
+    ][:8]
+    if not changed:
+        contradictions = [
+            item
+            for item in contradictions
+            if item != "recent telemetry transition conflicts with current blocked gate"
+        ]
+    return {
+        "changed_vars": changed[:12],
+        "first_frame_only_values": first_frame_only[:8],
+        "contradictions": contradictions,
+    }
 
 
 def _sanitize_evidence_packet_summary_for_event(raw: Any) -> dict[str, Any]:
@@ -716,6 +868,15 @@ def _sanitize_evidence_packet_summary_for_event(raw: Any) -> dict[str, Any]:
         sanitized["conflicts"] = [
             item for item in conflicts if isinstance(item, str) and len(item) <= 120
         ][:8]
+    telemetry_window_digest = raw.get("telemetry_window_digest")
+    if isinstance(telemetry_window_digest, Mapping):
+        sanitized["telemetry_window_digest"] = {
+            key: value
+            for key, value in telemetry_window_digest.items()
+            if key in {"frame_count", "latest_seq", "changed_var_count", "contradiction_count"}
+            and (isinstance(value, int) or value is None)
+            and not isinstance(value, bool)
+        }
     return sanitized
 
 
@@ -2534,6 +2695,7 @@ class LiveDcsTutorLoop:
         self.overlay_allowset = set(self.overlay_allowlist)
         self.step_fallback_profiles = step_fallback_profiles_from_specs(self.step_harness_specs)
         self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
+        self.telemetry_window_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
         self.vision_sync_window_ms = (
             int(vision_sync_window_ms)
             if isinstance(vision_sync_window_ms, int) and vision_sync_window_ms > 0
@@ -2808,6 +2970,8 @@ class LiveDcsTutorLoop:
             self._remember_step_interactions(current_delta_targets)
         if isinstance(delta, Mapping) and t_wall is not None:
             self.recent_ring.add_delta(delta, t_wall=t_wall, seq=seq)
+        if isinstance(enriched_vars, Mapping) and t_wall is not None:
+            self.telemetry_window_ring.add_delta(enriched_vars, t_wall=t_wall, seq=seq)
 
         self._emit_event(
             kind="observation",
@@ -2991,6 +3155,12 @@ class LiveDcsTutorLoop:
 
         now_t_wall = _coerce_float(payload.get("t_wall"))
         recent_frames = self.recent_ring.snapshot(now_t_wall=now_t_wall) if now_t_wall is not None else self.recent_ring.snapshot()
+        telemetry_window_frames_raw = (
+            self.telemetry_window_ring.snapshot(now_t_wall=now_t_wall)
+            if now_t_wall is not None
+            else self.telemetry_window_ring.snapshot()
+        )
+        telemetry_window_frames = _telemetry_window_frames_from_var_snapshots(telemetry_window_frames_raw)
         recent_deltas = build_prompt_recent_deltas(recent_frames, self.mapper, max_items=20)
         recent_actions = build_recent_button_signal(recent_frames, self.mapper, max_items=8)
         recent_buttons = [
@@ -3109,6 +3279,7 @@ class LiveDcsTutorLoop:
             "gates": gates,
             "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
+            "telemetry_window_frames": telemetry_window_frames,
             "deterministic_step_hint": deterministic_hint,
             "telemetry": {"t_wall": now_t_wall} if now_t_wall is not None else {},
             "vision": vision_context,
@@ -3266,6 +3437,7 @@ class LiveDcsTutorLoop:
             },
             "state_harness": {
                 "conflicts": list(state_harness.get("conflicts", [])),
+                "telemetry_window_digest": _telemetry_window_signature(state_harness),
                 "telemetry_status": (
                     state_harness.get("telemetry_evidence", {}).get("source_status")
                     if isinstance(state_harness.get("telemetry_evidence"), Mapping)
@@ -3273,7 +3445,11 @@ class LiveDcsTutorLoop:
                 ),
                 "visual_candidate_steps": _visual_candidate_steps_from_state_harness(state_harness),
             },
-            "evidence_packet_summary": evidence_packet_summary,
+            "evidence_packet_summary": {
+                key: value
+                for key, value in evidence_packet_summary.items()
+                if key != "telemetry_window_digest"
+            },
         }
         state_key = _stable_hash_json(state_signature)
         return req, prompt_result.metadata, state_key

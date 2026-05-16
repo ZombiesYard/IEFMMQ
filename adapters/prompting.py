@@ -1037,6 +1037,27 @@ def _string_items(raw: Any) -> list[str]:
     return out
 
 
+def _sanitize_digest_prompt_scalar(raw: Any) -> Any:
+    value = _sanitize_scalar(raw)
+    if isinstance(value, (list, tuple, set, dict)):
+        value = str(value)
+    if isinstance(value, str) and len(value) > 80:
+        return value[:80] + "..."
+    return value
+
+
+def _sanitize_digest_prompt_item(raw: Mapping[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for field in fields:
+        if field not in raw:
+            continue
+        value = _sanitize_digest_prompt_scalar(raw.get(field))
+        if value is None:
+            continue
+        out[field] = value
+    return out
+
+
 def build_state_harness(context: Mapping[str, Any]) -> dict[str, Any]:
     return build_evidence_packet(context).to_state_harness_dict()
 
@@ -1060,6 +1081,8 @@ def _reprioritize_candidate_steps_for_harness(candidate_steps: list[str], state_
 def _build_state_harness_prompt_payload(state_harness: Mapping[str, Any], *, compact: bool = False) -> dict[str, Any]:
     telemetry_raw = state_harness.get("telemetry_evidence")
     telemetry = telemetry_raw if isinstance(telemetry_raw, Mapping) else {}
+    telemetry_window_raw = state_harness.get("telemetry_window_digest")
+    telemetry_window = telemetry_window_raw if isinstance(telemetry_window_raw, Mapping) else {}
     vision_raw = state_harness.get("vision_evidence")
     vision = vision_raw if isinstance(vision_raw, Mapping) else {}
     deterministic_raw = state_harness.get("deterministic_candidate")
@@ -1086,6 +1109,41 @@ def _build_state_harness_prompt_payload(state_harness: Mapping[str, Any], *, com
             "role": deterministic.get("role"),
         },
     }
+    telemetry_window_payload = {
+        "window_duration_s": telemetry_window.get("window_duration_s"),
+        "frame_count": telemetry_window.get("frame_count"),
+        "latest_seq": telemetry_window.get("latest_seq"),
+        "latest_t_wall": telemetry_window.get("latest_t_wall"),
+        "changed_vars": [
+            _sanitize_digest_prompt_item(
+                item,
+                ("var", "first_value", "last_value", "transition_count", "latest_transition_age_s"),
+            )
+            for item in telemetry_window.get("changed_vars", [])
+            if isinstance(item, Mapping)
+        ][:6],
+        "stable_true_vars": _string_items(telemetry_window.get("stable_true_vars"))[:8],
+        "stable_false_vars": _string_items(telemetry_window.get("stable_false_vars"))[:8],
+        "unknown_or_missing_vars": _string_items(telemetry_window.get("unknown_or_missing_vars"))[:8],
+        "first_frame_only_values": [
+            _sanitize_digest_prompt_item(item, ("var", "value"))
+            for item in telemetry_window.get("first_frame_only_values", [])
+            if isinstance(item, Mapping)
+        ][:4],
+        "last_seen_true": [
+            _sanitize_digest_prompt_item(item, ("var", "seq", "age_s"))
+            for item in telemetry_window.get("last_seen_true", [])
+            if isinstance(item, Mapping)
+        ][:6],
+        "contradictions": _string_items(telemetry_window.get("contradictions"))[:6],
+    }
+    if (
+        telemetry_window_payload["frame_count"]
+        or telemetry_window_payload["changed_vars"]
+        or telemetry_window_payload["contradictions"]
+        or telemetry_window_payload["first_frame_only_values"]
+    ):
+        payload["telemetry_window_digest"] = telemetry_window_payload
     if not compact:
         payload["telemetry_evidence"]["early_vars"] = telemetry.get("early_vars", {})
         payload["vision_evidence"]["seen_fact_ids"] = _string_items(vision.get("seen_fact_ids"))[:8]
@@ -1106,6 +1164,9 @@ def _build_state_harness_prompt_payload(state_harness: Mapping[str, Any], *, com
             "source_status": recent.get("source_status"),
             "recent_buttons": _string_items(recent.get("recent_buttons"))[:6],
         }
+    else:
+        if "telemetry_window_digest" in payload:
+            payload["telemetry_window_digest"].pop("last_seen_true", None)
     return payload
 
 
@@ -1456,6 +1517,7 @@ def build_help_prompt_result(
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S19 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，字段顺序固定为 target,type,ref,quote,grounding_confidence，type 必须与 ref 前缀匹配，quote 最长 120 字符，且 ref 必须逐字匹配 allowed_evidence_refs 中的完整条目（含 @frame_id）。若证据不足，返回空 targets 和空 evidence。",
             "state_harness 是证据裁决包；deterministic_step_hint 只是候选，不是最终裁判。",
+            "使用 telemetry_window_digest 裁决最近 telemetry 时间窗；主 help LLM 保持 text-only，不得要求或粘贴 raw full JSONL。telemetry sequence evidence may override 误导性的首帧/current-frame 值；冲突时解释原因并选择完整序列最支持的 candidate_steps 项。",
             "若 state_harness.conflicts 含 early_step_from_telemetry_vs_late_display_from_vlm，不得仅因 battery_on=false/早期 latch=false 输出 S01/S02/S03；说明 telemetry 可能是首帧或未恢复，选择视觉一致步骤或要求确认。",
             "若 VLM fresh/seen 含 tac_page_visible+bit_root_page_visible 且 fcs_page_visible=not_seen，按 S08 恢复：左 DDI TAC -> SUPT/FCS，不退回电瓶、Fire Test 或 APU。",
             "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应使用 deterministic_step_hint.inferred_step_id（通常为 S33），不要猜测别的步骤；overlay 应为空，explanation 应明确说明流程已完成。",
@@ -1513,6 +1575,7 @@ def build_help_prompt_result(
             "Never use VARS.fcs_bit_switch_up by itself to decide which S19 page/state the user is on. Combine it with the VLM visual fact labels.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence in that exact field order. The type must match the ref prefix, quote length must be <= 120 chars, and the ref must exactly match a full entry from allowed_evidence_refs (including any @frame_id suffix). If not enough evidence, return empty targets and empty evidence.",
             "state_harness arbitrates evidence; deterministic_step_hint is a candidate, not final authority.",
+            "Use telemetry_window_digest: telemetry sequence evidence may override; do not paste raw full JSONL.",
             "If state_harness.conflicts has early_step_from_telemetry_vs_late_display_from_vlm, do not output S01/S02/S03 from battery_on=false/early latches=false; say telemetry may be stale and choose VLM-consistent step or ask confirmation.",
             "If VLM fresh/seen has tac_page_visible+bit_root_page_visible and fcs_page_visible=not_seen, do S08 recovery: Left DDI TAC -> SUPT/FCS.",
             "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Use deterministic_step_hint.inferred_step_id (typically S33) for diagnosis.step_id and next.step_id, do not guess a different step, keep overlay empty, and make the explanation explicitly say the procedure is complete.",
@@ -1578,6 +1641,21 @@ def build_help_prompt_result(
             priority_targets=overlay_target_priority,
             ui_map_path=ui_map_path,
         )
+        state_harness_payload = _build_state_harness_prompt_payload(state_harness)
+        decision_priority = [
+            "state_harness",
+            "gates_summary",
+            "vision_fact_summary",
+            "deterministic_step_hint",
+            "overlay_target_policy",
+            "recent_actions_signal",
+            "recent_deltas_summary",
+            "current_vars_selected",
+            "EVIDENCE_SOURCES.VISION_FACTS",
+            "EVIDENCE_SOURCES.RAG_SNIPPETS",
+        ]
+        if "telemetry_window_digest" in state_harness_payload:
+            decision_priority.insert(3, "telemetry_window_digest")
         next_step = candidate_steps[1] if len(candidate_steps) > 1 else candidate_steps[0]
         example_targets: list[str] = []
         priority_candidates = current_overlay_target_policy.get("candidate_targets_in_priority_order")
@@ -1622,24 +1700,13 @@ def build_help_prompt_result(
             "allowed_overlay_targets": overlay_targets,
             "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
-            "decision_priority": [
-                "state_harness",
-                "gates_summary",
-                "vision_fact_summary",
-                "deterministic_step_hint",
-                "overlay_target_policy",
-                "recent_actions_signal",
-                "recent_deltas_summary",
-                "current_vars_selected",
-                "EVIDENCE_SOURCES.VISION_FACTS",
-                "EVIDENCE_SOURCES.RAG_SNIPPETS",
-            ],
+            "decision_priority": decision_priority,
             "scenario_profile": scenario_profile,
             "current_vars_selected": selected_vars,
             "gates_summary": gates_summary,
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
-            "state_harness": _build_state_harness_prompt_payload(state_harness),
+            "state_harness": state_harness_payload,
             "deterministic_step_hint": deterministic_step_hint,
             "vision_fact_summary": vision_fact_summary,
             "multimodal_input": multimodal_input,
@@ -1750,6 +1817,8 @@ def build_help_prompt_result(
             compact_state_harness = _build_state_harness_prompt_payload(state_harness, compact=True)
             compact_harness_has_signal = bool(
                 compact_state_harness.get("conflicts")
+                or compact_state_harness.get("telemetry_window_digest", {}).get("frame_count")
+                or compact_state_harness.get("telemetry_window_digest", {}).get("contradictions")
                 or compact_state_harness.get("vision_evidence", {}).get("late_display_anchors")
                 or compact_state_harness.get("vision_evidence", {}).get("visual_candidate_steps")
                 or compact_state_harness.get("telemetry_evidence", {}).get("source_status") == "low_confidence_bootstrap"
@@ -1757,6 +1826,8 @@ def build_help_prompt_result(
             compact_decision_priority = ["gates_summary", "deterministic_step_hint"]
             if compact_harness_has_signal:
                 compact_decision_priority.insert(0, "state_harness")
+                if "telemetry_window_digest" in compact_state_harness:
+                    compact_decision_priority.insert(1, "telemetry_window_digest")
             compact_payload = {
                 "allowed_step_ids": candidate_steps[:3],
                 "allowed_overlay_targets": overlay_targets,
