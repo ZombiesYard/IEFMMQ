@@ -2,8 +2,8 @@
 Normalized evidence packet for help-cycle adjudication.
 
 This module intentionally depends only on core Python data structures. Runtime
-adapters may feed it telemetry, VLM facts, gate results, and recent actions, but
-the packet itself remains independent from DCS, OpenAI, and overlay transport.
+adapters may feed it telemetry, VLM facts, gate results, and recent actions,
+but the packet itself remains independent from concrete transport providers.
 """
 
 from __future__ import annotations
