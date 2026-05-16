@@ -130,6 +130,31 @@ def test_merge_vision_fact_observation_tolerates_invalid_result_kind_and_backfil
     assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
 
 
+def test_merge_vision_fact_observation_keeps_final_go_seen_without_note_or_kind() -> None:
+    snapshot = merge_vision_fact_observation(
+        {},
+        VisionFactObservation(
+            session_id="sess-live",
+            trigger_wall_ms=1772872445000,
+            frame_ids=["1772872445010_000123"],
+            facts=[
+                VisionFact(
+                    fact_id="fcsmc_final_go_result_visible",
+                    state="seen",
+                    source_frame_id="1772872445010_000123",
+                    expires_after_ms=600000,
+                    evidence_note="",
+                )
+            ],
+        ),
+        config=_DEFAULT_VISION_FACT_CONFIG,
+        now_wall_ms=1772872445000,
+    )
+
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "seen"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
+
+
 def test_merge_vision_fact_observation_downgrades_intermediate_pbit_go_from_seen() -> None:
     snapshot = merge_vision_fact_observation(
         {},
@@ -587,7 +612,7 @@ def test_extract_vision_fact_snapshot_ignores_invalid_result_kind_and_backfills_
     assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
 
 
-def test_extract_vision_fact_snapshot_does_not_backfill_final_go_from_only_fcsa_fcsb_go() -> None:
+def test_extract_vision_fact_snapshot_backfills_final_go_from_fcsa_fcsb_go() -> None:
     snapshot = extract_vision_fact_snapshot(
         [
             {
@@ -598,8 +623,8 @@ def test_extract_vision_fact_snapshot_does_not_backfill_final_go_from_only_fcsa_
         ]
     )
 
-    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "other"
-    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "not_seen"
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "seen"
 
 
 def test_extract_vision_fact_snapshot_strips_invalid_result_kind_when_note_cannot_backfill() -> None:
@@ -628,4 +653,5 @@ def test_extract_vision_fact_snapshot_strips_invalid_result_kind_without_evidenc
         ]
     )
 
-    assert "result_kind" not in snapshot["fcsmc_final_go_result_visible"]
+    assert snapshot["fcsmc_final_go_result_visible"]["result_kind"] == "final_go"
+    assert snapshot["fcsmc_final_go_result_visible"]["state"] == "seen"

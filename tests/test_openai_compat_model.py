@@ -16,6 +16,14 @@ from tests._fakes import (
 REAL_PACK_PATH = Path(__file__).resolve().parent.parent / "packs" / "fa18c_startup" / "pack.yaml"
 
 
+def _schema_contains_key(value, key: str) -> bool:
+    if isinstance(value, dict):
+        return key in value or any(_schema_contains_key(item, key) for item in value.values())
+    if isinstance(value, list):
+        return any(_schema_contains_key(item, key) for item in value)
+    return False
+
+
 def _attach_vision_context(
     request,
     *,
@@ -101,6 +109,9 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert call["json"]["response_format"]["type"] == "json_schema"
     assert call["json"]["response_format"]["json_schema"]["name"] == "HelpResponse"
     assert call["json"]["response_format"]["json_schema"]["strict"] is True
+    response_schema = call["json"]["response_format"]["json_schema"]["schema"]
+    for unsupported_key in ("uniqueItems", "allOf", "if", "then", "contains", "const"):
+        assert not _schema_contains_key(response_schema, unsupported_key)
     assert call["headers"]["Authorization"] == "Bearer sk-local"
     assert call["timeout"] == 15.0
     prompt_payload = _extract_prompt_constraints_json(call["json"]["messages"][1]["content"])
@@ -109,7 +120,7 @@ def test_explain_error_success_200_valid_help_response() -> None:
     assert prompt_payload["overlay_target_policy"]["mode"] == "single_target_preferred"
     assert prompt_payload["overlay_target_policy"]["max_targets"] == 1
     assert "uncertainty_policy" in prompt_payload
-    assert prompt_payload["decision_priority"][:2] == ["deterministic_step_hint", "gates_summary"]
+    assert prompt_payload["decision_priority"][:2] == ["state_harness", "gates_summary"]
 
 
 def test_explain_error_accepts_multiple_overlay_targets_when_enabled() -> None:
@@ -648,6 +659,7 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert res.status == "ok"
     assert res.metadata["multimodal_capability_enabled"] is True
     assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["main_help_multimodal_input_enabled"] is True
     assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
     assert res.metadata["multimodal_primary_frame_id"] == "1772872444950_000122"
     assert res.metadata["multimodal_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
@@ -668,6 +680,35 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert "base64," in content[1]["image_url"]["url"]
     assert "Primary visual frame: 1772872444950_000122" in content[2]["text"]
     assert "Trigger frame: 1772872445010_000123" in content[2]["text"]
+
+
+def test_openai_compat_can_keep_help_request_text_only_while_multimodal_is_enabled(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+        enable_help_multimodal=False,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert res.metadata["multimodal_capability_enabled"] is True
+    assert res.metadata["main_help_multimodal_input_enabled"] is False
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872445010_000123"]
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_image_count"] == 0
+    assert res.metadata["multimodal_path_attempted"] is False
+    request_payload = fake.calls[0]["json"]
+    assert isinstance(request_payload["messages"][1]["content"], str)
 
 
 def test_openai_compat_dashscope_qwen35_multimodal_uses_json_object_and_omits_max_tokens(tmp_path: Path) -> None:
@@ -759,6 +800,42 @@ def test_openai_compat_multimodal_failure_falls_back_to_text_only_and_records_me
     assert res.metadata["multimodal_path_success"] is False
     assert res.metadata["multimodal_fallback_to_text"] is True
     assert "Unknown field image_url" in res.metadata["multimodal_failure_reason"]
+
+
+def test_openai_compat_multimodal_5xx_falls_back_to_text_only_and_records_metadata(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(
+        responses=[
+            FakeResponse(
+                {"error": {"message": "Request failed with an internal error during generation"}},
+                status_code=500,
+            ),
+            FakeResponse(valid_payload, status_code=200),
+        ]
+    )
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert len(fake.calls) == 2
+    assert isinstance(fake.calls[0]["json"]["messages"][1]["content"], list)
+    assert isinstance(fake.calls[1]["json"]["messages"][1]["content"], str)
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_images_built"] is True
+    assert res.metadata["multimodal_path_attempted"] is True
+    assert res.metadata["multimodal_path_success"] is False
+    assert res.metadata["multimodal_fallback_to_text"] is True
+    assert "HTTP 500" in res.metadata["multimodal_failure_reason"]
 
 
 def test_openai_compat_does_not_fallback_to_text_only_for_non_multimodal_transport_errors(tmp_path: Path) -> None:

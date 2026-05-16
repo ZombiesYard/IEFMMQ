@@ -147,11 +147,13 @@ def test_enrich_bios_observation_includes_probe_state_for_s19_progression() -> N
     assert enriched.payload["vars"]["probe_switch_value"] == 1
     assert enriched.payload["vars"]["ext_refuel_probe_value"] == 65535
     assert enriched.payload["vars"]["probe_extended"] is True
-    assert enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert enriched.payload["vars"]["probe_retracted"] is False
+    assert enriched.payload["vars"]["probe_cycle_complete"] is False
     assert enriched.payload["vars"]["launch_bar_switch_value"] == 1
+    assert enriched.payload["vars"]["launch_bar_extended"] is True
 
 
-def test_enrich_bios_observation_latches_probe_cycle_complete_after_extension() -> None:
+def test_enrich_bios_observation_marks_probe_cycle_complete_after_retraction() -> None:
     extend_obs = Observation(
         source="dcs_bios",
         payload={
@@ -194,9 +196,41 @@ def test_enrich_bios_observation_latches_probe_cycle_complete_after_extension() 
         delta_stream_id="probe-cycle",
     )
 
-    assert extend_enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert extend_enriched.payload["vars"]["probe_extended"] is True
+    assert extend_enriched.payload["vars"]["probe_retracted"] is False
+    assert extend_enriched.payload["vars"]["probe_cycle_complete"] is False
     assert retract_enriched.payload["vars"]["probe_extended"] is False
+    assert retract_enriched.payload["vars"]["probe_retracted"] is True
     assert retract_enriched.payload["vars"]["probe_cycle_complete"] is True
+
+
+def test_enrich_bios_observation_maps_flap_switch_full_half_auto() -> None:
+    def _enriched_for_flap(value: int) -> Observation:
+        return enrich_bios_observation(
+            Observation(
+                source="dcs_bios",
+                payload={
+                    "seq": 47 + value,
+                    "t_wall": 210.0 + value,
+                    "bios": {"FLAP_SW": value},
+                    "delta": {"FLAP_SW": value},
+                },
+            ),
+            _resolver(),
+            mapper=_mapper(),
+        )
+
+    full = _enriched_for_flap(0).payload["vars"]
+    half = _enriched_for_flap(1).payload["vars"]
+    auto = _enriched_for_flap(2).payload["vars"]
+
+    assert full["flap_full"] is True
+    assert full["flap_auto"] is False
+    assert full["flap_configured"] is False
+    assert half["flap_half"] is True
+    assert half["flap_auto"] is False
+    assert auto["flap_auto"] is True
+    assert auto["flap_configured"] is True
 
 
 def test_enrich_bios_observation_supports_tag_hook_and_debug_cache() -> None:
@@ -596,6 +630,53 @@ def test_enrich_bios_observation_latches_momentary_lights_test_completion_within
     assert "lights_test_complete" not in second.payload["vars"]["vars_source_missing"]
 
 
+def test_enrich_bios_observation_requires_bleed_air_cycle_before_completion(monkeypatch) -> None:
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    initial_norm = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 505,
+            "t_wall": 14.0,
+            "bios": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 2},
+            "delta": {"BLEED_AIR_KNOB": 2},
+        },
+        metadata={"session_id": "sess-bleed-cycle"},
+    )
+    away_from_norm = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 506,
+            "t_wall": 15.0,
+            "bios": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 1},
+            "delta": {"BLEED_AIR_KNOB": 1},
+        },
+        metadata={"session_id": "sess-bleed-cycle"},
+    )
+    back_to_norm = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 507,
+            "t_wall": 16.0,
+            "bios": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 2},
+            "delta": {"BLEED_AIR_KNOB": 2},
+        },
+        metadata={"session_id": "sess-bleed-cycle"},
+    )
+
+    first = enrich_bios_observation(initial_norm, _resolver(), mapper=_mapper())
+    second = enrich_bios_observation(away_from_norm, _resolver(), mapper=_mapper())
+    third = enrich_bios_observation(back_to_norm, _resolver(), mapper=_mapper())
+
+    assert first.payload["vars"]["bleed_air_norm"] is True
+    assert first.payload["vars"]["bleed_air_cycle_complete"] is False
+    assert second.payload["vars"]["bleed_air_norm"] is False
+    assert second.payload["vars"]["bleed_air_cycle_complete"] is False
+    assert third.payload["vars"]["bleed_air_norm"] is True
+    assert third.payload["vars"]["bleed_air_cycle_complete"] is True
+
+
 def test_enrich_bios_observation_latched_momentary_completion_is_session_sticky_and_scoped(monkeypatch) -> None:
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
     monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
@@ -854,6 +935,109 @@ def test_enrich_bios_observation_restores_momentary_latches_across_process_resta
     assert second.payload["vars"]["takeoff_trim_set"] is True
 
 
+def test_enrich_bios_observation_restores_bleed_air_cycle_latch_across_process_restart(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch_path = tmp_path / "completion_latches.json"
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", latch_path)
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", True)
+
+    away_from_norm = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 534,
+            "t_wall": 62.0,
+            "bios": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 1},
+            "delta": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 1},
+        },
+        metadata={"session_id": "sess-persisted-bleed"},
+    )
+    back_to_norm = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 535,
+            "t_wall": 63.0,
+            "bios": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 2},
+            "delta": {"BLEED_AIR_KNOB": 2},
+        },
+        metadata={"session_id": "sess-persisted-bleed"},
+    )
+    restored = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 536,
+            "t_wall": 64.0,
+            "bios": {"BATTERY_SW": 2, "BLEED_AIR_KNOB": 2},
+            "delta": {"BATTERY_SW": 2},
+        },
+        metadata={"session_id": "sess-persisted-bleed"},
+    )
+
+    enrich_bios_observation(away_from_norm, _resolver(), mapper=_mapper())
+    completed = enrich_bios_observation(back_to_norm, _resolver(), mapper=_mapper())
+    assert completed.payload["vars"]["bleed_air_cycle_complete"] is True
+    assert latch_path.exists()
+
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", False)
+
+    second_process = enrich_bios_observation(restored, _resolver(), mapper=_mapper())
+    assert second_process.payload["vars"]["bleed_air_cycle_complete"] is True
+
+
+def test_enrich_bios_observation_keeps_persisted_latches_when_restart_frame_has_late_progress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    latch_path = tmp_path / "completion_latches.json"
+    latch_path.write_text(
+        json.dumps(
+            {
+                "sess-restarted-simtutor": {
+                    "fire_test_complete": True,
+                    "lights_test_complete": True,
+                    "ins_fast_align_complete": True,
+                    "bleed_air_cycle_left_norm": True,
+                    "bleed_air_cycle_complete": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_PATH", latch_path)
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES", OrderedDict())
+    monkeypatch.setattr(telemetry_pipeline, "_COMPLETION_LATCHES_LOADED", False)
+
+    restarted_mid_session = Observation(
+        source="dcs_bios",
+        payload={
+            "seq": 537,
+            "t_wall": 65.0,
+            "bios": {
+                "BATTERY_SW": 1,
+                "IFEI_RPM_R": "64",
+                "BLEED_AIR_KNOB": 2,
+                "FIRE_TEST_SW": 1,
+                "LIGHTS_TEST_SW": 0,
+                "MPCD_PB_19": 0,
+            },
+            "delta": {"BATTERY_SW": 1},
+        },
+        metadata={"session_id": "sess-restarted-simtutor"},
+    )
+
+    enriched = enrich_bios_observation(restarted_mid_session, _resolver(), mapper=_mapper())
+    vars_out = enriched.payload["vars"]
+    assert vars_out["battery_on"] is False
+    assert vars_out["rpm_r_gte_60"] is True
+    assert vars_out["fire_test_complete"] is True
+    assert vars_out["lights_test_complete"] is True
+    assert vars_out["ins_fast_align_complete"] is True
+    assert vars_out["bleed_air_cycle_complete"] is True
+
+
 def test_enrich_bios_observation_clears_persisted_momentary_latches_on_cold_start(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -865,6 +1049,8 @@ def test_enrich_bios_observation_clears_persisted_momentary_latches_on_cold_star
                 "sess-cold-start-clear": {
                     "fcs_reset_complete": True,
                     "takeoff_trim_set": True,
+                    "bleed_air_cycle_left_norm": True,
+                    "bleed_air_cycle_complete": True,
                 }
             }
         ),
@@ -879,7 +1065,7 @@ def test_enrich_bios_observation_clears_persisted_momentary_latches_on_cold_star
         payload={
             "seq": 532,
             "t_wall": 60.0,
-            "bios": {"BATTERY_SW": 1, "FCS_RESET_BTN": 0, "TO_TRIM_BTN": 0},
+            "bios": {"BATTERY_SW": 1, "FCS_RESET_BTN": 0, "TO_TRIM_BTN": 0, "BLEED_AIR_KNOB": 2},
             "delta": {"BATTERY_SW": 1},
         },
         metadata={"session_id": "sess-cold-start-clear"},
@@ -889,6 +1075,7 @@ def test_enrich_bios_observation_clears_persisted_momentary_latches_on_cold_star
     assert enriched.payload["vars"]["battery_on"] is False
     assert enriched.payload["vars"]["fcs_reset_complete"] is False
     assert enriched.payload["vars"]["takeoff_trim_set"] is False
+    assert enriched.payload["vars"]["bleed_air_cycle_complete"] is False
 
 
 def test_save_completion_latches_skips_non_regular_path(

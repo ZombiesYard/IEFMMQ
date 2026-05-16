@@ -43,6 +43,22 @@ MAX_RAG_SNIPPET_CHARS = 220
 # Keep only the highest-signal overlay candidates so policy hints stay useful
 # without bloating the prompt when recent UI/delta lists are noisy.
 MAX_PRIORITY_OVERLAY_TARGETS = 8
+EARLY_STEP_IDS = {"S01", "S02", "S03"}
+LATE_DISPLAY_ANCHOR_FACTS = {
+    "tac_page_visible",
+    "supt_page_visible",
+    "fcs_page_visible",
+    "bit_root_page_visible",
+    "fcsmc_page_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_final_go_result_visible",
+    "hsi_page_visible",
+    "hsi_map_layer_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
+}
+HARNESS_LATE_VLM_CONFLICT = "early_step_from_telemetry_vs_late_display_from_vlm"
 
 _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.apu_on": ("apu_switch",),
@@ -928,6 +944,186 @@ def _extract_priority_var_keys_from_hint(deterministic_step_hint: Mapping[str, A
     return out
 
 
+def _string_items(raw: Any) -> list[str]:
+    if not isinstance(raw, (list, tuple, set)):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str) or not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def _build_visual_candidate_steps(anchor_ids: set[str]) -> list[str]:
+    candidates: list[str] = []
+    if {"tac_page_visible", "bit_root_page_visible"}.intersection(anchor_ids):
+        candidates.extend(["S08", "S09"])
+    if {"ins_grnd_alignment_text_visible", "ins_ok_text_visible", "hsi_page_visible", "hsi_map_layer_visible"}.intersection(anchor_ids):
+        candidates.extend(["S12", "S13"])
+    if {"fcsmc_page_visible", "fcsmc_in_test_visible", "fcsmc_intermediate_result_visible", "fcsmc_final_go_result_visible"}.intersection(anchor_ids):
+        candidates.extend(["S18", "S19", "S20"])
+    return _string_items(candidates)
+
+
+def build_state_harness(context: Mapping[str, Any]) -> dict[str, Any]:
+    vars_raw = context.get("vars")
+    vars_map = vars_raw if isinstance(vars_raw, Mapping) else {}
+    missing_sources = _string_items(vars_map.get("vars_source_missing"))
+    missing_count = len(missing_sources)
+    seq = None
+    vision_raw = context.get("vision")
+    if isinstance(vision_raw, Mapping):
+        raw_seq = vision_raw.get("observation_seq")
+        if isinstance(raw_seq, int) and not isinstance(raw_seq, bool):
+            seq = raw_seq
+
+    bootstrap_like = (
+        missing_count >= 20
+        or (isinstance(seq, int) and seq <= 3)
+        or (
+            vars_map.get("battery_on") is False
+            and vars_map.get("power_available") is False
+            and missing_count >= 8
+        )
+    )
+    telemetry_status = "low_confidence_bootstrap" if bootstrap_like else "nominal"
+
+    vision_summary_raw = context.get("vision_fact_summary")
+    vision_summary = vision_summary_raw if isinstance(vision_summary_raw, Mapping) else {}
+    seen_ids = set(_string_items(vision_summary.get("seen_fact_ids")))
+    fresh_ids = set(_string_items(vision_summary.get("fresh_fact_ids")))
+    not_seen_ids = set(_string_items(vision_summary.get("not_seen_fact_ids")))
+    late_anchors = sorted((seen_ids | fresh_ids).intersection(LATE_DISPLAY_ANCHOR_FACTS))
+    visual_candidates = _build_visual_candidate_steps(set(late_anchors))
+
+    deterministic_raw = context.get("deterministic_step_hint")
+    deterministic = deterministic_raw if isinstance(deterministic_raw, Mapping) else {}
+    deterministic_step = deterministic.get("inferred_step_id")
+    deterministic_missing = _string_items(deterministic.get("missing_conditions"))
+
+    conflicts: list[str] = []
+    if isinstance(deterministic_step, str) and deterministic_step in EARLY_STEP_IDS and len(late_anchors) >= 2:
+        conflicts.append(HARNESS_LATE_VLM_CONFLICT)
+
+    gates_raw = context.get("gates")
+    gates = gates_raw if isinstance(gates_raw, Mapping) else {}
+    blocked_gates = [
+        key for key, value in gates.items()
+        if isinstance(key, str) and isinstance(value, Mapping) and value.get("status") == "blocked"
+    ][:8]
+    recent_actions_raw = context.get("recent_actions")
+    recent_actions = recent_actions_raw if isinstance(recent_actions_raw, Mapping) else {}
+
+    return {
+        "telemetry_evidence": {
+            "source_status": telemetry_status,
+            "confidence": "low" if telemetry_status != "nominal" else "medium",
+            "observation_seq": seq,
+            "vars_source_missing_count": missing_count,
+            "early_vars": {
+                key: vars_map.get(key)
+                for key in ("battery_on", "power_available", "fire_test_a_complete", "fire_test_b_complete")
+                if key in vars_map
+            },
+        },
+        "vision_evidence": {
+            "source_status": vision_summary.get("status", "vision_unavailable"),
+            "confidence": "high" if late_anchors else "medium",
+            "late_display_anchors": late_anchors,
+            "visual_candidate_steps": visual_candidates,
+            "seen_fact_ids": sorted(seen_ids)[:12],
+            "fresh_fact_ids": sorted(fresh_ids)[:12],
+            "not_seen_fact_ids": sorted(not_seen_ids)[:12],
+        },
+        "gate_evidence": {
+            "blocked_gate_ids": blocked_gates,
+            "blocked_gate_count": len(blocked_gates),
+        },
+        "recent_action_evidence": {
+            "recent_buttons": _string_items(recent_actions.get("recent_buttons"))[:8],
+            "source_status": "available" if recent_actions else "empty",
+        },
+        "deterministic_candidate": {
+            "step_id": deterministic_step if isinstance(deterministic_step, str) else None,
+            "overlay_step_id": deterministic.get("overlay_step_id") if isinstance(deterministic.get("overlay_step_id"), str) else None,
+            "missing_conditions": deterministic_missing,
+            "role": "candidate_not_authoritative",
+        },
+        "conflicts": conflicts,
+    }
+
+
+def _harness_conflicts_with_early_deterministic(state_harness: Mapping[str, Any]) -> bool:
+    conflicts = state_harness.get("conflicts")
+    return isinstance(conflicts, list) and HARNESS_LATE_VLM_CONFLICT in conflicts
+
+
+def _reprioritize_candidate_steps_for_harness(candidate_steps: list[str], state_harness: Mapping[str, Any]) -> list[str]:
+    if not _harness_conflicts_with_early_deterministic(state_harness):
+        return candidate_steps
+    vision_evidence = state_harness.get("vision_evidence")
+    if not isinstance(vision_evidence, Mapping):
+        return candidate_steps
+    visual_candidates = _string_items(vision_evidence.get("visual_candidate_steps"))
+    prioritized = [step for step in visual_candidates if step in candidate_steps]
+    return [*prioritized, *[step for step in candidate_steps if step not in set(prioritized)]]
+
+
+def _build_state_harness_prompt_payload(state_harness: Mapping[str, Any], *, compact: bool = False) -> dict[str, Any]:
+    telemetry_raw = state_harness.get("telemetry_evidence")
+    telemetry = telemetry_raw if isinstance(telemetry_raw, Mapping) else {}
+    vision_raw = state_harness.get("vision_evidence")
+    vision = vision_raw if isinstance(vision_raw, Mapping) else {}
+    deterministic_raw = state_harness.get("deterministic_candidate")
+    deterministic = deterministic_raw if isinstance(deterministic_raw, Mapping) else {}
+    payload: dict[str, Any] = {
+        "conflicts": list(state_harness.get("conflicts", []))
+        if isinstance(state_harness.get("conflicts"), list)
+        else [],
+        "telemetry_evidence": {
+            "source_status": telemetry.get("source_status"),
+            "confidence": telemetry.get("confidence"),
+            "observation_seq": telemetry.get("observation_seq"),
+            "vars_source_missing_count": telemetry.get("vars_source_missing_count"),
+        },
+        "vision_evidence": {
+            "source_status": vision.get("source_status"),
+            "confidence": vision.get("confidence"),
+            "late_display_anchors": _string_items(vision.get("late_display_anchors"))[:8],
+            "visual_candidate_steps": _string_items(vision.get("visual_candidate_steps"))[:6],
+        },
+        "deterministic_candidate": {
+            "step_id": deterministic.get("step_id"),
+            "overlay_step_id": deterministic.get("overlay_step_id"),
+            "role": deterministic.get("role"),
+        },
+    }
+    if not compact:
+        payload["telemetry_evidence"]["early_vars"] = telemetry.get("early_vars", {})
+        payload["vision_evidence"]["seen_fact_ids"] = _string_items(vision.get("seen_fact_ids"))[:8]
+        payload["vision_evidence"]["fresh_fact_ids"] = _string_items(vision.get("fresh_fact_ids"))[:8]
+        payload["vision_evidence"]["not_seen_fact_ids"] = _string_items(vision.get("not_seen_fact_ids"))[:8]
+        payload["deterministic_candidate"]["missing_conditions"] = _string_items(
+            deterministic.get("missing_conditions")
+        )[:6]
+        gate_raw = state_harness.get("gate_evidence")
+        gate = gate_raw if isinstance(gate_raw, Mapping) else {}
+        recent_raw = state_harness.get("recent_action_evidence")
+        recent = recent_raw if isinstance(recent_raw, Mapping) else {}
+        payload["gate_evidence"] = {
+            "blocked_gate_ids": _string_items(gate.get("blocked_gate_ids"))[:6],
+            "blocked_gate_count": gate.get("blocked_gate_count"),
+        }
+        payload["recent_action_evidence"] = {
+            "source_status": recent.get("source_status"),
+            "recent_buttons": _string_items(recent.get("recent_buttons"))[:6],
+        }
+    return payload
+
+
 def _build_evidence_sources(
     selected_vars: Mapping[str, Any],
     gates_summary: list[dict[str, Any]],
@@ -1084,7 +1280,10 @@ def _build_multimodal_input_payload(context: Mapping[str, Any]) -> dict[str, Any
     if not isinstance(vision, Mapping):
         return {"attached": False}
     frame_ids = [item for item in vision.get("frame_ids", []) if isinstance(item, str) and item]
-    attached = bool(vision.get("vision_used")) or bool(frame_ids)
+    if "main_help_multimodal_attached" in vision:
+        attached = bool(vision.get("main_help_multimodal_attached"))
+    else:
+        attached = bool(vision.get("vision_used")) or bool(frame_ids)
     payload: dict[str, Any] = {"attached": attached}
     if frame_ids:
         payload["frame_ids"] = frame_ids[:2]
@@ -1195,6 +1394,18 @@ def build_help_prompt_result(
     )
     uncertainty_policy = _build_uncertainty_policy(deterministic_step_hint)
     vision_fact_summary = _build_vision_fact_summary_payload(context)
+    state_harness = (
+        dict(context.get("state_harness"))
+        if isinstance(context.get("state_harness"), Mapping)
+        else build_state_harness(
+            {
+                **dict(context),
+                "deterministic_step_hint": deterministic_step_hint,
+                "vision_fact_summary": vision_fact_summary,
+            }
+        )
+    )
+    candidate_steps = _reprioritize_candidate_steps_for_harness(candidate_steps, state_harness)
     multimodal_input = _build_multimodal_input_payload(context)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
@@ -1233,14 +1444,14 @@ def build_help_prompt_result(
             "视觉事实 ID（如 fcs_page_visible、fcsmc_page_visible、bit_root_page_visible 等 VISION_FACTS 中的 fact_id）是 VLM 对页面状态的标注，不是座舱可高亮的 UI 控件。overlay.targets 只能选择 allowed_overlay_targets 中的 UI 控件名（如 fcs_bit_switch、right_mdi_pb5、left_mdi_pb15 等），严禁将视觉事实 ID 作为 overlay target。",
             "使用视觉证据时，ref 必须逐字匹配 allowed_evidence_refs 里的完整条目；若 allowed_evidence_refs 给的是带 @frame_id 的 VISION_FACTS.fact_id@frame_id，就必须原样引用，不能省略 @frame_id。",
             "不得自造新的 visual fact 名称或同义词；例如右 DDI 的 BIT FAILURES/root 页面只能使用 bit_root_page_visible，不能写 right_ddi_bit_failures_page_visible 一类别名。",
-            "若 multimodal_input.attached=true 且 vision_fact_summary.status=vision_unavailable，可直接依据已附带图像判断 diagnosis/next 与单目标 overlay；若当前没有 VISION_FACTS.* ref，可改用 gate/rag 作为 evidence，不得仅因“缺少视觉 refs”就拒绝给出可操作目标。",
+            "主 help LLM 默认不直接接收图像；视觉判断只能使用 vision_fact_summary 与 VISION_FACTS.* 结构化证据。若 vision_fact_summary.status=vision_not_required，说明当前步骤不需要调用 VLM，并非视觉或网络失败。",
             "若左 DDI 仍在 TAC 页、STATUS/TAC 一类页面，或只看到 PB18/MENU 导航而没有看到 FCS 页面标签，则不能直接指导按 PB15 进入 FCS 页；此时应先按 PB18 切到 SUPT 页，再找 FCS。",
             "若当前步骤是把左右油门杆从 OFF 推到 IDLE（如 S05/S11），不要把 throttle_quadrant_reference 当成可点击的真实操纵杆，也不要指导用户操作油门阻力调节杆；该参考点只能表示油门区域。若无法高亮真实油门杆，应直接用文字说明键位：左油门 Right Alt+Home，右油门 Right Shift+Home。",
             "S08、S18 与 S19 的右 DDI 页面阶段由 VLM 的视觉事实标注区分：bit_root_page_visible 对应 BIT root 页面；fcsmc_page_visible 表示已经进入 FCS-MC 页面；fcsmc_in_test_visible、fcsmc_intermediate_result_visible、fcsmc_final_go_result_visible 表示 S19 FCS BIT 运行阶段。信任 VLM 的标注；当 VLM 返回 state='uncertain' 时，结合 VARS 与 gates_summary 判断。",
             "对于 FCS RESET：信任 VLM 的 fcs_page_x_marks_visible 标注来判断 FCS 页面内 X/故障填充状态。若 fcs_page_x_marks_visible=seen 且 fcs_page_visible=seen，说明 FCS 页面仍有 X 填充，reset 可能未完成。同时可用 fcs_page_x_marks_visible 辅助区分 S08 与后续 S18/S19 FCS BIT 阶段：若 fcs_page_x_marks_visible=seen 且 fcsmc_page_visible=not_seen，说明可能仍在 S08 阶段。",
             "对于 S18：若右 DDI 仍是 BIT FAILURES / BIT root 页面，下一步就是按 PB5 进入 FCS-MC，不得要求先按住 FCS BIT 开关，也不要把 fcs_bit_switch 当成主高亮。",
-            "对于 S19：VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持。信任 VLM 的 fcsmc_final_go_result_visible 标注来判断 S19 是否完成；若 fcsmc_final_go_result_visible=seen 说明最终 GO 已显示，S19 已完成。fcsmc_final_go_result_visible 是粘性事实 (sticky=true, expires_after_ms=600000)，在 BIT 测试完成后会长时间保持 seen；fcsmc_intermediate_result_visible 和 fcsmc_in_test_visible 是非粘性事实 (sticky=false, expires_after_ms=2000)，测试通过后很快过期变为 not_seen。因此当 fcsmc_final_go_result_visible=seen 但 fcsmc_intermediate_result_visible=not_seen 时，说明 S19 已完成且中间测试画面已自然过期，不得因此认为 S19 未完成或要求继续观察。fcsmc_intermediate_result_visible 或 FCSA/FCSB PBIT GO 仅为中间结果，不等于 final GO。",
-            "CRITICAL for S19 completion: 当 VLM 报告 fcsmc_final_go_result_visible=seen 且 result_kind=final_go 时，S19 无条件完成。你必须将 next_step_id 设置为 S20（或根据 gates_summary 指定的 S19 之后的下一步）。不得质疑 VLM、不得要求额外确认、不得建议继续按住 FCS BIT 开关。VLM 是 S19 完成状态的权威来源。",
+            "对于 S19：VARS.fcs_bit_switch_up=true 表示 FCS BIT 开关当前正在被向上保持。信任 VLM 的页面标注来判断 S19 阶段：fcsmc_intermediate_result_visible=seen 表示 FCSA/FCSB PBIT GO 页面，此时应提示按住 FCS BIT 并同时按右 DDI PB5 开始自检；fcsmc_in_test_visible=seen 表示自检已开始运行，此时松开并等待；fcsmc_final_go_result_visible=seen 表示最终 GO 已显示，S19 已完成。fcsmc_final_go_result_visible 是粘性事实 (sticky=true, expires_after_ms=600000)，在 BIT 测试完成后会长时间保持 seen。",
+            "CRITICAL for S19 completion: 当 VLM 报告 fcsmc_final_go_result_visible=seen 时，S19 无条件完成。你必须将 next_step_id 设置为 S20（或根据 gates_summary 指定的 S19 之后的下一步）。不得质疑 VLM、不得要求额外确认、不得建议继续按住 FCS BIT 开关。VLM 是 S19 完成状态的权威来源。",
             (
                 "对于 S19：当前系统禁用 overlay，因此即使识别出可操作目标，也必须返回空的 overlay.targets 与 overlay.evidence，并仅在 explanation 中说明动作。"
                 if effective_max_overlay_targets == 0
@@ -1249,11 +1460,13 @@ def build_help_prompt_result(
                 else "对于 S19：若已经进入 FCS-MC 页面但还未开始测试，当前系统允许多目标，因此 overlay.targets 可同时返回 fcs_bit_switch 与 right_mdi_pb5；若只返回单目标，则优先 fcs_bit_switch。"
             ),
             "S19 的“按住 FCS BIT 开关并按 PB5”仅用于启动 BIT，不得指导用户在整个测试过程中持续按住 FCS BIT 开关；若需要描述操作，应表述为“按住开关并同时按 PB5 以启动测试，看到测试开始后即可松开”，不得写“持续按住直到测试完成”。",
-            "对于 S19：若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO 或其他明显测试进行中/中间结果，说明测试已经开始；即使此时 VARS.fcs_bit_switch_up=false，也不能仅凭该变量退回去要求重新按住开关。",
+            "对于 S19：若页面已显示 IN TEST，说明测试已经开始；即使此时 VARS.fcs_bit_switch_up=false，也不能仅凭该变量退回去要求重新按住开关。若页面显示 FCSA/FCSB PBIT GO（fcsmc_intermediate_result_visible=seen），不要说等待最终 GO，应提示按住 FCS BIT 并同时按右 DDI PB5 开始自检。",
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S19 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，字段顺序固定为 target,type,ref,quote,grounding_confidence，type 必须与 ref 前缀匹配，quote 最长 120 字符，且 ref 必须逐字匹配 allowed_evidence_refs 中的完整条目（含 @frame_id）。若证据不足，返回空 targets 和空 evidence。",
-            "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
-            "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应使用 deterministic_step_hint.inferred_step_id（通常为 S26），不要猜测别的步骤；overlay 应为空，explanation 应明确说明流程已完成。",
+            "state_harness 是证据裁决包；deterministic_step_hint 只是候选，不是最终裁判。",
+            "若 state_harness.conflicts 含 early_step_from_telemetry_vs_late_display_from_vlm，不得仅因 battery_on=false/早期 latch=false 输出 S01/S02/S03；说明 telemetry 可能是首帧或未恢复，选择视觉一致步骤或要求确认。",
+            "若 VLM fresh/seen 含 tac_page_visible+bit_root_page_visible 且 fcs_page_visible=not_seen，按 S08 恢复：左 DDI TAC -> SUPT/FCS，不退回电瓶、Fire Test 或 APU。",
+            "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应使用 deterministic_step_hint.inferred_step_id（通常为 S33），不要猜测别的步骤；overlay 应为空，explanation 应明确说明流程已完成。",
             "若 deterministic_step_hint.requires_visual_confirmation=false 且 deterministic_step_hint.observability_status=observable，应优先依据 gates_summary、current_vars_selected 与 missing_conditions 作为主要理由；同时必须参考 vision_fact_summary 中的 seen/not_seen 标注：若 any_fact_seen=false（全部视觉事实均为 not_seen），说明屏幕可能未亮或页面完全不匹配，必须在 explanation 中明确指出。",
             (
                 "若 uncertainty_policy.partial 生效：可以沿 deterministic_step_hint 给 diagnosis/next，但 explanation 必须明确要求确认；当前系统禁用 overlay，因此仍必须返回空 targets 与空 evidence。"
@@ -1288,14 +1501,14 @@ def build_help_prompt_result(
             "Visual fact IDs (such as fcs_page_visible, fcsmc_page_visible, bit_root_page_visible) are VLM page-state labels, NOT cockpit UI controls. overlay.targets must only use UI control names from allowed_overlay_targets (e.g., fcs_bit_switch, right_mdi_pb5, left_mdi_pb15). Never use a visual fact ID as an overlay target.",
             "When using visual evidence, the ref must exactly match a full entry from allowed_evidence_refs. If the allowed VISION_FACTS ref includes an @frame_id suffix, copy that exact suffix and do not omit it.",
             "Do not invent new visual fact names or synonyms. For example, the right-DDI BIT FAILURES/root page must use bit_root_page_visible, not aliases such as right_ddi_bit_failures_page_visible.",
-            "If multimodal_input.attached=true and vision_fact_summary.status=vision_unavailable, you may still use the attached image for diagnosis/next and a single overlay target. When no VISION_FACTS.* ref is available, support the overlay with the strongest gate/rag ref instead of refusing solely because visual refs are missing.",
+            "The main help LLM does not receive cockpit images by default; use only vision_fact_summary and VISION_FACTS.* as structured visual evidence. If vision_fact_summary.status=vision_not_required, the current step does not require a VLM call; it is not a vision or network failure.",
             "If the left DDI is still on TAC, STATUS/TAC, or only shows PB18/MENU navigation without an actual visible FCS page label, do not instruct PB15 yet; press PB18 first to reach the SUPT page, then select FCS.",
             "If the current step is moving a throttle from OFF to IDLE (such as S05/S11), do not treat throttle_quadrant_reference as the actual throttle lever and do not instruct the user to operate the friction-adjusting lever. It is only a region reference. If the real throttle lever cannot be highlighted, give explicit keyboard guidance instead: left throttle Right Alt+Home, right throttle Right Shift+Home.",
             "S08, S18, and S19 right-DDI page stages are distinguished by the VLM's visual fact labels: bit_root_page_visible for the BIT root page, fcsmc_page_visible for having entered FCS-MC, and fcsmc_in_test_visible/fcsmc_intermediate_result_visible/fcsmc_final_go_result_visible for the S19 FCS BIT run stages. Trust the VLM's labels; when the VLM returns state='uncertain', reason from VARS and gates_summary.",
             "For FCS RESET: trust the VLM's fcs_page_x_marks_visible label to judge X/fault-fill status inside the FCS page. If fcs_page_x_marks_visible=seen and fcs_page_visible=seen, the FCS page still shows X fills and reset may be incomplete. Also use fcs_page_x_marks_visible to help distinguish S08 from later S18/S19 FCS BIT stages: if fcs_page_x_marks_visible=seen and fcsmc_page_visible=not_seen, the user may still be in S08.",
             "For S18, if the right DDI is still on the BIT FAILURES / BIT root page, the next action is PB5 to enter FCS-MC. Do not ask the user to hold the FCS BIT switch first, and do not make fcs_bit_switch the primary overlay on the root page.",
-            "For S19, VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up. Trust the VLM's fcsmc_final_go_result_visible label to decide whether S19 is complete; if fcsmc_final_go_result_visible=seen, the final GO is visible and S19 is complete. fcsmc_final_go_result_visible is sticky (sticky=true, expires_after_ms=600000), so it persists long after the BIT completes; fcsmc_intermediate_result_visible and fcsmc_in_test_visible are non-sticky (sticky=false, expires_after_ms=2000), so they naturally expire to not_seen after the test passes. When fcsmc_final_go_result_visible=seen but fcsmc_intermediate_result_visible=not_seen, S19 is complete and the intermediate screens have simply expired — do not treat this as S19 being incomplete. fcsmc_intermediate_result_visible or FCSA/FCSB PBIT GO means intermediate results, not final GO.",
-            "CRITICAL for S19 completion: When VLM reports fcsmc_final_go_result_visible=seen with result_kind=final_go, S19 is COMPLETE unconditionally. You MUST set next_step_id to S20 (or the next step after S19 based on gates_summary). Do NOT question the VLM, do NOT ask for additional confirmation, do NOT suggest holding FCS BIT longer. The VLM is the authoritative source for S19 completion.",
+            "For S19, VARS.fcs_bit_switch_up=true means the FCS BIT switch is currently being held up. Trust the VLM page labels for the S19 stage: fcsmc_intermediate_result_visible=seen means the FCSA/FCSB PBIT GO page is visible, so instruct the user to hold FCS BIT while pressing Right DDI PB5 to start the BIT; fcsmc_in_test_visible=seen means the BIT is running, so release and wait; fcsmc_final_go_result_visible=seen means the final GO is visible and S19 is complete. fcsmc_final_go_result_visible is sticky (sticky=true, expires_after_ms=600000), so it persists long after the BIT completes.",
+            "CRITICAL for S19 completion: When VLM reports fcsmc_final_go_result_visible=seen, S19 is COMPLETE unconditionally. You MUST set next_step_id to S20 (or the next step after S19 based on gates_summary). Do NOT question the VLM, do NOT ask for additional confirmation, do NOT suggest holding FCS BIT longer. The VLM is the authoritative source for S19 completion.",
             (
                 "For S19, overlay is disabled for this request. Even if you identify the next control correctly, keep overlay.targets=[] and overlay.evidence=[] and explain the action in text only."
                 if effective_max_overlay_targets == 0
@@ -1304,11 +1517,13 @@ def build_help_prompt_result(
                 else "For S19, once the right DDI has entered the FCS-MC page but before the BIT has started, multi-target overlay is allowed, so overlay.targets may include both fcs_bit_switch and right_mdi_pb5 together; if you return only one target, prefer fcs_bit_switch."
             ),
             "For S19, 'hold FCS BIT and press PB5' is only the BIT start action. Do not instruct the user to keep holding the FCS BIT switch for the entire test. If you describe the action, say to hold the switch while pressing PB5 to start the test, then release it once the BIT has started; never say 'hold it until the test completes'.",
-            "For S19, if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO, or another obvious test-in-progress/intermediate state, the BIT has already started. Even if VARS.fcs_bit_switch_up=false at that moment, do not regress to telling the user to hold the switch again based on that variable alone.",
+            "For S19, if the page already shows IN TEST, the BIT has already started. Even if VARS.fcs_bit_switch_up=false at that moment, do not regress to telling the user to hold the switch again based on that variable alone. If the page shows FCSA/FCSB PBIT GO (fcsmc_intermediate_result_visible=seen), do not say to wait for final GO; instruct the user to hold FCS BIT while pressing Right DDI PB5 to start the BIT.",
             "Never use VARS.fcs_bit_switch_up by itself to decide which S19 page/state the user is on. Combine it with the VLM visual fact labels.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence in that exact field order. The type must match the ref prefix, quote length must be <= 120 chars, and the ref must exactly match a full entry from allowed_evidence_refs (including any @frame_id suffix). If not enough evidence, return empty targets and empty evidence.",
-            "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
-            "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Use deterministic_step_hint.inferred_step_id (typically S26) for diagnosis.step_id and next.step_id, do not guess a different step, keep overlay empty, and make the explanation explicitly say the procedure is complete.",
+            "state_harness arbitrates evidence; deterministic_step_hint is a candidate, not final authority.",
+            "If state_harness.conflicts has early_step_from_telemetry_vs_late_display_from_vlm, do not output S01/S02/S03 from battery_on=false/early latches=false; say telemetry may be stale and choose VLM-consistent step or ask confirmation.",
+            "If VLM fresh/seen has tac_page_visible+bit_root_page_visible and fcs_page_visible=not_seen, do S08 recovery: Left DDI TAC -> SUPT/FCS.",
+            "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Use deterministic_step_hint.inferred_step_id (typically S33) for diagnosis.step_id and next.step_id, do not guess a different step, keep overlay empty, and make the explanation explicitly say the procedure is complete.",
             "If deterministic_step_hint.requires_visual_confirmation=false and deterministic_step_hint.observability_status=observable, use gates_summary, current_vars_selected, and missing_conditions as the primary evidence. Also check vision_fact_summary.any_fact_seen: if any_fact_seen=false (all visual facts are not_seen), the displays may be off or the pages do not match, and you MUST state this clearly in the explanation.",
             (
                 "If uncertainty_policy.partial applies, you may use deterministic_step_hint for diagnosis/next, but the explanation must explicitly ask for confirmation; overlay is disabled, so keep overlay.targets=[] and overlay.evidence=[]."
@@ -1414,9 +1629,10 @@ def build_help_prompt_result(
             "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
             "decision_priority": [
-                "deterministic_step_hint",
+                "state_harness",
                 "gates_summary",
                 "vision_fact_summary",
+                "deterministic_step_hint",
                 "overlay_target_policy",
                 "recent_actions_signal",
                 "recent_deltas_summary",
@@ -1429,6 +1645,7 @@ def build_help_prompt_result(
             "gates_summary": gates_summary,
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
+            "state_harness": _build_state_harness_prompt_payload(state_harness),
             "deterministic_step_hint": deterministic_step_hint,
             "vision_fact_summary": vision_fact_summary,
             "multimodal_input": multimodal_input,
@@ -1536,13 +1753,20 @@ def build_help_prompt_result(
                 compact_rag_snippets,
                 rag_input_count=rag_input_count,
             )
+            compact_state_harness = _build_state_harness_prompt_payload(state_harness, compact=True)
+            compact_harness_has_signal = bool(
+                compact_state_harness.get("conflicts")
+                or compact_state_harness.get("vision_evidence", {}).get("late_display_anchors")
+                or compact_state_harness.get("vision_evidence", {}).get("visual_candidate_steps")
+                or compact_state_harness.get("telemetry_evidence", {}).get("source_status") == "low_confidence_bootstrap"
+            )
+            compact_decision_priority = ["gates_summary", "deterministic_step_hint"]
+            if compact_harness_has_signal:
+                compact_decision_priority.insert(0, "state_harness")
             compact_payload = {
                 "allowed_step_ids": candidate_steps[:3],
                 "allowed_overlay_targets": overlay_targets,
-                "decision_priority": [
-                    "deterministic_step_hint",
-                    "gates_summary",
-                ],
+                "decision_priority": compact_decision_priority,
                 "gates_summary": gates_summary,
                 "deterministic_step_hint": compact_hint,
                 "multimodal_input": {"attached": bool(multimodal_input.get("attached"))},
@@ -1557,6 +1781,8 @@ def build_help_prompt_result(
                 },
                 "allowed_evidence_refs": compact_allowed_refs,
             }
+            if compact_harness_has_signal:
+                compact_payload["state_harness"] = compact_state_harness
             compact_visual_refs = [ref for ref in compact_allowed_refs if isinstance(ref, str) and ref.startswith("VISION_FACTS.")]
             if compact_rag_snippets:
                 compact_payload["decision_priority"].append("EVIDENCE_SOURCES.RAG_SNIPPETS")
@@ -1646,6 +1872,18 @@ def build_help_prompt_result(
         "grounding_reason": grounding_payload["reason"],
         "vision_fact_status": vision_fact_summary["status"],
         "vision_fact_seen_ids": list(vision_fact_summary.get("seen_fact_ids", [])),
+        "state_harness_conflicts": list(state_harness.get("conflicts", [])) if isinstance(state_harness.get("conflicts"), list) else [],
+        "state_harness_telemetry_status": (
+            state_harness.get("telemetry_evidence", {}).get("source_status")
+            if isinstance(state_harness.get("telemetry_evidence"), Mapping)
+            else None
+        ),
+        "state_harness_visual_candidate_steps": (
+            list(state_harness.get("vision_evidence", {}).get("visual_candidate_steps", []))
+            if isinstance(state_harness.get("vision_evidence"), Mapping)
+            and isinstance(state_harness.get("vision_evidence", {}).get("visual_candidate_steps"), list)
+            else []
+        ),
         "multimodal_input_attached": bool(multimodal_input.get("attached")),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
@@ -1661,6 +1899,8 @@ __all__ = [
     "MAX_PROMPT_CHARS",
     "MAX_PROMPT_TOKENS_EST",
     "PromptBuildResult",
+    "HARNESS_LATE_VLM_CONFLICT",
+    "build_state_harness",
     "build_help_prompt",
     "build_help_prompt_result",
 ]

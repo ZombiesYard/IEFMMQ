@@ -184,14 +184,68 @@ steps:
 - step_id: S20
   phase: P5
   phase_label: FCS & flight controls
-  official_description: Four down test. Cycle/test the refueling probe, speed brake,
-    launch bar, arrestor hook, pitot heat, and set flaps to HALF.
-  short_explanation: 'Perform the “four down” checks: cycle refueling probe, speed
-    brake, launch bar, arrestor hook, pitot heat, and set flaps to HALF.'
-  cockpit_area: Multiple (consoles, throttles, quarter panels)
+  official_description: Extend the refueling probe for the four-down check.
+  short_explanation: Extend the refueling probe and confirm the probe position reaches full extension.
+  cockpit_area: Left console
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:22-22
 - step_id: S21
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Retract the refueling probe after the extension check.
+  short_explanation: Retract the refueling probe and confirm it returns fully in.
+  cockpit_area: Left console
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S22
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Extend the launch bar for the four-down check.
+  short_explanation: Move the launch bar switch to extend.
+  cockpit_area: Left vertical panel
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S23
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Retract the launch bar after the extension check.
+  short_explanation: Move the launch bar switch back to retract.
+  cockpit_area: Left vertical panel
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S24
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Lower the arresting hook for the four-down check.
+  short_explanation: Move the arresting hook handle down.
+  cockpit_area: Left vertical panel
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S25
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Raise the arresting hook after the down check.
+  short_explanation: Move the arresting hook handle back up.
+  cockpit_area: Left vertical panel
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S26
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Turn pitot heat ON.
+  short_explanation: Set pitot heat to ON.
+  cockpit_area: Right console
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S27
+  phase: P5
+  phase_label: FCS & flight controls
+  official_description: Set the flap switch to AUTO.
+  short_explanation: Move the flap switch from the cold-start FULL position to AUTO.
+  cockpit_area: Left console
+  source_chunk_refs:
+  - fa18c_startup_master/fa18c_startup_master_1:22-22
+- step_id: S28
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Left mouse click on the hand brake to release it.
@@ -199,7 +253,7 @@ steps:
   cockpit_area: Left console (parking brake)
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:23-23
-- step_id: S22
+- step_id: S29
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set your BINGO fuel level (minimum fuel to return home) by
@@ -209,7 +263,7 @@ steps:
   cockpit_area: IFEI
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:24-24
-- step_id: S23
+- step_id: S30
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set the Standby Barometric Altimeter to airfield elevation.
@@ -218,7 +272,7 @@ steps:
   cockpit_area: Right instrument panel
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:25-25
-- step_id: S24
+- step_id: S31
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set the Radar Altimeter to 200 feet for an airfield takeoff
@@ -228,7 +282,7 @@ steps:
   cockpit_area: Right quarter panel
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:26-26
-- step_id: S25
+- step_id: S32
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Uncage the standby Attitude Indicator.
@@ -237,7 +291,7 @@ steps:
   cockpit_area: Right instrument panel
   source_chunk_refs:
   - fa18c_startup_master/fa18c_startup_master_1:27-27
-- step_id: S26
+- step_id: S33
   phase: P6
   phase_label: Pre-taxi instruments & final checks
   official_description: Set the Attitude Source to AUTO.

@@ -25,6 +25,8 @@ EXPECTED_S11_S25_VAR_KEYS = {
     "left_engine_idle_ready",
     "ins_mode_set",
     "ins_mode_cv_or_gnd",
+    "ins_fast_align_pressed",
+    "ins_fast_align_complete",
     "radar_mode_value",
     "radar_mode_opr",
     "obogs_switch_on",
@@ -43,8 +45,16 @@ EXPECTED_S11_S25_VAR_KEYS = {
     "fcs_bit_switch_up",
     "fcs_bit_complete",
     "probe_switch_value",
+    "ext_refuel_probe_value",
+    "probe_extended",
+    "probe_retracted",
+    "probe_cycle_complete",
     "launch_bar_switch_value",
+    "launch_bar_extended",
+    "launch_bar_retracted",
     "hook_handle_value",
+    "hook_extended",
+    "hook_retracted",
     "pitot_heat_on",
     "four_down_complete",
     "parking_brake_pull_value",
@@ -264,7 +274,7 @@ def test_var_resolver_pack_map_resolves_from_dcs_bios_frame_once() -> None:
         assert (vars_out[key] is None) == (key in vars_out["vars_source_missing"])
 
 
-def test_var_resolver_marks_probe_extended_from_switch_or_external_position() -> None:
+def test_var_resolver_marks_probe_extension_and_retraction_from_external_position() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
 
     switch_extended = TelemetryFrame(
@@ -275,7 +285,8 @@ def test_var_resolver_marks_probe_extended_from_switch_or_external_position() ->
     )
     vars_switch = resolver.resolve(switch_extended)
     assert vars_switch["probe_switch_value"] == 0
-    assert vars_switch["probe_extended"] is True
+    assert vars_switch["probe_extended"] is False
+    assert vars_switch["probe_retracted"] is True
     assert vars_switch["probe_cycle_complete"] is True
 
     physically_extended = TelemetryFrame(
@@ -288,7 +299,8 @@ def test_var_resolver_marks_probe_extended_from_switch_or_external_position() ->
     assert vars_physical["probe_switch_value"] == 1
     assert vars_physical["ext_refuel_probe_value"] == 65535
     assert vars_physical["probe_extended"] is True
-    assert vars_physical["probe_cycle_complete"] is True
+    assert vars_physical["probe_retracted"] is False
+    assert vars_physical["probe_cycle_complete"] is False
 
     retracted = TelemetryFrame(
         seq=3,
@@ -298,7 +310,8 @@ def test_var_resolver_marks_probe_extended_from_switch_or_external_position() ->
     )
     vars_retracted = resolver.resolve(retracted)
     assert vars_retracted["probe_extended"] is False
-    assert vars_retracted["probe_cycle_complete"] is False
+    assert vars_retracted["probe_retracted"] is True
+    assert vars_retracted["probe_cycle_complete"] is True
 
 
 def test_var_resolver_pack_battery_on_requires_switch_value_2() -> None:
@@ -536,6 +549,8 @@ def test_var_resolver_pack_s11_s25_vars_are_present_and_unknown_is_explicit() ->
     assert vars_out["ins_mode"] == 2
     assert vars_out["ins_mode_set"] is True
     assert vars_out["ins_mode_cv_or_gnd"] is True
+    assert vars_out["ins_fast_align_pressed"] is False
+    assert vars_out["ins_fast_align_complete"] is False
 
 
 def test_var_resolver_pack_ins_mode_matches_clickabledata_positions() -> None:
@@ -558,6 +573,23 @@ def test_var_resolver_pack_ins_mode_matches_clickabledata_positions() -> None:
     assert gnd_vars["ins_mode"] == 2
     assert gnd_vars["ins_mode_set"] is True
     assert gnd_vars["ins_mode_cv_or_gnd"] is True
+
+
+def test_var_resolver_pack_ins_fast_align_pb19_pressed() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    for key in ("AMPCD_PB_19", "MPCD_PB_19"):
+        frame = TelemetryFrame(
+            seq=704,
+            t_wall=704.0,
+            source="dcs_bios",
+            bios={key: 1},
+        )
+
+        vars_out = resolver.resolve(frame)
+
+        assert vars_out["ins_fast_align_pressed"] is True
+        assert vars_out["ins_fast_align_complete"] is True
 
 
 def test_var_resolver_pack_radar_mode_matches_clickabledata_positions() -> None:
@@ -917,9 +949,9 @@ def test_var_resolver_pack_bingo_and_attitude_source_vars_follow_bios_state() ->
 def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
 
-    frame_auto = TelemetryFrame(seq=801, t_wall=801.0, source="dcs_bios", bios={"FLAP_SW": 0})
+    frame_auto = TelemetryFrame(seq=801, t_wall=801.0, source="dcs_bios", bios={"FLAP_SW": 2})
     vars_auto = resolver.resolve(frame_auto)
-    assert vars_auto["flap_mode_value"] == 0
+    assert vars_auto["flap_mode_value"] == 2
     assert vars_auto["flap_auto"] is True
     assert vars_auto["flap_half"] is False
     assert vars_auto["flap_full"] is False
@@ -931,11 +963,11 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert vars_half["flap_auto"] is False
     assert vars_half["flap_half"] is True
     assert vars_half["flap_full"] is False
-    assert vars_half["flap_configured"] is True
+    assert vars_half["flap_configured"] is False
 
-    frame_full = TelemetryFrame(seq=803, t_wall=803.0, source="dcs_bios", bios={"FLAP_SW": 2})
+    frame_full = TelemetryFrame(seq=803, t_wall=803.0, source="dcs_bios", bios={"FLAP_SW": 0})
     vars_full = resolver.resolve(frame_full)
-    assert vars_full["flap_mode_value"] == 2
+    assert vars_full["flap_mode_value"] == 0
     assert vars_full["flap_auto"] is False
     assert vars_full["flap_half"] is False
     assert vars_full["flap_full"] is True
@@ -952,7 +984,6 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert "flap_auto" in vars_none["vars_source_missing"]
     assert "flap_half" in vars_none["vars_source_missing"]
     assert "flap_full" in vars_none["vars_source_missing"]
-    assert "flap_configured" in vars_none["vars_source_missing"]
 
     frame_missing = TelemetryFrame(seq=805, t_wall=805.0, source="dcs_bios", bios={})
     vars_missing = resolver.resolve(frame_missing)
@@ -965,7 +996,6 @@ def test_var_resolver_pack_flap_semantics_for_0_1_2_none_and_missing() -> None:
     assert "flap_auto" in vars_missing["vars_source_missing"]
     assert "flap_half" in vars_missing["vars_source_missing"]
     assert "flap_full" in vars_missing["vars_source_missing"]
-    assert "flap_configured" in vars_missing["vars_source_missing"]
 
 
 def test_var_resolver_pack_composite_vars_propagate_source_missing() -> None:

@@ -4,6 +4,7 @@ OpenAI-compatible ModelPort adapter (vLLM/llama.cpp/TGI compatible).
 
 from __future__ import annotations
 
+import copy
 import random
 import time
 from pathlib import Path
@@ -46,6 +47,7 @@ class OpenAICompatModel(BaseHelpModel):
         print_model_io: bool = False,
         api_key: str | None = None,
         enable_multimodal: bool = False,
+        enable_help_multimodal: bool | None = None,
         allowed_local_image_roots: Sequence[str | Path] | None = None,
         max_local_image_bytes: int | None = None,
         telemetry_map_path: str | Path | None = None,
@@ -54,6 +56,9 @@ class OpenAICompatModel(BaseHelpModel):
         self.api_key = api_key
         self.max_tokens = int(max_tokens) if isinstance(max_tokens, int) and max_tokens > 0 else None
         self.enable_multimodal = bool(enable_multimodal)
+        self.enable_help_multimodal = (
+            bool(enable_multimodal) if enable_help_multimodal is None else bool(enable_help_multimodal)
+        )
         self.allowed_local_image_roots = normalize_allowed_local_image_roots(allowed_local_image_roots)
         self.max_local_image_bytes = (
             int(max_local_image_bytes)
@@ -61,6 +66,7 @@ class OpenAICompatModel(BaseHelpModel):
             else self._DEFAULT_MAX_LOCAL_IMAGE_BYTES
         )
         self._help_response_schema = get_help_response_schema()
+        self._structured_output_schema = _build_vllm_compatible_response_format_schema(self._help_response_schema)
         self._runtime_metadata = self._empty_multimodal_metadata(
             multimodal_capability_enabled=self.enable_multimodal
         )
@@ -210,6 +216,7 @@ class OpenAICompatModel(BaseHelpModel):
         self._runtime_metadata.update(
             {
                 "multimodal_capability_enabled": self.enable_multimodal,
+                "main_help_multimodal_input_enabled": self.enable_help_multimodal,
                 "multimodal_input_present": bool(multimodal_spec["candidate_frames"]),
                 "multimodal_candidate_frame_ids": list(multimodal_spec["candidate_frame_ids"]),
                 "multimodal_primary_frame_id": multimodal_spec["primary_frame_id"],
@@ -224,7 +231,7 @@ class OpenAICompatModel(BaseHelpModel):
                 "multimodal_failure_reason": multimodal_spec["failure_reason"],
             }
         )
-        if not self.enable_multimodal or not multimodal_spec["image_contents"]:
+        if not self.enable_help_multimodal or not self.enable_multimodal or not multimodal_spec["image_contents"]:
             return messages, prompt_meta
 
         rewritten: list[dict[str, Any]] = []
@@ -319,6 +326,11 @@ class OpenAICompatModel(BaseHelpModel):
                 continue
             break
 
+        status_code = getattr(response, "status_code", None)
+        if has_vision and isinstance(status_code, int) and status_code >= 500:
+            error_text = self._extract_response_error_text(response)
+            detail = f": {error_text}" if error_text else ""
+            raise MultimodalRequestRejected(f"server failed multimodal request with HTTP {status_code}{detail}")
         if has_vision and self._is_multimodal_unsupported_400(response):
             error_text = self._extract_response_error_text(response) or "server rejected multimodal request"
             raise MultimodalRequestRejected(error_text)
@@ -441,7 +453,7 @@ class OpenAICompatModel(BaseHelpModel):
             "json_schema": {
                 "name": "HelpResponse",
                 "strict": True,
-                "schema": self._help_response_schema,
+                "schema": self._structured_output_schema,
             },
         }
 
@@ -470,7 +482,7 @@ class OpenAICompatModel(BaseHelpModel):
         ]
 
         image_contents: list[dict[str, Any]] = []
-        if not self.enable_multimodal:
+        if not self.enable_multimodal or not self.enable_help_multimodal:
             return {
                 "candidate_frames": candidate_frames,
                 "candidate_frame_ids": candidate_frame_ids,
@@ -628,6 +640,7 @@ class OpenAICompatModel(BaseHelpModel):
     ) -> dict[str, Any]:
         return {
             "multimodal_capability_enabled": bool(multimodal_capability_enabled),
+            "main_help_multimodal_input_enabled": bool(multimodal_capability_enabled),
             "multimodal_input_present": False,
             "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,
@@ -671,6 +684,43 @@ class OpenAICompatModel(BaseHelpModel):
 
     def _extract_response_error_text(self, response: Any) -> str:
         return extract_response_error_text(response)
+
+
+_VLLM_STRUCTURED_OUTPUT_UNSUPPORTED_SCHEMA_KEYS = {
+    "$schema",
+    "$id",
+    "$comment",
+    "allOf",
+    "if",
+    "then",
+    "else",
+    "contains",
+    "const",
+    "uniqueItems",
+}
+
+
+def _build_vllm_compatible_response_format_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Drop constraints known to break vLLM structured-output backends.
+
+    The full schema is still enforced after generation by the local parser and
+    validator; this copy is only used as a generation hint for OpenAI-compatible
+    servers with incomplete JSON Schema support.
+    """
+
+    return _strip_unsupported_schema_keywords(copy.deepcopy(dict(schema)))
+
+
+def _strip_unsupported_schema_keywords(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _strip_unsupported_schema_keywords(item)
+            for key, item in value.items()
+            if key not in _VLLM_STRUCTURED_OUTPUT_UNSUPPORTED_SCHEMA_KEYS
+        }
+    if isinstance(value, list):
+        return [_strip_unsupported_schema_keywords(item) for item in value]
+    return value
 
 
 __all__ = ["OpenAICompatModel"]

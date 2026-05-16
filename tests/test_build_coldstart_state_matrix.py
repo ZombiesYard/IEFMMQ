@@ -57,10 +57,10 @@ def test_build_coldstart_state_matrix_covers_all_steps_and_expected_inference(tm
     )
 
     assert manifest["scenario_profile"] == "airfield"
-    assert manifest["case_count"] == 52
+    assert manifest["case_count"] == 66
     assert (output_dir / "matrix.json").exists()
 
-    expected_step_ids = {f"S{i:02d}" for i in range(1, 27)}
+    expected_step_ids = {f"S{i:02d}" for i in range(1, 34)}
     observed: dict[str, set[str]] = {}
     frame_schema = _load_bios_frame_schema()
     validator = Draft202012Validator(frame_schema)
@@ -128,20 +128,20 @@ def test_build_coldstart_state_matrix_cli_supports_carrier_profile(tmp_path: Pat
         for case in manifest["cases"]
         if case["step_id"] == "S12" and case["state_kind"] == "just_completed"
     )
-    s24_case = next(
+    s31_case = next(
         case
         for case in manifest["cases"]
-        if case["step_id"] == "S24" and case["state_kind"] == "just_completed"
+        if case["step_id"] == "S31" and case["state_kind"] == "just_completed"
     )
 
     resolver = VarResolver.from_yaml(TELEMETRY_MAP_PATH)
     s12_frames = TelemetryWriter.load(output_dir / s12_case["replay_input"])
-    s24_frames = TelemetryWriter.load(output_dir / s24_case["replay_input"])
+    s31_frames = TelemetryWriter.load(output_dir / s31_case["replay_input"])
     s12_vars = resolver.resolve(s12_frames[-1])
-    s24_vars = resolver.resolve(s24_frames[-1])
+    s31_vars = resolver.resolve(s31_frames[-1])
 
     assert s12_vars["ins_mode"] == 1
-    assert 30 <= s24_vars["radar_altimeter_bug_value"] <= 60
+    assert 30 <= s31_vars["radar_altimeter_bug_value"] <= 60
 
 
 def test_fire_test_complete_binding_uses_non_center_rocker_state_for_true() -> None:

@@ -61,6 +61,8 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "throttle_r_idle_complete",
     "ins_mode_set",
     "ins_mode_cv_or_gnd",
+    "ins_fast_align_pressed",
+    "ins_fast_align_complete",
     "radar_mode_opr",
     "radar_on",
     "right_engine_nominal_start_params",
@@ -93,6 +95,8 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "fcs_reset_pressed",
     "fcs_reset_complete",
     "flap_mode_value",
+    "flap_full",
+    "flap_half",
     "flap_auto",
     "flap_configured",
     "takeoff_trim_pressed",
@@ -101,10 +105,15 @@ DEFAULT_SELECTED_VAR_KEYS: tuple[str, ...] = (
     "probe_switch_value",
     "ext_refuel_probe_value",
     "probe_extended",
+    "probe_retracted",
     "probe_cycle_complete",
     "pitot_heat_on",
     "launch_bar_switch_value",
+    "launch_bar_extended",
+    "launch_bar_retracted",
     "hook_handle_value",
+    "hook_extended",
+    "hook_retracted",
     "parking_brake_released",
     "bingo_fuel_set",
     "standby_altimeter_set",
@@ -125,8 +134,8 @@ _MOMENTARY_COMPLETION_KEYS: tuple[str, ...] = (
     "fire_test_b_complete",
     "lights_test_complete",
     "fcs_reset_complete",
+    "ins_fast_align_complete",
     "takeoff_trim_set",
-    "probe_cycle_complete",
     "bingo_fuel_set",
 )
 _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
@@ -135,10 +144,35 @@ _MOMENTARY_COMPLETION_TRIGGER_VARS: dict[str, str] = {
     "fire_test_b_complete": "fire_test_b_active",
     "lights_test_complete": "lights_test_active",
     "fcs_reset_complete": "fcs_reset_pressed",
+    "ins_fast_align_complete": "ins_fast_align_pressed",
     "takeoff_trim_set": "takeoff_trim_pressed",
-    "probe_cycle_complete": "probe_extended",
     "bingo_fuel_set": "ifei_up_or_down_pressed",
 }
+_BLEED_AIR_CYCLE_COMPLETE_KEY = "bleed_air_cycle_complete"
+_BLEED_AIR_CYCLE_LEFT_NORM_KEY = "bleed_air_cycle_left_norm"
+_COMPLETION_LATCH_PERSISTED_KEYS: tuple[str, ...] = (
+    *_MOMENTARY_COMPLETION_KEYS,
+    _BLEED_AIR_CYCLE_COMPLETE_KEY,
+    _BLEED_AIR_CYCLE_LEFT_NORM_KEY,
+)
+_COLD_START_RESET_SUPPRESSOR_VARS: tuple[str, ...] = (
+    "rpm_r_gte_25",
+    "rpm_l_gte_25",
+    "rpm_r_gte_60",
+    "rpm_l_gte_60",
+    "engine_crank_right_complete",
+    "engine_crank_left_complete",
+    "throttle_r_idle_complete",
+    "throttle_l_idle_complete",
+    "right_engine_nominal_start_params",
+    "left_engine_nominal_start_params",
+    "left_engine_idle_ready",
+    "ins_mode_cv_or_gnd",
+    "comm1_freq_134_000",
+    "radar_on",
+    "radar_mode_opr",
+    "obogs_ready",
+)
 _COMPLETION_LATCHES: OrderedDict[str, dict[str, bool | float]] = OrderedDict()
 _COMPLETION_LATCHES_LOADED = False
 _MAX_COMPLETION_LATCH_STREAMS = 256
@@ -174,6 +208,16 @@ def _is_regular_file(path: Path) -> bool:
     return stat.S_ISREG(mode)
 
 
+def _should_reset_completion_latches(resolved_vars: Mapping[str, Any]) -> bool:
+    raw_missing = resolved_vars.get("vars_source_missing")
+    missing_sources = {
+        item for item in raw_missing if isinstance(item, str) and item
+    } if isinstance(raw_missing, list) else set()
+    if "battery_on" in missing_sources or resolved_vars.get("battery_on") is not False:
+        return False
+    return not any(bool(resolved_vars.get(key)) for key in _COLD_START_RESET_SUPPRESSOR_VARS)
+
+
 def _load_completion_latches_from_disk() -> None:
     global _COMPLETION_LATCHES_LOADED, _COMPLETION_LATCHES
     if _COMPLETION_LATCHES_LOADED:
@@ -194,7 +238,7 @@ def _load_completion_latches_from_disk() -> None:
             if not isinstance(stream_id, str) or not stream_id.strip() or not isinstance(state, Mapping):
                 continue
             normalized_state: dict[str, bool | float] = {}
-            for key in _MOMENTARY_COMPLETION_KEYS:
+            for key in _COMPLETION_LATCH_PERSISTED_KEYS:
                 value = state.get(key)
                 if isinstance(value, bool):
                     normalized_state[key] = value
@@ -213,7 +257,7 @@ def _serialize_completion_latches_payload(
         stream_id: {
             key: value
             for key, value in state.items()
-            if key in _MOMENTARY_COMPLETION_KEYS and isinstance(value, (bool, int, float))
+            if key in _COMPLETION_LATCH_PERSISTED_KEYS and isinstance(value, (bool, int, float))
         }
         for stream_id, state in states.items()
         if isinstance(stream_id, str) and stream_id and isinstance(state, Mapping)
@@ -351,13 +395,7 @@ def _apply_momentary_completion_latches(
         completion_key: bool(resolved_vars.get(trigger_var))
         for completion_key, trigger_var in _MOMENTARY_COMPLETION_TRIGGER_VARS.items()
     }
-    raw_missing = resolved_vars.get("vars_source_missing")
-    missing_sources = {
-        item for item in raw_missing if isinstance(item, str) and item
-    } if isinstance(raw_missing, list) else set()
-    reset_session_completion = (
-        "battery_on" not in missing_sources and resolved_vars.get("battery_on") is False
-    )
+    reset_session_completion = _should_reset_completion_latches(resolved_vars)
 
     save_payload: dict[str, dict[str, bool | float]] | None = None
     with _COMPLETION_LATCHES_LOCK:
@@ -416,6 +454,75 @@ def _apply_momentary_completion_latches(
             }
             if latched_true:
                 out["vars_source_missing"] = [key for key in missing_keys if key not in latched_true]
+
+    return out
+
+
+def _apply_bleed_air_cycle_latch(
+    resolved_vars: Mapping[str, Any],
+    bios: Mapping[str, Any],
+    *,
+    stream_id: str,
+    t_wall: float | None,
+) -> dict[str, Any]:
+    out = dict(resolved_vars)
+    if t_wall is None or "BLEED_AIR_KNOB" not in bios:
+        return out
+
+    knob_value = _as_int(bios.get("BLEED_AIR_KNOB"))
+    if knob_value is None:
+        return out
+
+    reset_session_completion = _should_reset_completion_latches(resolved_vars)
+
+    normalized_stream_id = _normalize_delta_stream_id(stream_id)
+    save_payload: dict[str, dict[str, bool | float]] | None = None
+    with _COMPLETION_LATCHES_LOCK:
+        _load_completion_latches_from_disk()
+        previous_state = dict(_COMPLETION_LATCHES.get(normalized_stream_id, {}))
+        state = dict(previous_state)
+        if reset_session_completion:
+            state.clear()
+
+        left_norm = state.get(_BLEED_AIR_CYCLE_LEFT_NORM_KEY) is True
+        cycle_complete = state.get(_BLEED_AIR_CYCLE_COMPLETE_KEY) is True
+        if knob_value != 2:
+            left_norm = True
+            cycle_complete = False
+        elif left_norm:
+            cycle_complete = True
+
+        if left_norm:
+            state[_BLEED_AIR_CYCLE_LEFT_NORM_KEY] = True
+        else:
+            state.pop(_BLEED_AIR_CYCLE_LEFT_NORM_KEY, None)
+        if cycle_complete:
+            state[_BLEED_AIR_CYCLE_COMPLETE_KEY] = True
+        else:
+            state.pop(_BLEED_AIR_CYCLE_COMPLETE_KEY, None)
+
+        if state:
+            _COMPLETION_LATCHES[normalized_stream_id] = state
+            _COMPLETION_LATCHES.move_to_end(normalized_stream_id)
+        else:
+            _COMPLETION_LATCHES.pop(normalized_stream_id, None)
+
+        while len(_COMPLETION_LATCHES) > max(1, int(_MAX_COMPLETION_LATCH_STREAMS)):
+            _COMPLETION_LATCHES.popitem(last=False)
+
+        if previous_state != state:
+            save_payload = _serialize_completion_latches_payload(_COMPLETION_LATCHES)
+
+    out[_BLEED_AIR_CYCLE_COMPLETE_KEY] = bool(cycle_complete)
+    raw_missing_out = out.get("vars_source_missing")
+    if cycle_complete and isinstance(raw_missing_out, list):
+        out["vars_source_missing"] = [
+            key for key in raw_missing_out
+            if key != _BLEED_AIR_CYCLE_COMPLETE_KEY
+        ]
+
+    if save_payload is not None:
+        _save_completion_latches_to_disk(save_payload)
 
     return out
 
@@ -577,6 +684,12 @@ def enrich_bios_observation(
     t_wall = _as_float(payload.get("t_wall"))
     resolved_vars = _apply_momentary_completion_latches(
         resolver.resolve(payload),
+        stream_id=resolved_stream_id,
+        t_wall=t_wall,
+    )
+    resolved_vars = _apply_bleed_air_cycle_latch(
+        resolved_vars,
+        bios_map,
         stream_id=resolved_stream_id,
         t_wall=t_wall,
     )
