@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from adapters.step_harness_specs import load_step_harness_specs
 from core.step_harness import StepHarnessSpec
 
@@ -49,17 +51,26 @@ def test_step_harness_spec_derives_early_telemetry_delta_and_gate_contract() -> 
 def test_step_harness_spec_derives_vlm_contract_for_s18_and_s19() -> None:
     specs = load_step_harness_specs(PACK_PATH)
 
+    s15 = specs["S15"]
+    assert s15.vision_facts == ("VISION_FACTS.fcs_page_x_marks_visible",)
+    assert s15.requires_visual_confirmation is True
+    assert s15.signal_quality.freshness_ms == 2000
+
     s18 = specs["S18"]
     assert s18.observability_status == "partial"
     assert s18.required_observables == ("delta", "gate", "visual")
-    assert s18.vision_facts == ("VISION_FACTS.fcsmc_page_visible",)
+    assert s18.vision_facts == (
+        "VISION_FACTS.fcsmc_page_visible",
+        "VISION_FACTS.bit_root_page_visible",
+    )
     assert "VISION_FACTS.fcsmc_page_visible==seen" in s18.completion_predicates
     assert s18.requires_visual_confirmation is True
     assert s18.signal_quality.freshness_ms == 2000
     assert s18.allowed_overlay_targets == ("right_mdi_pb18", "right_mdi_pb5")
 
     s19 = specs["S19"]
-    assert s19.vision_facts == ("VISION_FACTS.fcsmc_final_go_result_visible",)
+    assert "VISION_FACTS.fcsmc_final_go_result_visible" in s19.vision_facts
+    assert "VISION_FACTS.fcsmc_final_go_result_visible==seen" in s19.completion_predicates
     assert s19.latch_semantics == "sticky_visual_completion"
     assert s19.signal_quality.freshness_ms == 600000
     assert s19.recovery_policy.kind == "visual_confirmation"
@@ -99,4 +110,54 @@ def test_step_harness_spec_preserves_s20_to_s27_split_four_down_targets() -> Non
         assert spec.allowed_overlay_targets == targets
         assert spec.observability_status == "observable"
         assert spec.required_observables == ("var", "gate")
-        assert spec.completion_predicates == (f"GATES.{step_id}.completion",)
+        assert f"GATES.{step_id}.completion" in spec.completion_predicates
+
+
+def test_step_harness_spec_keeps_raw_ui_targets_when_overlay_is_disabled(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: partial\n"
+        "    overlay_enabled: false\n"
+        "    evidence_requirements: [delta]\n"
+        "    ui_targets: [manual_switch]\n"
+        "precondition_gates: {S01: []}\n"
+        "completion_gates: {S01: []}\n",
+        encoding="utf-8",
+    )
+
+    spec = load_step_harness_specs(pack)["S01"]
+
+    assert spec.allowed_overlay_targets == ()
+    assert spec.forbidden_overlay_targets == ("manual_switch",)
+    assert spec.declared_ui_targets == ("manual_switch",)
+    assert spec.recent_action_facts == ("RECENT_ACTIONS.manual_switch",)
+    assert spec.recovery_policy.allowed_targets == ("manual_switch",)
+
+
+def test_step_harness_spec_validates_pack_step_metadata(tmp_path: Path) -> None:
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "pack_id: test\n"
+        "version: v1\n"
+        "steps:\n"
+        "  - id: S01\n"
+        "    observability: maybe\n"
+        "precondition_gates: {S01: []}\n"
+        "completion_gates: {S01: []}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"pack\.steps\[0\]\.observability must be one of"):
+        load_step_harness_specs(pack)
+
+
+def test_step_harness_spec_completion_predicates_include_scenario_overrides() -> None:
+    airfield = load_step_harness_specs(PACK_PATH)["S31"]
+    carrier = load_step_harness_specs(PACK_PATH, scenario_profile="carrier")["S31"]
+
+    assert "vars.radar_altimeter_bug_value in [180,220]" in airfield.completion_predicates
+    assert "vars.radar_altimeter_bug_value in [30,60]" in carrier.completion_predicates

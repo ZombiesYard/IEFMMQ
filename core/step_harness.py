@@ -55,6 +55,7 @@ class StepHarnessSpec:
     observability_status: str
     signal_quality: SignalQualityRequirement
     requires_visual_confirmation: bool
+    declared_ui_targets: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -72,6 +73,7 @@ class StepHarnessSpec:
             "observability_status": self.observability_status,
             "signal_quality": self.signal_quality.to_dict(),
             "requires_visual_confirmation": self.requires_visual_confirmation,
+            "declared_ui_targets": list(self.declared_ui_targets),
         }
 
 
