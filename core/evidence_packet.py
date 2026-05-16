@@ -53,6 +53,69 @@ DEFAULT_VISUAL_CANDIDATE_STEP_GROUPS: tuple[tuple[tuple[str, ...], tuple[str, ..
 CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS = "early_step_from_telemetry_vs_late_display_from_vlm"
 CONFLICT_LATCH_MISSING_VS_LATER_STAGE_EVIDENCE = "latch_missing_vs_later_stage_evidence"
 CONFLICT_RECENT_ACTION_VS_GATE_CONTRADICTION = "recent_action_vs_gate_contradiction"
+CONFLICT_TELEMETRY_WINDOW_VS_SINGLE_FRAME = "telemetry_window_conflicts_with_single_frame_hint"
+CONTRADICTION_BATTERY_FIRST_FRAME_REFUTED = (
+    "battery_on=false only in first frame but later downstream avionics evidence is present"
+)
+CONTRADICTION_FIRE_TEST_LATCH_MISSING_LATER_STAGE = (
+    "fire_test latch missing while later-stage telemetry evidence is present"
+)
+CONTRADICTION_RECENT_TRANSITION_BLOCKED_GATE = (
+    "recent telemetry transition conflicts with current blocked gate"
+)
+MAX_DIGEST_STRING_VALUE_CHARS = 80
+
+IMPORTANT_BOOLEAN_VARS = frozenset(
+    {
+        "battery_on",
+        "power_available",
+        "left_ddi_on",
+        "right_ddi_on",
+        "mpcd_on",
+        "hud_on",
+        "fire_test_a_complete",
+        "fire_test_b_complete",
+        "fire_test_complete",
+        "fcs_bit_switch_up",
+        "pitot_heat_on",
+        "flap_auto",
+    }
+)
+DOWNSTREAM_AVIONICS_VARS = frozenset(
+    {
+        "power_available",
+        "left_ddi_on",
+        "right_ddi_on",
+        "mpcd_on",
+        "hud_on",
+    }
+)
+EARLY_LATCH_VARS = frozenset(
+    {
+        "fire_test_a_complete",
+        "fire_test_b_complete",
+        "fire_test_complete",
+    }
+)
+TELEMETRY_WINDOW_CANDIDATE_VARS = frozenset(
+    {
+        "battery_on",
+        "power_available",
+        "left_ddi_on",
+        "right_ddi_on",
+        "mpcd_on",
+        "hud_on",
+        "fire_test_a_complete",
+        "fire_test_b_complete",
+        "fire_test_complete",
+        "fcs_bit_switch_up",
+        "ext_refuel_probe_value",
+        "launch_bar_switch_value",
+        "hook_handle_value",
+        "pitot_heat_on",
+        "flap_auto",
+    }
+)
 
 
 def _string_items(raw: Any) -> list[str]:
@@ -78,6 +141,54 @@ def _coerce_number(raw: Any) -> int | float | None:
     if isinstance(raw, bool) or not isinstance(raw, (int, float)):
         return None
     return raw
+
+
+def _safe_digest_value(raw: Any) -> Any:
+    if raw is None or isinstance(raw, (bool, int, float)):
+        return raw
+    if isinstance(raw, str):
+        return raw if len(raw) <= MAX_DIGEST_STRING_VALUE_CHARS else raw[:MAX_DIGEST_STRING_VALUE_CHARS] + "..."
+    text = str(raw)
+    return text if len(text) <= MAX_DIGEST_STRING_VALUE_CHARS else text[:MAX_DIGEST_STRING_VALUE_CHARS] + "..."
+
+
+def _frame_vars(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    vars_raw = raw.get("vars")
+    if isinstance(vars_raw, Mapping):
+        return {
+            key: _safe_digest_value(value)
+            for key, value in vars_raw.items()
+            if isinstance(key, str) and key
+        }
+    delta_raw = raw.get("delta")
+    if isinstance(delta_raw, Mapping):
+        return {
+            key: _safe_digest_value(value)
+            for key, value in delta_raw.items()
+            if isinstance(key, str) and key
+        }
+    return {}
+
+
+def _frame_vars_are_full_snapshot(raw: Mapping[str, Any]) -> bool:
+    if raw.get("vars_is_full_snapshot") is True or raw.get("frame_kind") == "vars_snapshot":
+        return True
+    return isinstance(raw.get("vars"), Mapping) and not isinstance(raw.get("delta"), Mapping)
+
+
+def _latest_frame_meta(frames: tuple[dict[str, Any], ...]) -> tuple[int | None, int | float | None]:
+    latest_seq: int | None = None
+    latest_t_wall: int | float | None = None
+    for frame in frames:
+        seq = _coerce_int(frame.get("seq"))
+        if seq is not None:
+            latest_seq = seq
+        t_wall = _coerce_number(frame.get("t_wall"))
+        if t_wall is not None:
+            latest_t_wall = t_wall
+    return latest_seq, latest_t_wall
 
 
 def _late_display_anchor_fact_ids(context: Mapping[str, Any]) -> set[str]:
@@ -138,6 +249,59 @@ class TelemetryEvidence:
             "observation_seq": self.freshness.get("observation_seq"),
             "vars_source_missing_count": self.missing_source_count,
             "early_vars": dict(self.early_vars),
+        }
+
+
+@dataclass(frozen=True)
+class TelemetryWindowDigest:
+    window_duration_s: float | None
+    frame_count: int
+    latest_seq: int | None
+    latest_t_wall: int | float | None
+    changed_vars: tuple[dict[str, Any], ...]
+    stable_true_vars: tuple[str, ...]
+    stable_false_vars: tuple[str, ...]
+    unknown_or_missing_vars: tuple[str, ...]
+    first_frame_only_values: tuple[dict[str, Any], ...]
+    last_seen_true: tuple[dict[str, Any], ...]
+    contradictions: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "window_duration_s": self.window_duration_s,
+            "frame_count": self.frame_count,
+            "latest_seq": self.latest_seq,
+            "latest_t_wall": self.latest_t_wall,
+            "changed_vars": [dict(item) for item in self.changed_vars],
+            "stable_true_vars": list(self.stable_true_vars),
+            "stable_false_vars": list(self.stable_false_vars),
+            "unknown_or_missing_vars": list(self.unknown_or_missing_vars),
+            "first_frame_only_values": [dict(item) for item in self.first_frame_only_values],
+            "last_seen_true": [dict(item) for item in self.last_seen_true],
+            "contradictions": list(self.contradictions),
+        }
+
+    def to_state_harness_dict(self) -> dict[str, Any]:
+        return {
+            "window_duration_s": self.window_duration_s,
+            "frame_count": self.frame_count,
+            "latest_seq": self.latest_seq,
+            "latest_t_wall": self.latest_t_wall,
+            "changed_vars": [dict(item) for item in self.changed_vars[:12]],
+            "stable_true_vars": list(self.stable_true_vars[:16]),
+            "stable_false_vars": list(self.stable_false_vars[:16]),
+            "unknown_or_missing_vars": list(self.unknown_or_missing_vars[:16]),
+            "first_frame_only_values": [dict(item) for item in self.first_frame_only_values[:8]],
+            "last_seen_true": [dict(item) for item in self.last_seen_true[:12]],
+            "contradictions": list(self.contradictions[:8]),
+        }
+
+    def compact_summary(self) -> dict[str, Any]:
+        return {
+            "frame_count": self.frame_count,
+            "latest_seq": self.latest_seq,
+            "changed_var_count": len(self.changed_vars),
+            "contradiction_count": len(self.contradictions),
         }
 
 
@@ -287,6 +451,7 @@ class StepCandidate:
 @dataclass(frozen=True)
 class EvidencePacket:
     telemetry_evidence: TelemetryEvidence
+    telemetry_window_digest: TelemetryWindowDigest
     vision_evidence: VisionEvidence
     gate_evidence: GateEvidence
     recent_action_evidence: RecentActionEvidence
@@ -296,6 +461,7 @@ class EvidencePacket:
     def to_dict(self) -> dict[str, Any]:
         return {
             "telemetry_evidence": self.telemetry_evidence.to_dict(),
+            "telemetry_window_digest": self.telemetry_window_digest.to_dict(),
             "vision_evidence": self.vision_evidence.to_dict(),
             "gate_evidence": self.gate_evidence.to_dict(),
             "recent_action_evidence": self.recent_action_evidence.to_dict(),
@@ -307,10 +473,15 @@ class EvidencePacket:
         legacy_conflicts = [
             conflict
             for conflict in self.conflicts
-            if conflict == CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS
+            if conflict
+            in {
+                CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS,
+                CONFLICT_TELEMETRY_WINDOW_VS_SINGLE_FRAME,
+            }
         ]
         return {
             "telemetry_evidence": self.telemetry_evidence.to_state_harness_dict(),
+            "telemetry_window_digest": self.telemetry_window_digest.to_state_harness_dict(),
             "vision_evidence": self.vision_evidence.to_state_harness_dict(),
             "gate_evidence": self.gate_evidence.to_state_harness_dict(),
             "recent_action_evidence": self.recent_action_evidence.to_state_harness_dict(),
@@ -322,6 +493,7 @@ class EvidencePacket:
         return {
             "telemetry_status": self.telemetry_evidence.source_status,
             "telemetry_missing_source_count": self.telemetry_evidence.missing_source_count,
+            "telemetry_window_digest": self.telemetry_window_digest.compact_summary(),
             "vision_status": self.vision_evidence.source_status,
             "vision_seen_count": len(self.vision_evidence.seen_fact_ids),
             "vision_fresh_count": len(self.vision_evidence.fresh_fact_ids),
@@ -369,6 +541,185 @@ def _build_telemetry_evidence(context: Mapping[str, Any]) -> TelemetryEvidence:
             for key in ("battery_on", "power_available", "fire_test_a_complete", "fire_test_b_complete")
             if key in vars_map
         },
+    )
+
+
+def _build_telemetry_window_digest(context: Mapping[str, Any]) -> TelemetryWindowDigest:
+    frames_raw = context.get("telemetry_window_frames")
+    raw_frames = frames_raw if isinstance(frames_raw, list) else []
+    frames: list[dict[str, Any]] = []
+    for raw in raw_frames:
+        if not isinstance(raw, Mapping):
+            continue
+        frame_vars = _frame_vars(raw)
+        frames.append(
+            {
+                "seq": _coerce_int(raw.get("seq")),
+                "t_wall": _coerce_number(raw.get("t_wall")),
+                "vars": frame_vars,
+                "vars_is_full_snapshot": _frame_vars_are_full_snapshot(raw),
+            }
+        )
+
+    frame_tuple = tuple(frames)
+    latest_seq, latest_t_wall = _latest_frame_meta(frame_tuple)
+    t_values = [frame["t_wall"] for frame in frame_tuple if _coerce_number(frame.get("t_wall")) is not None]
+    window_duration_s = None
+    if len(t_values) >= 2:
+        window_duration_s = round(float(t_values[-1]) - float(t_values[0]), 3)
+
+    vars_raw = context.get("vars")
+    latest_vars = vars_raw if isinstance(vars_raw, Mapping) else {}
+    missing_vars = set(_string_items(latest_vars.get("vars_source_missing")))
+    for key, value in latest_vars.items():
+        if isinstance(key, str) and key and value is None:
+            missing_vars.add(key)
+
+    observations: dict[str, list[tuple[Any, int | None, int | float | None]]] = {}
+    for frame in frame_tuple:
+        seq = _coerce_int(frame.get("seq"))
+        t_wall = _coerce_number(frame.get("t_wall"))
+        vars_map = frame.get("vars")
+        if not isinstance(vars_map, Mapping):
+            continue
+        for key, value in vars_map.items():
+            if not isinstance(key, str) or not key:
+                continue
+            observations.setdefault(key, []).append((_safe_digest_value(value), seq, t_wall))
+
+    for key, value in latest_vars.items():
+        if not isinstance(key, str) or not key or key == "vars_source_missing" or value is None:
+            continue
+        if key in observations:
+            continue
+        observed = observations.setdefault(key, [])
+        safe_value = _safe_digest_value(value)
+        if not observed or observed[-1][0] != safe_value:
+            observed.append((safe_value, latest_seq, latest_t_wall))
+
+    changed_vars: list[dict[str, Any]] = []
+    stable_true_vars: list[str] = []
+    stable_false_vars: list[str] = []
+    last_seen_true: list[dict[str, Any]] = []
+    for key in sorted(observations.keys()):
+        values = observations[key]
+        if not values:
+            continue
+        compact_values = [value for value, _, _ in values]
+        transition_count = 0
+        latest_transition_t = values[-1][2]
+        for idx in range(1, len(compact_values)):
+            if compact_values[idx] != compact_values[idx - 1]:
+                transition_count += 1
+                latest_transition_t = values[idx][2]
+        if transition_count:
+            age = None
+            if latest_t_wall is not None and latest_transition_t is not None:
+                age = round(float(latest_t_wall) - float(latest_transition_t), 3)
+            changed_vars.append(
+                {
+                    "var": key,
+                    "first_value": compact_values[0],
+                    "last_value": compact_values[-1],
+                    "transition_count": transition_count,
+                    "latest_transition_age_s": age,
+                }
+            )
+
+        if key in IMPORTANT_BOOLEAN_VARS and compact_values and all(
+            value is True or value is False or value is None for value in compact_values
+        ):
+            if all(value is True for value in compact_values):
+                stable_true_vars.append(key)
+            elif all(value is False for value in compact_values):
+                stable_false_vars.append(key)
+            true_observations = [
+                (seq, t_wall)
+                for value, seq, t_wall in values
+                if value is True
+            ]
+            if true_observations:
+                seq, t_wall = true_observations[-1]
+                entry: dict[str, Any] = {"var": key}
+                if seq is not None:
+                    entry["seq"] = seq
+                if latest_t_wall is not None and t_wall is not None:
+                    entry["age_s"] = round(float(latest_t_wall) - float(t_wall), 3)
+                last_seen_true.append(entry)
+
+    first_frame_only_values: list[dict[str, Any]] = []
+    if (
+        len(frame_tuple) >= 2
+        and bool(frame_tuple[0].get("vars_is_full_snapshot"))
+        and any(bool(frame.get("vars_is_full_snapshot")) for frame in frame_tuple[1:])
+    ):
+        first_vars = frame_tuple[0].get("vars")
+        later_keys = {
+            key
+            for frame in frame_tuple[1:]
+            if bool(frame.get("vars_is_full_snapshot"))
+            if isinstance(frame.get("vars"), Mapping)
+            for key in frame["vars"].keys()
+            if isinstance(key, str)
+        }
+        if isinstance(first_vars, Mapping):
+            later_vars = [
+                frame["vars"]
+                for frame in frame_tuple[1:]
+                if bool(frame.get("vars_is_full_snapshot")) and isinstance(frame.get("vars"), Mapping)
+            ]
+            for key, value in first_vars.items():
+                later_present = key in later_keys
+                later_has_known_value = any(vars_map.get(key) is not None for vars_map in later_vars)
+                if isinstance(key, str) and key and (not later_present or not later_has_known_value):
+                    first_frame_only_values.append({"var": key, "value": _safe_digest_value(value)})
+
+    downstream_true = any(
+        latest_vars.get(key) is True
+        or key in stable_true_vars
+        or any(item.get("var") == key and item.get("last_value") is True for item in changed_vars)
+        for key in DOWNSTREAM_AVIONICS_VARS
+    )
+    contradictions: list[str] = []
+    if downstream_true and any(
+        item.get("var") == "battery_on" and item.get("value") is False
+        for item in first_frame_only_values
+    ):
+        contradictions.append(CONTRADICTION_BATTERY_FIRST_FRAME_REFUTED)
+    if downstream_true and (
+        missing_vars.intersection(EARLY_LATCH_VARS)
+        or any("fire_test" in item for item in _string_items(context.get("deterministic_step_hint", {}).get("missing_conditions") if isinstance(context.get("deterministic_step_hint"), Mapping) else []))
+    ):
+        contradictions.append(CONTRADICTION_FIRE_TEST_LATCH_MISSING_LATER_STAGE)
+
+    gate_raw = context.get("gates")
+    gates = gate_raw if isinstance(gate_raw, Mapping) else {}
+    changed_names = {
+        item.get("var")
+        for item in changed_vars
+        if isinstance(item.get("var"), str) and item.get("var") in TELEMETRY_WINDOW_CANDIDATE_VARS
+    }
+    for gate in gates.values():
+        if not isinstance(gate, Mapping) or gate.get("status") != "blocked":
+            continue
+        searchable = " ".join(str(gate.get(key, "")) for key in ("gate_id", "reason_code", "reason"))
+        if any(name in searchable for name in changed_names):
+            contradictions.append(CONTRADICTION_RECENT_TRANSITION_BLOCKED_GATE)
+            break
+
+    unknown_or_missing = sorted(missing_vars)
+    return TelemetryWindowDigest(
+        window_duration_s=window_duration_s,
+        frame_count=len(frame_tuple),
+        latest_seq=latest_seq,
+        latest_t_wall=latest_t_wall,
+        changed_vars=tuple(changed_vars[:24]),
+        stable_true_vars=tuple(_string_items(stable_true_vars)[:24]),
+        stable_false_vars=tuple(_string_items(stable_false_vars)[:24]),
+        unknown_or_missing_vars=tuple(unknown_or_missing[:32]),
+        first_frame_only_values=tuple(first_frame_only_values[:16]),
+        last_seen_true=tuple(last_seen_true[:24]),
+        contradictions=tuple(_string_items(contradictions)),
     )
 
 
@@ -548,12 +899,21 @@ def _has_recent_action_gate_contradiction(
 def _build_conflicts(
     *,
     telemetry_evidence: TelemetryEvidence,
+    telemetry_window_digest: TelemetryWindowDigest,
     vision_evidence: VisionEvidence,
     gate_evidence: GateEvidence,
     recent_action_evidence: RecentActionEvidence,
     deterministic_candidate: DeterministicCandidateEvidence,
 ) -> tuple[str, ...]:
     conflicts: list[str] = []
+    if any(
+        item in telemetry_window_digest.contradictions
+        for item in {
+            CONTRADICTION_BATTERY_FIRST_FRAME_REFUTED,
+            CONTRADICTION_FIRE_TEST_LATCH_MISSING_LATER_STAGE,
+        }
+    ):
+        conflicts.append(CONFLICT_TELEMETRY_WINDOW_VS_SINGLE_FRAME)
     if (
         deterministic_candidate.step_id in EARLY_STEP_IDS
         and len(vision_evidence.late_display_anchors) >= 2
@@ -561,7 +921,11 @@ def _build_conflicts(
         conflicts.append(CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS)
     if (
         deterministic_candidate.missing_conditions
-        and vision_evidence.late_display_anchors
+        and (
+            vision_evidence.late_display_anchors
+            or CONTRADICTION_FIRE_TEST_LATCH_MISSING_LATER_STAGE
+            in telemetry_window_digest.contradictions
+        )
         and any("_complete" in item or "latch" in item for item in deterministic_candidate.missing_conditions)
     ):
         conflicts.append(CONFLICT_LATCH_MISSING_VS_LATER_STAGE_EVIDENCE)
@@ -572,12 +936,14 @@ def _build_conflicts(
 
 def build_evidence_packet(context: Mapping[str, Any]) -> EvidencePacket:
     telemetry_evidence = _build_telemetry_evidence(context)
+    telemetry_window_digest = _build_telemetry_window_digest(context)
     vision_evidence = _build_vision_evidence(context)
     gate_evidence = _build_gate_evidence(context)
     recent_action_evidence = _build_recent_action_evidence(context)
     deterministic_candidate = _build_deterministic_candidate(context)
     conflicts = _build_conflicts(
         telemetry_evidence=telemetry_evidence,
+        telemetry_window_digest=telemetry_window_digest,
         vision_evidence=vision_evidence,
         gate_evidence=gate_evidence,
         recent_action_evidence=recent_action_evidence,
@@ -585,6 +951,7 @@ def build_evidence_packet(context: Mapping[str, Any]) -> EvidencePacket:
     )
     return EvidencePacket(
         telemetry_evidence=telemetry_evidence,
+        telemetry_window_digest=telemetry_window_digest,
         vision_evidence=vision_evidence,
         gate_evidence=gate_evidence,
         recent_action_evidence=recent_action_evidence,
@@ -645,7 +1012,82 @@ def _candidate_reason(source: str, step_id: str) -> str:
         return "blocked gate evidence points at this procedure step"
     if source == "recent_action":
         return "recent cockpit action matches this step target set"
+    if source == "telemetry_window":
+        return "recent telemetry window sequence supports this procedure region"
     return f"{source} supports {step_id}"
+
+
+def _telemetry_window_refs_for_var(kind: str, var_name: str) -> tuple[str, ...]:
+    return (f"TELEMETRY_WINDOW.{kind}.{var_name}",)
+
+
+def _changed_var_map(digest: TelemetryWindowDigest) -> dict[str, dict[str, Any]]:
+    return {
+        item["var"]: item
+        for item in digest.changed_vars
+        if isinstance(item.get("var"), str)
+    }
+
+
+def _has_first_frame_false(digest: TelemetryWindowDigest, var_name: str) -> bool:
+    return any(
+        item.get("var") == var_name and item.get("value") is False
+        for item in digest.first_frame_only_values
+    )
+
+
+def _supports_later_avionics(digest: TelemetryWindowDigest) -> bool:
+    changed = _changed_var_map(digest)
+    for var_name in DOWNSTREAM_AVIONICS_VARS:
+        if var_name in digest.stable_true_vars:
+            return True
+        item = changed.get(var_name)
+        if item is not None and item.get("last_value") is True:
+            return True
+    return False
+
+
+def _telemetry_progression_candidates(digest: TelemetryWindowDigest) -> tuple[tuple[str, str, str], ...]:
+    changed = _changed_var_map(digest)
+    out: list[tuple[str, str, str]] = []
+
+    probe = changed.get("ext_refuel_probe_value")
+    if probe is not None:
+        last = _coerce_number(probe.get("last_value"))
+        if last is not None and last >= 60000:
+            out.append(("S21", "changed_vars", "ext_refuel_probe_value"))
+        elif last is not None and last <= 5000:
+            out.append(("S22", "changed_vars", "ext_refuel_probe_value"))
+
+    launch_bar = changed.get("launch_bar_switch_value")
+    if launch_bar is not None:
+        last = _coerce_number(launch_bar.get("last_value"))
+        if last == 1:
+            out.append(("S23", "changed_vars", "launch_bar_switch_value"))
+        elif last == 0:
+            out.append(("S24", "changed_vars", "launch_bar_switch_value"))
+
+    hook = changed.get("hook_handle_value")
+    if hook is not None:
+        last = _coerce_number(hook.get("last_value"))
+        if last == 1:
+            out.append(("S25", "changed_vars", "hook_handle_value"))
+        elif last == 0:
+            out.append(("S26", "changed_vars", "hook_handle_value"))
+
+    pitot = changed.get("pitot_heat_on")
+    if pitot is not None and pitot.get("last_value") is True:
+        out.append(("S27", "changed_vars", "pitot_heat_on"))
+    changed = _changed_var_map(digest)
+
+    def _age(item: tuple[str, str, str]) -> float:
+        changed_item = changed.get(item[2])
+        if changed_item is None:
+            return 999999.0
+        raw_age = changed_item.get("latest_transition_age_s")
+        return float(raw_age) if isinstance(raw_age, (int, float)) and not isinstance(raw_age, bool) else 999999.0
+
+    return tuple(sorted(out, key=_age))
 
 
 def build_step_candidates(
@@ -693,6 +1135,93 @@ def build_step_candidates(
                 reason=_candidate_reason(visual_source, step_id),
             )
         )
+
+    telemetry_digest = packet.telemetry_window_digest
+    if telemetry_digest.frame_count:
+        if _has_first_frame_false(telemetry_digest, "battery_on") and _supports_later_avionics(telemetry_digest):
+            refs = []
+            if "left_ddi_on" in telemetry_digest.stable_true_vars:
+                refs.extend(_telemetry_window_refs_for_var("stable_true_vars", "left_ddi_on"))
+            elif "power_available" in telemetry_digest.stable_true_vars:
+                refs.extend(_telemetry_window_refs_for_var("stable_true_vars", "power_available"))
+            else:
+                refs.extend(_telemetry_window_refs_for_var("last_seen_true", "power_available"))
+            _append(
+                StepCandidate(
+                    step_id="S08",
+                    source="telemetry_window",
+                    role="candidate",
+                    supporting_evidence_refs=tuple(refs),
+                    refuting_evidence_refs=_telemetry_window_refs_for_var(
+                        "first_frame_only_values",
+                        "battery_on",
+                    ),
+                    confidence=0.82,
+                    missing_conditions=(),
+                    proposed_next_action_target_ids=_targets_for_step("S08", step_harness_specs),
+                    reason=_candidate_reason("telemetry_window", "S08"),
+                )
+            )
+        elif (
+            "fire_test latch missing while later-stage telemetry evidence is present"
+            in telemetry_digest.contradictions
+            and _supports_later_avionics(telemetry_digest)
+        ):
+            _append(
+                StepCandidate(
+                    step_id="S08",
+                    source="telemetry_window",
+                    role="candidate",
+                    supporting_evidence_refs=_telemetry_window_refs_for_var(
+                        "stable_true_vars",
+                        "left_ddi_on",
+                    ),
+                    refuting_evidence_refs=tuple(
+                        f"TELEMETRY_WINDOW.unknown_or_missing_vars.{var_name}"
+                        for var_name in telemetry_digest.unknown_or_missing_vars
+                        if var_name in EARLY_LATCH_VARS
+                    ),
+                    confidence=0.78,
+                    missing_conditions=(),
+                    proposed_next_action_target_ids=_targets_for_step("S08", step_harness_specs),
+                    reason=_candidate_reason("telemetry_window", "S08"),
+                )
+            )
+
+        changed = _changed_var_map(telemetry_digest)
+        fcs_bit_switch = changed.get("fcs_bit_switch_up")
+        if fcs_bit_switch is not None and fcs_bit_switch.get("last_value") is True:
+            _append(
+                StepCandidate(
+                    step_id="S19",
+                    source="telemetry_window",
+                    role="candidate",
+                    supporting_evidence_refs=_telemetry_window_refs_for_var(
+                        "changed_vars",
+                        "fcs_bit_switch_up",
+                    ),
+                    refuting_evidence_refs=_gate_refs_for_step(packet.gate_evidence, "S19"),
+                    confidence=0.74,
+                    missing_conditions=(),
+                    proposed_next_action_target_ids=_targets_for_step("S19", step_harness_specs),
+                    reason=_candidate_reason("telemetry_window", "S19"),
+                )
+            )
+
+        for step_id, ref_kind, var_name in _telemetry_progression_candidates(telemetry_digest):
+            _append(
+                StepCandidate(
+                    step_id=step_id,
+                    source="telemetry_window",
+                    role="candidate",
+                    supporting_evidence_refs=_telemetry_window_refs_for_var(ref_kind, var_name),
+                    refuting_evidence_refs=(),
+                    confidence=0.7,
+                    missing_conditions=(),
+                    proposed_next_action_target_ids=_targets_for_step(step_id, step_harness_specs),
+                    reason=_candidate_reason("telemetry_window", step_id),
+                )
+            )
 
     deterministic_step_id = packet.deterministic_candidate.step_id
     if isinstance(deterministic_step_id, str) and deterministic_step_id:
@@ -782,11 +1311,13 @@ __all__ = [
     "CONFLICT_LATCH_MISSING_VS_LATER_STAGE_EVIDENCE",
     "CONFLICT_RECENT_ACTION_VS_GATE_CONTRADICTION",
     "CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS",
+    "CONFLICT_TELEMETRY_WINDOW_VS_SINGLE_FRAME",
     "EARLY_STEP_IDS",
     "DEFAULT_LATE_DISPLAY_ANCHOR_FACTS",
     "DEFAULT_VISUAL_CANDIDATE_STEP_GROUPS",
     "EvidencePacket",
     "StepCandidate",
+    "TelemetryWindowDigest",
     "build_evidence_packet",
     "build_step_candidates",
 ]

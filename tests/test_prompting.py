@@ -70,6 +70,113 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert sample_evidence["type"] == infer_evidence_type_from_ref(sample_evidence["ref"])
 
 
+def test_prompt_exposes_telemetry_window_digest_for_sequence_adjudication() -> None:
+    ctx = _base_context()
+    ctx["state_harness"] = {
+        "telemetry_window_digest": {
+            "window_duration_s": 3.0,
+            "frame_count": 2,
+            "latest_seq": 12,
+            "changed_vars": [
+                {
+                    "var": "battery_on",
+                    "first_value": False,
+                    "last_value": True,
+                    "transition_count": 1,
+                    "latest_transition_age_s": 0.0,
+                }
+            ],
+            "stable_true_vars": ["power_available", "left_ddi_on"],
+            "stable_false_vars": [],
+            "unknown_or_missing_vars": ["fire_test_a_complete"],
+            "first_frame_only_values": [{"var": "battery_on", "value": False}],
+            "last_seen_true": [{"var": "left_ddi_on", "seq": 12, "age_s": 0.0}],
+            "contradictions": [
+                "battery_on=false only in first frame but later downstream avionics evidence is present"
+            ],
+        },
+        "telemetry_evidence": {"source_status": "nominal", "confidence": "medium"},
+        "vision_evidence": {"source_status": "vision_unavailable", "confidence": "medium"},
+        "deterministic_candidate": {"step_id": "S01", "role": "candidate_not_authoritative"},
+        "conflicts": [],
+    }
+    ctx["candidate_steps"] = [
+        {
+            "step_id": "S08",
+            "source": "telemetry_window",
+            "role": "candidate",
+            "supporting_evidence_refs": ["TELEMETRY_WINDOW.stable_true_vars.left_ddi_on"],
+            "refuting_evidence_refs": ["TELEMETRY_WINDOW.first_frame_only_values.battery_on"],
+            "confidence": 0.82,
+        }
+    ]
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    digest = payload["state_harness"]["telemetry_window_digest"]
+    assert digest["frame_count"] == 2
+    assert digest["first_frame_only_values"] == [{"var": "battery_on", "value": False}]
+    assert "telemetry_window_digest" in payload["decision_priority"]
+    assert "raw full JSONL" in result.prompt
+    assert "telemetry sequence evidence may override" in result.prompt
+
+
+def test_prompt_compacts_long_telemetry_window_digest_values_without_hard_truncate() -> None:
+    ctx = _base_context()
+    ctx["state_harness"] = {
+        "telemetry_window_digest": {
+            "frame_count": 2,
+            "latest_seq": 2,
+            "changed_vars": [
+                {
+                    "var": "debug_text",
+                    "first_value": ["A" * 5000],
+                    "last_value": {"nested": "B" * 5000},
+                    "transition_count": 1,
+                    "latest_transition_age_s": 0.0,
+                }
+            ],
+            "contradictions": ["recent telemetry transition conflicts with current blocked gate"],
+        },
+        "telemetry_evidence": {"source_status": "nominal", "confidence": "medium"},
+        "vision_evidence": {"source_status": "vision_unavailable", "confidence": "medium"},
+        "deterministic_candidate": {"step_id": "S19", "role": "candidate_not_authoritative"},
+        "conflicts": ["telemetry_window_conflicts_with_single_frame_hint"],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=7000, max_prompt_tokens_est=1400)
+    if "compact_template" in result.metadata.get("trim_reasons", []):
+        constraints_line = next(line for line in result.prompt.splitlines() if line.startswith("constraints="))
+        payload = json.loads(constraints_line[len("constraints=") :])
+    else:
+        payload = _extract_prompt_constraints_json(result.prompt)
+    changed = payload["state_harness"]["telemetry_window_digest"]["changed_vars"][0]
+
+    assert "hard_truncate" not in result.metadata.get("trim_reasons", [])
+    assert len(changed["first_value"]) <= 83
+    assert len(changed["last_value"]) <= 83
+
+
+def test_compact_prompt_omits_telemetry_window_priority_when_digest_absent() -> None:
+    ctx = _base_context()
+    ctx["state_harness"] = {
+        "conflicts": ["early_step_from_telemetry_vs_late_display_from_vlm"],
+        "telemetry_evidence": {"source_status": "low_confidence_bootstrap"},
+        "vision_evidence": {"late_display_anchors": ["tac_page_visible"]},
+        "deterministic_candidate": {"step_id": "S01"},
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=500, max_prompt_tokens_est=120)
+    constraints_line = next(line for line in result.prompt.splitlines() if line.startswith("constraints="))
+    payload = json.loads(constraints_line[len("constraints=") :])
+
+    assert "compact_template" in result.metadata.get("trim_reasons", [])
+    assert "state_harness" in payload
+    assert "telemetry_window_digest" not in payload["state_harness"]
+    assert "telemetry_window_digest" not in payload["decision_priority"]
+
+
 def test_prompt_accepts_structured_candidate_steps_and_keeps_allowed_step_ids() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = [

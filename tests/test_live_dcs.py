@@ -47,6 +47,7 @@ from live_dcs import (
     _sanitize_request_payload_for_event,
     _sanitize_response_payload_for_event,
     _sanitize_policy_error_for_user,
+    _telemetry_window_signature,
 )
 from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
@@ -735,6 +736,10 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
         "nominal",
         "low_confidence_bootstrap",
     }
+    telemetry_window_digest = request.context["state_harness"]["telemetry_window_digest"]
+    assert telemetry_window_digest["frame_count"] >= 1
+    assert telemetry_window_digest["latest_seq"] == 1
+    assert "telemetry_window_digest" in request.context["evidence_packet_summary"]
     assert isinstance(request.context["evidence_packet_summary"]["blocked_gate_count"], int)
     assert request.metadata["evidence_packet_summary"] == request.context["evidence_packet_summary"]
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
@@ -746,6 +751,116 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
     assert executor.calls[0][0]["target"] == "apu_switch"
+
+
+def test_live_loop_telemetry_window_uses_canonical_vars_not_raw_delta_keys(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_fcs_bit_window.jsonl"
+    frame1 = _bios_frame(1, 10.0, apu_switch=0)
+    frame2 = _bios_frame(2, 11.0, apu_switch=0)
+    frame1["bios"]["FCS_BIT_SW"] = 0
+    frame1["delta"]["FCS_BIT_SW"] = 0
+    frame2["bios"]["FCS_BIT_SW"] = 1
+    frame2["delta"]["FCS_BIT_SW"] = 1
+    _write_replay(replay_path, [frame1, frame2])
+
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=model,
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="en",
+    )
+    try:
+        loop.run(max_frames=2, auto_help_every_n_frames=2)
+    finally:
+        loop.close()
+
+    request = model.calls[0]["request"]
+    assert any(
+        candidate["source"] == "telemetry_window" and candidate["step_id"] == "S19"
+        for candidate in request.context["candidate_steps"]
+    )
+    digest = request.context["state_harness"]["telemetry_window_digest"]
+    assert any(item["var"] == "fcs_bit_switch_up" for item in digest["changed_vars"])
+
+
+def test_tutor_request_event_sanitizes_telemetry_window_digest_nested_values() -> None:
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "state_harness": {
+                "telemetry_window_digest": {
+                    "frame_count": 2,
+                    "latest_seq": 9,
+                    "unexpected": "drop-me",
+                    "changed_vars": [
+                        {
+                            "var": "debug_text",
+                            "first_value": "A" * 200,
+                            "last_value": "B" * 200,
+                            "extra": "drop-me",
+                        }
+                    ],
+                    "contradictions": ["recent telemetry transition conflicts with current blocked gate"],
+                }
+            }
+        },
+    )
+
+    payload = _sanitize_request_payload_for_event(request)
+    digest = payload["context"]["state_harness"]["telemetry_window_digest"]
+
+    assert digest["frame_count"] == 2
+    assert "unexpected" not in digest
+    assert "extra" not in digest["changed_vars"][0]
+    assert len(digest["changed_vars"][0]["first_value"]) <= 83
+    assert len(digest["changed_vars"][0]["last_value"]) <= 83
+
+
+def test_telemetry_window_signature_ignores_seq_churn_but_keeps_semantic_changes() -> None:
+    base = {
+        "telemetry_window_digest": {
+            "latest_seq": 1,
+            "latest_t_wall": 10.0,
+            "changed_vars": [
+                {
+                    "var": "fcs_bit_switch_up",
+                    "first_value": False,
+                    "last_value": True,
+                    "transition_count": 1,
+                    "latest_transition_age_s": 0.0,
+                }
+            ],
+            "contradictions": [],
+        }
+    }
+    churned = {
+        "telemetry_window_digest": {
+            **base["telemetry_window_digest"],
+            "latest_seq": 99,
+            "latest_t_wall": 99.0,
+        }
+    }
+    changed = {
+        "telemetry_window_digest": {
+            **base["telemetry_window_digest"],
+            "changed_vars": [
+                {
+                    "var": "fcs_bit_switch_up",
+                    "first_value": True,
+                    "last_value": False,
+                    "transition_count": 1,
+                    "latest_transition_age_s": 0.0,
+                }
+            ],
+        }
+    }
+
+    assert _telemetry_window_signature(base) == _telemetry_window_signature(churned)
+    assert _telemetry_window_signature(base) != _telemetry_window_signature(changed)
 
 
 def test_live_loop_sends_final_tutor_message_to_dcs_text_channel(tmp_path: Path) -> None:
