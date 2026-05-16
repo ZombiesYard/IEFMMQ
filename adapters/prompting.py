@@ -799,6 +799,97 @@ def _normalize_enum_list(values: Any, fallback: list[str]) -> list[str]:
     return list(fallback)
 
 
+def _build_candidate_step_payload(values: Any, fallback: list[str]) -> list[dict[str, Any]]:
+    allowed = set(fallback)
+    payload: list[dict[str, Any]] = []
+    seen_candidates: set[tuple[str, str]] = set()
+
+    if isinstance(values, list) and values and all(isinstance(item, Mapping) for item in values):
+        for item in values:
+            step_id_raw = item.get("step_id")
+            source = str(_sanitize_scalar(item.get("source") or "unknown"))
+            key = (step_id_raw, source) if isinstance(step_id_raw, str) else ("", "")
+            if not isinstance(step_id_raw, str) or step_id_raw not in allowed or key in seen_candidates:
+                continue
+            seen_candidates.add(key)
+            candidate: dict[str, Any] = {
+                "step_id": step_id_raw,
+                "source": source,
+                "role": str(_sanitize_scalar(item.get("role") or "candidate")),
+                "supporting_evidence_refs": _string_items(item.get("supporting_evidence_refs"))[:8],
+                "refuting_evidence_refs": _string_items(item.get("refuting_evidence_refs"))[:8],
+                "missing_conditions": _string_items(item.get("missing_conditions"))[:MAX_MISSING_CONDITIONS_SIGNAL_ITEMS],
+                "proposed_next_action_target_ids": _string_items(item.get("proposed_next_action_target_ids"))[:8],
+                "reason": str(_sanitize_scalar(item.get("reason") or "")),
+            }
+            confidence = item.get("confidence")
+            if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+                candidate["confidence"] = round(float(confidence), 3)
+            payload.append(candidate)
+        if payload:
+            return payload
+
+    step_ids = _normalize_enum_list(values, fallback)
+    for step_id in step_ids:
+        payload.append(
+            {
+                "step_id": step_id,
+                "source": "legacy_order",
+                "role": "fallback",
+                "confidence": 0.1,
+                "reason": "ordered step id fallback",
+            }
+        )
+    return payload
+
+
+def _candidate_step_ids(candidate_steps: list[dict[str, Any]]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in candidate_steps:
+        step_id = item.get("step_id")
+        if isinstance(step_id, str) and step_id and step_id not in seen:
+            seen.add(step_id)
+            out.append(step_id)
+    return out
+
+
+def _reorder_candidate_step_payload(
+    candidate_steps: list[dict[str, Any]],
+    ordered_step_ids: list[str],
+) -> list[dict[str, Any]]:
+    by_step: dict[str, list[dict[str, Any]]] = {}
+    for item in candidate_steps:
+        step_id = item.get("step_id")
+        if isinstance(step_id, str):
+            by_step.setdefault(step_id, []).append(item)
+    reordered: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for step_id in ordered_step_ids:
+        items = by_step.get(step_id)
+        if not items or step_id in seen:
+            continue
+        seen.add(step_id)
+        reordered.extend(items)
+    for item in candidate_steps:
+        step_id = item.get("step_id")
+        if isinstance(step_id, str) and step_id not in seen:
+            reordered.append(item)
+    return reordered
+
+
+def _filter_candidate_step_payload(
+    candidate_steps: list[dict[str, Any]],
+    allowed_step_ids: list[str],
+) -> list[dict[str, Any]]:
+    allowed = set(allowed_step_ids)
+    return [
+        item
+        for item in _reorder_candidate_step_payload(candidate_steps, allowed_step_ids)
+        if isinstance(item.get("step_id"), str) and item["step_id"] in allowed
+    ]
+
+
 def _build_deterministic_step_hint(context: Mapping[str, Any]) -> dict[str, Any]:
     raw = context.get("deterministic_step_hint")
     if not isinstance(raw, Mapping):
@@ -1272,7 +1363,13 @@ def build_help_prompt_result(
     schema_category_enum = list(schema["properties"]["diagnosis"]["properties"]["error_category"]["enum"])
     category_enum = _normalize_enum_list(context.get("error_category_enum"), schema_category_enum)
 
-    candidate_steps = _normalize_enum_list(context.get("candidate_steps"), step_enum)
+    raw_candidate_steps = context.get("candidate_steps")
+    has_structured_candidate_steps = (
+        isinstance(raw_candidate_steps, list)
+        and any(isinstance(item, Mapping) for item in raw_candidate_steps)
+    )
+    candidate_step_payload = _build_candidate_step_payload(raw_candidate_steps, step_enum)
+    candidate_steps = _candidate_step_ids(candidate_step_payload) or list(step_enum)
     overlay_targets = _normalize_enum_list(context.get("overlay_target_allowlist"), target_enum)
     max_vars = DEFAULT_MAX_VARS_ITEMS
     recent_deltas_summary = _build_delta_summary(context, top_k=MAX_DELTA_SUMMARY_ITEMS)
@@ -1300,6 +1397,7 @@ def build_help_prompt_result(
         )
     )
     candidate_steps = _reprioritize_candidate_steps_for_harness(candidate_steps, state_harness)
+    candidate_step_payload = _reorder_candidate_step_payload(candidate_step_payload, candidate_steps)
     multimodal_input = _build_multimodal_input_payload(context)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
@@ -1517,8 +1615,10 @@ def build_help_prompt_result(
             "overlay": {"targets": example_targets, "evidence": example_overlay_evidence},
             "explanations": ["Use concise guidance." if lang == "en" else "请给出简洁指导。"],
         }
+        current_candidate_step_payload = _filter_candidate_step_payload(candidate_step_payload, candidate_steps)
         payload = {
             "allowed_step_ids": candidate_steps,
+            "candidate_steps": current_candidate_step_payload,
             "allowed_overlay_targets": overlay_targets,
             "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
@@ -1675,6 +1775,19 @@ def build_help_prompt_result(
                 },
                 "allowed_evidence_refs": compact_allowed_refs,
             }
+            if has_structured_candidate_steps:
+                compact_candidate_steps = _filter_candidate_step_payload(
+                    candidate_step_payload,
+                    candidate_steps[:3],
+                )
+                compact_payload["candidate_steps"] = [
+                    {
+                        key: item[key]
+                        for key in ("step_id", "source", "role", "confidence")
+                        if key in item
+                    }
+                    for item in compact_candidate_steps[:3]
+                ]
             if compact_harness_has_signal:
                 compact_payload["state_harness"] = compact_state_harness
             compact_visual_refs = [ref for ref in compact_allowed_refs if isinstance(ref, str) and ref.startswith("VISION_FACTS.")]
@@ -1778,6 +1891,7 @@ def build_help_prompt_result(
             and isinstance(state_harness.get("vision_evidence", {}).get("visual_candidate_steps"), list)
             else []
         ),
+        "candidate_step_ids": list(candidate_steps),
         "multimodal_input_attached": bool(multimodal_input.get("attached")),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)

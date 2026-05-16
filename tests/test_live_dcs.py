@@ -704,7 +704,13 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert request is not None
     assert request.intent == "help"
     assert "candidate_steps" in request.context
-    assert request.context["candidate_steps"] == [f"S{i:02d}" for i in range(1, 34)]
+    candidate_steps = request.context["candidate_steps"]
+    assert isinstance(candidate_steps, list)
+    assert candidate_steps[0]["source"] == "deterministic"
+    assert candidate_steps[0]["role"] == "candidate_not_authoritative"
+    assert candidate_steps[0]["step_id"]
+    assert "supporting_evidence_refs" in candidate_steps[0]
+    assert "proposed_next_action_target_ids" in candidate_steps[0]
     assert "recent_deltas" in request.context
     assert "recent_actions" in request.context
     assert "deterministic_step_hint" in request.context

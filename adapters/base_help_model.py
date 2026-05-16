@@ -499,7 +499,21 @@ class BaseHelpModel(ModelPort):
         schema_categories = schema["properties"]["diagnosis"]["properties"]["error_category"]["enum"]
 
         context = request.context if request and isinstance(request.context, dict) else {}
-        candidate_steps = context.get("candidate_steps")
+        raw_candidate_steps = context.get("candidate_steps")
+        candidate_step_items: list[dict[str, Any]] | None = None
+        if (
+            isinstance(raw_candidate_steps, list)
+            and raw_candidate_steps
+            and all(isinstance(item, Mapping) for item in raw_candidate_steps)
+        ):
+            candidate_step_items = [dict(item) for item in raw_candidate_steps]
+            candidate_steps = [
+                item.get("step_id")
+                for item in candidate_step_items
+                if isinstance(item.get("step_id"), str)
+            ]
+        else:
+            candidate_steps = raw_candidate_steps
         if not isinstance(candidate_steps, list) or not candidate_steps:
             candidate_steps = list(schema_step_ids)
         inference = deterministic_inference
@@ -514,6 +528,16 @@ class BaseHelpModel(ModelPort):
         )
         if not (isinstance(harness_conflicts, list) and HARNESS_LATE_VLM_CONFLICT in harness_conflicts):
             candidate_steps = self._prioritize_inferred_step(candidate_steps, inferred_step_id)
+        if candidate_step_items is not None:
+            by_step: dict[str, list[dict[str, Any]]] = {}
+            for item in candidate_step_items:
+                step_id = item.get("step_id")
+                if isinstance(step_id, str):
+                    by_step.setdefault(step_id, []).append(item)
+            candidate_step_items = []
+            for step_id in candidate_steps:
+                if isinstance(step_id, str):
+                    candidate_step_items.extend(by_step.get(step_id, []))
         allowlist = context.get("overlay_target_allowlist")
         if not isinstance(allowlist, list) or not allowlist:
             allowlist = list(schema_targets)
@@ -550,7 +574,7 @@ class BaseHelpModel(ModelPort):
             "intent": request.intent if request else "help",
             "message": request.message if request else None,
             "scenario_profile": scenario_profile,
-            "candidate_steps": candidate_steps,
+            "candidate_steps": candidate_step_items if candidate_step_items is not None else candidate_steps,
             "overlay_target_allowlist": allowlist,
             "vars": context.get("vars"),
             "recent_deltas": context.get("recent_deltas"),
@@ -874,7 +898,14 @@ class BaseHelpModel(ModelPort):
 
         candidate_steps = context.get("candidate_steps")
         if isinstance(candidate_steps, list) and candidate_steps:
-            allowed_steps = {sid for sid in candidate_steps if isinstance(sid, str)}
+            allowed_steps: set[str] = set()
+            for item in candidate_steps:
+                if isinstance(item, str):
+                    allowed_steps.add(item)
+                elif isinstance(item, Mapping):
+                    step_id = item.get("step_id")
+                    if isinstance(step_id, str) and step_id:
+                        allowed_steps.add(step_id)
             for path in ("diagnosis.step_id", "next.step_id"):
                 section, key = path.split(".")
                 sid = help_obj[section][key]

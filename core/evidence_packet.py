@@ -259,6 +259,32 @@ class DeterministicCandidateEvidence:
 
 
 @dataclass(frozen=True)
+class StepCandidate:
+    step_id: str
+    source: str
+    role: str
+    supporting_evidence_refs: tuple[str, ...]
+    refuting_evidence_refs: tuple[str, ...]
+    confidence: float
+    missing_conditions: tuple[str, ...]
+    proposed_next_action_target_ids: tuple[str, ...]
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "step_id": self.step_id,
+            "source": self.source,
+            "role": self.role,
+            "supporting_evidence_refs": list(self.supporting_evidence_refs),
+            "refuting_evidence_refs": list(self.refuting_evidence_refs),
+            "confidence": self.confidence,
+            "missing_conditions": list(self.missing_conditions),
+            "proposed_next_action_target_ids": list(self.proposed_next_action_target_ids),
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
 class EvidencePacket:
     telemetry_evidence: TelemetryEvidence
     vision_evidence: VisionEvidence
@@ -567,6 +593,191 @@ def build_evidence_packet(context: Mapping[str, Any]) -> EvidencePacket:
     )
 
 
+def _visual_refs(vision_evidence: VisionEvidence) -> tuple[str, ...]:
+    return tuple(f"VISION_FACTS.{fact_id}" for fact_id in vision_evidence.late_display_anchors)
+
+
+def _gate_refs_for_step(gate_evidence: GateEvidence, step_id: str) -> tuple[str, ...]:
+    refs: list[str] = []
+    prefix = f"{step_id}."
+    for gate_id in gate_evidence.blocked_gate_ids:
+        if gate_id == step_id or gate_id.startswith(prefix):
+            refs.append(f"GATES.{gate_id}")
+    return tuple(refs)
+
+
+def _targets_for_step(step_id: str, step_harness_specs: Mapping[str, Any] | None) -> tuple[str, ...]:
+    if not isinstance(step_harness_specs, Mapping):
+        return ()
+    spec = step_harness_specs.get(step_id)
+    if spec is None:
+        return ()
+    allowed = getattr(spec, "allowed_overlay_targets", None)
+    if allowed:
+        return tuple(_string_items(allowed))
+    declared = getattr(spec, "declared_ui_targets", None)
+    return tuple(_string_items(declared))
+
+
+def _visual_candidate_step_ids(packet: EvidencePacket) -> tuple[str, ...]:
+    anchors = set(packet.vision_evidence.late_display_anchors)
+    if "fcsmc_final_go_result_visible" in anchors:
+        return ("S20",)
+    if anchors.intersection(
+        {
+            "fcsmc_page_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_intermediate_result_visible",
+        }
+    ):
+        return ("S19", "S18", "S20")
+    return tuple(packet.vision_evidence.visual_candidate_steps)
+
+
+def _candidate_reason(source: str, step_id: str) -> str:
+    if source == "deterministic":
+        return "forward deterministic inference fallback"
+    if source == "sticky_state":
+        return "sticky VLM completion state supports advancing to the next procedure step"
+    if source == "visual_anchor":
+        return "fresh VLM visual anchors support this procedure step"
+    if source == "gate_blocker":
+        return "blocked gate evidence points at this procedure step"
+    if source == "recent_action":
+        return "recent cockpit action matches this step target set"
+    return f"{source} supports {step_id}"
+
+
+def build_step_candidates(
+    packet: EvidencePacket,
+    *,
+    step_harness_specs: Mapping[str, Any] | None = None,
+    ordered_step_ids: list[str] | tuple[str, ...] | None = None,
+    max_candidates: int = 8,
+) -> tuple[StepCandidate, ...]:
+    """
+    Generate ordered adjudication candidates for a help cycle.
+
+    Deterministic inference remains present, but it is explicitly marked as
+    non-authoritative so downstream code can compare it with visual, gate, and
+    recent-action evidence instead of inheriting a single final truth.
+    """
+    candidates: list[StepCandidate] = []
+    seen_candidates: set[tuple[str, str]] = set()
+    visual_refs = _visual_refs(packet.vision_evidence)
+    has_visual_conflict = CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS in packet.conflicts
+
+    def _append(candidate: StepCandidate) -> None:
+        key = (candidate.step_id, candidate.source)
+        if not candidate.step_id or key in seen_candidates:
+            return
+        seen_candidates.add(key)
+        candidates.append(candidate)
+
+    visual_source = (
+        "sticky_state"
+        if "fcsmc_final_go_result_visible" in packet.vision_evidence.late_display_anchors
+        else "visual_anchor"
+    )
+    for step_id in _visual_candidate_step_ids(packet):
+        _append(
+            StepCandidate(
+                step_id=step_id,
+                source=visual_source,
+                role="candidate",
+                supporting_evidence_refs=visual_refs,
+                refuting_evidence_refs=(),
+                confidence=0.92 if visual_source == "sticky_state" else 0.86,
+                missing_conditions=(),
+                proposed_next_action_target_ids=_targets_for_step(step_id, step_harness_specs),
+                reason=_candidate_reason(visual_source, step_id),
+            )
+        )
+
+    deterministic_step_id = packet.deterministic_candidate.step_id
+    if isinstance(deterministic_step_id, str) and deterministic_step_id:
+        _append(
+            StepCandidate(
+                step_id=deterministic_step_id,
+                source="deterministic",
+                role=packet.deterministic_candidate.role,
+                supporting_evidence_refs=_gate_refs_for_step(packet.gate_evidence, deterministic_step_id),
+                refuting_evidence_refs=visual_refs if has_visual_conflict else (),
+                confidence=0.35 if has_visual_conflict else 0.55,
+                missing_conditions=packet.deterministic_candidate.missing_conditions,
+                proposed_next_action_target_ids=_targets_for_step(deterministic_step_id, step_harness_specs),
+                reason=_candidate_reason("deterministic", deterministic_step_id),
+            )
+        )
+
+    for gate in packet.gate_evidence.blocked_gates:
+        step_id = gate.get("step_id")
+        if not isinstance(step_id, str) or not step_id:
+            gate_id = gate.get("gate_id")
+            if isinstance(gate_id, str) and "." in gate_id:
+                step_id = gate_id.split(".", 1)[0]
+        if not isinstance(step_id, str) or not step_id:
+            continue
+        gate_id = gate.get("gate_id")
+        refs = (f"GATES.{gate_id}",) if isinstance(gate_id, str) and gate_id else ()
+        _append(
+            StepCandidate(
+                step_id=step_id,
+                source="gate_blocker",
+                role="candidate",
+                supporting_evidence_refs=refs,
+                refuting_evidence_refs=(),
+                confidence=0.66,
+                missing_conditions=(),
+                proposed_next_action_target_ids=_targets_for_step(step_id, step_harness_specs),
+                reason=_candidate_reason("gate_blocker", step_id),
+            )
+        )
+
+    recent_targets = set(packet.recent_action_evidence.target_ids)
+    if recent_targets and isinstance(step_harness_specs, Mapping):
+        for step_id in ordered_step_ids or tuple(step_harness_specs.keys()):
+            if not isinstance(step_id, str) or (step_id, "recent_action") in seen_candidates:
+                continue
+            matched_targets = sorted(recent_targets.intersection(_targets_for_step(step_id, step_harness_specs)))
+            if not matched_targets:
+                continue
+            _append(
+                StepCandidate(
+                    step_id=step_id,
+                    source="recent_action",
+                    role="candidate",
+                    supporting_evidence_refs=tuple(f"RECENT_ACTIONS.{target}" for target in matched_targets),
+                    refuting_evidence_refs=(),
+                    confidence=0.5,
+                    missing_conditions=(),
+                    proposed_next_action_target_ids=tuple(matched_targets),
+                    reason=_candidate_reason("recent_action", step_id),
+                )
+            )
+
+    if ordered_step_ids and not candidates:
+        for step_id in ordered_step_ids:
+            if not isinstance(step_id, str) or not step_id:
+                continue
+            _append(
+                StepCandidate(
+                    step_id=step_id,
+                    source="procedure_order",
+                    role="fallback",
+                    supporting_evidence_refs=(),
+                    refuting_evidence_refs=(),
+                    confidence=0.1,
+                    missing_conditions=(),
+                    proposed_next_action_target_ids=_targets_for_step(step_id, step_harness_specs),
+                    reason="procedure order fallback candidate",
+                )
+            )
+            break
+
+    return tuple(candidates[: max(1, int(max_candidates))])
+
+
 __all__ = [
     "CONFLICT_LATCH_MISSING_VS_LATER_STAGE_EVIDENCE",
     "CONFLICT_RECENT_ACTION_VS_GATE_CONTRADICTION",
@@ -575,5 +786,7 @@ __all__ = [
     "DEFAULT_LATE_DISPLAY_ANCHOR_FACTS",
     "DEFAULT_VISUAL_CANDIDATE_STEP_GROUPS",
     "EvidencePacket",
+    "StepCandidate",
     "build_evidence_packet",
+    "build_step_candidates",
 ]
