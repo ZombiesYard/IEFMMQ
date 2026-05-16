@@ -244,6 +244,8 @@ def test_load_pack_gate_config_applies_carrier_profile_overrides() -> None:
 
     assert airfield["completion_gates"]["S12"][0]["reason_code"] == "s12_requires_ins_mode_gnd"
     assert carrier["completion_gates"]["S12"][0]["reason_code"] == "s12_requires_ins_mode_cv"
+    assert airfield["completion_gates"]["S12"][1]["reason_code"] == "s12_requires_ampcd_pb19_fast_align"
+    assert carrier["completion_gates"]["S12"][1]["reason_code"] == "s12_requires_ampcd_pb19_fast_align"
     assert airfield["completion_gates"]["S24"][0]["reason_code"] == "s24_requires_radalt_bug_airfield_200"
     assert carrier["completion_gates"]["S24"][0]["reason_code"] == "s24_requires_radalt_bug_carrier_40"
 
@@ -260,6 +262,7 @@ def test_evaluate_pack_gates_profile_changes_s12_and_s23_gate_results() -> None:
         rpm_l_gte_60=True,
         throttle_l_not_off=True,
         ins_mode=2,
+        ins_fast_align_complete=True,
         radar_altimeter_bug_value=200,
     )
 

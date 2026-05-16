@@ -1241,9 +1241,11 @@ def test_load_pack_gate_config_uses_clickabledata_ins_positions_for_airfield_and
     assert airfield_rules[0]["var"] == "vars.ins_mode"
     assert airfield_rules[0]["min"] == 2
     assert airfield_rules[0]["max"] == 2
+    assert airfield_rules[1]["var"] == "vars.ins_fast_align_complete"
     assert carrier_rules[0]["var"] == "vars.ins_mode"
     assert carrier_rules[0]["min"] == 1
     assert carrier_rules[0]["max"] == 1
+    assert carrier_rules[1]["var"] == "vars.ins_fast_align_complete"
 
 
 def test_load_pack_gate_config_requires_radar_mode_opr_for_s13_and_later_steps() -> None:
@@ -1674,6 +1676,7 @@ def test_infer_step_blocks_at_s16_when_flap_not_auto(
         "ins_mode": 2,
         "ins_mode_set": True,
         "ins_mode_cv_or_gnd": True,
+        "ins_fast_align_complete": True,
         "radar_mode_opr": True,
         "obogs_ready": True,
         "fcs_reset_complete": True,

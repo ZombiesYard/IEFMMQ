@@ -25,6 +25,8 @@ EXPECTED_S11_S25_VAR_KEYS = {
     "left_engine_idle_ready",
     "ins_mode_set",
     "ins_mode_cv_or_gnd",
+    "ins_fast_align_pressed",
+    "ins_fast_align_complete",
     "radar_mode_value",
     "radar_mode_opr",
     "obogs_switch_on",
@@ -536,6 +538,8 @@ def test_var_resolver_pack_s11_s25_vars_are_present_and_unknown_is_explicit() ->
     assert vars_out["ins_mode"] == 2
     assert vars_out["ins_mode_set"] is True
     assert vars_out["ins_mode_cv_or_gnd"] is True
+    assert vars_out["ins_fast_align_pressed"] is False
+    assert vars_out["ins_fast_align_complete"] is False
 
 
 def test_var_resolver_pack_ins_mode_matches_clickabledata_positions() -> None:
@@ -558,6 +562,23 @@ def test_var_resolver_pack_ins_mode_matches_clickabledata_positions() -> None:
     assert gnd_vars["ins_mode"] == 2
     assert gnd_vars["ins_mode_set"] is True
     assert gnd_vars["ins_mode_cv_or_gnd"] is True
+
+
+def test_var_resolver_pack_ins_fast_align_pb19_pressed() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    for key in ("AMPCD_PB_19", "MPCD_PB_19"):
+        frame = TelemetryFrame(
+            seq=704,
+            t_wall=704.0,
+            source="dcs_bios",
+            bios={key: 1},
+        )
+
+        vars_out = resolver.resolve(frame)
+
+        assert vars_out["ins_fast_align_pressed"] is True
+        assert vars_out["ins_fast_align_complete"] is True
 
 
 def test_var_resolver_pack_radar_mode_matches_clickabledata_positions() -> None:

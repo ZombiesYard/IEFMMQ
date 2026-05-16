@@ -759,7 +759,7 @@ def test_live_loop_sends_final_tutor_message_to_dcs_text_channel(tmp_path: Path)
     assert stats["help_cycles"] == 1
     assert tutor_text_sender.calls == [
         {
-            "text": "Turn on APU.",
+            "text": "当前处于 S03。请左键点击 APU 开关将其拨到 ON，然后等待绿色 APU READY 灯亮起。",
             "display_time_s": 9.0,
             "clear_view": True,
             "expect_ack": True,
@@ -2806,7 +2806,9 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
     response_mapping = meta["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["eng_crank_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
-    assert tutor_response_payload["message"] == "S03 is not complete yet. Please satisfy: vars.apu_start_support_complete==true."
+    assert tutor_response_payload["message"] == (
+        "You are on S03. Left-click the APU switch to ON, then wait for the green APU READY light."
+    )
     assert tutor_response_payload["explanations"] == [tutor_response_payload["message"]]
     assert meta["fallback_message"] == "Please operate apu_switch first."
     assert "Please operate apu_switch first." in meta["fallback_explanations"]
@@ -3030,6 +3032,73 @@ def test_safe_fallback_overlay_enforces_ddi_before_ampcd_for_s08(tmp_path: Path)
         assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_brightness_selector"], (
             f"Expected left_mdi_brightness_selector first, got {fallback_help_obj['overlay']['targets']}"
         )
+    finally:
+        loop.close()
+
+
+def test_safe_fallback_overlay_highlights_all_four_display_power_controls_for_s08(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s08_four_display_power_targets.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {
+                    "left_ddi_on": True,
+                    "right_ddi_on": False,
+                    "mpcd_on": False,
+                    "hud_on": False,
+                },
+                "gates": {
+                    "S08.completion": {
+                        "status": "blocked",
+                        "reason_code": "s08_requires_displays_on",
+                        "reason": "Displays must be powered.",
+                    }
+                },
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": [
+                        "vars.right_ddi_on==true",
+                        "vars.mpcd_on==true",
+                        "vars.hud_on==true",
+                    ],
+                    "gate_blockers": [
+                        {
+                            "ref": "GATES.S08.completion",
+                            "reason": "Displays must be powered.",
+                        }
+                    ],
+                    "recent_ui_targets": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+            },
+        )
+
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+
+        assert fallback_reason == "deterministic_step:S08"
+        assert isinstance(fallback_help_obj, dict)
+        assert fallback_help_obj["overlay"]["targets"] == [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+        ]
     finally:
         loop.close()
 
@@ -3394,6 +3463,157 @@ def test_visual_action_hint_does_not_override_existing_model_action(tmp_path: Pa
         loop.close()
 
 
+def test_s08_dual_visual_missing_overrides_model_left_nav_to_right_display_recovery(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s08_dual_visual_missing_model_left_nav.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": {
+                    "S08.completion": {
+                        "status": "blocked",
+                        "reason_code": "s08_requires_visual_pages",
+                        "reason": "FCS and BIT pages are not confirmed.",
+                    },
+                },
+                "vision_fact_summary": {
+                    "status": "available",
+                    "seen_fact_ids": ["tac_page_visible", "hsi_page_visible", "hsi_map_layer_visible"],
+                    "fresh_fact_ids": ["tac_page_visible", "hsi_page_visible", "hsi_map_layer_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible", "bit_root_page_visible"],
+                    "uncertain_fact_ids": [],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": [
+                        "vision_facts.fcs_page_visible==seen",
+                        "vision_facts.bit_root_page_visible==seen",
+                    ],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                    "visual_action_hint": {"target": "left_mdi_pb18"},
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="左 DDI 当前显示 TAC 页面，请先按 PB18 切到 SUPT。",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "left_mdi_pb18",
+                    "element_id": "pnt_72",
+                }
+            ],
+            explanations=["左 DDI 当前显示 TAC 页面，请先按 PB18 切到 SUPT。"],
+            metadata={"help_response": {"next": {"step_id": "S08"}, "diagnosis": {"step_id": "S08"}}},
+        )
+
+        override_used, override_reason = loop._apply_s08_visual_recovery_overlay_override(response, request)
+
+        assert override_used is True
+        assert override_reason == "deterministic_step:S08"
+        assert [action["target"] for action in response.actions][:3] == [
+            "right_mdi_brightness_selector",
+            "left_mdi_pb18",
+            "right_mdi_pb18",
+        ]
+        assert "右 DDI" in response.message
+        assert response.metadata["s08_visual_recovery_overlay_override_used"] is True
+    finally:
+        loop.close()
+
+
+def test_s08_visual_uncertain_overrides_model_ampcd_to_ddi_recovery(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s08_visual_uncertain_model_ampcd.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": {
+                    "S08.completion": {
+                        "status": "blocked",
+                        "reason_code": "s08_requires_mpcd_on",
+                        "reason": "MPCD must be powered.",
+                    },
+                },
+                "vision_fact_summary": {
+                    "status": "extractor_failed",
+                    "seen_fact_ids": [],
+                    "fresh_fact_ids": [],
+                    "not_seen_fact_ids": ["fcsmc_final_go_result_visible"],
+                    "uncertain_fact_ids": [],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": ["vars.mpcd_on==true"],
+                    "gate_blockers": [
+                        {"ref": "GATES.S08.completion", "reason": "MPCD must be powered."}
+                    ],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="当前 MPCD 未通电。请先将 AMPCD 亮度旋钮向上点亮。",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "ampcd_off_brightness_knob",
+                    "element_id": "pnt_203",
+                }
+            ],
+            explanations=["当前 MPCD 未通电。请先将 AMPCD 亮度旋钮向上点亮。"],
+            metadata={"help_response": {"next": {"step_id": "S08"}, "diagnosis": {"step_id": "S08"}}},
+        )
+
+        override_used, override_reason = loop._apply_s08_visual_recovery_overlay_override(response, request)
+
+        assert override_used is True
+        assert override_reason == "deterministic_step:S08"
+        assert [action["target"] for action in response.actions] == ["left_mdi_brightness_selector"]
+        assert "AMPCD" in response.message
+        assert "DDI" in response.message
+        assert response.metadata["s08_visual_recovery_overlay_override_used"] is True
+    finally:
+        loop.close()
+
+
 def test_manual_throttle_guidance_rewrites_s11_throttle_reference_to_keyboard_text(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_manual_throttle_guidance_s11.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
@@ -3543,6 +3763,232 @@ def test_build_procedural_action_hint_for_s09_starts_with_comm1_pull() -> None:
     }
 
 
+def test_live_loop_rewrites_s03_apu_on_wait_for_ready_guidance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s03_apu_on_wait_ready.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            {
+                "schema_version": "v2",
+                "seq": 1,
+                "t_wall": 10.0,
+                "aircraft": "FA-18C_hornet",
+                "bios": {
+                    "BATTERY_SW": 2,
+                    "L_GEN_SW": 1,
+                    "R_GEN_SW": 1,
+                    "APU_CONTROL_SW": 1,
+                    "APU_READY_LT": 0,
+                },
+                "delta": {"APU_CONTROL_SW": 1},
+            }
+        ],
+    )
+
+    class WrongApuOnModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="请左键点击 APU 开关将其打开。",
+                actions=[],
+                explanations=["请打开 APU 开关。"],
+                metadata={
+                    "provider": "fake_llm",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S03", "error_category": "OM"},
+                        "next": {"step_id": "S03"},
+                        "overlay": {
+                            "targets": ["apu_switch"],
+                            "evidence": [
+                                {
+                                    "target": "apu_switch",
+                                    "type": "var",
+                                    "ref": "VARS.apu_ready",
+                                    "quote": "APU READY is not yet true.",
+                                    "grounding_confidence": 0.8,
+                                }
+                            ],
+                        },
+                        "explanations": ["请打开 APU 开关。"],
+                        "confidence": 0.8,
+                    },
+                },
+            )
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(
+            inferred_step_id="S03",
+            missing_conditions=("vars.apu_start_support_complete==true",),
+        ),
+    )
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=WrongApuOnModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    try:
+        obs = loop.source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert "APU READY" in response.message
+    assert "等待" in response.message
+    assert "打开 APU 开关" not in response.message
+
+
+def test_live_loop_clears_s05_throttle_reference_overlay_when_idle_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay_path = tmp_path / "bios_s05_throttle_keyboard_only.jsonl"
+    _write_replay(
+        replay_path,
+        [
+            {
+                "schema_version": "v2",
+                "seq": 1,
+                "t_wall": 10.0,
+                "aircraft": "FA-18C_hornet",
+                "bios": {
+                    "BATTERY_SW": 2,
+                    "L_GEN_SW": 1,
+                    "R_GEN_SW": 1,
+                    "IFEI_RPM_R": 26,
+                    "INT_THROTTLE_RIGHT": 0,
+                },
+                "delta": {"IFEI_RPM_R": 26},
+            }
+        ],
+    )
+
+    class WrongThrottleModel:
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id if request else None,
+                message="请操作油门区域。",
+                actions=[],
+                explanations=["请操作油门区域。"],
+                metadata={
+                    "provider": "fake_llm",
+                    "help_response": {
+                        "diagnosis": {"step_id": "S05", "error_category": "OM"},
+                        "next": {"step_id": "S05"},
+                        "overlay": {
+                            "targets": ["throttle_quadrant_reference"],
+                            "evidence": [
+                                {
+                                    "target": "throttle_quadrant_reference",
+                                    "type": "var",
+                                    "ref": "VARS.throttle_r_idle_complete",
+                                    "quote": "Right throttle idle is not complete.",
+                                    "grounding_confidence": 0.8,
+                                }
+                            ],
+                        },
+                        "explanations": ["请操作油门区域。"],
+                        "confidence": 0.8,
+                    },
+                },
+            )
+
+    monkeypatch.setattr(
+        "live_dcs.infer_step_id",
+        lambda *args, **kwargs: StepInferenceResult(
+            inferred_step_id="S05",
+            missing_conditions=("vars.throttle_r_idle_complete==true",),
+        ),
+    )
+    executor = RecordingExecutor()
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=WrongThrottleModel(),
+        action_executor=executor,
+        lang="zh",
+    )
+    try:
+        obs = loop.source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert response.actions == []
+    assert report["executed"] == []
+    assert "Right Shift+Home" in response.message
+    assert response.metadata["manual_throttle_guidance_rewritten"] is True
+
+
+def test_safe_fallback_overlay_uses_s08_left_and_right_page_navigation_when_visual_pages_missing(
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_s08_visual_pages_missing_multi.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=2,
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": {
+                    "S08.completion": {
+                        "status": "blocked",
+                        "reason_code": "s08_requires_pages",
+                        "reason": "FCS and BIT pages are not confirmed.",
+                    },
+                },
+                "vision_fact_summary": {
+                    "status": "extractor_failed",
+                    "seen_fact_ids": [],
+                    "not_seen_fact_ids": ["fcs_page_visible", "bit_root_page_visible"],
+                    "uncertain_fact_ids": [],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": [
+                        "vision_facts.fcs_page_visible==seen",
+                        "vision_facts.bit_root_page_visible==seen",
+                    ],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+                "rag_topk": [],
+            },
+        )
+
+        fallback_help_obj, fallback_reason = loop._build_safe_fallback_overlay_help_obj(request)
+    finally:
+        loop.close()
+
+    assert fallback_reason == "deterministic_step:S08"
+    assert isinstance(fallback_help_obj, dict)
+    assert fallback_help_obj["overlay"]["targets"] == ["right_mdi_brightness_selector", "left_mdi_pb18"]
+
+
 def test_build_procedural_action_hint_for_s09_advances_through_ufc_entry_sequence() -> None:
     allowed = [
         "ufc_comm1_channel_selector_pull",
@@ -3672,6 +4118,19 @@ def test_build_procedural_action_hint_for_s19_prefers_fcs_bit_switch_on_fcsmc_pa
     ) is None
 
 
+def test_build_procedural_action_hint_for_s12_prompts_ampcd_pb19_after_ins_mode_set() -> None:
+    allowed = ["ins_mode_knob", "ampcd_pb19"]
+
+    assert _build_procedural_action_hint(
+        inferred_step_id="S12",
+        vars_selected={"ins_mode_cv_or_gnd": True, "ins_fast_align_complete": False},
+        allowed_targets=allowed,
+    ) == {
+        "target": "ampcd_pb19",
+        "reason": "INS mode is set for alignment; press AMPCD PB19 to start the fast alignment self-test.",
+    }
+
+
 def test_build_procedural_action_hint_for_s20_advances_after_probe_extends() -> None:
     allowed = [
         "refuel_probe_switch",
@@ -3718,6 +4177,202 @@ def test_build_procedural_action_hint_for_s20_advances_after_probe_extends() -> 
         "target": "pitot_heater_switch",
         "reason": "The launch bar and arresting hook have already been checked; continue the four-down checklist by turning pitot heat ON.",
     }
+
+
+def test_procedural_guidance_rewrite_mentions_s09_frequency_134(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s09_frequency_rewrite.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {"comm1_freq_134_000": False},
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S09",
+                    "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="请设置 COMM1。",
+            actions=[],
+            explanations=["请设置 COMM1。"],
+            metadata={},
+        )
+
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+
+        assert rewritten is True
+        assert reason == "s09_comm1_frequency_guidance"
+        assert "134.000" in response.message
+        assert "1-3-4-0-0-0" in response.message
+    finally:
+        loop.close()
+
+
+def test_procedural_guidance_rewrite_waits_without_highlight_when_s19_in_test(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s19_in_test_wait.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["fcsmc_page_visible", "fcsmc_in_test_visible"],
+                    "fresh_fact_ids": ["fcsmc_in_test_visible"],
+                    "not_seen_fact_ids": ["fcsmc_final_go_result_visible"],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S19",
+                    "missing_conditions": ["vision_facts.fcsmc_final_go_result_visible==seen"],
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="请保持 FCS BIT 开关向上等待测试完成。",
+            actions=[{"kind": "highlight", "target": "fcs_bit_switch"}],
+            explanations=["请保持 FCS BIT 开关向上等待测试完成。"],
+            metadata={"next": {"step_id": "S19"}},
+        )
+
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+
+        assert rewritten is True
+        assert reason == "s19_fcs_bit_in_test_wait"
+        assert response.actions == []
+        assert "无需继续保持" in response.message
+        assert "等待最终 GO" in response.message
+    finally:
+        loop.close()
+
+
+def test_procedural_guidance_does_not_wait_on_s19_intermediate_without_in_test(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s19_intermediate_not_wait.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["fcsmc_page_visible", "fcsmc_intermediate_result_visible"],
+                    "fresh_fact_ids": ["fcsmc_intermediate_result_visible"],
+                    "not_seen_fact_ids": ["fcsmc_in_test_visible", "fcsmc_final_go_result_visible"],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S19",
+                    "missing_conditions": ["vision_facts.fcsmc_final_go_result_visible==seen"],
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="当前处于 S19。请按住 FCS BIT 开关，同时点击右 DDI PB5 启动测试。",
+            actions=[
+                {"kind": "highlight", "target": "fcs_bit_switch"},
+                {"kind": "highlight", "target": "right_mdi_pb5"},
+            ],
+            explanations=["当前处于 S19。请按住 FCS BIT 开关，同时点击右 DDI PB5 启动测试。"],
+            metadata={"next": {"step_id": "S19"}},
+        )
+
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+
+        assert rewritten is False
+        assert reason == "not_applicable"
+        assert response.actions[0]["target"] == "fcs_bit_switch"
+        assert response.actions[1]["target"] == "right_mdi_pb5"
+        assert "启动测试" in response.message
+    finally:
+        loop.close()
+
+
+def test_s19_final_go_fresh_fact_suppresses_s19_fallback(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s19_final_go_fresh.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["fcsmc_page_visible"],
+                    "fresh_fact_ids": ["fcsmc_final_go_result_visible"],
+                    "not_seen_fact_ids": ["fcsmc_final_go_result_visible"],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S19",
+                    "missing_conditions": ["vision_facts.fcsmc_final_go_result_visible==seen"],
+                    "observability_status": "partial",
+                    "requires_visual_confirmation": True,
+                    "action_hint": {"targets": ["fcs_bit_switch", "right_mdi_pb5"]},
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="继续按住 FCS BIT。",
+            actions=[],
+            explanations=["继续按住 FCS BIT。"],
+            metadata={
+                "next": {"step_id": "S19"},
+                "help_response": {
+                    "diagnosis": {"step_id": "S19", "error_category": "CO"},
+                    "next": {"step_id": "S19"},
+                    "overlay": {"targets": ["fcs_bit_switch"], "evidence": []},
+                    "explanations": ["继续按住 FCS BIT。"],
+                },
+            },
+        )
+
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+
+        assert rewritten is True
+        assert reason == "s19_final_go_complete"
+        assert response.actions == []
+        assert response.metadata["next"]["step_id"] == "S20"
+        assert response.metadata["help_response"]["next"]["step_id"] == "S20"
+        assert response.metadata["help_response"]["diagnosis"]["step_id"] == "S20"
+        assert response.metadata["help_response"]["overlay"]["targets"] == []
+        assert loop._should_use_deterministic_overlay_fallback(response, request, None) is False
+    finally:
+        loop.close()
 
 
 def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar() -> None:

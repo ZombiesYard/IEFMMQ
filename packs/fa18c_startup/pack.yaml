@@ -344,6 +344,10 @@ completion_gates:
       max: 2
       reason_code: s12_requires_ins_mode_gnd
       reason: "INS mode must be set to GND for airfield startup."
+    - op: flag_true
+      var: vars.ins_fast_align_complete
+      reason_code: s12_requires_ampcd_pb19_fast_align
+      reason: "AMPCD PB19 must be pressed to start fast INS alignment."
   S13:
     - op: flag_true
       var: vars.radar_mode_opr
@@ -423,6 +427,10 @@ profile_overrides:
           max: 1
           reason_code: s12_requires_ins_mode_cv
           reason: "INS mode must be set to CV for carrier startup."
+        - op: flag_true
+          var: vars.ins_fast_align_complete
+          reason_code: s12_requires_ampcd_pb19_fast_align
+          reason: "AMPCD PB19 must be pressed to start fast INS alignment."
       S24:
         - op: arg_in_range
           var: vars.radar_altimeter_bug_value

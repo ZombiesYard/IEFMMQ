@@ -51,6 +51,13 @@ cockpit_elements:
     dcs_id: "pnt_331"
     aliases: ["Fire and Bleed Air Test Switch", "FIRE_TEST_SW"]
     panel_area: "left_console_engine_start"
+    interaction:
+      click_type_by_value:
+        TEST_A: "right"
+        TEST_B: "left"
+    interaction_hint:
+      zh: "Fire Test：TEST A 右键按住，TEST B 左键按住。"
+      en: "Fire Test: right-click and hold for TEST A; left-click and hold for TEST B."
   apu_switch:
     description: "APU control switch"
     dcs_id: "pnt_375"
