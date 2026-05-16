@@ -741,6 +741,31 @@ def test_infer_step_advances_past_s19_when_structured_final_go_result_is_seen(
     assert result.inferred_step_id == "S23"
 
 
+def test_infer_step_advances_past_s19_when_final_go_fact_is_seen_without_result_kind(
+    real_pack_ctx: Mapping[str, Any],
+) -> None:
+    pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
+    pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
+    vars_map = dict(real_pack_ctx["baseline_vars"])
+    vars_map["standby_altimeter_set"] = False
+
+    result = infer_step_id(
+        pack_steps,
+        vars_map,
+        [],
+        precondition_gates=pack_gates["precondition_gates"],
+        completion_gates=pack_gates["completion_gates"],
+        pack_path=REAL_PACK_PATH,
+        vision_facts=[
+            {"fact_id": "fcs_page_visible", "state": "seen"},
+            {"fact_id": "fcsmc_page_visible", "state": "seen"},
+            {"fact_id": "fcsmc_final_go_result_visible", "state": "seen"},
+        ],
+    )
+
+    assert result.inferred_step_id == "S23"
+
+
 def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
     real_pack_ctx: Mapping[str, Any],
 ) -> None:

@@ -47,6 +47,7 @@ class OpenAICompatModel(BaseHelpModel):
         print_model_io: bool = False,
         api_key: str | None = None,
         enable_multimodal: bool = False,
+        enable_help_multimodal: bool | None = None,
         allowed_local_image_roots: Sequence[str | Path] | None = None,
         max_local_image_bytes: int | None = None,
         telemetry_map_path: str | Path | None = None,
@@ -55,6 +56,9 @@ class OpenAICompatModel(BaseHelpModel):
         self.api_key = api_key
         self.max_tokens = int(max_tokens) if isinstance(max_tokens, int) and max_tokens > 0 else None
         self.enable_multimodal = bool(enable_multimodal)
+        self.enable_help_multimodal = (
+            bool(enable_multimodal) if enable_help_multimodal is None else bool(enable_help_multimodal)
+        )
         self.allowed_local_image_roots = normalize_allowed_local_image_roots(allowed_local_image_roots)
         self.max_local_image_bytes = (
             int(max_local_image_bytes)
@@ -212,6 +216,7 @@ class OpenAICompatModel(BaseHelpModel):
         self._runtime_metadata.update(
             {
                 "multimodal_capability_enabled": self.enable_multimodal,
+                "main_help_multimodal_input_enabled": self.enable_help_multimodal,
                 "multimodal_input_present": bool(multimodal_spec["candidate_frames"]),
                 "multimodal_candidate_frame_ids": list(multimodal_spec["candidate_frame_ids"]),
                 "multimodal_primary_frame_id": multimodal_spec["primary_frame_id"],
@@ -226,7 +231,7 @@ class OpenAICompatModel(BaseHelpModel):
                 "multimodal_failure_reason": multimodal_spec["failure_reason"],
             }
         )
-        if not self.enable_multimodal or not multimodal_spec["image_contents"]:
+        if not self.enable_help_multimodal or not self.enable_multimodal or not multimodal_spec["image_contents"]:
             return messages, prompt_meta
 
         rewritten: list[dict[str, Any]] = []
@@ -477,7 +482,7 @@ class OpenAICompatModel(BaseHelpModel):
         ]
 
         image_contents: list[dict[str, Any]] = []
-        if not self.enable_multimodal:
+        if not self.enable_multimodal or not self.enable_help_multimodal:
             return {
                 "candidate_frames": candidate_frames,
                 "candidate_frame_ids": candidate_frame_ids,
@@ -635,6 +640,7 @@ class OpenAICompatModel(BaseHelpModel):
     ) -> dict[str, Any]:
         return {
             "multimodal_capability_enabled": bool(multimodal_capability_enabled),
+            "main_help_multimodal_input_enabled": bool(multimodal_capability_enabled),
             "multimodal_input_present": False,
             "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,

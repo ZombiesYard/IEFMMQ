@@ -907,7 +907,7 @@ def _vision_fact_state_is_seen(fact: Mapping[str, Any] | None) -> bool:
 def _is_s18_final_go_result_fact(fact: Mapping[str, Any]) -> bool:
     kind = fact.get("result_kind")
     if kind is None:
-        return False
+        return True
     return kind == "final_go"
 
 

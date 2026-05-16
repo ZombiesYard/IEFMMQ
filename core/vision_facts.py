@@ -287,6 +287,8 @@ def _normalize_result_kind(
         and _S18_FCSB_GO_RE.search(evidence_note)
     ):
         return "final_go"
+    if _S18_FCSA_GO_RE.search(evidence_note) and _S18_FCSB_GO_RE.search(evidence_note):
+        return "final_go"
     return "other"
 
 
@@ -345,6 +347,8 @@ def normalize_vision_fact(
         "sticky": bool(spec["sticky"]),
     }
     result_kind = _normalize_result_kind(fact_id, raw_fact.get("result_kind"), normalized["evidence_note"])
+    if fact_id == "fcsmc_final_go_result_visible" and normalized["state"] == "seen" and result_kind is None:
+        result_kind = "final_go"
     if result_kind is not None:
         normalized["result_kind"] = result_kind
     coerced_state = _coerce_s18_result_fact_state(
@@ -528,11 +532,13 @@ def extract_vision_fact_snapshot(
                 normalized_item.get("result_kind"),
                 evidence_note_text,
             )
+            state = normalize_fact_state(normalized_item.get("state"))
+            if fact_id == "fcsmc_final_go_result_visible" and state == "seen" and result_kind is None:
+                result_kind = "final_go"
             if result_kind is not None:
                 normalized_item["result_kind"] = result_kind
             else:
                 normalized_item.pop("result_kind", None)
-            state = normalize_fact_state(normalized_item.get("state"))
             coerced_state = _coerce_s18_result_fact_state(
                 fact_id=fact_id,
                 state=state,

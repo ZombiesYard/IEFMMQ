@@ -659,6 +659,7 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert res.status == "ok"
     assert res.metadata["multimodal_capability_enabled"] is True
     assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["main_help_multimodal_input_enabled"] is True
     assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
     assert res.metadata["multimodal_primary_frame_id"] == "1772872444950_000122"
     assert res.metadata["multimodal_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
@@ -679,6 +680,35 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert "base64," in content[1]["image_url"]["url"]
     assert "Primary visual frame: 1772872444950_000122" in content[2]["text"]
     assert "Trigger frame: 1772872445010_000123" in content[2]["text"]
+
+
+def test_openai_compat_can_keep_help_request_text_only_while_multimodal_is_enabled(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+        enable_help_multimodal=False,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert res.metadata["multimodal_capability_enabled"] is True
+    assert res.metadata["main_help_multimodal_input_enabled"] is False
+    assert res.metadata["multimodal_input_present"] is True
+    assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872445010_000123"]
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_image_count"] == 0
+    assert res.metadata["multimodal_path_attempted"] is False
+    request_payload = fake.calls[0]["json"]
+    assert isinstance(request_payload["messages"][1]["content"], str)
 
 
 def test_openai_compat_dashscope_qwen35_multimodal_uses_json_object_and_omits_max_tokens(tmp_path: Path) -> None:
