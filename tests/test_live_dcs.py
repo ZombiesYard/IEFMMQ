@@ -704,7 +704,7 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert request is not None
     assert request.intent == "help"
     assert "candidate_steps" in request.context
-    assert request.context["candidate_steps"] == [f"S{i:02d}" for i in range(1, 27)]
+    assert request.context["candidate_steps"] == [f"S{i:02d}" for i in range(1, 34)]
     assert "recent_deltas" in request.context
     assert "recent_actions" in request.context
     assert "deterministic_step_hint" in request.context
@@ -2575,7 +2575,26 @@ def test_real_fa18c_pack_marks_non_display_steps_as_bios_observable() -> None:
 
     profiles = _load_step_signal_profiles(pack_path)
 
-    for step_id in ("S11", "S12", "S13", "S14", "S16", "S21", "S22", "S24", "S25", "S26"):
+    for step_id in (
+        "S11",
+        "S12",
+        "S13",
+        "S14",
+        "S16",
+        "S20",
+        "S21",
+        "S22",
+        "S23",
+        "S24",
+        "S25",
+        "S26",
+        "S27",
+        "S28",
+        "S29",
+        "S31",
+        "S32",
+        "S33",
+    ):
         assert profiles[step_id]["observability"] == "observable"
         assert profiles[step_id]["observability_status"] == "observable"
         assert profiles[step_id]["requires_visual_confirmation"] is False
@@ -2605,7 +2624,7 @@ def test_real_fa18c_pack_marks_non_display_partial_steps_as_non_visual() -> None
 
     profiles = _load_step_signal_profiles(pack_path)
 
-    for step_id in ("S17", "S20", "S23"):
+    for step_id in ("S17", "S30"):
         assert profiles[step_id]["observability"] == "partial"
         assert profiles[step_id]["observability_status"] == "partial"
         assert profiles[step_id]["requires_visual_confirmation"] is False
@@ -4225,52 +4244,25 @@ def test_build_procedural_action_hint_for_s12_prompts_ampcd_pb19_after_ins_mode_
     }
 
 
-def test_build_procedural_action_hint_for_s20_advances_after_probe_extends() -> None:
-    allowed = [
-        "refuel_probe_switch",
-        "launch_bar_switch",
-        "arresting_hook_handle",
-        "pitot_heater_switch",
-    ]
+def test_build_procedural_action_hint_for_split_four_down_steps_uses_only_current_step_target() -> None:
+    cases = {
+        "S20": ("refuel_probe_switch", "Extend the refueling probe for the four-down check."),
+        "S21": ("refuel_probe_switch", "Retract the refueling probe after confirming extension."),
+        "S22": ("launch_bar_switch", "Extend the launch bar for the four-down check."),
+        "S23": ("launch_bar_switch", "Retract the launch bar after confirming extension."),
+        "S24": ("arresting_hook_handle", "Lower the arresting hook for the four-down check."),
+        "S25": ("arresting_hook_handle", "Raise the arresting hook after confirming it is down."),
+        "S26": ("pitot_heater_switch", "Turn pitot heat ON."),
+        "S27": ("flap_switch", "Move the flap switch to AUTO."),
+    }
 
-    assert _build_procedural_action_hint(
-        inferred_step_id="S20",
-        vars_selected={"probe_extended": False, "probe_cycle_complete": False},
-        allowed_targets=allowed,
-    ) == {
-        "target": "refuel_probe_switch",
-        "reason": "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
-    }
-    assert _build_procedural_action_hint(
-        inferred_step_id="S20",
-        vars_selected={"probe_extended": False, "probe_cycle_complete": True},
-        allowed_targets=allowed,
-    ) == {
-        "target": "launch_bar_switch",
-        "reason": "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
-    }
-    assert _build_procedural_action_hint(
-        inferred_step_id="S20",
-        vars_selected={"probe_extended": False, "probe_cycle_complete": True, "pitot_heat_on": False},
-        allowed_targets=allowed,
-        step_interacted_targets=["refuel_probe_switch", "launch_bar_switch"],
-    ) == {
-        "target": "arresting_hook_handle",
-        "reason": "The launch bar has already been cycled in this startup session; continue the four-down checklist with the arresting hook next.",
-    }
-    assert _build_procedural_action_hint(
-        inferred_step_id="S20",
-        vars_selected={"probe_extended": False, "probe_cycle_complete": True, "pitot_heat_on": False},
-        allowed_targets=allowed,
-        step_interacted_targets=[
-            "refuel_probe_switch",
-            "launch_bar_switch",
-            "arresting_hook_handle",
-        ],
-    ) == {
-        "target": "pitot_heater_switch",
-        "reason": "The launch bar and arresting hook have already been checked; continue the four-down checklist by turning pitot heat ON.",
-    }
+    for step_id, (target, reason) in cases.items():
+        assert _build_procedural_action_hint(
+            inferred_step_id=step_id,
+            vars_selected={"probe_cycle_complete": True, "pitot_heat_on": False},
+            allowed_targets=list({target, "refuel_probe_switch", "launch_bar_switch", "arresting_hook_handle", "pitot_heater_switch", "flap_switch"}),
+            step_interacted_targets=["refuel_probe_switch", "launch_bar_switch"],
+        ) == {"target": target, "reason": reason}
 
 
 def test_procedural_guidance_rewrite_mentions_s09_frequency_134(tmp_path: Path) -> None:
@@ -4497,7 +4489,7 @@ def test_s19_final_go_fresh_fact_suppresses_s19_fallback(tmp_path: Path) -> None
         loop.close()
 
 
-def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar() -> None:
+def test_action_hint_overlay_override_uses_split_s26_pitot_target() -> None:
     response = TutorResponse(
         message="Extend the refuel probe.",
         explanations=["Extend the refuel probe."],
@@ -4510,8 +4502,8 @@ def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar
             }
         ],
         metadata={
-            "next": {"step_id": "S21"},
-            "diagnosis": {"step_id": "S20", "error_category": "OM"},
+            "next": {"step_id": "S26"},
+            "diagnosis": {"step_id": "S26", "error_category": "OM"},
         },
     )
     request = TutorRequest(
@@ -4521,15 +4513,15 @@ def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar
         context={
             "overlay_target_allowlist": ["refuel_probe_switch", "launch_bar_switch"],
             "gates": [
-                {"gate_id": "S20.completion", "status": "allowed"},
-                {"gate_id": "S20.precondition", "status": "allowed"},
+                {"gate_id": "S26.completion", "status": "blocked"},
+                {"gate_id": "S26.precondition", "status": "allowed"},
             ],
             "deterministic_step_hint": {
-                "inferred_step_id": "S20",
-                "overlay_step_id": "S20",
+                "inferred_step_id": "S26",
+                "overlay_step_id": "S26",
                 "requires_visual_confirmation": False,
                 "step_evidence_requirements": ["gate", "rag", "delta"],
-                "action_hint": {"target": "launch_bar_switch"},
+                "action_hint": {"target": "pitot_heater_switch", "reason": "Turn pitot heat ON."},
             },
             "rag_topk": [],
         },
@@ -4548,10 +4540,10 @@ def test_action_hint_overlay_override_rewrites_s19_probe_backtrack_to_launch_bar
         used, reason = loop._apply_action_hint_overlay_override(response, request)
 
         assert used is True
-        assert reason == "deterministic_step:S20"
-        assert response.actions[0]["target"] == "launch_bar_switch"
-        assert response.metadata["action_hint_overlay_override_target"] == "launch_bar_switch"
-        assert "发射杆开关" in response.message
+        assert reason == "deterministic_step:S26"
+        assert response.actions[0]["target"] == "pitot_heater_switch"
+        assert response.metadata["action_hint_overlay_override_target"] == "pitot_heater_switch"
+        assert response.message == "Turn pitot heat ON."
     finally:
         loop.close()
 
@@ -5751,7 +5743,10 @@ def test_live_loop_skips_vision_fact_extractor_for_non_visual_step(tmp_path: Pat
         vision_mode="replay",
         vision_fact_extractor=FailingIfCalledVisionFactExtractor(),
     )
-    loop._infer_preliminary_step_for_vision_facts = lambda obs: StepInferenceResult("S03", [])
+    loop._infer_preliminary_step_for_vision_facts = lambda obs: StepInferenceResult("S22", [])
+    loop._sticky_inference_step_id = "S08"
+    loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+    loop._last_inferred_step_id = "S08"
     try:
         obs = source.get_observation()
         assert obs is not None
@@ -5764,7 +5759,7 @@ def test_live_loop_skips_vision_fact_extractor_for_non_visual_step(tmp_path: Pat
     assert response is not None
     request = model.calls[0]["request"]
     assert request.metadata["vision_fact_status"] == "vision_not_required"
-    assert request.metadata["vision_fact_active_step_ids"] == ["S03"]
+    assert request.metadata["vision_fact_active_step_ids"] == ["S22"]
     assert request.context["vision_fact_summary"]["status"] == "vision_not_required"
     assert response.metadata["vision_fact_status"] == "vision_not_required"
     assert response.metadata["vision_fallback_reason"] is None
@@ -6779,7 +6774,7 @@ def test_live_loop_uses_deterministic_fallback_when_visual_model_disagrees_with_
 
     monkeypatch.setattr(
         "live_dcs.infer_step_id",
-        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S22", missing_conditions=()),
+        lambda *args, **kwargs: StepInferenceResult(inferred_step_id="S30", missing_conditions=()),
     )
 
     source = ReplayBiosReceiver(replay_path, speed=0.0)
@@ -6806,7 +6801,7 @@ def test_live_loop_uses_deterministic_fallback_when_visual_model_disagrees_with_
     assert response.actions
     assert response.actions[0]["target"] == "standby_altimeter_pressure_knob"
     assert response.metadata["fallback_overlay_used"] is True
-    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S22"
+    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S30"
     assert response.metadata["vision_fallback_reason"] is None
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "standby_altimeter_pressure_knob"
 
@@ -7130,7 +7125,7 @@ def test_live_loop_short_circuits_terminal_state_without_calling_model(
                 **kwargs,
             )
             hint = dict(request.context.get("deterministic_step_hint", {}))
-            hint["inferred_step_id"] = "S26"
+            hint["inferred_step_id"] = "S33"
             hint["missing_conditions"] = []
             hint["missing_conditions_count"] = 0
             hint["gate_blockers"] = []
@@ -7152,8 +7147,8 @@ def test_live_loop_short_circuits_terminal_state_without_calling_model(
     assert response.metadata["terminal_state_rewritten"] is True
     assert response.message == "当前冷启动流程已完成，无需继续操作。"
     assert response.explanations == ["当前冷启动流程已完成，无需继续操作。"]
-    assert response.metadata["diagnosis"]["step_id"] == "S26"
-    assert response.metadata["next"] == {"step_id": "S26"}
+    assert response.metadata["diagnosis"]["step_id"] == "S33"
+    assert response.metadata["next"] == {"step_id": "S33"}
     assert response.actions == []
     assert response.metadata["fallback_overlay_used"] is False
     assert response.metadata["fallback_overlay_reason"] == "all_steps_complete"
@@ -7191,9 +7186,9 @@ def test_rewrite_terminal_state_conflict_response_skips_when_gate_blockers_exist
             message="help",
             context={
                 "deterministic_step_hint": {
-                    "inferred_step_id": "S26",
+                    "inferred_step_id": "S33",
                     "missing_conditions": [],
-                    "gate_blockers": [{"ref": "GATES.S26.precondition", "reason": "blocked"}],
+                    "gate_blockers": [{"ref": "GATES.S33.precondition", "reason": "blocked"}],
                 }
             },
         )
@@ -7225,7 +7220,7 @@ def test_rewrite_terminal_state_conflict_response_skips_short_circuit_response_w
             message="help",
             context={
                 "deterministic_step_hint": {
-                    "inferred_step_id": "S26",
+                    "inferred_step_id": "S33",
                     "missing_conditions": [],
                     "gate_blockers": [],
                 }
@@ -7240,8 +7235,8 @@ def test_rewrite_terminal_state_conflict_response_skips_short_circuit_response_w
     assert rewritten is False
     assert response.message == "当前冷启动流程已完成，无需继续操作。"
     assert response.explanations == ["当前冷启动流程已完成，无需继续操作。"]
-    assert response.metadata["diagnosis"] == {"step_id": "S26"}
-    assert response.metadata["next"] == {"step_id": "S26"}
+    assert response.metadata["diagnosis"] == {"step_id": "S33"}
+    assert response.metadata["next"] == {"step_id": "S33"}
     assert response.metadata["terminal_state_original_message"] == "当前冷启动流程已完成，无需继续操作。"
     assert response.metadata["terminal_state_original_explanations"] == []
 
@@ -7282,7 +7277,7 @@ def test_rewrite_terminal_state_conflict_response_clears_stale_actions(tmp_path:
             message="help",
             context={
                 "deterministic_step_hint": {
-                    "inferred_step_id": "S26",
+                    "inferred_step_id": "S33",
                     "missing_conditions": [],
                     "gate_blockers": [],
                 }
@@ -7304,8 +7299,8 @@ def test_rewrite_terminal_state_conflict_response_clears_stale_actions(tmp_path:
             "element_id": "pnt_999",
         }
     ]
-    assert response.metadata["diagnosis"] == {"step_id": "S26", "error_category": "OM"}
-    assert response.metadata["next"] == {"step_id": "S26"}
+    assert response.metadata["diagnosis"] == {"step_id": "S33", "error_category": "OM"}
+    assert response.metadata["next"] == {"step_id": "S33"}
 
 
 def test_live_loop_replaces_stale_s08_overlay_with_s09_action_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -7974,7 +7969,7 @@ def test_build_vision_selection_falls_back_when_trigger_time_is_non_finite(
     assert selection.trigger_wall_ms == 42500
 
 
-def test_fallback_overlay_skips_interacted_targets_for_s20(tmp_path: Path) -> None:
+def test_fallback_overlay_for_s20_uses_only_refuel_probe_target(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s20_remaining.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
 
@@ -7989,8 +7984,7 @@ def test_fallback_overlay_skips_interacted_targets_for_s20(tmp_path: Path) -> No
         loop._step_interacted_targets = {"launch_bar_switch", "refuel_probe_switch"}
 
         s20_targets = loop.step_signal_profiles.get("S20", {}).get("ui_targets", [])
-        assert "launch_bar_switch" in s20_targets
-        assert "flap_switch" in s20_targets
+        assert s20_targets == ["refuel_probe_switch"]
 
         hint: dict[str, Any] = {
             "inferred_step_id": "S20",
@@ -8000,7 +7994,7 @@ def test_fallback_overlay_skips_interacted_targets_for_s20(tmp_path: Path) -> No
             "recent_ui_targets": [],
             "requires_visual_confirmation": False,
             "step_evidence_requirements": ["gate"],
-            "observability": "partial",
+            "observability": "observable",
         }
         request = TutorRequest(
             actor="learner",
@@ -8021,12 +8015,7 @@ def test_fallback_overlay_skips_interacted_targets_for_s20(tmp_path: Path) -> No
 
         assert help_obj is not None, f"expected overlay help_obj, got reason={reason}"
         actions = help_obj.get("overlay", {}).get("targets", [])
-        assert len(actions) >= 1
-        chosen = actions[0]
-        assert chosen not in {"launch_bar_switch", "refuel_probe_switch"}, (
-            f"expected non-interacted target, got {chosen}"
-        )
-        assert chosen in {"flap_switch", "arresting_hook_handle", "pitot_heater_switch", "throttle_quadrant_reference"}
+        assert actions == ["refuel_probe_switch"]
     finally:
         loop.close()
 
@@ -8251,5 +8240,5 @@ def test_build_request_remembers_launch_bar_interaction_before_next_help(
 
     hint = request.context["deterministic_step_hint"]
     assert hint["recent_ui_targets"] == []
-    assert hint["step_interacted_targets"] == ["launch_bar_switch"]
-    assert hint["action_hint"]["target"] == "arresting_hook_handle"
+    assert hint["step_interacted_targets"] == []
+    assert hint["action_hint"]["target"] == "refuel_probe_switch"

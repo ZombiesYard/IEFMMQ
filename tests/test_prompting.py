@@ -34,8 +34,8 @@ def test_prompt_defaults_to_registry_backed_step_ids() -> None:
     payload = _extract_prompt_constraints_json(result.prompt)
 
     assert payload["allowed_step_ids"][0] == "S01"
-    assert payload["allowed_step_ids"][-1] == "S26"
-    assert len(payload["allowed_step_ids"]) == 26
+    assert payload["allowed_step_ids"][-1] == "S33"
+    assert len(payload["allowed_step_ids"]) == 33
 
 
 def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -> None:
@@ -139,7 +139,7 @@ def test_prompt_terminal_state_rule_uses_inferred_step_id_instead_of_empty_step_
     result = build_help_prompt_result(_base_context(), "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
 
     assert "Leave diagnosis.step_id and next.step_id empty" not in result.prompt
-    assert "Use deterministic_step_hint.inferred_step_id (typically S26)" in result.prompt
+    assert "Use deterministic_step_hint.inferred_step_id (typically S33)" in result.prompt
 
 
 def test_prompt_state_harness_marks_late_vlm_vs_early_telemetry_conflict() -> None:

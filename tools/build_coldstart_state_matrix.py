@@ -144,11 +144,11 @@ def _set_obogs_ready(bios: dict[str, Any], desired: Any) -> None:
 
 
 def _set_flap_auto(bios: dict[str, Any], desired: Any) -> None:
-    bios["FLAP_SW"] = 0 if _bool_like(desired) else 1
+    bios["FLAP_SW"] = 2 if _bool_like(desired) else 0
 
 
 def _set_flap_configured(bios: dict[str, Any], desired: Any) -> None:
-    bios["FLAP_SW"] = 0 if _bool_like(desired) else 2
+    bios["FLAP_SW"] = 2 if _bool_like(desired) else 0
 
 
 def _set_parking_brake_released(bios: dict[str, Any], desired: Any) -> None:
@@ -207,6 +207,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "engine_crank_left_complete": _set_enum("ENGINE_CRANK_SW", true_value=0, false_value=1),
     "engine_crank_right": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
     "engine_crank_right_complete": _set_enum("ENGINE_CRANK_SW", true_value=2, false_value=1),
+    "ext_refuel_probe_value": _set_numeric("EXT_REFUEL_PROBE"),
     "flap_auto": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_auto),
     "flap_configured": _VarBinding(primary_bios_key="FLAP_SW", setter=_set_flap_configured),
     "fcs_reset_complete": _set_enum("FCS_RESET_BTN", true_value=1, false_value=0),
@@ -236,6 +237,8 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     # enforced by telemetry_pipeline across multiple frames in production.
     "lights_test_complete": _set_enum("LIGHTS_TEST_SW", true_value=1, false_value=0),
     "left_ddi_on": _set_enum("LEFT_DDI_BRT_CTL", true_value=1, false_value=0),
+    "launch_bar_switch_value": _set_numeric("LAUNCH_BAR_SW"),
+    "hook_handle_value": _set_numeric("HOOK_LEVER"),
     "mpcd_on": _set_enum("AMPCD_BRT_CTL", true_value=1, false_value=0),
     "obogs_ready": _VarBinding(primary_bios_key="OBOGS_SW", setter=_set_obogs_ready),
     "parking_brake_released": _VarBinding(

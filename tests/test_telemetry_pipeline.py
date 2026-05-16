@@ -147,11 +147,13 @@ def test_enrich_bios_observation_includes_probe_state_for_s19_progression() -> N
     assert enriched.payload["vars"]["probe_switch_value"] == 1
     assert enriched.payload["vars"]["ext_refuel_probe_value"] == 65535
     assert enriched.payload["vars"]["probe_extended"] is True
-    assert enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert enriched.payload["vars"]["probe_retracted"] is False
+    assert enriched.payload["vars"]["probe_cycle_complete"] is False
     assert enriched.payload["vars"]["launch_bar_switch_value"] == 1
+    assert enriched.payload["vars"]["launch_bar_extended"] is True
 
 
-def test_enrich_bios_observation_latches_probe_cycle_complete_after_extension() -> None:
+def test_enrich_bios_observation_marks_probe_cycle_complete_after_retraction() -> None:
     extend_obs = Observation(
         source="dcs_bios",
         payload={
@@ -194,9 +196,41 @@ def test_enrich_bios_observation_latches_probe_cycle_complete_after_extension() 
         delta_stream_id="probe-cycle",
     )
 
-    assert extend_enriched.payload["vars"]["probe_cycle_complete"] is True
+    assert extend_enriched.payload["vars"]["probe_extended"] is True
+    assert extend_enriched.payload["vars"]["probe_retracted"] is False
+    assert extend_enriched.payload["vars"]["probe_cycle_complete"] is False
     assert retract_enriched.payload["vars"]["probe_extended"] is False
+    assert retract_enriched.payload["vars"]["probe_retracted"] is True
     assert retract_enriched.payload["vars"]["probe_cycle_complete"] is True
+
+
+def test_enrich_bios_observation_maps_flap_switch_full_half_auto() -> None:
+    def _enriched_for_flap(value: int) -> Observation:
+        return enrich_bios_observation(
+            Observation(
+                source="dcs_bios",
+                payload={
+                    "seq": 47 + value,
+                    "t_wall": 210.0 + value,
+                    "bios": {"FLAP_SW": value},
+                    "delta": {"FLAP_SW": value},
+                },
+            ),
+            _resolver(),
+            mapper=_mapper(),
+        )
+
+    full = _enriched_for_flap(0).payload["vars"]
+    half = _enriched_for_flap(1).payload["vars"]
+    auto = _enriched_for_flap(2).payload["vars"]
+
+    assert full["flap_full"] is True
+    assert full["flap_auto"] is False
+    assert full["flap_configured"] is False
+    assert half["flap_half"] is True
+    assert half["flap_auto"] is False
+    assert auto["flap_auto"] is True
+    assert auto["flap_configured"] is True
 
 
 def test_enrich_bios_observation_supports_tag_hook_and_debug_cache() -> None:

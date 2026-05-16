@@ -100,7 +100,7 @@ mappings:
   UFC_COMM2_PULL:
     - ufc_comm2_channel_selector_pull
 
-  # S14-S26
+  # S14-S33
   OBOGS_SW:
     - obogs_control_switch
   OXY_FLOW:

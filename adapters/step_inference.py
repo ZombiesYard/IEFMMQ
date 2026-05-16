@@ -142,7 +142,7 @@ def _load_registry_steps_cached(
 ) -> tuple[dict[str, Any], ...]:
     del registry_mtime_ns, registry_size_bytes  # cache-key components only
     try:
-        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=26)
+        entries = load_step_registry_dicts(Path(resolved_registry_path), expected_count=33)
     except (StepRegistryError, OSError, ValueError):
         return ()
     return tuple(dict(step) for step in entries)

@@ -715,8 +715,8 @@ def test_infer_step_advances_past_s19_when_structured_final_go_result_is_seen(
     pack_steps: list[dict[str, Any]] = real_pack_ctx["pack_steps"]
     pack_gates: Mapping[str, Any] = real_pack_ctx["pack_gates"]
     vars_map = dict(real_pack_ctx["baseline_vars"])
-    # S19 is visually confirmed complete, but S23 (standby altimeter) has not
-    # been set yet — it should be the next required step.
+    # S19 is visually confirmed complete; the newly split four-down flow starts
+    # at S20, so the next required step should be probe extension.
     vars_map["standby_altimeter_set"] = False
 
     result = infer_step_id(
@@ -738,7 +738,7 @@ def test_infer_step_advances_past_s19_when_structured_final_go_result_is_seen(
         ],
     )
 
-    assert result.inferred_step_id == "S23"
+    assert result.inferred_step_id == "S20"
 
 
 def test_infer_step_advances_past_s19_when_final_go_fact_is_seen_without_result_kind(
@@ -763,7 +763,7 @@ def test_infer_step_advances_past_s19_when_final_go_fact_is_seen_without_result_
         ],
     )
 
-    assert result.inferred_step_id == "S23"
+    assert result.inferred_step_id == "S20"
 
 
 def test_infer_step_does_not_hold_s09_without_explicit_comm_completion_evidence(
@@ -1278,7 +1278,23 @@ def test_load_pack_gate_config_requires_radar_mode_opr_for_s13_and_later_steps()
 
     assert pack_gates["completion_gates"]["S13"][0]["var"] == "vars.radar_mode_opr"
     assert pack_gates["precondition_gates"]["S19"][0]["var"] == "vars.right_ddi_on"
-    for step_id in ("S14", "S20", "S21", "S22", "S23", "S24", "S25", "S26"):
+    for step_id in (
+        "S14",
+        "S20",
+        "S21",
+        "S22",
+        "S23",
+        "S24",
+        "S25",
+        "S26",
+        "S27",
+        "S28",
+        "S29",
+        "S30",
+        "S31",
+        "S32",
+        "S33",
+    ):
         assert pack_gates["precondition_gates"][step_id][0]["var"] == "vars.radar_mode_opr"
 
 
@@ -1388,7 +1404,7 @@ def _bump_mtime(path: Path) -> None:
 
 def _registry_payload(first_short_explanation: str) -> dict:
     steps = []
-    for i in range(1, 27):
+    for i in range(1, 34):
         sid = f"S{i:02d}"
         short = first_short_explanation if i == 1 else f"step-{sid}"
         steps.append(

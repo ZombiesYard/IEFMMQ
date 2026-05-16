@@ -1238,7 +1238,7 @@ def _extract_selected_layout_id(vision_selection: HelpCycleVisionSelection) -> s
 def _is_terminal_step_hint_complete(hint: Mapping[str, Any] | None) -> bool:
     if not isinstance(hint, Mapping):
         return False
-    if hint.get("inferred_step_id") != "S26":
+    if hint.get("inferred_step_id") != "S33":
         return False
     missing_conditions = hint.get("missing_conditions")
     normalized_missing = [
@@ -1781,40 +1781,24 @@ def _build_procedural_action_hint(
             "Rotate the BLEED AIR knob 360° clockwise (right-click 4 times) from NORM back to NORM.",
         )
 
-    if inferred_step_id == "S20":
+    four_down_single_step_hints = {
+        "S20": ("refuel_probe_switch", "Extend the refueling probe for the four-down check."),
+        "S21": ("refuel_probe_switch", "Retract the refueling probe after confirming extension."),
+        "S22": ("launch_bar_switch", "Extend the launch bar for the four-down check."),
+        "S23": ("launch_bar_switch", "Retract the launch bar after confirming extension."),
+        "S24": ("arresting_hook_handle", "Lower the arresting hook for the four-down check."),
+        "S25": ("arresting_hook_handle", "Raise the arresting hook after confirming it is down."),
+        "S26": ("pitot_heater_switch", "Turn pitot heat ON."),
+        "S27": ("flap_switch", "Move the flap switch to AUTO."),
+    }
+    if inferred_step_id in four_down_single_step_hints:
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
-        interacted_targets = {
-            item for item in (step_interacted_targets or ()) if isinstance(item, str) and item
-        }
-
-        def _hint(target: str, reason: str) -> dict[str, Any] | None:
-            if target not in allowed:
-                return None
-            return {"target": target, "reason": reason}
-
-        if vars_selected.get("probe_cycle_complete") is not True:
-            return _hint(
-                "refuel_probe_switch",
-                "The refueling probe is not yet fully extended; move the probe switch to EXTEND first.",
-            )
-        if "launch_bar_switch" not in interacted_targets:
-            return _hint(
-                "launch_bar_switch",
-                "The refueling probe has already been cycled in this startup session; continue the four-down checklist with the launch bar switch.",
-            )
-        if "arresting_hook_handle" not in interacted_targets:
-            return _hint(
-                "arresting_hook_handle",
-                "The launch bar has already been cycled in this startup session; continue the four-down checklist with the arresting hook next.",
-            )
-        if vars_selected.get("pitot_heat_on") is not True:
-            return _hint(
-                "pitot_heater_switch",
-                "The launch bar and arresting hook have already been checked; continue the four-down checklist by turning pitot heat ON.",
-            )
-        return None
+        target, reason = four_down_single_step_hints[str(inferred_step_id)]
+        if target not in allowed:
+            return None
+        return {"target": target, "reason": reason}
 
     if inferred_step_id == "S14":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
@@ -1845,7 +1829,7 @@ def _build_procedural_action_hint(
         if vars_selected.get("flap_auto") is True:
             return None
         flap_mode = vars_selected.get("flap_mode_value")
-        if isinstance(flap_mode, (int, float)) and int(flap_mode) == 2:
+        if isinstance(flap_mode, (int, float)) and int(flap_mode) == 0:
             return _hint(
                 "flap_switch",
                 "Flap switch is at FULL (cold-start default). Move the flap switch to AUTO.",
@@ -1918,7 +1902,7 @@ def _build_procedural_action_hint(
             "On the right DDI BIT FAILURES page, press PB5 to enter the FCS-MC BIT page before holding the FCS BIT switch.",
         )
 
-    if inferred_step_id == "S22":
+    if inferred_step_id == "S29":
         allowed = {item for item in allowed_targets if isinstance(item, str) and item}
         if not allowed:
             return None
@@ -3309,15 +3293,36 @@ class LiveDcsTutorLoop:
         self,
         preliminary_inference: StepInferenceResult,
     ) -> list[str]:
-        candidates = [
-            preliminary_inference.inferred_step_id,
-            self._sticky_inference_step_id,
-            self._last_inferred_step_id,
-        ]
         out: list[str] = []
-        for item in candidates:
-            if isinstance(item, str) and item and item not in out:
-                out.append(item)
+        current_step_id = preliminary_inference.inferred_step_id
+        if isinstance(current_step_id, str) and current_step_id:
+            out.append(current_step_id)
+        current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
+
+        def _is_adjacent_visual_step(step_id: Any) -> bool:
+            if not isinstance(step_id, str) or not step_id:
+                return False
+            if step_id not in self.vision_priority_step_set:
+                return False
+            if step_id == current_step_id:
+                return True
+            step_idx = self._step_order_index.get(step_id)
+            if current_idx is None or step_idx is None:
+                return False
+            return abs(step_idx - current_idx) <= 1
+
+        sticky_missing_has_visual_hold = any(
+            isinstance(item, str) and item.startswith("vision_facts.")
+            for item in self._sticky_inference_missing_conditions
+        )
+        if sticky_missing_has_visual_hold and _is_adjacent_visual_step(self._sticky_inference_step_id):
+            sticky_step_id = self._sticky_inference_step_id
+            if isinstance(sticky_step_id, str) and sticky_step_id not in out:
+                out.append(sticky_step_id)
+        if _is_adjacent_visual_step(self._last_inferred_step_id):
+            last_step_id = self._last_inferred_step_id
+            if isinstance(last_step_id, str) and last_step_id not in out:
+                out.append(last_step_id)
         return out
 
     def _should_extract_vision_facts_for_steps(self, step_ids: Sequence[str] | None) -> bool:
@@ -3460,8 +3465,8 @@ class LiveDcsTutorLoop:
             metadata={
                 "provider": "fallback",
                 "generation_mode": "fallback",
-                "diagnosis": {"step_id": "S26"},
-                "next": {"step_id": "S26"},
+                "diagnosis": {"step_id": "S33"},
+                "next": {"step_id": "S33"},
                 "terminal_state_rewritten": True,
                 "terminal_state_original_message": message,
                 "terminal_state_original_explanations": [],
@@ -3737,7 +3742,7 @@ class LiveDcsTutorLoop:
         if not isinstance(help_response, Mapping):
             return False
         inferred_step_id = hint.get("inferred_step_id")
-        if inferred_step_id != "S26":
+        if inferred_step_id != "S33":
             return False
         missing_conditions = hint.get("missing_conditions")
         normalized_missing = [
@@ -3753,7 +3758,7 @@ class LiveDcsTutorLoop:
             return False
 
         model_next_step_id = _extract_model_next_step_id(response.metadata)
-        if model_next_step_id == "S26":
+        if model_next_step_id == "S33":
             return False
 
         response.metadata["terminal_state_rewritten"] = True
@@ -3780,12 +3785,12 @@ class LiveDcsTutorLoop:
             if isinstance(response.metadata.get("diagnosis"), Mapping)
             else {}
         )
-        rewritten_diagnosis = {"step_id": "S26"}
+        rewritten_diagnosis = {"step_id": "S33"}
         error_category = original_diagnosis.get("error_category")
         if isinstance(error_category, str) and error_category:
             rewritten_diagnosis["error_category"] = error_category
         response.metadata["diagnosis"] = rewritten_diagnosis
-        response.metadata["next"] = {"step_id": "S26"}
+        response.metadata["next"] = {"step_id": "S33"}
 
         return True
 
@@ -3894,8 +3899,8 @@ class LiveDcsTutorLoop:
                 if isinstance(item, str) and item
             }
         inferred_step_id = hint.get("inferred_step_id")
+        action_hint = hint.get("action_hint")
         if bool(hint.get("requires_visual_confirmation")) is True:
-            action_hint = hint.get("action_hint")
             if isinstance(action_hint, Mapping):
                 hinted_target = action_hint.get("target")
                 if isinstance(hinted_target, str) and hinted_target:
@@ -3908,8 +3913,7 @@ class LiveDcsTutorLoop:
                     elif inferred_step_id == "S19" and "fcsmc_page_visible" in seen_fact_ids:
                         action_target = hinted_target
                         override_kind = "action_hint"
-        elif inferred_step_id == "S20":
-            action_hint = hint.get("action_hint")
+        elif inferred_step_id in {"S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"}:
             if isinstance(action_hint, Mapping):
                 hinted_target = action_hint.get("target")
                 if isinstance(hinted_target, str) and hinted_target:
@@ -3981,25 +3985,19 @@ class LiveDcsTutorLoop:
                 response.metadata["action_hint_overlay_override_original_message"] = original_message
             if original_explanations and original_explanations != [rewritten]:
                 response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
-        elif inferred_step_id == "S20" and override_kind == "action_hint":
+        elif (
+            inferred_step_id in {"S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"}
+            and override_kind == "action_hint"
+        ):
             original_message = response.message
             original_explanations = list(response.explanations)
-            if action_target == "launch_bar_switch":
-                if self.lang == "zh":
-                    rewritten = "加油管在本次启动中已经完成伸出检查。下一步请继续四落检查，操作发射杆开关。"
-                else:
-                    rewritten = (
-                        "The refueling probe has already been cycled during this startup. "
-                        "Continue the four-down checklist with the launch bar switch next."
-                    )
+            hint_reason = action_hint.get("reason") if isinstance(action_hint, Mapping) else None
+            if isinstance(hint_reason, str) and hint_reason:
+                rewritten = hint_reason
+            elif self.lang == "zh":
+                rewritten = "请按系统提示操作当前高亮目标，继续完成四落检查。"
             else:
-                hint_reason = action_hint.get("reason") if isinstance(action_hint, Mapping) else None
-                if isinstance(hint_reason, str) and hint_reason:
-                    rewritten = hint_reason
-                elif self.lang == "zh":
-                    rewritten = "请按系统提示操作当前高亮目标，继续完成四落检查。"
-                else:
-                    rewritten = "Follow the highlighted target to continue the four-down checklist."
+                rewritten = "Follow the highlighted target to continue the four-down checklist."
             response.message = rewritten
             response.explanations = [rewritten]
             if original_message != rewritten:
@@ -4413,9 +4411,9 @@ class LiveDcsTutorLoop:
                 reason = "s19_final_go_complete"
                 rejected_model_step_id = _extract_model_next_step_id(response.metadata)
                 if self.lang == "zh":
-                    rewritten = "FCS BIT 最终 GO 已显示，S19 已完成。下一步进入 S20 四落检查。"
+                    rewritten = "FCS BIT 最终 GO 已显示，S19 已完成。下一步进入 S20，先展开受油管开始四落检查。"
                 else:
-                    rewritten = "The final FCS BIT GO result is visible, so S19 is complete. Continue to S20 four-down checks."
+                    rewritten = "The final FCS BIT GO result is visible, so S19 is complete. Continue to S20 by extending the refueling probe."
                 response.actions = []
                 response.metadata["diagnosis"] = {"step_id": "S20"}
                 response.metadata["next"] = {"step_id": "S20"}
@@ -4634,7 +4632,7 @@ class LiveDcsTutorLoop:
             item for item in gate_blockers_raw if isinstance(item, Mapping) and item
         ] if isinstance(gate_blockers_raw, (list, tuple)) else []
 
-        if inferred_step_id == "S26" and not missing_conditions and not gate_blockers:
+        if inferred_step_id == "S33" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
 
         _precondition_blocked = any(

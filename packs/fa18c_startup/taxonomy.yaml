@@ -27,8 +27,8 @@ taxonomy:
       definition: "Step executed with wrong value/position/magnitude."
       weight: 1
       examples:
-        - "Sets BINGO fuel to unreasonable value (S21)."
-        - "Radar altimeter bug set to 5000 ft instead of low pattern altitude (S23)."
+        - "Sets BINGO fuel to unreasonable value (S29)."
+        - "Radar altimeter bug set to 5000 ft instead of low pattern altitude (S31)."
     - code: SV
       name: State Violation
       definition: "Performs a step while its required preconditions are not satisfied."

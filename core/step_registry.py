@@ -251,7 +251,7 @@ def _load_registry_cached(
 def load_step_registry(
     path: str | Path | None = None,
     *,
-    expected_count: int | None = 26,
+    expected_count: int | None = 33,
 ) -> list[CanonicalStep]:
     registry_path = Path(path).resolve() if path is not None else default_step_registry_path().resolve()
     mtime_ns, size_bytes = _safe_stat(registry_path, label="step registry")
@@ -261,7 +261,7 @@ def load_step_registry(
 def load_step_registry_dicts(
     path: str | Path | None = None,
     *,
-    expected_count: int | None = 26,
+    expected_count: int | None = 33,
 ) -> list[dict[str, Any]]:
     return [step.to_dict() for step in load_step_registry(path, expected_count=expected_count)]
 
@@ -269,7 +269,7 @@ def load_step_registry_dicts(
 def load_step_ids(
     path: str | Path | None = None,
     *,
-    expected_count: int | None = 26,
+    expected_count: int | None = 33,
 ) -> list[str]:
     return [step.step_id for step in load_step_registry(path, expected_count=expected_count)]
 

@@ -117,7 +117,7 @@ vars:
   ufc_scratchpad_string_1_display: "bios.UFC_SCRATCHPAD_STRING_1_DISPLAY"
   ufc_scratchpad_string_2_display: "bios.UFC_SCRATCHPAD_STRING_2_DISPLAY"
 
-  # S14-S26 extension vars.
+  # S14-S33 extension vars.
   # If a checklist item is currently not observable from trusted telemetry, expose it
   # as explicit "unknown" (instead of false) so gating/inference can degrade safely.
   obogs_switch_on: "bios.OBOGS_SW == 1"
@@ -129,10 +129,10 @@ vars:
   fcs_page_reviewed: "'unknown'"
 
   flap_mode_value: "derived(num(bios.FLAP_SW))"
-  flap_auto: "derived(vars.flap_mode_value == 0)"
+  flap_full: "derived(vars.flap_mode_value == 0)"
   flap_half: "derived(vars.flap_mode_value == 1)"
-  flap_full: "derived(vars.flap_mode_value == 2)"
-  flap_configured: "derived(vars.flap_mode_value == 0 or vars.flap_mode_value == 1)"
+  flap_auto: "derived(vars.flap_mode_value == 2)"
+  flap_configured: "derived(vars.flap_auto)"
 
   takeoff_trim_pressed: "bios.TO_TRIM_BTN == 1"
   takeoff_trim_set: "derived(vars.takeoff_trim_pressed)"
@@ -144,10 +144,15 @@ vars:
   ext_refuel_probe_value: "derived(num(bios.EXT_REFUEL_PROBE))"
   # pnt_341 clickable order is EXTEND/RETRACT/EMERG EXTD => 0/1/2. The external
   # probe position argument also rises toward 65535 when physically extended.
-  probe_extended: "derived(vars.probe_switch_value == 0 or vars.ext_refuel_probe_value >= 60000)"
-  probe_cycle_complete: "derived(vars.probe_extended)"
+  probe_extended: "derived(vars.ext_refuel_probe_value >= 60000)"
+  probe_retracted: "derived(vars.ext_refuel_probe_value <= 5000)"
+  probe_cycle_complete: "derived(vars.probe_retracted)"
   launch_bar_switch_value: "derived(num(bios.LAUNCH_BAR_SW))"
+  launch_bar_extended: "derived(vars.launch_bar_switch_value == 1)"
+  launch_bar_retracted: "derived(vars.launch_bar_switch_value == 0)"
   hook_handle_value: "derived(num(bios.HOOK_LEVER))"
+  hook_extended: "derived(vars.hook_handle_value == 1)"
+  hook_retracted: "derived(vars.hook_handle_value == 0)"
   pitot_heat_on: "bios.PITOT_HEAT_SW > 0"
   four_down_complete: "'unknown'"
 
