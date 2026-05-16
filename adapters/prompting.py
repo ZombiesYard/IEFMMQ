@@ -17,6 +17,10 @@ import yaml
 
 from adapters.evidence_refs import EVIDENCE_TYPE_PREFIXES, infer_evidence_type_from_ref
 from adapters.pack_gates import SUPPORTED_SCENARIO_PROFILES
+from core.evidence_packet import (
+    CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS,
+    build_evidence_packet,
+)
 from core.llm_schema import get_help_response_schema
 from core.step_signal_metadata import (
     STEP_EVIDENCE_REQUIREMENT_VALUES,
@@ -43,22 +47,7 @@ MAX_RAG_SNIPPET_CHARS = 220
 # Keep only the highest-signal overlay candidates so policy hints stay useful
 # without bloating the prompt when recent UI/delta lists are noisy.
 MAX_PRIORITY_OVERLAY_TARGETS = 8
-EARLY_STEP_IDS = {"S01", "S02", "S03"}
-LATE_DISPLAY_ANCHOR_FACTS = {
-    "tac_page_visible",
-    "supt_page_visible",
-    "fcs_page_visible",
-    "bit_root_page_visible",
-    "fcsmc_page_visible",
-    "fcsmc_in_test_visible",
-    "fcsmc_intermediate_result_visible",
-    "fcsmc_final_go_result_visible",
-    "hsi_page_visible",
-    "hsi_map_layer_visible",
-    "ins_grnd_alignment_text_visible",
-    "ins_ok_text_visible",
-}
-HARNESS_LATE_VLM_CONFLICT = "early_step_from_telemetry_vs_late_display_from_vlm"
+HARNESS_LATE_VLM_CONFLICT = CONFLICT_STALE_TELEMETRY_VS_FRESH_VISUAL_FACTS
 
 _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.apu_on": ("apu_switch",),
@@ -957,103 +946,8 @@ def _string_items(raw: Any) -> list[str]:
     return out
 
 
-def _build_visual_candidate_steps(anchor_ids: set[str]) -> list[str]:
-    candidates: list[str] = []
-    if {"tac_page_visible", "bit_root_page_visible"}.intersection(anchor_ids):
-        candidates.extend(["S08", "S09"])
-    if {"ins_grnd_alignment_text_visible", "ins_ok_text_visible", "hsi_page_visible", "hsi_map_layer_visible"}.intersection(anchor_ids):
-        candidates.extend(["S12", "S13"])
-    if {"fcsmc_page_visible", "fcsmc_in_test_visible", "fcsmc_intermediate_result_visible", "fcsmc_final_go_result_visible"}.intersection(anchor_ids):
-        candidates.extend(["S18", "S19", "S20"])
-    return _string_items(candidates)
-
-
 def build_state_harness(context: Mapping[str, Any]) -> dict[str, Any]:
-    vars_raw = context.get("vars")
-    vars_map = vars_raw if isinstance(vars_raw, Mapping) else {}
-    missing_sources = _string_items(vars_map.get("vars_source_missing"))
-    missing_count = len(missing_sources)
-    seq = None
-    vision_raw = context.get("vision")
-    if isinstance(vision_raw, Mapping):
-        raw_seq = vision_raw.get("observation_seq")
-        if isinstance(raw_seq, int) and not isinstance(raw_seq, bool):
-            seq = raw_seq
-
-    bootstrap_like = (
-        missing_count >= 20
-        or (isinstance(seq, int) and seq <= 3)
-        or (
-            vars_map.get("battery_on") is False
-            and vars_map.get("power_available") is False
-            and missing_count >= 8
-        )
-    )
-    telemetry_status = "low_confidence_bootstrap" if bootstrap_like else "nominal"
-
-    vision_summary_raw = context.get("vision_fact_summary")
-    vision_summary = vision_summary_raw if isinstance(vision_summary_raw, Mapping) else {}
-    seen_ids = set(_string_items(vision_summary.get("seen_fact_ids")))
-    fresh_ids = set(_string_items(vision_summary.get("fresh_fact_ids")))
-    not_seen_ids = set(_string_items(vision_summary.get("not_seen_fact_ids")))
-    late_anchors = sorted((seen_ids | fresh_ids).intersection(LATE_DISPLAY_ANCHOR_FACTS))
-    visual_candidates = _build_visual_candidate_steps(set(late_anchors))
-
-    deterministic_raw = context.get("deterministic_step_hint")
-    deterministic = deterministic_raw if isinstance(deterministic_raw, Mapping) else {}
-    deterministic_step = deterministic.get("inferred_step_id")
-    deterministic_missing = _string_items(deterministic.get("missing_conditions"))
-
-    conflicts: list[str] = []
-    if isinstance(deterministic_step, str) and deterministic_step in EARLY_STEP_IDS and len(late_anchors) >= 2:
-        conflicts.append(HARNESS_LATE_VLM_CONFLICT)
-
-    gates_raw = context.get("gates")
-    gates = gates_raw if isinstance(gates_raw, Mapping) else {}
-    blocked_gates = [
-        key for key, value in gates.items()
-        if isinstance(key, str) and isinstance(value, Mapping) and value.get("status") == "blocked"
-    ][:8]
-    recent_actions_raw = context.get("recent_actions")
-    recent_actions = recent_actions_raw if isinstance(recent_actions_raw, Mapping) else {}
-
-    return {
-        "telemetry_evidence": {
-            "source_status": telemetry_status,
-            "confidence": "low" if telemetry_status != "nominal" else "medium",
-            "observation_seq": seq,
-            "vars_source_missing_count": missing_count,
-            "early_vars": {
-                key: vars_map.get(key)
-                for key in ("battery_on", "power_available", "fire_test_a_complete", "fire_test_b_complete")
-                if key in vars_map
-            },
-        },
-        "vision_evidence": {
-            "source_status": vision_summary.get("status", "vision_unavailable"),
-            "confidence": "high" if late_anchors else "medium",
-            "late_display_anchors": late_anchors,
-            "visual_candidate_steps": visual_candidates,
-            "seen_fact_ids": sorted(seen_ids)[:12],
-            "fresh_fact_ids": sorted(fresh_ids)[:12],
-            "not_seen_fact_ids": sorted(not_seen_ids)[:12],
-        },
-        "gate_evidence": {
-            "blocked_gate_ids": blocked_gates,
-            "blocked_gate_count": len(blocked_gates),
-        },
-        "recent_action_evidence": {
-            "recent_buttons": _string_items(recent_actions.get("recent_buttons"))[:8],
-            "source_status": "available" if recent_actions else "empty",
-        },
-        "deterministic_candidate": {
-            "step_id": deterministic_step if isinstance(deterministic_step, str) else None,
-            "overlay_step_id": deterministic.get("overlay_step_id") if isinstance(deterministic.get("overlay_step_id"), str) else None,
-            "missing_conditions": deterministic_missing,
-            "role": "candidate_not_authoritative",
-        },
-        "conflicts": conflicts,
-    }
+    return build_evidence_packet(context).to_state_harness_dict()
 
 
 def _harness_conflicts_with_early_deterministic(state_harness: Mapping[str, Any]) -> bool:

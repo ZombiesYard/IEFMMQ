@@ -725,6 +725,15 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert "S03.completion" in gates
     assert gates["S03.completion"]["status"] in {"allowed", "blocked"}
     assert request.metadata["prompt_hash"]
+    assert request.context["evidence_packet_summary"]["telemetry_status"] in {
+        "nominal",
+        "low_confidence_bootstrap",
+    }
+    assert isinstance(request.context["evidence_packet_summary"]["blocked_gate_count"], int)
+    assert request.metadata["evidence_packet_summary"] == request.context["evidence_packet_summary"]
+    tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
+    assert tutor_request_payload["context"]["evidence_packet_summary"] == request.context["evidence_packet_summary"]
+    assert tutor_request_payload["metadata"]["evidence_packet_summary"] == request.context["evidence_packet_summary"]
     assert request.context["overlay_target_allowlist"] == ["apu_switch"]
 
     assert len(executor.calls) == 1

@@ -38,7 +38,7 @@ from adapters.pack_gates import (
     load_pack_gate_config,
     normalize_scenario_profile,
 )
-from adapters.prompting import HARNESS_LATE_VLM_CONFLICT, build_help_prompt_result, build_state_harness
+from adapters.prompting import HARNESS_LATE_VLM_CONFLICT, build_help_prompt_result
 from adapters.recent_actions import (
     RecentDeltaRingBuffer,
     build_prompt_recent_deltas,
@@ -128,6 +128,7 @@ from core.vision_facts import (
     prune_expired_facts,
     snapshot_to_list,
 )
+from core.evidence_packet import build_evidence_packet
 from core.vars import VarResolver
 from ports.knowledge_port import KnowledgePort, KnowledgeRetrieveWithMetaPort
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
@@ -529,6 +530,7 @@ _SAFE_REQUEST_METADATA_FIELDS: tuple[str, ...] = (
     "vision_fact_seen_ids",
     "state_harness_conflicts",
     "state_harness_telemetry_status",
+    "evidence_packet_summary",
     "help_cycle_id",
     "generation_mode",
     "vision_used",
@@ -551,6 +553,9 @@ def _sanitize_request_metadata_for_event(raw: Any) -> dict[str, Any]:
         if key not in raw:
             continue
         value = raw.get(key)
+        if key == "evidence_packet_summary":
+            sanitized[key] = _sanitize_evidence_packet_summary_for_event(value)
+            continue
         if isinstance(value, Mapping):
             sanitized[key] = dict(value)
         elif isinstance(value, tuple):
@@ -688,6 +693,32 @@ def _sanitize_state_harness_for_event(raw: Any) -> dict[str, Any]:
     return sanitized
 
 
+def _sanitize_evidence_packet_summary_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    sanitized: dict[str, Any] = {}
+    for key in ("telemetry_status", "vision_status"):
+        value = raw.get(key)
+        if isinstance(value, str) and len(value) <= 80:
+            sanitized[key] = value
+    for key in (
+        "telemetry_missing_source_count",
+        "vision_seen_count",
+        "vision_fresh_count",
+        "blocked_gate_count",
+        "recent_action_count",
+    ):
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            sanitized[key] = value
+    conflicts = raw.get("conflicts")
+    if isinstance(conflicts, list):
+        sanitized["conflicts"] = [
+            item for item in conflicts if isinstance(item, str) and len(item) <= 120
+        ][:8]
+    return sanitized
+
+
 def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, Mapping):
         return {}
@@ -706,6 +737,10 @@ def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
         )
     if "state_harness" in raw:
         sanitized["state_harness"] = _sanitize_state_harness_for_event(raw.get("state_harness"))
+    if "evidence_packet_summary" in raw:
+        sanitized["evidence_packet_summary"] = _sanitize_evidence_packet_summary_for_event(
+            raw.get("evidence_packet_summary")
+        )
     if "vision" in raw:
         sanitized["vision"] = _sanitize_vision_context_for_event(raw.get("vision"))
     if "vision_facts" in raw:
@@ -3072,13 +3107,17 @@ class LiveDcsTutorLoop:
         preliminary_harness_context = {
             "vars": vars_selected,
             "gates": gates,
+            "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
             "deterministic_step_hint": deterministic_hint,
+            "telemetry": {"t_wall": now_t_wall} if now_t_wall is not None else {},
             "vision": vision_context,
             "vision_facts": list(vision_fact_context.get("vision_facts", [])),
             "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
         }
-        state_harness = build_state_harness(preliminary_harness_context)
+        evidence_packet = build_evidence_packet(preliminary_harness_context)
+        state_harness = evidence_packet.to_state_harness_dict()
+        evidence_packet_summary = evidence_packet.compact_summary()
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
         overlay_target_allowlist = _resolve_step_overlay_allowlist(
             overlay_step_id,
@@ -3123,6 +3162,7 @@ class LiveDcsTutorLoop:
             "candidate_steps": _reprioritize_steps_for_state_harness(self.candidate_steps, state_harness),
             "overlay_target_allowlist": overlay_target_allowlist,
             "state_harness": state_harness,
+            "evidence_packet_summary": evidence_packet_summary,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
             "rag_topk": rag_topk,
@@ -3187,6 +3227,7 @@ class LiveDcsTutorLoop:
                     if isinstance(state_harness.get("telemetry_evidence"), Mapping)
                     else None
                 ),
+                "evidence_packet_summary": evidence_packet_summary,
             },
         )
 
@@ -3224,6 +3265,7 @@ class LiveDcsTutorLoop:
                 ),
                 "visual_candidate_steps": _visual_candidate_steps_from_state_harness(state_harness),
             },
+            "evidence_packet_summary": evidence_packet_summary,
         }
         state_key = _stable_hash_json(state_signature)
         return req, prompt_result.metadata, state_key
