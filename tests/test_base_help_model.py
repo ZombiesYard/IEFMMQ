@@ -4,6 +4,7 @@ from pathlib import Path
 
 from adapters import base_help_model
 from adapters.openai_compat_model import OpenAICompatModel
+from core.types import TutorRequest
 from tests._fakes import FakeClient
 
 
@@ -105,3 +106,25 @@ def test_expand_presented_missing_condition_keeps_derived_condition_when_all_fal
     )
 
     assert expanded == ("vars.apu_start_support_complete==true",)
+
+
+def test_validate_context_bounds_accepts_structured_candidate_steps() -> None:
+    model = OpenAICompatModel(client=FakeClient(responses=[]), lang="en")
+    request = TutorRequest(
+        intent="help",
+        message="help",
+        context={
+            "candidate_steps": [
+                {"step_id": "S02", "source": "visual_anchor"},
+                {"step_id": "S01", "source": "deterministic"},
+            ],
+            "overlay_target_allowlist": ["apu_switch"],
+        },
+    )
+    help_obj = {
+        "diagnosis": {"step_id": "S02"},
+        "next": {"step_id": "S02"},
+        "overlay": {"targets": ["apu_switch"]},
+    }
+
+    model._validate_context_bounds(help_obj, request)

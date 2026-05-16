@@ -43,6 +43,8 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     payload = _extract_prompt_constraints_json(prompt)
 
     assert payload["allowed_step_ids"] == ["S02", "S03"]
+    assert [item["step_id"] for item in payload["candidate_steps"]] == ["S02", "S03"]
+    assert payload["candidate_steps"][0]["source"] == "legacy_order"
     assert payload["allowed_overlay_targets"] == ["apu_switch", "battery_switch"]
     assert payload["allowed_overlay_evidence_types"] == ["var", "gate", "rag", "delta", "visual"]
     assert payload["allowed_error_categories"]
@@ -66,6 +68,82 @@ def test_prompt_contains_enum_constraints_delta_summary_and_evidence_sources() -
     assert sample_evidence["ref"] in payload["allowed_evidence_refs"]
     assert len(sample_evidence["quote"]) <= 120
     assert sample_evidence["type"] == infer_evidence_type_from_ref(sample_evidence["ref"])
+
+
+def test_prompt_accepts_structured_candidate_steps_and_keeps_allowed_step_ids() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = [
+        {
+            "step_id": "S08",
+            "source": "visual_anchor",
+            "role": "candidate",
+            "supporting_evidence_refs": ["VISION_FACTS.tac_page_visible"],
+            "refuting_evidence_refs": ["VARS.battery_on"],
+            "confidence": 0.86,
+            "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            "proposed_next_action_target_ids": ["left_mdi_pb18"],
+            "reason": "fresh VLM page anchors outrank bootstrap telemetry",
+        },
+        {
+            "step_id": "S01",
+            "source": "deterministic",
+            "role": "candidate_not_authoritative",
+            "supporting_evidence_refs": ["GATES.S01.completion"],
+            "refuting_evidence_refs": ["VISION_FACTS.tac_page_visible"],
+            "confidence": 0.35,
+            "missing_conditions": ["vars.battery_on==true"],
+            "proposed_next_action_target_ids": ["battery_switch"],
+            "reason": "forward deterministic fallback",
+        },
+    ]
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S01",
+        "missing_conditions": ["vars.battery_on==true"],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert payload["allowed_step_ids"] == ["S08", "S01"]
+    assert payload["candidate_steps"][0]["step_id"] == "S08"
+    assert payload["candidate_steps"][0]["source"] == "visual_anchor"
+    assert payload["candidate_steps"][1]["role"] == "candidate_not_authoritative"
+    assert result.metadata["candidate_step_ids"] == ["S08", "S01"]
+
+
+def test_prompt_compact_template_keeps_minimal_structured_candidate_steps() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = [
+        {
+            "step_id": "S08",
+            "source": "visual_anchor",
+            "role": "candidate",
+            "confidence": 0.86,
+            "supporting_evidence_refs": ["VISION_FACTS.tac_page_visible"],
+        },
+        {
+            "step_id": "S01",
+            "source": "deterministic",
+            "role": "candidate_not_authoritative",
+            "confidence": 0.35,
+            "missing_conditions": ["vars.battery_on==true"],
+        },
+    ]
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=500, max_prompt_tokens_est=120)
+
+    assert "compact_template" in result.metadata["trim_reasons"]
+    constraints_line = next(line for line in result.prompt.splitlines() if line.startswith("constraints="))
+    payload = json.loads(constraints_line[len("constraints=") :])
+    assert payload["candidate_steps"][0] == {
+        "confidence": 0.86,
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S08",
+    }
+    assert {
+        item["step_id"] for item in payload["candidate_steps"]
+    }.issubset(set(payload["allowed_step_ids"]))
 
 
 def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:

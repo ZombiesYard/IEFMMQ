@@ -128,7 +128,7 @@ from core.vision_facts import (
     prune_expired_facts,
     snapshot_to_list,
 )
-from core.evidence_packet import build_evidence_packet
+from core.evidence_packet import build_evidence_packet, build_step_candidates
 from core.vars import VarResolver
 from ports.knowledge_port import KnowledgePort, KnowledgeRetrieveWithMetaPort
 from simtutor.cli_parsing import parse_env_int, parse_non_negative_int_arg
@@ -3118,6 +3118,14 @@ class LiveDcsTutorLoop:
         evidence_packet = build_evidence_packet(preliminary_harness_context)
         state_harness = evidence_packet.to_state_harness_dict()
         evidence_packet_summary = evidence_packet.compact_summary()
+        candidate_step_payload = [
+            candidate.to_dict()
+            for candidate in build_step_candidates(
+                evidence_packet,
+                step_harness_specs=self.step_harness_specs,
+                ordered_step_ids=_reprioritize_steps_for_state_harness(self.candidate_steps, state_harness),
+            )
+        ]
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
         overlay_target_allowlist = _resolve_step_overlay_allowlist(
             overlay_step_id,
@@ -3159,7 +3167,7 @@ class LiveDcsTutorLoop:
             "recent_actions": recent_actions,
             "pack_path": str(self.pack_path),
             "telemetry_map_path": str(self.telemetry_map_path),
-            "candidate_steps": _reprioritize_steps_for_state_harness(self.candidate_steps, state_harness),
+            "candidate_steps": candidate_step_payload,
             "overlay_target_allowlist": overlay_target_allowlist,
             "state_harness": state_harness,
             "evidence_packet_summary": evidence_packet_summary,
@@ -3238,7 +3246,7 @@ class LiveDcsTutorLoop:
                 if isinstance(value, bool) or value is None
             },
             "recent_buttons": recent_buttons,
-            "candidate_steps": self.candidate_steps,
+            "candidate_steps": candidate_step_payload,
             "overlay_target_allowlist": self.overlay_allowlist,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
