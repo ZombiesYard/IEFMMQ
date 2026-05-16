@@ -38,7 +38,7 @@ from adapters.pack_gates import (
     load_pack_gate_config,
     normalize_scenario_profile,
 )
-from adapters.prompting import build_help_prompt_result
+from adapters.prompting import HARNESS_LATE_VLM_CONFLICT, build_help_prompt_result, build_state_harness
 from adapters.recent_actions import (
     RecentDeltaRingBuffer,
     build_prompt_recent_deltas,
@@ -519,6 +519,8 @@ _SAFE_REQUEST_METADATA_FIELDS: tuple[str, ...] = (
     "vision_frame_ids",
     "vision_fact_status",
     "vision_fact_seen_ids",
+    "state_harness_conflicts",
+    "state_harness_telemetry_status",
     "help_cycle_id",
     "generation_mode",
     "vision_used",
@@ -614,6 +616,9 @@ _SAFE_PROMPT_BUILD_FIELDS: tuple[str, ...] = (
     "grounding_reason",
     "vision_fact_status",
     "vision_fact_seen_ids",
+    "state_harness_conflicts",
+    "state_harness_telemetry_status",
+    "state_harness_visual_candidate_steps",
 )
 
 
@@ -661,6 +666,20 @@ def _sanitize_vision_fact_summary_for_event(raw: Any) -> dict[str, Any]:
     return sanitized
 
 
+def _sanitize_state_harness_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    sanitized: dict[str, Any] = {}
+    conflicts = raw.get("conflicts")
+    if isinstance(conflicts, list):
+        sanitized["conflicts"] = [item for item in conflicts if isinstance(item, str)]
+    for key in ("telemetry_evidence", "vision_evidence", "deterministic_candidate"):
+        value = raw.get(key)
+        if isinstance(value, Mapping):
+            sanitized[key] = dict(value)
+    return sanitized
+
+
 def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, Mapping):
         return {}
@@ -677,6 +696,8 @@ def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
         sanitized["deterministic_step_hint"] = _sanitize_deterministic_hint_for_event(
             raw.get("deterministic_step_hint")
         )
+    if "state_harness" in raw:
+        sanitized["state_harness"] = _sanitize_state_harness_for_event(raw.get("state_harness"))
     if "vision" in raw:
         sanitized["vision"] = _sanitize_vision_context_for_event(raw.get("vision"))
     if "vision_facts" in raw:
@@ -1520,6 +1541,71 @@ def _prefer_s08_visual_page_targets(
     if "right_mdi_pb18" in allowed:
         out.append("right_mdi_pb18")
     return out[: max(1, int(max_targets))]
+
+
+def _state_harness_has_late_vlm_conflict(raw: Any) -> bool:
+    if not isinstance(raw, Mapping):
+        return False
+    conflicts = raw.get("conflicts")
+    return isinstance(conflicts, list) and HARNESS_LATE_VLM_CONFLICT in conflicts
+
+
+def _visual_candidate_steps_from_state_harness(raw: Any) -> list[str]:
+    if not isinstance(raw, Mapping):
+        return []
+    vision_evidence = raw.get("vision_evidence")
+    if not isinstance(vision_evidence, Mapping):
+        return []
+    candidates = vision_evidence.get("visual_candidate_steps")
+    if not isinstance(candidates, (list, tuple)):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in candidates:
+        if not isinstance(item, str) or not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def _reprioritize_steps_for_state_harness(candidate_steps: Sequence[str], state_harness: Any) -> list[str]:
+    steps = [step for step in candidate_steps if isinstance(step, str) and step]
+    if not _state_harness_has_late_vlm_conflict(state_harness):
+        return steps
+    visual_candidates = _visual_candidate_steps_from_state_harness(state_harness)
+    prioritized = [step for step in visual_candidates if step in steps]
+    return [*prioritized, *[step for step in steps if step not in set(prioritized)]]
+
+
+def _broaden_overlay_allowlist_for_state_harness(
+    overlay_target_allowlist: Sequence[str],
+    *,
+    state_harness: Any,
+    step_fallback_profiles: Mapping[str, Any],
+    overlay_allowset: set[str],
+) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for target in overlay_target_allowlist:
+        if isinstance(target, str) and target and target not in seen:
+            seen.add(target)
+            out.append(target)
+    if not _state_harness_has_late_vlm_conflict(state_harness):
+        return out
+    for step_id in _visual_candidate_steps_from_state_harness(state_harness):
+        profile = step_fallback_profiles.get(step_id)
+        if not isinstance(profile, Mapping):
+            continue
+        targets = profile.get("ui_targets")
+        if not isinstance(targets, list):
+            continue
+        for target in targets:
+            if not isinstance(target, str) or target not in overlay_allowset or target in seen:
+                continue
+            seen.add(target)
+            out.append(target)
+    return out
 
 
 def _build_visual_action_hint(
@@ -2939,6 +3025,16 @@ class LiveDcsTutorLoop:
                 requires_visual_confirmation = step_signal_profile.get("requires_visual_confirmation")
                 if isinstance(requires_visual_confirmation, bool):
                     deterministic_hint["requires_visual_confirmation"] = requires_visual_confirmation
+        preliminary_harness_context = {
+            "vars": vars_selected,
+            "gates": gates,
+            "recent_actions": recent_actions,
+            "deterministic_step_hint": deterministic_hint,
+            "vision": vision_context,
+            "vision_facts": list(vision_fact_context.get("vision_facts", [])),
+            "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
+        }
+        state_harness = build_state_harness(preliminary_harness_context)
         rag_topk, grounding_meta = self._build_grounding_context(deterministic_hint)
         overlay_target_allowlist = _resolve_step_overlay_allowlist(
             overlay_step_id,
@@ -2946,6 +3042,12 @@ class LiveDcsTutorLoop:
             overlay_allowset=self.overlay_allowset,
             default_allowlist=self.overlay_allowlist,
             deterministic_hint=deterministic_hint,
+        )
+        overlay_target_allowlist = _broaden_overlay_allowlist_for_state_harness(
+            overlay_target_allowlist,
+            state_harness=state_harness,
+            step_fallback_profiles=self.step_fallback_profiles,
+            overlay_allowset=self.overlay_allowset,
         )
         visual_action_hint = _build_visual_action_hint(
             inferred_step_id=inference.inferred_step_id,
@@ -2974,8 +3076,9 @@ class LiveDcsTutorLoop:
             "recent_actions": recent_actions,
             "pack_path": str(self.pack_path),
             "telemetry_map_path": str(self.telemetry_map_path),
-            "candidate_steps": list(self.candidate_steps),
+            "candidate_steps": _reprioritize_steps_for_state_harness(self.candidate_steps, state_harness),
             "overlay_target_allowlist": overlay_target_allowlist,
+            "state_harness": state_harness,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
             "rag_topk": rag_topk,
@@ -3034,6 +3137,12 @@ class LiveDcsTutorLoop:
                 "vision_fact_seen_ids": list(
                     vision_fact_context.get("vision_fact_summary", {}).get("seen_fact_ids", [])
                 ),
+                "state_harness_conflicts": list(state_harness.get("conflicts", [])),
+                "state_harness_telemetry_status": (
+                    state_harness.get("telemetry_evidence", {}).get("source_status")
+                    if isinstance(state_harness.get("telemetry_evidence"), Mapping)
+                    else None
+                ),
             },
         )
 
@@ -3061,6 +3170,15 @@ class LiveDcsTutorLoop:
                 "uncertain_fact_ids": list(
                     vision_fact_context.get("vision_fact_summary", {}).get("uncertain_fact_ids", [])
                 ),
+            },
+            "state_harness": {
+                "conflicts": list(state_harness.get("conflicts", [])),
+                "telemetry_status": (
+                    state_harness.get("telemetry_evidence", {}).get("source_status")
+                    if isinstance(state_harness.get("telemetry_evidence"), Mapping)
+                    else None
+                ),
+                "visual_candidate_steps": _visual_candidate_steps_from_state_harness(state_harness),
             },
         }
         state_key = _stable_hash_json(state_signature)
@@ -3799,6 +3917,110 @@ class LiveDcsTutorLoop:
         response.metadata["s08_visual_recovery_overlay_override_used"] = True
         response.metadata["s08_visual_recovery_overlay_override_reason"] = override_reason
         return True, override_reason
+
+    def _apply_harness_conflict_guardrail(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        state_harness = context.get("state_harness")
+        if not _state_harness_has_late_vlm_conflict(state_harness):
+            return False, "no_harness_conflict"
+
+        rejected_step_id = _extract_model_next_step_id(response.metadata)
+        if not isinstance(rejected_step_id, str) or rejected_step_id not in {"S01", "S02", "S03"}:
+            diagnosis = response.metadata.get("diagnosis")
+            if isinstance(diagnosis, Mapping) and isinstance(diagnosis.get("step_id"), str):
+                rejected_step_id = diagnosis["step_id"]
+        if not isinstance(rejected_step_id, str) or rejected_step_id not in {"S01", "S02", "S03"}:
+            return False, "model_step_not_early"
+
+        vision_summary = context.get("vision_fact_summary")
+        vision_seen_or_fresh: set[str] = set()
+        if isinstance(vision_summary, Mapping):
+            for key in ("seen_fact_ids", "fresh_fact_ids"):
+                raw_ids = vision_summary.get(key)
+                if isinstance(raw_ids, (list, tuple, set)):
+                    vision_seen_or_fresh.update(item for item in raw_ids if isinstance(item, str) and item)
+
+        if "supt_page_visible" in vision_seen_or_fresh:
+            target = "left_mdi_pb15"
+            evidence_fact = "supt_page_visible"
+            guidance_zh = "VLM 已确认左 DDI 在 SUPT 页面；请按左 DDI PB15 进入 FCS 页面。"
+            guidance_en = "The VLM confirms the left DDI is on SUPT; press Left DDI PB15 to enter the FCS page."
+        elif "tac_page_visible" in vision_seen_or_fresh:
+            target = "left_mdi_pb18"
+            evidence_fact = "tac_page_visible"
+            guidance_zh = "VLM 已确认左 DDI 仍在 TAC 页面；请先按左 DDI PB18 切到 SUPT，再进入 FCS。"
+            guidance_en = "The VLM confirms the left DDI is still on TAC; press Left DDI PB18 to reach SUPT, then enter FCS."
+        else:
+            target = "right_mdi_brightness_selector"
+            evidence_fact = "bit_root_page_visible" if "bit_root_page_visible" in vision_seen_or_fresh else None
+            guidance_zh = "VLM 已看到后续显示页面；请先确认 DDI 页面状态，不要退回早期启动步骤。"
+            guidance_en = "The VLM sees later display pages; confirm the DDI page state instead of regressing to early startup steps."
+
+        evidence_ref = None
+        if isinstance(evidence_fact, str):
+            vision_facts = context.get("vision_facts")
+            if isinstance(vision_facts, list):
+                for item in vision_facts:
+                    if not isinstance(item, Mapping) or item.get("fact_id") != evidence_fact:
+                        continue
+                    frame_id = item.get("source_frame_id")
+                    evidence_ref = (
+                        f"VISION_FACTS.{evidence_fact}@{frame_id}"
+                        if isinstance(frame_id, str) and frame_id
+                        else f"VISION_FACTS.{evidence_fact}"
+                    )
+                    break
+            if evidence_ref is None:
+                evidence_ref = f"VISION_FACTS.{evidence_fact}"
+
+        guidance = guidance_zh if self.lang == "zh" else guidance_en
+        help_obj: dict[str, Any] = {
+            "diagnosis": {"step_id": "S08", "error_category": "CO"},
+            "next": {"step_id": "S08"},
+            "overlay": {"targets": [target], "evidence": []},
+            "explanations": [guidance],
+        }
+        if isinstance(evidence_ref, str) and evidence_ref:
+            help_obj["overlay"]["evidence"] = [
+                {
+                    "target": target,
+                    "type": "visual",
+                    "ref": evidence_ref,
+                    "quote": "VLM visual page state conflicts with early telemetry.",
+                    "grounding_confidence": 0.95,
+                }
+            ]
+
+        mapped = map_help_response_to_tutor_response(
+            help_obj,
+            request=request,
+            status=response.status,
+            max_overlay_targets=self.max_overlay_targets,
+            ui_map_path=self.ui_map_path,
+            lang=self.lang,
+        )
+        if not mapped.actions:
+            return False, "harness_guardrail_mapping_failed"
+
+        response.metadata["harness_conflict_detected"] = True
+        response.metadata["harness_guardrail_original_message"] = response.message
+        response.metadata["harness_guardrail_original_actions"] = copy.deepcopy(
+            [dict(action) for action in response.actions if isinstance(action, Mapping)]
+        )
+        response.metadata["rejected_model_step_id"] = rejected_step_id
+        response.metadata["harness_guardrail_applied"] = True
+        response.metadata["harness_guardrail_reason"] = HARNESS_LATE_VLM_CONFLICT
+        response.metadata["harness_guardrail_mapping"] = dict(mapped.metadata)
+        response.metadata["diagnosis"] = {"step_id": "S08", "error_category": "CO"}
+        response.metadata["next"] = {"step_id": "S08"}
+        response.actions = list(mapped.actions)
+        response.message = guidance
+        response.explanations = [guidance]
+        return True, HARNESS_LATE_VLM_CONFLICT
 
     def _rewrite_manual_throttle_guidance_response(
         self,
@@ -4763,6 +4985,13 @@ class LiveDcsTutorLoop:
 
             fallback_overlay_used = False
             fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
+            harness_guardrail_used, harness_guardrail_reason = self._apply_harness_conflict_guardrail(
+                response,
+                request,
+            )
+            if harness_guardrail_used:
+                fallback_overlay_used = True
+                fallback_overlay_reason = harness_guardrail_reason
             s08_visual_override_used, s08_visual_override_reason = self._apply_s08_visual_recovery_overlay_override(
                 response,
                 request,

@@ -105,10 +105,11 @@ def test_resolve_codex_binary_prefers_explicit_existing_path(tmp_path: Path) -> 
     assert resolved == str(codex_path)
 
 
-def test_resolve_codex_binary_rejects_non_executable_explicit_path(tmp_path: Path) -> None:
+def test_resolve_codex_binary_rejects_non_executable_explicit_path(tmp_path: Path, monkeypatch) -> None:
     codex_path = tmp_path / "codex"
     codex_path.write_text("#!/bin/sh\n", encoding="utf-8")
     codex_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    monkeypatch.setattr("tools.copilot_review_autofix.os.access", lambda *args, **kwargs: False)
 
     try:
         resolve_codex_binary(str(codex_path))

@@ -3614,6 +3614,99 @@ def test_s08_visual_uncertain_overrides_model_ampcd_to_ddi_recovery(tmp_path: Pa
         loop.close()
 
 
+def test_harness_conflict_guardrail_rejects_early_step_model_answer(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_harness_conflict_guardrail.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "state_harness": {
+                    "conflicts": ["early_step_from_telemetry_vs_late_display_from_vlm"],
+                    "vision_evidence": {
+                        "late_display_anchors": [
+                            "tac_page_visible",
+                            "bit_root_page_visible",
+                            "hsi_page_visible",
+                        ],
+                        "visual_candidate_steps": ["S08", "S09"],
+                    },
+                },
+                "vision_fact_summary": {
+                    "status": "available",
+                    "seen_fact_ids": ["tac_page_visible", "bit_root_page_visible", "hsi_page_visible"],
+                    "fresh_fact_ids": ["tac_page_visible", "bit_root_page_visible", "hsi_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
+                    "uncertain_fact_ids": [],
+                },
+                "vision_facts": [
+                    {
+                        "fact_id": "tac_page_visible",
+                        "state": "seen",
+                        "source_frame_id": "frame-001",
+                    },
+                ],
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S01",
+                    "overlay_step_id": "S01",
+                    "missing_conditions": ["vars.battery_on==true"],
+                    "gate_blockers": [{"ref": "GATES.S01.completion", "reason": "Battery must be on."}],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["var", "gate", "delta"],
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="当前 S01 尚未完成，请先将 BATT 开关拨到 ON（右键）。",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "battery_switch",
+                    "element_id": "pnt_404",
+                }
+            ],
+            explanations=["当前 S01 尚未完成，请先将 BATT 开关拨到 ON（右键）。"],
+            metadata={
+                "help_response": {
+                    "diagnosis": {"step_id": "S01", "error_category": "OM"},
+                    "next": {"step_id": "S01"},
+                    "overlay": {"targets": ["battery_switch"], "evidence": []},
+                    "explanations": ["当前 S01 尚未完成，请先将 BATT 开关拨到 ON（右键）。"],
+                },
+                "diagnosis": {"step_id": "S01", "error_category": "OM"},
+                "next": {"step_id": "S01"},
+            },
+        )
+
+        guardrail_used, guardrail_reason = loop._apply_harness_conflict_guardrail(response, request)
+
+        assert guardrail_used is True
+        assert guardrail_reason == "early_step_from_telemetry_vs_late_display_from_vlm"
+        assert response.actions
+        assert response.actions[0]["target"] == "left_mdi_pb18"
+        assert response.metadata["harness_conflict_detected"] is True
+        assert response.metadata["harness_guardrail_applied"] is True
+        assert response.metadata["rejected_model_step_id"] == "S01"
+        assert "电瓶" not in response.message
+    finally:
+        loop.close()
+
+
 def test_manual_throttle_guidance_rewrites_s11_throttle_reference_to_keyboard_text(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_manual_throttle_guidance_s11.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])

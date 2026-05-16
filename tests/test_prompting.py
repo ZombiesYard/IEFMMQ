@@ -142,6 +142,41 @@ def test_prompt_terminal_state_rule_uses_inferred_step_id_instead_of_empty_step_
     assert "Use deterministic_step_hint.inferred_step_id (typically S26)" in result.prompt
 
 
+def test_prompt_state_harness_marks_late_vlm_vs_early_telemetry_conflict() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = ["S01", "S02", "S03", "S08", "S09"]
+    ctx["overlay_target_allowlist"] = ["battery_switch", "left_mdi_pb18", "left_mdi_pb15"]
+    ctx["vars"] = {
+        "battery_on": False,
+        "power_available": False,
+        "fire_test_a_complete": False,
+        "fire_test_b_complete": False,
+        "vars_source_missing": ["battery_on", *[f"missing_{idx}" for idx in range(40)]],
+    }
+    ctx["deterministic_step_hint"] = {
+        "inferred_step_id": "S01",
+        "overlay_step_id": "S01",
+        "missing_conditions": ["vars.battery_on==true"],
+        "step_ui_targets": ["battery_switch"],
+    }
+    ctx["vision_fact_summary"] = {
+        "status": "available",
+        "fresh_fact_ids": ["tac_page_visible", "bit_root_page_visible", "hsi_page_visible"],
+        "seen_fact_ids": ["tac_page_visible", "bit_root_page_visible", "hsi_page_visible"],
+        "not_seen_fact_ids": ["fcs_page_visible"],
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    assert "early_step_from_telemetry_vs_late_display_from_vlm" in payload["state_harness"]["conflicts"]
+    assert payload["state_harness"]["telemetry_evidence"]["source_status"] == "low_confidence_bootstrap"
+    assert payload["state_harness"]["deterministic_candidate"]["role"] == "candidate_not_authoritative"
+    assert payload["allowed_step_ids"].index("S08") < payload["allowed_step_ids"].index("S01")
+    assert "Prefer deterministic_step_hint when evidence does not conflict" not in result.prompt
+    assert "state_harness" in result.prompt
+
+
 def test_prompt_excludes_boolean_expires_after_ms_from_vision_facts() -> None:
     ctx = _base_context()
     ctx["vision_facts"] = [
@@ -384,7 +419,7 @@ def test_prompt_includes_vision_fact_summary_and_visual_overlay_evidence_refs() 
         }
     ]
     assert payload["decision_priority"][:3] == [
-        "deterministic_step_hint",
+        "state_harness",
         "gates_summary",
         "vision_fact_summary",
     ]

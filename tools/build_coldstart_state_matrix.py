@@ -226,6 +226,8 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "fire_test_complete": _set_enum("FIRE_TEST_SW", true_value=0, false_value=1),
     "hud_on": _set_enum("HUD_SYM_BRT", true_value=1, false_value=0),
     "ins_mode": _set_numeric("INS_SW"),
+    "ins_fast_align_pressed": _set_enum("AMPCD_PB_19", true_value=1, false_value=0),
+    "ins_fast_align_complete": _set_enum("AMPCD_PB_19", true_value=1, false_value=0),
     "l_gen_on": _set_enum("L_GEN_SW", true_value=1, false_value=0),
     # LIGHTS_TEST_SW is a momentary pushbutton (0=OFF, 1=TEST).
     # Production latch behaviour: lights_test_complete ← lights_test_active.

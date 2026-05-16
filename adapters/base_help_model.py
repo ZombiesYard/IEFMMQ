@@ -12,7 +12,7 @@ from typing import Any, Mapping
 
 from adapters.help_response_parser import parse_help_response_with_diagnostics
 from adapters.json_extract import parse_first_json
-from adapters.prompting import build_help_prompt_result
+from adapters.prompting import HARNESS_LATE_VLM_CONFLICT, build_help_prompt_result
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.step_inference import (
     StepInferenceResult,
@@ -506,7 +506,14 @@ class BaseHelpModel(ModelPort):
         inferred_step_id = None
         if inference is not None:
             inferred_step_id = inference.inferred_step_id
-        candidate_steps = self._prioritize_inferred_step(candidate_steps, inferred_step_id)
+        state_harness = context.get("state_harness")
+        harness_conflicts = (
+            state_harness.get("conflicts")
+            if isinstance(state_harness, Mapping)
+            else None
+        )
+        if not (isinstance(harness_conflicts, list) and HARNESS_LATE_VLM_CONFLICT in harness_conflicts):
+            candidate_steps = self._prioritize_inferred_step(candidate_steps, inferred_step_id)
         allowlist = context.get("overlay_target_allowlist")
         if not isinstance(allowlist, list) or not allowlist:
             allowlist = list(schema_targets)

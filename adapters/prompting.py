@@ -43,6 +43,22 @@ MAX_RAG_SNIPPET_CHARS = 220
 # Keep only the highest-signal overlay candidates so policy hints stay useful
 # without bloating the prompt when recent UI/delta lists are noisy.
 MAX_PRIORITY_OVERLAY_TARGETS = 8
+EARLY_STEP_IDS = {"S01", "S02", "S03"}
+LATE_DISPLAY_ANCHOR_FACTS = {
+    "tac_page_visible",
+    "supt_page_visible",
+    "fcs_page_visible",
+    "bit_root_page_visible",
+    "fcsmc_page_visible",
+    "fcsmc_in_test_visible",
+    "fcsmc_intermediate_result_visible",
+    "fcsmc_final_go_result_visible",
+    "hsi_page_visible",
+    "hsi_map_layer_visible",
+    "ins_grnd_alignment_text_visible",
+    "ins_ok_text_visible",
+}
+HARNESS_LATE_VLM_CONFLICT = "early_step_from_telemetry_vs_late_display_from_vlm"
 
 _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "vars.apu_on": ("apu_switch",),
@@ -928,6 +944,186 @@ def _extract_priority_var_keys_from_hint(deterministic_step_hint: Mapping[str, A
     return out
 
 
+def _string_items(raw: Any) -> list[str]:
+    if not isinstance(raw, (list, tuple, set)):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str) or not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+
+def _build_visual_candidate_steps(anchor_ids: set[str]) -> list[str]:
+    candidates: list[str] = []
+    if {"tac_page_visible", "bit_root_page_visible"}.intersection(anchor_ids):
+        candidates.extend(["S08", "S09"])
+    if {"ins_grnd_alignment_text_visible", "ins_ok_text_visible", "hsi_page_visible", "hsi_map_layer_visible"}.intersection(anchor_ids):
+        candidates.extend(["S12", "S13"])
+    if {"fcsmc_page_visible", "fcsmc_in_test_visible", "fcsmc_intermediate_result_visible", "fcsmc_final_go_result_visible"}.intersection(anchor_ids):
+        candidates.extend(["S18", "S19", "S20"])
+    return _string_items(candidates)
+
+
+def build_state_harness(context: Mapping[str, Any]) -> dict[str, Any]:
+    vars_raw = context.get("vars")
+    vars_map = vars_raw if isinstance(vars_raw, Mapping) else {}
+    missing_sources = _string_items(vars_map.get("vars_source_missing"))
+    missing_count = len(missing_sources)
+    seq = None
+    vision_raw = context.get("vision")
+    if isinstance(vision_raw, Mapping):
+        raw_seq = vision_raw.get("observation_seq")
+        if isinstance(raw_seq, int) and not isinstance(raw_seq, bool):
+            seq = raw_seq
+
+    bootstrap_like = (
+        missing_count >= 20
+        or (isinstance(seq, int) and seq <= 3)
+        or (
+            vars_map.get("battery_on") is False
+            and vars_map.get("power_available") is False
+            and missing_count >= 8
+        )
+    )
+    telemetry_status = "low_confidence_bootstrap" if bootstrap_like else "nominal"
+
+    vision_summary_raw = context.get("vision_fact_summary")
+    vision_summary = vision_summary_raw if isinstance(vision_summary_raw, Mapping) else {}
+    seen_ids = set(_string_items(vision_summary.get("seen_fact_ids")))
+    fresh_ids = set(_string_items(vision_summary.get("fresh_fact_ids")))
+    not_seen_ids = set(_string_items(vision_summary.get("not_seen_fact_ids")))
+    late_anchors = sorted((seen_ids | fresh_ids).intersection(LATE_DISPLAY_ANCHOR_FACTS))
+    visual_candidates = _build_visual_candidate_steps(set(late_anchors))
+
+    deterministic_raw = context.get("deterministic_step_hint")
+    deterministic = deterministic_raw if isinstance(deterministic_raw, Mapping) else {}
+    deterministic_step = deterministic.get("inferred_step_id")
+    deterministic_missing = _string_items(deterministic.get("missing_conditions"))
+
+    conflicts: list[str] = []
+    if isinstance(deterministic_step, str) and deterministic_step in EARLY_STEP_IDS and len(late_anchors) >= 2:
+        conflicts.append(HARNESS_LATE_VLM_CONFLICT)
+
+    gates_raw = context.get("gates")
+    gates = gates_raw if isinstance(gates_raw, Mapping) else {}
+    blocked_gates = [
+        key for key, value in gates.items()
+        if isinstance(key, str) and isinstance(value, Mapping) and value.get("status") == "blocked"
+    ][:8]
+    recent_actions_raw = context.get("recent_actions")
+    recent_actions = recent_actions_raw if isinstance(recent_actions_raw, Mapping) else {}
+
+    return {
+        "telemetry_evidence": {
+            "source_status": telemetry_status,
+            "confidence": "low" if telemetry_status != "nominal" else "medium",
+            "observation_seq": seq,
+            "vars_source_missing_count": missing_count,
+            "early_vars": {
+                key: vars_map.get(key)
+                for key in ("battery_on", "power_available", "fire_test_a_complete", "fire_test_b_complete")
+                if key in vars_map
+            },
+        },
+        "vision_evidence": {
+            "source_status": vision_summary.get("status", "vision_unavailable"),
+            "confidence": "high" if late_anchors else "medium",
+            "late_display_anchors": late_anchors,
+            "visual_candidate_steps": visual_candidates,
+            "seen_fact_ids": sorted(seen_ids)[:12],
+            "fresh_fact_ids": sorted(fresh_ids)[:12],
+            "not_seen_fact_ids": sorted(not_seen_ids)[:12],
+        },
+        "gate_evidence": {
+            "blocked_gate_ids": blocked_gates,
+            "blocked_gate_count": len(blocked_gates),
+        },
+        "recent_action_evidence": {
+            "recent_buttons": _string_items(recent_actions.get("recent_buttons"))[:8],
+            "source_status": "available" if recent_actions else "empty",
+        },
+        "deterministic_candidate": {
+            "step_id": deterministic_step if isinstance(deterministic_step, str) else None,
+            "overlay_step_id": deterministic.get("overlay_step_id") if isinstance(deterministic.get("overlay_step_id"), str) else None,
+            "missing_conditions": deterministic_missing,
+            "role": "candidate_not_authoritative",
+        },
+        "conflicts": conflicts,
+    }
+
+
+def _harness_conflicts_with_early_deterministic(state_harness: Mapping[str, Any]) -> bool:
+    conflicts = state_harness.get("conflicts")
+    return isinstance(conflicts, list) and HARNESS_LATE_VLM_CONFLICT in conflicts
+
+
+def _reprioritize_candidate_steps_for_harness(candidate_steps: list[str], state_harness: Mapping[str, Any]) -> list[str]:
+    if not _harness_conflicts_with_early_deterministic(state_harness):
+        return candidate_steps
+    vision_evidence = state_harness.get("vision_evidence")
+    if not isinstance(vision_evidence, Mapping):
+        return candidate_steps
+    visual_candidates = _string_items(vision_evidence.get("visual_candidate_steps"))
+    prioritized = [step for step in visual_candidates if step in candidate_steps]
+    return [*prioritized, *[step for step in candidate_steps if step not in set(prioritized)]]
+
+
+def _build_state_harness_prompt_payload(state_harness: Mapping[str, Any], *, compact: bool = False) -> dict[str, Any]:
+    telemetry_raw = state_harness.get("telemetry_evidence")
+    telemetry = telemetry_raw if isinstance(telemetry_raw, Mapping) else {}
+    vision_raw = state_harness.get("vision_evidence")
+    vision = vision_raw if isinstance(vision_raw, Mapping) else {}
+    deterministic_raw = state_harness.get("deterministic_candidate")
+    deterministic = deterministic_raw if isinstance(deterministic_raw, Mapping) else {}
+    payload: dict[str, Any] = {
+        "conflicts": list(state_harness.get("conflicts", []))
+        if isinstance(state_harness.get("conflicts"), list)
+        else [],
+        "telemetry_evidence": {
+            "source_status": telemetry.get("source_status"),
+            "confidence": telemetry.get("confidence"),
+            "observation_seq": telemetry.get("observation_seq"),
+            "vars_source_missing_count": telemetry.get("vars_source_missing_count"),
+        },
+        "vision_evidence": {
+            "source_status": vision.get("source_status"),
+            "confidence": vision.get("confidence"),
+            "late_display_anchors": _string_items(vision.get("late_display_anchors"))[:8],
+            "visual_candidate_steps": _string_items(vision.get("visual_candidate_steps"))[:6],
+        },
+        "deterministic_candidate": {
+            "step_id": deterministic.get("step_id"),
+            "overlay_step_id": deterministic.get("overlay_step_id"),
+            "role": deterministic.get("role"),
+        },
+    }
+    if not compact:
+        payload["telemetry_evidence"]["early_vars"] = telemetry.get("early_vars", {})
+        payload["vision_evidence"]["seen_fact_ids"] = _string_items(vision.get("seen_fact_ids"))[:8]
+        payload["vision_evidence"]["fresh_fact_ids"] = _string_items(vision.get("fresh_fact_ids"))[:8]
+        payload["vision_evidence"]["not_seen_fact_ids"] = _string_items(vision.get("not_seen_fact_ids"))[:8]
+        payload["deterministic_candidate"]["missing_conditions"] = _string_items(
+            deterministic.get("missing_conditions")
+        )[:6]
+        gate_raw = state_harness.get("gate_evidence")
+        gate = gate_raw if isinstance(gate_raw, Mapping) else {}
+        recent_raw = state_harness.get("recent_action_evidence")
+        recent = recent_raw if isinstance(recent_raw, Mapping) else {}
+        payload["gate_evidence"] = {
+            "blocked_gate_ids": _string_items(gate.get("blocked_gate_ids"))[:6],
+            "blocked_gate_count": gate.get("blocked_gate_count"),
+        }
+        payload["recent_action_evidence"] = {
+            "source_status": recent.get("source_status"),
+            "recent_buttons": _string_items(recent.get("recent_buttons"))[:6],
+        }
+    return payload
+
+
 def _build_evidence_sources(
     selected_vars: Mapping[str, Any],
     gates_summary: list[dict[str, Any]],
@@ -1195,6 +1391,18 @@ def build_help_prompt_result(
     )
     uncertainty_policy = _build_uncertainty_policy(deterministic_step_hint)
     vision_fact_summary = _build_vision_fact_summary_payload(context)
+    state_harness = (
+        dict(context.get("state_harness"))
+        if isinstance(context.get("state_harness"), Mapping)
+        else build_state_harness(
+            {
+                **dict(context),
+                "deterministic_step_hint": deterministic_step_hint,
+                "vision_fact_summary": vision_fact_summary,
+            }
+        )
+    )
+    candidate_steps = _reprioritize_candidate_steps_for_harness(candidate_steps, state_harness)
     multimodal_input = _build_multimodal_input_payload(context)
     scenario_profile_raw = context.get("scenario_profile")
     scenario_profile = (
@@ -1252,7 +1460,9 @@ def build_help_prompt_result(
             "对于 S19：若页面已显示 IN TEST、PBIT GO、FCSA/FCSB PBIT GO 或其他明显测试进行中/中间结果，说明测试已经开始；即使此时 VARS.fcs_bit_switch_up=false，也不能仅凭该变量退回去要求重新按住开关。",
             "禁止仅凭 VARS.fcs_bit_switch_up 的 true/false 单独判断 S19 所处页面阶段；必须把它与 VLM 视觉事实标注一起解释。",
             "overlay.evidence 每项必须包含 target/type/ref/quote/grounding_confidence，字段顺序固定为 target,type,ref,quote,grounding_confidence，type 必须与 ref 前缀匹配，quote 最长 120 字符，且 ref 必须逐字匹配 allowed_evidence_refs 中的完整条目（含 @frame_id）。若证据不足，返回空 targets 和空 evidence。",
-            "优先参考 deterministic_step_hint，若证据不冲突，优先沿 inferred_step_id 给出 diagnosis/next。",
+            "state_harness 是证据裁决包；deterministic_step_hint 只是候选，不是最终裁判。",
+            "若 state_harness.conflicts 含 early_step_from_telemetry_vs_late_display_from_vlm，不得仅因 battery_on=false/早期 latch=false 输出 S01/S02/S03；说明 telemetry 可能是首帧或未恢复，选择视觉一致步骤或要求确认。",
+            "若 VLM fresh/seen 含 tac_page_visible+bit_root_page_visible 且 fcs_page_visible=not_seen，按 S08 恢复：左 DDI TAC -> SUPT/FCS，不退回电瓶、Fire Test 或 APU。",
             "若 deterministic_step_hint.missing_conditions_count=0 且 deterministic_step_hint.gate_blocker_count=0，说明所有步骤的完成条件均已满足，冷启动流程已完成。此时 diagnosis.step_id 和 next.step_id 应使用 deterministic_step_hint.inferred_step_id（通常为 S26），不要猜测别的步骤；overlay 应为空，explanation 应明确说明流程已完成。",
             "若 deterministic_step_hint.requires_visual_confirmation=false 且 deterministic_step_hint.observability_status=observable，应优先依据 gates_summary、current_vars_selected 与 missing_conditions 作为主要理由；同时必须参考 vision_fact_summary 中的 seen/not_seen 标注：若 any_fact_seen=false（全部视觉事实均为 not_seen），说明屏幕可能未亮或页面完全不匹配，必须在 explanation 中明确指出。",
             (
@@ -1307,7 +1517,9 @@ def build_help_prompt_result(
             "For S19, if the page already shows IN TEST, PBIT GO, FCSA/FCSB PBIT GO, or another obvious test-in-progress/intermediate state, the BIT has already started. Even if VARS.fcs_bit_switch_up=false at that moment, do not regress to telling the user to hold the switch again based on that variable alone.",
             "Never use VARS.fcs_bit_switch_up by itself to decide which S19 page/state the user is on. Combine it with the VLM visual fact labels.",
             "Each overlay.evidence item must include target/type/ref/quote/grounding_confidence in that exact field order. The type must match the ref prefix, quote length must be <= 120 chars, and the ref must exactly match a full entry from allowed_evidence_refs (including any @frame_id suffix). If not enough evidence, return empty targets and empty evidence.",
-            "Prefer deterministic_step_hint when evidence does not conflict; prioritize inferred_step_id for diagnosis/next.",
+            "state_harness arbitrates evidence; deterministic_step_hint is a candidate, not final authority.",
+            "If state_harness.conflicts has early_step_from_telemetry_vs_late_display_from_vlm, do not output S01/S02/S03 from battery_on=false/early latches=false; say telemetry may be stale and choose VLM-consistent step or ask confirmation.",
+            "If VLM fresh/seen has tac_page_visible+bit_root_page_visible and fcs_page_visible=not_seen, do S08 recovery: Left DDI TAC -> SUPT/FCS.",
             "If deterministic_step_hint.missing_conditions_count=0 and deterministic_step_hint.gate_blocker_count=0, all step completion conditions are satisfied and the cold-start procedure is finished. Use deterministic_step_hint.inferred_step_id (typically S26) for diagnosis.step_id and next.step_id, do not guess a different step, keep overlay empty, and make the explanation explicitly say the procedure is complete.",
             "If deterministic_step_hint.requires_visual_confirmation=false and deterministic_step_hint.observability_status=observable, use gates_summary, current_vars_selected, and missing_conditions as the primary evidence. Also check vision_fact_summary.any_fact_seen: if any_fact_seen=false (all visual facts are not_seen), the displays may be off or the pages do not match, and you MUST state this clearly in the explanation.",
             (
@@ -1414,9 +1626,10 @@ def build_help_prompt_result(
             "allowed_overlay_evidence_types": overlay_evidence_type_enum,
             "allowed_error_categories": category_enum,
             "decision_priority": [
-                "deterministic_step_hint",
+                "state_harness",
                 "gates_summary",
                 "vision_fact_summary",
+                "deterministic_step_hint",
                 "overlay_target_policy",
                 "recent_actions_signal",
                 "recent_deltas_summary",
@@ -1429,6 +1642,7 @@ def build_help_prompt_result(
             "gates_summary": gates_summary,
             "recent_deltas_summary": recent_deltas_summary,
             "recent_actions_signal": recent_actions_signal,
+            "state_harness": _build_state_harness_prompt_payload(state_harness),
             "deterministic_step_hint": deterministic_step_hint,
             "vision_fact_summary": vision_fact_summary,
             "multimodal_input": multimodal_input,
@@ -1536,13 +1750,20 @@ def build_help_prompt_result(
                 compact_rag_snippets,
                 rag_input_count=rag_input_count,
             )
+            compact_state_harness = _build_state_harness_prompt_payload(state_harness, compact=True)
+            compact_harness_has_signal = bool(
+                compact_state_harness.get("conflicts")
+                or compact_state_harness.get("vision_evidence", {}).get("late_display_anchors")
+                or compact_state_harness.get("vision_evidence", {}).get("visual_candidate_steps")
+                or compact_state_harness.get("telemetry_evidence", {}).get("source_status") == "low_confidence_bootstrap"
+            )
+            compact_decision_priority = ["gates_summary", "deterministic_step_hint"]
+            if compact_harness_has_signal:
+                compact_decision_priority.insert(0, "state_harness")
             compact_payload = {
                 "allowed_step_ids": candidate_steps[:3],
                 "allowed_overlay_targets": overlay_targets,
-                "decision_priority": [
-                    "deterministic_step_hint",
-                    "gates_summary",
-                ],
+                "decision_priority": compact_decision_priority,
                 "gates_summary": gates_summary,
                 "deterministic_step_hint": compact_hint,
                 "multimodal_input": {"attached": bool(multimodal_input.get("attached"))},
@@ -1557,6 +1778,8 @@ def build_help_prompt_result(
                 },
                 "allowed_evidence_refs": compact_allowed_refs,
             }
+            if compact_harness_has_signal:
+                compact_payload["state_harness"] = compact_state_harness
             compact_visual_refs = [ref for ref in compact_allowed_refs if isinstance(ref, str) and ref.startswith("VISION_FACTS.")]
             if compact_rag_snippets:
                 compact_payload["decision_priority"].append("EVIDENCE_SOURCES.RAG_SNIPPETS")
@@ -1646,6 +1869,18 @@ def build_help_prompt_result(
         "grounding_reason": grounding_payload["reason"],
         "vision_fact_status": vision_fact_summary["status"],
         "vision_fact_seen_ids": list(vision_fact_summary.get("seen_fact_ids", [])),
+        "state_harness_conflicts": list(state_harness.get("conflicts", [])) if isinstance(state_harness.get("conflicts"), list) else [],
+        "state_harness_telemetry_status": (
+            state_harness.get("telemetry_evidence", {}).get("source_status")
+            if isinstance(state_harness.get("telemetry_evidence"), Mapping)
+            else None
+        ),
+        "state_harness_visual_candidate_steps": (
+            list(state_harness.get("vision_evidence", {}).get("visual_candidate_steps", []))
+            if isinstance(state_harness.get("vision_evidence"), Mapping)
+            and isinstance(state_harness.get("vision_evidence", {}).get("visual_candidate_steps"), list)
+            else []
+        ),
         "multimodal_input_attached": bool(multimodal_input.get("attached")),
     }
     return PromptBuildResult(prompt=prompt, metadata=meta)
@@ -1661,6 +1896,8 @@ __all__ = [
     "MAX_PROMPT_CHARS",
     "MAX_PROMPT_TOKENS_EST",
     "PromptBuildResult",
+    "HARNESS_LATE_VLM_CONFLICT",
+    "build_state_harness",
     "build_help_prompt",
     "build_help_prompt_result",
 ]
