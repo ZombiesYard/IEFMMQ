@@ -21,12 +21,12 @@ def _obs_with_vars(**vars_map):
     }
 
 
-def test_pack_gate_config_contains_s01_to_s25_for_precondition_and_completion() -> None:
+def test_pack_gate_config_contains_s01_to_s33_for_precondition_and_completion() -> None:
     cfg = load_pack_gate_config(PACK_PATH)
     pre = cfg["precondition_gates"]
     comp = cfg["completion_gates"]
 
-    for step_id in [f"S{i:02d}" for i in range(1, 26)]:
+    for step_id in [f"S{i:02d}" for i in range(1, 34)]:
         assert step_id in pre, f"missing precondition gate config for {step_id}"
         assert step_id in comp, f"missing completion gate config for {step_id}"
         assert isinstance(pre[step_id], tuple)

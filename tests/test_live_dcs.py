@@ -716,6 +716,10 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert hint.get("inferred_step_id")
     assert isinstance(hint.get("requires_visual_confirmation"), bool)
     assert hint.get("step_ui_targets") == ["apu_switch"]
+    harness_spec = hint.get("step_harness_spec")
+    assert isinstance(harness_spec, dict)
+    assert harness_spec["step_id"] == hint["inferred_step_id"]
+    assert harness_spec["allowed_overlay_targets"] == ["apu_switch"]
     gates = request.context["gates"]
     assert isinstance(gates, dict)
     assert "S03.completion" in gates
