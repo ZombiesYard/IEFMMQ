@@ -33,7 +33,13 @@ _DEFAULT_PACK_PATH = _REPO_ROOT / "packs" / "fa18c_startup" / "pack.yaml"
 _MAX_MISSING_CONDITIONS = 8
 _MAX_RECENT_UI_TARGETS = 24
 _UNKNOWN_TEXT_VALUES = frozenset({"unknown", "unk", "missing", "n/a", "na"})
-_PACK_METADATA_MERGE_FIELDS = ("observability", "evidence_requirements", "ui_targets", "requires_visual_confirmation")
+_PACK_METADATA_MERGE_FIELDS = (
+    "observability",
+    "evidence_requirements",
+    "ui_targets",
+    "overlay_enabled",
+    "requires_visual_confirmation",
+)
 RecentUiTargetsInput: TypeAlias = Sequence[str] | Mapping[str, Any] | IterableABC[str] | None
 
 

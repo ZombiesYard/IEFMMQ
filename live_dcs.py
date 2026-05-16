@@ -47,6 +47,11 @@ from adapters.recent_actions import (
 )
 from adapters.response_mapping import map_help_response_to_tutor_response
 from adapters.source_chunk_refs import build_source_chunk_ref
+from adapters.step_harness_specs import (
+    load_step_harness_specs,
+    step_fallback_profiles_from_specs,
+    step_signal_profiles_from_specs,
+)
 from adapters.step_inference import StepInferenceResult, infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
 from adapters.vision_capture_trigger import (
@@ -2478,7 +2483,11 @@ class LiveDcsTutorLoop:
                 source_policy=self.knowledge_source_policy,
             )
         self.pack_steps = load_pack_steps(self.pack_path)
-        self.step_signal_profiles = _load_step_signal_profiles(self.pack_path)
+        self.step_harness_specs = load_step_harness_specs(
+            self.pack_path,
+            scenario_profile=self.scenario_profile,
+        )
+        self.step_signal_profiles = step_signal_profiles_from_specs(self.step_harness_specs)
         gate_config = load_pack_gate_config(
             self.pack_path,
             scenario_profile=self.scenario_profile,
@@ -2488,11 +2497,7 @@ class LiveDcsTutorLoop:
         self.candidate_steps = _load_step_ids(self.pack_path)
         self.overlay_allowlist = _load_overlay_allowlist(self.pack_path, self.ui_map_path)
         self.overlay_allowset = set(self.overlay_allowlist)
-        self.step_fallback_profiles = _build_step_fallback_profiles(
-            self.pack_steps,
-            precondition_gates=self.precondition_gates,
-            completion_gates=self.completion_gates,
-        )
+        self.step_fallback_profiles = step_fallback_profiles_from_specs(self.step_harness_specs)
         self.recent_ring = RecentDeltaRingBuffer(window_s=8.0, max_items=20)
         self.vision_sync_window_ms = (
             int(vision_sync_window_ms)
@@ -3037,6 +3042,10 @@ class LiveDcsTutorLoop:
             "scenario_profile": self.scenario_profile,
             "vision_fact_status": vision_fact_context.get("status"),
         }
+        if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
+            step_harness_spec = self.step_harness_specs.get(inference.inferred_step_id)
+            if step_harness_spec is not None:
+                deterministic_hint["step_harness_spec"] = step_harness_spec.to_dict()
         if isinstance(step_signal_profile, Mapping):
                 observability = step_signal_profile.get("observability")
                 if isinstance(observability, str) and observability:
@@ -4622,6 +4631,8 @@ class LiveDcsTutorLoop:
         fallback_targets = _normalize_step_ui_targets(fallback_targets_raw)
         if not fallback_targets:
             return None, f"unsupported_step:{overlay_step_id}"
+        if step_fallback_profile.get("overlay_enabled") is False:
+            return None, f"overlay_disabled:{overlay_step_id}"
         declared_fallback_target = fallback_targets[0]
         missing_conditions_raw = hint.get("missing_conditions")
         missing_conditions = [
