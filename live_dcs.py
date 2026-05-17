@@ -89,6 +89,11 @@ from core.harness_validation import (
     HarnessTextGuidanceRule,
     plan_harness_action,
 )
+from core.help_orchestrator import (
+    HelpCycleDecisionResult,
+    HelpCycleOrchestrator,
+    PreparedHelpCycle,
+)
 from core.security import (
     redact_sensitive_text,
     sanitize_help_response_for_log,
@@ -385,6 +390,59 @@ class ActionExecutorLike(Protocol):
 
     def close(self) -> None:
         ...
+
+
+@dataclass
+class _StaticHelpAdjudicator:
+    response: TutorResponse
+
+    def adjudicate(self, observation: Observation, request: TutorRequest) -> TutorResponse:
+        return self.response
+
+
+@dataclass
+class _StaticDecisionValidator:
+    fallback_overlay_used: bool
+    fallback_overlay_reason: str
+
+    def validate_and_repair(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> HelpCycleDecisionResult:
+        return HelpCycleDecisionResult(
+            response=response,
+            fallback_overlay_used=self.fallback_overlay_used,
+            fallback_overlay_reason=self.fallback_overlay_reason,
+        )
+
+
+@dataclass
+class _CallableHelpAdjudicator:
+    adjudicate_response: Callable[[Observation, TutorRequest], TutorResponse]
+
+    def adjudicate(self, observation: Observation, request: TutorRequest) -> TutorResponse:
+        return self.adjudicate_response(observation, request)
+
+
+@dataclass
+class _CallableDecisionValidator:
+    validate_response: Callable[[TutorResponse, TutorRequest], HelpCycleDecisionResult]
+
+    def validate_and_repair(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> HelpCycleDecisionResult:
+        return self.validate_response(response, request)
+
+
+@dataclass
+class _CallableActionPlanner:
+    execute_actions: Callable[[Sequence[Mapping[str, Any] | Any]], Mapping[str, Any]]
+
+    def execute(self, actions: Sequence[Mapping[str, Any] | Any]) -> Mapping[str, Any]:
+        return self.execute_actions(actions)
 
 
 class TutorTextSenderLike(Protocol):
@@ -5612,6 +5670,212 @@ class LiveDcsTutorLoop:
         overlay_raw_report = self.action_executor.execute_actions(actions)
         return _normalize_help_report(overlay_raw_report)
 
+    def _adjudicate_live_help_response(
+        self,
+        obs: Observation,
+        request: TutorRequest,
+        *,
+        terminal_state_short_circuited: bool,
+        inferred_step_id: str | None,
+        fallback_conditions: Sequence[str],
+    ) -> TutorResponse:
+        if terminal_state_short_circuited:
+            return self._build_terminal_state_response(request)
+        self._stats.model_calls += 1
+        try:
+            return self.model.explain_error(obs, request)
+        except Exception as exc:
+            return TutorResponse(
+                status="error",
+                in_reply_to=request.request_id,
+                message=self._fallback_message(inferred_step_id, fallback_conditions),
+                actions=[],
+                metadata={
+                    "provider": "fallback",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
+            )
+
+    def _validate_and_repair_live_help_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+        *,
+        prompt_meta: Mapping[str, Any],
+        state_key: str,
+        help_cycle_id: str,
+        vision_selection: HelpCycleVisionSelection,
+        vision_fact_context: Mapping[str, Any],
+        vision_fact_active_step_ids: Sequence[str],
+        terminal_state_short_circuited: bool,
+    ) -> HelpCycleDecisionResult:
+        response.metadata = dict(response.metadata)
+        response.metadata.setdefault("provider", "fallback" if response.status == "error" else "unknown")
+        response.metadata["prompt_hash"] = request.metadata.get("prompt_hash")
+        response.metadata["prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+        response.metadata["prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+        response.metadata.setdefault("generation_prompt_hash", response.metadata.get("prompt_hash"))
+        response.metadata.setdefault(
+            "generation_prompt_tokens_est",
+            response.metadata.get("prompt_tokens_est"),
+        )
+        response.metadata.setdefault(
+            "generation_prompt_trimmed",
+            response.metadata.get("prompt_trimmed"),
+        )
+        response.metadata["request_prompt_hash"] = request.metadata.get("prompt_hash")
+        response.metadata["request_prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
+        response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
+        response.metadata["state_key"] = state_key
+        response.metadata["prompt_build"] = dict(prompt_meta)
+        response.metadata["help_cycle_id"] = help_cycle_id
+        response.metadata["vision"] = vision_selection.to_dict()
+        response.metadata["vision_status"] = vision_selection.status
+        response.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
+        response.metadata["vision_fact_status"] = vision_fact_context["status"]
+        response.metadata["vision_fact_active_step_ids"] = list(vision_fact_active_step_ids)
+        response.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
+        response.metadata["vision_facts"] = list(vision_fact_context["vision_facts"])
+        response.metadata["generation_mode"] = _normalize_generation_mode(response)
+
+        mapped_actions, mapped_meta = self._map_response_actions(response, request)
+        response.actions = mapped_actions
+        if mapped_meta:
+            response.metadata["response_mapping"] = mapped_meta
+        self._normalize_observable_text_only_response(response, request)
+        self._rewrite_low_confidence_bootstrap_response(response, request)
+        self._rewrite_conflicting_step_completion_response(response, request)
+        self._rewrite_terminal_state_conflict_response(response, request)
+        self._rewrite_procedural_guidance_response(response, request)
+
+        fallback_overlay_used = False
+        fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
+        harness_validation_used, harness_validation_reason = self._apply_harness_validation_action_plan(
+            response,
+            request,
+        )
+        if harness_validation_used:
+            fallback_overlay_used = bool(response.actions)
+            fallback_overlay_reason = harness_validation_reason
+        harness_guardrail_used, harness_guardrail_reason = self._apply_harness_conflict_guardrail(
+            response,
+            request,
+        )
+        if harness_guardrail_used:
+            fallback_overlay_used = True
+            fallback_overlay_reason = harness_guardrail_reason
+        s08_visual_override_used, s08_visual_override_reason = self._apply_s08_visual_recovery_overlay_override(
+            response,
+            request,
+        )
+        if s08_visual_override_used:
+            fallback_overlay_used = True
+            fallback_overlay_reason = s08_visual_override_reason
+        action_hint_override_used, action_hint_override_reason = self._apply_action_hint_overlay_override(
+            response,
+            request,
+        )
+        if action_hint_override_used:
+            fallback_overlay_used = True
+            fallback_overlay_reason = action_hint_override_reason
+        should_apply_safe_fallback = self._should_use_deterministic_overlay_fallback(
+            response,
+            request,
+            mapped_meta,
+        )
+        if should_apply_safe_fallback and not action_hint_override_used and not harness_validation_used:
+            fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
+                response,
+                request,
+            )
+        manual_throttle_rewritten, manual_throttle_reason = self._rewrite_manual_throttle_guidance_response(
+            response,
+            request,
+        )
+        if manual_throttle_rewritten:
+            fallback_overlay_used = False
+            fallback_overlay_reason = manual_throttle_reason
+
+        if mapped_meta:
+            mapping_failure_codes = classify_mapping_failure(mapped_meta)
+            if mapping_failure_codes:
+                response.metadata["response_mapping_failure_codes"] = list(mapping_failure_codes)
+                response.metadata["response_mapping_failure_code"] = mapping_failure_codes[0]
+                response.metadata.setdefault("response_mapping_failure_stage", "response_mapping")
+                if not fallback_overlay_used:
+                    response.metadata = merge_failure_metadata(
+                        response.metadata,
+                        *mapping_failure_codes,
+                        stage="response_mapping",
+                    )
+
+        response.metadata["fallback_overlay_used"] = fallback_overlay_used
+        response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
+        self._annotate_response_audit_metadata(response)
+        _normalize_cached_response_metadata(response.metadata)
+        response_audit_fields = _build_help_cycle_audit_fields(
+            request=request,
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
+            response_metadata=response.metadata,
+        )
+        _apply_help_cycle_audit_fields(response.metadata, response_audit_fields)
+        if isinstance(response_audit_fields.get("vision_fallback_reason"), str):
+            response.metadata = merge_failure_metadata(
+                response.metadata,
+                response_audit_fields["vision_fallback_reason"],
+                stage="vision",
+            )
+        trace_metadata = {
+            "help_cycle_id": help_cycle_id,
+            "generation_mode": response.metadata["generation_mode"],
+            **response_audit_fields,
+        }
+        response.actions = _attach_help_cycle_trace_to_actions(
+            response.actions,
+            trace_metadata=trace_metadata,
+        )
+        return HelpCycleDecisionResult(
+            response=response,
+            fallback_overlay_used=fallback_overlay_used,
+            fallback_overlay_reason=fallback_overlay_reason,
+        )
+
+    def _execute_final_action_plan_via_orchestrator(
+        self,
+        *,
+        obs: Observation,
+        request: TutorRequest,
+        response: TutorResponse,
+        prompt_meta: Mapping[str, Any],
+        state_key: str,
+        vision_fact_context: Mapping[str, Any],
+        vision_fact_active_step_ids: Sequence[str],
+        help_cycle_id: str,
+        fallback_overlay_used: bool,
+        fallback_overlay_reason: str,
+    ) -> tuple[TutorResponse, dict[str, Any]]:
+        result = HelpCycleOrchestrator(
+            llm=_StaticHelpAdjudicator(response),
+            validator=_StaticDecisionValidator(
+                fallback_overlay_used=fallback_overlay_used,
+                fallback_overlay_reason=fallback_overlay_reason,
+            ),
+            actions=_CallableActionPlanner(self._execute_or_dry_run_actions),
+        ).run_prepared(
+            PreparedHelpCycle(
+                observation=obs,
+                request=request,
+                prompt_metadata=prompt_meta,
+                state_key=state_key,
+                vision_context=vision_fact_context,
+                active_step_ids=vision_fact_active_step_ids,
+                help_cycle_id=help_cycle_id,
+            )
+        )
+        return result.response, _normalize_help_report(result.action_report)
+
     def _send_tutor_text(self, response: TutorResponse) -> None:
         if self.tutor_text_sender is None:
             response.metadata["dcs_tutor_text"] = {
@@ -5770,7 +6034,21 @@ class LiveDcsTutorLoop:
                 response.actions,
                 trace_metadata=trace_metadata,
             )
-            overlay_report = self._execute_or_dry_run_actions(response.actions)
+            cached_fallback_reason = response.metadata.get("fallback_overlay_reason")
+            response, overlay_report = self._execute_final_action_plan_via_orchestrator(
+                obs=obs,
+                request=request,
+                response=response,
+                prompt_meta=prompt_meta,
+                state_key=state_key,
+                vision_fact_context=vision_fact_context,
+                vision_fact_active_step_ids=vision_fact_active_step_ids,
+                help_cycle_id=help_cycle_id,
+                fallback_overlay_used=bool(response.metadata.get("fallback_overlay_used")),
+                fallback_overlay_reason=(
+                    cached_fallback_reason if isinstance(cached_fallback_reason, str) else "not_needed"
+                ),
+            )
         else:
             hint = request.context.get("deterministic_step_hint", {})
             inferred_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
@@ -5808,156 +6086,43 @@ class LiveDcsTutorLoop:
             terminal_state_short_circuited = _is_terminal_step_hint_complete(
                 hint if isinstance(hint, Mapping) else None
             )
-            if terminal_state_short_circuited:
-                response = self._build_terminal_state_response(request)
-            else:
-                self._stats.model_calls += 1
-                try:
-                    response = self.model.explain_error(obs, request)
-                except Exception as exc:
-                    response = TutorResponse(
-                        status="error",
-                        in_reply_to=request.request_id,
-                        message=self._fallback_message(
-                            inferred_step_id if isinstance(inferred_step_id, str) else None,
-                            fallback_conditions,
-                        ),
-                        actions=[],
-                        metadata={
-                            "provider": "fallback",
-                            "error_type": type(exc).__name__,
-                            "error": str(exc),
-                        },
+            orchestrated = HelpCycleOrchestrator(
+                llm=_CallableHelpAdjudicator(
+                    lambda observation, tutor_request: self._adjudicate_live_help_response(
+                        observation,
+                        tutor_request,
+                        terminal_state_short_circuited=terminal_state_short_circuited,
+                        inferred_step_id=inferred_step_id if isinstance(inferred_step_id, str) else None,
+                        fallback_conditions=fallback_conditions,
                     )
-
-            response.metadata = dict(response.metadata)
-            response.metadata.setdefault("provider", "fallback" if response.status == "error" else "unknown")
-            response.metadata["prompt_hash"] = request.metadata.get("prompt_hash")
-            response.metadata["prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
-            response.metadata["prompt_trimmed"] = request.metadata.get("prompt_trimmed")
-            response.metadata.setdefault("generation_prompt_hash", response.metadata.get("prompt_hash"))
-            response.metadata.setdefault(
-                "generation_prompt_tokens_est",
-                response.metadata.get("prompt_tokens_est"),
-            )
-            response.metadata.setdefault(
-                "generation_prompt_trimmed",
-                response.metadata.get("prompt_trimmed"),
-            )
-            response.metadata["request_prompt_hash"] = request.metadata.get("prompt_hash")
-            response.metadata["request_prompt_tokens_est"] = request.metadata.get("prompt_tokens_est")
-            response.metadata["request_prompt_trimmed"] = request.metadata.get("prompt_trimmed")
-            response.metadata["state_key"] = state_key
-            response.metadata["prompt_build"] = dict(prompt_meta)
-            response.metadata["help_cycle_id"] = help_cycle_id
-            response.metadata["vision"] = vision_selection.to_dict()
-            response.metadata["vision_status"] = vision_selection.status
-            response.metadata["vision_frame_ids"] = list(vision_selection.frame_ids)
-            response.metadata["vision_fact_status"] = vision_fact_context["status"]
-            response.metadata["vision_fact_active_step_ids"] = list(vision_fact_active_step_ids)
-            response.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
-            response.metadata["vision_facts"] = list(vision_fact_context["vision_facts"])
-            response.metadata["generation_mode"] = _normalize_generation_mode(response)
-
-            mapped_actions, mapped_meta = self._map_response_actions(response, request)
-            response.actions = mapped_actions
-            if mapped_meta:
-                response.metadata["response_mapping"] = mapped_meta
-            self._normalize_observable_text_only_response(response, request)
-            self._rewrite_low_confidence_bootstrap_response(response, request)
-            self._rewrite_conflicting_step_completion_response(response, request)
-            self._rewrite_terminal_state_conflict_response(response, request)
-            self._rewrite_procedural_guidance_response(response, request)
-
-            fallback_overlay_used = False
-            fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
-            harness_validation_used, harness_validation_reason = self._apply_harness_validation_action_plan(
-                response,
-                request,
-            )
-            if harness_validation_used:
-                fallback_overlay_used = bool(response.actions)
-                fallback_overlay_reason = harness_validation_reason
-            harness_guardrail_used, harness_guardrail_reason = self._apply_harness_conflict_guardrail(
-                response,
-                request,
-            )
-            if harness_guardrail_used:
-                fallback_overlay_used = True
-                fallback_overlay_reason = harness_guardrail_reason
-            s08_visual_override_used, s08_visual_override_reason = self._apply_s08_visual_recovery_overlay_override(
-                response,
-                request,
-            )
-            if s08_visual_override_used:
-                fallback_overlay_used = True
-                fallback_overlay_reason = s08_visual_override_reason
-            action_hint_override_used, action_hint_override_reason = self._apply_action_hint_overlay_override(
-                response,
-                request,
-            )
-            if action_hint_override_used:
-                fallback_overlay_used = True
-                fallback_overlay_reason = action_hint_override_reason
-            should_apply_safe_fallback = self._should_use_deterministic_overlay_fallback(
-                response,
-                request,
-                mapped_meta,
-            )
-            if should_apply_safe_fallback and not action_hint_override_used and not harness_validation_used:
-                fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
-                    response,
-                    request,
+                ),
+                validator=_CallableDecisionValidator(
+                    lambda tutor_response, tutor_request: self._validate_and_repair_live_help_response(
+                        tutor_response,
+                        tutor_request,
+                        prompt_meta=prompt_meta,
+                        state_key=state_key,
+                        help_cycle_id=help_cycle_id,
+                        vision_selection=vision_selection,
+                        vision_fact_context=vision_fact_context,
+                        vision_fact_active_step_ids=vision_fact_active_step_ids,
+                        terminal_state_short_circuited=terminal_state_short_circuited,
+                    )
+                ),
+                actions=_CallableActionPlanner(self._execute_or_dry_run_actions),
+            ).run_prepared(
+                PreparedHelpCycle(
+                    observation=obs,
+                    request=request,
+                    prompt_metadata=prompt_meta,
+                    state_key=state_key,
+                    vision_context=vision_fact_context,
+                    active_step_ids=vision_fact_active_step_ids,
+                    help_cycle_id=help_cycle_id,
                 )
-            manual_throttle_rewritten, manual_throttle_reason = self._rewrite_manual_throttle_guidance_response(
-                response,
-                request,
             )
-            if manual_throttle_rewritten:
-                fallback_overlay_used = False
-                fallback_overlay_reason = manual_throttle_reason
-
-            if mapped_meta:
-                mapping_failure_codes = classify_mapping_failure(mapped_meta)
-                if mapping_failure_codes:
-                    response.metadata["response_mapping_failure_codes"] = list(mapping_failure_codes)
-                    response.metadata["response_mapping_failure_code"] = mapping_failure_codes[0]
-                    response.metadata.setdefault("response_mapping_failure_stage", "response_mapping")
-                    if not fallback_overlay_used:
-                        response.metadata = merge_failure_metadata(
-                            response.metadata,
-                            *mapping_failure_codes,
-                            stage="response_mapping",
-                        )
-
-            response.metadata["fallback_overlay_used"] = fallback_overlay_used
-            response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
-            self._annotate_response_audit_metadata(response)
-            _normalize_cached_response_metadata(response.metadata)
-            response_audit_fields = _build_help_cycle_audit_fields(
-                request=request,
-                vision_selection=vision_selection,
-                vision_fact_context=vision_fact_context,
-                response_metadata=response.metadata,
-            )
-            _apply_help_cycle_audit_fields(response.metadata, response_audit_fields)
-            if isinstance(response_audit_fields.get("vision_fallback_reason"), str):
-                response.metadata = merge_failure_metadata(
-                    response.metadata,
-                    response_audit_fields["vision_fallback_reason"],
-                    stage="vision",
-                )
-            trace_metadata = {
-                "help_cycle_id": help_cycle_id,
-                "generation_mode": response.metadata["generation_mode"],
-                **response_audit_fields,
-            }
-            response.actions = _attach_help_cycle_trace_to_actions(
-                response.actions,
-                trace_metadata=trace_metadata,
-            )
-
-            overlay_report = self._execute_or_dry_run_actions(response.actions)
+            response = orchestrated.response
+            overlay_report = _normalize_help_report(orchestrated.action_report)
             provider = response.metadata.get("provider")
             cacheable = response.status == "ok" and provider != "fallback"
             if cacheable:
