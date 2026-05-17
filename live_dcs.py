@@ -83,6 +83,12 @@ from core.help_failure import (
     merge_failure_metadata,
     overlay_rejection_payload,
 )
+from core.harness_validation import (
+    HarnessActionHintFactRule,
+    HarnessCompletionAdvance,
+    HarnessTextGuidanceRule,
+    plan_harness_action,
+)
 from core.security import (
     redact_sensitive_text,
     sanitize_help_response_for_log,
@@ -3714,18 +3720,19 @@ class LiveDcsTutorLoop:
         metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
         raw_help_response = metadata.get("help_response")
         if isinstance(raw_help_response, Mapping):
-            response.metadata["model_raw_help_response"] = copy.deepcopy(dict(raw_help_response))
+            response.metadata.setdefault("model_raw_help_response", copy.deepcopy(dict(raw_help_response)))
             raw_explanations = raw_help_response.get("explanations")
             if isinstance(raw_explanations, list):
-                response.metadata["model_raw_explanations"] = [
-                    item for item in raw_explanations if isinstance(item, str)
-                ]
+                response.metadata.setdefault(
+                    "model_raw_explanations",
+                    [item for item in raw_explanations if isinstance(item, str)],
+                )
             raw_next = raw_help_response.get("next")
             if isinstance(raw_next, Mapping):
-                response.metadata["model_raw_next"] = dict(raw_next)
+                response.metadata.setdefault("model_raw_next", dict(raw_next))
             raw_diagnosis = raw_help_response.get("diagnosis")
             if isinstance(raw_diagnosis, Mapping):
-                response.metadata["model_raw_diagnosis"] = dict(raw_diagnosis)
+                response.metadata.setdefault("model_raw_diagnosis", dict(raw_diagnosis))
 
         final_public_response: dict[str, Any] = {
             "message": response.message,
@@ -4460,6 +4467,372 @@ class LiveDcsTutorLoop:
         response.message = guidance
         response.explanations = [guidance]
         return True, HARNESS_LATE_VLM_CONFLICT
+
+    def _apply_harness_validation_action_plan(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False, "missing_deterministic_hint"
+
+        inferred_step_id = hint.get("inferred_step_id")
+        overlay_step_id = hint.get("overlay_step_id")
+        if response.metadata.get("completion_conflict_rewritten") is True:
+            return False, "completion_conflict_already_rewritten"
+        response_mapping_meta = response.metadata.get("response_mapping")
+        if (
+            response.actions
+            and isinstance(response_mapping_meta, Mapping)
+            and response_mapping_meta.get("rejected_targets_by_request_allowlist")
+        ):
+            return False, "response_mapping_already_repaired_allowlist"
+        if inferred_step_id == "S18":
+            return False, "legacy_s18_action_hint_guardrail"
+        if _state_harness_has_late_vlm_conflict(context.get("state_harness")):
+            return False, "late_vlm_conflict_guardrail"
+        model_step_id = _extract_model_next_step_id(response.metadata)
+        if not isinstance(model_step_id, str) or not model_step_id:
+            diagnosis = response.metadata.get("diagnosis")
+            if isinstance(diagnosis, Mapping):
+                raw_step_id = diagnosis.get("step_id")
+                if isinstance(raw_step_id, str) and raw_step_id:
+                    model_step_id = raw_step_id
+
+        proposed_targets: list[str] = []
+        evidence_refs: list[str] = []
+        help_response = response.metadata.get("help_response")
+        original_help_response = copy.deepcopy(help_response) if isinstance(help_response, Mapping) else None
+        if isinstance(help_response, Mapping):
+            overlay = help_response.get("overlay")
+            if isinstance(overlay, Mapping):
+                raw_targets = overlay.get("targets")
+                if isinstance(raw_targets, list):
+                    proposed_targets = [item for item in raw_targets if isinstance(item, str) and item]
+                raw_evidence = overlay.get("evidence")
+                if isinstance(raw_evidence, list):
+                    for item in raw_evidence:
+                        if not isinstance(item, Mapping):
+                            continue
+                        ref = item.get("ref")
+                        if isinstance(ref, str) and ref:
+                            evidence_refs.append(ref)
+        if not proposed_targets:
+            proposed_targets = [
+                target
+                for target in (
+                    action.get("target") if isinstance(action, Mapping) else None
+                    for action in response.actions
+                )
+                if isinstance(target, str) and target
+            ]
+
+        candidate_step_ids: list[str] = []
+        raw_candidates = context.get("candidate_steps")
+        if isinstance(raw_candidates, list):
+            for candidate in raw_candidates:
+                if isinstance(candidate, Mapping):
+                    step_id = candidate.get("step_id")
+                    if isinstance(step_id, str) and step_id:
+                        candidate_step_ids.append(step_id)
+                elif isinstance(candidate, str) and candidate:
+                    candidate_step_ids.append(candidate)
+        if not candidate_step_ids:
+            candidate_step_ids = list(self.candidate_steps)
+
+        vision_summary = context.get("vision_fact_summary")
+        vision_seen_fact_ids: list[str] = []
+        vision_fresh_fact_ids: list[str] = []
+        if isinstance(vision_summary, Mapping):
+            raw_seen = vision_summary.get("seen_fact_ids")
+            if isinstance(raw_seen, (list, tuple, set)):
+                vision_seen_fact_ids = [item for item in raw_seen if isinstance(item, str) and item]
+            raw_fresh = vision_summary.get("fresh_fact_ids")
+            if isinstance(raw_fresh, (list, tuple, set)):
+                vision_fresh_fact_ids = [item for item in raw_fresh if isinstance(item, str) and item]
+
+        action_hint = hint.get("action_hint")
+        manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
+        missing_conditions = hint.get("missing_conditions")
+        missing_set = {
+            item for item in missing_conditions
+            if isinstance(item, str) and item
+        } if isinstance(missing_conditions, (list, tuple)) else set()
+        include_s05_manual_guidance = (
+            "vars.throttle_r_not_off==true" in missing_set
+            or "vars.throttle_r_idle_complete==true" in missing_set
+        )
+        include_s11_manual_guidance = (
+            "vars.throttle_l_not_off==true" in missing_set
+            or "vars.throttle_l_idle_complete==true" in missing_set
+        )
+        if self.lang == "zh":
+            if include_s05_manual_guidance:
+                manual_text_guidance_rules.append(HarnessTextGuidanceRule(
+                    step_id="S05",
+                    target="*",
+                    guidance=(
+                        "当前处于 S05（右发油门推进到 IDLE）阶段。右油门杆还没有移出 OFF 卡位。"
+                        "该动作不在当前 overlay 布局内，请按 Right Shift+Home 将右油门杆推至 IDLE 位置。"
+                    ),
+                ))
+            if include_s11_manual_guidance:
+                manual_text_guidance_rules.append(HarnessTextGuidanceRule(
+                    step_id="S11",
+                    target="*",
+                    guidance=(
+                        "当前处于 S11（左发油门推进到 IDLE）阶段。左油门杆还没有移出 OFF 卡位。"
+                        "该动作不在当前 overlay 布局内，请按 Right Alt+Home 将左油门杆推至 IDLE 位置。"
+                    ),
+                ))
+        else:
+            if include_s05_manual_guidance:
+                manual_text_guidance_rules.append(HarnessTextGuidanceRule(
+                    step_id="S05",
+                    target="*",
+                    guidance=(
+                        "You are on S05 (move the right throttle to IDLE). The right throttle is still in the OFF detent. "
+                        "This control is outside the current overlay layout; press Right Shift+Home to move the right throttle to IDLE."
+                    ),
+                ))
+            if include_s11_manual_guidance:
+                manual_text_guidance_rules.append(HarnessTextGuidanceRule(
+                    step_id="S11",
+                    target="*",
+                    guidance=(
+                        "You are on S11 (move the left throttle to IDLE). The left throttle is still in the OFF detent. "
+                        "This control is outside the current overlay layout; press Right Alt+Home to move the left throttle to IDLE."
+                    ),
+                ))
+        plan = plan_harness_action(
+            step_specs=self.step_harness_specs,
+            inferred_step_id=inferred_step_id if isinstance(inferred_step_id, str) else None,
+            model_step_id=model_step_id if isinstance(model_step_id, str) else None,
+            overlay_step_id=overlay_step_id if isinstance(overlay_step_id, str) else None,
+            proposed_overlay_targets=proposed_targets,
+            candidate_step_ids=candidate_step_ids,
+            runtime_overlay_targets=self.overlay_allowlist,
+            request_overlay_targets=context.get("overlay_target_allowlist"),
+            allowed_evidence_refs=sorted(_collect_request_evidence_refs(context)),
+            evidence_refs=evidence_refs,
+            max_overlay_targets=self.max_overlay_targets,
+            vision_seen_fact_ids=vision_seen_fact_ids,
+            vision_fresh_fact_ids=vision_fresh_fact_ids,
+            action_hint=action_hint if isinstance(action_hint, Mapping) else None,
+            completion_advancements=[
+                HarnessCompletionAdvance(
+                    step_id="S19",
+                    fact_id="fcsmc_final_go_result_visible",
+                    next_step_id="S20",
+                    source="validator_s19_final_go",
+                )
+            ],
+            action_hint_step_ids=["S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
+            action_hint_fact_rules=[
+                HarnessActionHintFactRule(step_id="S19", fact_id="fcsmc_intermediate_result_visible")
+            ],
+            text_guidance_rules=manual_text_guidance_rules,
+        )
+
+        response.metadata["validator_rejected"] = bool(plan.validator_rejected)
+        response.metadata["repair_applied"] = bool(response.metadata.get("repair_applied")) or bool(plan.repair_applied)
+        response.metadata["final_action_plan_source"] = plan.final_action_plan_source
+        response.metadata["harness_validation_reasons"] = list(plan.reasons)
+        response.metadata["harness_action_plan"] = {
+            "step_id": plan.step_id,
+            "overlay_step_id": plan.overlay_step_id,
+            "targets": list(plan.targets),
+            "text_only": plan.text_only,
+            "source": plan.final_action_plan_source,
+        }
+        if isinstance(plan.rejected_model_step_id, str) and plan.rejected_model_step_id:
+            response.metadata["rejected_model_step_id"] = plan.rejected_model_step_id
+        elif "rejected_model_step_id" in response.metadata:
+            response.metadata.pop("rejected_model_step_id", None)
+        if original_help_response is not None:
+            response.metadata.setdefault("model_raw_help_response", original_help_response)
+
+        if plan.text_only:
+            original_actions = copy.deepcopy([dict(action) for action in response.actions if isinstance(action, Mapping)])
+            if original_actions:
+                response.metadata["harness_validator_original_actions"] = original_actions
+            response.actions = []
+            if isinstance(plan.guidance, str) and plan.guidance:
+                original_message = response.message
+                original_explanations = list(response.explanations)
+                response.message = plan.guidance
+                response.explanations = [plan.guidance]
+                if original_message != response.message:
+                    response.metadata["harness_validator_original_message"] = original_message
+                    response.metadata["manual_throttle_guidance_original_message"] = original_message
+                if original_explanations and original_explanations != response.explanations:
+                    response.metadata["harness_validator_original_explanations"] = original_explanations
+                    response.metadata["manual_throttle_guidance_original_explanations"] = original_explanations
+            if plan.step_id in {"S05", "S11"}:
+                response.metadata["manual_throttle_guidance_rewritten"] = True
+                response.metadata["manual_throttle_guidance_step_id"] = plan.step_id
+                response.metadata["manual_throttle_guidance_original_actions"] = original_actions
+                response.metadata["help_response"] = {
+                    "diagnosis": {"step_id": plan.step_id, "error_category": "OM"},
+                    "next": {"step_id": plan.step_id},
+                    "overlay": {"targets": [], "evidence": []},
+                    "explanations": [response.message],
+                }
+                return True, "manual_throttle_keyboard_guidance"
+            return True, plan.final_action_plan_source
+
+        current_targets = [
+            target
+            for target in (
+                action.get("target") if isinstance(action, Mapping) else None
+                for action in response.actions
+            )
+            if isinstance(target, str) and target
+        ]
+        current_next = response.metadata.get("next")
+        current_next_step_id = current_next.get("step_id") if isinstance(current_next, Mapping) else None
+        current_diagnosis = response.metadata.get("diagnosis")
+        current_diagnosis_step_id = (
+            current_diagnosis.get("step_id") if isinstance(current_diagnosis, Mapping) else None
+        )
+        only_target_repair = bool(plan.repair_applied) and all(
+            isinstance(reason, str)
+            and (
+                reason.startswith("target_not_allowed:")
+                or reason.startswith("target_not_in_request_allowlist:")
+                or reason.startswith("target_dropped_by_max_overlay_targets:")
+            )
+            for reason in plan.reasons
+        )
+        if (
+            response.actions
+            and tuple(current_targets) == plan.targets
+            and (
+                (
+                    not plan.repair_applied
+                    and plan.rejected_model_step_id is None
+                )
+                or (
+                    only_target_repair
+                    and plan.rejected_model_step_id is None
+                    and current_next_step_id == plan.step_id
+                    and current_diagnosis_step_id == plan.step_id
+                )
+            )
+        ):
+            return False, "already_valid"
+        if not plan.targets:
+            if plan.validator_rejected and response.actions:
+                response.metadata["harness_validator_original_actions"] = copy.deepcopy(
+                    [dict(action) for action in response.actions if isinstance(action, Mapping)]
+                )
+                response.actions = []
+                if isinstance(original_help_response, Mapping):
+                    cleaned_help_response = copy.deepcopy(dict(original_help_response))
+                    cleaned_help_response["diagnosis"] = {"step_id": plan.step_id, "error_category": "OM"}
+                    cleaned_help_response["next"] = {"step_id": plan.step_id}
+                    cleaned_help_response["overlay"] = {"targets": [], "evidence": []}
+                    response.metadata["help_response"] = cleaned_help_response
+                return True, "validator_rejected_no_action"
+            return False, "no_planned_targets"
+
+        original_actions = copy.deepcopy([dict(action) for action in response.actions if isinstance(action, Mapping)])
+        if original_actions:
+            response.metadata["harness_validator_original_actions"] = original_actions
+
+        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
+            request,
+            override_inferred_step_id=plan.step_id,
+            override_overlay_step_id=plan.overlay_step_id,
+            ignore_request_allowlist=True,
+        )
+        if isinstance(fallback_help_obj, Mapping):
+            planned_help_obj = copy.deepcopy(dict(fallback_help_obj))
+        else:
+            planned_help_obj = {
+                "diagnosis": {"step_id": plan.step_id, "error_category": "OM"},
+                "next": {"step_id": plan.step_id},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": list(response.explanations) or ([response.message] if response.message else []),
+            }
+        planned_help_obj["diagnosis"] = {"step_id": plan.step_id, "error_category": "OM"}
+        planned_help_obj["next"] = {"step_id": plan.step_id}
+        evidence_source = None
+        for ref in plan.evidence_refs:
+            evidence_type = infer_evidence_type_from_ref(ref)
+            if evidence_type is None:
+                continue
+            evidence_source = {
+                "type": evidence_type,
+                "ref": ref,
+                "quote": "Harness validator planned target.",
+                "grounding_confidence": 0.51,
+            }
+            break
+        fallback_overlay = fallback_help_obj.get("overlay") if isinstance(fallback_help_obj, Mapping) else None
+        if evidence_source is None and isinstance(fallback_overlay, Mapping):
+            fallback_evidence = fallback_overlay.get("evidence")
+            if isinstance(fallback_evidence, list):
+                for item in fallback_evidence:
+                    if not isinstance(item, Mapping):
+                        continue
+                    ref = item.get("ref")
+                    evidence_type = item.get("type")
+                    if isinstance(ref, str) and isinstance(evidence_type, str):
+                        evidence_source = {
+                            "type": evidence_type,
+                            "ref": ref,
+                            "quote": item.get("quote") if isinstance(item.get("quote"), str) else "Harness validator planned target.",
+                            "grounding_confidence": item.get("grounding_confidence", 0.51),
+                        }
+                        break
+        if evidence_source is None:
+            return False, "fallback_failed:no_verifiable_evidence_ref"
+        planned_help_obj["overlay"] = {
+            "targets": list(plan.targets),
+            "evidence": [
+                {
+                    "target": target,
+                    "type": evidence_source["type"],
+                    "ref": evidence_source["ref"],
+                    "quote": evidence_source["quote"],
+                    "grounding_confidence": evidence_source["grounding_confidence"],
+                }
+                for target in plan.targets
+            ],
+        }
+        if isinstance(plan.guidance, str) and plan.guidance:
+            planned_help_obj["explanations"] = [plan.guidance]
+
+        mapped = map_help_response_to_tutor_response(
+            planned_help_obj,
+            request=request,
+            status=response.status,
+            max_overlay_targets=self.max_overlay_targets,
+            ui_map_path=self.ui_map_path,
+            lang=self.lang,
+        )
+        mapped_meta = dict(mapped.metadata)
+        response.metadata["harness_validator_mapping"] = mapped_meta
+        if not mapped.actions:
+            mapping_errors = mapped_meta.get("mapping_errors")
+            if isinstance(mapping_errors, list) and mapping_errors:
+                return False, f"mapping_failed:{'|'.join(str(item) for item in mapping_errors[:3])}"
+            return False, "mapping_failed"
+        response.actions = list(mapped.actions)
+        response.metadata["diagnosis"] = {"step_id": plan.step_id, "error_category": "OM"}
+        response.metadata["next"] = {"step_id": plan.step_id}
+        response.metadata["help_response"] = planned_help_obj
+        response.metadata["harness_validator_fallback_reason"] = fallback_reason
+        if isinstance(plan.guidance, str) and plan.guidance:
+            response.message = plan.guidance
+            response.explanations = [plan.guidance]
+        elif mapped.explanations and response.metadata.get("procedural_guidance_rewritten") is not True:
+            response.message = mapped.explanations[0]
+            response.explanations = list(mapped.explanations)
+        return True, fallback_reason
 
     def _rewrite_manual_throttle_guidance_response(
         self,
@@ -5498,6 +5871,13 @@ class LiveDcsTutorLoop:
 
             fallback_overlay_used = False
             fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
+            harness_validation_used, harness_validation_reason = self._apply_harness_validation_action_plan(
+                response,
+                request,
+            )
+            if harness_validation_used:
+                fallback_overlay_used = bool(response.actions)
+                fallback_overlay_reason = harness_validation_reason
             harness_guardrail_used, harness_guardrail_reason = self._apply_harness_conflict_guardrail(
                 response,
                 request,
@@ -5524,7 +5904,7 @@ class LiveDcsTutorLoop:
                 request,
                 mapped_meta,
             )
-            if should_apply_safe_fallback and not action_hint_override_used:
+            if should_apply_safe_fallback and not action_hint_override_used and not harness_validation_used:
                 fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
                     response,
                     request,
