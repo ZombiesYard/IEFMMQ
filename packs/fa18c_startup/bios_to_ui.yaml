@@ -41,8 +41,12 @@ mappings:
     - ampcd_pb19
   RADAR_SW:
     - radar_mode_knob
+  LEFT_DDI_BRT_SELECT:
+    - left_mdi_brightness_selector
   LEFT_DDI_BRT_CTL:
     - left_mdi_brightness_selector
+  RIGHT_DDI_BRT_SELECT:
+    - right_mdi_brightness_selector
   RIGHT_DDI_BRT_CTL:
     - right_mdi_brightness_selector
   AMPCD_BRT_CTL:

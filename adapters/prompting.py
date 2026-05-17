@@ -598,7 +598,18 @@ def _build_overlay_target_priority(
     if step_id == "S08":
         ampcd = "ampcd_off_brightness_knob"
         ddi_selectors = ("left_mdi_brightness_selector", "right_mdi_brightness_selector")
-        if ampcd in ranked:
+        missing_conditions_for_s08 = deterministic_step_hint.get("missing_conditions")
+        ddi_power_missing = False
+        if isinstance(missing_conditions_for_s08, list):
+            ddi_power_missing = any(
+                isinstance(item, str)
+                and (
+                    item.strip().startswith("vars.left_ddi_on==")
+                    or item.strip().startswith("vars.right_ddi_on==")
+                )
+                for item in missing_conditions_for_s08
+            )
+        if ddi_power_missing and ampcd in ranked:
             ddi_present = [t for t in ddi_selectors if t in ranked]
             if ddi_present:
                 ampcd_pos = ranked.index(ampcd)

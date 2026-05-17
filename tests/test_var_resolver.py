@@ -673,7 +673,9 @@ def test_var_resolver_pack_lights_test_vars_follow_switch_and_annunciators() -> 
             "MASTER_CAUTION_LT": 0,
             "LH_ADV_GO": 0,
             "LEFT_DDI_BRT_CTL": 65535,
+            "LEFT_DDI_BRT_SELECT": 2,
             "RIGHT_DDI_BRT_CTL": 65535,
+            "RIGHT_DDI_BRT_SELECT": 2,
             "AMPCD_BRT_CTL": 65535,
             "HUD_SYM_BRT": 65535,
         },
@@ -693,7 +695,9 @@ def test_var_resolver_pack_lights_test_complete_does_not_use_display_power_as_pr
         source="dcs_bios",
         bios={
             "LEFT_DDI_BRT_CTL": 65535,
+            "LEFT_DDI_BRT_SELECT": 2,
             "RIGHT_DDI_BRT_CTL": 65535,
+            "RIGHT_DDI_BRT_SELECT": 2,
             "AMPCD_BRT_CTL": 65535,
             "HUD_SYM_BRT": 65535,
         },
@@ -706,6 +710,40 @@ def test_var_resolver_pack_lights_test_complete_does_not_use_display_power_as_pr
     assert vars_out["lights_test_active"] is False
     assert vars_out["annunciator_panel_activity"] is False
     assert vars_out["lights_test_complete"] is False
+
+
+def test_var_resolver_pack_ddi_on_uses_brightness_selector_not_potentiometer() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    selector_off = TelemetryFrame(
+        seq=725,
+        t_wall=725.0,
+        source="dcs_bios",
+        bios={
+            "LEFT_DDI_BRT_CTL": 65535,
+            "LEFT_DDI_BRT_SELECT": 2,
+            "RIGHT_DDI_BRT_CTL": 65535,
+            "RIGHT_DDI_BRT_SELECT": 0,
+        },
+    )
+    selector_on = TelemetryFrame(
+        seq=726,
+        t_wall=726.0,
+        source="dcs_bios",
+        bios={
+            "LEFT_DDI_BRT_CTL": 65535,
+            "LEFT_DDI_BRT_SELECT": 2,
+            "RIGHT_DDI_BRT_CTL": 65535,
+            "RIGHT_DDI_BRT_SELECT": 1,
+        },
+    )
+
+    off_vars = resolver.resolve(selector_off)
+    on_vars = resolver.resolve(selector_on)
+
+    assert off_vars["left_ddi_on"] is True
+    assert off_vars["right_ddi_on"] is False
+    assert on_vars["right_ddi_on"] is True
 
 
 def test_var_resolver_pack_lights_test_complete_does_not_use_generic_annunciators_as_proxy() -> None:

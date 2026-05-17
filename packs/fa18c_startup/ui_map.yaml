@@ -112,7 +112,7 @@ cockpit_elements:
   left_mdi_brightness_selector:
     description: "Left MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_51"
-    aliases: ["Left MDI Brightness Selector", "LEFT_DDI_BRT_CTL"]
+    aliases: ["Left MDI Brightness Selector", "LEFT_DDI_BRT_SELECT", "LEFT_DDI_BRT_CTL"]
     panel_area: "left_instrument_panel"
     interaction:
       click_type: "right"
@@ -123,7 +123,7 @@ cockpit_elements:
   right_mdi_brightness_selector:
     description: "Right MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_76"
-    aliases: ["Right MDI Brightness Selector", "RIGHT_DDI_BRT_CTL"]
+    aliases: ["Right MDI Brightness Selector", "RIGHT_DDI_BRT_SELECT", "RIGHT_DDI_BRT_CTL"]
     panel_area: "right_instrument_panel"
     interaction:
       click_type: "right"

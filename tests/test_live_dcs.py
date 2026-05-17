@@ -3271,14 +3271,9 @@ def test_safe_fallback_overlay_prefers_hud_target_for_s08_hud_missing(tmp_path: 
         loop.close()
 
 
-def test_safe_fallback_overlay_enforces_ddi_before_ampcd_for_s08(tmp_path: Path) -> None:
-    """When mpcd_on is the only missing condition for S08 (DDI vars are
-    true but AMPCD is still off), the deterministic fallback must still
-    prefer a DDI brightness selector over the AMPCD brightness knob.
-
-    This guards against the Lot 20 case where BIOS may report DDIs as
-    "on" from switch position but they are not actually powered, and the
-    AMPCD requires at least one DDI to be lit before its knob has effect.
+def test_safe_fallback_overlay_prefers_ampcd_when_s08_ddis_are_powered(tmp_path: Path) -> None:
+    """When both DDI selector vars are true and only AMPCD remains missing,
+    S08 fallback should no longer regress to a DDI selector.
     """
     replay_path = tmp_path / "bios_s08_ddi_before_ampcd.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
@@ -3324,11 +3319,8 @@ def test_safe_fallback_overlay_enforces_ddi_before_ampcd_for_s08(tmp_path: Path)
 
         assert fallback_reason == "deterministic_step:S08"
         assert isinstance(fallback_help_obj, dict)
-        # The first highlighted target must be a DDI brightness selector,
-        # not ampcd_off_brightness_knob, because AMPCD won't light without
-        # a powered DDI on F/A-18C Lot 20.
-        assert fallback_help_obj["overlay"]["targets"] == ["left_mdi_brightness_selector"], (
-            f"Expected left_mdi_brightness_selector first, got {fallback_help_obj['overlay']['targets']}"
+        assert fallback_help_obj["overlay"]["targets"] == ["ampcd_off_brightness_knob"], (
+            f"Expected ampcd_off_brightness_knob, got {fallback_help_obj['overlay']['targets']}"
         )
     finally:
         loop.close()
@@ -3392,7 +3384,6 @@ def test_safe_fallback_overlay_highlights_all_four_display_power_controls_for_s0
         assert fallback_reason == "deterministic_step:S08"
         assert isinstance(fallback_help_obj, dict)
         assert fallback_help_obj["overlay"]["targets"] == [
-            "left_mdi_brightness_selector",
             "right_mdi_brightness_selector",
             "ampcd_off_brightness_knob",
             "hud_symbology_brightness_knob",
@@ -3902,12 +3893,11 @@ def test_s08_visual_uncertain_overrides_model_ampcd_to_ddi_recovery(tmp_path: Pa
 
         override_used, override_reason = loop._apply_s08_visual_recovery_overlay_override(response, request)
 
-        assert override_used is True
-        assert override_reason == "deterministic_step:S08"
-        assert [action["target"] for action in response.actions] == ["left_mdi_brightness_selector"]
+        assert override_used is False
+        assert override_reason == "ampcd_allowed_after_ddi_power"
+        assert [action["target"] for action in response.actions] == ["ampcd_off_brightness_knob"]
         assert "AMPCD" in response.message
-        assert "DDI" in response.message
-        assert response.metadata["s08_visual_recovery_overlay_override_used"] is True
+        assert "s08_visual_recovery_overlay_override_used" not in response.metadata
     finally:
         loop.close()
 

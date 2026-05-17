@@ -62,12 +62,15 @@ vars:
   engine_crank_left_complete: "derived(vars.engine_crank_left or vars.rpm_l_gte_25 or vars.rpm_l_gte_60 or vars.left_engine_idle_ready)"
 
   # Displays / avionics
-  left_ddi_on: "bios.LEFT_DDI_BRT_CTL > 0"
-  right_ddi_on: "bios.RIGHT_DDI_BRT_CTL > 0"
+  # DDI power is controlled by the OFF/NIGHT/DAY selector, not by the
+  # brightness potentiometer. The brightness potentiometer can be non-zero
+  # while the selector is still OFF.
+  left_ddi_on: "bios.LEFT_DDI_BRT_SELECT > 0"
+  right_ddi_on: "bios.RIGHT_DDI_BRT_SELECT > 0"
   mpcd_on: "bios.AMPCD_BRT_CTL > 0"
   hud_on: "bios.HUD_SYM_BRT > 0"
   bleed_air_cycle_complete: "derived(vars.bleed_air_norm)"
-  core_avionics_online: "derived(bios.LEFT_DDI_BRT_CTL > 0 and bios.RIGHT_DDI_BRT_CTL > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
+  core_avionics_online: "derived(bios.LEFT_DDI_BRT_SELECT > 0 and bios.RIGHT_DDI_BRT_SELECT > 0 and bios.AMPCD_BRT_CTL > 0 and bios.HUD_SYM_BRT > 0)"
 
   # Key switches / sensor panel
   # DCS-BIOS exports rocker selectors as 0/1/2 where 1 is centered and 0/2 are the

@@ -130,6 +130,28 @@ _MISSING_CONDITION_TARGET_HINTS: dict[str, tuple[str, ...]] = {
     "rpm_r_gte_60": (),
     "throttle_r_idle_complete": ("throttle_quadrant_reference",),
 }
+_S08_POWER_SEQUENCE: tuple[tuple[str, str, str], ...] = (
+    (
+        "left_ddi_on",
+        "left_mdi_brightness_selector",
+        "Left DDI is still OFF. Set the left DDI brightness selector to NIGHT/DAY; the screen may take a moment to illuminate.",
+    ),
+    (
+        "right_ddi_on",
+        "right_mdi_brightness_selector",
+        "Right DDI is still OFF. Set the right DDI brightness selector to NIGHT/DAY; the screen may take a moment to illuminate.",
+    ),
+    (
+        "mpcd_on",
+        "ampcd_off_brightness_knob",
+        "Both DDIs are powered. Increase the AMPCD brightness knob next.",
+    ),
+    (
+        "hud_on",
+        "hud_symbology_brightness_knob",
+        "DDIs and AMPCD are powered. Increase HUD symbology brightness next.",
+    ),
+)
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vision_facts import (
     VisionFactsConfigError,
@@ -2206,6 +2228,38 @@ def _build_visual_action_hint(
     }
 
 
+def _s08_power_targets_for_missing_conditions(
+    missing_conditions: Sequence[str],
+    *,
+    allowed_targets: Sequence[str],
+) -> list[str]:
+    allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+    targets: list[str] = []
+    for var_name, target, _reason in _S08_POWER_SEQUENCE:
+        if target not in allowed:
+            continue
+        if any(
+            isinstance(item, str) and item.strip().startswith(f"vars.{var_name}==")
+            for item in missing_conditions
+        ):
+            targets.append(target)
+    return targets
+
+
+def _build_s08_power_action_hint(
+    *,
+    vars_selected: Mapping[str, Any],
+    allowed_targets: Sequence[str],
+) -> dict[str, Any] | None:
+    allowed = {item for item in allowed_targets if isinstance(item, str) and item}
+    if not allowed:
+        return None
+    for var_name, target, reason in _S08_POWER_SEQUENCE:
+        if target in allowed and vars_selected.get(var_name) is not True:
+            return {"target": target, "reason": reason}
+    return None
+
+
 def _normalize_ufc_scratchpad_text(vars_selected: Mapping[str, Any]) -> str:
     parts: list[str] = []
     for key in (
@@ -2300,6 +2354,12 @@ def _build_procedural_action_hint(
         return _hint(
             "bleed_air_knob",
             "Rotate the BLEED AIR knob 360° clockwise (right-click 4 times) from NORM back to NORM.",
+        )
+
+    if inferred_step_id == "S08":
+        return _build_s08_power_action_hint(
+            vars_selected=vars_selected,
+            allowed_targets=allowed_targets,
         )
 
     four_down_single_step_hints = {
@@ -4479,6 +4539,12 @@ class LiveDcsTutorLoop:
                 if isinstance(hinted_target, str) and hinted_target:
                     action_target = hinted_target
                     override_kind = "action_hint"
+        elif inferred_step_id == "S08":
+            if isinstance(action_hint, Mapping):
+                hinted_target = action_hint.get("target")
+                if isinstance(hinted_target, str) and hinted_target:
+                    action_target = hinted_target
+                    override_kind = "action_hint"
         current_targets = [
             target
             for target in (
@@ -4564,6 +4630,28 @@ class LiveDcsTutorLoop:
                 response.metadata["action_hint_overlay_override_original_message"] = original_message
             if original_explanations and original_explanations != [rewritten]:
                 response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
+        elif inferred_step_id == "S08" and override_kind == "action_hint":
+            original_message = response.message
+            original_explanations = list(response.explanations)
+            hint_reason = action_hint.get("reason") if isinstance(action_hint, Mapping) else None
+            if self.lang == "zh":
+                by_target = {
+                    "left_mdi_brightness_selector": "左 DDI 选择旋钮还未到 NIGHT/DAY。请先打开左 DDI；DDI 打开后屏幕会有短暂亮起延迟。",
+                    "right_mdi_brightness_selector": "右 DDI 选择旋钮还未到 NIGHT/DAY。请打开右 DDI；DDI 打开后屏幕会有短暂亮起延迟。",
+                    "ampcd_off_brightness_knob": "左右 DDI 已经上电。下一步请调高 AMPCD 亮度旋钮点亮 AMPCD。",
+                    "hud_symbology_brightness_knob": "DDI 和 AMPCD 已经上电。下一步请调高 HUD 亮度。",
+                }
+                rewritten = by_target.get(action_target, "请按当前高亮目标继续完成显示器上电。")
+            elif isinstance(hint_reason, str) and hint_reason:
+                rewritten = hint_reason
+            else:
+                rewritten = "Follow the highlighted display power target; DDI screens can take a moment to illuminate."
+            response.message = rewritten
+            response.explanations = [rewritten]
+            if original_message != rewritten:
+                response.metadata["action_hint_overlay_override_original_message"] = original_message
+            if original_explanations and original_explanations != [rewritten]:
+                response.metadata["action_hint_overlay_override_original_explanations"] = original_explanations
 
         response.metadata["action_hint_overlay_override_used"] = True
         response.metadata["action_hint_overlay_override_target"] = action_target
@@ -4624,6 +4712,12 @@ class LiveDcsTutorLoop:
             and "vars.mpcd_on==true" in missing_set
             and not has_display_page_evidence
         ):
+            ddi_power_missing = (
+                "vars.left_ddi_on==true" in missing_set
+                or "vars.right_ddi_on==true" in missing_set
+            )
+            if not ddi_power_missing:
+                return False, "ampcd_allowed_after_ddi_power"
             response.metadata["s08_visual_recovery_overlay_override_original_actions"] = copy.deepcopy(
                 [dict(action) for action in response.actions if isinstance(action, Mapping)]
             )
@@ -4947,7 +5041,7 @@ class LiveDcsTutorLoop:
                     source="validator_s19_final_go",
                 )
             ],
-            action_hint_step_ids=["S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
+            action_hint_step_ids=["S08", "S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
             action_hint_fact_rules=[
                 HarnessActionHintFactRule(step_id="S19", fact_id="fcsmc_intermediate_result_visible")
             ],
@@ -5666,7 +5760,13 @@ class LiveDcsTutorLoop:
             step_id=overlay_step_id,
         )
         if overlay_step_id == "S08":
-            if s08_visual_page_targets:
+            s08_missing_power_targets = _s08_power_targets_for_missing_conditions(
+                missing_conditions,
+                allowed_targets=candidate_targets,
+            )
+            if s08_missing_power_targets:
+                fallback_targets_list = s08_missing_power_targets[: max(1, int(self.max_overlay_targets))]
+            elif s08_visual_page_targets:
                 fallback_targets_list = candidate_targets[: max(1, int(self.max_overlay_targets))]
             else:
                 s08_power_vars = {"left_ddi_on", "right_ddi_on", "mpcd_on", "hud_on"}

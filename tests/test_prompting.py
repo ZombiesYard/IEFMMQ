@@ -958,14 +958,9 @@ def test_prompt_prioritizes_hud_brightness_when_s08_missing_hud_power() -> None:
     assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "hud_symbology_brightness_knob"
 
 
-def test_prompt_enforces_ddi_before_ampcd_for_s08_mpcd_missing() -> None:
-    """When mpcd_on is the only missing condition for S08 (DDI vars are
-    true but AMPCD is still off), the prompt must still rank a DDI
-    brightness selector before the AMPCD knob in its priority list.
-
-    This guards against the Lot 20 case where BIOS may report DDIs as
-    "on" from switch position but they are not actually powered, and the
-    AMPCD requires at least one DDI to be lit before its knob has effect.
+def test_prompt_prefers_ampcd_for_s08_when_ddis_are_powered() -> None:
+    """When both DDI selector vars are true and only AMPCD remains missing,
+    the prompt should not regress to either DDI selector.
     """
     ctx = {
         "candidate_steps": ["S08"],
@@ -994,12 +989,10 @@ def test_prompt_enforces_ddi_before_ampcd_for_s08_mpcd_missing() -> None:
 
     payload = _extract_prompt_constraints_json(build_help_prompt(ctx, "en"))
 
-    # The preferred target must be a DDI brightness selector, not the
-    # AMPCD brightness knob, because AMPCD needs at least one DDI powered.
-    assert payload["overlay_target_policy"]["preferred_target"] == "left_mdi_brightness_selector", (
-        f"Expected left_mdi_brightness_selector, got {payload['overlay_target_policy']['preferred_target']}"
+    assert payload["overlay_target_policy"]["preferred_target"] == "ampcd_off_brightness_knob", (
+        f"Expected ampcd_off_brightness_knob, got {payload['overlay_target_policy']['preferred_target']}"
     )
-    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "left_mdi_brightness_selector"
+    assert payload["overlay_target_policy"]["candidate_targets_in_priority_order"][0] == "ampcd_off_brightness_knob"
 
 
 def test_prompt_keeps_visual_action_hint_for_s08_without_promoting_it_to_preferred_target() -> None:
