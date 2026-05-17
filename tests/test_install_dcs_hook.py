@@ -21,6 +21,23 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _write_repo_scripting_files(
+    repo_root: Path,
+    *,
+    include_function: bool = True,
+    include_hook: bool = True,
+) -> None:
+    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
+    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
+    if include_function:
+        _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+    if include_hook:
+        _write(
+            repo_root / "DCS" / "Scripts" / "Hooks" / "SimTutorHighlight.lua",
+            "-- SimTutor highlight hook\n",
+        )
+
+
 def test_patch_export_appends_line(tmp_path: Path) -> None:
     export_path = tmp_path / "Export.lua"
     original = "pcall(function() local TheWayLfs=require('lfs');dofile(TheWayLfs.writedir()..'Scripts/TheWay/TheWay.lua'); end)\n"
@@ -66,9 +83,7 @@ def test_patch_export_creates_when_missing(tmp_path: Path) -> None:
 
 def test_run_install_copies_and_export(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
-    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
-    _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+    _write_repo_scripting_files(repo_root)
 
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     export_path = saved_games_dir / "Scripts" / "Export.lua"
@@ -85,6 +100,7 @@ def test_run_install_copies_and_export(tmp_path: Path) -> None:
     assert result.export_backup is not None
     assert (saved_games_dir / "Scripts" / "SimTutor" / "SimTutor.lua").exists()
     assert (saved_games_dir / "Scripts" / "SimTutor" / "SimTutor Function.lua").exists()
+    assert (saved_games_dir / "Scripts" / "Hooks" / "SimTutorHighlight.lua").exists()
 
     content = export_path.read_text(encoding="utf-8")
     assert SIMTUTOR_EXPORT_SNIPPET in content
@@ -101,9 +117,7 @@ def test_run_install_missing_source_dir_raises(tmp_path: Path) -> None:
 
 def test_run_install_no_export_copies_only(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
-    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
-    _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+    _write_repo_scripting_files(repo_root)
 
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     result = run_install(
@@ -119,8 +133,7 @@ def test_run_install_no_export_copies_only(tmp_path: Path) -> None:
 
 def test_install_scripting_files_missing_one_file_raises(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
-    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
+    _write_repo_scripting_files(repo_root, include_function=False)
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
 
     with pytest.raises(FileNotFoundError, match="SimTutor Function.lua"):
@@ -148,7 +161,7 @@ def test_build_composite_panel_config_enables_vlm_frame_and_frames_root(tmp_path
     assert "ack_port = 7782" in config
     assert "auto_clear = true" in config
     assert "hilite_id = 9101" in config
-    assert "hilite_ids = {9101, 9102}" in config
+    assert "hilite_ids = {9101, 9102, 9103, 9104}" in config
     assert 'host = "127.0.0.1"' in config
     assert "port = 7783" in config
     # Verify these host/port assertions are scoped to the tutor_text block,
@@ -177,7 +190,16 @@ def test_build_composite_panel_config_supports_custom_overlay_transport(tmp_path
     assert "ack_port = 9002" in config
     assert "auto_clear = false" in config
     assert "hilite_id = 9200" in config
-    assert "hilite_ids = {9200, 9201}" in config
+    assert "hilite_ids = {9200, 9201, 9202, 9203}" in config
+
+
+def test_dcs_highlight_hook_backfills_default_slots_for_legacy_config() -> None:
+    hook_path = Path(__file__).resolve().parents[1] / "DCS" / "Scripts" / "Hooks" / "SimTutorHighlight.lua"
+    hook_text = hook_path.read_text(encoding="utf-8")
+
+    assert "ids[1] = math.floor(fallback_id)" in hook_text
+    assert "ids[2] = math.floor(fallback_id) + 1" in hook_text
+    assert "ids[4] = math.floor(fallback_id) + 3" in hook_text
 
 
 def test_build_composite_panel_config_converts_wsl_mount_output_root_to_windows_path() -> None:
@@ -204,11 +226,29 @@ def test_install_composite_panel_config_is_idempotent(tmp_path: Path) -> None:
     assert 'vlm_frame = true' in first.path.read_text(encoding="utf-8")
 
 
+def test_install_composite_panel_config_updates_legacy_overlay_slots(tmp_path: Path) -> None:
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    config_path = saved_games_dir / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
+    _write(
+        config_path,
+        "return {\n"
+        "    overlay = {\n"
+        "        hilite_id = 9101,\n"
+        "    },\n"
+        "}\n",
+    )
+
+    result = install_composite_panel_config(saved_games_dir=saved_games_dir)
+
+    assert result.changed is True
+    config = config_path.read_text(encoding="utf-8")
+    assert "hilite_id = 9101" in config
+    assert "hilite_ids = {9101, 9102, 9103, 9104}" in config
+
+
 def test_run_install_can_deploy_composite_panel_baseline_and_monitor_setup(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
-    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
-    _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+    _write_repo_scripting_files(repo_root)
 
     saved_games_dir = tmp_path / "Saved Games" / "DCS"
     result = run_install(
@@ -237,9 +277,7 @@ def test_run_install_can_deploy_composite_panel_baseline_and_monitor_setup(tmp_p
 
 def test_run_install_can_auto_detect_resolution_for_composite_panel(monkeypatch, tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
-    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
-    _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+    _write_repo_scripting_files(repo_root)
     monkeypatch.setattr("tools.install_dcs_monitor_setup.detect_main_resolution", lambda: (3440, 1440))
 
     result = run_install(
@@ -260,9 +298,7 @@ def test_run_install_can_auto_detect_resolution_for_composite_panel(monkeypatch,
 
 def test_run_install_rejects_partial_monitor_dimensions_for_composite_panel(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
-    simtutor_dir = repo_root / "DCS" / "Scripts" / "SimTutor"
-    _write(simtutor_dir / "SimTutor.lua", "-- SimTutor main\n")
-    _write(simtutor_dir / "SimTutor Function.lua", "-- SimTutor functions\n")
+    _write_repo_scripting_files(repo_root)
 
     with pytest.raises(ValueError, match="main_width and main_height must be provided together"):
         run_install(

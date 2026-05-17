@@ -221,6 +221,60 @@ def test_cli_replay_bios_udp_help_generates_help_cycle_and_dry_run_overlay(monke
     assert "overlay_dry_run" in kinds
 
 
+def test_cli_replay_bios_warns_for_single_slot_config_when_overlay_enabled(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    replay_path = tmp_path / "bios_cli_replay_empty.jsonl"
+    replay_path.write_text("", encoding="utf-8")
+    output_path = tmp_path / "replay_warning.jsonl"
+    saved_games_dir = tmp_path / "Saved Games" / "DCS"
+    config_path = saved_games_dir / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "return {\n"
+        "    overlay = {\n"
+        "        hilite_id = 9101,\n"
+        "    },\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "adapters.action_executor.DcsOverlaySender",
+        lambda **_kwargs: type("DummySender", (), {"close": lambda self: None})(),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "simtutor",
+            "replay-bios",
+            "--input",
+            str(replay_path),
+            "--output",
+            str(output_path),
+            "--vision-saved-games-dir",
+            str(saved_games_dir),
+            "--session-id",
+            "sess-replay-warning",
+            "--max-overlay-targets",
+            "2",
+            "--no-dry-run-overlay",
+        ],
+    )
+
+    code = main()
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "[REPLAY_BIOS] WARNING:" in captured.out
+    events = JsonlEventStore.load(output_path)
+    warning_event = next(event for event in events if event["payload"].get("event") == "overlay_config_warning")
+    assert warning_event["payload"]["max_overlay_targets"] == 2
+    assert warning_event["payload"]["config_path"] == str(config_path)
+
+
 def test_cli_replay_bios_wires_noop_tutor_text_sender_into_loop(monkeypatch, tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_cli_sender.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

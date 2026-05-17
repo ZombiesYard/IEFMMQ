@@ -134,6 +134,7 @@ VR 使用补充：
   - 这里是 v0.4 组合面板最小模板，包含 `caps.vlm_frame = true`
   - 也包含 `vision.output_root`、`layout_id`、`channel`、背景色和推荐输出分辨率
   - 现在也包含 `overlay.command_host/command_port/ack_host/ack_port`，默认仍是单机 `127.0.0.1`
+  - 启用多目标 overlay（例如 Python 使用 `--max-overlay-targets 2`）时，这里必须包含 `overlay.hilite_ids = {9101, 9102, 9103, 9104}` 或更多 ID；旧配置如果只有 `overlay.hilite_id = 9101`，请重新运行安装器更新 DCS hook/config
 - `Saved Games/<DCS variant>/Config/MonitorSetup/SimTutor_FA18C_CompositePanel_v1.lua`
   - 这是 DCS 原生视口导出排版文件
 
@@ -293,6 +294,7 @@ python live_dcs.py \
   - `vision.layout_id = "fa18c_composite_panel_v2"`
   - `overlay.command_host = "127.0.0.1"`（默认单机）
   - `overlay.ack_host = "127.0.0.1"`（默认单机）
+  - `overlay.hilite_ids = {9101, 9102, 9103, 9104}`（多目标高亮需要至少两个槽位）
 
 ### 2. DCS Options
 

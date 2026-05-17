@@ -44,6 +44,7 @@ from live_dcs import (
     _normalize_cached_response_metadata,
     _path_like_to_uri,
     _prefer_navigation_target_from_vision_context,
+    _emit_multi_target_overlay_config_warning,
     _resolve_overlay_step_id,
     _resolve_step_overlay_allowlist,
     _sanitize_request_payload_for_event,
@@ -5652,6 +5653,38 @@ def test_live_dcs_cli_print_model_io_invalid_env_falls_back_false_with_warning(m
         "SIMTUTOR_PRINT_MODEL_IO" in record.message and "Invalid boolean environment value" in record.message
         for record in caplog.records
     )
+
+
+def test_live_dcs_warns_when_multi_target_overlay_uses_single_slot_config(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    config_path = tmp_path / "Saved Games" / "DCS" / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        "return {\n"
+        "    overlay = {\n"
+        "        hilite_id = 9101,\n"
+        "    },\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    events: list[Any] = []
+
+    warning = _emit_multi_target_overlay_config_warning(
+        max_overlay_targets=2,
+        config_path=config_path,
+        event_sink=events.append,
+    )
+
+    captured = capsys.readouterr()
+    assert warning is not None
+    assert "[LIVE_DCS] WARNING:" in captured.out
+    assert "only 1 DCS highlight slot" in captured.out
+    assert len(events) == 1
+    assert events[0].kind == "system"
+    assert events[0].payload["event"] == "overlay_config_warning"
+    assert events[0].payload["max_overlay_targets"] == 2
 
 
 def test_live_dcs_cli_cold_start_production_reads_env_default(monkeypatch) -> None:

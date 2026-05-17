@@ -30,6 +30,7 @@ DEFAULT_OVERLAY_ACK_HOST = "127.0.0.1"
 DEFAULT_OVERLAY_ACK_PORT = 7782
 DEFAULT_TUTOR_TEXT_HOST = "127.0.0.1"
 DEFAULT_TUTOR_TEXT_PORT = 7783
+DEFAULT_OVERLAY_HILITE_SLOT_COUNT = 4
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,7 @@ def build_composite_panel_config(
     overlay_ack_port: int = DEFAULT_OVERLAY_ACK_PORT,
     overlay_auto_clear: bool = True,
     overlay_hilite_id: int = 9101,
+    overlay_hilite_slot_count: int = DEFAULT_OVERLAY_HILITE_SLOT_COUNT,
 ) -> str:
     effective_frames_root = (frames_root or _vision_frames_root(saved_games_dir)).expanduser().resolve()
     lua_frames_root = _format_lua_path(effective_frames_root)
@@ -159,6 +161,11 @@ def build_composite_panel_config(
         raise ValueError("overlay_ack_port must be positive")
     if overlay_hilite_id < 0:
         raise ValueError("overlay_hilite_id must be non-negative")
+    if overlay_hilite_slot_count <= 0:
+        raise ValueError("overlay_hilite_slot_count must be positive")
+    overlay_hilite_ids = ", ".join(
+        str(int(overlay_hilite_id) + idx) for idx in range(int(overlay_hilite_slot_count))
+    )
 
     lines = [
         "-- SimTutor composite-panel baseline for v0.4 vision bring-up.",
@@ -188,7 +195,7 @@ def build_composite_panel_config(
         f"        ack_port = {int(overlay_ack_port)},",
         f"        auto_clear = {'true' if overlay_auto_clear else 'false'},",
         f"        hilite_id = {int(overlay_hilite_id)},",
-        f"        hilite_ids = {{{int(overlay_hilite_id)}, {int(overlay_hilite_id) + 1}}},",
+        f"        hilite_ids = {{{overlay_hilite_ids}}},",
         "    },",
         "    tutor_text = {",
         f'        host = "{DEFAULT_TUTOR_TEXT_HOST}",',
@@ -239,6 +246,7 @@ def install_composite_panel_config(
     overlay_ack_port: int = DEFAULT_OVERLAY_ACK_PORT,
     overlay_auto_clear: bool = True,
     overlay_hilite_id: int = 9101,
+    overlay_hilite_slot_count: int = DEFAULT_OVERLAY_HILITE_SLOT_COUNT,
 ) -> ConfigInstallResult:
     config_path = saved_games_dir / "Scripts" / "SimTutor" / "SimTutorConfig.lua"
     config_text = build_composite_panel_config(
@@ -256,6 +264,7 @@ def install_composite_panel_config(
         overlay_ack_port=overlay_ack_port,
         overlay_auto_clear=overlay_auto_clear,
         overlay_hilite_id=overlay_hilite_id,
+        overlay_hilite_slot_count=overlay_hilite_slot_count,
     )
     _ensure_parent(config_path)
     changed = True
@@ -272,9 +281,14 @@ def install_scripting_files(source_root: Path, saved_games_dir: Path) -> bool:
     source_dir = source_root / "DCS" / "Scripts" / "SimTutor"
     if not source_dir.exists():
         raise FileNotFoundError(f"Missing source dir: {source_dir}")
+    hook_source_dir = source_root / "DCS" / "Scripts" / "Hooks"
+    if not hook_source_dir.exists():
+        raise FileNotFoundError(f"Missing source dir: {hook_source_dir}")
 
     target_dir = saved_games_dir / "Scripts" / "SimTutor"
     target_dir.mkdir(parents=True, exist_ok=True)
+    hook_target_dir = saved_games_dir / "Scripts" / "Hooks"
+    hook_target_dir.mkdir(parents=True, exist_ok=True)
 
     any_copied = False
     for name in ["SimTutor.lua", "SimTutor Function.lua"]:
@@ -282,6 +296,13 @@ def install_scripting_files(source_root: Path, saved_games_dir: Path) -> bool:
         if not src.exists():
             raise FileNotFoundError(f"Missing source file: {src}")
         dst = target_dir / name
+        shutil.copy2(src, dst)
+        any_copied = True
+    for name in ["SimTutorHighlight.lua"]:
+        src = hook_source_dir / name
+        if not src.exists():
+            raise FileNotFoundError(f"Missing source file: {src}")
+        dst = hook_target_dir / name
         shutil.copy2(src, dst)
         any_copied = True
     return any_copied

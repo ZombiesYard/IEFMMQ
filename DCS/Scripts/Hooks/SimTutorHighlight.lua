@@ -79,6 +79,9 @@ local function normalize_hilite_ids(raw, fallback_id)
   end
   if #ids == 0 and type(fallback_id) == "number" and fallback_id >= 0 then
     ids[1] = math.floor(fallback_id)
+    ids[2] = math.floor(fallback_id) + 1
+    ids[3] = math.floor(fallback_id) + 2
+    ids[4] = math.floor(fallback_id) + 3
   end
   return ids
 end

@@ -30,6 +30,12 @@ python -m tools.install_dcs_hook \
   --saved-games-dir "<saved-games-dir>"
 ```
 
+Re-run this installer after enabling multi-target overlay, for example when using
+`--max-overlay-targets 2`. The generated `SimTutorConfig.lua` must contain
+`overlay.hilite_ids = {9101, 9102, 9103, 9104}` or more IDs; legacy configs with only
+`overlay.hilite_id = 9101` expose a single DCS highlight slot and can make the
+last target replace the first visible highlight.
+
 Single-monitor example:
 
 ```bash
