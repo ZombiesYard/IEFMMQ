@@ -4005,6 +4005,8 @@ def test_harness_validation_repairs_s08_selector_from_tac_evidence_ref(tmp_path:
             ],
             explanations=["The left DDI is showing TAC; navigate toward the FCS page."],
             metadata={
+                "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                "next": {"step_id": "S08"},
                 "help_response": {
                     "diagnosis": {"step_id": "S08", "error_category": "CO"},
                     "next": {"step_id": "S08"},
@@ -4097,6 +4099,8 @@ def test_harness_validation_keeps_s08_power_hint_when_tac_seen_but_left_ddi_powe
             ],
             explanations=["The left DDI is showing TAC; navigate toward the FCS page."],
             metadata={
+                "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                "next": {"step_id": "S08"},
                 "help_response": {
                     "diagnosis": {"step_id": "S08", "error_category": "CO"},
                     "next": {"step_id": "S08"},
@@ -4186,6 +4190,8 @@ def test_harness_validation_does_not_trust_s08_tac_evidence_ref_when_fact_not_se
             ],
             explanations=["The left DDI is showing TAC; navigate toward the FCS page."],
             metadata={
+                "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                "next": {"step_id": "S08"},
                 "help_response": {
                     "diagnosis": {"step_id": "S08", "error_category": "CO"},
                     "next": {"step_id": "S08"},
@@ -4206,11 +4212,14 @@ def test_harness_validation_does_not_trust_s08_tac_evidence_ref_when_fact_not_se
             },
         )
 
-        _used, _reason = loop._apply_harness_validation_action_plan(response, request)
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
 
+        assert used is True
+        assert reason == "s08_unconfirmed_visual_evidence_filtered"
         assert [action["target"] for action in response.actions] == ["left_mdi_brightness_selector"]
         assert "s08_visual_hint_repair_applied" not in response.metadata
         assert "visual_hint_target" not in response.metadata
+        assert response.metadata["s08_unconfirmed_visual_evidence_filtered"] is True
         help_response = response.metadata["help_response"]
         evidence = help_response["overlay"]["evidence"]
         assert all(item.get("ref") != "VISION_FACTS.tac_page_visible@frame-tac" for item in evidence)
@@ -4282,6 +4291,8 @@ def test_harness_validation_does_not_trust_s08_visual_action_hint_when_fact_not_
             ],
             explanations=["The left DDI is showing TAC; navigate toward the FCS page."],
             metadata={
+                "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                "next": {"step_id": "S08"},
                 "help_response": {
                     "diagnosis": {"step_id": "S08", "error_category": "CO"},
                     "next": {"step_id": "S08"},
@@ -4302,11 +4313,14 @@ def test_harness_validation_does_not_trust_s08_visual_action_hint_when_fact_not_
             },
         )
 
-        _used, _reason = loop._apply_harness_validation_action_plan(response, request)
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
 
+        assert used is True
+        assert reason == "s08_unconfirmed_visual_evidence_filtered"
         assert [action["target"] for action in response.actions] == ["left_mdi_brightness_selector"]
         assert "s08_visual_hint_repair_applied" not in response.metadata
         assert "visual_hint_target" not in response.metadata
+        assert response.metadata["s08_unconfirmed_visual_evidence_filtered"] is True
         help_response = response.metadata["help_response"]
         evidence = help_response["overlay"]["evidence"]
         assert all(item.get("ref") != "VISION_FACTS.tac_page_visible@frame-tac" for item in evidence)

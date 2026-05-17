@@ -2381,6 +2381,40 @@ def _s08_filter_unconfirmed_page_navigation_refs(
     return filtered
 
 
+def _s08_clean_unconfirmed_page_navigation_help_response(
+    context: Mapping[str, Any],
+    help_response: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any] | None, bool]:
+    if not isinstance(help_response, Mapping):
+        return None, False
+    overlay = help_response.get("overlay")
+    if not isinstance(overlay, Mapping):
+        return None, False
+    evidence = overlay.get("evidence")
+    if not isinstance(evidence, list):
+        return None, False
+
+    cleaned_evidence: list[Any] = []
+    changed = False
+    vision_summary = context.get("vision_fact_summary")
+    for item in evidence:
+        ref = item.get("ref") if isinstance(item, Mapping) else None
+        if isinstance(ref, str):
+            fact_id = _s08_page_navigation_fact_id_from_ref(ref)
+            if fact_id is not None and not _vision_summary_seen_or_fresh(vision_summary, fact_id):
+                changed = True
+                continue
+        cleaned_evidence.append(item)
+
+    if not changed:
+        return None, False
+    cleaned_help_response = copy.deepcopy(dict(help_response))
+    cleaned_overlay = copy.deepcopy(dict(overlay))
+    cleaned_overlay["evidence"] = cleaned_evidence
+    cleaned_help_response["overlay"] = cleaned_overlay
+    return cleaned_help_response, True
+
+
 def _s08_visual_fact_ref_for_seen_target(
     context: Mapping[str, Any],
     evidence_refs: Sequence[str],
@@ -5332,6 +5366,14 @@ class LiveDcsTutorLoop:
                 )
             )
         ):
+            cleaned_help_response, evidence_cleaned = _s08_clean_unconfirmed_page_navigation_help_response(
+                context,
+                response.metadata.get("help_response"),
+            )
+            if evidence_cleaned and cleaned_help_response is not None:
+                response.metadata["help_response"] = cleaned_help_response
+                response.metadata["s08_unconfirmed_visual_evidence_filtered"] = True
+                return True, "s08_unconfirmed_visual_evidence_filtered"
             return False, "already_valid"
         if not plan.targets:
             if plan.validator_rejected and response.actions:
