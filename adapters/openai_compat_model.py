@@ -57,7 +57,7 @@ class OpenAICompatModel(BaseHelpModel):
         self.max_tokens = int(max_tokens) if isinstance(max_tokens, int) and max_tokens > 0 else None
         self.enable_multimodal = bool(enable_multimodal)
         self.enable_help_multimodal = (
-            bool(enable_multimodal) if enable_help_multimodal is None else bool(enable_help_multimodal)
+            False if enable_help_multimodal is None else bool(enable_help_multimodal)
         )
         self.allowed_local_image_roots = normalize_allowed_local_image_roots(allowed_local_image_roots)
         self.max_local_image_bytes = (
@@ -68,7 +68,8 @@ class OpenAICompatModel(BaseHelpModel):
         self._help_response_schema = get_help_response_schema()
         self._structured_output_schema = _build_vllm_compatible_response_format_schema(self._help_response_schema)
         self._runtime_metadata = self._empty_multimodal_metadata(
-            multimodal_capability_enabled=self.enable_multimodal
+            multimodal_capability_enabled=self.enable_multimodal,
+            main_help_multimodal_input_enabled=self.enable_help_multimodal,
         )
         super().__init__(
             model_name=model_name,
@@ -84,7 +85,8 @@ class OpenAICompatModel(BaseHelpModel):
 
     def _reset_runtime_metadata(self) -> None:
         self._runtime_metadata = self._empty_multimodal_metadata(
-            multimodal_capability_enabled=self.enable_multimodal
+            multimodal_capability_enabled=self.enable_multimodal,
+            main_help_multimodal_input_enabled=self.enable_help_multimodal,
         )
 
     def _collect_runtime_metadata(self) -> dict[str, Any]:
@@ -637,10 +639,11 @@ class OpenAICompatModel(BaseHelpModel):
     def _empty_multimodal_metadata(
         *,
         multimodal_capability_enabled: bool = False,
+        main_help_multimodal_input_enabled: bool = False,
     ) -> dict[str, Any]:
         return {
             "multimodal_capability_enabled": bool(multimodal_capability_enabled),
-            "main_help_multimodal_input_enabled": bool(multimodal_capability_enabled),
+            "main_help_multimodal_input_enabled": bool(main_help_multimodal_input_enabled),
             "multimodal_input_present": False,
             "multimodal_candidate_frame_ids": [],
             "multimodal_primary_frame_id": None,
