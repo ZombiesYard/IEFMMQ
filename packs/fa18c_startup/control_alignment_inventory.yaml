@@ -1,0 +1,471 @@
+version: v1
+metadata:
+  source_clickabledata: "L:/DCS World/Mods/aircraft/FA-18C/Cockpit/Scripts/clickabledata.lua"
+  source_bios_map: "packs/fa18c_startup/bios_to_ui.yaml"
+  source_telemetry_map: "packs/fa18c_startup/telemetry_map.yaml"
+  notes: >
+    Machine-readable alignment inventory for FA-18C cold-start UI targets.
+    DCS-BIOS Lua/JSON reference files were not present at the documented local
+    path during this audit; bios_keys are therefore anchored to the checked-in
+    pack mapping and telemetry map.
+
+controls:
+  battery_switch:
+    dcs_id: "pnt_404"
+    clickabledata: {label: "Battery switch ON/OFF/ORIDE", device: "devices.ELEC_INTERFACE", command: "elec_commands.BatterySwitch"}
+    bios_keys: ["BATTERY_SW"]
+    telemetry_vars: ["battery_on", "power_available"]
+    pack_steps: ["S01"]
+    prompt_harness_refs: ["S01.ui_targets", "S01.gates"]
+    highlightable: true
+    notes: "Three-position battery selector; current telemetry uses ON == 2."
+  generator_left_switch:
+    dcs_id: "pnt_402"
+    clickabledata: {label: "Left Generator Control Switch, NORM/OFF", device: "devices.ELEC_INTERFACE", command: "elec_commands.LGenSwitch"}
+    bios_keys: ["L_GEN_SW"]
+    telemetry_vars: ["l_gen_on"]
+    pack_steps: ["S01"]
+    prompt_harness_refs: ["S01.ui_targets"]
+    highlightable: true
+    notes: "Generator switch position is evidence, not power_available by itself."
+  generator_right_switch:
+    dcs_id: "pnt_403"
+    clickabledata: {label: "Right Generator Control Switch, NORM/OFF", device: "devices.ELEC_INTERFACE", command: "elec_commands.RGenSwitch"}
+    bios_keys: ["R_GEN_SW"]
+    telemetry_vars: ["r_gen_on"]
+    pack_steps: ["S01"]
+    prompt_harness_refs: ["S01.ui_targets"]
+    highlightable: true
+    notes: "Generator switch position is evidence, not power_available by itself."
+  fire_test_switch:
+    dcs_id: "pnt_331"
+    clickabledata: {label: "Fire and Bleed Air Test Switch", device: "devices.ENGINES_INTERFACE", command: "engines_commands.FireBleedAirTestSw"}
+    bios_keys: ["FIRE_TEST_SW"]
+    telemetry_vars: ["fire_test_active", "fire_test_a_complete", "fire_test_b_complete", "fire_test_complete"]
+    pack_steps: ["S02"]
+    prompt_harness_refs: ["S02.ui_targets", "S02.gates"]
+    highlightable: true
+    notes: "Spring-loaded rocker; A and B directions are separate latched evidence."
+  apu_switch:
+    dcs_id: "pnt_375"
+    clickabledata: {label: "APU Control Switch, ON/OFF", device: "devices.ENGINES_INTERFACE", command: "engines_commands.APU_ControlSw"}
+    bios_keys: ["APU_CONTROL_SW", "APU_READY_LT"]
+    telemetry_vars: ["apu_on", "apu_ready"]
+    pack_steps: ["S03"]
+    prompt_harness_refs: ["S03.ui_targets", "S04.preconditions"]
+    highlightable: true
+    notes: "APU switch and APU READY light are separate evidence; only switch is a UI target."
+  eng_crank_switch:
+    dcs_id: "pnt_377"
+    clickabledata: {label: "Engine Crank Switch, L/OFF/R", device: "devices.ENGINES_INTERFACE", command: "engines_commands.EngineCrankSw"}
+    bios_keys: ["ENGINE_CRANK_SW"]
+    telemetry_vars: ["engine_crank_right", "engine_crank_left", "engine_crank_right_complete", "engine_crank_left_complete"]
+    pack_steps: ["S04", "S10"]
+    prompt_harness_refs: ["S04.ui_targets", "S10.ui_targets"]
+    highlightable: true
+    notes: "Spring-loaded three-position switch; 0=LEFT, 1=OFF, 2=RIGHT."
+  throttle_quadrant_reference:
+    dcs_id: "pnt_504"
+    clickabledata: {label: "Throttles Friction Adjusting Lever", device: "devices.CONTROL_INTERFACE", command: "ctrl_commands.ThrottleFriction"}
+    bios_keys: ["INT_THROTTLE_LEFT", "INT_THROTTLE_RIGHT"]
+    telemetry_vars: ["throttle_l_not_off", "throttle_r_not_off", "left_engine_idle_ready", "throttle_r_idle_complete"]
+    pack_steps: []
+    prompt_harness_refs: ["manual_throttle_hotkeys"]
+    highlightable: false
+    notes: "Manual/hotkey reference for throttle movement; dcs_id is an approximate cockpit-area anchor."
+  bleed_air_knob:
+    dcs_id: "pnt_411"
+    clickabledata: {label: "BLEED AIR Knob", device: "devices.ENVIRONMENT_SYSTEM", command: "environment_commands.BleedAirKnob"}
+    bios_keys: ["BLEED_AIR_KNOB"]
+    telemetry_vars: ["bleed_air_norm", "bleed_air_cycle_complete"]
+    pack_steps: ["S06"]
+    prompt_harness_refs: ["S06.ui_targets", "S06.gates"]
+    highlightable: true
+    notes: "Multi-position environmental knob; completion currently requires NORM."
+  lights_test_button:
+    dcs_id: "pnt_416"
+    clickabledata: {label: "Lights Test Switch TEST/OFF", device: "devices.CPT_LIGHTS", command: "cptlights_commands.LightsTestSw"}
+    bios_keys: ["LIGHTS_TEST_SW"]
+    telemetry_vars: ["lights_test_active", "lights_test_complete", "annunciator_panel_activity"]
+    pack_steps: ["S07"]
+    prompt_harness_refs: ["S07.ui_targets", "S07.gates"]
+    highlightable: true
+    notes: "Momentary switch; direct pressed state is latched in-session."
+  left_mdi_brightness_selector:
+    dcs_id: "pnt_51"
+    clickabledata: {label: "Left MDI Brightness Selector Knob, OFF/NIGHT/DAY", device: "devices.MDI_LEFT", command: "MDI_commands.MDI_off_night_day"}
+    bios_keys: ["LEFT_DDI_BRT_SELECT"]
+    telemetry_vars: ["left_ddi_on", "core_avionics_online"]
+    pack_steps: ["S08"]
+    prompt_harness_refs: ["S08.ui_targets", "S08.overlay_target_policy"]
+    highlightable: true
+    notes: "Display power selector; do not alias LEFT_DDI_BRT_CTL or LEFT_DDI_CONT_CTL here."
+  left_mdi_brightness_control:
+    dcs_id: "pnt_52"
+    clickabledata: {label: "Left MDI Brightness Control Knob", device: "devices.MDI_LEFT", command: "MDI_commands.MDI_brightness"}
+    bios_keys: ["LEFT_DDI_BRT_CTL"]
+    telemetry_vars: []
+    pack_steps: []
+    prompt_harness_refs: ["recent_action_mapping"]
+    highlightable: true
+    notes: "Brightness potentiometer only; not valid evidence that the DDI selector is ON."
+  left_mdi_contrast_control:
+    dcs_id: "pnt_53"
+    clickabledata: {label: "Left MDI Contrast Control Knob", device: "devices.MDI_LEFT", command: "MDI_commands.MDI_contrast"}
+    bios_keys: ["LEFT_DDI_CONT_CTL"]
+    telemetry_vars: []
+    pack_steps: []
+    prompt_harness_refs: ["recent_action_mapping"]
+    highlightable: true
+    notes: "Contrast potentiometer; separate from selector and brightness control."
+  right_mdi_brightness_selector:
+    dcs_id: "pnt_76"
+    clickabledata: {label: "Right MDI Brightness Selector Knob, OFF/NIGHT/DAY", device: "devices.MDI_RIGHT", command: "MDI_commands.MDI_off_night_day"}
+    bios_keys: ["RIGHT_DDI_BRT_SELECT"]
+    telemetry_vars: ["right_ddi_on", "core_avionics_online"]
+    pack_steps: ["S08"]
+    prompt_harness_refs: ["S08.ui_targets", "S08.overlay_target_policy"]
+    highlightable: true
+    notes: "Display power selector; do not alias RIGHT_DDI_BRT_CTL or RIGHT_DDI_CONT_CTL here."
+  right_mdi_brightness_control:
+    dcs_id: "pnt_77"
+    clickabledata: {label: "Right MDI Brightness Control Knob", device: "devices.MDI_RIGHT", command: "MDI_commands.MDI_brightness"}
+    bios_keys: ["RIGHT_DDI_BRT_CTL"]
+    telemetry_vars: []
+    pack_steps: []
+    prompt_harness_refs: ["recent_action_mapping"]
+    highlightable: true
+    notes: "Brightness potentiometer only; not valid evidence that the DDI selector is ON."
+  right_mdi_contrast_control:
+    dcs_id: "pnt_78"
+    clickabledata: {label: "Right MDI Contrast Control Knob", device: "devices.MDI_RIGHT", command: "MDI_commands.MDI_contrast"}
+    bios_keys: ["RIGHT_DDI_CONT_CTL"]
+    telemetry_vars: []
+    pack_steps: []
+    prompt_harness_refs: ["recent_action_mapping"]
+    highlightable: true
+    notes: "Contrast potentiometer; separate from selector and brightness control."
+  ampcd_off_brightness_knob:
+    dcs_id: "pnt_203"
+    clickabledata: {label: "AMPCD Off/Brightness Control Knob", device: "devices.AMPCD", command: "AMPCD_commands.AMPCD_off_brightness"}
+    bios_keys: ["AMPCD_BRT_CTL"]
+    telemetry_vars: ["mpcd_on", "core_avionics_online"]
+    pack_steps: ["S08"]
+    prompt_harness_refs: ["S08.ui_targets", "S08.overlay_target_policy"]
+    highlightable: true
+    notes: "AMPCD combines off/power and brightness in one control."
+  hud_symbology_brightness_knob:
+    dcs_id: "pnt_141"
+    clickabledata: {label: "HUD Symbology Brightness Control Knob", device: "devices.HUD", command: "HUD_commands.HUD_SymbBrightCtrl"}
+    bios_keys: ["HUD_SYM_BRT"]
+    telemetry_vars: ["hud_on", "core_avionics_online"]
+    pack_steps: ["S08"]
+    prompt_harness_refs: ["S08.ui_targets", "S08.overlay_target_policy"]
+    highlightable: true
+    notes: "HUD brightness axis is the startup power/visibility control used by S08."
+  left_mdi_pb5:
+    dcs_id: "pnt_58"
+    clickabledata: {label: "Left MDI PB 5", device: "devices.MDI_LEFT", command: "MDI_commands.MDI_PB_5"}
+    bios_keys: ["LEFT_DDI_PB_05", "LEFT_MDI_PB_5"]
+    telemetry_vars: []
+    pack_steps: []
+    prompt_harness_refs: ["S08.ui_targets"]
+    highlightable: true
+    notes: "Legacy and replay DCS-BIOS spellings both map to this physical pushbutton."
+  left_mdi_pb15:
+    dcs_id: "pnt_68"
+    clickabledata: {label: "Left MDI PB 15", device: "devices.MDI_LEFT", command: "MDI_commands.MDI_PB_15"}
+    bios_keys: ["LEFT_DDI_PB_15", "LEFT_MDI_PB_15"]
+    telemetry_vars: []
+    pack_steps: ["S08", "S15"]
+    prompt_harness_refs: ["S08.ui_targets", "S08.FCS_page_recovery"]
+    highlightable: true
+    notes: "Used for left DDI FCS page selection after MENU/SUPT recovery."
+  left_mdi_pb18:
+    dcs_id: "pnt_72"
+    clickabledata: {label: "Left MDI PB 18", device: "devices.MDI_LEFT", command: "MDI_commands.MDI_PB_18"}
+    bios_keys: ["LEFT_DDI_PB_18", "LEFT_MDI_PB_18"]
+    telemetry_vars: []
+    pack_steps: ["S08", "S15"]
+    prompt_harness_refs: ["S08.ui_targets", "S08.MENU_recovery"]
+    highlightable: true
+    notes: "MENU/root navigation on left DDI."
+  right_mdi_pb5:
+    dcs_id: "pnt_83"
+    clickabledata: {label: "Right MDI PB 5", device: "devices.MDI_RIGHT", command: "MDI_commands.MDI_PB_5"}
+    bios_keys: ["RIGHT_DDI_PB_05", "RIGHT_MDI_PB_5"]
+    telemetry_vars: []
+    pack_steps: ["S08", "S18", "S19"]
+    prompt_harness_refs: ["S08.ui_targets", "S18.ui_targets", "S19.ui_targets"]
+    highlightable: true
+    notes: "Used for BIT/FCS-MC page flow on the right DDI."
+  right_mdi_pb18:
+    dcs_id: "pnt_96"
+    clickabledata: {label: "Right MDI PB 18", device: "devices.MDI_RIGHT", command: "MDI_commands.MDI_PB_18"}
+    bios_keys: ["RIGHT_DDI_PB_18", "RIGHT_MDI_PB_18"]
+    telemetry_vars: []
+    pack_steps: ["S08", "S18"]
+    prompt_harness_refs: ["S08.ui_targets", "S18.recovery"]
+    highlightable: true
+    notes: "MENU/root recovery on right DDI."
+  ampcd_pb19:
+    dcs_id: "pnt_201"
+    clickabledata: {label: "AMPCD PB 19", device: "devices.AMPCD", command: "AMPCD_commands.AMPCD_PB_19"}
+    bios_keys: ["AMPCD_PB_19", "MPCD_PB_19"]
+    telemetry_vars: ["ins_fast_align_pressed", "ins_fast_align_complete"]
+    pack_steps: ["S12"]
+    prompt_harness_refs: ["S12.ui_targets", "S12.gates"]
+    highlightable: true
+    notes: "Starts fast alignment self-test after INS mode selection."
+  fcs_reset_button:
+    dcs_id: "pnt_349"
+    clickabledata: {label: "FCS RESET Button", device: "devices.CONTROL_INTERFACE", command: "ctrl_commands.ResetSw"}
+    bios_keys: ["FCS_RESET_BTN"]
+    telemetry_vars: ["fcs_reset_pressed", "fcs_reset_complete"]
+    pack_steps: ["S15"]
+    prompt_harness_refs: ["S15.ui_targets", "S15.gates"]
+    highlightable: true
+    notes: "Momentary reset button."
+  fcs_bit_switch:
+    dcs_id: "pnt_470"
+    clickabledata: {label: "FCS BIT Switch", device: "devices.CONTROL_INTERFACE", command: "ctrl_commands.FcsBitSw"}
+    bios_keys: ["FCS_BIT_SW"]
+    telemetry_vars: ["fcs_bit_switch_up", "fcs_bit_complete"]
+    pack_steps: ["S19"]
+    prompt_harness_refs: ["S19.ui_targets"]
+    highlightable: true
+    notes: "FCS BIT hold-up switch; paired with right DDI PB5 in S19."
+  ufc_comm1_channel_selector_rotate:
+    dcs_id: "pnt_124"
+    clickabledata: {label: "UFC COMM 1 Channel Selector Knob", device: "devices.UFC", command: "UFC_commands.Comm1ChanSelector"}
+    bios_keys: ["COMM1_CHAN", "COMM1_CHANNEL_NUMERIC", "COMM1_FREQ"]
+    telemetry_vars: ["comm1_channel_numeric", "comm1_freq_value", "comm1_freq_134_000"]
+    pack_steps: []
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "Shares clickable id with COMM1 pull action by explicit compatibility rule."
+  ufc_comm1_channel_selector_pull:
+    dcs_id: "pnt_124"
+    clickabledata: {label: "UFC COMM 1 Channel Selector Pull", device: "devices.UFC", command: "UFC_commands.Comm1Pull"}
+    bios_keys: ["UFC_COMM1_PULL", "COMM1_CHAN", "COMM1_CHANNEL_NUMERIC", "COMM1_FREQ"]
+    telemetry_vars: ["ufc_comm1_pull_pressed", "comm1_channel_numeric", "comm1_freq_value"]
+    pack_steps: ["S09"]
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "Same physical control as COMM1 rotate; separate semantic action target."
+  ufc_key_1:
+    dcs_id: "pnt_111"
+    clickabledata: {label: "UFC Keyboard Pushbutton, 1", device: "devices.UFC", command: "UFC_commands.UFC_1"}
+    bios_keys: ["UFC_1"]
+    telemetry_vars: ["ufc_key_1_pressed"]
+    pack_steps: ["S09"]
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "UFC numeric entry."
+  ufc_key_3:
+    dcs_id: "pnt_113"
+    clickabledata: {label: "UFC Keyboard Pushbutton, 3", device: "devices.UFC", command: "UFC_commands.UFC_3"}
+    bios_keys: ["UFC_3"]
+    telemetry_vars: ["ufc_key_3_pressed"]
+    pack_steps: ["S09"]
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "UFC numeric entry."
+  ufc_key_4:
+    dcs_id: "pnt_114"
+    clickabledata: {label: "UFC Keyboard Pushbutton, 4", device: "devices.UFC", command: "UFC_commands.UFC_4"}
+    bios_keys: ["UFC_4"]
+    telemetry_vars: ["ufc_key_4_pressed"]
+    pack_steps: ["S09"]
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "UFC numeric entry."
+  ufc_key_0:
+    dcs_id: "pnt_120"
+    clickabledata: {label: "UFC Keyboard Pushbutton, 0", device: "devices.UFC", command: "UFC_commands.UFC_0"}
+    bios_keys: ["UFC_0"]
+    telemetry_vars: ["ufc_key_0_pressed"]
+    pack_steps: ["S09"]
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "UFC numeric entry."
+  ufc_ent_button:
+    dcs_id: "pnt_47_122"
+    clickabledata: {label: "UFC Keyboard Pushbutton, ENT", device: "devices.UFC", command: "UFC_commands.UFC_ENT"}
+    bios_keys: ["UFC_ENT"]
+    telemetry_vars: ["ufc_ent_pressed"]
+    pack_steps: ["S09"]
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "Composite clickable id from the UFC ENT element."
+  ufc_comm2_channel_selector_rotate:
+    dcs_id: "pnt_126"
+    clickabledata: {label: "UFC COMM 2 Channel Selector Knob", device: "devices.UFC", command: "UFC_commands.Comm2ChanSelector"}
+    bios_keys: ["COMM2_CHAN", "COMM2_CHANNEL_NUMERIC", "COMM2_FREQ"]
+    telemetry_vars: ["comm2_channel_numeric", "comm2_freq_value"]
+    pack_steps: []
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "Shares clickable id with COMM2 pull action by explicit compatibility rule."
+  ufc_comm2_channel_selector_pull:
+    dcs_id: "pnt_126"
+    clickabledata: {label: "UFC COMM 2 Channel Selector Pull", device: "devices.UFC", command: "UFC_commands.Comm2Pull"}
+    bios_keys: ["UFC_COMM2_PULL", "COMM2_CHAN", "COMM2_CHANNEL_NUMERIC", "COMM2_FREQ"]
+    telemetry_vars: ["ufc_comm2_pull_pressed", "comm2_channel_numeric", "comm2_freq_value"]
+    pack_steps: []
+    prompt_harness_refs: ["S09.ui_targets"]
+    highlightable: true
+    notes: "Same physical control as COMM2 rotate; separate semantic action target."
+  ins_mode_knob:
+    dcs_id: "pnt_443"
+    clickabledata: {label: "INS Switch, OFF/CV/GND/NAV/IFA/GYRO/GB/TEST", device: "devices.INS", command: "INS_commands.INS_SwitchChange"}
+    bios_keys: ["INS_SW"]
+    telemetry_vars: ["ins_mode", "ins_mode_set", "ins_mode_cv_or_gnd"]
+    pack_steps: ["S12"]
+    prompt_harness_refs: ["S12.ui_targets", "S12.gates"]
+    highlightable: true
+    notes: "Clickable order is OFF/CV/GND/NAV/IFA/GYRO/GB/TEST."
+  radar_mode_knob:
+    dcs_id: "pnt_440"
+    clickabledata: {label: "RADAR Switch (MW to pull), OFF/STBY/OPR/EMERG(PULL)", device: "devices.RADAR", command: "RADAR_commands.RADAR_SwitchChange"}
+    bios_keys: ["RADAR_SW"]
+    telemetry_vars: ["radar_mode_value", "radar_mode_opr", "radar_on"]
+    pack_steps: ["S13"]
+    prompt_harness_refs: ["S13.ui_targets", "S13.gates"]
+    highlightable: true
+    notes: "Base switch positions are OFF/STBY/OPR; EMERG is a separate pull."
+  obogs_control_switch:
+    dcs_id: "pnt_365"
+    clickabledata: {label: "OBOGS Control Switch, ON/OFF", device: "devices.OXYGEN_INTERFACE", command: "oxygen_commands.OBOGS_ControlSw"}
+    bios_keys: ["OBOGS_SW"]
+    telemetry_vars: ["obogs_switch_on", "obogs_ready"]
+    pack_steps: ["S14"]
+    prompt_harness_refs: ["S14.ui_targets"]
+    highlightable: true
+    notes: "Part of OBOGS ready evidence."
+  obogs_flow_knob:
+    dcs_id: "pnt_366"
+    clickabledata: {label: "OXY Flow Knob", device: "devices.OXYGEN_INTERFACE", command: "oxygen_commands.OxyFlowControlValve"}
+    bios_keys: ["OXY_FLOW"]
+    telemetry_vars: ["obogs_flow_on", "obogs_ready"]
+    pack_steps: ["S14"]
+    prompt_harness_refs: ["S14.ui_targets"]
+    highlightable: true
+    notes: "Oxygen flow axis paired with OBOGS switch."
+  flap_switch:
+    dcs_id: "pnt_234"
+    clickabledata: {label: "FLAP Switch, AUTO/HALF/FULL", device: "devices.CONTROL_INTERFACE", command: "ctrl_commands.FlapSw"}
+    bios_keys: ["FLAP_SW"]
+    telemetry_vars: ["flap_mode_value", "flap_full", "flap_half", "flap_auto", "flap_configured"]
+    pack_steps: ["S16", "S27"]
+    prompt_harness_refs: ["S16.ui_targets", "S16.gates"]
+    highlightable: true
+    notes: "S16 expects AUTO."
+  takeoff_trim_button:
+    dcs_id: "pnt_346"
+    clickabledata: {label: "T/O TRIM Button", device: "devices.CONTROL_INTERFACE", command: "ctrl_commands.ToTrimSw"}
+    bios_keys: ["TO_TRIM_BTN"]
+    telemetry_vars: ["takeoff_trim_pressed", "takeoff_trim_set"]
+    pack_steps: ["S17"]
+    prompt_harness_refs: ["S17.ui_targets"]
+    highlightable: true
+    notes: "Momentary takeoff trim button."
+  refuel_probe_switch:
+    dcs_id: "pnt_341"
+    clickabledata: {label: "Probe Control Switch, EXTEND/RETRACT/EMERG EXTD", device: "devices.FUEL_INTERFACE", command: "fuel_commands.ProbeSw"}
+    bios_keys: ["PROBE_SW", "EXT_REFUEL_PROBE"]
+    telemetry_vars: ["probe_switch_value", "ext_refuel_probe_value", "probe_extended", "probe_retracted", "probe_cycle_complete"]
+    pack_steps: ["S20", "S21"]
+    prompt_harness_refs: ["S20.ui_targets", "S21.ui_targets", "S20.gates", "S21.gates"]
+    highlightable: true
+    notes: "Switch position and external probe position are both tracked."
+  launch_bar_switch:
+    dcs_id: "pnt_233"
+    clickabledata: {label: "Launch Bar Control Switch, EXTEND/RETRACT", device: "devices.GEAR_INTERFACE", command: "gear_commands.LaunchBarSw"}
+    bios_keys: ["LAUNCH_BAR_SW"]
+    telemetry_vars: ["launch_bar_switch_value", "launch_bar_extended", "launch_bar_retracted"]
+    pack_steps: ["S22", "S23"]
+    prompt_harness_refs: ["S22.ui_targets", "S23.ui_targets"]
+    highlightable: true
+    notes: "Carrier/airfield launch-bar configuration target."
+  arresting_hook_handle:
+    dcs_id: "pnt_293"
+    clickabledata: {label: "Arresting Hook Handle, UP/DOWN", device: "devices.GEAR_INTERFACE", command: "gear_commands.HookHandle"}
+    bios_keys: ["HOOK_LEVER", "EXT_HOOK", "ARRESTING_HOOK_LT"]
+    telemetry_vars: ["hook_handle_value", "hook_extended", "hook_retracted"]
+    pack_steps: ["S24", "S25"]
+    prompt_harness_refs: ["S24.ui_targets", "S25.ui_targets"]
+    highlightable: true
+    notes: "Handle, external hook state, and hook light all map to the same semantic target."
+  pitot_heater_switch:
+    dcs_id: "pnt_409"
+    clickabledata: {label: "Pitot Heater Switch, ON/AUTO", device: "devices.ANTIICE_INTERFACE", command: "antiice_commands.PitotHeaterSw"}
+    bios_keys: ["PITOT_HEAT_SW"]
+    telemetry_vars: ["pitot_heat_on"]
+    pack_steps: ["S26"]
+    prompt_harness_refs: ["S26.ui_targets"]
+    highlightable: true
+    notes: "Anti-ice switch."
+  parking_brake_handle:
+    dcs_id: "pnt_240"
+    clickabledata: {label: "Emergency/Parking Brake Handle", device: "devices.GEAR_INTERFACE", command: "gear_commands.EmergParkBrake"}
+    bios_keys: ["EMERGENCY_PARKING_BRAKE_PULL", "EMERGENCY_PARKING_BRAKE_ROTATE"]
+    telemetry_vars: ["parking_brake_pull_value", "parking_brake_rotate_value", "parking_brake_released"]
+    pack_steps: ["S28"]
+    prompt_harness_refs: ["S28.ui_targets"]
+    highlightable: true
+    notes: "Pull and rotate exports are compatible actions for one physical handle."
+  ifei_up_button:
+    dcs_id: "pnt_170"
+    clickabledata: {label: "IFEI Up Arrow Button", device: "devices.IFEI", command: "IFEI_commands.IFEI_UP"}
+    bios_keys: ["IFEI_UP_BTN"]
+    telemetry_vars: ["ifei_up_pressed", "ifei_up_or_down_pressed", "bingo_fuel_set"]
+    pack_steps: ["S29"]
+    prompt_harness_refs: ["S29.ui_targets"]
+    highlightable: true
+    notes: "Bingo-fuel adjustment button."
+  ifei_down_button:
+    dcs_id: "pnt_171"
+    clickabledata: {label: "IFEI Down Arrow Button", device: "devices.IFEI", command: "IFEI_commands.IFEI_DWN"}
+    bios_keys: ["IFEI_DWN_BTN"]
+    telemetry_vars: ["ifei_down_pressed", "ifei_up_or_down_pressed", "bingo_fuel_set"]
+    pack_steps: ["S29"]
+    prompt_harness_refs: ["S29.ui_targets"]
+    highlightable: true
+    notes: "Bingo-fuel adjustment button."
+  standby_altimeter_pressure_knob:
+    dcs_id: "pnt_224"
+    clickabledata: {label: "AAU-52 Altimeter Pressure Setting Knob", device: "devices.AAU52", command: "aau52_commands.AAU52_ClkCmd_ZeroSetting"}
+    bios_keys: ["STBY_PRESS_SET_0", "STBY_PRESS_SET_1", "STBY_PRESS_SET_2"]
+    telemetry_vars: ["standby_pressure_set_0", "standby_pressure_set_1", "standby_pressure_set_2", "standby_altimeter_set"]
+    pack_steps: ["S30"]
+    prompt_harness_refs: ["S30.ui_targets", "S30.gates"]
+    highlightable: true
+    notes: "Three exported counters represent one pressure setting knob."
+  radar_altimeter_bug_knob:
+    dcs_id: "pnt_291"
+    clickabledata: {label: "Radar Altimeter Push to Test/Set Min Alt", device: "devices.ID2163A", command: "id2163a_commands.ID2163A_SetMinAlt"}
+    bios_keys: ["RADALT_MIN_HEIGHT_PTR"]
+    telemetry_vars: ["radar_altimeter_bug_value", "radar_altimeter_bug_set"]
+    pack_steps: ["S31"]
+    prompt_harness_refs: ["S31.ui_targets", "S31.gates"]
+    highlightable: true
+    notes: "Push-to-test and min-alt pointer are one cockpit control family."
+  standby_attitude_cage_knob:
+    dcs_id: "pnt_213"
+    clickabledata: {label: "SAI Cage Knob", device: "devices.SAI", command: "sai_commands.SAI_Cage"}
+    bios_keys: ["SAI_CAGE", "SAI_ATT_WARNING_FLAG"]
+    telemetry_vars: ["sai_cage_value", "standby_attitude_uncaged"]
+    pack_steps: ["S32"]
+    prompt_harness_refs: ["S32.ui_targets"]
+    highlightable: true
+    notes: "Cage control plus warning flag evidence."
+  attitude_source_selector:
+    dcs_id: "pnt_148"
+    clickabledata: {label: "Attitude Selector Switch, INS/AUTO/STBY", device: "devices.HUD", command: "HUD_commands.HUD_AttitudeSelSw"}
+    bios_keys: ["HUD_ATT_SW"]
+    telemetry_vars: ["hud_att_source_value", "attitude_source_auto"]
+    pack_steps: ["S33"]
+    prompt_harness_refs: ["S33.ui_targets"]
+    highlightable: true
+    notes: "HUD attitude source selector."

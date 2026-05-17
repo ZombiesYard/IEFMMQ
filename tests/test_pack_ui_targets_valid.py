@@ -11,6 +11,8 @@ from core.step_signal_metadata import STEP_EVIDENCE_REQUIREMENT_VALUES, STEP_OBS
 BASE_DIR = Path(__file__).resolve().parent.parent
 PACK_PATH = BASE_DIR / "packs" / "fa18c_startup" / "pack.yaml"
 UI_MAP_PATH = BASE_DIR / "packs" / "fa18c_startup" / "ui_map.yaml"
+BIOS_TO_UI_PATH = BASE_DIR / "packs" / "fa18c_startup" / "bios_to_ui.yaml"
+CONTROL_ALIGNMENT_INVENTORY_PATH = BASE_DIR / "packs" / "fa18c_startup" / "control_alignment_inventory.yaml"
 DEFAULT_CLICKABLEDATA_PATH = BASE_DIR / "CockpitScripts" / "clickabledata.lua"
 CLICKABLE_IDS_FIXTURE_PATH = BASE_DIR / "tests" / "fixtures" / "fa18c_clickable_ids.txt"
 CLICKABLEDATA_ENV_VAR = "SIMTUTOR_FA18C_CLICKABLEDATA_PATH"
@@ -235,6 +237,102 @@ def test_ui_map_dcs_ids_align_with_cockpit_clickabledata() -> None:
         assert dcs_id in clickable_ids, (
             f"ui_map target {target!r} uses dcs_id {dcs_id!r} not found in clickable reference source: {source_path}"
         )
+
+
+def test_control_alignment_inventory_covers_current_ui_map_targets() -> None:
+    pack = _load_yaml(PACK_PATH)
+    ui_map = _load_yaml(UI_MAP_PATH)
+    bios_to_ui = _load_yaml(BIOS_TO_UI_PATH)
+    inventory = _load_yaml(CONTROL_ALIGNMENT_INVENTORY_PATH)
+
+    cockpit_elements = ui_map.get("cockpit_elements")
+    controls = inventory.get("controls")
+    steps = pack.get("steps")
+    assert isinstance(cockpit_elements, dict) and cockpit_elements
+    assert isinstance(controls, dict) and controls
+    assert isinstance(steps, list) and steps
+    assert set(controls) == set(cockpit_elements)
+
+    expected_steps_by_target: dict[str, list[str]] = {}
+    for step in steps:
+        assert isinstance(step, dict)
+        step_id = step.get("id")
+        assert isinstance(step_id, str) and step_id
+        ui_targets = step.get("ui_targets")
+        assert isinstance(ui_targets, list)
+        for target in ui_targets:
+            if isinstance(target, str) and target:
+                expected_steps_by_target.setdefault(target, []).append(step_id)
+
+    mapped_keys_by_target: dict[str, set[str]] = {}
+    mappings = bios_to_ui.get("mappings")
+    assert isinstance(mappings, dict) and mappings
+    for bios_key, raw_targets in mappings.items():
+        assert isinstance(bios_key, str) and bios_key
+        if isinstance(raw_targets, list):
+            targets = raw_targets
+        elif isinstance(raw_targets, dict):
+            targets = raw_targets.get("targets")
+        else:
+            targets = [raw_targets]
+        assert isinstance(targets, list)
+        for target in targets:
+            if isinstance(target, str) and target:
+                mapped_keys_by_target.setdefault(target, set()).add(bios_key)
+
+    for target, entry in controls.items():
+        assert isinstance(entry, dict), f"inventory target {target!r} must map to a mapping"
+        assert entry.get("dcs_id") == cockpit_elements[target].get("dcs_id")
+        clickable = entry.get("clickabledata")
+        assert isinstance(clickable, dict), f"inventory target {target!r} missing clickabledata"
+        assert isinstance(clickable.get("label"), str) and clickable["label"].strip()
+        assert isinstance(entry.get("bios_keys"), list), f"inventory target {target!r} missing bios_keys list"
+        assert isinstance(entry.get("telemetry_vars"), list), (
+            f"inventory target {target!r} missing telemetry_vars list"
+        )
+        assert isinstance(entry.get("pack_steps"), list), f"inventory target {target!r} missing pack_steps list"
+        assert entry["pack_steps"] == expected_steps_by_target.get(target, [])
+        assert mapped_keys_by_target.get(target, set()).issubset(set(entry["bios_keys"]))
+        assert isinstance(entry.get("highlightable"), bool), f"inventory target {target!r} missing highlightable bool"
+
+
+def test_ddi_selector_brightness_and_contrast_targets_are_separate() -> None:
+    ui_map = _load_yaml(UI_MAP_PATH)
+    cockpit_elements = ui_map["cockpit_elements"]
+
+    expected = {
+        "left_mdi_brightness_selector": ("pnt_51", "LEFT_DDI_BRT_SELECT"),
+        "left_mdi_brightness_control": ("pnt_52", "LEFT_DDI_BRT_CTL"),
+        "left_mdi_contrast_control": ("pnt_53", "LEFT_DDI_CONT_CTL"),
+        "right_mdi_brightness_selector": ("pnt_76", "RIGHT_DDI_BRT_SELECT"),
+        "right_mdi_brightness_control": ("pnt_77", "RIGHT_DDI_BRT_CTL"),
+        "right_mdi_contrast_control": ("pnt_78", "RIGHT_DDI_CONT_CTL"),
+    }
+
+    observed_dcs_ids: set[str] = set()
+    for target, (dcs_id, bios_key) in expected.items():
+        entry = cockpit_elements[target]
+        assert entry["dcs_id"] == dcs_id
+        assert bios_key in entry["aliases"]
+        assert dcs_id not in observed_dcs_ids
+        observed_dcs_ids.add(dcs_id)
+
+    assert "LEFT_DDI_BRT_CTL" not in cockpit_elements["left_mdi_brightness_selector"]["aliases"]
+    assert "LEFT_DDI_CONT_CTL" not in cockpit_elements["left_mdi_brightness_selector"]["aliases"]
+    assert "RIGHT_DDI_BRT_CTL" not in cockpit_elements["right_mdi_brightness_selector"]["aliases"]
+    assert "RIGHT_DDI_CONT_CTL" not in cockpit_elements["right_mdi_brightness_selector"]["aliases"]
+
+
+def test_s08_display_power_targets_stay_on_ddi_selectors_not_potentiometers() -> None:
+    pack = _load_yaml(PACK_PATH)
+    s08 = next(step for step in pack["steps"] if step["id"] == "S08")
+
+    targets = set(s08["ui_targets"])
+    assert {"left_mdi_brightness_selector", "right_mdi_brightness_selector"}.issubset(targets)
+    assert "left_mdi_brightness_control" not in targets
+    assert "right_mdi_brightness_control" not in targets
+    assert "left_mdi_contrast_control" not in targets
+    assert "right_mdi_contrast_control" not in targets
 
 
 def test_ui_map_interaction_policy_has_bilingual_entries() -> None:

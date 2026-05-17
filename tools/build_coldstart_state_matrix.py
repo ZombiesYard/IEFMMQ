@@ -236,7 +236,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     # so this is a single-frame approximation; full latch semantics are
     # enforced by telemetry_pipeline across multiple frames in production.
     "lights_test_complete": _set_enum("LIGHTS_TEST_SW", true_value=1, false_value=0),
-    "left_ddi_on": _set_enum("LEFT_DDI_BRT_CTL", true_value=1, false_value=0),
+    "left_ddi_on": _set_enum("LEFT_DDI_BRT_SELECT", true_value=1, false_value=0),
     "launch_bar_switch_value": _set_numeric("LAUNCH_BAR_SW"),
     "hook_handle_value": _set_numeric("HOOK_LEVER"),
     "mpcd_on": _set_enum("AMPCD_BRT_CTL", true_value=1, false_value=0),
@@ -251,7 +251,7 @@ _VAR_BINDINGS: dict[str, _VarBinding] = {
     "radar_altimeter_bug_value": _VarBinding(primary_bios_key="RADALT_MIN_HEIGHT_PTR", setter=_set_radar_altimeter_bug_value),
     "radar_mode_opr": _set_enum("RADAR_SW", true_value=2, false_value=0),
     "radar_on": _set_enum("RADAR_SW", true_value=2, false_value=0),
-    "right_ddi_on": _set_enum("RIGHT_DDI_BRT_CTL", true_value=1, false_value=0),
+    "right_ddi_on": _set_enum("RIGHT_DDI_BRT_SELECT", true_value=1, false_value=0),
     "right_engine_nominal_start_params": _VarBinding(
         primary_bios_key="IFEI_RPM_R",
         setter=_set_right_engine_nominal_start_params,

@@ -153,3 +153,8 @@ def test_fire_test_complete_binding_uses_non_center_rocker_state_for_true() -> N
 
     binding.setter(bios, False)
     assert bios["FIRE_TEST_SW"] == 1
+
+
+def test_ddi_on_bindings_use_selector_keys_not_brightness_pots() -> None:
+    assert _VAR_BINDINGS["left_ddi_on"].primary_bios_key == "LEFT_DDI_BRT_SELECT"
+    assert _VAR_BINDINGS["right_ddi_on"].primary_bios_key == "RIGHT_DDI_BRT_SELECT"

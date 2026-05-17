@@ -44,11 +44,15 @@ mappings:
   LEFT_DDI_BRT_SELECT:
     - left_mdi_brightness_selector
   LEFT_DDI_BRT_CTL:
-    - left_mdi_brightness_selector
+    - left_mdi_brightness_control
+  LEFT_DDI_CONT_CTL:
+    - left_mdi_contrast_control
   RIGHT_DDI_BRT_SELECT:
     - right_mdi_brightness_selector
   RIGHT_DDI_BRT_CTL:
-    - right_mdi_brightness_selector
+    - right_mdi_brightness_control
+  RIGHT_DDI_CONT_CTL:
+    - right_mdi_contrast_control
   AMPCD_BRT_CTL:
     - ampcd_off_brightness_knob
   HUD_SYM_BRT:
