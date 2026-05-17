@@ -2302,6 +2302,10 @@ def _s08_visual_hint_fact_id_for_target(target: str | None) -> str | None:
     return None
 
 
+def _s08_power_condition_missing(missing_set: set[str]) -> bool:
+    return any(f"vars.{var_name}==true" in missing_set for var_name, _target, _reason in _S08_POWER_SEQUENCE)
+
+
 def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | None) -> str | None:
     if not isinstance(fact_id, str) or not fact_id:
         return None
@@ -2351,6 +2355,30 @@ def _s08_visual_evidence_ref_for_target(evidence_refs: Sequence[str], target: st
         if isinstance(ref, str) and (ref == prefix or ref.startswith(f"{prefix}@")):
             return ref
     return None
+
+
+def _s08_page_navigation_fact_id_from_ref(ref: str) -> str | None:
+    for fact_id in ("supt_page_visible", "tac_page_visible"):
+        prefix = f"VISION_FACTS.{fact_id}"
+        if ref == prefix or ref.startswith(f"{prefix}@"):
+            return fact_id
+    return None
+
+
+def _s08_filter_unconfirmed_page_navigation_refs(
+    context: Mapping[str, Any],
+    evidence_refs: Sequence[str],
+) -> list[str]:
+    filtered: list[str] = []
+    vision_summary = context.get("vision_fact_summary")
+    for ref in evidence_refs:
+        if not isinstance(ref, str) or not ref:
+            continue
+        fact_id = _s08_page_navigation_fact_id_from_ref(ref)
+        if fact_id is not None and not _vision_summary_seen_or_fresh(vision_summary, fact_id):
+            continue
+        filtered.append(ref)
+    return filtered
 
 
 def _s08_visual_fact_ref_for_seen_target(
@@ -5086,25 +5114,37 @@ class LiveDcsTutorLoop:
             if isinstance(raw_fresh, (list, tuple, set)):
                 vision_fresh_fact_ids = [item for item in raw_fresh if isinstance(item, str) and item]
 
+        missing_conditions = hint.get("missing_conditions")
+        missing_set = {
+            item for item in missing_conditions
+            if isinstance(item, str) and item
+        } if isinstance(missing_conditions, (list, tuple)) else set()
+
         action_hint = hint.get("action_hint")
         visual_action_hint = hint.get("visual_action_hint")
         s08_visual_hint_target: str | None = None
         s08_visual_hint_ref: str | None = None
         s08_visual_hint_used = False
-        if inferred_step_id == "S08" and isinstance(visual_action_hint, Mapping):
+        s08_visual_navigation_allowed = (
+            inferred_step_id == "S08"
+            and not _s08_power_condition_missing(missing_set)
+        )
+        if inferred_step_id == "S08":
+            evidence_refs = _s08_filter_unconfirmed_page_navigation_refs(context, evidence_refs)
+        if s08_visual_navigation_allowed and isinstance(visual_action_hint, Mapping):
             visual_target = visual_action_hint.get("target")
             if isinstance(visual_target, str) and visual_target:
-                action_hint = visual_action_hint
-                s08_visual_hint_target = visual_target
-                s08_visual_hint_used = True
                 s08_visual_hint_ref = _s08_visual_fact_ref_for_seen_target(
                     context,
                     evidence_refs,
                     visual_target,
                 )
                 if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
+                    action_hint = visual_action_hint
+                    s08_visual_hint_target = visual_target
+                    s08_visual_hint_used = True
                     evidence_refs = [s08_visual_hint_ref]
-        if inferred_step_id == "S08" and not s08_visual_hint_used:
+        if s08_visual_navigation_allowed and not s08_visual_hint_used:
             evidence_hint = _s08_visual_hint_from_seen_evidence_refs(context, evidence_refs)
             summary_hint = _s08_visual_hint_from_vision_summary(context)
             if evidence_hint is None and summary_hint is not None:
@@ -5121,11 +5161,6 @@ class LiveDcsTutorLoop:
                 if isinstance(evidence_ref, str) and evidence_ref:
                     evidence_refs = [evidence_ref]
         manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
-        missing_conditions = hint.get("missing_conditions")
-        missing_set = {
-            item for item in missing_conditions
-            if isinstance(item, str) and item
-        } if isinstance(missing_conditions, (list, tuple)) else set()
         include_s05_manual_guidance = (
             "vars.throttle_r_not_off==true" in missing_set
             or "vars.throttle_r_idle_complete==true" in missing_set
