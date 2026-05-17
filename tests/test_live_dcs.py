@@ -5738,6 +5738,81 @@ def test_live_dcs_main_wires_tutor_text_sender_into_loop(monkeypatch, tmp_path: 
     assert isinstance(captured["loop_kwargs"]["tutor_text_sender"], FakeTutorTextSender)
 
 
+def test_live_dcs_main_resolves_existing_output_path_and_logs_metadata(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import live_dcs
+
+    requested_output = tmp_path / "events.jsonl"
+    requested_output.write_text("previous run\n", encoding="utf-8")
+    captured: dict[str, Any] = {"events": []}
+
+    class FakeStore:
+        def __init__(self, path, *_args, mode: str = "a", **_kwargs) -> None:
+            attempted = captured.setdefault("attempted_paths", [])
+            attempted.append(Path(path))
+            assert mode == "x"
+            if len(attempted) <= 2:
+                raise FileExistsError(path)
+            captured["store_path"] = Path(path)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def append(self, event) -> None:
+            captured["events"].append(event)
+
+    class FakeTutorTextSender:
+        def __init__(self, **_kwargs) -> None:
+            return
+
+        def close(self) -> None:
+            return
+
+    class FakeLoop:
+        def __init__(self, **_kwargs) -> None:
+            return
+
+        def run(self, **_kwargs) -> dict[str, Any]:
+            return {"help_cycles": 0}
+
+        def close(self) -> None:
+            return
+
+    monkeypatch.setattr("live_dcs.JsonlEventStore", FakeStore)
+    monkeypatch.setattr("live_dcs.OverlayActionExecutor", lambda **_kwargs: object())
+    monkeypatch.setattr("live_dcs._build_observation_source_from_args", lambda _args: object())
+    monkeypatch.setattr("live_dcs._build_model_from_args", lambda _args: object())
+    monkeypatch.setattr("live_dcs._build_vision_port_from_args", lambda _args, mode: (None, None, None, None))
+    monkeypatch.setattr("live_dcs.DcsTutorTextSender", FakeTutorTextSender)
+    monkeypatch.setattr("live_dcs.LiveDcsTutorLoop", FakeLoop)
+
+    code = live_dcs.main(["--output", str(requested_output), "--duration", "0"])
+
+    assert code == 0
+    resolved_output = captured["store_path"]
+    assert resolved_output != requested_output
+    assert resolved_output.parent == requested_output.parent
+    assert resolved_output.name.startswith("events_")
+    assert len(captured["attempted_paths"]) == 3
+    assert requested_output.read_text(encoding="utf-8") == "previous run\n"
+    startup_events = [event for event in captured["events"] if event.kind == "system"]
+    assert startup_events
+    assert startup_events[0].payload["event"] == "live_dcs_runtime_log"
+    assert startup_events[0].payload["requested_output_path"] == str(requested_output)
+    assert startup_events[0].payload["resolved_output_path"] == str(resolved_output)
+    assert startup_events[0].metadata["requested_output_path"] == str(requested_output)
+    assert startup_events[0].metadata["resolved_output_path"] == str(resolved_output)
+    out = capsys.readouterr().out
+    assert f"[LIVE_DCS] resolved output path: {resolved_output}" in out
+    assert f"[LIVE_DCS] wrote events to {resolved_output}" in out
+
+
 def test_live_loop_request_context_and_metadata_include_scenario_profile(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_scenario_profile.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
