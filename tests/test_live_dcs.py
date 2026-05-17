@@ -3752,6 +3752,200 @@ def test_visual_action_hint_does_not_override_existing_model_action(tmp_path: Pa
         loop.close()
 
 
+def test_harness_validation_repairs_s08_selector_to_supt_visual_hint(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s08_visual_hint_repairs_selector_to_pb15.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S08.completion", "status": "blocked", "reason": "FCS page is not visible."},
+                    {"gate_id": "S08.precondition", "status": "allowed"},
+                ],
+                "vision_facts": [
+                    {"fact_id": "supt_page_visible", "state": "seen", "source_frame_id": "frame-supt"},
+                    {"fact_id": "bit_root_page_visible", "state": "seen", "source_frame_id": "frame-bit"},
+                    {"fact_id": "fcs_page_visible", "state": "not_seen", "source_frame_id": "frame-fcs"},
+                ],
+                "vision_fact_summary": {
+                    "status": "available",
+                    "seen_fact_ids": ["bit_root_page_visible", "supt_page_visible"],
+                    "fresh_fact_ids": ["bit_root_page_visible", "supt_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
+                    "uncertain_fact_ids": [],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["visual", "gate"],
+                    "visual_action_hint": {
+                        "target": "left_mdi_pb15",
+                        "reason": "SUPT is visible; press PB15 to enter FCS.",
+                    },
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="Use the left MDI to navigate to FCS.",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "left_mdi_brightness_selector",
+                    "element_id": "pnt_51",
+                }
+            ],
+            explanations=["Use the left MDI to navigate to FCS."],
+            metadata={
+                "help_response": {
+                    "diagnosis": {"step_id": "S08", "error_category": "OM"},
+                    "next": {"step_id": "S08"},
+                    "overlay": {
+                        "targets": ["left_mdi_brightness_selector"],
+                        "evidence": [
+                            {
+                                "target": "left_mdi_brightness_selector",
+                                "type": "visual",
+                                "ref": "VISION_FACTS.supt_page_visible@frame-supt",
+                                "quote": "SUPT visible.",
+                                "grounding_confidence": 0.9,
+                            }
+                        ],
+                    },
+                    "explanations": ["Use the left MDI to navigate to FCS."],
+                }
+            },
+        )
+
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "deterministic_step:S08"
+        assert [action["target"] for action in response.actions] == ["left_mdi_pb15"]
+        assert response.metadata["s08_visual_hint_repair_applied"] is True
+        assert response.metadata["rejected_model_target"] == "left_mdi_brightness_selector"
+        assert response.metadata["visual_hint_target"] == "left_mdi_pb15"
+        assert response.metadata["final_action_plan_source"] == "validator_action_hint"
+        assert response.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == (
+            "VISION_FACTS.supt_page_visible@frame-supt"
+        )
+    finally:
+        loop.close()
+
+
+def test_harness_validation_repairs_s08_selector_to_tac_visual_hint(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s08_visual_hint_repairs_selector_to_pb18.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S08.completion", "status": "blocked", "reason": "FCS page is not visible."},
+                    {"gate_id": "S08.precondition", "status": "allowed"},
+                ],
+                "vision_facts": [
+                    {"fact_id": "tac_page_visible", "state": "seen", "source_frame_id": "frame-tac"},
+                    {"fact_id": "bit_root_page_visible", "state": "seen", "source_frame_id": "frame-bit"},
+                    {"fact_id": "fcs_page_visible", "state": "not_seen", "source_frame_id": "frame-fcs"},
+                ],
+                "vision_fact_summary": {
+                    "status": "available",
+                    "seen_fact_ids": ["bit_root_page_visible", "tac_page_visible"],
+                    "fresh_fact_ids": ["bit_root_page_visible", "tac_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
+                    "uncertain_fact_ids": ["supt_page_visible"],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["visual", "gate"],
+                    "visual_action_hint": {
+                        "target": "left_mdi_pb18",
+                        "reason": "TAC is visible; press PB18 to reach SUPT.",
+                    },
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="Use the left MDI to navigate to FCS.",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "left_mdi_brightness_selector",
+                    "element_id": "pnt_51",
+                }
+            ],
+            explanations=["Use the left MDI to navigate to FCS."],
+            metadata={
+                "help_response": {
+                    "diagnosis": {"step_id": "S08", "error_category": "OM"},
+                    "next": {"step_id": "S08"},
+                    "overlay": {
+                        "targets": ["left_mdi_brightness_selector"],
+                        "evidence": [
+                            {
+                                "target": "left_mdi_brightness_selector",
+                                "type": "visual",
+                                "ref": "VISION_FACTS.tac_page_visible@frame-tac",
+                                "quote": "TAC visible.",
+                                "grounding_confidence": 0.9,
+                            }
+                        ],
+                    },
+                    "explanations": ["Use the left MDI to navigate to FCS."],
+                }
+            },
+        )
+
+        used, _reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert [action["target"] for action in response.actions] == ["left_mdi_pb18"]
+        assert response.metadata["s08_visual_hint_repair_applied"] is True
+        assert response.metadata["rejected_model_target"] == "left_mdi_brightness_selector"
+        assert response.metadata["visual_hint_target"] == "left_mdi_pb18"
+        assert response.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == (
+            "VISION_FACTS.tac_page_visible@frame-tac"
+        )
+    finally:
+        loop.close()
+
+
 def test_s08_dual_visual_missing_overrides_model_left_nav_to_right_display_recovery(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s08_dual_visual_missing_model_left_nav.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])

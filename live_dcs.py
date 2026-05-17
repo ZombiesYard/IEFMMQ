@@ -2290,6 +2290,33 @@ def _s19_final_go_seen_or_fresh(summary: Mapping[str, Any] | None) -> bool:
     return _vision_summary_seen_or_fresh(summary, "fcsmc_final_go_result_visible")
 
 
+def _s08_visual_hint_fact_id_for_target(target: str | None) -> str | None:
+    if target == "left_mdi_pb15":
+        return "supt_page_visible"
+    if target == "left_mdi_pb18":
+        return "tac_page_visible"
+    return None
+
+
+def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | None) -> str | None:
+    if not isinstance(fact_id, str) or not fact_id:
+        return None
+    vision_facts = context.get("vision_facts")
+    if isinstance(vision_facts, list):
+        for item in vision_facts:
+            if not isinstance(item, Mapping) or item.get("fact_id") != fact_id:
+                continue
+            frame_id = item.get("source_frame_id")
+            return (
+                f"VISION_FACTS.{fact_id}@{frame_id}"
+                if isinstance(frame_id, str) and frame_id
+                else f"VISION_FACTS.{fact_id}"
+            )
+    if _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+        return f"VISION_FACTS.{fact_id}"
+    return None
+
+
 def _build_procedural_action_hint(
     *,
     inferred_step_id: str | None,
@@ -4966,6 +4993,22 @@ class LiveDcsTutorLoop:
                 vision_fresh_fact_ids = [item for item in raw_fresh if isinstance(item, str) and item]
 
         action_hint = hint.get("action_hint")
+        visual_action_hint = hint.get("visual_action_hint")
+        s08_visual_hint_target: str | None = None
+        s08_visual_hint_ref: str | None = None
+        s08_visual_hint_used = False
+        if inferred_step_id == "S08" and isinstance(visual_action_hint, Mapping):
+            visual_target = visual_action_hint.get("target")
+            if isinstance(visual_target, str) and visual_target:
+                action_hint = visual_action_hint
+                s08_visual_hint_target = visual_target
+                s08_visual_hint_used = True
+                s08_visual_hint_ref = _visual_fact_ref_from_context(
+                    context,
+                    _s08_visual_hint_fact_id_for_target(visual_target),
+                )
+                if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
+                    evidence_refs = [s08_visual_hint_ref]
         manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         missing_conditions = hint.get("missing_conditions")
         missing_set = {
@@ -5059,6 +5102,15 @@ class LiveDcsTutorLoop:
             "text_only": plan.text_only,
             "source": plan.final_action_plan_source,
         }
+        if s08_visual_hint_used:
+            response.metadata["visual_hint_target"] = s08_visual_hint_target
+            if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
+                response.metadata["visual_hint_evidence_ref"] = s08_visual_hint_ref
+            if plan.repair_applied:
+                response.metadata["s08_visual_hint_repair_applied"] = True
+            if plan.rejected_model_targets:
+                response.metadata["rejected_model_targets"] = list(plan.rejected_model_targets)
+                response.metadata["rejected_model_target"] = plan.rejected_model_targets[0]
         if isinstance(plan.rejected_model_step_id, str) and plan.rejected_model_step_id:
             response.metadata["rejected_model_step_id"] = plan.rejected_model_step_id
         elif "rejected_model_step_id" in response.metadata:
