@@ -70,6 +70,8 @@ python live_dcs.py \
   --output logs/live_dcs.jsonl
 ```
 
+If `--output` already exists, the live loop opens a unique timestamped or numeric-suffixed JSONL path instead of overwriting it. The final resolved path is printed to the console and recorded in the startup `system` event metadata as `resolved_output_path`.
+
 ## Run Vision Sidecar
 
 PowerShell example on the simulator host:
@@ -91,3 +93,16 @@ python -m simtutor record-vlm \
   --vision-saved-games-dir "<saved-games-dir>" \
   --max-frames 2000
 ```
+
+## Extract One Failed Help Cycle
+
+For a live failure reported as `request_id=<id>`, extract the relevant request, response, evidence, harness trace, vision facts, and final overlay targets into a compact fixture:
+
+```bash
+python -m simtutor extract-live-fixture \
+  --input logs/live_dcs.jsonl \
+  --request-id "<request-id>" \
+  --output-dir artifacts/live_fixtures
+```
+
+See [Replay and CLI reference](replay-and-cli-reference.md#extract-a-live-help-fixture) for the fixture shape and regression workflow.
