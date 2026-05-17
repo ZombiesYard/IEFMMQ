@@ -2302,6 +2302,10 @@ def _s08_visual_hint_fact_id_for_target(target: str | None) -> str | None:
     return None
 
 
+def _s08_power_condition_missing(missing_set: set[str]) -> bool:
+    return any(f"vars.{var_name}==true" in missing_set for var_name, _target, _reason in _S08_POWER_SEQUENCE)
+
+
 def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | None) -> str | None:
     if not isinstance(fact_id, str) or not fact_id:
         return None
@@ -2309,6 +2313,9 @@ def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | Non
     if isinstance(vision_facts, list):
         for item in vision_facts:
             if not isinstance(item, Mapping) or item.get("fact_id") != fact_id:
+                continue
+            state = item.get("state")
+            if isinstance(state, str) and state not in {"seen", "fresh"}:
                 continue
             frame_id = item.get("source_frame_id")
             return (
@@ -2318,6 +2325,121 @@ def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | Non
             )
     if _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
         return f"VISION_FACTS.{fact_id}"
+    return None
+
+
+def _s08_visual_hint_from_vision_summary(context: Mapping[str, Any]) -> tuple[str, str, str | None] | None:
+    for fact_id, target, reason in (
+        (
+            "supt_page_visible",
+            "left_mdi_pb15",
+            "VLM confirms SUPT is visible; press PB15 to enter the FCS page.",
+        ),
+        (
+            "tac_page_visible",
+            "left_mdi_pb18",
+            "VLM confirms TAC is visible; press PB18 to reach the SUPT page.",
+        ),
+    ):
+        if _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+            return target, reason, _visual_fact_ref_from_context(context, fact_id)
+    return None
+
+
+def _s08_visual_evidence_ref_for_target(evidence_refs: Sequence[str], target: str | None) -> str | None:
+    fact_id = _s08_visual_hint_fact_id_for_target(target)
+    if fact_id is None:
+        return None
+    prefix = f"VISION_FACTS.{fact_id}"
+    for ref in evidence_refs:
+        if isinstance(ref, str) and (ref == prefix or ref.startswith(f"{prefix}@")):
+            return ref
+    return None
+
+
+def _s08_page_navigation_fact_id_from_ref(ref: str) -> str | None:
+    for fact_id in ("supt_page_visible", "tac_page_visible"):
+        prefix = f"VISION_FACTS.{fact_id}"
+        if ref == prefix or ref.startswith(f"{prefix}@"):
+            return fact_id
+    return None
+
+
+def _s08_filter_unconfirmed_page_navigation_refs(
+    context: Mapping[str, Any],
+    evidence_refs: Sequence[str],
+) -> list[str]:
+    filtered: list[str] = []
+    vision_summary = context.get("vision_fact_summary")
+    for ref in evidence_refs:
+        if not isinstance(ref, str) or not ref:
+            continue
+        fact_id = _s08_page_navigation_fact_id_from_ref(ref)
+        if fact_id is not None and not _vision_summary_seen_or_fresh(vision_summary, fact_id):
+            continue
+        filtered.append(ref)
+    return filtered
+
+
+def _s08_clean_unconfirmed_page_navigation_help_response(
+    context: Mapping[str, Any],
+    help_response: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any] | None, bool]:
+    if not isinstance(help_response, Mapping):
+        return None, False
+    overlay = help_response.get("overlay")
+    if not isinstance(overlay, Mapping):
+        return None, False
+    evidence = overlay.get("evidence")
+    if not isinstance(evidence, list):
+        return None, False
+
+    cleaned_evidence: list[Any] = []
+    changed = False
+    vision_summary = context.get("vision_fact_summary")
+    for item in evidence:
+        ref = item.get("ref") if isinstance(item, Mapping) else None
+        if isinstance(ref, str):
+            fact_id = _s08_page_navigation_fact_id_from_ref(ref)
+            if fact_id is not None and not _vision_summary_seen_or_fresh(vision_summary, fact_id):
+                changed = True
+                continue
+        cleaned_evidence.append(item)
+
+    if not changed:
+        return None, False
+    cleaned_help_response = copy.deepcopy(dict(help_response))
+    cleaned_overlay = copy.deepcopy(dict(overlay))
+    cleaned_overlay["evidence"] = cleaned_evidence
+    cleaned_help_response["overlay"] = cleaned_overlay
+    return cleaned_help_response, True
+
+
+def _s08_visual_fact_ref_for_seen_target(
+    context: Mapping[str, Any],
+    evidence_refs: Sequence[str],
+    target: str | None,
+) -> str | None:
+    fact_id = _s08_visual_hint_fact_id_for_target(target)
+    if fact_id is None or not _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+        return None
+    return _s08_visual_evidence_ref_for_target(evidence_refs, target) or _visual_fact_ref_from_context(context, fact_id)
+
+
+def _s08_visual_hint_from_seen_evidence_refs(
+    context: Mapping[str, Any],
+    evidence_refs: Sequence[str],
+) -> tuple[str, str, str] | None:
+    for fact_id, target in (
+        ("supt_page_visible", "left_mdi_pb15"),
+        ("tac_page_visible", "left_mdi_pb18"),
+    ):
+        if not _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+            continue
+        prefix = f"VISION_FACTS.{fact_id}"
+        for ref in evidence_refs:
+            if isinstance(ref, str) and (ref == prefix or ref.startswith(f"{prefix}@")):
+                return target, f"Visual evidence {ref} confirms S08 page navigation.", ref
     return None
 
 
@@ -5026,29 +5148,53 @@ class LiveDcsTutorLoop:
             if isinstance(raw_fresh, (list, tuple, set)):
                 vision_fresh_fact_ids = [item for item in raw_fresh if isinstance(item, str) and item]
 
-        action_hint = hint.get("action_hint")
-        visual_action_hint = hint.get("visual_action_hint")
-        s08_visual_hint_target: str | None = None
-        s08_visual_hint_ref: str | None = None
-        s08_visual_hint_used = False
-        if inferred_step_id == "S08" and isinstance(visual_action_hint, Mapping):
-            visual_target = visual_action_hint.get("target")
-            if isinstance(visual_target, str) and visual_target:
-                action_hint = visual_action_hint
-                s08_visual_hint_target = visual_target
-                s08_visual_hint_used = True
-                s08_visual_hint_ref = _visual_fact_ref_from_context(
-                    context,
-                    _s08_visual_hint_fact_id_for_target(visual_target),
-                )
-                if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
-                    evidence_refs = [s08_visual_hint_ref]
-        manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         missing_conditions = hint.get("missing_conditions")
         missing_set = {
             item for item in missing_conditions
             if isinstance(item, str) and item
         } if isinstance(missing_conditions, (list, tuple)) else set()
+
+        action_hint = hint.get("action_hint")
+        visual_action_hint = hint.get("visual_action_hint")
+        s08_visual_hint_target: str | None = None
+        s08_visual_hint_ref: str | None = None
+        s08_visual_hint_used = False
+        s08_visual_navigation_allowed = (
+            inferred_step_id == "S08"
+            and not _s08_power_condition_missing(missing_set)
+        )
+        if inferred_step_id == "S08":
+            evidence_refs = _s08_filter_unconfirmed_page_navigation_refs(context, evidence_refs)
+        if s08_visual_navigation_allowed and isinstance(visual_action_hint, Mapping):
+            visual_target = visual_action_hint.get("target")
+            if isinstance(visual_target, str) and visual_target:
+                s08_visual_hint_ref = _s08_visual_fact_ref_for_seen_target(
+                    context,
+                    evidence_refs,
+                    visual_target,
+                )
+                if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
+                    action_hint = visual_action_hint
+                    s08_visual_hint_target = visual_target
+                    s08_visual_hint_used = True
+                    evidence_refs = [s08_visual_hint_ref]
+        if s08_visual_navigation_allowed and not s08_visual_hint_used:
+            evidence_hint = _s08_visual_hint_from_seen_evidence_refs(context, evidence_refs)
+            summary_hint = _s08_visual_hint_from_vision_summary(context)
+            if evidence_hint is None and summary_hint is not None:
+                evidence_hint = summary_hint
+            if evidence_hint is not None:
+                evidence_target, evidence_reason, evidence_ref = evidence_hint
+                action_hint = {
+                    "target": evidence_target,
+                    "reason": evidence_reason,
+                }
+                s08_visual_hint_target = evidence_target
+                s08_visual_hint_ref = evidence_ref
+                s08_visual_hint_used = True
+                if isinstance(evidence_ref, str) and evidence_ref:
+                    evidence_refs = [evidence_ref]
+        manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         include_s05_manual_guidance = (
             "vars.throttle_r_not_off==true" in missing_set
             or "vars.throttle_r_idle_complete==true" in missing_set
@@ -5220,6 +5366,14 @@ class LiveDcsTutorLoop:
                 )
             )
         ):
+            cleaned_help_response, evidence_cleaned = _s08_clean_unconfirmed_page_navigation_help_response(
+                context,
+                response.metadata.get("help_response"),
+            )
+            if evidence_cleaned and cleaned_help_response is not None:
+                response.metadata["help_response"] = cleaned_help_response
+                response.metadata["s08_unconfirmed_visual_evidence_filtered"] = True
+                return True, "s08_unconfirmed_visual_evidence_filtered"
             return False, "already_valid"
         if not plan.targets:
             if plan.validator_rejected and response.actions:
