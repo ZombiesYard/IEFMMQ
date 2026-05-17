@@ -1657,9 +1657,265 @@ def _attach_help_cycle_trace_to_actions(
         for key, value in normalized_trace.items():
             if key == "help_cycle_id":
                 continue
-            item.setdefault(key, value)
+            item[key] = value
         traced.append(item)
     return traced
+
+
+def _compact_candidate_for_trace(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, Mapping):
+        return None
+    step_id = raw.get("step_id")
+    if not isinstance(step_id, str) or not step_id:
+        return None
+    out: dict[str, Any] = {"step_id": step_id}
+    for key in (
+        "source",
+        "role",
+        "observability",
+        "requires_visual_confirmation",
+        "confidence",
+        "rank",
+    ):
+        if key in raw:
+            out[key] = _copy_event_field(raw.get(key))
+    for key in ("supporting_evidence_refs", "blocking_evidence_refs", "proposed_next_action_target_ids"):
+        value = raw.get(key)
+        if isinstance(value, (list, tuple)):
+            out[key] = [item for item in value if isinstance(item, str) and item][:8]
+    return out
+
+
+def _overlay_targets_from_actions(actions: Sequence[Mapping[str, Any] | Any]) -> list[str]:
+    out: list[str] = []
+    for action in actions:
+        if not isinstance(action, Mapping):
+            continue
+        target = action.get("target")
+        if isinstance(target, str) and target and target not in out:
+            out.append(target)
+    return out
+
+
+def _step_id_from_payload(raw: Any) -> str | None:
+    if not isinstance(raw, Mapping):
+        return None
+    step_id = raw.get("step_id")
+    return step_id if isinstance(step_id, str) and step_id else None
+
+
+def _help_response_overlay_targets(raw: Any) -> list[str]:
+    if not isinstance(raw, Mapping):
+        return []
+    overlay = raw.get("overlay")
+    if not isinstance(overlay, Mapping):
+        return []
+    targets = overlay.get("targets")
+    if not isinstance(targets, (list, tuple)):
+        return []
+    return [item for item in targets if isinstance(item, str) and item]
+
+
+def _help_response_evidence_refs(raw: Any) -> list[str]:
+    if not isinstance(raw, Mapping):
+        return []
+    overlay = raw.get("overlay")
+    if not isinstance(overlay, Mapping):
+        return []
+    evidence = overlay.get("evidence")
+    if not isinstance(evidence, (list, tuple)):
+        return []
+    refs: list[str] = []
+    for item in evidence:
+        if not isinstance(item, Mapping):
+            continue
+        ref = item.get("ref")
+        if isinstance(ref, str) and ref:
+            refs.append(ref)
+    return refs
+
+
+def _help_response_step_id(raw: Any) -> str | None:
+    if not isinstance(raw, Mapping):
+        return None
+    next_step = _step_id_from_payload(raw.get("next"))
+    if next_step is not None:
+        return next_step
+    return _step_id_from_payload(raw.get("diagnosis"))
+
+
+def _message_category_from_response(response: TutorResponse) -> str:
+    metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+    if metadata.get("terminal_state_rewritten") is True:
+        return "terminal_completed"
+    if metadata.get("manual_throttle_guidance_rewritten") is True:
+        return "manual_text_guidance"
+    if metadata.get("completion_conflict_rewritten") is True:
+        return "completion_conflict_repair"
+    if metadata.get("harness_guardrail_applied") is True:
+        return "harness_guardrail_repair"
+    if metadata.get("validator_rejected") is True or metadata.get("repair_applied") is True:
+        return "harness_validator_repair"
+    if metadata.get("fallback_overlay_used") is True:
+        return "fallback_overlay"
+    generation_mode = metadata.get("generation_mode")
+    if generation_mode == "repair":
+        return "llm_repair"
+    if generation_mode == "fallback" or response.status == "error":
+        return "fallback"
+    return "model"
+
+
+def _vlm_call_trace(
+    *,
+    vision_selection: HelpCycleVisionSelection,
+    vision_fact_context: Mapping[str, Any],
+) -> dict[str, Any]:
+    status = vision_fact_context.get("status")
+    metadata = vision_fact_context.get("metadata")
+    extractor_used = bool(metadata.get("extractor_used")) if isinstance(metadata, Mapping) else False
+    reason = metadata.get("reason") if isinstance(metadata, Mapping) else None
+    if not isinstance(reason, str) or not reason:
+        reason = vision_selection.sync_miss_reason if isinstance(vision_selection.sync_miss_reason, str) else None
+
+    if status == VISION_NOT_REQUIRED:
+        call_status = "not_required"
+    elif status == "extractor_failed":
+        call_status = "failed"
+    elif extractor_used:
+        call_status = "called"
+    else:
+        call_status = "skipped"
+
+    return {
+        "status": call_status,
+        "reason": reason,
+        "vision_status": vision_selection.status,
+        "vision_fact_status": status,
+        "extractor_used": extractor_used,
+        "frame_ids": list(vision_selection.frame_ids),
+        "sync_status": vision_selection.sync_status,
+        "sync_delta_ms": vision_selection.sync_delta_ms,
+    }
+
+
+def _build_harness_trace_metadata(
+    *,
+    request: TutorRequest,
+    response: TutorResponse,
+    vision_selection: HelpCycleVisionSelection,
+    vision_fact_context: Mapping[str, Any],
+) -> dict[str, Any]:
+    context = request.context if isinstance(request.context, Mapping) else {}
+    response_metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+    raw_candidates = context.get("candidate_steps")
+    candidates = [
+        candidate
+        for candidate in (
+            _compact_candidate_for_trace(item)
+            for item in (raw_candidates if isinstance(raw_candidates, list) else [])
+        )
+        if candidate is not None
+    ]
+
+    model_help_response = response_metadata.get("model_raw_help_response")
+    if not isinstance(model_help_response, Mapping):
+        model_help_response = response_metadata.get("help_response")
+    model_step_id = _help_response_step_id(model_help_response)
+    if model_step_id is None:
+        model_step_id = _extract_model_next_step_id(response_metadata)
+
+    final_plan_raw = response_metadata.get("harness_action_plan")
+    final_plan = dict(final_plan_raw) if isinstance(final_plan_raw, Mapping) else {}
+    final_targets = _overlay_targets_from_actions(response.actions)
+    if not final_plan:
+        final_plan = {
+            "step_id": _step_id_from_payload(response_metadata.get("next"))
+            or _step_id_from_payload(response_metadata.get("diagnosis")),
+            "overlay_step_id": None,
+            "targets": list(final_targets),
+            "text_only": not bool(final_targets),
+            "source": response_metadata.get("final_action_plan_source") or response_metadata.get("generation_mode"),
+        }
+    else:
+        final_plan.setdefault("targets", list(final_targets))
+        final_plan.setdefault("source", response_metadata.get("final_action_plan_source"))
+
+    chosen_step_id = final_plan.get("step_id")
+    chosen_candidate = None
+    if isinstance(chosen_step_id, str) and chosen_step_id:
+        chosen_candidate = next((dict(item) for item in candidates if item.get("step_id") == chosen_step_id), None)
+        if chosen_candidate is None:
+            chosen_candidate = {"step_id": chosen_step_id, "source": "final_action_plan"}
+
+    rejected_candidate_ids: list[str] = []
+    rejected_model_step_id = response_metadata.get("rejected_model_step_id")
+    if isinstance(rejected_model_step_id, str) and rejected_model_step_id:
+        rejected_candidate_ids.append(rejected_model_step_id)
+    for reason in response_metadata.get("harness_validation_reasons", []):
+        if not isinstance(reason, str):
+            continue
+        prefix = "model_step_not_candidate:"
+        if reason.startswith(prefix):
+            rejected_candidate_ids.append(reason[len(prefix):])
+    rejected_candidates = [
+        {"step_id": step_id}
+        for step_id in _dedupe_strings(rejected_candidate_ids)
+    ]
+
+    final_source = final_plan.get("source")
+    repair_path = final_source if isinstance(final_source, str) and final_source != "model" else None
+    repair_applied = bool(response_metadata.get("repair_applied"))
+    if repair_path is None and repair_applied:
+        repair_path = "response_repair"
+    if repair_path is None and response_metadata.get("fallback_overlay_used") is True:
+        fallback_reason = response_metadata.get("fallback_overlay_reason")
+        repair_path = fallback_reason if isinstance(fallback_reason, str) and fallback_reason else "fallback_overlay"
+
+    message_category = _message_category_from_response(response)
+    vlm_call = _vlm_call_trace(vision_selection=vision_selection, vision_fact_context=vision_fact_context)
+    trace = {
+        "schema_version": "v1",
+        "evidence_packet_summary": dict(context.get("evidence_packet_summary", {})),
+        "candidates": candidates,
+        "chosen_candidate": chosen_candidate,
+        "rejected_candidates": rejected_candidates,
+        "model_decision": {
+            "step_id": model_step_id,
+            "overlay_targets": _help_response_overlay_targets(model_help_response),
+            "evidence_refs": _help_response_evidence_refs(model_help_response),
+            "status": response.status,
+            "generation_mode": response_metadata.get("generation_mode"),
+        },
+        "validator_result": {
+            "rejected": bool(response_metadata.get("validator_rejected")),
+            "reasons": list(response_metadata.get("harness_validation_reasons", []))
+            if isinstance(response_metadata.get("harness_validation_reasons"), list)
+            else [],
+            "rejected_model_step_id": rejected_model_step_id if isinstance(rejected_model_step_id, str) else None,
+            "fallback_overlay_used": bool(response_metadata.get("fallback_overlay_used")),
+            "fallback_overlay_reason": response_metadata.get("fallback_overlay_reason"),
+        },
+        "repair_result": {
+            "applied": repair_applied or repair_path is not None or response_metadata.get("generation_mode") == "repair",
+            "path": repair_path,
+            "json_repaired": bool(response_metadata.get("json_repaired")),
+            "evidence_ref_repair": dict(response_metadata.get("evidence_ref_repair", {}))
+            if isinstance(response_metadata.get("evidence_ref_repair"), Mapping)
+            else {},
+        },
+        "final_action_plan": final_plan,
+        "final_overlay_targets": final_targets,
+        "message_category": message_category,
+        "vlm_call": vlm_call,
+    }
+    response.metadata["message_category"] = message_category
+    response.metadata["vlm_call_status"] = vlm_call["status"]
+    response.metadata["vlm_call_reason"] = vlm_call["reason"]
+    response.metadata["final_overlay_targets"] = list(final_targets)
+    response.metadata["final_action_plan"] = dict(final_plan)
+    response.metadata["harness_trace"] = trace
+    return trace
 
 
 def _dedupe_strings(items: Iterable[str]) -> list[str]:
@@ -3774,23 +4030,27 @@ class LiveDcsTutorLoop:
             },
         )
 
-    def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
+    def _capture_model_raw_help_response(self, response: TutorResponse) -> None:
         metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
         raw_help_response = metadata.get("help_response")
-        if isinstance(raw_help_response, Mapping):
-            response.metadata.setdefault("model_raw_help_response", copy.deepcopy(dict(raw_help_response)))
-            raw_explanations = raw_help_response.get("explanations")
-            if isinstance(raw_explanations, list):
-                response.metadata.setdefault(
-                    "model_raw_explanations",
-                    [item for item in raw_explanations if isinstance(item, str)],
-                )
-            raw_next = raw_help_response.get("next")
-            if isinstance(raw_next, Mapping):
-                response.metadata.setdefault("model_raw_next", dict(raw_next))
-            raw_diagnosis = raw_help_response.get("diagnosis")
-            if isinstance(raw_diagnosis, Mapping):
-                response.metadata.setdefault("model_raw_diagnosis", dict(raw_diagnosis))
+        if not isinstance(raw_help_response, Mapping):
+            return
+        response.metadata.setdefault("model_raw_help_response", copy.deepcopy(dict(raw_help_response)))
+        raw_explanations = raw_help_response.get("explanations")
+        if isinstance(raw_explanations, list):
+            response.metadata.setdefault(
+                "model_raw_explanations",
+                [item for item in raw_explanations if isinstance(item, str)],
+            )
+        raw_next = raw_help_response.get("next")
+        if isinstance(raw_next, Mapping):
+            response.metadata.setdefault("model_raw_next", dict(raw_next))
+        raw_diagnosis = raw_help_response.get("diagnosis")
+        if isinstance(raw_diagnosis, Mapping):
+            response.metadata.setdefault("model_raw_diagnosis", dict(raw_diagnosis))
+
+    def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
+        self._capture_model_raw_help_response(response)
 
         final_public_response: dict[str, Any] = {
             "message": response.message,
@@ -5738,6 +5998,7 @@ class LiveDcsTutorLoop:
         response.metadata["vision_fact_summary"] = dict(vision_fact_context["vision_fact_summary"])
         response.metadata["vision_facts"] = list(vision_fact_context["vision_facts"])
         response.metadata["generation_mode"] = _normalize_generation_mode(response)
+        self._capture_model_raw_help_response(response)
 
         mapped_actions, mapped_meta = self._map_response_actions(response, request)
         response.actions = mapped_actions
@@ -5814,6 +6075,12 @@ class LiveDcsTutorLoop:
         response.metadata["fallback_overlay_reason"] = fallback_overlay_reason
         self._annotate_response_audit_metadata(response)
         _normalize_cached_response_metadata(response.metadata)
+        _build_harness_trace_metadata(
+            request=request,
+            response=response,
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
+        )
         response_audit_fields = _build_help_cycle_audit_fields(
             request=request,
             vision_selection=vision_selection,
@@ -5830,7 +6097,7 @@ class LiveDcsTutorLoop:
         trace_metadata = {
             "help_cycle_id": help_cycle_id,
             "generation_mode": response.metadata["generation_mode"],
-            **response_audit_fields,
+            **normalize_help_cycle_audit_fields(response.metadata),
         }
         response.actions = _attach_help_cycle_trace_to_actions(
             response.actions,
@@ -6025,10 +6292,16 @@ class LiveDcsTutorLoop:
                     response_audit_fields["vision_fallback_reason"],
                     stage="vision",
                 )
+            _build_harness_trace_metadata(
+                request=request,
+                response=response,
+                vision_selection=vision_selection,
+                vision_fact_context=vision_fact_context,
+            )
             trace_metadata = {
                 "help_cycle_id": help_cycle_id,
                 "generation_mode": response.metadata["generation_mode"],
-                **response_audit_fields,
+                **normalize_help_cycle_audit_fields(response.metadata),
             }
             response.actions = _attach_help_cycle_trace_to_actions(
                 response.actions,

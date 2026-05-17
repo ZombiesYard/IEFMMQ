@@ -50,6 +50,11 @@ def test_run_replay_eval_suite_oracle_emits_fixed_summary(tmp_path: Path) -> Non
     assert 0.0 <= summary["requires_visual_confirmation_accuracy"] <= 1.0
     assert summary["vision_unavailable_rate"] == 0.6
     assert summary["sync_failure_rate"] == 0.2
+    assert summary["message_category_evaluated_count"] == 0
+    assert summary["message_category_accuracy"] is None
+    assert summary["repair_path_evaluated_count"] == 0
+    assert summary["repair_path_accuracy"] is None
+    assert summary["harness_trace_coverage"] == 1.0
     assert len(report["cases"]) == 5
     assert {case["status"] for case in report["cases"]}.issubset({"passed", "failed"})
 
@@ -564,6 +569,184 @@ def test_extract_case_outcome_ignores_blank_diagnosis_step_id_and_falls_back_to_
 
     assert outcome["actual"]["step_id"] == "S04"
     assert outcome["checks"]["step_match"] is True
+
+
+def test_extract_case_outcome_checks_harness_trace_message_and_repair_path() -> None:
+    case = ReplayEvalCase(
+        case_id="trace-c1",
+        input_path=REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "cases" / "noop_2min" / "dcs_bios_raw.jsonl",
+        session_id="sess-trace-c1",
+        scenario_profile="airfield",
+        max_frames=2,
+        expectation=ReplayEvalExpectation(
+            step_id="S08",
+            overlay_target="left_mdi_pb15",
+            requires_visual_confirmation=True,
+            vision_status="ok",
+            sync_status="matched",
+            sync_delta_ms=12,
+            frame_ids=("frame-1",),
+            message_category="harness_validator_repair",
+            repair_path="validator_repair",
+        ),
+    )
+    events = [
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "context": {
+                    "vision": {
+                        "status": "ok",
+                        "sync_status": "matched",
+                        "sync_delta_ms": 12,
+                        "frame_ids": ["frame-1"],
+                    }
+                }
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "actions": [{"target": "left_mdi_pb15"}],
+                "metadata": {
+                    "diagnosis": {"step_id": "S08"},
+                    "requires_visual_confirmation": True,
+                    "generation_mode": "repair",
+                    "message_category": "harness_validator_repair",
+                    "harness_trace": {
+                        "schema_version": "v1",
+                        "message_category": "harness_validator_repair",
+                        "repair_result": {
+                            "applied": True,
+                            "path": "validator_repair",
+                        },
+                        "final_action_plan": {
+                            "source": "validator_repair",
+                            "targets": ["left_mdi_pb15"],
+                        },
+                        "vlm_call": {"status": "called", "reason": None},
+                    },
+                },
+            },
+        },
+    ]
+
+    outcome = _extract_case_outcome(events, case=case)
+
+    assert outcome["actual"]["message_category"] == "harness_validator_repair"
+    assert outcome["actual"]["repair_path"] == "validator_repair"
+    assert outcome["actual"]["harness_trace_present"] is True
+    assert outcome["actual"]["vlm_call_status"] == "called"
+    assert outcome["checks"]["message_category_match"] is True
+    assert outcome["checks"]["repair_path_match"] is True
+    assert outcome["status"] == "passed"
+
+
+def test_extract_case_outcome_keeps_legacy_event_without_trace_passed() -> None:
+    case = ReplayEvalCase(
+        case_id="legacy-c1",
+        input_path=REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "cases" / "noop_2min" / "dcs_bios_raw.jsonl",
+        session_id="sess-legacy-c1",
+        scenario_profile="airfield",
+        max_frames=2,
+        expectation=ReplayEvalExpectation(
+            step_id="S03",
+            overlay_target="apu_switch",
+            requires_visual_confirmation=False,
+            vision_status="vision_unavailable",
+            sync_status=None,
+            sync_delta_ms=None,
+            frame_ids=(),
+        ),
+    )
+    events = [
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "context": {
+                    "vision": {
+                        "status": "vision_unavailable",
+                        "sync_status": None,
+                        "sync_delta_ms": None,
+                        "frame_ids": [],
+                    }
+                }
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "actions": [{"target": "apu_switch"}],
+                "metadata": {
+                    "diagnosis": {"step_id": "S03"},
+                    "requires_visual_confirmation": False,
+                    "generation_mode": "model",
+                },
+            },
+        },
+    ]
+
+    outcome = _extract_case_outcome(events, case=case)
+
+    assert outcome["actual"]["harness_trace_present"] is False
+    assert outcome["status"] == "passed"
+
+
+def test_extract_case_outcome_fails_when_expected_message_category_mismatches() -> None:
+    case = ReplayEvalCase(
+        case_id="trace-mismatch-c1",
+        input_path=REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "cases" / "noop_2min" / "dcs_bios_raw.jsonl",
+        session_id="sess-trace-mismatch-c1",
+        scenario_profile="airfield",
+        max_frames=2,
+        expectation=ReplayEvalExpectation(
+            step_id="S08",
+            overlay_target="left_mdi_pb15",
+            requires_visual_confirmation=True,
+            vision_status="ok",
+            sync_status="matched",
+            sync_delta_ms=12,
+            frame_ids=("frame-1",),
+            message_category="harness_validator_repair",
+            repair_path="validator_repair",
+        ),
+    )
+    events = [
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "context": {
+                    "vision": {
+                        "status": "ok",
+                        "sync_status": "matched",
+                        "sync_delta_ms": 12,
+                        "frame_ids": ["frame-1"],
+                    }
+                }
+            },
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "actions": [{"target": "left_mdi_pb15"}],
+                "metadata": {
+                    "diagnosis": {"step_id": "S08"},
+                    "requires_visual_confirmation": True,
+                    "message_category": "model",
+                    "harness_trace": {
+                        "message_category": "model",
+                        "repair_result": {"path": "validator_repair"},
+                    },
+                },
+            },
+        },
+    ]
+
+    outcome = _extract_case_outcome(events, case=case)
+
+    assert outcome["checks"]["message_category_match"] is False
+    assert outcome["checks"]["repair_path_match"] is True
+    assert outcome["status"] == "failed"
 
 
 def test_run_replay_eval_suite_continues_after_case_error(tmp_path: Path) -> None:
