@@ -637,7 +637,7 @@ def test_openai_compat_dashscope_qwen35_uses_json_object_and_omits_max_tokens() 
     assert "chat_template_kwargs" not in request_payload
 
 
-def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_available(tmp_path: Path) -> None:
+def test_openai_compat_qwen35_keeps_help_text_only_when_multimodal_enabled_by_default(tmp_path: Path) -> None:
     primary_image = tmp_path / "trigger_frame.png"
     primary_image.write_bytes(b"primary-frame")
     pre_trigger_image = tmp_path / "pre_trigger_frame.png"
@@ -659,10 +659,44 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert res.status == "ok"
     assert res.metadata["multimodal_capability_enabled"] is True
     assert res.metadata["multimodal_input_present"] is True
-    assert res.metadata["main_help_multimodal_input_enabled"] is True
+    assert res.metadata["main_help_multimodal_input_enabled"] is False
     assert res.metadata["multimodal_candidate_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
     assert res.metadata["multimodal_primary_frame_id"] == "1772872444950_000122"
-    assert res.metadata["multimodal_frame_ids"] == ["1772872444950_000122", "1772872445010_000123"]
+    assert res.metadata["multimodal_frame_ids"] == []
+    assert res.metadata["multimodal_images_built"] is False
+    assert res.metadata["multimodal_image_count"] == 0
+    assert res.metadata["multimodal_path_attempted"] is False
+    assert res.metadata["multimodal_path_success"] is False
+    assert res.metadata["multimodal_fallback_to_text"] is False
+    request_payload = fake.calls[0]["json"]
+    assert request_payload["max_tokens"] == 384
+    assert request_payload["chat_template_kwargs"] == {"enable_thinking": False}
+    content = request_payload["messages"][1]["content"]
+    assert isinstance(content, str)
+
+
+def test_openai_compat_qwen35_sends_multimodal_images_when_help_explicitly_enabled(tmp_path: Path) -> None:
+    primary_image = tmp_path / "trigger_frame.png"
+    primary_image.write_bytes(b"primary-frame")
+    pre_trigger_image = tmp_path / "pre_trigger_frame.png"
+    pre_trigger_image.write_bytes(b"pre-trigger-frame")
+    valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
+    fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        lang="en",
+        enable_multimodal=True,
+        enable_help_multimodal=True,
+        allowed_local_image_roots=[tmp_path],
+    )
+    request = _request_help()
+    _attach_vision_context(request, primary_image=primary_image, pre_trigger_image=pre_trigger_image)
+
+    res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
+
+    assert res.status == "ok"
+    assert res.metadata["main_help_multimodal_input_enabled"] is True
     assert res.metadata["multimodal_images_built"] is True
     assert res.metadata["multimodal_image_count"] == 2
     assert res.metadata["multimodal_path_attempted"] is True
@@ -670,7 +704,6 @@ def test_openai_compat_qwen35_sends_multimodal_images_when_vision_context_is_ava
     assert res.metadata["multimodal_fallback_to_text"] is False
     request_payload = fake.calls[0]["json"]
     assert request_payload["max_tokens"] == 640
-    assert request_payload["chat_template_kwargs"] == {"enable_thinking": False}
     content = request_payload["messages"][1]["content"]
     assert isinstance(content, list)
     assert [item["type"] for item in content] == ["image_url", "image_url", "text"]
@@ -722,6 +755,7 @@ def test_openai_compat_dashscope_qwen35_multimodal_uses_json_object_and_omits_ma
         base_url="https://dashscope.aliyuncs.com/compatible-mode",
         lang="zh",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -752,6 +786,7 @@ def test_openai_compat_localizes_multimodal_frame_notes_for_zh(tmp_path: Path) -
         model_name="Qwen/Qwen3.5-27B",
         lang="zh",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -781,6 +816,7 @@ def test_openai_compat_multimodal_failure_falls_back_to_text_only_and_records_me
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -819,6 +855,7 @@ def test_openai_compat_multimodal_5xx_falls_back_to_text_only_and_records_metada
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -846,6 +883,7 @@ def test_openai_compat_does_not_fallback_to_text_only_for_non_multimodal_transpo
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -877,7 +915,12 @@ def test_openai_compat_keeps_multimodal_input_present_when_image_build_fails() -
     }
     valid_payload = _openai_chat_payload_from_help_obj(_help_obj_ok())
     fake = FakeClient(responses=[FakeResponse(valid_payload, status_code=200)])
-    model = OpenAICompatModel(client=fake, model_name="Qwen/Qwen3.5-27B", enable_multimodal=True)
+    model = OpenAICompatModel(
+        client=fake,
+        model_name="Qwen/Qwen3.5-27B",
+        enable_multimodal=True,
+        enable_help_multimodal=True,
+    )
 
     res = model.explain_error(Observation(source="mock", procedure_hint="S03"), request)
 
@@ -906,6 +949,7 @@ def test_openai_compat_falls_back_to_trigger_frame_when_resolved_frame_lacks_ima
         model_name="Qwen/Qwen3.5-27B",
         lang="en",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -934,6 +978,7 @@ def test_openai_compat_keeps_multimodal_when_primary_frame_file_is_missing(tmp_p
         model_name="Qwen/Qwen3.5-27B",
         lang="en",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -1023,6 +1068,7 @@ def test_openai_compat_retry_after_multimodal_rejection_stays_text_only(tmp_path
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
     )
     request = _request_help()
@@ -1049,6 +1095,7 @@ def test_openai_compat_rejects_local_image_path_outside_allowed_roots(tmp_path: 
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path / "allowed"],
     )
     request = _request_help()
@@ -1074,6 +1121,7 @@ def test_openai_compat_rejects_local_image_path_exceeding_size_limit(tmp_path: P
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
         allowed_local_image_roots=[tmp_path],
         max_local_image_bytes=8,
     )
@@ -1098,6 +1146,7 @@ def test_openai_compat_rejects_inline_data_urls_in_vision_context() -> None:
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
     )
     request = _request_help()
     request.context["vision"] = {
@@ -1133,6 +1182,7 @@ def test_openai_compat_rejects_remote_image_urls_in_vision_context() -> None:
         client=fake,
         model_name="Qwen/Qwen3.5-27B",
         enable_multimodal=True,
+        enable_help_multimodal=True,
     )
     request = _request_help()
     request.context["vision"] = {

@@ -218,6 +218,77 @@ def test_prompt_accepts_structured_candidate_steps_and_keeps_allowed_step_ids() 
     assert result.metadata["candidate_step_ids"] == ["S08", "S01"]
 
 
+def test_prompt_exposes_harness_decision_contract_and_packet() -> None:
+    ctx = _base_context()
+    ctx["candidate_steps"] = [
+        {
+            "step_id": "S08",
+            "source": "visual_anchor",
+            "role": "candidate",
+            "supporting_evidence_refs": ["VISION_FACTS.tac_page_visible@frame-1"],
+            "refuting_evidence_refs": ["VARS.battery_on"],
+            "confidence": 0.86,
+            "proposed_next_action_target_ids": ["left_mdi_pb18"],
+            "reason": "fresh VLM page anchors outrank bootstrap telemetry",
+        },
+        {
+            "step_id": "S01",
+            "source": "deterministic",
+            "role": "candidate_not_authoritative",
+            "supporting_evidence_refs": ["GATES.S01.completion"],
+            "refuting_evidence_refs": ["VISION_FACTS.tac_page_visible@frame-1"],
+            "confidence": 0.35,
+            "proposed_next_action_target_ids": ["battery_switch"],
+            "reason": "forward deterministic fallback",
+        },
+    ]
+    ctx["overlay_target_allowlist"] = ["battery_switch", "left_mdi_pb18"]
+    ctx["state_harness"] = {
+        "conflicts": ["early_step_from_telemetry_vs_late_display_from_vlm"],
+        "telemetry_evidence": {"source_status": "low_confidence_bootstrap"},
+        "vision_evidence": {
+            "source_status": "available",
+            "late_display_anchors": ["tac_page_visible"],
+            "visual_candidate_steps": ["S08", "S09"],
+        },
+        "deterministic_candidate": {"step_id": "S01", "role": "candidate_not_authoritative"},
+    }
+
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=20000, max_prompt_tokens_est=6000)
+    payload = _extract_prompt_constraints_json(result.prompt)
+
+    contract = payload["harness_decision_contract"]
+    assert contract["decision_schema"]["required"] == [
+        "chosen_step_id",
+        "diagnosis_category",
+        "rejected_candidates",
+        "conflict_resolution",
+        "next_action_intent",
+        "proposed_overlay_targets",
+        "evidence_refs",
+        "uncertainty_status",
+        "validator_repair_expected",
+    ]
+    assert contract["decision_schema"]["type"] == "object"
+    assert contract["decision_schema"]["additionalProperties"] is False
+    assert contract["decision_schema"]["properties"]["chosen_step_id"]["enum"] == ["S08", "S01"]
+    assert contract["decision_schema"]["properties"]["diagnosis_category"]["enum"]
+    assert contract["decision_schema"]["properties"]["rejected_candidates"]["items"]["required"] == [
+        "step_id",
+        "source",
+        "reason",
+    ]
+    assert contract["decision_schema"]["properties"]["proposed_overlay_targets"]["maxItems"] == 1
+    assert contract["public_output_schema"] == "TutorResponse via existing HelpResponse mapping"
+    assert payload["harness_packet"]["evidence_packet"] == "state_harness"
+    assert payload["harness_packet"]["step_candidates"] == "candidate_steps"
+    assert payload["harness_packet"]["gates"] == "gates_summary"
+    assert payload["harness_packet"]["recent_actions"] == "recent_actions_signal"
+    assert "HarnessDecision" in result.prompt
+    assert "adjudicate candidates" in result.prompt
+    assert "candidate_not_authoritative" in result.prompt
+
+
 def test_prompt_compact_template_keeps_minimal_structured_candidate_steps() -> None:
     ctx = _base_context()
     ctx["candidate_steps"] = [
@@ -237,9 +308,10 @@ def test_prompt_compact_template_keeps_minimal_structured_candidate_steps() -> N
         },
     ]
 
-    result = build_help_prompt_result(ctx, "en", max_prompt_chars=500, max_prompt_tokens_est=120)
+    result = build_help_prompt_result(ctx, "en", max_prompt_chars=900, max_prompt_tokens_est=220)
 
     assert "compact_template" in result.metadata["trim_reasons"]
+    assert "hard_truncate" not in result.metadata["trim_reasons"]
     constraints_line = next(line for line in result.prompt.splitlines() if line.startswith("constraints="))
     payload = json.loads(constraints_line[len("constraints=") :])
     assert payload["candidate_steps"][0] == {
@@ -251,6 +323,9 @@ def test_prompt_compact_template_keeps_minimal_structured_candidate_steps() -> N
     assert {
         item["step_id"] for item in payload["candidate_steps"]
     }.issubset(set(payload["allowed_step_ids"]))
+    assert "harness_decision_contract" in payload
+    assert payload["harness_decision_contract"]["decision_schema"]["type"] == "object"
+    assert payload["harness_packet"]["step_candidates"] == "candidate_steps"
 
 
 def test_prompt_exposes_single_target_policy_and_evidence_contract() -> None:

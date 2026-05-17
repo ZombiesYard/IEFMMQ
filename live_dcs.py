@@ -6048,7 +6048,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--model-enable-multimodal",
         dest="model_enable_multimodal",
         action="store_true",
-        help="Allow OpenAI-compatible models to send synchronized vision frames as multimodal image inputs.",
+        help="Enable synchronized vision-frame support for structured VLM facts; main help remains text-only.",
     )
     model_multimodal_group.add_argument(
         "--no-model-enable-multimodal",
