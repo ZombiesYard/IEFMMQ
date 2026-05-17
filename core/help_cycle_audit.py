@@ -18,6 +18,10 @@ HELP_CYCLE_AUDIT_FIELDS: tuple[str, ...] = (
     "fused_missing_conditions",
     "vision_fallback_reason",
     "layout_id",
+    "message_category",
+    "vlm_call_status",
+    "vlm_call_reason",
+    "final_overlay_targets",
 )
 
 

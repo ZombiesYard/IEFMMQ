@@ -18,6 +18,7 @@ from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.overlay.sender import DcsOverlaySender
 from adapters.openai_compat_model import OpenAICompatModel
 from adapters.step_inference import StepInferenceResult
+from adapters.vision_sync import HelpCycleVisionSelection
 from adapters.vision_fact_extractor import VisionFactExtractionResult
 from adapters.source_chunk_refs import build_source_chunk_ref
 from core.help_failure import ALLOWLIST_FAIL, EVIDENCE_FAIL
@@ -30,6 +31,7 @@ from live_dcs import (
     UdpHelpTrigger,
     _build_model_from_args,
     _build_observation_source_from_args,
+    _build_harness_trace_metadata,
     _build_procedural_action_hint,
     build_arg_parser,
     _build_vision_fact_extractor_from_model,
@@ -747,6 +749,18 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert tutor_request_payload["metadata"]["evidence_packet_summary"] == request.context["evidence_packet_summary"]
     assert request.context["overlay_target_allowlist"] == ["apu_switch"]
 
+    tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
+    response_meta = tutor_response_payload["metadata"]
+    trace = response_meta["harness_trace"]
+    assert trace["schema_version"] == "v1"
+    assert trace["evidence_packet_summary"] == request.context["evidence_packet_summary"]
+    assert trace["candidates"][0]["step_id"] == candidate_steps[0]["step_id"]
+    assert trace["model_decision"]["step_id"] == "S03"
+    assert trace["final_overlay_targets"] == ["apu_switch"]
+    assert trace["vlm_call"]["status"] in {"not_required", "skipped"}
+    assert response_meta["final_overlay_targets"] == ["apu_switch"]
+    assert response_meta["vlm_call_status"] == trace["vlm_call"]["status"]
+
     assert len(executor.calls) == 1
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
@@ -1414,12 +1428,23 @@ def test_live_loop_help_cycle_id_links_request_response_and_overlay_events(monke
         assert response_payload["metadata"]["help_cycle_id"] == help_cycle_id
         generation_mode = response_payload["metadata"]["generation_mode"]
         observed_generation_modes.append(generation_mode)
+        harness_trace = response_payload["metadata"]["harness_trace"]
+        assert harness_trace["schema_version"] == "v1"
+        assert harness_trace["final_overlay_targets"] == [
+            action["target"]
+            for action in response_payload["actions"]
+            if isinstance(action, dict) and isinstance(action.get("target"), str)
+        ]
+        assert harness_trace["validator_result"]["fallback_overlay_reason"]
+        assert response_payload["metadata"]["message_category"] == harness_trace["message_category"]
         assert response_events[0].metadata["generation_mode"] == generation_mode
         for event in cycle_events:
             if event.kind.startswith("overlay_"):
                 overlay_event_kinds.add(event.kind)
                 assert event.payload["help_cycle_id"] == help_cycle_id
                 assert event.metadata["generation_mode"] == generation_mode
+                assert event.metadata["final_overlay_targets"]
+                assert "harness_trace" not in event.metadata
 
     assert observed_generation_modes == ["model", "repair", "fallback"]
     assert "overlay_requested" in overlay_event_kinds
@@ -2051,6 +2076,15 @@ def test_live_loop_reuses_cached_result_for_same_state_within_cooldown(tmp_path:
     assert second_response_meta["request_prompt_hash"] == second_request_meta["prompt_hash"]
     assert second_response_meta["request_prompt_tokens_est"] == second_request_meta["prompt_tokens_est"]
     assert second_response_meta["request_prompt_trimmed"] == second_request_meta["prompt_trimmed"]
+    assert first_response_meta["harness_trace"]["schema_version"] == "v1"
+    assert second_response_meta["harness_trace"]["schema_version"] == "v1"
+    assert first_response_meta["help_cycle_id"] != second_response_meta["help_cycle_id"]
+    assert first_response_meta["harness_trace"]["final_overlay_targets"] == ["apu_switch"]
+    assert second_response_meta["harness_trace"]["final_overlay_targets"] == ["apu_switch"]
+    assert executor.calls[0][0]["help_cycle_id"] == first_response_meta["help_cycle_id"]
+    assert executor.calls[1][0]["help_cycle_id"] == second_response_meta["help_cycle_id"]
+    assert "harness_trace" not in executor.calls[0][0]
+    assert "harness_trace" not in executor.calls[1][0]
 
 
 def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: Path) -> None:
@@ -4729,6 +4763,111 @@ def test_s19_final_go_fresh_fact_suppresses_s19_fallback(tmp_path: Path) -> None
             "pitot_heater_switch",
         }
         assert loop._should_use_deterministic_overlay_fallback(response, request, None) is False
+    finally:
+        loop.close()
+
+
+def test_s19_final_go_trace_preserves_raw_model_step_before_guardrail(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s19_final_go_trace.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            request_id="cycle-s19-final-go",
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "candidate_steps": [
+                    {"step_id": "S19", "source": "deterministic"},
+                    {"step_id": "S20", "source": "visual_completion"},
+                ],
+                "evidence_packet_summary": {"vision_status": "available"},
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["fcsmc_final_go_result_visible"],
+                    "fresh_fact_ids": [],
+                    "not_seen_fact_ids": [],
+                },
+                "vars": {"probe_cycle_complete": True},
+                "gates": [
+                    {"gate_id": "S20.completion", "status": "blocked"},
+                    {"gate_id": "S20.precondition", "status": "allowed"},
+                ],
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S19",
+                    "missing_conditions": ["vision_facts.fcsmc_final_go_result_visible==seen"],
+                    "observability_status": "partial",
+                    "requires_visual_confirmation": True,
+                    "action_hint": {"targets": ["fcs_bit_switch", "right_mdi_pb5"]},
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="Keep holding FCS BIT.",
+            actions=[],
+            explanations=["Keep holding FCS BIT."],
+            metadata={
+                "generation_mode": "model",
+                "next": {"step_id": "S19"},
+                "help_response": {
+                    "diagnosis": {"step_id": "S19", "error_category": "CO"},
+                    "next": {"step_id": "S19"},
+                    "overlay": {"targets": ["fcs_bit_switch"], "evidence": []},
+                    "explanations": ["Keep holding FCS BIT."],
+                },
+            },
+        )
+
+        loop._capture_model_raw_help_response(response)
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+        loop._annotate_response_audit_metadata(response)
+        trace = _build_harness_trace_metadata(
+            request=request,
+            response=response,
+            vision_selection=HelpCycleVisionSelection(
+                status="available",
+                observation_ref=None,
+                observation_seq=None,
+                observation_t_wall_s=None,
+                observation_t_wall_ms=10000,
+                trigger_wall_ms=10000,
+                sync_window_ms=100,
+                vision_used=True,
+                frame_id="frame-s19-final-go",
+                sync_status="matched_exact",
+                sync_delta_ms=0,
+                frame_stale=False,
+                frame_ids=["frame-s19-final-go"],
+                selected_frames=[],
+                pre_trigger_frame=None,
+                trigger_frame=None,
+                sync_miss_reason=None,
+            ),
+            vision_fact_context={
+                "status": "available",
+                "vision_fact_summary": {
+                    "seen_fact_ids": ["fcsmc_final_go_result_visible"],
+                    "fresh_fact_ids": [],
+                    "frame_ids": ["frame-s19-final-go"],
+                },
+                "vision_facts": [],
+                "metadata": {"extractor_used": True},
+            },
+        )
+
+        assert rewritten is True
+        assert reason == "s19_final_go_complete"
+        assert response.metadata["next"]["step_id"] == "S20"
+        assert response.metadata["model_raw_help_response"]["next"]["step_id"] == "S19"
+        assert trace["model_decision"]["step_id"] == "S19"
+        assert trace["final_action_plan"]["step_id"] == "S20"
     finally:
         loop.close()
 

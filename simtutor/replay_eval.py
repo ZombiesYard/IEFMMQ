@@ -117,6 +117,8 @@ class ReplayEvalExpectation:
     sync_status: str | None
     sync_delta_ms: int | None
     frame_ids: tuple[str, ...]
+    message_category: str | None = None
+    repair_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -380,6 +382,16 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
             ),
             sync_delta_ms=_ensure_optional_int(expected.get("sync_delta_ms"), field_name=f"{case_id}.expected.sync_delta_ms"),
             frame_ids=_normalize_string_list(expected.get("frame_ids"), field_name=f"{case_id}.expected.frame_ids"),
+            message_category=(
+                _ensure_text(expected.get("message_category"), field_name=f"{case_id}.expected.message_category")
+                if expected.get("message_category") is not None
+                else None
+            ),
+            repair_path=(
+                _ensure_text(expected.get("repair_path"), field_name=f"{case_id}.expected.repair_path")
+                if expected.get("repair_path") is not None
+                else None
+            ),
         )
 
         vision = item.get("vision")
@@ -480,6 +492,9 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
     help_response = response_meta.get("help_response")
     if not isinstance(help_response, Mapping):
         help_response = {}
+    harness_trace = response_meta.get("harness_trace")
+    if not isinstance(harness_trace, Mapping):
+        harness_trace = {}
 
     diagnosis = response_meta.get("diagnosis")
     if not isinstance(diagnosis, Mapping):
@@ -505,6 +520,16 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
 
     diagnosis_step_id = _extract_optional_text(diagnosis.get("step_id"))
     next_step_id = _extract_optional_text(next_step.get("step_id"))
+    repair_result = harness_trace.get("repair_result")
+    if not isinstance(repair_result, Mapping):
+        repair_result = {}
+    vlm_call = harness_trace.get("vlm_call")
+    if not isinstance(vlm_call, Mapping):
+        vlm_call = {}
+    message_category = _extract_optional_text(response_meta.get("message_category"))
+    if message_category is None:
+        message_category = _extract_optional_text(harness_trace.get("message_category"))
+    repair_path = _extract_optional_text(repair_result.get("path"))
 
     actual = {
         "step_id": diagnosis_step_id or next_step_id,
@@ -521,6 +546,11 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
         else (),
         "generation_mode": response_meta.get("generation_mode"),
         "multimodal_fallback_to_text": _extract_optional_bool(response_meta.get("multimodal_fallback_to_text")),
+        "message_category": message_category,
+        "repair_path": repair_path,
+        "harness_trace_present": bool(harness_trace),
+        "vlm_call_status": _extract_optional_text(vlm_call.get("status")),
+        "vlm_call_reason": _extract_optional_text(vlm_call.get("reason")),
     }
     checks = {
         "step_match": actual["step_id"] == case.expectation.step_id,
@@ -532,6 +562,16 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
         "sync_status_match": actual["sync_status"] == case.expectation.sync_status,
         "sync_delta_ms_match": actual["sync_delta_ms"] == case.expectation.sync_delta_ms,
         "frame_ids_match": tuple(actual["frame_ids"]) == tuple(case.expectation.frame_ids),
+        "message_category_match": (
+            True
+            if case.expectation.message_category is None
+            else actual["message_category"] == case.expectation.message_category
+        ),
+        "repair_path_match": (
+            True
+            if case.expectation.repair_path is None
+            else actual["repair_path"] == case.expectation.repair_path
+        ),
     }
     fallback_used = bool(
         actual["generation_mode"] == "fallback" or actual["multimodal_fallback_to_text"] is True
@@ -546,6 +586,8 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
             "sync_status": case.expectation.sync_status,
             "sync_delta_ms": case.expectation.sync_delta_ms,
             "frame_ids": list(case.expectation.frame_ids),
+            "message_category": case.expectation.message_category,
+            "repair_path": case.expectation.repair_path,
         },
         "actual": {
             "step_id": actual["step_id"],
@@ -557,6 +599,11 @@ def _extract_case_outcome(events: Sequence[Mapping[str, Any]], *, case: ReplayEv
             "frame_ids": list(actual["frame_ids"]),
             "generation_mode": actual["generation_mode"],
             "multimodal_fallback_to_text": actual["multimodal_fallback_to_text"],
+            "message_category": actual["message_category"],
+            "repair_path": actual["repair_path"],
+            "harness_trace_present": actual["harness_trace_present"],
+            "vlm_call_status": actual["vlm_call_status"],
+            "vlm_call_reason": actual["vlm_call_reason"],
         },
         "checks": checks,
         "vision_sidecar_configured": case.vision is not None,
@@ -579,6 +626,11 @@ def _build_summary(case_results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "fallback_rate": 0.0,
             "vision_unavailable_rate": 0.0,
             "sync_failure_rate": 0.0,
+            "message_category_accuracy": 0.0,
+            "repair_path_accuracy": 0.0,
+            "harness_trace_coverage": 0.0,
+            "message_category_evaluated_count": 0,
+            "repair_path_evaluated_count": 0,
         }
 
     def _count(check: Callable[[Mapping[str, Any]], bool]) -> int:
@@ -591,6 +643,21 @@ def _build_summary(case_results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     fallback_count = _count(lambda item: bool(item.get("fallback_used")))
     vision_unavailable_count = _count(lambda item: bool(item.get("vision_unavailable")))
     sync_failure_count = _count(lambda item: bool(item.get("sync_failed")))
+    message_category_evaluated = _count(
+        lambda item: item.get("expected", {}).get("message_category") is not None
+    )
+    repair_path_evaluated = _count(
+        lambda item: item.get("expected", {}).get("repair_path") is not None
+    )
+    message_category_hits = _count(
+        lambda item: item.get("expected", {}).get("message_category") is not None
+        and bool(item.get("checks", {}).get("message_category_match"))
+    )
+    repair_path_hits = _count(
+        lambda item: item.get("expected", {}).get("repair_path") is not None
+        and bool(item.get("checks", {}).get("repair_path_match"))
+    )
+    harness_trace_count = _count(lambda item: bool(item.get("actual", {}).get("harness_trace_present")))
     return {
         "case_count": total,
         "passed_case_count": passed,
@@ -600,6 +667,19 @@ def _build_summary(case_results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "fallback_rate": round(fallback_count / total, 4),
         "vision_unavailable_rate": round(vision_unavailable_count / total, 4),
         "sync_failure_rate": round(sync_failure_count / total, 4),
+        "message_category_accuracy": (
+            round(message_category_hits / message_category_evaluated, 4)
+            if message_category_evaluated
+            else None
+        ),
+        "repair_path_accuracy": (
+            round(repair_path_hits / repair_path_evaluated, 4)
+            if repair_path_evaluated
+            else None
+        ),
+        "harness_trace_coverage": round(harness_trace_count / total, 4),
+        "message_category_evaluated_count": message_category_evaluated,
+        "repair_path_evaluated_count": repair_path_evaluated,
     }
 
 
@@ -626,6 +706,8 @@ def _error_case_result(
             "sync_status": case.expectation.sync_status,
             "sync_delta_ms": case.expectation.sync_delta_ms,
             "frame_ids": list(case.expectation.frame_ids),
+            "message_category": case.expectation.message_category,
+            "repair_path": case.expectation.repair_path,
         },
         "actual": {
             "step_id": None,
@@ -637,6 +719,11 @@ def _error_case_result(
             "frame_ids": [],
             "generation_mode": None,
             "multimodal_fallback_to_text": None,
+            "message_category": None,
+            "repair_path": None,
+            "harness_trace_present": False,
+            "vlm_call_status": None,
+            "vlm_call_reason": None,
         },
         "checks": {
             "step_match": False,
@@ -646,6 +733,8 @@ def _error_case_result(
             "sync_status_match": False,
             "sync_delta_ms_match": False,
             "frame_ids_match": False,
+            "message_category_match": False,
+            "repair_path_match": False,
         },
         "vision_sidecar_configured": case.vision is not None,
         "fallback_used": False,
