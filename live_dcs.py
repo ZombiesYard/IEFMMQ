@@ -2321,6 +2321,18 @@ def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | Non
     return None
 
 
+def _s08_visual_hint_from_evidence_refs(evidence_refs: Sequence[str]) -> tuple[str, str] | None:
+    for fact_id, target in (
+        ("supt_page_visible", "left_mdi_pb15"),
+        ("tac_page_visible", "left_mdi_pb18"),
+    ):
+        prefix = f"VISION_FACTS.{fact_id}"
+        for ref in evidence_refs:
+            if isinstance(ref, str) and (ref == prefix or ref.startswith(f"{prefix}@")):
+                return target, ref
+    return None
+
+
 def _build_procedural_action_hint(
     *,
     inferred_step_id: str | None,
@@ -5043,6 +5055,18 @@ class LiveDcsTutorLoop:
                 )
                 if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
                     evidence_refs = [s08_visual_hint_ref]
+        if inferred_step_id == "S08" and not s08_visual_hint_used:
+            evidence_hint = _s08_visual_hint_from_evidence_refs(evidence_refs)
+            if evidence_hint is not None:
+                evidence_target, evidence_ref = evidence_hint
+                action_hint = {
+                    "target": evidence_target,
+                    "reason": f"Visual evidence {evidence_ref} indicates S08 page navigation.",
+                }
+                s08_visual_hint_target = evidence_target
+                s08_visual_hint_ref = evidence_ref
+                s08_visual_hint_used = True
+                evidence_refs = [evidence_ref]
         manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         missing_conditions = hint.get("missing_conditions")
         missing_set = {
