@@ -3970,14 +3970,14 @@ def test_harness_validation_repairs_s08_selector_from_tac_evidence_ref(tmp_path:
                     {"gate_id": "S08.precondition", "status": "allowed"},
                 ],
                 "vision_facts": [
-                    {"fact_id": "tac_page_visible", "state": "not_seen", "source_frame_id": "frame-tac"},
+                    {"fact_id": "tac_page_visible", "state": "seen", "source_frame_id": "frame-tac"},
                     {"fact_id": "fcs_page_visible", "state": "not_seen", "source_frame_id": "frame-fcs"},
                 ],
                 "vision_fact_summary": {
                     "status": "available",
-                    "seen_fact_ids": [],
-                    "fresh_fact_ids": [],
-                    "not_seen_fact_ids": ["tac_page_visible", "fcs_page_visible"],
+                    "seen_fact_ids": ["tac_page_visible"],
+                    "fresh_fact_ids": ["tac_page_visible"],
+                    "not_seen_fact_ids": ["fcs_page_visible"],
                     "uncertain_fact_ids": [],
                 },
                 "deterministic_step_hint": {
@@ -4033,6 +4033,95 @@ def test_harness_validation_repairs_s08_selector_from_tac_evidence_ref(tmp_path:
         assert response.metadata["rejected_model_target"] == "left_mdi_brightness_selector"
         assert response.metadata["visual_hint_target"] == "left_mdi_pb18"
         assert response.metadata["visual_hint_evidence_ref"] == "VISION_FACTS.tac_page_visible@frame-tac"
+    finally:
+        loop.close()
+
+
+def test_harness_validation_does_not_trust_s08_tac_evidence_ref_when_fact_not_seen(
+    tmp_path: Path,
+) -> None:
+    replay_path = tmp_path / "bios_s08_visual_evidence_not_seen_keeps_power_hint.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="en",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "overlay_target_allowlist": list(loop.overlay_allowlist),
+                "gates": [
+                    {"gate_id": "S08.completion", "status": "blocked", "reason": "Left DDI must be powered."},
+                    {"gate_id": "S08.precondition", "status": "allowed"},
+                ],
+                "vision_facts": [
+                    {"fact_id": "tac_page_visible", "state": "not_seen", "source_frame_id": "frame-tac"},
+                    {"fact_id": "fcs_page_visible", "state": "not_seen", "source_frame_id": "frame-fcs"},
+                ],
+                "vision_fact_summary": {
+                    "status": "available",
+                    "seen_fact_ids": [],
+                    "fresh_fact_ids": [],
+                    "not_seen_fact_ids": ["tac_page_visible", "fcs_page_visible"],
+                    "uncertain_fact_ids": [],
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S08",
+                    "overlay_step_id": "S08",
+                    "missing_conditions": ["vars.left_ddi_on==true"],
+                    "gate_blockers": [],
+                    "observability_status": "observable",
+                    "step_evidence_requirements": ["visual", "gate"],
+                    "action_hint": {"target": "left_mdi_brightness_selector"},
+                },
+                "rag_topk": [],
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="The left DDI is showing TAC; navigate toward the FCS page.",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "left_mdi_brightness_selector",
+                    "element_id": "pnt_51",
+                }
+            ],
+            explanations=["The left DDI is showing TAC; navigate toward the FCS page."],
+            metadata={
+                "help_response": {
+                    "diagnosis": {"step_id": "S08", "error_category": "CO"},
+                    "next": {"step_id": "S08"},
+                    "overlay": {
+                        "targets": ["left_mdi_brightness_selector"],
+                        "evidence": [
+                            {
+                                "target": "left_mdi_brightness_selector",
+                                "type": "visual",
+                                "ref": "VISION_FACTS.tac_page_visible@frame-tac",
+                                "quote": "TAC visible.",
+                                "grounding_confidence": 0.9,
+                            }
+                        ],
+                    },
+                    "explanations": ["The left DDI is showing TAC; navigate toward the FCS page."],
+                }
+            },
+        )
+
+        _used, _reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert [action["target"] for action in response.actions] == ["left_mdi_brightness_selector"]
+        assert "s08_visual_hint_repair_applied" not in response.metadata
+        assert "visual_hint_target" not in response.metadata
     finally:
         loop.close()
 

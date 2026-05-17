@@ -2310,6 +2310,9 @@ def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | Non
         for item in vision_facts:
             if not isinstance(item, Mapping) or item.get("fact_id") != fact_id:
                 continue
+            state = item.get("state")
+            if isinstance(state, str) and state not in {"seen", "fresh"}:
+                continue
             frame_id = item.get("source_frame_id")
             return (
                 f"VISION_FACTS.{fact_id}@{frame_id}"
@@ -2321,15 +2324,60 @@ def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | Non
     return None
 
 
-def _s08_visual_hint_from_evidence_refs(evidence_refs: Sequence[str]) -> tuple[str, str] | None:
+def _s08_visual_hint_from_vision_summary(context: Mapping[str, Any]) -> tuple[str, str, str | None] | None:
+    for fact_id, target, reason in (
+        (
+            "supt_page_visible",
+            "left_mdi_pb15",
+            "VLM confirms SUPT is visible; press PB15 to enter the FCS page.",
+        ),
+        (
+            "tac_page_visible",
+            "left_mdi_pb18",
+            "VLM confirms TAC is visible; press PB18 to reach the SUPT page.",
+        ),
+    ):
+        if _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+            return target, reason, _visual_fact_ref_from_context(context, fact_id)
+    return None
+
+
+def _s08_visual_evidence_ref_for_target(evidence_refs: Sequence[str], target: str | None) -> str | None:
+    fact_id = _s08_visual_hint_fact_id_for_target(target)
+    if fact_id is None:
+        return None
+    prefix = f"VISION_FACTS.{fact_id}"
+    for ref in evidence_refs:
+        if isinstance(ref, str) and (ref == prefix or ref.startswith(f"{prefix}@")):
+            return ref
+    return None
+
+
+def _s08_visual_fact_ref_for_seen_target(
+    context: Mapping[str, Any],
+    evidence_refs: Sequence[str],
+    target: str | None,
+) -> str | None:
+    fact_id = _s08_visual_hint_fact_id_for_target(target)
+    if fact_id is None or not _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+        return None
+    return _s08_visual_evidence_ref_for_target(evidence_refs, target) or _visual_fact_ref_from_context(context, fact_id)
+
+
+def _s08_visual_hint_from_seen_evidence_refs(
+    context: Mapping[str, Any],
+    evidence_refs: Sequence[str],
+) -> tuple[str, str, str] | None:
     for fact_id, target in (
         ("supt_page_visible", "left_mdi_pb15"),
         ("tac_page_visible", "left_mdi_pb18"),
     ):
+        if not _vision_summary_seen_or_fresh(context.get("vision_fact_summary"), fact_id):
+            continue
         prefix = f"VISION_FACTS.{fact_id}"
         for ref in evidence_refs:
             if isinstance(ref, str) and (ref == prefix or ref.startswith(f"{prefix}@")):
-                return target, ref
+                return target, f"Visual evidence {ref} confirms S08 page navigation.", ref
     return None
 
 
@@ -5049,24 +5097,29 @@ class LiveDcsTutorLoop:
                 action_hint = visual_action_hint
                 s08_visual_hint_target = visual_target
                 s08_visual_hint_used = True
-                s08_visual_hint_ref = _visual_fact_ref_from_context(
+                s08_visual_hint_ref = _s08_visual_fact_ref_for_seen_target(
                     context,
-                    _s08_visual_hint_fact_id_for_target(visual_target),
+                    evidence_refs,
+                    visual_target,
                 )
                 if isinstance(s08_visual_hint_ref, str) and s08_visual_hint_ref:
                     evidence_refs = [s08_visual_hint_ref]
         if inferred_step_id == "S08" and not s08_visual_hint_used:
-            evidence_hint = _s08_visual_hint_from_evidence_refs(evidence_refs)
+            evidence_hint = _s08_visual_hint_from_seen_evidence_refs(context, evidence_refs)
+            summary_hint = _s08_visual_hint_from_vision_summary(context)
+            if evidence_hint is None and summary_hint is not None:
+                evidence_hint = summary_hint
             if evidence_hint is not None:
-                evidence_target, evidence_ref = evidence_hint
+                evidence_target, evidence_reason, evidence_ref = evidence_hint
                 action_hint = {
                     "target": evidence_target,
-                    "reason": f"Visual evidence {evidence_ref} indicates S08 page navigation.",
+                    "reason": evidence_reason,
                 }
                 s08_visual_hint_target = evidence_target
                 s08_visual_hint_ref = evidence_ref
                 s08_visual_hint_used = True
-                evidence_refs = [evidence_ref]
+                if isinstance(evidence_ref, str) and evidence_ref:
+                    evidence_refs = [evidence_ref]
         manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         missing_conditions = hint.get("missing_conditions")
         missing_set = {
