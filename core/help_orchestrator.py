@@ -1,9 +1,9 @@
 """
 Application-level help-cycle orchestration ports.
 
-The concrete live DCS loop wires these ports to adapters. Tests can wire fake
-ports, which keeps harness orchestration verifiable without DCS, model servers,
-or overlay transport.
+The concrete live runtime wires these ports to adapters. Tests can wire fake
+ports, which keeps harness orchestration verifiable without simulator runtime,
+model servers, or overlay transport.
 """
 
 from __future__ import annotations
