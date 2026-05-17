@@ -726,11 +726,27 @@ def _build_telemetry_window_digest(context: Mapping[str, Any]) -> TelemetryWindo
 def _build_vision_evidence(context: Mapping[str, Any]) -> VisionEvidence:
     summary_raw = context.get("vision_fact_summary")
     summary = summary_raw if isinstance(summary_raw, Mapping) else {}
+    source_status = _status_from_bool(summary.get("status")) if summary else "vision_unavailable"
+    frame_ids = _string_items(summary.get("frame_ids"))
+    if source_status == "vision_not_required":
+        return VisionEvidence(
+            source_status=source_status,
+            confidence="low",
+            freshness={"fresh_fact_ids": [], "frame_ids": list(frame_ids)},
+            seen_fact_ids=(),
+            not_seen_fact_ids=(),
+            uncertain_fact_ids=(),
+            fresh_fact_ids=(),
+            late_display_anchors=(),
+            visual_candidate_steps=(),
+            source_frame_ids=tuple(frame_ids),
+            facts=(),
+        )
+
     seen_ids = set(_string_items(summary.get("seen_fact_ids")))
     fresh_ids = set(_string_items(summary.get("fresh_fact_ids")))
     not_seen_ids = set(_string_items(summary.get("not_seen_fact_ids")))
     uncertain_ids = set(_string_items(summary.get("uncertain_fact_ids")))
-    frame_ids = _string_items(summary.get("frame_ids"))
 
     facts: list[dict[str, Any]] = []
     facts_raw = context.get("vision_facts")
@@ -766,7 +782,6 @@ def _build_vision_evidence(context: Mapping[str, Any]) -> VisionEvidence:
             facts.append(fact)
 
     late_anchors = sorted((seen_ids | fresh_ids).intersection(_late_display_anchor_fact_ids(context)))
-    source_status = _status_from_bool(summary.get("status")) if summary else "vision_unavailable"
     if source_status == "vision_unavailable" and facts:
         source_status = "available"
     return VisionEvidence(

@@ -1643,9 +1643,28 @@ def _build_help_cycle_audit_fields(
     vision_fact_extractor_used = (
         bool(vision_fact_metadata.get("extractor_used")) if isinstance(vision_fact_metadata, Mapping) else False
     )
+    vision_fact_cached_count = (
+        vision_fact_metadata.get("cached_fact_count")
+        if isinstance(vision_fact_metadata, Mapping) and isinstance(vision_fact_metadata.get("cached_fact_count"), int)
+        else 0
+    )
+    vision_fact_sticky_count = (
+        vision_fact_metadata.get("sticky_fact_count")
+        if isinstance(vision_fact_metadata, Mapping) and isinstance(vision_fact_metadata.get("sticky_fact_count"), int)
+        else 0
+    )
+    vision_fact_ignored_count = (
+        vision_fact_metadata.get("ignored_fact_count")
+        if isinstance(vision_fact_metadata, Mapping) and isinstance(vision_fact_metadata.get("ignored_fact_count"), int)
+        else 0
+    )
     return {
         "vision_used": bool(vision_selection.vision_used),
         "vision_fact_extractor_used": vision_fact_extractor_used,
+        "vision_frame_capture_selected": bool(vision_selection.frame_ids),
+        "vision_fact_cached_count": vision_fact_cached_count,
+        "vision_fact_sticky_count": vision_fact_sticky_count,
+        "vision_fact_ignored_count": vision_fact_ignored_count,
         "frame_id": vision_selection.frame_id,
         "sync_delta_ms": vision_selection.sync_delta_ms,
         "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
@@ -1800,6 +1819,21 @@ def _vlm_call_trace(
     status = vision_fact_context.get("status")
     metadata = vision_fact_context.get("metadata")
     extractor_used = bool(metadata.get("extractor_used")) if isinstance(metadata, Mapping) else False
+    ignored_fact_count = (
+        metadata.get("ignored_fact_count")
+        if isinstance(metadata, Mapping) and isinstance(metadata.get("ignored_fact_count"), int)
+        else 0
+    )
+    cached_fact_count = (
+        metadata.get("cached_fact_count")
+        if isinstance(metadata, Mapping) and isinstance(metadata.get("cached_fact_count"), int)
+        else 0
+    )
+    sticky_fact_count = (
+        metadata.get("sticky_fact_count")
+        if isinstance(metadata, Mapping) and isinstance(metadata.get("sticky_fact_count"), int)
+        else 0
+    )
     reason = metadata.get("reason") if isinstance(metadata, Mapping) else None
     if not isinstance(reason, str) or not reason:
         reason = vision_selection.sync_miss_reason if isinstance(vision_selection.sync_miss_reason, str) else None
@@ -1819,6 +1853,11 @@ def _vlm_call_trace(
         "vision_status": vision_selection.status,
         "vision_fact_status": status,
         "extractor_used": extractor_used,
+        "extractor_called": extractor_used,
+        "frame_capture_selected": bool(vision_selection.frame_ids),
+        "cached_fact_count": cached_fact_count,
+        "sticky_fact_count": sticky_fact_count,
+        "ignored_fact_count": ignored_fact_count,
         "frame_ids": list(vision_selection.frame_ids),
         "sync_status": vision_selection.sync_status,
         "sync_delta_ms": vision_selection.sync_delta_ms,
@@ -4095,32 +4134,24 @@ class LiveDcsTutorLoop:
         current_step_id = preliminary_inference.inferred_step_id
         if isinstance(current_step_id, str) and current_step_id:
             out.append(current_step_id)
-        current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
-
-        def _is_adjacent_visual_step(step_id: Any) -> bool:
-            if not isinstance(step_id, str) or not step_id:
-                return False
-            if step_id not in self.vision_priority_step_set:
-                return False
-            if step_id == current_step_id:
-                return True
-            step_idx = self._step_order_index.get(step_id)
-            if current_idx is None or step_idx is None:
-                return False
-            return abs(step_idx - current_idx) <= 1
 
         sticky_missing_has_visual_hold = any(
             isinstance(item, str) and item.startswith("vision_facts.")
             for item in self._sticky_inference_missing_conditions
         )
-        if sticky_missing_has_visual_hold and _is_adjacent_visual_step(self._sticky_inference_step_id):
-            sticky_step_id = self._sticky_inference_step_id
+        sticky_step_id = self._sticky_inference_step_id
+        sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
+        current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
+        if (
+            sticky_missing_has_visual_hold
+            and isinstance(sticky_step_id, str)
+            and sticky_step_id in self.vision_priority_step_set
+            and current_idx is not None
+            and sticky_idx is not None
+            and current_idx <= sticky_idx
+        ):
             if isinstance(sticky_step_id, str) and sticky_step_id not in out:
                 out.append(sticky_step_id)
-        if _is_adjacent_visual_step(self._last_inferred_step_id):
-            last_step_id = self._last_inferred_step_id
-            if isinstance(last_step_id, str) and last_step_id not in out:
-                out.append(last_step_id)
         return out
 
     def _should_extract_vision_facts_for_steps(self, step_ids: Sequence[str] | None) -> bool:
@@ -4144,23 +4175,31 @@ class LiveDcsTutorLoop:
             item for item in (active_step_ids or []) if isinstance(item, str) and item
         ]
         if active_step_ids is not None and not self._should_extract_vision_facts_for_steps(normalized_active_step_ids):
+            cached_facts = snapshot_to_list(self._vision_fact_snapshot)
+            sticky_fact_count = sum(1 for item in cached_facts if item.get("sticky") is True)
             summary = build_vision_fact_summary(
-                self._vision_fact_snapshot,
+                {},
                 status=VISION_NOT_REQUIRED,
                 frame_ids=vision_selection.frame_ids,
             )
             return {
                 "status": VISION_NOT_REQUIRED,
-                "vision_facts": snapshot_to_list(self._vision_fact_snapshot),
+                "vision_facts": [],
                 "vision_fact_summary": summary,
                 "metadata": {
                     "reason": "vision_not_required_for_step",
                     "active_step_ids": normalized_active_step_ids,
                     "vision_priority_steps": list(self.vision_priority_steps),
                     "extractor_used": False,
+                    "cached_fact_count": len(cached_facts),
+                    "sticky_fact_count": sticky_fact_count,
+                    "ignored_fact_count": len(cached_facts),
+                    "facts_ignored_reason": "current_step_not_visual_priority",
                 },
             }
         if self.vision_fact_extractor is None:
+            cached_facts = snapshot_to_list(self._vision_fact_snapshot)
+            sticky_fact_count = sum(1 for item in cached_facts if item.get("sticky") is True)
             summary = build_vision_fact_summary(
                 self._vision_fact_snapshot,
                 status="vision_unavailable",
@@ -4168,15 +4207,25 @@ class LiveDcsTutorLoop:
             )
             return {
                 "status": "vision_unavailable",
-                "vision_facts": snapshot_to_list(self._vision_fact_snapshot),
+                "vision_facts": cached_facts,
                 "vision_fact_summary": summary,
-                "metadata": {"reason": "vision_fact_extractor_unconfigured", "extractor_used": False},
+                "metadata": {
+                    "reason": "vision_fact_extractor_unconfigured",
+                    "extractor_used": False,
+                    "cached_fact_count": len(cached_facts),
+                    "sticky_fact_count": sticky_fact_count,
+                    "ignored_fact_count": 0,
+                },
             }
 
         vision_payload = vision_selection.to_dict()
         if isinstance(help_cycle_id, str) and help_cycle_id:
             vision_payload["help_cycle_id"] = help_cycle_id
             vision_payload["request_id"] = help_cycle_id
+        cached_facts_before_extract = snapshot_to_list(self._vision_fact_snapshot)
+        sticky_fact_count_before_extract = sum(
+            1 for item in cached_facts_before_extract if item.get("sticky") is True
+        )
         result = self.vision_fact_extractor.extract(
             vision_payload,
             session_id=self.vision_session_id,
@@ -4216,6 +4265,9 @@ class LiveDcsTutorLoop:
         metadata["extractor_used"] = True
         metadata["active_step_ids"] = normalized_active_step_ids
         metadata["vision_priority_steps"] = list(self.vision_priority_steps)
+        metadata["cached_fact_count"] = len(cached_facts_before_extract)
+        metadata["sticky_fact_count"] = sticky_fact_count_before_extract
+        metadata["ignored_fact_count"] = 0
         if result.error:
             metadata["error"] = result.error
         if merge_error is not None:
