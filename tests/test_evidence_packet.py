@@ -246,6 +246,45 @@ def test_step_candidates_represent_s19_fcsmc_visual_state_and_final_go_sticky_pr
     ]
 
 
+def test_step_candidates_suppress_sticky_visual_state_when_vision_not_required() -> None:
+    packet = build_evidence_packet(
+        {
+            "vision_fact_summary": {
+                "status": "vision_not_required",
+                "frame_ids": ["frame-s20"],
+                "fresh_fact_ids": [],
+                "seen_fact_ids": ["fcsmc_final_go_result_visible"],
+                "not_seen_fact_ids": [],
+                "uncertain_fact_ids": [],
+            },
+            "vision_facts": [
+                {
+                    "fact_id": "fcsmc_final_go_result_visible",
+                    "state": "seen",
+                    "sticky": True,
+                    "expires_after_ms": 600000,
+                }
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S20",
+                "overlay_step_id": "S20",
+                "requires_visual_confirmation": False,
+                "missing_conditions": ["vars.ext_refuel_probe_value>=60000"],
+            },
+        }
+    )
+
+    payload = packet.to_dict()
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+
+    assert payload["vision_evidence"]["source_status"] == "vision_not_required"
+    assert payload["vision_evidence"]["late_display_anchors"] == []
+    assert payload["vision_evidence"]["visual_candidate_steps"] == []
+    assert candidates[0]["step_id"] == "S20"
+    assert candidates[0]["source"] == "deterministic"
+    assert not any(item["source"] == "sticky_state" for item in candidates)
+
+
 def test_step_candidates_keep_four_down_deterministic_progression_when_telemetry_only() -> None:
     packet = build_evidence_packet(
         {

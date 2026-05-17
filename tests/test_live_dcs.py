@@ -7056,6 +7056,201 @@ def test_live_loop_skips_vision_fact_extractor_for_non_visual_step(tmp_path: Pat
     assert stats["vision_cycles"] == 0
 
 
+def test_live_loop_ignores_stale_s19_visual_facts_for_s20(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s20_ignores_stale_s19_vlm.jsonl"
+    frame = _bios_frame(1, 10.0, apu_switch=1)
+    frame["bios"]["EXT_REFUEL_PROBE_SW"] = 0
+    frame["delta"]["EXT_REFUEL_PROBE_SW"] = 0
+    _write_replay(replay_path, [frame])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-s20-no-vlm"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000321",
+                    capture_wall_ms=10000,
+                    frame_seq=321,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000321.png"),
+                )
+            ]
+
+    class FailingIfCalledVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):  # pragma: no cover
+            del vision, session_id, trigger_wall_ms
+            raise AssertionError("VLM extractor should not be called for S20")
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-s20-no-vlm",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-s20-no-vlm",
+        vision_mode="replay",
+        vision_fact_extractor=FailingIfCalledVisionFactExtractor(),
+    )
+    loop._infer_preliminary_step_for_vision_facts = lambda obs: StepInferenceResult(
+        "S20",
+        ("vars.ext_refuel_probe_value>=60000",),
+    )
+    loop._last_inferred_step_id = "S19"
+    loop._sticky_inference_step_id = "S19"
+    loop._sticky_inference_missing_conditions = ("vars.ext_refuel_probe_value>=60000",)
+    loop._vision_fact_snapshot = {
+        "fcsmc_final_go_result_visible": {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "state": "seen",
+            "source_frame_id": "old-s19-frame",
+            "sticky": True,
+            "expires_after_ms": 600000,
+            "observed_at_wall_ms": 9000,
+            "expires_at_wall_ms": 609000,
+            "evidence_note": "Stale FCS-MC GO result from S19.",
+        },
+        "fcs_page_visible": {
+            "fact_id": "fcs_page_visible",
+            "state": "seen",
+            "source_frame_id": "old-s08-frame",
+            "sticky": False,
+            "expires_after_ms": 600000,
+            "observed_at_wall_ms": 9000,
+            "expires_at_wall_ms": 609000,
+            "evidence_note": "Stale S08 page.",
+        },
+    }
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+        stats = loop.stats.to_dict()
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fact_status"] == "vision_not_required"
+    assert request.metadata["vision_fact_active_step_ids"] == ["S20"]
+    assert request.context["vision_facts"] == []
+    assert request.context["vision_fact_summary"]["seen_fact_ids"] == []
+    assert request.context["state_harness"]["vision_evidence"]["late_display_anchors"] == []
+    assert not any(
+        item["source"] in {"sticky_state", "visual_anchor"}
+        for item in request.context["candidate_steps"]
+    )
+    assert response.metadata["vlm_call_status"] == "not_required"
+    assert response.metadata["harness_trace"]["vlm_call"]["ignored_fact_count"] == 2
+    assert response.metadata["harness_trace"]["vlm_call"]["sticky_fact_count"] == 1
+    assert response.metadata["harness_trace"]["vlm_call"]["extractor_called"] is False
+    assert stats["vision_cycles"] == 0
+
+
+def test_live_loop_keeps_unresolved_visual_sticky_hold_for_regressed_preliminary_step(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_visual_sticky_regression.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-sticky-visual-regression",
+    )
+    try:
+        loop._sticky_inference_step_id = "S19"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcsmc_final_go_result_visible==seen",)
+
+        regressed = loop._active_step_ids_for_vision_facts(StepInferenceResult("S17", ()))
+        advanced = loop._active_step_ids_for_vision_facts(StepInferenceResult("S20", ()))
+    finally:
+        loop.close()
+
+    assert regressed == ["S17", "S19"]
+    assert advanced == ["S20"]
+
+
+def test_live_loop_ignores_stale_s19_visual_facts_for_s21(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s21_ignores_stale_s19_vlm.jsonl"
+    frame = _bios_frame(1, 10.0, apu_switch=1)
+    frame["bios"]["EXT_REFUEL_PROBE_SW"] = 65535
+    frame["delta"]["EXT_REFUEL_PROBE_SW"] = 65535
+    _write_replay(replay_path, [frame])
+
+    class FailingIfCalledVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):  # pragma: no cover
+            del vision, session_id, trigger_wall_ms
+            raise AssertionError("VLM extractor should not be called for S21")
+
+        def close(self) -> None:
+            return
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-s21-no-vlm",
+        vision_fact_extractor=FailingIfCalledVisionFactExtractor(),
+    )
+    loop._infer_preliminary_step_for_vision_facts = lambda obs: StepInferenceResult(
+        "S21",
+        ("vars.ext_refuel_probe_value==0",),
+    )
+    loop._last_inferred_step_id = "S19"
+    loop._sticky_inference_step_id = "S19"
+    loop._sticky_inference_missing_conditions = ("vars.ext_refuel_probe_value==0",)
+    loop._vision_fact_snapshot = {
+        "fcsmc_final_go_result_visible": {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "state": "seen",
+            "source_frame_id": "old-s19-frame",
+            "sticky": True,
+            "expires_after_ms": 600000,
+            "observed_at_wall_ms": 9000,
+            "expires_at_wall_ms": 609000,
+            "evidence_note": "Stale FCS-MC GO result from S19.",
+        }
+    }
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fact_status"] == "vision_not_required"
+    assert request.metadata["vision_fact_active_step_ids"] == ["S21"]
+    assert request.context["vision_facts"] == []
+    assert not any(
+        item["source"] in {"sticky_state", "visual_anchor"}
+        for item in request.context["candidate_steps"]
+    )
+    assert response.metadata["vlm_call_status"] == "not_required"
+    assert response.metadata["harness_trace"]["vlm_call"]["ignored_fact_count"] == 1
+
+
 def test_live_loop_calls_vision_fact_extractor_for_s08_and_merges_facts(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s08_uses_vlm.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
