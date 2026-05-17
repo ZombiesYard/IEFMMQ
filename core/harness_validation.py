@@ -26,6 +26,7 @@ class HarnessActionPlan:
     validator_rejected: bool
     repair_applied: bool
     rejected_model_step_id: str | None
+    rejected_model_targets: tuple[str, ...]
     final_action_plan_source: str
     reasons: tuple[str, ...]
 
@@ -261,6 +262,7 @@ def plan_harness_action(
             validator_rejected=True,
             repair_applied=True,
             rejected_model_step_id=rejected_model_step_id,
+            rejected_model_targets=(),
             final_action_plan_source=text_guidance.source,
             reasons=tuple((*reasons, f"text_only_guidance:{text_guidance.target}")),
         )
@@ -295,6 +297,14 @@ def plan_harness_action(
         max_overlay_targets=max_overlay_targets,
     )
     reasons.extend(target_reasons)
+    rejected_model_targets: tuple[str, ...] = ()
+    if use_hint and proposed_targets:
+        hinted_target_set = set(hinted_targets)
+        rejected_model_targets = tuple(
+            target for target in proposed_targets
+            if target not in hinted_target_set
+        )
+        reasons.extend(f"action_hint_target_mismatch:{target}" for target in rejected_model_targets)
 
     if not targets and spec is not None and spec.allowed_overlay_targets and max_overlay_targets > 0:
         repaired_targets, repair_reasons = _filter_targets(
@@ -340,6 +350,7 @@ def plan_harness_action(
         validator_rejected=rejected,
         repair_applied=repaired,
         rejected_model_step_id=rejected_model_step_id,
+        rejected_model_targets=rejected_model_targets,
         final_action_plan_source=source,
         reasons=tuple(reasons),
     )

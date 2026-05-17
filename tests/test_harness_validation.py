@@ -233,3 +233,33 @@ def test_plan_harness_action_rejects_overlay_for_disabled_spec_even_with_unrelat
     assert plan.targets == ()
     assert plan.validator_rejected is True
     assert "target_not_allowed:battery_switch" in plan.reasons
+
+
+def test_plan_harness_action_records_rejected_target_when_action_hint_repairs_s08() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S08": _spec(
+                "S08",
+                ("left_mdi_brightness_selector", "left_mdi_pb18", "left_mdi_pb15"),
+            )
+        },
+        inferred_step_id="S08",
+        model_step_id="S08",
+        proposed_overlay_targets=["left_mdi_brightness_selector"],
+        candidate_step_ids=["S08"],
+        runtime_overlay_targets=["left_mdi_brightness_selector", "left_mdi_pb18", "left_mdi_pb15"],
+        request_overlay_targets=["left_mdi_brightness_selector", "left_mdi_pb18", "left_mdi_pb15"],
+        allowed_evidence_refs=["VISION_FACTS.supt_page_visible@frame-1"],
+        evidence_refs=["VISION_FACTS.supt_page_visible@frame-1"],
+        max_overlay_targets=1,
+        vision_seen_fact_ids=["supt_page_visible", "bit_root_page_visible"],
+        action_hint={"target": "left_mdi_pb15", "reason": "SUPT is visible; press PB15."},
+        action_hint_step_ids=["S08"],
+    )
+
+    assert plan.targets == ("left_mdi_pb15",)
+    assert plan.repair_applied is True
+    assert plan.validator_rejected is True
+    assert plan.final_action_plan_source == "validator_action_hint"
+    assert plan.rejected_model_targets == ("left_mdi_brightness_selector",)
+    assert "action_hint_target_mismatch:left_mdi_brightness_selector" in plan.reasons
