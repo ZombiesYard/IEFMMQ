@@ -4879,6 +4879,153 @@ def test_action_hint_overlay_override_uses_split_s26_pitot_target() -> None:
         loop.close()
 
 
+def test_harness_validation_action_plan_records_s26_repair_metadata() -> None:
+    response = TutorResponse(
+        message="Extend the refuel probe.",
+        explanations=["Extend the refuel probe."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "refuel_probe_switch",
+                "element_id": "pnt_341",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S26"},
+            "diagnosis": {"step_id": "S26", "error_category": "OM"},
+            "help_response": {
+                "diagnosis": {"step_id": "S26", "error_category": "OM"},
+                "next": {"step_id": "S26"},
+                "overlay": {
+                    "targets": ["refuel_probe_switch"],
+                    "evidence": [
+                        {
+                            "target": "refuel_probe_switch",
+                            "type": "gate",
+                            "ref": "GATES.S26.completion",
+                            "quote": "blocked",
+                        }
+                    ],
+                },
+                "explanations": ["Extend the refuel probe."],
+            },
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": ["refuel_probe_switch", "pitot_heater_switch"],
+            "gates": [
+                {"gate_id": "S26.completion", "status": "blocked"},
+                {"gate_id": "S26.precondition", "status": "allowed"},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S26",
+                "overlay_step_id": "S26",
+                "requires_visual_confirmation": False,
+                "step_evidence_requirements": ["gate"],
+                "action_hint": {"target": "pitot_heater_switch", "reason": "Turn pitot heat ON."},
+            },
+            "rag_topk": [],
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=2,
+    )
+    try:
+        request.context["overlay_target_allowlist"] = list(loop.overlay_allowlist)
+
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "deterministic_step:S26"
+        assert response.actions[0]["target"] == "pitot_heater_switch"
+        assert response.metadata["validator_rejected"] is True
+        assert response.metadata["repair_applied"] is True
+        assert response.metadata["final_action_plan_source"] == "validator_action_hint"
+        assert response.metadata["harness_validator_fallback_reason"] == "deterministic_step:S26"
+    finally:
+        loop.close()
+
+
+def test_harness_validation_action_plan_rewrites_manual_throttle_to_text_only() -> None:
+    response = TutorResponse(
+        message="Highlight throttle.",
+        explanations=["Highlight throttle."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "throttle_quadrant_reference",
+                "element_id": "pnt_throttle",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S11"},
+            "diagnosis": {"step_id": "S11", "error_category": "OM"},
+            "help_response": {
+                "diagnosis": {"step_id": "S11", "error_category": "OM"},
+                "next": {"step_id": "S11"},
+                "overlay": {
+                    "targets": ["throttle_quadrant_reference"],
+                    "evidence": [
+                        {
+                            "target": "throttle_quadrant_reference",
+                            "type": "gate",
+                            "ref": "GATES.S11.completion",
+                            "quote": "blocked",
+                        }
+                    ],
+                },
+                "explanations": ["Highlight throttle."],
+            },
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": ["throttle_quadrant_reference"],
+            "gates": [{"gate_id": "S11.completion", "status": "blocked"}],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S11",
+                "overlay_step_id": "S11",
+                "missing_conditions": ["vars.throttle_l_idle_complete==true"],
+            },
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "manual_throttle_keyboard_guidance"
+        assert response.actions == []
+        assert "Right Alt+Home" in response.message
+        assert response.metadata["validator_rejected"] is True
+        assert response.metadata["repair_applied"] is True
+        assert response.metadata["final_action_plan_source"] == "validator_text_only_guidance"
+    finally:
+        loop.close()
+
+
 def test_resolve_overlay_step_id_does_not_advance_partial_visual_hold_steps() -> None:
     assert _resolve_overlay_step_id(
         "S18",
