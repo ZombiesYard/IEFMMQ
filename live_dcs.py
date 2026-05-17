@@ -6544,6 +6544,27 @@ def _new_default_log_path() -> Path:
     return Path("logs") / f"live_dcs_{ts}.jsonl"
 
 
+def _unique_log_path_candidates(requested_path: str | Path) -> Iterable[Path]:
+    path = Path(requested_path).expanduser()
+    yield path
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    stem = path.stem or "live_dcs"
+    suffix = path.suffix
+    yield path.with_name(f"{stem}_{timestamp}{suffix}")
+    for index in range(2, 1000):
+        yield path.with_name(f"{stem}_{timestamp}_{index}{suffix}")
+
+
+def _open_unique_event_store(requested_path: str | Path) -> tuple[Path, JsonlEventStore]:
+    for candidate in _unique_log_path_candidates(requested_path):
+        try:
+            return candidate, JsonlEventStore(candidate, mode="x")
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"could not resolve unique log path for {requested_path}")
+
+
 def _build_observation_source_from_args(args: argparse.Namespace) -> ObservationSource:
     if args.replay_bios:
         return ReplayBiosReceiver(args.replay_bios, speed=args.speed)
@@ -6919,27 +6940,41 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_arg_parser().parse_args(list(argv) if argv is not None else None)
 
-    output = Path(args.output) if args.output else _new_default_log_path()
-    output.parent.mkdir(parents=True, exist_ok=True)
+    requested_output = Path(args.output) if args.output else _new_default_log_path()
+    output, store = _open_unique_event_store(requested_output)
+    print(f"[LIVE_DCS] resolved output path: {output}")
 
-    source = _build_observation_source_from_args(args)
+    with store:
+        source = _build_observation_source_from_args(args)
 
-    model = _build_model_from_args(args)
-    vision_port, vision_session_id, vision_sync_window_ms, vision_trigger_wait_ms = _build_vision_port_from_args(
-        args,
-        mode="live",
-    )
-    vision_capture_notifier = (
-        UdpVisionCaptureNotifier(
-            session_id=vision_session_id,
-            host=args.vision_capture_trigger_host,
-            port=args.vision_capture_trigger_port,
+        model = _build_model_from_args(args)
+        vision_port, vision_session_id, vision_sync_window_ms, vision_trigger_wait_ms = _build_vision_port_from_args(
+            args,
+            mode="live",
         )
-        if vision_session_id and int(args.vision_capture_trigger_port) > 0
-        else None
-    )
-
-    with JsonlEventStore(output, mode="w") as store:
+        vision_capture_notifier = (
+            UdpVisionCaptureNotifier(
+                session_id=vision_session_id,
+                host=args.vision_capture_trigger_host,
+                port=args.vision_capture_trigger_port,
+            )
+            if vision_session_id and int(args.vision_capture_trigger_port) > 0
+            else None
+        )
+        store.append(
+            Event(
+                kind="system",
+                payload={
+                    "event": "live_dcs_runtime_log",
+                    "requested_output_path": str(requested_output),
+                    "resolved_output_path": str(output),
+                },
+                metadata={
+                    "requested_output_path": str(requested_output),
+                    "resolved_output_path": str(output),
+                },
+            )
+        )
         executor = OverlayActionExecutor(
             ui_map_path=args.ui_map,
             pack_path=args.pack,

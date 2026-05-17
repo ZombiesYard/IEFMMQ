@@ -356,6 +356,15 @@ def _run_replay_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_extract_live_fixture(args: argparse.Namespace) -> int:
+    from core.live_replay_fixture import extract_live_replay_fixture_from_jsonl, write_live_replay_fixture
+
+    fixture = extract_live_replay_fixture_from_jsonl(args.input, request_id=args.request_id)
+    output_path = write_live_replay_fixture(fixture, output=args.output, output_dir=args.output_dir)
+    print(f"[EXTRACT_LIVE_FIXTURE] wrote {output_path}")
+    return 0
+
+
 def _sanitize_participant_slug(raw: str) -> str:
     """Return a safe directory name from a participant identifier."""
     # Discard any path component; only use the terminal name.
@@ -680,6 +689,22 @@ def main() -> int:
     )
     rec_vlm.set_defaults(merge_full_state=True)
 
+    extract_fixture = sub.add_parser(
+        "extract-live-fixture",
+        help="Extract one live help cycle from a JSONL log into a replay/debug fixture",
+    )
+    extract_fixture.add_argument("--input", required=True, help="Live JSONL runtime log path")
+    extract_fixture.add_argument(
+        "--request-id",
+        "--help-cycle-id",
+        dest="request_id",
+        required=True,
+        help="Live help request_id/help_cycle_id to extract",
+    )
+    extract_output = extract_fixture.add_mutually_exclusive_group(required=True)
+    extract_output.add_argument("--output", help="Fixture JSON output path")
+    extract_output.add_argument("--output-dir", help="Directory for <request_id>.fixture.json")
+
     rep_eval = sub.add_parser("replay-eval", help="Run fixed replay regression suite and emit a stable report")
     rep_eval.add_argument(
         "--suite",
@@ -775,6 +800,12 @@ def main() -> int:
             return _run_record_vlm(args)
         except Exception as exc:
             print(f"[RECORD_VLM] error: {exc}")
+            return 1
+    if args.command == "extract-live-fixture":
+        try:
+            return _run_extract_live_fixture(args)
+        except Exception as exc:
+            print(f"[EXTRACT_LIVE_FIXTURE] error: {exc}")
             return 1
     if args.command == "replay-eval":
         try:
