@@ -38,9 +38,13 @@ def test_pack_bios_to_ui_covers_cold_start_step_keys() -> None:
         "LEFT_DDI_PB_15": ["left_mdi_pb15"],
         "LEFT_DDI_PB_18": ["left_mdi_pb18"],
         "LEFT_DDI_BRT_SELECT": ["left_mdi_brightness_selector"],
+        "LEFT_DDI_BRT_CTL": ["left_mdi_brightness_control"],
+        "LEFT_DDI_CONT_CTL": ["left_mdi_contrast_control"],
         "RIGHT_DDI_PB_05": ["right_mdi_pb5"],
         "RIGHT_DDI_PB_18": ["right_mdi_pb18"],
         "RIGHT_DDI_BRT_SELECT": ["right_mdi_brightness_selector"],
+        "RIGHT_DDI_BRT_CTL": ["right_mdi_brightness_control"],
+        "RIGHT_DDI_CONT_CTL": ["right_mdi_contrast_control"],
         "COMM1_CHANNEL_NUMERIC": [
             "ufc_comm1_channel_selector_rotate",
             "ufc_comm1_channel_selector_pull",

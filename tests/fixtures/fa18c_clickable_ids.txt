@@ -37,9 +37,13 @@ pnt_470
 pnt_47_122
 pnt_504
 pnt_51
+pnt_52
+pnt_53
 pnt_58
 pnt_68
 pnt_72
 pnt_76
+pnt_77
+pnt_78
 pnt_83
 pnt_96

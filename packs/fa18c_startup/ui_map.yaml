@@ -112,25 +112,65 @@ cockpit_elements:
   left_mdi_brightness_selector:
     description: "Left MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_51"
-    aliases: ["Left MDI Brightness Selector", "LEFT_DDI_BRT_SELECT", "LEFT_DDI_BRT_CTL"]
+    aliases: ["Left MDI Brightness Selector", "LEFT_DDI_BRT_SELECT"]
     panel_area: "left_instrument_panel"
     interaction:
       click_type: "right"
       detent_direction: "counter_clockwise"
     interaction_hint:
-      zh: "左 MDI 亮度：右键到下一挡。"
-      en: "Left MDI brightness: right-click to the next detent."
+      zh: "左 MDI OFF/NIGHT/DAY 选择旋钮：右键到下一挡。"
+      en: "Left MDI OFF/NIGHT/DAY selector: right-click to the next detent."
+  left_mdi_brightness_control:
+    description: "Left MDI Brightness Control Knob"
+    dcs_id: "pnt_52"
+    aliases: ["Left MDI Brightness Control Knob", "LEFT_DDI_BRT_CTL"]
+    panel_area: "left_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "左 MDI 亮度微调：滚轮向上增加亮度。"
+      en: "Left MDI brightness control: mouse-wheel up increases brightness."
+  left_mdi_contrast_control:
+    description: "Left MDI Contrast Control Knob"
+    dcs_id: "pnt_53"
+    aliases: ["Left MDI Contrast Control Knob", "LEFT_DDI_CONT_CTL"]
+    panel_area: "left_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "左 MDI 对比度微调：滚轮向上增加对比度。"
+      en: "Left MDI contrast control: mouse-wheel up increases contrast."
   right_mdi_brightness_selector:
     description: "Right MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_76"
-    aliases: ["Right MDI Brightness Selector", "RIGHT_DDI_BRT_SELECT", "RIGHT_DDI_BRT_CTL"]
+    aliases: ["Right MDI Brightness Selector", "RIGHT_DDI_BRT_SELECT"]
     panel_area: "right_instrument_panel"
     interaction:
       click_type: "right"
       detent_direction: "counter_clockwise"
     interaction_hint:
-      zh: "右 MDI 亮度：右键到下一挡。"
-      en: "Right MDI brightness: right-click to the next detent."
+      zh: "右 MDI OFF/NIGHT/DAY 选择旋钮：右键到下一挡。"
+      en: "Right MDI OFF/NIGHT/DAY selector: right-click to the next detent."
+  right_mdi_brightness_control:
+    description: "Right MDI Brightness Control Knob"
+    dcs_id: "pnt_77"
+    aliases: ["Right MDI Brightness Control Knob", "RIGHT_DDI_BRT_CTL"]
+    panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "右 MDI 亮度微调：滚轮向上增加亮度。"
+      en: "Right MDI brightness control: mouse-wheel up increases brightness."
+  right_mdi_contrast_control:
+    description: "Right MDI Contrast Control Knob"
+    dcs_id: "pnt_78"
+    aliases: ["Right MDI Contrast Control Knob", "RIGHT_DDI_CONT_CTL"]
+    panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "右 MDI 对比度微调：滚轮向上增加对比度。"
+      en: "Right MDI contrast control: mouse-wheel up increases contrast."
   ampcd_off_brightness_knob:
     description: "AMPCD Off/Brightness Control Knob"
     dcs_id: "pnt_203"

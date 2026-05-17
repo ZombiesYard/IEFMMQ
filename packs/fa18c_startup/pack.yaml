@@ -73,7 +73,11 @@ ui_targets:
   - bleed_air_knob
   - lights_test_button
   - left_mdi_brightness_selector
+  - left_mdi_brightness_control
+  - left_mdi_contrast_control
   - right_mdi_brightness_selector
+  - right_mdi_brightness_control
+  - right_mdi_contrast_control
   - ampcd_off_brightness_knob
   - hud_symbology_brightness_knob
   - left_mdi_pb5
