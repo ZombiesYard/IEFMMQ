@@ -143,7 +143,9 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
         StdinHelpTrigger,
         UdpHelpTrigger,
         _build_vision_port_from_args,
+        _emit_multi_target_overlay_config_warning,
     )
+    from adapters.dcs.overlay.config import simtutor_config_path_from_saved_games_dir
 
     output = Path(args.output) if args.output else _new_replay_bios_log_path()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -163,6 +165,13 @@ def _run_replay_bios(args: argparse.Namespace) -> int:
             mode="replay",
         )
         with JsonlEventStore(output, mode="w") as store:
+            if not bool(args.dry_run_overlay):
+                _emit_multi_target_overlay_config_warning(
+                    max_overlay_targets=max(0, int(args.max_overlay_targets)),
+                    config_path=simtutor_config_path_from_saved_games_dir(args.vision_saved_games_dir),
+                    event_sink=store.append,
+                    prefix="[REPLAY_BIOS]",
+                )
             with OverlayActionExecutor(
                 ui_map_path=args.ui_map,
                 pack_path=args.pack,

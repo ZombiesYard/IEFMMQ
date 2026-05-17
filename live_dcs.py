@@ -21,6 +21,10 @@ from uuid import UUID, uuid4
 import yaml
 
 from adapters.action_executor import OverlayActionExecutor
+from adapters.dcs.overlay.config import (
+    build_multi_target_overlay_config_warning,
+    simtutor_config_path_from_saved_games_dir,
+)
 from adapters.dcs_bios.bios_ui_map import BiosUiMapper
 from adapters.dcs_bios.receiver import DcsBiosRawReceiver, DcsBiosReceiver
 from adapters.dcs.tutor_text import DcsTutorTextSender
@@ -2999,6 +3003,36 @@ class UdpVisionCaptureNotifier:
             self._sock.close()
         except OSError:
             pass
+
+
+def _emit_multi_target_overlay_config_warning(
+    *,
+    max_overlay_targets: int,
+    config_path: Path | None = None,
+    event_sink: Callable[[Event], None] | None = None,
+    prefix: str = "[LIVE_DCS]",
+) -> str | None:
+    warning = build_multi_target_overlay_config_warning(
+        max_overlay_targets=max_overlay_targets,
+        config_path=config_path,
+    )
+    if warning is None:
+        return None
+
+    print(f"{prefix} WARNING: {warning}")
+    if event_sink is not None:
+        event_sink(
+            Event(
+                kind="system",
+                payload={
+                    "event": "overlay_config_warning",
+                    "warning": warning,
+                    "max_overlay_targets": max(0, int(max_overlay_targets)),
+                    "config_path": str(config_path) if config_path is not None else None,
+                },
+            )
+        )
+    return warning
 
 
 class LiveDcsTutorLoop:
@@ -7126,6 +7160,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "resolved_output_path": str(output),
                 },
             )
+        )
+        _emit_multi_target_overlay_config_warning(
+            max_overlay_targets=max(0, int(args.max_overlay_targets)),
+            config_path=simtutor_config_path_from_saved_games_dir(args.vision_saved_games_dir),
+            event_sink=store.append,
         )
         executor = OverlayActionExecutor(
             ui_map_path=args.ui_map,
