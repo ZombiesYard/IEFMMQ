@@ -5136,8 +5136,6 @@ class LiveDcsTutorLoop:
             and response_mapping_meta.get("rejected_targets_by_request_allowlist")
         ):
             return False, "response_mapping_already_repaired_allowlist"
-        if inferred_step_id == "S18":
-            return False, "legacy_s18_action_hint_guardrail"
         if _state_harness_has_late_vlm_conflict(context.get("state_harness")):
             return False, "late_vlm_conflict_guardrail"
         model_step_id = _extract_model_next_step_id(response.metadata)
@@ -5192,6 +5190,7 @@ class LiveDcsTutorLoop:
         vision_summary = context.get("vision_fact_summary")
         vision_seen_fact_ids: list[str] = []
         vision_fresh_fact_ids: list[str] = []
+        vision_not_seen_fact_ids: list[str] = []
         if isinstance(vision_summary, Mapping):
             raw_seen = vision_summary.get("seen_fact_ids")
             if isinstance(raw_seen, (list, tuple, set)):
@@ -5199,6 +5198,9 @@ class LiveDcsTutorLoop:
             raw_fresh = vision_summary.get("fresh_fact_ids")
             if isinstance(raw_fresh, (list, tuple, set)):
                 vision_fresh_fact_ids = [item for item in raw_fresh if isinstance(item, str) and item]
+            raw_not_seen = vision_summary.get("not_seen_fact_ids")
+            if isinstance(raw_not_seen, (list, tuple, set)):
+                vision_not_seen_fact_ids = [item for item in raw_not_seen if isinstance(item, str) and item]
 
         missing_conditions = hint.get("missing_conditions")
         missing_set = {
@@ -5211,6 +5213,9 @@ class LiveDcsTutorLoop:
         s08_visual_hint_target: str | None = None
         s08_visual_hint_ref: str | None = None
         s08_visual_hint_used = False
+        s18_visual_hint_target: str | None = None
+        s18_visual_hint_reason: str | None = None
+        s18_visual_hint_used = False
         s08_visual_navigation_allowed = (
             inferred_step_id == "S08"
             and not _s08_power_condition_missing(missing_set)
@@ -5246,6 +5251,54 @@ class LiveDcsTutorLoop:
                 s08_visual_hint_used = True
                 if isinstance(evidence_ref, str) and evidence_ref:
                     evidence_refs = [evidence_ref]
+        s18_bit_root_to_fcsmc_allowed = (
+            inferred_step_id == "S18"
+            and (
+                "bit_root_page_visible" in set(vision_seen_fact_ids)
+                or "bit_root_page_visible" in set(vision_fresh_fact_ids)
+            )
+            and "fcsmc_page_visible" in set(vision_not_seen_fact_ids)
+        )
+        if s18_bit_root_to_fcsmc_allowed and isinstance(action_hint, Mapping):
+            action_target = action_hint.get("target")
+            if action_target == "right_mdi_pb5":
+                repaired_hint = dict(action_hint)
+                hint_reason = repaired_hint.get("reason")
+                if not isinstance(hint_reason, str) or not hint_reason:
+                    hint_reason = (
+                        "右 DDI 已在 BIT root 页面；请按右 DDI PB5/FCS-MC 进入 FCS-MC BIT 页面。"
+                        if self.lang == "zh"
+                        else "The right DDI is on the BIT root page; press right DDI PB5/FCS-MC to enter the FCS-MC BIT page."
+                    )
+                    repaired_hint["reason"] = hint_reason
+                action_hint = repaired_hint
+                s18_visual_hint_target = "right_mdi_pb5"
+                s18_visual_hint_reason = hint_reason
+                s18_visual_hint_used = True
+                allowed_refs = _collect_request_evidence_refs(context)
+                bit_root_ref_prefix = "VISION_FACTS.bit_root_page_visible"
+                bit_root_ref = next(
+                    (
+                        ref for ref in evidence_refs
+                        if ref in allowed_refs and ref.startswith(bit_root_ref_prefix)
+                    ),
+                    None,
+                )
+                if bit_root_ref is None:
+                    frame_ids = vision_summary.get("frame_ids") if isinstance(vision_summary, Mapping) else None
+                    candidate_refs: list[str] = []
+                    if isinstance(frame_ids, (list, tuple)):
+                        candidate_refs.extend(
+                            f"{bit_root_ref_prefix}@{frame_id}"
+                            for frame_id in frame_ids
+                            if isinstance(frame_id, str) and frame_id
+                        )
+                    candidate_refs.append(bit_root_ref_prefix)
+                    bit_root_ref = next((ref for ref in candidate_refs if ref in allowed_refs), None)
+                if bit_root_ref is not None:
+                    evidence_refs = [bit_root_ref]
+        if inferred_step_id == "S18" and not s18_bit_root_to_fcsmc_allowed:
+            return False, "legacy_s18_action_hint_guardrail"
         manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         include_s05_manual_guidance = (
             "vars.throttle_r_not_off==true" in missing_set
@@ -5307,6 +5360,7 @@ class LiveDcsTutorLoop:
             max_overlay_targets=self.max_overlay_targets,
             vision_seen_fact_ids=vision_seen_fact_ids,
             vision_fresh_fact_ids=vision_fresh_fact_ids,
+            vision_not_seen_fact_ids=vision_not_seen_fact_ids,
             action_hint=action_hint if isinstance(action_hint, Mapping) else None,
             completion_advancements=[
                 HarnessCompletionAdvance(
@@ -5318,10 +5372,19 @@ class LiveDcsTutorLoop:
             ],
             action_hint_step_ids=["S08", "S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
             action_hint_fact_rules=[
+                HarnessActionHintFactRule(
+                    step_id="S18",
+                    fact_id="bit_root_page_visible",
+                    not_seen_fact_id="fcsmc_page_visible",
+                    source="visual_action_hint_repair",
+                ),
                 HarnessActionHintFactRule(step_id="S19", fact_id="fcsmc_intermediate_result_visible")
             ],
             text_guidance_rules=manual_text_guidance_rules,
         )
+        plan_guidance = plan.guidance
+        if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
+            plan_guidance = s18_visual_hint_reason
 
         response.metadata["validator_rejected"] = bool(plan.validator_rejected)
         response.metadata["repair_applied"] = bool(response.metadata.get("repair_applied")) or bool(plan.repair_applied)
@@ -5343,6 +5406,13 @@ class LiveDcsTutorLoop:
             if plan.rejected_model_targets:
                 response.metadata["rejected_model_targets"] = list(plan.rejected_model_targets)
                 response.metadata["rejected_model_target"] = plan.rejected_model_targets[0]
+        if s18_visual_hint_used:
+            response.metadata["visual_hint_target"] = s18_visual_hint_target
+            if plan.repair_applied:
+                response.metadata["s18_visual_hint_repair_applied"] = True
+        if plan.rejected_model_targets:
+            response.metadata["rejected_model_targets"] = list(plan.rejected_model_targets)
+            response.metadata["rejected_model_target"] = plan.rejected_model_targets[0]
         if isinstance(plan.rejected_model_step_id, str) and plan.rejected_model_step_id:
             response.metadata["rejected_model_step_id"] = plan.rejected_model_step_id
         elif "rejected_model_step_id" in response.metadata:
@@ -5355,11 +5425,11 @@ class LiveDcsTutorLoop:
             if original_actions:
                 response.metadata["harness_validator_original_actions"] = original_actions
             response.actions = []
-            if isinstance(plan.guidance, str) and plan.guidance:
+            if isinstance(plan_guidance, str) and plan_guidance:
                 original_message = response.message
                 original_explanations = list(response.explanations)
-                response.message = plan.guidance
-                response.explanations = [plan.guidance]
+                response.message = plan_guidance
+                response.explanations = [plan_guidance]
                 if original_message != response.message:
                     response.metadata["harness_validator_original_message"] = original_message
                     response.metadata["manual_throttle_guidance_original_message"] = original_message
@@ -5507,8 +5577,8 @@ class LiveDcsTutorLoop:
                 for target in plan.targets
             ],
         }
-        if isinstance(plan.guidance, str) and plan.guidance:
-            planned_help_obj["explanations"] = [plan.guidance]
+        if isinstance(plan_guidance, str) and plan_guidance:
+            planned_help_obj["explanations"] = [plan_guidance]
 
         mapped = map_help_response_to_tutor_response(
             planned_help_obj,
@@ -5530,9 +5600,9 @@ class LiveDcsTutorLoop:
         response.metadata["next"] = {"step_id": plan.step_id}
         response.metadata["help_response"] = planned_help_obj
         response.metadata["harness_validator_fallback_reason"] = fallback_reason
-        if isinstance(plan.guidance, str) and plan.guidance:
-            response.message = plan.guidance
-            response.explanations = [plan.guidance]
+        if isinstance(plan_guidance, str) and plan_guidance:
+            response.message = plan_guidance
+            response.explanations = [plan_guidance]
         elif mapped.explanations and response.metadata.get("procedural_guidance_rewritten") is not True:
             response.message = mapped.explanations[0]
             response.explanations = list(mapped.explanations)

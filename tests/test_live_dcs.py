@@ -8931,6 +8931,92 @@ def test_live_loop_overrides_s18_root_menu_overlay_with_action_hint_when_vision_
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
 
 
+def test_live_fixture_s18_bit_root_repairs_pb18_to_pb5() -> None:
+    fixture_path = Path("artifacts/live_fixtures/644fac65-eb37-4de1-a591-fd1de392c647.fixture.json")
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    request_payload = fixture["cycle"]["tutor_request"]
+    context = request_payload["context"]
+    raw_help = fixture["model_io"]["model_raw_help_response"]
+    frame_ids = context["vision_fact_summary"]["frame_ids"]
+    frame_id = frame_ids[0]
+
+    request = TutorRequest(
+        request_id=request_payload["request_id"],
+        message=request_payload.get("message"),
+        observation_ref=request_payload.get("observation_ref"),
+        context=context,
+        metadata=dict(request_payload.get("metadata") or {}),
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+        actions=[],
+        explanations=list(raw_help["explanations"]),
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": raw_help,
+        },
+    )
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s18-fixture-repair",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        result = loop._validate_and_repair_live_help_response(
+            response,
+            request,
+            prompt_meta={},
+            state_key="fixture-s18",
+            help_cycle_id=request.request_id,
+            vision_selection=HelpCycleVisionSelection(
+                status="available",
+                observation_ref=context["vision"].get("observation_ref"),
+                observation_seq=context["vision"].get("observation_seq"),
+                observation_t_wall_s=context["vision"].get("observation_t_wall_s"),
+                observation_t_wall_ms=context["vision"].get("observation_t_wall_ms"),
+                trigger_wall_ms=context["vision"].get("trigger_wall_ms"),
+                sync_window_ms=context["vision"].get("sync_window_ms"),
+                vision_used=True,
+                frame_id=frame_id,
+                sync_status=context["vision"].get("sync_status"),
+                sync_delta_ms=context["vision"].get("sync_delta_ms"),
+                frame_stale=False,
+                frame_ids=list(frame_ids),
+                selected_frames=[],
+                pre_trigger_frame=None,
+                trigger_frame=None,
+                sync_miss_reason=context["vision"].get("sync_miss_reason"),
+            ),
+            vision_fact_context={
+                "status": "available",
+                "vision_fact_summary": context["vision_fact_summary"],
+                "vision_facts": context["vision_facts"],
+            },
+            vision_fact_active_step_ids=["S18"],
+            terminal_state_short_circuited=False,
+        )
+    finally:
+        loop.close()
+
+    repaired = result.response
+    assert [action["target"] for action in repaired.actions] == ["right_mdi_pb5"]
+    assert repaired.message is not None
+    assert "PB5" in repaired.message
+    assert "PB18" not in repaired.message
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_model_target"] == "right_mdi_pb18"
+    assert repaired.metadata["visual_hint_target"] == "right_mdi_pb5"
+    assert repaired.metadata["final_action_plan"]["source"] == "visual_action_hint_repair"
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
+
+
 def test_map_response_actions_accepts_fake_llm_multi_target_help_response_when_enabled(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_multi_target_mapping.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])

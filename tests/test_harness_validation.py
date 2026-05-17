@@ -263,3 +263,82 @@ def test_plan_harness_action_records_rejected_target_when_action_hint_repairs_s0
     assert plan.final_action_plan_source == "validator_action_hint"
     assert plan.rejected_model_targets == ("left_mdi_brightness_selector",)
     assert "action_hint_target_mismatch:left_mdi_brightness_selector" in plan.reasons
+
+
+def test_plan_harness_action_repairs_s18_bit_root_to_pb5_when_fcsmc_not_seen() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S18": _spec(
+                "S18",
+                ("right_mdi_pb18", "right_mdi_pb5"),
+                recovery_kind="visual_confirmation",
+            )
+        },
+        inferred_step_id="S18",
+        model_step_id="S18",
+        proposed_overlay_targets=["right_mdi_pb18"],
+        candidate_step_ids=["S18"],
+        runtime_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        request_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        allowed_evidence_refs=["VISION_FACTS.bit_root_page_visible@frame-1"],
+        evidence_refs=["VISION_FACTS.bit_root_page_visible@frame-1"],
+        max_overlay_targets=1,
+        vision_seen_fact_ids=["bit_root_page_visible"],
+        vision_not_seen_fact_ids=["fcsmc_page_visible"],
+        action_hint={
+            "target": "right_mdi_pb5",
+            "reason": "BIT root is visible; press PB5 FCS-MC.",
+        },
+        action_hint_fact_rules=[
+            HarnessActionHintFactRule(
+                step_id="S18",
+                fact_id="bit_root_page_visible",
+                not_seen_fact_id="fcsmc_page_visible",
+                source="visual_action_hint_repair",
+            )
+        ],
+    )
+
+    assert plan.targets == ("right_mdi_pb5",)
+    assert plan.guidance == "BIT root is visible; press PB5 FCS-MC."
+    assert plan.validator_rejected is True
+    assert plan.repair_applied is True
+    assert plan.final_action_plan_source == "visual_action_hint_repair"
+    assert plan.rejected_model_targets == ("right_mdi_pb18",)
+    assert "action_hint_target_mismatch:right_mdi_pb18" in plan.reasons
+
+
+def test_plan_harness_action_keeps_s18_recovery_pb18_when_bit_root_not_visible() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S18": _spec(
+                "S18",
+                ("right_mdi_pb18", "right_mdi_pb5"),
+                recovery_kind="visual_confirmation",
+            )
+        },
+        inferred_step_id="S18",
+        model_step_id="S18",
+        proposed_overlay_targets=["right_mdi_pb18"],
+        candidate_step_ids=["S18"],
+        runtime_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        request_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        allowed_evidence_refs=["VISION_FACTS.fcsmc_page_visible@frame-1"],
+        evidence_refs=["VISION_FACTS.fcsmc_page_visible@frame-1"],
+        max_overlay_targets=1,
+        vision_not_seen_fact_ids=["bit_root_page_visible"],
+        action_hint={"target": "right_mdi_pb5"},
+        action_hint_fact_rules=[
+            HarnessActionHintFactRule(
+                step_id="S18",
+                fact_id="bit_root_page_visible",
+                not_seen_fact_id="fcsmc_page_visible",
+                source="visual_action_hint_repair",
+            )
+        ],
+    )
+
+    assert plan.targets == ("right_mdi_pb18",)
+    assert plan.repair_applied is False
+    assert plan.validator_rejected is False
+    assert plan.final_action_plan_source == "model"

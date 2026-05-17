@@ -43,6 +43,8 @@ class HarnessCompletionAdvance:
 class HarnessActionHintFactRule:
     step_id: str
     fact_id: str
+    not_seen_fact_id: str | None = None
+    source: str = "validator_action_hint"
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,14 @@ def _seen_or_fresh(
     vision_fresh_fact_ids: Sequence[str] | None,
 ) -> bool:
     return fact_id in set(_strings(vision_seen_fact_ids)) or fact_id in set(_strings(vision_fresh_fact_ids))
+
+
+def _not_seen(
+    fact_id: str,
+    *,
+    vision_not_seen_fact_ids: Sequence[str] | None,
+) -> bool:
+    return fact_id in set(_strings(vision_not_seen_fact_ids))
 
 
 def _completion_advance_for_seen_fact(
@@ -128,19 +138,29 @@ def _hint_allowed_by_fact_rule(
     action_hint_fact_rules: Sequence[HarnessActionHintFactRule] | None,
     vision_seen_fact_ids: Sequence[str] | None,
     vision_fresh_fact_ids: Sequence[str] | None,
-) -> bool:
+    vision_not_seen_fact_ids: Sequence[str] | None,
+) -> str | None:
     if not isinstance(step_id, str) or not step_id:
-        return False
+        return None
     for rule in action_hint_fact_rules or ():
         if rule.step_id != step_id:
             continue
-        if _seen_or_fresh(
+        seen_requirement_met = _seen_or_fresh(
             rule.fact_id,
             vision_seen_fact_ids=vision_seen_fact_ids,
             vision_fresh_fact_ids=vision_fresh_fact_ids,
-        ):
-            return True
-    return False
+        )
+        not_seen_requirement_met = (
+            True
+            if rule.not_seen_fact_id is None
+            else _not_seen(
+                rule.not_seen_fact_id,
+                vision_not_seen_fact_ids=vision_not_seen_fact_ids,
+            )
+        )
+        if seen_requirement_met and not_seen_requirement_met:
+            return rule.source
+    return None
 
 
 def _filter_targets(
@@ -204,6 +224,7 @@ def plan_harness_action(
     max_overlay_targets: int = 1,
     vision_seen_fact_ids: Sequence[str] | None = None,
     vision_fresh_fact_ids: Sequence[str] | None = None,
+    vision_not_seen_fact_ids: Sequence[str] | None = None,
     action_hint: Mapping[str, Any] | None = None,
     completion_advancements: Sequence[HarnessCompletionAdvance] | None = None,
     action_hint_step_ids: Sequence[str] | None = None,
@@ -273,19 +294,23 @@ def plan_harness_action(
     if hinted_targets:
         if selected_step_id in action_hint_step_set:
             use_hint = True
-        if _hint_allowed_by_fact_rule(
+        hint_rule_source = _hint_allowed_by_fact_rule(
             selected_step_id,
             action_hint_fact_rules=action_hint_fact_rules,
             vision_seen_fact_ids=vision_seen_fact_ids,
             vision_fresh_fact_ids=vision_fresh_fact_ids,
-        ):
+            vision_not_seen_fact_ids=vision_not_seen_fact_ids,
+        )
+        if hint_rule_source is not None:
             use_hint = True
+            source = hint_rule_source
 
     if completion_advance is not None:
         base_targets = spec.allowed_overlay_targets if spec is not None else ()
     elif use_hint:
         base_targets = hinted_targets
-        source = "validator_action_hint"
+        if source == "model":
+            source = "validator_action_hint"
     else:
         base_targets = proposed_targets
 
