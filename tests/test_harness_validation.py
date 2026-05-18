@@ -298,28 +298,43 @@ def test_plan_harness_action_keeps_s19_intermediate_multi_target_guidance() -> N
 
 
 def test_plan_harness_action_uses_single_current_target_for_s20_to_s27() -> None:
-    plan = plan_harness_action(
-        step_specs={
-            "S26": _spec("S26", ("pitot_heater_switch",)),
-            "S20": _spec("S20", ("refuel_probe_switch",)),
-        },
-        inferred_step_id="S26",
-        model_step_id="S26",
-        proposed_overlay_targets=["refuel_probe_switch"],
-        candidate_step_ids=["S26", "S27"],
-        runtime_overlay_targets=["refuel_probe_switch", "pitot_heater_switch"],
-        request_overlay_targets=["refuel_probe_switch", "pitot_heater_switch"],
-        allowed_evidence_refs=["GATES.S26.completion"],
-        evidence_refs=["GATES.S26.completion"],
-        max_overlay_targets=2,
-        action_hint={"target": "pitot_heater_switch"},
-        action_hint_step_ids=["S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
-    )
+    expected_targets = {
+        "S20": "refuel_probe_switch",
+        "S21": "refuel_probe_switch",
+        "S22": "launch_bar_switch",
+        "S23": "launch_bar_switch",
+        "S24": "arresting_hook_handle",
+        "S25": "arresting_hook_handle",
+        "S26": "pitot_heater_switch",
+        "S27": "flap_switch",
+    }
+    wrong_target = "battery_switch"
+    step_specs = {
+        step_id: _spec(step_id, (target,))
+        for step_id, target in expected_targets.items()
+    }
+    runtime_targets = [wrong_target, *expected_targets.values()]
 
-    assert plan.targets == ("pitot_heater_switch",)
-    assert plan.validator_rejected is True
-    assert plan.repair_applied is True
-    assert plan.final_action_plan_source == "validator_action_hint"
+    for step_id, expected_target in expected_targets.items():
+        plan = plan_harness_action(
+            step_specs=step_specs,
+            inferred_step_id=step_id,
+            model_step_id=step_id,
+            proposed_overlay_targets=[wrong_target],
+            candidate_step_ids=[step_id],
+            runtime_overlay_targets=runtime_targets,
+            request_overlay_targets=runtime_targets,
+            allowed_evidence_refs=[f"GATES.{step_id}.completion"],
+            evidence_refs=[f"GATES.{step_id}.completion"],
+            max_overlay_targets=2,
+            action_hint={"target": expected_target},
+            action_hint_step_ids=["S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
+        )
+
+        assert plan.targets == (expected_target,)
+        assert plan.validator_rejected is True
+        assert plan.repair_applied is True
+        assert plan.final_action_plan_source == "validator_action_hint"
 
 
 def test_plan_harness_action_returns_text_only_for_unhighlightable_manual_control() -> None:
@@ -522,3 +537,289 @@ def test_plan_harness_action_keeps_s18_recovery_pb18_when_bit_root_not_visible()
     assert plan.repair_applied is False
     assert plan.validator_rejected is False
     assert plan.final_action_plan_source == "model"
+
+
+def test_plan_harness_action_uses_s18_visual_state_without_live_hint() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S18": _spec(
+                "S18",
+                ("right_mdi_pb18", "right_mdi_pb5"),
+                recovery_kind="visual_confirmation",
+            )
+        },
+        inferred_step_id="S18",
+        model_step_id="S18",
+        proposed_overlay_targets=["right_mdi_pb18"],
+        candidate_step_ids=["S18"],
+        runtime_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        request_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        max_overlay_targets=1,
+        vision_seen_fact_ids=["bit_root_page_visible"],
+        vision_not_seen_fact_ids=["fcsmc_page_visible"],
+    )
+
+    assert plan.targets == ("right_mdi_pb5",)
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "state_action_target_mismatch:right_mdi_pb18" in plan.reasons
+
+
+def test_plan_harness_action_clears_unavailable_s18_state_target() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S18": _spec(
+                "S18",
+                ("right_mdi_pb18", "right_mdi_pb5"),
+                recovery_kind="visual_confirmation",
+            )
+        },
+        inferred_step_id="S18",
+        model_step_id="S18",
+        proposed_overlay_targets=["right_mdi_pb18"],
+        candidate_step_ids=["S18"],
+        runtime_overlay_targets=["right_mdi_pb18"],
+        request_overlay_targets=["right_mdi_pb18"],
+        max_overlay_targets=1,
+        vision_seen_fact_ids=["bit_root_page_visible"],
+        vision_not_seen_fact_ids=["fcsmc_page_visible"],
+    )
+
+    assert plan.text_only is True
+    assert plan.targets == ()
+    assert "PB5" in (plan.guidance or "")
+    assert "target_not_in_runtime_allowlist:right_mdi_pb5" in plan.reasons
+
+
+def test_plan_harness_action_uses_s09_scratchpad_state_without_live_hint() -> None:
+    specs = {
+        "S09": _spec(
+            "S09",
+            (
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S09"].allowed_overlay_targets)
+    cases = [
+        ({}, "ufc_comm1_channel_selector_pull"),
+        (
+            {
+                "ufc_comm1_pull_pressed": True,
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+                "ufc_scratchpad_number_display": "305.000",
+            },
+            "ufc_key_1",
+        ),
+        (
+            {
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+                "ufc_scratchpad_number_display": "     .1",
+            },
+            "ufc_key_3",
+        ),
+        (
+            {
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+                "ufc_scratchpad_number_display": "    .13",
+            },
+            "ufc_key_4",
+        ),
+        (
+            {
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+                "ufc_scratchpad_number_display": "   .134",
+            },
+            "ufc_key_0",
+        ),
+        (
+            {
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+                "ufc_scratchpad_number_display": "134.000",
+            },
+            "ufc_ent_button",
+        ),
+    ]
+
+    for vars_map, expected_target in cases:
+        plan = plan_harness_action(
+            step_specs=specs,
+            inferred_step_id="S09",
+            model_step_id="S09",
+            proposed_overlay_targets=["ufc_comm1_channel_selector_pull"],
+            candidate_step_ids=["S09"],
+            runtime_overlay_targets=allowed_targets,
+            request_overlay_targets=allowed_targets,
+            max_overlay_targets=1,
+            latest_vars={"comm1_freq_134_000": False, **vars_map},
+            recent_action_targets=[],
+        )
+
+        assert plan.targets == (expected_target,)
+        assert plan.final_action_plan_source == "state_action_planner"
+
+
+def test_plan_harness_action_uses_recent_action_for_s09_open_scratchpad() -> None:
+    specs = {
+        "S09": _spec(
+            "S09",
+            (
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S09"].allowed_overlay_targets)
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S09",
+        model_step_id="S09",
+        proposed_overlay_targets=["ufc_comm1_channel_selector_pull"],
+        candidate_step_ids=["S09"],
+        runtime_overlay_targets=allowed_targets,
+        request_overlay_targets=allowed_targets,
+        max_overlay_targets=1,
+        latest_vars={"comm1_freq_134_000": False},
+        recent_action_targets=["ufc_comm1_channel_selector_pull"],
+    )
+
+    assert plan.targets == ("ufc_key_1",)
+    assert plan.final_action_plan_source == "state_action_planner"
+
+
+def test_plan_harness_action_clears_unavailable_s09_state_target_instead_of_repairing_to_pull() -> None:
+    specs = {
+        "S09": _spec(
+            "S09",
+            (
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ),
+        )
+    }
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S09",
+        model_step_id="S09",
+        proposed_overlay_targets=["ufc_comm1_channel_selector_pull"],
+        candidate_step_ids=["S09"],
+        runtime_overlay_targets=["ufc_comm1_channel_selector_pull"],
+        request_overlay_targets=["ufc_comm1_channel_selector_pull"],
+        max_overlay_targets=1,
+        latest_vars={
+            "comm1_freq_134_000": False,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "     .1",
+        },
+    )
+
+    assert plan.text_only is True
+    assert plan.targets == ()
+    assert "press 3 next" in (plan.guidance or "")
+    assert "target_not_in_runtime_allowlist:ufc_key_3" in plan.reasons
+    assert plan.final_action_plan_source == "state_action_planner"
+
+
+def test_plan_harness_action_returns_text_only_when_probe_is_already_moving() -> None:
+    cases = [
+        (
+            "S20",
+            {"probe_switch_value": 0, "ext_refuel_probe_value": 12000},
+            [
+                {"seq": 1, "t_wall": 1.0, "vars": {"ext_refuel_probe_value": 8000}},
+                {"seq": 2, "t_wall": 2.0, "vars": {"ext_refuel_probe_value": 12000}},
+            ],
+            "extending",
+        ),
+        (
+            "S21",
+            {"probe_switch_value": 1, "ext_refuel_probe_value": 5600},
+            [
+                {"seq": 1, "t_wall": 1.0, "vars": {"ext_refuel_probe_value": 6200}},
+                {"seq": 2, "t_wall": 2.0, "vars": {"ext_refuel_probe_value": 5600}},
+            ],
+            "retracting",
+        ),
+    ]
+
+    for step_id, vars_map, frames, expected_word in cases:
+        packet = build_evidence_packet({"vars": vars_map, "telemetry_window_frames": frames})
+        plan = plan_harness_action(
+            step_specs={step_id: _spec(step_id, ("refuel_probe_switch",))},
+            inferred_step_id=step_id,
+            model_step_id=step_id,
+            proposed_overlay_targets=["refuel_probe_switch"],
+            candidate_step_ids=[step_id],
+            runtime_overlay_targets=["refuel_probe_switch"],
+            request_overlay_targets=["refuel_probe_switch"],
+            max_overlay_targets=1,
+            latest_vars=vars_map,
+            evidence_packet=packet,
+        )
+
+        assert plan.text_only is True
+        assert plan.targets == ()
+        assert expected_word in (plan.guidance or "")
+        assert plan.final_action_plan_source == "state_action_planner_wait"
+
+
+def test_plan_harness_action_clears_partial_s19_multi_target_plan() -> None:
+    plan = plan_harness_action(
+        step_specs={"S19": _spec("S19", ("fcs_bit_switch", "right_mdi_pb5"))},
+        inferred_step_id="S19",
+        model_step_id="S19",
+        proposed_overlay_targets=["right_mdi_pb5"],
+        candidate_step_ids=["S19"],
+        runtime_overlay_targets=["fcs_bit_switch", "right_mdi_pb5"],
+        request_overlay_targets=["fcs_bit_switch", "right_mdi_pb5"],
+        max_overlay_targets=1,
+        vision_seen_fact_ids=["fcsmc_intermediate_result_visible"],
+    )
+
+    assert plan.text_only is True
+    assert plan.targets == ()
+    assert "PB5" in (plan.guidance or "")
+    assert "target_dropped_by_max_overlay_targets:right_mdi_pb5" in plan.reasons
+
+
+def test_plan_harness_action_expands_incomplete_s19_intermediate_hint_to_atomic_pair() -> None:
+    plan = plan_harness_action(
+        step_specs={"S19": _spec("S19", ("fcs_bit_switch", "right_mdi_pb5"))},
+        inferred_step_id="S19",
+        model_step_id="S19",
+        proposed_overlay_targets=["fcs_bit_switch"],
+        candidate_step_ids=["S19"],
+        runtime_overlay_targets=["fcs_bit_switch", "right_mdi_pb5"],
+        request_overlay_targets=["fcs_bit_switch", "right_mdi_pb5"],
+        max_overlay_targets=2,
+        vision_seen_fact_ids=["fcsmc_intermediate_result_visible"],
+        action_hint={"target": "fcs_bit_switch"},
+        action_hint_fact_rules=[
+            HarnessActionHintFactRule(step_id="S19", fact_id="fcsmc_intermediate_result_visible")
+        ],
+    )
+
+    assert plan.text_only is False
+    assert plan.targets == ("fcs_bit_switch", "right_mdi_pb5")
+    assert "action_hint_incomplete_for_state_plan:fcs_bit_switch" in plan.reasons
+    assert plan.final_action_plan_source == "state_action_planner"
