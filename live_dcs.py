@@ -6598,6 +6598,39 @@ class LiveDcsTutorLoop:
                     return step_id
         return None
 
+    def _remember_final_response_progress(self, response: TutorResponse, request: TutorRequest) -> bool:
+        final_plan = response.metadata.get("harness_action_plan")
+        if not isinstance(final_plan, Mapping):
+            return False
+        final_step_id = final_plan.get("step_id")
+        if not isinstance(final_step_id, str) or not final_step_id:
+            return False
+        final_idx = self._step_order_index.get(final_step_id)
+        if final_idx is None:
+            return False
+        last_step_id = self._last_inferred_step_id
+        last_idx = self._step_order_index.get(last_step_id) if isinstance(last_step_id, str) else None
+        if last_idx is not None and final_idx < last_idx:
+            return False
+
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        hint_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
+        if hint_step_id == final_step_id and isinstance(hint, Mapping):
+            raw_missing = hint.get("missing_conditions")
+            missing_conditions = tuple(
+                item for item in raw_missing if isinstance(item, str) and item
+            ) if isinstance(raw_missing, (list, tuple)) else ()
+        else:
+            missing_conditions = tuple(self._missing_conditions_for_final_step(final_step_id, context))
+
+        if final_step_id != self._last_inferred_step_id:
+            self._step_interacted_targets = set()
+        self._last_inferred_step_id = final_step_id
+        self._sticky_inference_step_id = final_step_id
+        self._sticky_inference_missing_conditions = missing_conditions
+        return True
+
     def _missing_conditions_for_final_step(
         self,
         step_id: str,
@@ -8177,6 +8210,7 @@ class LiveDcsTutorLoop:
             else:
                 self._help_cache = None
 
+        self._remember_final_response_progress(response, request)
         hint = request.context.get("deterministic_step_hint")
         if isinstance(hint, Mapping):
             observability_status = hint.get("observability_status")
