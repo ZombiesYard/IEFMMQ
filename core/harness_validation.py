@@ -486,12 +486,12 @@ def _probe_motion_state(
     is_retracting = first_value is not None and last_value is not None and last_value < first_value
 
     if step_id == "S20":
-        if switch_value == 0 and probe_value is not None and 0 < probe_value < 60000 and is_extending:
+        if probe_value is not None and 0 < probe_value < 60000 and is_extending:
             return "s20_extending"
     if step_id == "S21":
         near_retract_threshold = probe_value is not None and 5000 < probe_value <= 7000
-        if switch_value == 1 and probe_value is not None and probe_value > 5000 and (
-            is_retracting or near_retract_threshold
+        if probe_value is not None and probe_value > 5000 and (
+            is_retracting or (switch_value == 1 and near_retract_threshold)
         ):
             return "s21_retracting"
     return None

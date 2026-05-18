@@ -2480,6 +2480,20 @@ def _left_engine_start_complete(vars_selected: Mapping[str, Any]) -> bool:
     )
 
 
+def _refuel_probe_extended(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("probe_extended") is True:
+        return True
+    probe_value = _coerce_float(vars_selected.get("ext_refuel_probe_value"))
+    return probe_value is not None and probe_value >= 60000
+
+
+def _refuel_probe_retracted(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("probe_retracted") is True:
+        return True
+    probe_value = _coerce_float(vars_selected.get("ext_refuel_probe_value"))
+    return probe_value is not None and probe_value <= 5000
+
+
 def _missing_conditions_satisfied_by_vars(
     missing_conditions: Sequence[str],
     vars_selected: Mapping[str, Any],
@@ -2701,16 +2715,16 @@ def _refuel_probe_motion_state(context: Mapping[str, Any], step_id: str | None) 
     is_retracting = first_value is not None and last_value is not None and last_value < first_value
 
     if step_id == "S20":
-        if vars_map.get("probe_extended") is True or (probe_value is not None and probe_value >= 60000):
+        if _refuel_probe_extended(vars_map):
             return "s20_extended"
-        if switch_value == 0 and probe_value is not None and 0 < probe_value < 60000 and is_extending:
+        if probe_value is not None and 0 < probe_value < 60000 and is_extending:
             return "s20_extending"
     elif step_id == "S21":
-        if vars_map.get("probe_retracted") is True or (probe_value is not None and probe_value <= 5000):
+        if _refuel_probe_retracted(vars_map):
             return "s21_retracted"
         near_retract_threshold = probe_value is not None and 5000 < probe_value <= 7000
-        if switch_value == 1 and probe_value is not None and probe_value > 5000 and (
-            is_retracting or near_retract_threshold
+        if probe_value is not None and probe_value > 5000 and (
+            is_retracting or (switch_value == 1 and near_retract_threshold)
         ):
             return "s21_retracting"
     return None
@@ -3648,6 +3662,8 @@ class LiveDcsTutorLoop:
         }
         self._sticky_inference_step_id: str | None = None
         self._sticky_inference_missing_conditions: tuple[str, ...] = ()
+        self._refuel_probe_s20_latched_complete = False
+        self._refuel_probe_s21_latched_complete = False
         self._pending_help_trigger_t_wall: float | None = None
         self._stats = LiveLoopStats()
 
@@ -3675,6 +3691,8 @@ class LiveDcsTutorLoop:
         self._last_inferred_step_id = None
         self._sticky_inference_step_id = None
         self._sticky_inference_missing_conditions = ()
+        self._refuel_probe_s20_latched_complete = False
+        self._refuel_probe_s21_latched_complete = False
 
     def _remember_step_interactions(self, targets: Sequence[str] | None) -> None:
         if not isinstance(self._last_inferred_step_id, str) or not self._last_inferred_step_id:
@@ -3682,6 +3700,29 @@ class LiveDcsTutorLoop:
         for target in targets or ():
             if isinstance(target, str) and target:
                 self._step_interacted_targets.add(target)
+
+    def _step_reached_for_refuel_probe_latch(self, step_id: str | None) -> bool:
+        idx = self._step_order_index.get(step_id) if isinstance(step_id, str) else None
+        s20_idx = self._step_order_index.get("S20")
+        return idx is not None and s20_idx is not None and idx >= s20_idx
+
+    def _update_refuel_probe_completion_latches(
+        self,
+        vars_selected: Mapping[str, Any],
+        *,
+        current_step_id: str | None = None,
+    ) -> None:
+        if not (
+            self._step_reached_for_refuel_probe_latch(current_step_id)
+            or self._step_reached_for_refuel_probe_latch(self._sticky_inference_step_id)
+        ):
+            return
+        if self._refuel_probe_s21_latched_complete and not _refuel_probe_retracted(vars_selected):
+            self._refuel_probe_s21_latched_complete = False
+        if _refuel_probe_extended(vars_selected):
+            self._refuel_probe_s20_latched_complete = True
+        if self._refuel_probe_s20_latched_complete and _refuel_probe_retracted(vars_selected):
+            self._refuel_probe_s21_latched_complete = True
 
     def _ensure_knowledge(self) -> KnowledgePort:
         if self.knowledge is None:
@@ -3846,6 +3887,8 @@ class LiveDcsTutorLoop:
             self._accumulated_vars.update(enriched_vars)
             if self._should_reset_sticky_inference(self._accumulated_vars):
                 self._clear_live_progress_state()
+            else:
+                self._update_refuel_probe_completion_latches(self._accumulated_vars)
 
         payload = raw_obs.payload if isinstance(raw_obs.payload, Mapping) else {}
         delta = payload.get("delta")
@@ -4400,6 +4443,33 @@ class LiveDcsTutorLoop:
         sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
         if current_idx is None:
             return inference
+        self._update_refuel_probe_completion_latches(vars_selected, current_step_id=current_step_id)
+        if (
+            self._refuel_probe_s21_latched_complete
+            and _refuel_probe_retracted(vars_selected)
+            and current_step_id in {"S20", "S21"}
+        ):
+            advanced = self._infer_after_completed_step(
+                "S21",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if self._refuel_probe_s20_latched_complete and current_step_id == "S20":
+            advanced = self._infer_after_completed_step(
+                "S20",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
         if (
             current_step_id in {"S09", "S10"}
             and _missing_conditions_satisfied_by_vars(inference.missing_conditions, vars_selected)
