@@ -51,6 +51,7 @@ from live_dcs import (
     _sanitize_response_payload_for_event,
     _sanitize_policy_error_for_user,
     _telemetry_window_signature,
+    _text_claims_step_complete,
 )
 from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
@@ -9069,6 +9070,291 @@ def test_live_fixture_s18_bit_root_repairs_pb18_to_pb5() -> None:
     assert repaired.metadata["visual_hint_target"] == "right_mdi_pb5"
     assert repaired.metadata["final_action_plan"]["source"] == "visual_action_hint_repair"
     assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
+
+
+def _validate_compact_live_help_response(
+    *,
+    request: TutorRequest,
+    response: TutorResponse,
+    vision_status: str = "vision_not_required",
+) -> TutorResponse:
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id=f"sess-{request.request_id}",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        result = loop._validate_and_repair_live_help_response(
+            response,
+            request,
+            prompt_meta={},
+            state_key=f"state-{request.request_id}",
+            help_cycle_id=request.request_id,
+            vision_selection=HelpCycleVisionSelection(
+                status=vision_status,
+                observation_ref=None,
+                observation_seq=None,
+                observation_t_wall_s=None,
+                observation_t_wall_ms=None,
+                trigger_wall_ms=None,
+                sync_window_ms=None,
+                vision_used=False,
+                frame_id=None,
+                sync_status=None,
+                sync_delta_ms=None,
+                frame_stale=False,
+                frame_ids=[],
+                selected_frames=[],
+                pre_trigger_frame=None,
+                trigger_frame=None,
+                sync_miss_reason=None,
+            ),
+            vision_fact_context={
+                "status": vision_status,
+                "vision_fact_summary": {"status": vision_status},
+                "vision_facts": [],
+            },
+            vision_fact_active_step_ids=[],
+            terminal_state_short_circuited=False,
+        )
+        return result.response
+    finally:
+        loop.close()
+
+
+def test_live_help_fixture_299_s12_aligns_pb19_message_and_overlay() -> None:
+    request = TutorRequest(
+        request_id="2c936164-c567-4865-997c-ce65b827209d",
+        message="help",
+        context={
+            "vars": {
+                "ins_mode_cv_or_gnd": True,
+                "ins_mode_set": True,
+                "ins_fast_align_complete": False,
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S12",
+                "overlay_step_id": "S12",
+                "missing_conditions": ["vars.ins_fast_align_complete==true"],
+                "step_ui_targets": ["ins_mode_knob", "ampcd_pb19"],
+                "action_hint": {"target": "ampcd_pb19"},
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["ins_mode_knob", "ampcd_pb19"],
+            "rag_topk": [{"snippet_id": "DCS FA-18C Early Access Guide EN_115"}],
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前步骤 S12 未完成，需要设置 INS 模式。",
+        actions=[],
+        explanations=["当前步骤 S12 未完成，需要设置 INS 模式。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S12", "error_category": "OM"},
+                "next": {"step_id": "S12"},
+                "overlay": {
+                    "targets": ["ins_mode_knob"],
+                    "evidence": [
+                        {
+                            "target": "ins_mode_knob",
+                            "type": "rag",
+                            "ref": "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_115",
+                            "quote": "INS alignment guidance.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["当前步骤 S12 未完成，需要设置 INS 模式。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert [action["target"] for action in repaired.actions] == ["ampcd_pb19"]
+    assert "PB19" in repaired.message
+    assert "设置 INS 模式" not in repaired.message
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["final_overlay_targets"] == ["ampcd_pb19"]
+    assert repaired.metadata["final_action_plan"]["targets"] == ["ampcd_pb19"]
+    assert repaired.metadata["final_action_plan"]["source"] == "validator_action_hint"
+    assert "action_hint_target_mismatch:ins_mode_knob" in repaired.metadata["harness_validation_reasons"]
+    assert repaired.metadata["model_raw_help_response"]["overlay"]["targets"] == ["ins_mode_knob"]
+    assert repaired.metadata["help_response"]["overlay"]["targets"] == ["ampcd_pb19"]
+    assert repaired.metadata["final_public_response"]["message"] == repaired.message
+    assert repaired.metadata["final_public_response"]["explanations"] == [repaired.message]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ampcd_pb19"
+
+
+def test_live_help_fixture_299_s12_carrier_keeps_ins_knob_until_cv_mode() -> None:
+    request = TutorRequest(
+        request_id="issue-299-s12-carrier-gnd",
+        message="help",
+        context={
+            "scenario_profile": "carrier",
+            "vars": {
+                "ins_mode": 2,
+                "ins_mode_cv_or_gnd": True,
+                "ins_mode_set": True,
+                "ins_fast_align_complete": False,
+            },
+            "gates": {
+                "S12.completion": {
+                    "status": "blocked",
+                    "reason_code": "s12_requires_ins_mode_cv",
+                }
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S12",
+                "overlay_step_id": "S12",
+                "scenario_profile": "carrier",
+                "missing_conditions": [
+                    "vars.ins_mode==1",
+                    "vars.ins_fast_align_complete==true",
+                ],
+                "step_ui_targets": ["ins_mode_knob", "ampcd_pb19"],
+                "action_hint": {"target": "ampcd_pb19"},
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["ins_mode_knob", "ampcd_pb19"],
+            "rag_topk": [{"snippet_id": "DCS FA-18C Early Access Guide EN_115"}],
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="INS 仍需设置到 CV。",
+        actions=[],
+        explanations=["INS 仍需设置到 CV。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S12", "error_category": "OM"},
+                "next": {"step_id": "S12"},
+                "overlay": {
+                    "targets": ["ins_mode_knob"],
+                    "evidence": [
+                        {
+                            "target": "ins_mode_knob",
+                            "type": "rag",
+                            "ref": "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_115",
+                            "quote": "Set INS mode to CV for carrier alignment.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["INS 仍需设置到 CV。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert [action["target"] for action in repaired.actions] == ["ins_mode_knob"]
+    assert "PB19" not in repaired.message
+    assert repaired.metadata["final_overlay_targets"] == ["ins_mode_knob"]
+    assert repaired.metadata["final_action_plan"]["targets"] == ["ins_mode_knob"]
+    assert repaired.metadata["final_action_plan"]["source"] == "model"
+    assert "action_hint_target_mismatch:ins_mode_knob" not in repaired.metadata["harness_validation_reasons"]
+
+
+def test_live_help_fixture_299_s17_keeps_takeoff_trim_overlay() -> None:
+    request = TutorRequest(
+        request_id="19115196-2759-42d9-82b5-2822cb322285",
+        message="help",
+        context={
+            "vars": {"takeoff_trim_set": False},
+            "gates": {
+                "S17.completion": {
+                    "status": "blocked",
+                    "reason_code": "s17_requires_takeoff_trim_pressed",
+                }
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S17",
+                "overlay_step_id": "S17",
+                "missing_conditions": ["vars.takeoff_trim_set==true"],
+                "step_ui_targets": ["takeoff_trim_button"],
+                "action_hint": {"target": "takeoff_trim_button"},
+                "observability_status": "partial",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["takeoff_trim_button"],
+        },
+    )
+    raw_message = "当前处于 S17 步骤，请按下 TAKEOFF TRIM 按钮以完成该步骤。"
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message=raw_message,
+        actions=[],
+        explanations=[raw_message],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S17", "error_category": "OM"},
+                "next": {"step_id": "S17"},
+                "overlay": {
+                    "targets": ["takeoff_trim_button"],
+                    "evidence": [
+                        {
+                            "target": "takeoff_trim_button",
+                            "type": "gate",
+                            "ref": "GATES.S17.completion",
+                            "quote": "Takeoff trim must be set.",
+                            "grounding_confidence": 0.95,
+                        }
+                    ],
+                },
+                "explanations": [raw_message],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert [action["target"] for action in repaired.actions] == ["takeoff_trim_button"]
+    assert repaired.metadata.get("completion_conflict_rewritten") is not True
+    assert "takeoff_trim_button" in repaired.message
+    assert repaired.explanations == [repaired.message]
+    assert repaired.metadata["next"]["step_id"] == "S17"
+    assert repaired.metadata["diagnosis"]["step_id"] == "S17"
+    assert repaired.metadata["final_overlay_targets"] == ["takeoff_trim_button"]
+    assert repaired.metadata["final_action_plan"]["targets"] == ["takeoff_trim_button"]
+    assert repaired.metadata["final_public_response"]["message"] == repaired.message
+    assert repaired.metadata["final_public_response"]["explanations"] == [repaired.message]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "takeoff_trim_button"
+
+
+def test_completion_claim_parser_distinguishes_guidance_from_completion_claim() -> None:
+    assert not _text_claims_step_complete(
+        "当前处于 S17 步骤，请按下 TAKEOFF TRIM 按钮以完成该步骤。",
+        "S17",
+    )
+    assert not _text_claims_step_complete(
+        "当前处于 S17 步骤，请按下 TAKEOFF TRIM 按钮完成该步骤。",
+        "S17",
+    )
+    assert _text_claims_step_complete(
+        "S20 已经通过展开受油管来完成。当前进入下一步。",
+        "S20",
+    )
+    assert _text_claims_step_complete(
+        "当前处于 S17 步骤，已按下 TAKEOFF TRIM 按钮完成该步骤。",
+        "S17",
+    )
 
 
 def test_map_response_actions_accepts_fake_llm_multi_target_help_response_when_enabled(tmp_path: Path) -> None:
