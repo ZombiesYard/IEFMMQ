@@ -8932,20 +8932,74 @@ def test_live_loop_overrides_s18_root_menu_overlay_with_action_hint_when_vision_
 
 
 def test_live_fixture_s18_bit_root_repairs_pb18_to_pb5() -> None:
-    fixture_path = Path("artifacts/live_fixtures/644fac65-eb37-4de1-a591-fd1de392c647.fixture.json")
-    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
-    request_payload = fixture["cycle"]["tutor_request"]
-    context = request_payload["context"]
-    raw_help = fixture["model_io"]["model_raw_help_response"]
-    frame_ids = context["vision_fact_summary"]["frame_ids"]
+    frame_ids = ["1779045062695_000060"]
     frame_id = frame_ids[0]
-
+    context = {
+        "deterministic_step_hint": {
+            "action_hint": {"target": "right_mdi_pb5"},
+            "inferred_step_id": "S18",
+            "missing_conditions": ["vision_facts.fcsmc_page_visible==seen"],
+            "overlay_step_id": "S18",
+            "step_ui_targets": ["right_mdi_pb18", "right_mdi_pb5"],
+        },
+        "overlay_target_allowlist": ["right_mdi_pb18", "right_mdi_pb5"],
+        "vision": {
+            "observation_ref": "obs-s18-bit-root",
+            "observation_seq": 9824,
+            "observation_t_wall_ms": 1779045062600,
+            "observation_t_wall_s": 1779045062.6004815,
+            "sync_delta_ms": 92,
+            "sync_miss_reason": "missing_pre_trigger_frame",
+            "sync_status": "matched_future_fallback",
+            "sync_window_ms": 250,
+            "trigger_wall_ms": 1779045062603,
+        },
+        "vision_fact_summary": {
+            "frame_ids": frame_ids,
+            "fresh_fact_ids": ["bit_root_page_visible"],
+            "not_seen_fact_ids": ["fcsmc_page_visible"],
+            "seen_fact_ids": ["bit_root_page_visible"],
+            "status": "available",
+            "uncertain_fact_ids": [],
+        },
+        "vision_facts": [
+            {
+                "fact_id": "bit_root_page_visible",
+                "source_frame_id": frame_id,
+                "state": "seen",
+            },
+            {
+                "fact_id": "fcsmc_page_visible",
+                "source_frame_id": frame_id,
+                "state": "not_seen",
+            },
+        ],
+    }
+    raw_help = {
+        "diagnosis": {"step_id": "S18", "error_category": "CO"},
+        "explanations": [
+            "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+        ],
+        "next": {"step_id": "S18"},
+        "overlay": {
+            "evidence": [
+                {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": f"VISION_FACTS.bit_root_page_visible@{frame_id}",
+                    "target": "right_mdi_pb18",
+                    "type": "visual",
+                }
+            ],
+            "targets": ["right_mdi_pb18"],
+        },
+    }
     request = TutorRequest(
-        request_id=request_payload["request_id"],
-        message=request_payload.get("message"),
-        observation_ref=request_payload.get("observation_ref"),
+        request_id="644fac65-eb37-4de1-a591-fd1de392c647",
+        message="help",
+        observation_ref="obs-s18-bit-root",
         context=context,
-        metadata=dict(request_payload.get("metadata") or {}),
+        metadata={},
     )
     response = TutorResponse(
         status="ok",
