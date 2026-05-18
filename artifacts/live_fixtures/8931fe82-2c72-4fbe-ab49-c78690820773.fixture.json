@@ -1,0 +1,4582 @@
+{
+  "context": {
+    "evidence_packet_summary": {
+      "blocked_gate_count": 7,
+      "conflicts": [],
+      "recent_action_count": 1,
+      "telemetry_missing_source_count": 4,
+      "telemetry_status": "nominal",
+      "telemetry_window_digest": {
+        "changed_var_count": 0,
+        "contradiction_count": 0,
+        "frame_count": 20,
+        "latest_seq": 6410
+      },
+      "vision_fresh_count": 5,
+      "vision_seen_count": 5,
+      "vision_status": "available"
+    },
+    "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+    "observations": [
+      {
+        "attachments": [],
+        "metadata": {
+          "delta_count": 2,
+          "delta_dropped_count": 0,
+          "from_addr": "192.168.0.105:61286",
+          "raw_delta_count": 2,
+          "seq": 6410
+        },
+        "observation_id": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+        "payload": {
+          "delta_summary": {
+            "changed_keys_sample": [
+              "HYD_IND_RIGHT",
+              "HYD_IND_BRAKE"
+            ],
+            "delta_count": 2,
+            "dropped_stats": {
+              "dropped_by_reason": {},
+              "dropped_total": 0
+            },
+            "raw_delta_count": 2,
+            "recent_key_changes_topk": [
+              {
+                "count": 1,
+                "importance": 1,
+                "key": "HYD_IND_RIGHT",
+                "ui_targets": [],
+                "value": 39047
+              },
+              {
+                "count": 1,
+                "importance": 1,
+                "key": "HYD_IND_BRAKE",
+                "ui_targets": [],
+                "value": 41343
+              }
+            ],
+            "truncated": false
+          },
+          "recent_ui_targets": [],
+          "seq": 6410,
+          "t_wall": 1779037955.3069358,
+          "vars": {
+            "annunciator_panel_activity": true,
+            "apu_on": true,
+            "apu_ready": true,
+            "apu_start_support_complete": true,
+            "attitude_source_auto": true,
+            "battery_on": true,
+            "bingo_fuel_set": false,
+            "bleed_air_cycle_complete": true,
+            "bleed_air_norm": true,
+            "comm1_channel_numeric": 1,
+            "comm1_freq_134_000": false,
+            "comm1_freq_value": 30500,
+            "comm2_channel_numeric": 1,
+            "comm2_freq_value": 30500,
+            "engine_crank_left": false,
+            "engine_crank_left_complete": false,
+            "engine_crank_right": false,
+            "engine_crank_right_complete": true,
+            "ext_pwr_on": true,
+            "ext_refuel_probe_value": 0,
+            "fcs_bit_switch_up": false,
+            "fcs_reset_complete": false,
+            "fcs_reset_pressed": false,
+            "ff_l": 0,
+            "ff_r": 700,
+            "fire_test_a_active": false,
+            "fire_test_a_complete": true,
+            "fire_test_active": false,
+            "fire_test_b_active": false,
+            "fire_test_b_complete": true,
+            "fire_test_complete": true,
+            "flap_auto": false,
+            "flap_configured": false,
+            "flap_full": true,
+            "flap_half": false,
+            "flap_mode_value": 0,
+            "hook_extended": true,
+            "hook_handle_value": 1,
+            "hook_retracted": false,
+            "hud_on": true,
+            "ins_fast_align_complete": false,
+            "ins_fast_align_pressed": false,
+            "ins_mode": 0,
+            "ins_mode_cv_or_gnd": false,
+            "ins_mode_set": false,
+            "l_gen_on": true,
+            "launch_bar_extended": false,
+            "launch_bar_retracted": true,
+            "launch_bar_switch_value": 0,
+            "left_ddi_on": true,
+            "left_engine_idle_ready": false,
+            "left_engine_nominal_start_params": false,
+            "lights_test_active": false,
+            "lights_test_complete": true,
+            "mpcd_on": true,
+            "noz_l": 0.0,
+            "noz_r": 76.3103685053788,
+            "obogs_flow_on": true,
+            "obogs_ready": false,
+            "obogs_switch_on": false,
+            "oil_l": 0,
+            "oil_r": 60,
+            "parking_brake_released": false,
+            "pitot_heat_on": false,
+            "power_available": true,
+            "probe_cycle_complete": true,
+            "probe_extended": false,
+            "probe_retracted": true,
+            "probe_switch_value": 1,
+            "r_gen_on": true,
+            "radar_altimeter_bug_set": false,
+            "radar_altimeter_bug_value": 0.0,
+            "radar_mode_opr": false,
+            "radar_on": false,
+            "right_ddi_on": true,
+            "right_engine_nominal_start_params": true,
+            "rpm_l": 0,
+            "rpm_l_gte_25": false,
+            "rpm_l_gte_60": false,
+            "rpm_r": 64,
+            "rpm_r_gte_25": true,
+            "rpm_r_gte_60": true,
+            "standby_altimeter_set": true,
+            "standby_attitude_uncaged": false,
+            "takeoff_trim_pressed": false,
+            "takeoff_trim_set": false,
+            "temp_l": 10,
+            "temp_r": 309,
+            "throttle_l_not_off": false,
+            "throttle_r_idle_complete": true,
+            "throttle_r_not_off": true,
+            "ufc_comm1_pull_pressed": false,
+            "ufc_ent_pressed": false,
+            "ufc_key_0_pressed": false,
+            "ufc_key_1_pressed": false,
+            "ufc_key_3_pressed": false,
+            "ufc_key_4_pressed": false,
+            "ufc_scratchpad_number_display": "        ",
+            "ufc_scratchpad_string_1_display": "  ",
+            "ufc_scratchpad_string_2_display": "  ",
+            "vars_source_missing": [
+              "ins_fast_align_pressed",
+              "ufc_scratchpad_number_display",
+              "ufc_scratchpad_string_1_display",
+              "ufc_scratchpad_string_2_display"
+            ]
+          }
+        },
+        "procedure_hint": null,
+        "source": "dcs_bios_raw",
+        "tags": [],
+        "timestamp": "2026-05-17T17:12:35.306935+00:00",
+        "version": "v1"
+      }
+    ],
+    "telemetry_window_digest": {
+      "changed_var_count": 0,
+      "contradiction_count": 0,
+      "frame_count": 20,
+      "latest_seq": 6410
+    },
+    "vision": {
+      "frame_ids": [
+        "1779037955374_000029"
+      ],
+      "request": null,
+      "response": {
+        "frame_id": "1779037955374_000029",
+        "frame_ids": [
+          "1779037955374_000029"
+        ],
+        "frame_stale": false,
+        "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+        "observation_seq": 6410,
+        "observation_t_wall_ms": 1779037955307,
+        "observation_t_wall_s": 1779037955.3069358,
+        "pre_trigger_frame": null,
+        "selected_frames": [
+          {
+            "capture_wall_ms": 1779037955374,
+            "channel": "composite_panel",
+            "frame_id": "1779037955374_000029",
+            "frame_seq": 29,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779037955374_000029_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779037955374_000029.png",
+            "sync_delta_ms": 97,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          }
+        ],
+        "status": "partial",
+        "sync_delta_ms": 97,
+        "sync_miss_reason": "missing_pre_trigger_frame",
+        "sync_status": "matched_future_fallback",
+        "sync_window_ms": 250,
+        "trigger_frame": {
+          "capture_wall_ms": 1779037955374,
+          "channel": "composite_panel",
+          "frame_id": "1779037955374_000029",
+          "frame_seq": 29,
+          "frame_stale": false,
+          "height": 1440,
+          "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779037955374_000029_vlm.png",
+          "layout_id": "fa18c_composite_panel_v2",
+          "role": "trigger_frame",
+          "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779037955374_000029.png",
+          "sync_delta_ms": 97,
+          "sync_miss_reason": null,
+          "sync_status": "matched_future_fallback",
+          "width": 3440
+        },
+        "trigger_wall_ms": 1779037955277,
+        "vision_used": true
+      },
+      "vision_fact_summary": {
+        "frame_ids": [
+          "1779037955374_000029"
+        ],
+        "fresh_fact_ids": [
+          "fcs_page_visible",
+          "fcs_page_x_marks_visible",
+          "bit_root_page_visible",
+          "hsi_page_visible",
+          "hsi_map_layer_visible"
+        ],
+        "not_seen_fact_ids": [
+          "tac_page_visible",
+          "supt_page_visible",
+          "fcsmc_page_visible",
+          "fcsmc_intermediate_result_visible",
+          "fcsmc_in_test_visible",
+          "fcsmc_final_go_result_visible",
+          "ins_grnd_alignment_text_visible",
+          "ins_ok_text_visible"
+        ],
+        "seen_fact_ids": [
+          "fcs_page_visible",
+          "fcs_page_x_marks_visible",
+          "bit_root_page_visible",
+          "hsi_page_visible",
+          "hsi_map_layer_visible"
+        ],
+        "status": "available",
+        "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+        "uncertain_fact_ids": []
+      },
+      "vision_facts": [
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "tac_page_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "supt_page_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "fcs_page_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "fcs_page_x_marks_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "bit_root_page_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "fcsmc_page_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "fcsmc_intermediate_result_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "fcsmc_in_test_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 600000,
+          "expires_at_wall_ms": 1779038555277,
+          "fact_id": "fcsmc_final_go_result_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": true
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "hsi_page_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "hsi_map_layer_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "ins_grnd_alignment_text_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779037957277,
+          "fact_id": "ins_ok_text_visible",
+          "observed_at_wall_ms": 1779037955277,
+          "source_frame_id": "1779037955374_000029",
+          "state": "not_seen",
+          "sticky": false
+        }
+      ]
+    },
+    "vision_fact_observations": [
+      {
+        "attachments": [],
+        "metadata": {
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "observation_kind": "vision_fact"
+        },
+        "observation_id": "a5f9fbe8-6fb5-4c9b-a5ef-e244abc21d6d",
+        "payload": {
+          "facts": [
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "tac_page_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "supt_page_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcs_page_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcs_page_x_marks_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "bit_root_page_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcsmc_page_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcsmc_intermediate_result_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcsmc_in_test_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 600000,
+              "fact_id": "fcsmc_final_go_result_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": true
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "hsi_page_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "hsi_map_layer_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "ins_grnd_alignment_text_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "ins_ok_text_visible",
+              "observed_at_wall_ms": 1779037955277,
+              "result_kind": null,
+              "source_frame_id": "1779037955374_000029",
+              "state": "not_seen",
+              "sticky": false
+            }
+          ],
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "metadata": {
+            "coerced_source_frame_fact_ids": [],
+            "coerced_source_frame_fact_ids_alias_of": "ignored_legacy_source_frame_fact_ids",
+            "configured_fact_count": 13,
+            "ignored_legacy_source_frame_fact_ids": [],
+            "ignored_model_fact_fields": {},
+            "raw_fact_count": 13,
+            "raw_llm_text": "{\"facts\":[{\"fact_id\":\"tac_page_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"supt_page_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcs_page_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcs_page_x_marks_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"bit_root_page_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_page_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_intermediate_result_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_in_test_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_final_go_result_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"hsi_page_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"hsi_map_layer_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"ins_grnd_alignment_text_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"ins_ok_text_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"}]}",
+            "sanitized_fact_count": 13,
+            "skipped_incomplete_mapping_fact_count": 0,
+            "skipped_non_mapping_fact_count": 0,
+            "skipped_unknown_fact_id_count": 0,
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779037955374_000029"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+              "uncertain_fact_ids": []
+            }
+          },
+          "observation_id": "a5f9fbe8-6fb5-4c9b-a5ef-e244abc21d6d",
+          "schema_version": "v2",
+          "session_id": "sess-live",
+          "source": "vision_fact_extractor",
+          "summary": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+          "timestamp": "2026-05-17T17:12:42.247528+00:00",
+          "trigger_wall_ms": 1779037955277
+        },
+        "procedure_hint": null,
+        "source": "vision_fact_extractor",
+        "tags": [],
+        "timestamp": "2026-05-17T17:12:42.247528+00:00",
+        "version": "v1"
+      }
+    ]
+  },
+  "cycle": {
+    "events": [
+      {
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "kind": "tutor_request",
+        "lineno": 6755,
+        "metadata": {
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "sync_delta_ms": 97,
+          "vision_fact_extractor_used": true,
+          "vision_fact_status": "available",
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_status": "partial",
+          "vision_used": true
+        },
+        "payload": {
+          "actor": "learner",
+          "context": {
+            "delta_dropped_count": 0,
+            "deterministic_step_hint": {
+              "action_hint": {
+                "target": "ufc_comm1_channel_selector_pull"
+              },
+              "gate_blocker_count": 1,
+              "inferred_step_id": "S09",
+              "missing_conditions_count": 1,
+              "observability": "observable",
+              "observability_status": "observable",
+              "overlay_step_id": "S09",
+              "recent_ui_targets": [
+                "left_mdi_pb15"
+              ],
+              "requires_visual_confirmation": false,
+              "scenario_profile": "airfield",
+              "step_ui_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button"
+              ]
+            },
+            "evidence_packet_summary": {
+              "blocked_gate_count": 7,
+              "conflicts": [],
+              "recent_action_count": 1,
+              "telemetry_missing_source_count": 4,
+              "telemetry_status": "nominal",
+              "telemetry_window_digest": {
+                "changed_var_count": 0,
+                "contradiction_count": 0,
+                "frame_count": 20,
+                "latest_seq": 6410
+              },
+              "vision_fresh_count": 5,
+              "vision_seen_count": 5,
+              "vision_status": "available"
+            },
+            "grounding_missing": false,
+            "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+            "grounding_reason": null,
+            "rag_topk": [
+              {
+                "chunk_id": "fa18c_startup_master_1",
+                "doc_id": "fa18c_startup_master",
+                "page_or_heading": "Master Step Table",
+                "score": 15.98560009496923,
+                "section": "Master Step Table",
+                "snippet_id": "fa18c_startup_master_1"
+              },
+              {
+                "chunk_id": "Appendix - Training Task Syllabus_5",
+                "doc_id": "Appendix - Training Task Syllabus",
+                "page_or_heading": "Phase P3 – Displays & Communications (S08–S09)",
+                "score": 14.558960000687737,
+                "section": "Phase P3 – Displays & Communications (S08–S09)",
+                "snippet_id": "Appendix - Training Task Syllabus_5"
+              },
+              {
+                "chunk_id": "fa18c_coldstart_quiz_1",
+                "doc_id": "fa18c_coldstart_quiz",
+                "page_or_heading": "Q1. Overall Goal",
+                "score": 13.29554266378183,
+                "section": "Q1. Overall Goal",
+                "snippet_id": "fa18c_coldstart_quiz_1"
+              },
+              {
+                "chunk_id": "fa18c_error_coding_guide_10",
+                "doc_id": "fa18c_error_coding_guide",
+                "page_or_heading": "3. Step Criticality",
+                "score": 13.120994677243015,
+                "section": "3. Step Criticality",
+                "snippet_id": "fa18c_error_coding_guide_10"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_92",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 93,
+                "score": 12.536685340631566,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_92"
+              }
+            ],
+            "scenario_profile": "airfield",
+            "state_harness": {
+              "conflicts": [],
+              "deterministic_candidate": {
+                "missing_conditions": [
+                  "vars.comm1_freq_134_000==true"
+                ],
+                "overlay_step_id": "S09",
+                "role": "candidate_not_authoritative",
+                "step_id": "S09"
+              },
+              "telemetry_evidence": {
+                "confidence": "medium",
+                "early_vars": {
+                  "battery_on": true,
+                  "fire_test_a_complete": true,
+                  "fire_test_b_complete": true,
+                  "power_available": true
+                },
+                "observation_seq": 6410,
+                "source_status": "nominal",
+                "vars_source_missing_count": 4
+              },
+              "telemetry_window_digest": {
+                "changed_vars": [],
+                "contradictions": [],
+                "first_frame_only_values": [],
+                "frame_count": 20,
+                "last_seen_true": [
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "battery_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "fire_test_a_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "fire_test_b_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "fire_test_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "hud_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "left_ddi_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "mpcd_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 6410,
+                    "var": "power_available"
+                  }
+                ],
+                "latest_seq": 6410,
+                "latest_t_wall": 1779037955.3069358,
+                "stable_false_vars": [
+                  "fcs_bit_switch_up",
+                  "flap_auto",
+                  "pitot_heat_on"
+                ],
+                "stable_true_vars": [
+                  "battery_on",
+                  "fire_test_a_complete",
+                  "fire_test_b_complete",
+                  "fire_test_complete",
+                  "hud_on",
+                  "left_ddi_on",
+                  "mpcd_on",
+                  "power_available",
+                  "right_ddi_on"
+                ],
+                "unknown_or_missing_vars": [
+                  "ins_fast_align_pressed",
+                  "ufc_scratchpad_number_display",
+                  "ufc_scratchpad_string_1_display",
+                  "ufc_scratchpad_string_2_display"
+                ],
+                "window_duration_s": 1.173
+              },
+              "vision_evidence": {
+                "confidence": "high",
+                "fresh_fact_ids": [
+                  "bit_root_page_visible",
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "hsi_map_layer_visible",
+                  "hsi_page_visible"
+                ],
+                "late_display_anchors": [
+                  "bit_root_page_visible",
+                  "fcs_page_visible",
+                  "hsi_map_layer_visible",
+                  "hsi_page_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "fcsmc_final_go_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_page_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible",
+                  "supt_page_visible",
+                  "tac_page_visible"
+                ],
+                "seen_fact_ids": [
+                  "bit_root_page_visible",
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "hsi_map_layer_visible",
+                  "hsi_page_visible"
+                ],
+                "source_status": "available",
+                "visual_candidate_steps": [
+                  "S08",
+                  "S09",
+                  "S12",
+                  "S13"
+                ]
+              }
+            },
+            "vision": {
+              "frame_id": "1779037955374_000029",
+              "frame_ids": [
+                "1779037955374_000029"
+              ],
+              "frame_stale": false,
+              "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+              "observation_seq": 6410,
+              "observation_t_wall_ms": 1779037955307,
+              "observation_t_wall_s": 1779037955.3069358,
+              "status": "partial",
+              "sync_delta_ms": 97,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_wall_ms": 1779037955277,
+              "vision_used": true
+            },
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779037955374_000029"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": [
+              {
+                "fact_id": "tac_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "supt_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcs_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcs_page_x_marks_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "bit_root_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_intermediate_result_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_in_test_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_final_go_result_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "hsi_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "hsi_map_layer_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "ins_grnd_alignment_text_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "ins_ok_text_visible",
+                "frame_ids": null,
+                "status": null
+              }
+            ]
+          },
+          "intent": "help",
+          "message": "[REDACTED_USER_MESSAGE]",
+          "metadata": {
+            "evidence_packet_summary": {
+              "blocked_gate_count": 7,
+              "conflicts": [],
+              "recent_action_count": 1,
+              "telemetry_missing_source_count": 4,
+              "telemetry_status": "nominal",
+              "telemetry_window_digest": {
+                "changed_var_count": 0,
+                "contradiction_count": 0,
+                "frame_count": 20,
+                "latest_seq": 6410
+              },
+              "vision_fresh_count": 5,
+              "vision_seen_count": 5,
+              "vision_status": "available"
+            },
+            "frame_id": "1779037955374_000029",
+            "fused_missing_conditions": [
+              "vars.comm1_freq_134_000==true"
+            ],
+            "fused_step_id": "S09",
+            "grounding_cache_hit": false,
+            "grounding_error_type": null,
+            "grounding_missing": false,
+            "grounding_missing_requested": false,
+            "grounding_policy_filtered_out_count": 0,
+            "grounding_policy_id": null,
+            "grounding_policy_version": null,
+            "grounding_reason": null,
+            "grounding_reason_requested": null,
+            "grounding_snippet_ids": [
+              "fa18c_startup_master_1"
+            ],
+            "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+            "layout_id": "fa18c_composite_panel_v2",
+            "prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+            "prompt_tokens_est": 1096,
+            "prompt_trimmed": true,
+            "scenario_profile": "airfield",
+            "source_chunk_refs": [
+              "fa18c_startup_master/fa18c_startup_master_1",
+              "Appendix - Training Task Syllabus/Appendix - Training Task Syllabus_5",
+              "fa18c_coldstart_quiz/fa18c_coldstart_quiz_1",
+              "fa18c_error_coding_guide/fa18c_error_coding_guide_10",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_92"
+            ],
+            "state_harness_conflicts": [],
+            "state_harness_telemetry_status": "nominal",
+            "sync_delta_ms": 97,
+            "vision_fact_seen_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "vision_fact_status": "available",
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779037955374_000029"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+              "uncertain_fact_ids": []
+            },
+            "vision_fallback_reason": null,
+            "vision_frame_ids": [
+              "1779037955374_000029"
+            ],
+            "vision_status": "partial",
+            "vision_used": true
+          },
+          "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+          "request_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "timestamp": "2026-05-17T17:12:42.284058+00:00",
+          "version": "v1"
+        },
+        "related_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "vision_refs": [
+          "1779037955374_000029"
+        ]
+      },
+      {
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "kind": "overlay_requested",
+        "lineno": 6756,
+        "metadata": {
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "sync_delta_ms": 97,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "action": "clear",
+          "attempt_count": 1,
+          "cmd_id": "68e6e4f3-3d4f-4bd7-8889-05e072dabe79",
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "schema_version": "v2",
+          "sync_delta_ms": 97,
+          "target": "pnt_51",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "kind": "overlay_requested",
+        "lineno": 6757,
+        "metadata": {
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "sync_delta_ms": 97,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "action": "highlight",
+          "attempt_count": 1,
+          "cmd_id": "b6e281a2-4647-4d54-b1cf-43e33e3fd774",
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "schema_version": "v2",
+          "sync_delta_ms": 97,
+          "target": "pnt_124",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "kind": "overlay_requested",
+        "lineno": 6758,
+        "metadata": {
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "sync_delta_ms": 97,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "action": "highlight",
+          "attempt_count": 1,
+          "cmd_id": "692d711e-9cc6-4a48-af92-2d71f042569e",
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "schema_version": "v2",
+          "sync_delta_ms": 97,
+          "target": "pnt_111",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "kind": "tutor_response",
+        "lineno": 6759,
+        "metadata": {
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "sync_delta_ms": 97,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "actions": [
+            {
+              "element_id": "pnt_124",
+              "evidence_refs": [
+                "VARS.left_ddi_on"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "frame_id": "1779037955374_000029",
+              "fused_missing_conditions": [
+                "vars.comm1_freq_134_000==true"
+              ],
+              "fused_step_id": "S09",
+              "generation_mode": "model",
+              "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "harness_validator_repair",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 97,
+              "target": "ufc_comm1_channel_selector_pull",
+              "type": "overlay",
+              "vision_fact_extractor_used": true,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779037955374_000029"
+                ],
+                "fresh_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "tac_page_visible",
+                  "supt_page_visible",
+                  "fcsmc_page_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_final_go_result_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "seen_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "status": "available",
+                "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_used": true,
+              "vlm_call_reason": "missing_pre_trigger_frame",
+              "vlm_call_status": "called"
+            },
+            {
+              "element_id": "pnt_111",
+              "evidence_refs": [
+                "VARS.left_ddi_on"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "frame_id": "1779037955374_000029",
+              "fused_missing_conditions": [
+                "vars.comm1_freq_134_000==true"
+              ],
+              "fused_step_id": "S09",
+              "generation_mode": "model",
+              "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "harness_validator_repair",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 97,
+              "target": "ufc_key_1",
+              "type": "overlay",
+              "vision_fact_extractor_used": true,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779037955374_000029"
+                ],
+                "fresh_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "tac_page_visible",
+                  "supt_page_visible",
+                  "fcsmc_page_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_final_go_result_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "seen_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "status": "available",
+                "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_used": true,
+              "vlm_call_reason": "missing_pre_trigger_frame",
+              "vlm_call_status": "called"
+            }
+          ],
+          "actor": "tutor",
+          "explanations": [
+            "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
+          ],
+          "in_reply_to": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "message": "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。",
+          "metadata": {
+            "dcs_tutor_text": {
+              "clear_view": false,
+              "cmd_id": "736cc68e-031e-4b7f-b692-052ff32beaba",
+              "display_time_s": 12.0,
+              "reason": null,
+              "status": "ok",
+              "text": "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
+            },
+            "delta_dropped_count": 0,
+            "deterministic_inference_error": null,
+            "deterministic_step_hint": {
+              "inferred_step_id": "S09",
+              "missing_conditions": [
+                "vars.comm1_freq_134_000==true"
+              ],
+              "observability": "observable",
+              "observability_status": "observable",
+              "recent_ui_targets": [
+                "left_mdi_pb15"
+              ],
+              "requires_visual_confirmation": false,
+              "step_evidence_requirements": [
+                "var",
+                "delta",
+                "rag"
+              ],
+              "step_ui_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button"
+              ]
+            },
+            "diagnosis": {
+              "error_category": "OM",
+              "step_id": "S09"
+            },
+            "evidence_guardrail_applied": true,
+            "evidence_guardrail_reasons": [
+              "invalid_target_evidence_refs:ufc_comm1_channel_selector_pull"
+            ],
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "failure_code": "evidence_fail",
+            "failure_codes": [
+              "evidence_fail"
+            ],
+            "failure_stage": "evidence_guardrail",
+            "fallback_overlay_reason": "deterministic_step:S09",
+            "fallback_overlay_used": true,
+            "final_action_plan": {
+              "overlay_step_id": "S09",
+              "source": "validator_repair",
+              "step_id": "S09",
+              "targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "text_only": false
+            },
+            "final_action_plan_source": "validator_repair",
+            "final_overlay_targets": [
+              "ufc_comm1_channel_selector_pull",
+              "ufc_key_1"
+            ],
+            "final_public_response": {
+              "actions": [
+                {
+                  "element_id": "pnt_124",
+                  "evidence_refs": [
+                    "VARS.left_ddi_on"
+                  ],
+                  "evidence_required": true,
+                  "final_overlay_targets": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1"
+                  ],
+                  "frame_id": "1779037955374_000029",
+                  "fused_missing_conditions": [
+                    "vars.comm1_freq_134_000==true"
+                  ],
+                  "fused_step_id": "S09",
+                  "generation_mode": "model",
+                  "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+                  "intent": "highlight",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "message_category": "harness_validator_repair",
+                  "style": {
+                    "color": "#00ffcc",
+                    "style": "highlight",
+                    "thickness": 2
+                  },
+                  "sync_delta_ms": 97,
+                  "target": "ufc_comm1_channel_selector_pull",
+                  "type": "overlay",
+                  "vision_fact_extractor_used": true,
+                  "vision_fact_summary": {
+                    "frame_ids": [
+                      "1779037955374_000029"
+                    ],
+                    "fresh_fact_ids": [
+                      "fcs_page_visible",
+                      "fcs_page_x_marks_visible",
+                      "bit_root_page_visible",
+                      "hsi_page_visible",
+                      "hsi_map_layer_visible"
+                    ],
+                    "not_seen_fact_ids": [
+                      "tac_page_visible",
+                      "supt_page_visible",
+                      "fcsmc_page_visible",
+                      "fcsmc_intermediate_result_visible",
+                      "fcsmc_in_test_visible",
+                      "fcsmc_final_go_result_visible",
+                      "ins_grnd_alignment_text_visible",
+                      "ins_ok_text_visible"
+                    ],
+                    "seen_fact_ids": [
+                      "fcs_page_visible",
+                      "fcs_page_x_marks_visible",
+                      "bit_root_page_visible",
+                      "hsi_page_visible",
+                      "hsi_map_layer_visible"
+                    ],
+                    "status": "available",
+                    "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+                    "uncertain_fact_ids": []
+                  },
+                  "vision_fallback_reason": null,
+                  "vision_used": true,
+                  "vlm_call_reason": "missing_pre_trigger_frame",
+                  "vlm_call_status": "called"
+                },
+                {
+                  "element_id": "pnt_111",
+                  "evidence_refs": [
+                    "VARS.left_ddi_on"
+                  ],
+                  "evidence_required": true,
+                  "final_overlay_targets": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1"
+                  ],
+                  "frame_id": "1779037955374_000029",
+                  "fused_missing_conditions": [
+                    "vars.comm1_freq_134_000==true"
+                  ],
+                  "fused_step_id": "S09",
+                  "generation_mode": "model",
+                  "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+                  "intent": "highlight",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "message_category": "harness_validator_repair",
+                  "style": {
+                    "color": "#00ffcc",
+                    "style": "highlight",
+                    "thickness": 2
+                  },
+                  "sync_delta_ms": 97,
+                  "target": "ufc_key_1",
+                  "type": "overlay",
+                  "vision_fact_extractor_used": true,
+                  "vision_fact_summary": {
+                    "frame_ids": [
+                      "1779037955374_000029"
+                    ],
+                    "fresh_fact_ids": [
+                      "fcs_page_visible",
+                      "fcs_page_x_marks_visible",
+                      "bit_root_page_visible",
+                      "hsi_page_visible",
+                      "hsi_map_layer_visible"
+                    ],
+                    "not_seen_fact_ids": [
+                      "tac_page_visible",
+                      "supt_page_visible",
+                      "fcsmc_page_visible",
+                      "fcsmc_intermediate_result_visible",
+                      "fcsmc_in_test_visible",
+                      "fcsmc_final_go_result_visible",
+                      "ins_grnd_alignment_text_visible",
+                      "ins_ok_text_visible"
+                    ],
+                    "seen_fact_ids": [
+                      "fcs_page_visible",
+                      "fcs_page_x_marks_visible",
+                      "bit_root_page_visible",
+                      "hsi_page_visible",
+                      "hsi_map_layer_visible"
+                    ],
+                    "status": "available",
+                    "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+                    "uncertain_fact_ids": []
+                  },
+                  "vision_fallback_reason": null,
+                  "vision_used": true,
+                  "vlm_call_reason": "missing_pre_trigger_frame",
+                  "vlm_call_status": "called"
+                }
+              ],
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S09"
+              },
+              "explanations": [
+                "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
+              ],
+              "message": "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。",
+              "next": {
+                "step_id": "S09"
+              }
+            },
+            "frame_id": "1779037955374_000029",
+            "fused_missing_conditions": [
+              "vars.comm1_freq_134_000==true"
+            ],
+            "fused_step_id": "S09",
+            "generation_mode": "model",
+            "generation_prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+            "generation_prompt_tokens_est": 1096,
+            "generation_prompt_trimmed": true,
+            "harness_action_plan": {
+              "overlay_step_id": "S09",
+              "source": "validator_repair",
+              "step_id": "S09",
+              "targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "text_only": false
+            },
+            "harness_trace": {
+              "candidates": [
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "left_mdi_brightness_selector",
+                    "right_mdi_brightness_selector",
+                    "ampcd_off_brightness_knob",
+                    "hud_symbology_brightness_knob",
+                    "left_mdi_pb18",
+                    "left_mdi_pb15",
+                    "right_mdi_pb18",
+                    "right_mdi_pb5"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S08",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S09",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "ins_mode_knob",
+                    "ampcd_pb19"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S12",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "radar_mode_knob"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S13",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.55,
+                  "proposed_next_action_target_ids": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button"
+                  ],
+                  "role": "candidate_not_authoritative",
+                  "source": "deterministic",
+                  "step_id": "S09",
+                  "supporting_evidence_refs": [
+                    "GATES.S09.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S09",
+                  "supporting_evidence_refs": [
+                    "GATES.S09.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "eng_crank_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S10",
+                  "supporting_evidence_refs": [
+                    "GATES.S10.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S11",
+                  "supporting_evidence_refs": [
+                    "GATES.S11.completion"
+                  ]
+                }
+              ],
+              "chosen_candidate": {
+                "confidence": 0.86,
+                "proposed_next_action_target_ids": [
+                  "ufc_comm1_channel_selector_pull",
+                  "ufc_key_1",
+                  "ufc_key_3",
+                  "ufc_key_4",
+                  "ufc_key_0",
+                  "ufc_ent_button"
+                ],
+                "role": "candidate",
+                "source": "visual_anchor",
+                "step_id": "S09",
+                "supporting_evidence_refs": [
+                  "VISION_FACTS.bit_root_page_visible",
+                  "VISION_FACTS.fcs_page_visible",
+                  "VISION_FACTS.hsi_map_layer_visible",
+                  "VISION_FACTS.hsi_page_visible"
+                ]
+              },
+              "evidence_packet_summary": {
+                "blocked_gate_count": 7,
+                "conflicts": [],
+                "recent_action_count": 1,
+                "telemetry_missing_source_count": 4,
+                "telemetry_status": "nominal",
+                "telemetry_window_digest": {
+                  "changed_var_count": 0,
+                  "contradiction_count": 0,
+                  "frame_count": 20,
+                  "latest_seq": 6410
+                },
+                "vision_fresh_count": 5,
+                "vision_seen_count": 5,
+                "vision_status": "available"
+              },
+              "final_action_plan": {
+                "overlay_step_id": "S09",
+                "source": "validator_repair",
+                "step_id": "S09",
+                "targets": [
+                  "ufc_comm1_channel_selector_pull",
+                  "ufc_key_1"
+                ],
+                "text_only": false
+              },
+              "final_overlay_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "message_category": "harness_validator_repair",
+              "model_decision": {
+                "evidence_refs": [],
+                "generation_mode": "model",
+                "overlay_targets": [],
+                "status": "ok",
+                "step_id": "S09"
+              },
+              "rejected_candidates": [],
+              "repair_result": {
+                "applied": true,
+                "evidence_ref_repair": {
+                  "details": [],
+                  "repair_applied": false
+                },
+                "json_repaired": false,
+                "path": "validator_repair"
+              },
+              "schema_version": "v1",
+              "validator_result": {
+                "fallback_overlay_reason": "deterministic_step:S09",
+                "fallback_overlay_used": true,
+                "reasons": [
+                  "target_dropped_by_max_overlay_targets:ufc_key_3",
+                  "target_dropped_by_max_overlay_targets:ufc_key_4",
+                  "target_dropped_by_max_overlay_targets:ufc_key_0",
+                  "target_dropped_by_max_overlay_targets:ufc_ent_button"
+                ],
+                "rejected": true,
+                "rejected_model_step_id": null
+              },
+              "vlm_call": {
+                "extractor_used": true,
+                "frame_ids": [
+                  "1779037955374_000029"
+                ],
+                "reason": "missing_pre_trigger_frame",
+                "status": "called",
+                "sync_delta_ms": 97,
+                "sync_status": "matched_future_fallback",
+                "vision_fact_status": "available",
+                "vision_status": "partial"
+              }
+            },
+            "harness_validation_reasons": [
+              "target_dropped_by_max_overlay_targets:ufc_key_3",
+              "target_dropped_by_max_overlay_targets:ufc_key_4",
+              "target_dropped_by_max_overlay_targets:ufc_key_0",
+              "target_dropped_by_max_overlay_targets:ufc_ent_button"
+            ],
+            "harness_validator_fallback_reason": "deterministic_step:S09",
+            "harness_validator_mapping": {
+              "allowed_evidence_ref_count": 130,
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S09"
+              },
+              "next": {
+                "step_id": "S09"
+              },
+              "observability_status": "observable",
+              "requires_visual_confirmation": false
+            },
+            "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+            "help_response": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S09"
+              },
+              "explanations": [
+                "请先操作 ufc_comm1_channel_selector_pull。"
+              ],
+              "next": {
+                "step_id": "S09"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.51,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "VARS.left_ddi_on",
+                    "target": "ufc_comm1_channel_selector_pull",
+                    "type": "var"
+                  },
+                  {
+                    "grounding_confidence": 0.51,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "VARS.left_ddi_on",
+                    "target": "ufc_key_1",
+                    "type": "var"
+                  }
+                ],
+                "targets": [
+                  "ufc_comm1_channel_selector_pull",
+                  "ufc_key_1"
+                ]
+              }
+            },
+            "help_response_pre_guardrail": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S09"
+              },
+              "explanations": [
+                "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+              ],
+              "next": {
+                "step_id": "S09"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "gates_summary.S09.completion",
+                    "target": "ufc_comm1_channel_selector_pull",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "ufc_comm1_channel_selector_pull"
+                ]
+              }
+            },
+            "json_repair_reasons": [],
+            "json_repaired": false,
+            "latency_ms": 4406,
+            "layout_id": "fa18c_composite_panel_v2",
+            "main_help_multimodal_input_enabled": false,
+            "message_category": "harness_validator_repair",
+            "model": "simtutor-base",
+            "model_raw_diagnosis": {
+              "error_category": "OM",
+              "step_id": "S09"
+            },
+            "model_raw_explanations": [
+              "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+              "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+            ],
+            "model_raw_help_response": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S09"
+              },
+              "explanations": [
+                "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+                "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+              ],
+              "next": {
+                "step_id": "S09"
+              },
+              "overlay": {
+                "evidence": [],
+                "targets": []
+              }
+            },
+            "model_raw_next": {
+              "step_id": "S09"
+            },
+            "multimodal_candidate_frame_ids": [
+              "1779037955374_000029"
+            ],
+            "multimodal_capability_enabled": true,
+            "multimodal_failed_frame_ids": [],
+            "multimodal_failure_reason": null,
+            "multimodal_fallback_to_text": false,
+            "multimodal_frame_failures": {},
+            "multimodal_frame_ids": [],
+            "multimodal_image_count": 0,
+            "multimodal_images_built": false,
+            "multimodal_input_present": true,
+            "multimodal_path_attempted": false,
+            "multimodal_path_success": false,
+            "multimodal_primary_frame_id": "1779037955374_000029",
+            "next": {
+              "step_id": "S09"
+            },
+            "observability_status": "observable",
+            "procedural_guidance_original_explanations": [
+              "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+              "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+            ],
+            "procedural_guidance_original_message": "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+            "procedural_guidance_rewrite_reason": "s09_comm1_frequency_guidance",
+            "procedural_guidance_rewritten": true,
+            "prompt_budget_used": 955,
+            "prompt_build": {
+              "allowed_evidence_refs": [
+                "RAG_SNIPPETS.fa18c_startup_master_1",
+                "VISION_FACTS.tac_page_visible@1779037955374_000029",
+                "VISION_FACTS.supt_page_visible@1779037955374_000029"
+              ],
+              "delta_summary_items": 0,
+              "delta_summary_top_k": 20,
+              "evidence_refs_count": 3,
+              "grounding_applied": true,
+              "grounding_missing": false,
+              "grounding_missing_requested": false,
+              "grounding_reason": null,
+              "max_overlay_targets": 2,
+              "max_prompt_chars": 9000,
+              "max_prompt_tokens_est": 2400,
+              "preferred_overlay_target": "ufc_comm1_channel_selector_pull",
+              "prompt_chars": 4381,
+              "prompt_tokens_est": 1096,
+              "prompt_trimmed": true,
+              "rag_snippet_count": 1,
+              "rag_snippet_ids": [
+                "fa18c_startup_master_1"
+              ],
+              "state_harness_conflicts": [],
+              "state_harness_telemetry_status": "nominal",
+              "state_harness_visual_candidate_steps": [
+                "S08",
+                "S09",
+                "S12",
+                "S13"
+              ],
+              "trim_reasons": [
+                "trimmed_delta_summary",
+                "trimmed_step_enum",
+                "trimmed_vars",
+                "trimmed_overlay_enum",
+                "trimmed_rag_snippets",
+                "compact_template"
+              ],
+              "vision_fact_seen_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "vision_fact_status": "available"
+            },
+            "prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+            "prompt_tokens_est": 1096,
+            "prompt_trimmed": true,
+            "provider": "openai_compat",
+            "repair_applied": true,
+            "repair_details": {
+              "details": [],
+              "dropped_unrepairable_evidence": 0,
+              "repair_applied": false,
+              "repaired_evidence_types": 0
+            },
+            "request_prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+            "request_prompt_tokens_est": 1096,
+            "request_prompt_trimmed": true,
+            "requires_visual_confirmation": false,
+            "response_mapping": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S09"
+              },
+              "next": {
+                "step_id": "S09"
+              },
+              "observability_status": "observable",
+              "requires_visual_confirmation": false
+            },
+            "retry_count": 0,
+            "retry_reason": null,
+            "scenario_profile": "airfield",
+            "state_key": "1e8dbb7e22d244cb8792aa149dc873906b34d3c0c1dc77544b5d0697c92cafc9",
+            "sync_delta_ms": 97,
+            "validator_rejected": true,
+            "vision": {
+              "frame_id": "1779037955374_000029",
+              "frame_ids": [
+                "1779037955374_000029"
+              ],
+              "frame_stale": false,
+              "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+              "observation_seq": 6410,
+              "observation_t_wall_ms": 1779037955307,
+              "observation_t_wall_s": 1779037955.3069358,
+              "pre_trigger_frame": null,
+              "selected_frames": [
+                {
+                  "capture_wall_ms": 1779037955374,
+                  "channel": "composite_panel",
+                  "frame_id": "1779037955374_000029",
+                  "frame_seq": 29,
+                  "frame_stale": false,
+                  "height": 1440,
+                  "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779037955374_000029_vlm.png",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "role": "trigger_frame",
+                  "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779037955374_000029.png",
+                  "sync_delta_ms": 97,
+                  "sync_miss_reason": null,
+                  "sync_status": "matched_future_fallback",
+                  "width": 3440
+                }
+              ],
+              "status": "partial",
+              "sync_delta_ms": 97,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_frame": {
+                "capture_wall_ms": 1779037955374,
+                "channel": "composite_panel",
+                "frame_id": "1779037955374_000029",
+                "frame_seq": 29,
+                "frame_stale": false,
+                "height": 1440,
+                "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779037955374_000029_vlm.png",
+                "layout_id": "fa18c_composite_panel_v2",
+                "role": "trigger_frame",
+                "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779037955374_000029.png",
+                "sync_delta_ms": 97,
+                "sync_miss_reason": null,
+                "sync_status": "matched_future_fallback",
+                "width": 3440
+              },
+              "trigger_wall_ms": 1779037955277,
+              "vision_used": true
+            },
+            "vision_fact_active_step_ids": [
+              "S08"
+            ],
+            "vision_fact_extractor_used": true,
+            "vision_fact_status": "available",
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779037955374_000029"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "fcs_page_x_marks_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": [
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "tac_page_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "supt_page_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "fcs_page_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "fcs_page_x_marks_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "bit_root_page_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "fcsmc_page_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "fcsmc_intermediate_result_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "fcsmc_in_test_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 600000,
+                "expires_at_wall_ms": 1779038555277,
+                "fact_id": "fcsmc_final_go_result_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": true
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "hsi_page_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "hsi_map_layer_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "ins_grnd_alignment_text_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779037957277,
+                "fact_id": "ins_ok_text_visible",
+                "observed_at_wall_ms": 1779037955277,
+                "source_frame_id": "1779037955374_000029",
+                "state": "not_seen",
+                "sticky": false
+              }
+            ],
+            "vision_fallback_reason": null,
+            "vision_frame_ids": [
+              "1779037955374_000029"
+            ],
+            "vision_status": "partial",
+            "vision_used": true,
+            "vlm_call_reason": "missing_pre_trigger_frame",
+            "vlm_call_status": "called"
+          },
+          "response_id": "507e3726-bab2-4d2c-852b-aa600bb3b3a9",
+          "status": "ok",
+          "timestamp": "2026-05-17T17:12:46.691368+00:00",
+          "version": "v1"
+        },
+        "related_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "vision_refs": [
+          "1779037955374_000029"
+        ]
+      }
+    ],
+    "tutor_request": {
+      "actor": "learner",
+      "context": {
+        "delta_dropped_count": 0,
+        "deterministic_step_hint": {
+          "action_hint": {
+            "target": "ufc_comm1_channel_selector_pull"
+          },
+          "gate_blocker_count": 1,
+          "inferred_step_id": "S09",
+          "missing_conditions_count": 1,
+          "observability": "observable",
+          "observability_status": "observable",
+          "overlay_step_id": "S09",
+          "recent_ui_targets": [
+            "left_mdi_pb15"
+          ],
+          "requires_visual_confirmation": false,
+          "scenario_profile": "airfield",
+          "step_ui_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button"
+          ]
+        },
+        "evidence_packet_summary": {
+          "blocked_gate_count": 7,
+          "conflicts": [],
+          "recent_action_count": 1,
+          "telemetry_missing_source_count": 4,
+          "telemetry_status": "nominal",
+          "telemetry_window_digest": {
+            "changed_var_count": 0,
+            "contradiction_count": 0,
+            "frame_count": 20,
+            "latest_seq": 6410
+          },
+          "vision_fresh_count": 5,
+          "vision_seen_count": 5,
+          "vision_status": "available"
+        },
+        "grounding_missing": false,
+        "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+        "grounding_reason": null,
+        "rag_topk": [
+          {
+            "chunk_id": "fa18c_startup_master_1",
+            "doc_id": "fa18c_startup_master",
+            "page_or_heading": "Master Step Table",
+            "score": 15.98560009496923,
+            "section": "Master Step Table",
+            "snippet_id": "fa18c_startup_master_1"
+          },
+          {
+            "chunk_id": "Appendix - Training Task Syllabus_5",
+            "doc_id": "Appendix - Training Task Syllabus",
+            "page_or_heading": "Phase P3 – Displays & Communications (S08–S09)",
+            "score": 14.558960000687737,
+            "section": "Phase P3 – Displays & Communications (S08–S09)",
+            "snippet_id": "Appendix - Training Task Syllabus_5"
+          },
+          {
+            "chunk_id": "fa18c_coldstart_quiz_1",
+            "doc_id": "fa18c_coldstart_quiz",
+            "page_or_heading": "Q1. Overall Goal",
+            "score": 13.29554266378183,
+            "section": "Q1. Overall Goal",
+            "snippet_id": "fa18c_coldstart_quiz_1"
+          },
+          {
+            "chunk_id": "fa18c_error_coding_guide_10",
+            "doc_id": "fa18c_error_coding_guide",
+            "page_or_heading": "3. Step Criticality",
+            "score": 13.120994677243015,
+            "section": "3. Step Criticality",
+            "snippet_id": "fa18c_error_coding_guide_10"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_92",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 93,
+            "score": 12.536685340631566,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_92"
+          }
+        ],
+        "scenario_profile": "airfield",
+        "state_harness": {
+          "conflicts": [],
+          "deterministic_candidate": {
+            "missing_conditions": [
+              "vars.comm1_freq_134_000==true"
+            ],
+            "overlay_step_id": "S09",
+            "role": "candidate_not_authoritative",
+            "step_id": "S09"
+          },
+          "telemetry_evidence": {
+            "confidence": "medium",
+            "early_vars": {
+              "battery_on": true,
+              "fire_test_a_complete": true,
+              "fire_test_b_complete": true,
+              "power_available": true
+            },
+            "observation_seq": 6410,
+            "source_status": "nominal",
+            "vars_source_missing_count": 4
+          },
+          "telemetry_window_digest": {
+            "changed_vars": [],
+            "contradictions": [],
+            "first_frame_only_values": [],
+            "frame_count": 20,
+            "last_seen_true": [
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "battery_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "fire_test_a_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "fire_test_b_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "fire_test_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "hud_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "left_ddi_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "mpcd_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 6410,
+                "var": "power_available"
+              }
+            ],
+            "latest_seq": 6410,
+            "latest_t_wall": 1779037955.3069358,
+            "stable_false_vars": [
+              "fcs_bit_switch_up",
+              "flap_auto",
+              "pitot_heat_on"
+            ],
+            "stable_true_vars": [
+              "battery_on",
+              "fire_test_a_complete",
+              "fire_test_b_complete",
+              "fire_test_complete",
+              "hud_on",
+              "left_ddi_on",
+              "mpcd_on",
+              "power_available",
+              "right_ddi_on"
+            ],
+            "unknown_or_missing_vars": [
+              "ins_fast_align_pressed",
+              "ufc_scratchpad_number_display",
+              "ufc_scratchpad_string_1_display",
+              "ufc_scratchpad_string_2_display"
+            ],
+            "window_duration_s": 1.173
+          },
+          "vision_evidence": {
+            "confidence": "high",
+            "fresh_fact_ids": [
+              "bit_root_page_visible",
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "hsi_map_layer_visible",
+              "hsi_page_visible"
+            ],
+            "late_display_anchors": [
+              "bit_root_page_visible",
+              "fcs_page_visible",
+              "hsi_map_layer_visible",
+              "hsi_page_visible"
+            ],
+            "not_seen_fact_ids": [
+              "fcsmc_final_go_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_page_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible",
+              "supt_page_visible",
+              "tac_page_visible"
+            ],
+            "seen_fact_ids": [
+              "bit_root_page_visible",
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "hsi_map_layer_visible",
+              "hsi_page_visible"
+            ],
+            "source_status": "available",
+            "visual_candidate_steps": [
+              "S08",
+              "S09",
+              "S12",
+              "S13"
+            ]
+          }
+        },
+        "vision": {
+          "frame_id": "1779037955374_000029",
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "frame_stale": false,
+          "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+          "observation_seq": 6410,
+          "observation_t_wall_ms": 1779037955307,
+          "observation_t_wall_s": 1779037955.3069358,
+          "status": "partial",
+          "sync_delta_ms": 97,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_wall_ms": 1779037955277,
+          "vision_used": true
+        },
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "fresh_fact_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "not_seen_fact_ids": [
+            "tac_page_visible",
+            "supt_page_visible",
+            "fcsmc_page_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_final_go_result_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "seen_fact_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "status": "available",
+          "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": [
+          {
+            "fact_id": "tac_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "supt_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcs_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcs_page_x_marks_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "bit_root_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_intermediate_result_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_in_test_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "hsi_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "hsi_map_layer_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "ins_grnd_alignment_text_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "ins_ok_text_visible",
+            "frame_ids": null,
+            "status": null
+          }
+        ]
+      },
+      "intent": "help",
+      "message": "[REDACTED_USER_MESSAGE]",
+      "metadata": {
+        "evidence_packet_summary": {
+          "blocked_gate_count": 7,
+          "conflicts": [],
+          "recent_action_count": 1,
+          "telemetry_missing_source_count": 4,
+          "telemetry_status": "nominal",
+          "telemetry_window_digest": {
+            "changed_var_count": 0,
+            "contradiction_count": 0,
+            "frame_count": 20,
+            "latest_seq": 6410
+          },
+          "vision_fresh_count": 5,
+          "vision_seen_count": 5,
+          "vision_status": "available"
+        },
+        "frame_id": "1779037955374_000029",
+        "fused_missing_conditions": [
+          "vars.comm1_freq_134_000==true"
+        ],
+        "fused_step_id": "S09",
+        "grounding_cache_hit": false,
+        "grounding_error_type": null,
+        "grounding_missing": false,
+        "grounding_missing_requested": false,
+        "grounding_policy_filtered_out_count": 0,
+        "grounding_policy_id": null,
+        "grounding_policy_version": null,
+        "grounding_reason": null,
+        "grounding_reason_requested": null,
+        "grounding_snippet_ids": [
+          "fa18c_startup_master_1"
+        ],
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "layout_id": "fa18c_composite_panel_v2",
+        "prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+        "prompt_tokens_est": 1096,
+        "prompt_trimmed": true,
+        "scenario_profile": "airfield",
+        "source_chunk_refs": [
+          "fa18c_startup_master/fa18c_startup_master_1",
+          "Appendix - Training Task Syllabus/Appendix - Training Task Syllabus_5",
+          "fa18c_coldstart_quiz/fa18c_coldstart_quiz_1",
+          "fa18c_error_coding_guide/fa18c_error_coding_guide_10",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_92"
+        ],
+        "state_harness_conflicts": [],
+        "state_harness_telemetry_status": "nominal",
+        "sync_delta_ms": 97,
+        "vision_fact_seen_ids": [
+          "fcs_page_visible",
+          "fcs_page_x_marks_visible",
+          "bit_root_page_visible",
+          "hsi_page_visible",
+          "hsi_map_layer_visible"
+        ],
+        "vision_fact_status": "available",
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "fresh_fact_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "not_seen_fact_ids": [
+            "tac_page_visible",
+            "supt_page_visible",
+            "fcsmc_page_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_final_go_result_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "seen_fact_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "status": "available",
+          "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+          "uncertain_fact_ids": []
+        },
+        "vision_fallback_reason": null,
+        "vision_frame_ids": [
+          "1779037955374_000029"
+        ],
+        "vision_status": "partial",
+        "vision_used": true
+      },
+      "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+      "request_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+      "timestamp": "2026-05-17T17:12:42.284058+00:00",
+      "version": "v1"
+    },
+    "tutor_response": {
+      "actions": [
+        {
+          "element_id": "pnt_124",
+          "evidence_refs": [
+            "VARS.left_ddi_on"
+          ],
+          "evidence_required": true,
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "intent": "highlight",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "style": {
+            "color": "#00ffcc",
+            "style": "highlight",
+            "thickness": 2
+          },
+          "sync_delta_ms": 97,
+          "target": "ufc_comm1_channel_selector_pull",
+          "type": "overlay",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        {
+          "element_id": "pnt_111",
+          "evidence_refs": [
+            "VARS.left_ddi_on"
+          ],
+          "evidence_required": true,
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "frame_id": "1779037955374_000029",
+          "fused_missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "fused_step_id": "S09",
+          "generation_mode": "model",
+          "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+          "intent": "highlight",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "harness_validator_repair",
+          "style": {
+            "color": "#00ffcc",
+            "style": "highlight",
+            "thickness": 2
+          },
+          "sync_delta_ms": 97,
+          "target": "ufc_key_1",
+          "type": "overlay",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "fcs_page_x_marks_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        }
+      ],
+      "actor": "tutor",
+      "explanations": [
+        "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
+      ],
+      "in_reply_to": "8931fe82-2c72-4fbe-ab49-c78690820773",
+      "message": "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。",
+      "metadata": {
+        "dcs_tutor_text": {
+          "clear_view": false,
+          "cmd_id": "736cc68e-031e-4b7f-b692-052ff32beaba",
+          "display_time_s": 12.0,
+          "reason": null,
+          "status": "ok",
+          "text": "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
+        },
+        "delta_dropped_count": 0,
+        "deterministic_inference_error": null,
+        "deterministic_step_hint": {
+          "inferred_step_id": "S09",
+          "missing_conditions": [
+            "vars.comm1_freq_134_000==true"
+          ],
+          "observability": "observable",
+          "observability_status": "observable",
+          "recent_ui_targets": [
+            "left_mdi_pb15"
+          ],
+          "requires_visual_confirmation": false,
+          "step_evidence_requirements": [
+            "var",
+            "delta",
+            "rag"
+          ],
+          "step_ui_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button"
+          ]
+        },
+        "diagnosis": {
+          "error_category": "OM",
+          "step_id": "S09"
+        },
+        "evidence_guardrail_applied": true,
+        "evidence_guardrail_reasons": [
+          "invalid_target_evidence_refs:ufc_comm1_channel_selector_pull"
+        ],
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "failure_code": "evidence_fail",
+        "failure_codes": [
+          "evidence_fail"
+        ],
+        "failure_stage": "evidence_guardrail",
+        "fallback_overlay_reason": "deterministic_step:S09",
+        "fallback_overlay_used": true,
+        "final_action_plan": {
+          "overlay_step_id": "S09",
+          "source": "validator_repair",
+          "step_id": "S09",
+          "targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "text_only": false
+        },
+        "final_action_plan_source": "validator_repair",
+        "final_overlay_targets": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1"
+        ],
+        "final_public_response": {
+          "actions": [
+            {
+              "element_id": "pnt_124",
+              "evidence_refs": [
+                "VARS.left_ddi_on"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "frame_id": "1779037955374_000029",
+              "fused_missing_conditions": [
+                "vars.comm1_freq_134_000==true"
+              ],
+              "fused_step_id": "S09",
+              "generation_mode": "model",
+              "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "harness_validator_repair",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 97,
+              "target": "ufc_comm1_channel_selector_pull",
+              "type": "overlay",
+              "vision_fact_extractor_used": true,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779037955374_000029"
+                ],
+                "fresh_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "tac_page_visible",
+                  "supt_page_visible",
+                  "fcsmc_page_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_final_go_result_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "seen_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "status": "available",
+                "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_used": true,
+              "vlm_call_reason": "missing_pre_trigger_frame",
+              "vlm_call_status": "called"
+            },
+            {
+              "element_id": "pnt_111",
+              "evidence_refs": [
+                "VARS.left_ddi_on"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1"
+              ],
+              "frame_id": "1779037955374_000029",
+              "fused_missing_conditions": [
+                "vars.comm1_freq_134_000==true"
+              ],
+              "fused_step_id": "S09",
+              "generation_mode": "model",
+              "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "harness_validator_repair",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 97,
+              "target": "ufc_key_1",
+              "type": "overlay",
+              "vision_fact_extractor_used": true,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779037955374_000029"
+                ],
+                "fresh_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "tac_page_visible",
+                  "supt_page_visible",
+                  "fcsmc_page_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_final_go_result_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "seen_fact_ids": [
+                  "fcs_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible"
+                ],
+                "status": "available",
+                "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_used": true,
+              "vlm_call_reason": "missing_pre_trigger_frame",
+              "vlm_call_status": "called"
+            }
+          ],
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S09"
+          },
+          "explanations": [
+            "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
+          ],
+          "message": "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。",
+          "next": {
+            "step_id": "S09"
+          }
+        },
+        "frame_id": "1779037955374_000029",
+        "fused_missing_conditions": [
+          "vars.comm1_freq_134_000==true"
+        ],
+        "fused_step_id": "S09",
+        "generation_mode": "model",
+        "generation_prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+        "generation_prompt_tokens_est": 1096,
+        "generation_prompt_trimmed": true,
+        "harness_action_plan": {
+          "overlay_step_id": "S09",
+          "source": "validator_repair",
+          "step_id": "S09",
+          "targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "text_only": false
+        },
+        "harness_trace": {
+          "candidates": [
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+                "left_mdi_pb18",
+                "left_mdi_pb15",
+                "right_mdi_pb18",
+                "right_mdi_pb5"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S08",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible"
+              ]
+            },
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S09",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible"
+              ]
+            },
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "ins_mode_knob",
+                "ampcd_pb19"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S12",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible"
+              ]
+            },
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "radar_mode_knob"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S13",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible"
+              ]
+            },
+            {
+              "confidence": 0.55,
+              "proposed_next_action_target_ids": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button"
+              ],
+              "role": "candidate_not_authoritative",
+              "source": "deterministic",
+              "step_id": "S09",
+              "supporting_evidence_refs": [
+                "GATES.S09.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S09",
+              "supporting_evidence_refs": [
+                "GATES.S09.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "eng_crank_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S10",
+              "supporting_evidence_refs": [
+                "GATES.S10.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S11",
+              "supporting_evidence_refs": [
+                "GATES.S11.completion"
+              ]
+            }
+          ],
+          "chosen_candidate": {
+            "confidence": 0.86,
+            "proposed_next_action_target_ids": [
+              "ufc_comm1_channel_selector_pull",
+              "ufc_key_1",
+              "ufc_key_3",
+              "ufc_key_4",
+              "ufc_key_0",
+              "ufc_ent_button"
+            ],
+            "role": "candidate",
+            "source": "visual_anchor",
+            "step_id": "S09",
+            "supporting_evidence_refs": [
+              "VISION_FACTS.bit_root_page_visible",
+              "VISION_FACTS.fcs_page_visible",
+              "VISION_FACTS.hsi_map_layer_visible",
+              "VISION_FACTS.hsi_page_visible"
+            ]
+          },
+          "evidence_packet_summary": {
+            "blocked_gate_count": 7,
+            "conflicts": [],
+            "recent_action_count": 1,
+            "telemetry_missing_source_count": 4,
+            "telemetry_status": "nominal",
+            "telemetry_window_digest": {
+              "changed_var_count": 0,
+              "contradiction_count": 0,
+              "frame_count": 20,
+              "latest_seq": 6410
+            },
+            "vision_fresh_count": 5,
+            "vision_seen_count": 5,
+            "vision_status": "available"
+          },
+          "final_action_plan": {
+            "overlay_step_id": "S09",
+            "source": "validator_repair",
+            "step_id": "S09",
+            "targets": [
+              "ufc_comm1_channel_selector_pull",
+              "ufc_key_1"
+            ],
+            "text_only": false
+          },
+          "final_overlay_targets": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1"
+          ],
+          "message_category": "harness_validator_repair",
+          "model_decision": {
+            "evidence_refs": [],
+            "generation_mode": "model",
+            "overlay_targets": [],
+            "status": "ok",
+            "step_id": "S09"
+          },
+          "rejected_candidates": [],
+          "repair_result": {
+            "applied": true,
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "json_repaired": false,
+            "path": "validator_repair"
+          },
+          "schema_version": "v1",
+          "validator_result": {
+            "fallback_overlay_reason": "deterministic_step:S09",
+            "fallback_overlay_used": true,
+            "reasons": [
+              "target_dropped_by_max_overlay_targets:ufc_key_3",
+              "target_dropped_by_max_overlay_targets:ufc_key_4",
+              "target_dropped_by_max_overlay_targets:ufc_key_0",
+              "target_dropped_by_max_overlay_targets:ufc_ent_button"
+            ],
+            "rejected": true,
+            "rejected_model_step_id": null
+          },
+          "vlm_call": {
+            "extractor_used": true,
+            "frame_ids": [
+              "1779037955374_000029"
+            ],
+            "reason": "missing_pre_trigger_frame",
+            "status": "called",
+            "sync_delta_ms": 97,
+            "sync_status": "matched_future_fallback",
+            "vision_fact_status": "available",
+            "vision_status": "partial"
+          }
+        },
+        "harness_validation_reasons": [
+          "target_dropped_by_max_overlay_targets:ufc_key_3",
+          "target_dropped_by_max_overlay_targets:ufc_key_4",
+          "target_dropped_by_max_overlay_targets:ufc_key_0",
+          "target_dropped_by_max_overlay_targets:ufc_ent_button"
+        ],
+        "harness_validator_fallback_reason": "deterministic_step:S09",
+        "harness_validator_mapping": {
+          "allowed_evidence_ref_count": 130,
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S09"
+          },
+          "next": {
+            "step_id": "S09"
+          },
+          "observability_status": "observable",
+          "requires_visual_confirmation": false
+        },
+        "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+        "help_response": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S09"
+          },
+          "explanations": [
+            "请先操作 ufc_comm1_channel_selector_pull。"
+          ],
+          "next": {
+            "step_id": "S09"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.51,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "VARS.left_ddi_on",
+                "target": "ufc_comm1_channel_selector_pull",
+                "type": "var"
+              },
+              {
+                "grounding_confidence": 0.51,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "VARS.left_ddi_on",
+                "target": "ufc_key_1",
+                "type": "var"
+              }
+            ],
+            "targets": [
+              "ufc_comm1_channel_selector_pull",
+              "ufc_key_1"
+            ]
+          }
+        },
+        "help_response_pre_guardrail": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S09"
+          },
+          "explanations": [
+            "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+          ],
+          "next": {
+            "step_id": "S09"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "gates_summary.S09.completion",
+                "target": "ufc_comm1_channel_selector_pull",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "ufc_comm1_channel_selector_pull"
+            ]
+          }
+        },
+        "json_repair_reasons": [],
+        "json_repaired": false,
+        "latency_ms": 4406,
+        "layout_id": "fa18c_composite_panel_v2",
+        "main_help_multimodal_input_enabled": false,
+        "message_category": "harness_validator_repair",
+        "model": "simtutor-base",
+        "model_raw_diagnosis": {
+          "error_category": "OM",
+          "step_id": "S09"
+        },
+        "model_raw_explanations": [
+          "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+          "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+        ],
+        "model_raw_help_response": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S09"
+          },
+          "explanations": [
+            "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+            "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+          ],
+          "next": {
+            "step_id": "S09"
+          },
+          "overlay": {
+            "evidence": [],
+            "targets": []
+          }
+        },
+        "model_raw_next": {
+          "step_id": "S09"
+        },
+        "multimodal_candidate_frame_ids": [
+          "1779037955374_000029"
+        ],
+        "multimodal_capability_enabled": true,
+        "multimodal_failed_frame_ids": [],
+        "multimodal_failure_reason": null,
+        "multimodal_fallback_to_text": false,
+        "multimodal_frame_failures": {},
+        "multimodal_frame_ids": [],
+        "multimodal_image_count": 0,
+        "multimodal_images_built": false,
+        "multimodal_input_present": true,
+        "multimodal_path_attempted": false,
+        "multimodal_path_success": false,
+        "multimodal_primary_frame_id": "1779037955374_000029",
+        "next": {
+          "step_id": "S09"
+        },
+        "observability_status": "observable",
+        "procedural_guidance_original_explanations": [
+          "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+          "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+        ],
+        "procedural_guidance_original_message": "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+        "procedural_guidance_rewrite_reason": "s09_comm1_frequency_guidance",
+        "procedural_guidance_rewritten": true,
+        "prompt_budget_used": 955,
+        "prompt_build": {
+          "allowed_evidence_refs": [
+            "RAG_SNIPPETS.fa18c_startup_master_1",
+            "VISION_FACTS.tac_page_visible@1779037955374_000029",
+            "VISION_FACTS.supt_page_visible@1779037955374_000029"
+          ],
+          "delta_summary_items": 0,
+          "delta_summary_top_k": 20,
+          "evidence_refs_count": 3,
+          "grounding_applied": true,
+          "grounding_missing": false,
+          "grounding_missing_requested": false,
+          "grounding_reason": null,
+          "max_overlay_targets": 2,
+          "max_prompt_chars": 9000,
+          "max_prompt_tokens_est": 2400,
+          "preferred_overlay_target": "ufc_comm1_channel_selector_pull",
+          "prompt_chars": 4381,
+          "prompt_tokens_est": 1096,
+          "prompt_trimmed": true,
+          "rag_snippet_count": 1,
+          "rag_snippet_ids": [
+            "fa18c_startup_master_1"
+          ],
+          "state_harness_conflicts": [],
+          "state_harness_telemetry_status": "nominal",
+          "state_harness_visual_candidate_steps": [
+            "S08",
+            "S09",
+            "S12",
+            "S13"
+          ],
+          "trim_reasons": [
+            "trimmed_delta_summary",
+            "trimmed_step_enum",
+            "trimmed_vars",
+            "trimmed_overlay_enum",
+            "trimmed_rag_snippets",
+            "compact_template"
+          ],
+          "vision_fact_seen_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "vision_fact_status": "available"
+        },
+        "prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+        "prompt_tokens_est": 1096,
+        "prompt_trimmed": true,
+        "provider": "openai_compat",
+        "repair_applied": true,
+        "repair_details": {
+          "details": [],
+          "dropped_unrepairable_evidence": 0,
+          "repair_applied": false,
+          "repaired_evidence_types": 0
+        },
+        "request_prompt_hash": "04597a0364d86fcceb5dcfacc6e63180456f4a13bb5378808c6b744b707cfe6c",
+        "request_prompt_tokens_est": 1096,
+        "request_prompt_trimmed": true,
+        "requires_visual_confirmation": false,
+        "response_mapping": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S09"
+          },
+          "next": {
+            "step_id": "S09"
+          },
+          "observability_status": "observable",
+          "requires_visual_confirmation": false
+        },
+        "retry_count": 0,
+        "retry_reason": null,
+        "scenario_profile": "airfield",
+        "state_key": "1e8dbb7e22d244cb8792aa149dc873906b34d3c0c1dc77544b5d0697c92cafc9",
+        "sync_delta_ms": 97,
+        "validator_rejected": true,
+        "vision": {
+          "frame_id": "1779037955374_000029",
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "frame_stale": false,
+          "observation_ref": "8993ade2-5ed2-4ba1-bf00-63488a41c879",
+          "observation_seq": 6410,
+          "observation_t_wall_ms": 1779037955307,
+          "observation_t_wall_s": 1779037955.3069358,
+          "pre_trigger_frame": null,
+          "selected_frames": [
+            {
+              "capture_wall_ms": 1779037955374,
+              "channel": "composite_panel",
+              "frame_id": "1779037955374_000029",
+              "frame_seq": 29,
+              "frame_stale": false,
+              "height": 1440,
+              "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779037955374_000029_vlm.png",
+              "layout_id": "fa18c_composite_panel_v2",
+              "role": "trigger_frame",
+              "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779037955374_000029.png",
+              "sync_delta_ms": 97,
+              "sync_miss_reason": null,
+              "sync_status": "matched_future_fallback",
+              "width": 3440
+            }
+          ],
+          "status": "partial",
+          "sync_delta_ms": 97,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_frame": {
+            "capture_wall_ms": 1779037955374,
+            "channel": "composite_panel",
+            "frame_id": "1779037955374_000029",
+            "frame_seq": 29,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779037955374_000029_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779037955374_000029.png",
+            "sync_delta_ms": 97,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          },
+          "trigger_wall_ms": 1779037955277,
+          "vision_used": true
+        },
+        "vision_fact_active_step_ids": [
+          "S08"
+        ],
+        "vision_fact_extractor_used": true,
+        "vision_fact_status": "available",
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779037955374_000029"
+          ],
+          "fresh_fact_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "not_seen_fact_ids": [
+            "tac_page_visible",
+            "supt_page_visible",
+            "fcsmc_page_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_final_go_result_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "seen_fact_ids": [
+            "fcs_page_visible",
+            "fcs_page_x_marks_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible"
+          ],
+          "status": "available",
+          "summary_text": "seen=fcs_page_visible,fcs_page_x_marks_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible; not_seen=tac_page_visible,supt_page_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": [
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "tac_page_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "supt_page_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "fcs_page_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "fcs_page_x_marks_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "bit_root_page_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "fcsmc_page_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "fcsmc_intermediate_result_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "fcsmc_in_test_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 600000,
+            "expires_at_wall_ms": 1779038555277,
+            "fact_id": "fcsmc_final_go_result_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": true
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "hsi_page_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "hsi_map_layer_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "ins_grnd_alignment_text_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779037957277,
+            "fact_id": "ins_ok_text_visible",
+            "observed_at_wall_ms": 1779037955277,
+            "source_frame_id": "1779037955374_000029",
+            "state": "not_seen",
+            "sticky": false
+          }
+        ],
+        "vision_fallback_reason": null,
+        "vision_frame_ids": [
+          "1779037955374_000029"
+        ],
+        "vision_status": "partial",
+        "vision_used": true,
+        "vlm_call_reason": "missing_pre_trigger_frame",
+        "vlm_call_status": "called"
+      },
+      "response_id": "507e3726-bab2-4d2c-852b-aa600bb3b3a9",
+      "status": "ok",
+      "timestamp": "2026-05-17T17:12:46.691368+00:00",
+      "version": "v1"
+    }
+  },
+  "expectations": {
+    "expected_final_step_id": "S09",
+    "expected_overlay_target_ids": [
+      "ufc_comm1_channel_selector_pull",
+      "ufc_key_1"
+    ],
+    "final_response_source": "validator_repair",
+    "llm_decision_status": "repaired",
+    "vlm_call_status": "called"
+  },
+  "extraction_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+  "harness": {
+    "candidate_steps": [
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "left_mdi_brightness_selector",
+          "right_mdi_brightness_selector",
+          "ampcd_off_brightness_knob",
+          "hud_symbology_brightness_knob",
+          "left_mdi_pb18",
+          "left_mdi_pb15",
+          "right_mdi_pb18",
+          "right_mdi_pb5"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S08",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible"
+        ]
+      },
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1",
+          "ufc_key_3",
+          "ufc_key_4",
+          "ufc_key_0",
+          "ufc_ent_button"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible"
+        ]
+      },
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "ins_mode_knob",
+          "ampcd_pb19"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S12",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible"
+        ]
+      },
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "radar_mode_knob"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S13",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible"
+        ]
+      },
+      {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1",
+          "ufc_key_3",
+          "ufc_key_4",
+          "ufc_key_0",
+          "ufc_ent_button"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "GATES.S09.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1",
+          "ufc_key_3",
+          "ufc_key_4",
+          "ufc_key_0",
+          "ufc_ent_button"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "GATES.S09.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "eng_crank_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S10",
+        "supporting_evidence_refs": [
+          "GATES.S10.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S11",
+        "supporting_evidence_refs": [
+          "GATES.S11.completion"
+        ]
+      }
+    ],
+    "final_action_plan": {
+      "overlay_step_id": "S09",
+      "source": "validator_repair",
+      "step_id": "S09",
+      "targets": [
+        "ufc_comm1_channel_selector_pull",
+        "ufc_key_1"
+      ],
+      "text_only": false
+    },
+    "model_decision": {
+      "evidence_refs": [],
+      "generation_mode": "model",
+      "overlay_targets": [],
+      "status": "ok",
+      "step_id": "S09"
+    },
+    "repair_result": {
+      "applied": true,
+      "evidence_ref_repair": {
+        "details": [],
+        "repair_applied": false
+      },
+      "json_repaired": false,
+      "path": "validator_repair"
+    },
+    "trace": {
+      "candidates": [
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "right_mdi_pb18",
+            "right_mdi_pb5"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S08",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible"
+          ]
+        },
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S09",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible"
+          ]
+        },
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "ins_mode_knob",
+            "ampcd_pb19"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S12",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible"
+          ]
+        },
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "radar_mode_knob"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S13",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible"
+          ]
+        },
+        {
+          "confidence": 0.55,
+          "proposed_next_action_target_ids": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button"
+          ],
+          "role": "candidate_not_authoritative",
+          "source": "deterministic",
+          "step_id": "S09",
+          "supporting_evidence_refs": [
+            "GATES.S09.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S09",
+          "supporting_evidence_refs": [
+            "GATES.S09.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "eng_crank_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S10",
+          "supporting_evidence_refs": [
+            "GATES.S10.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S11",
+          "supporting_evidence_refs": [
+            "GATES.S11.completion"
+          ]
+        }
+      ],
+      "chosen_candidate": {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1",
+          "ufc_key_3",
+          "ufc_key_4",
+          "ufc_key_0",
+          "ufc_ent_button"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible"
+        ]
+      },
+      "evidence_packet_summary": {
+        "blocked_gate_count": 7,
+        "conflicts": [],
+        "recent_action_count": 1,
+        "telemetry_missing_source_count": 4,
+        "telemetry_status": "nominal",
+        "telemetry_window_digest": {
+          "changed_var_count": 0,
+          "contradiction_count": 0,
+          "frame_count": 20,
+          "latest_seq": 6410
+        },
+        "vision_fresh_count": 5,
+        "vision_seen_count": 5,
+        "vision_status": "available"
+      },
+      "final_action_plan": {
+        "overlay_step_id": "S09",
+        "source": "validator_repair",
+        "step_id": "S09",
+        "targets": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1"
+        ],
+        "text_only": false
+      },
+      "final_overlay_targets": [
+        "ufc_comm1_channel_selector_pull",
+        "ufc_key_1"
+      ],
+      "message_category": "harness_validator_repair",
+      "model_decision": {
+        "evidence_refs": [],
+        "generation_mode": "model",
+        "overlay_targets": [],
+        "status": "ok",
+        "step_id": "S09"
+      },
+      "rejected_candidates": [],
+      "repair_result": {
+        "applied": true,
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "json_repaired": false,
+        "path": "validator_repair"
+      },
+      "schema_version": "v1",
+      "validator_result": {
+        "fallback_overlay_reason": "deterministic_step:S09",
+        "fallback_overlay_used": true,
+        "reasons": [
+          "target_dropped_by_max_overlay_targets:ufc_key_3",
+          "target_dropped_by_max_overlay_targets:ufc_key_4",
+          "target_dropped_by_max_overlay_targets:ufc_key_0",
+          "target_dropped_by_max_overlay_targets:ufc_ent_button"
+        ],
+        "rejected": true,
+        "rejected_model_step_id": null
+      },
+      "vlm_call": {
+        "extractor_used": true,
+        "frame_ids": [
+          "1779037955374_000029"
+        ],
+        "reason": "missing_pre_trigger_frame",
+        "status": "called",
+        "sync_delta_ms": 97,
+        "sync_status": "matched_future_fallback",
+        "vision_fact_status": "available",
+        "vision_status": "partial"
+      }
+    },
+    "validator_result": {
+      "fallback_overlay_reason": "deterministic_step:S09",
+      "fallback_overlay_used": true,
+      "reasons": [
+        "target_dropped_by_max_overlay_targets:ufc_key_3",
+        "target_dropped_by_max_overlay_targets:ufc_key_4",
+        "target_dropped_by_max_overlay_targets:ufc_key_0",
+        "target_dropped_by_max_overlay_targets:ufc_ent_button"
+      ],
+      "rejected": true,
+      "rejected_model_step_id": null
+    }
+  },
+  "help_cycle_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+  "model_io": {
+    "help_response": {
+      "diagnosis": {
+        "error_category": "OM",
+        "step_id": "S09"
+      },
+      "explanations": [
+        "请先操作 ufc_comm1_channel_selector_pull。"
+      ],
+      "next": {
+        "step_id": "S09"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.51,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "VARS.left_ddi_on",
+            "target": "ufc_comm1_channel_selector_pull",
+            "type": "var"
+          },
+          {
+            "grounding_confidence": 0.51,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "VARS.left_ddi_on",
+            "target": "ufc_key_1",
+            "type": "var"
+          }
+        ],
+        "targets": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1"
+        ]
+      }
+    },
+    "model_raw_help_response": {
+      "diagnosis": {
+        "error_category": "OM",
+        "step_id": "S09"
+      },
+      "explanations": [
+        "需要更多信息/请确认: ufc_comm1_channel_selector_pull",
+        "当前步骤 S09 未完成，需将 COMM1 预设 1 编程为 134.000 MHz。请操作 UFC COMM1 通道选择器。"
+      ],
+      "next": {
+        "step_id": "S09"
+      },
+      "overlay": {
+        "evidence": [],
+        "targets": []
+      }
+    },
+    "raw_llm_text_attempt_count": 0,
+    "raw_llm_text_present": false
+  },
+  "request_id": "8931fe82-2c72-4fbe-ab49-c78690820773",
+  "request_id_missing": false,
+  "schema_version": "live_help_replay_fixture.v1",
+  "source_log": {
+    "event_count": 7520,
+    "malformed_lines": [],
+    "path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/logs/live_help_harness_smoke_20260517_170452.jsonl"
+  }
+}
