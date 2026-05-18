@@ -64,6 +64,38 @@ def test_final_evidence_consistency_rejects_missing_condition_satisfied_by_telem
     assert "missing_condition_satisfied_by_latest_telemetry:vars.comm1_freq_134_000==true" in result.reasons
 
 
+def test_final_evidence_consistency_rejects_numeric_missing_condition_satisfied_by_telemetry() -> None:
+    context = {
+        "vars": {"rpm_r": 26, "ext_refuel_probe_value": 1200},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S05",
+            "overlay_step_id": "S05",
+            "missing_conditions": [
+                "vars.rpm_r>=25",
+                "vars.ext_refuel_probe_value in [0,5000]",
+            ],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S05",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[
+            "vars.rpm_r>=25",
+            "vars.ext_refuel_probe_value in [0,5000]",
+        ],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert result.rejected_missing_conditions == (
+        "vars.rpm_r>=25",
+        "vars.ext_refuel_probe_value in [0,5000]",
+    )
+
+
 def test_final_evidence_consistency_does_not_use_stale_last_seen_true_when_latest_false() -> None:
     context = {
         "vars": {"apu_start_support_complete": False},
@@ -114,6 +146,49 @@ def test_final_evidence_consistency_rejects_already_satisfied_completion_gate() 
     assert result.accepted is False
     assert result.rejected_missing_conditions == ()
     assert "completion_gate_already_satisfied:S03" in result.reasons
+
+
+def test_final_evidence_consistency_rejects_allowed_completion_gate_but_ignores_no_rules() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {},
+            "gates": {
+                "S03.completion": {
+                    "status": "allowed",
+                    "allowed": True,
+                    "step_id": "S03",
+                    "gate_type": "completion",
+                    "reason_code": "ok",
+                },
+                "S04.completion": {
+                    "status": "allowed",
+                    "allowed": True,
+                    "step_id": "S04",
+                    "gate_type": "completion",
+                    "reason_code": "no_rules",
+                },
+            },
+        }
+    )
+
+    rejected = validate_final_evidence_consistency(
+        accepted_step_id="S03",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[],
+        latest_vars={},
+        evidence_packet=packet,
+    )
+    accepted = validate_final_evidence_consistency(
+        accepted_step_id="S04",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[],
+        latest_vars={},
+        evidence_packet=packet,
+    )
+
+    assert rejected.accepted is False
+    assert "completion_gate_already_satisfied:S03" in rejected.reasons
+    assert accepted.accepted is True
 
 
 def test_plan_harness_action_repairs_invalid_target_to_step_spec_target() -> None:

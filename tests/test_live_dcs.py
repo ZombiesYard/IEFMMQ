@@ -3430,8 +3430,9 @@ def test_normalize_observable_text_only_response_rewrites_bad_visual_excuse(tmp_
         loop._normalize_observable_text_only_response(response, request)
 
         assert response.metadata["observable_text_rewritten"] is True
-        assert response.message == "降级提示：你大概率卡在 S05，请先满足：vars.rpm_r>=25。"
-        assert response.explanations == ["降级提示：你大概率卡在 S05，请先满足：vars.rpm_r>=25。"]
+        assert response.message == "降级提示：你大概率卡在 S05，请先完成该步骤的未满足条件。"
+        assert response.explanations == ["降级提示：你大概率卡在 S05，请先完成该步骤的未满足条件。"]
+        assert "vars.rpm_r" not in response.message
     finally:
         loop.close()
 
@@ -3472,7 +3473,7 @@ def test_normalize_observable_text_only_response_rewrites_visual_analysis_unavai
         loop._normalize_observable_text_only_response(response, request)
 
         assert response.metadata["observable_text_rewritten"] is True
-        assert response.message == "降级提示：你大概率卡在 S08，请先满足：vision_facts.fcs_page_visible==seen。"
+        assert response.message == "降级提示：你大概率卡在 S08，请先完成该步骤的未满足条件。"
     finally:
         loop.close()
 
@@ -10181,11 +10182,6 @@ def test_final_evidence_validator_rechecks_repaired_fallback_step() -> None:
                     "reason": "Left engine start must have begun.",
                     "reason_code": "s10_requires_engine_crank_left_complete",
                 },
-                "S12.completion": {
-                    "status": "satisfied",
-                    "step_id": "S12",
-                    "gate_type": "completion",
-                },
                 "S13.completion": {
                     "status": "blocked",
                     "step_id": "S13",
@@ -10271,6 +10267,7 @@ def test_final_evidence_validator_rechecks_repaired_fallback_step() -> None:
     assert response.metadata["next"]["step_id"] == "S13"
     assert response.metadata["harness_action_plan"]["source"] == "final_evidence_consistency_validator"
     assert response.metadata["harness_action_plan"]["targets"] == ["radar_mode_knob"]
+    assert "completion_gate_already_satisfied:S12" in response.metadata["final_evidence_consistency_reasons"]
     assert [action["target"] for action in response.actions] == ["radar_mode_knob"]
     assert "ins_mode_knob" not in [action["target"] for action in response.actions]
 
@@ -11142,7 +11139,8 @@ def test_live_loop_clears_conflicting_overlay_before_fallback_rebuilds_current_s
     assert response.metadata["fallback_overlay_used"] is True
     assert response.actions
     assert response.actions[0]["target"] == "eng_crank_switch"
-    assert response.message == "S10 is not complete yet. Please operate eng_crank_switch first, then satisfy: vars.engine_crank_left_complete==true."
+    assert response.message == "S10 is not complete yet. Please operate eng_crank_switch first and confirm that step is complete."
+    assert "vars.engine_crank_left_complete" not in response.message
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "eng_crank_switch"
 
 def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:

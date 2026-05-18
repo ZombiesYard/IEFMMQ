@@ -8,6 +8,7 @@ small plan that adapters can map to their transport-specific actions.
 
 from __future__ import annotations
 
+import ast
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -16,7 +17,9 @@ from typing import Any
 from core.step_harness import StepHarnessSpec
 
 
-_VARS_TRUE_PREDICATE_RE = re.compile(r"^\s*(?:payload\.)?vars\.([A-Za-z0-9_]+)\s*==\s*true\s*$")
+_VARS_PREDICATE_RE = re.compile(
+    r"^\s*(?:payload\.)?vars\.([A-Za-z0-9_]+)\s*(==|!=|>=|<=|>|<|\bin\b)\s*(.+?)\s*$"
+)
 
 
 @dataclass(frozen=True)
@@ -92,19 +95,71 @@ def _telemetry_digest_has_true_var(evidence_packet: Any, var_name: str) -> bool:
     return False
 
 
+def _parse_predicate_literal(raw: str) -> Any:
+    text = raw.strip()
+    lowered = text.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered in {"none", "null"}:
+        return None
+    try:
+        return ast.literal_eval(text)
+    except (SyntaxError, ValueError):
+        pass
+    try:
+        if any(ch in text for ch in (".", "e", "E")):
+            return float(text)
+        return int(text)
+    except ValueError:
+        return text
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _compare_predicate_value(value: Any, op: str, expected: Any) -> bool:
+    if op == "==":
+        return value == expected
+    if op == "!=":
+        return value != expected
+    if op in {">=", "<=", ">", "<"}:
+        if not (_is_number(value) and _is_number(expected)):
+            return False
+        if op == ">=":
+            return value >= expected
+        if op == "<=":
+            return value <= expected
+        if op == ">":
+            return value > expected
+        return value < expected
+    if op == "in":
+        if isinstance(expected, (list, tuple)) and len(expected) == 2 and all(_is_number(item) for item in expected):
+            low, high = expected
+            return _is_number(value) and low <= value <= high
+        if isinstance(expected, (list, tuple, set, frozenset)):
+            return value in expected
+    return False
+
+
 def _predicate_satisfied_by_latest_evidence(
     predicate: str,
     *,
     latest_vars: Mapping[str, Any],
     evidence_packet: Any = None,
 ) -> bool:
-    matched = _VARS_TRUE_PREDICATE_RE.match(predicate)
+    matched = _VARS_PREDICATE_RE.match(predicate)
     if matched is None:
         return False
     var_name = matched.group(1)
-    if latest_vars.get(var_name) is True:
-        return True
-    if latest_vars.get(var_name) is False:
+    op = matched.group(2).strip()
+    expected = _parse_predicate_literal(matched.group(3))
+    latest_value = latest_vars.get(var_name)
+    if var_name in latest_vars:
+        return _compare_predicate_value(latest_value, op, expected)
+    if not (op == "==" and expected is True):
         return False
     return _telemetry_digest_has_true_var(evidence_packet, var_name)
 
@@ -116,7 +171,12 @@ def _completion_gate_satisfied(evidence_packet: Any, step_id: str | None) -> boo
     for gate in getattr(gate_evidence, "satisfied_gates", ()):
         if not isinstance(gate, Mapping):
             continue
-        if gate.get("gate_id") == f"{step_id}.completion" and gate.get("status") == "satisfied":
+        if gate.get("gate_id") != f"{step_id}.completion":
+            continue
+        status = gate.get("status")
+        if status == "satisfied":
+            return True
+        if (status == "allowed" or gate.get("allowed") is True) and gate.get("reason_code") != "no_rules":
             return True
     return False
 

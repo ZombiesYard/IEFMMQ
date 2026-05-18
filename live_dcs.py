@@ -4572,7 +4572,7 @@ class LiveDcsTutorLoop:
             if inferred_step_id and missing_conditions:
                 return (
                     f"降级提示：你大概率卡在 {inferred_step_id}，"
-                    f"请先满足：{'; '.join(missing_conditions)}。"
+                    "请先完成该步骤的未满足条件。"
                 )
             if inferred_step_id:
                 return f"降级提示：你大概率卡在 {inferred_step_id}，请先检查并执行该步骤。"
@@ -4580,7 +4580,7 @@ class LiveDcsTutorLoop:
         if inferred_step_id and missing_conditions:
             return (
                 f"Fallback: likely stuck at {inferred_step_id}; "
-                f"please satisfy: {'; '.join(missing_conditions)}."
+                "please complete the unmet conditions for that step."
             )
         if inferred_step_id:
             return f"Fallback: likely stuck at {inferred_step_id}; please check that step."
@@ -4834,18 +4834,18 @@ class LiveDcsTutorLoop:
                     "but it has not entered the FCS page yet; press Left DDI PB15 to enter the FCS page first."
                 )
         elif self.lang == "zh":
-            rewritten = f"当前 {inferred_step_id} 尚未完成，请先满足：{'; '.join(normalized_missing)}。"
+            rewritten = f"当前 {inferred_step_id} 尚未完成，请先完成该步骤的未满足条件。"
             if isinstance(action_target, str) and action_target:
-                rewritten = f"当前 {inferred_step_id} 尚未完成。请先操作 {action_target}，再满足：{'; '.join(normalized_missing)}。"
+                rewritten = f"当前 {inferred_step_id} 尚未完成。请先操作 {action_target}，并确认该步骤条件已满足。"
         else:
             rewritten = (
                 f"{inferred_step_id} is not complete yet. "
-                f"Please satisfy: {'; '.join(normalized_missing)}."
+                "Please complete the unmet conditions for that step."
             )
             if isinstance(action_target, str) and action_target:
                 rewritten = (
                     f"{inferred_step_id} is not complete yet. "
-                    f"Please operate {action_target} first, then satisfy: {'; '.join(normalized_missing)}."
+                    f"Please operate {action_target} first and confirm that step is complete."
                 )
 
         response.message = rewritten
@@ -6006,8 +6006,9 @@ class LiveDcsTutorLoop:
         context = request.context if isinstance(request.context, Mapping) else {}
         vars_selected = context.get("vars")
         vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        evidence_context = self._context_with_full_pack_gates(context)
         try:
-            evidence_packet = build_evidence_packet(context)
+            evidence_packet = build_evidence_packet(evidence_context)
         except Exception:
             evidence_packet = None
         targets = _overlay_targets_from_actions(response.actions)
@@ -6042,6 +6043,24 @@ class LiveDcsTutorLoop:
         merged_reasons.extend(result.reasons)
         response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
         return True
+
+    def _context_with_full_pack_gates(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
+        vars_selected = context.get("vars")
+        if not isinstance(vars_selected, Mapping):
+            return context
+        full_gates = evaluate_pack_gates(
+            observations=[{"payload": {"vars": dict(vars_selected)}, "vars": dict(vars_selected)}],
+            precondition_gates=self.precondition_gates,
+            completion_gates=self.completion_gates,
+        )
+        if not full_gates:
+            return context
+        merged = dict(context)
+        existing_gates = context.get("gates")
+        gates = dict(existing_gates) if isinstance(existing_gates, Mapping) else {}
+        gates.update(full_gates)
+        merged["gates"] = gates
+        return merged
 
     def _deterministic_missing_conditions_from_context(self, context: Mapping[str, Any]) -> list[str]:
         hint = context.get("deterministic_step_hint")
@@ -6192,6 +6211,42 @@ class LiveDcsTutorLoop:
                     return step_id
         return None
 
+    def _missing_conditions_for_final_step(
+        self,
+        step_id: str,
+        context: Mapping[str, Any],
+    ) -> list[str]:
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        idx = self._step_order_index.get(step_id)
+        if idx is None:
+            return []
+        full_context = self._context_with_full_pack_gates(context)
+        gates = full_context.get("gates")
+        recent_actions = context.get("recent_actions")
+        recent_buttons = (
+            [
+                item for item in recent_actions.get("recent_buttons", [])
+                if isinstance(item, str) and item
+            ]
+            if isinstance(recent_actions, Mapping)
+            else []
+        )
+        inference = infer_step_id(
+            self.pack_steps[idx:],
+            vars_map,
+            recent_buttons,
+            gates=gates if isinstance(gates, Mapping) else None,
+            precondition_gates=self.precondition_gates,
+            completion_gates=self.completion_gates,
+            scenario_profile=self.scenario_profile,
+            pack_path=self.pack_path,
+            vision_facts=context.get("vision_facts"),
+        )
+        if inference.inferred_step_id != step_id:
+            return []
+        return [item for item in inference.missing_conditions if isinstance(item, str) and item]
+
     def _enforce_final_evidence_consistency_after_repairs(
         self,
         response: TutorResponse,
@@ -6210,7 +6265,7 @@ class LiveDcsTutorLoop:
         missing_list = (
             self._deterministic_missing_conditions_from_context(context)
             if final_step_id == inferred_step_id
-            else []
+            else self._missing_conditions_for_final_step(final_step_id, context)
         )
         rejected = self._apply_final_evidence_consistency_metadata(
             response,
@@ -6760,14 +6815,23 @@ class LiveDcsTutorLoop:
         if step_fallback_profile.get("overlay_enabled") is False:
             return None, f"overlay_disabled:{overlay_step_id}"
         declared_fallback_target = fallback_targets[0]
+        overridden_inferred_step = (
+            isinstance(override_inferred_step_id, str)
+            and override_inferred_step_id
+            and override_inferred_step_id != hint.get("inferred_step_id")
+        )
         missing_conditions_raw = hint.get("missing_conditions")
         missing_conditions = [
             item for item in missing_conditions_raw if isinstance(item, str) and item
         ] if isinstance(missing_conditions_raw, (list, tuple)) else []
+        if overridden_inferred_step:
+            missing_conditions = self._missing_conditions_for_final_step(inferred_step_id, context)
         gate_blockers_raw = hint.get("gate_blockers")
         gate_blockers = [
             item for item in gate_blockers_raw if isinstance(item, Mapping) and item
         ] if isinstance(gate_blockers_raw, (list, tuple)) else []
+        if overridden_inferred_step:
+            gate_blockers = []
 
         if inferred_step_id == "S33" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
