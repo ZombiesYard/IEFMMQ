@@ -72,6 +72,38 @@ source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packa
 source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q tests/test_vision_fact_extractor.py
 ```
 
+### 本机 pytest capture 临时文件问题
+
+这台工作机上，普通全量命令：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q
+```
+
+曾在 pytest **收集阶段**触发过下面这种内部错误：
+
+```text
+FileNotFoundError: [Errno 2] No such file or directory
+...
+_pytest/capture.py ... self.tmpfile.truncate()
+```
+
+这不是某个仓库测试断言失败，而是 pytest 默认 capture 机制在读写/截断它自己的临时 capture 文件时，临时文件已经不存在。  
+当前只能确认这是本机环境层面的 capture/tmpfile 问题，常见触发背景包括 WSL、挂载盘工作区、长测试收集、以及 pytest capture 临时文件生命周期不稳定；不要把它误判成业务代码失败。
+
+已验证可用的规避方式是关闭 pytest capture，并固定 basetemp 到仓库内：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q -s --basetemp=.tmp/pytest-full
+```
+
+经验规则：
+
+- 如果普通 `pytest -q` 在 `_pytest/capture.py` 里以 `FileNotFoundError` 崩掉，直接改跑上面的 `-q -s --basetemp=.tmp/pytest-full`
+- `--basetemp` 单独不一定够；这次实际验证中仍会触发 capture 错误，关键是 `-s` 关闭 capture
+- 如果加 `-s --basetemp=.tmp/pytest-full` 后全量通过，就按“测试通过，普通 capture 模式不稳定”记录
+- 单测子集通常可以继续用普通 `-q`；如果也遇到同样 capture 堆栈，再加 `-s --basetemp=.tmp/pytest-subset`
+
 补充理解：
 
 - 另一个模型/对话如果用了 `uv`，通常不是“逻辑上必须用 uv”
