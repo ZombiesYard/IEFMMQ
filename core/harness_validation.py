@@ -8,11 +8,15 @@ small plan that adapters can map to their transport-specific actions.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from core.step_harness import StepHarnessSpec
+
+
+_VARS_TRUE_PREDICATE_RE = re.compile(r"^\s*(?:payload\.)?vars\.([A-Za-z0-9_]+)\s*==\s*true\s*$")
 
 
 @dataclass(frozen=True)
@@ -55,6 +59,16 @@ class HarnessTextGuidanceRule:
     source: str = "validator_text_only_guidance"
 
 
+@dataclass(frozen=True)
+class EvidenceConsistencyResult:
+    accepted: bool
+    validator_rejected: bool
+    repair_applied: bool
+    rejected_missing_conditions: tuple[str, ...]
+    final_action_plan_source: str
+    reasons: tuple[str, ...]
+
+
 def _strings(raw: Sequence[str] | set[str] | tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
     if not isinstance(raw, (list, tuple, set)):
         return ()
@@ -66,6 +80,85 @@ def _strings(raw: Sequence[str] | set[str] | tuple[str, ...] | list[str] | None)
         seen.add(item)
         out.append(item)
     return tuple(out)
+
+
+def _telemetry_digest_has_true_var(evidence_packet: Any, var_name: str) -> bool:
+    digest = getattr(evidence_packet, "telemetry_window_digest", None)
+    if digest is None:
+        return False
+    stable_true = getattr(digest, "stable_true_vars", ())
+    if var_name in set(_strings(stable_true if isinstance(stable_true, (list, tuple, set)) else None)):
+        return True
+    last_seen_true = getattr(digest, "last_seen_true", ())
+    if isinstance(last_seen_true, (list, tuple)):
+        return any(isinstance(item, Mapping) and item.get("var") == var_name for item in last_seen_true)
+    return False
+
+
+def _predicate_satisfied_by_latest_evidence(
+    predicate: str,
+    *,
+    latest_vars: Mapping[str, Any],
+    evidence_packet: Any = None,
+) -> bool:
+    matched = _VARS_TRUE_PREDICATE_RE.match(predicate)
+    if matched is None:
+        return False
+    var_name = matched.group(1)
+    if latest_vars.get(var_name) is True:
+        return True
+    return _telemetry_digest_has_true_var(evidence_packet, var_name)
+
+
+def _completion_gate_satisfied(evidence_packet: Any, step_id: str | None) -> bool:
+    if not isinstance(step_id, str) or not step_id:
+        return False
+    gate_evidence = getattr(evidence_packet, "gate_evidence", None)
+    satisfied = getattr(gate_evidence, "satisfied_gate_ids", ())
+    return f"{step_id}.completion" in set(_strings(satisfied if isinstance(satisfied, (list, tuple, set)) else None))
+
+
+def validate_final_evidence_consistency(
+    *,
+    accepted_step_id: str | None,
+    accepted_overlay_targets: Sequence[str] | None,
+    accepted_missing_conditions: Sequence[str] | None,
+    latest_vars: Mapping[str, Any] | None,
+    evidence_packet: Any = None,
+) -> EvidenceConsistencyResult:
+    del accepted_overlay_targets
+    vars_map = latest_vars if isinstance(latest_vars, Mapping) else {}
+    missing_conditions = _strings(
+        accepted_missing_conditions
+        if isinstance(accepted_missing_conditions, (list, tuple, set))
+        else None
+    )
+    rejected_missing = tuple(
+        condition
+        for condition in missing_conditions
+        if _predicate_satisfied_by_latest_evidence(
+            condition,
+            latest_vars=vars_map,
+            evidence_packet=evidence_packet,
+        )
+    )
+
+    reasons = [
+        f"missing_condition_satisfied_by_latest_telemetry:{condition}"
+        for condition in rejected_missing
+    ]
+    if _completion_gate_satisfied(evidence_packet, accepted_step_id):
+        reasons.append(f"completion_gate_already_satisfied:{accepted_step_id}")
+
+    rejected = bool(reasons)
+    return EvidenceConsistencyResult(
+        accepted=not rejected,
+        validator_rejected=rejected,
+        repair_applied=rejected,
+        rejected_missing_conditions=rejected_missing,
+        final_action_plan_source="final_evidence_consistency_validator" if rejected else "model",
+        reasons=tuple(reasons),
+    )
 
 
 def _hint_targets(action_hint: Mapping[str, Any] | None) -> tuple[str, ...]:
@@ -382,9 +475,11 @@ def plan_harness_action(
 
 
 __all__ = [
+    "EvidenceConsistencyResult",
     "HarnessActionHintFactRule",
     "HarnessActionPlan",
     "HarnessCompletionAdvance",
     "HarnessTextGuidanceRule",
     "plan_harness_action",
+    "validate_final_evidence_consistency",
 ]

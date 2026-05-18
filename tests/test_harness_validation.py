@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from core.harness_validation import (
+    validate_final_evidence_consistency,
     HarnessActionHintFactRule,
     HarnessCompletionAdvance,
     HarnessTextGuidanceRule,
     plan_harness_action,
 )
+from core.evidence_packet import build_evidence_packet
 from core.step_harness import RecoveryActionPolicy, SignalQualityRequirement, StepHarnessSpec
 
 
@@ -34,6 +36,32 @@ def _spec(
         declared_ui_targets=targets,
         overlay_enabled=overlay_enabled,
     )
+
+
+def test_final_evidence_consistency_rejects_missing_condition_satisfied_by_telemetry() -> None:
+    context = {
+        "vars": {"comm1_freq_134_000": True},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S09",
+            "overlay_step_id": "S09",
+            "missing_conditions": ["vars.comm1_freq_134_000==true"],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S09",
+        accepted_overlay_targets=["ufc_comm1_channel_selector_pull"],
+        accepted_missing_conditions=["vars.comm1_freq_134_000==true"],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert result.validator_rejected is True
+    assert result.repair_applied is True
+    assert result.rejected_missing_conditions == ("vars.comm1_freq_134_000==true",)
+    assert "missing_condition_satisfied_by_latest_telemetry:vars.comm1_freq_134_000==true" in result.reasons
 
 
 def test_plan_harness_action_repairs_invalid_target_to_step_spec_target() -> None:

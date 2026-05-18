@@ -9954,8 +9954,12 @@ def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
     assert [action["target"] for action in repaired.actions] == ["eng_crank_switch"]
     assert repaired.metadata["diagnosis"]["step_id"] == "S10"
     assert repaired.metadata["next"]["step_id"] == "S10"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.comm1_freq_134_000==true"]
     assert repaired.metadata["s09_comm1_completion_guardrail_applied"] is True
     assert repaired.metadata["final_overlay_targets"] == ["eng_crank_switch"]
+    assert "vars.comm1_freq_134_000==true" not in repaired.message
     assert "134.000" in repaired.message
     assert "S10" in repaired.message
 
@@ -10042,6 +10046,9 @@ def test_live_help_fixture_310_s10_left_engine_complete_advances_past_crank() ->
 
     assert repaired.metadata["diagnosis"]["step_id"] == "S12"
     assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
     assert repaired.metadata["s10_left_engine_completion_guardrail_applied"] is True
     assert repaired.metadata["rejected_model_step_id"] == "S10"
     assert repaired.metadata["fallback_overlay_used"] is True
@@ -10050,6 +10057,7 @@ def test_live_help_fixture_310_s10_left_engine_complete_advances_past_crank() ->
     assert repaired.metadata["help_response"]["overlay"]["targets"] == ["ins_mode_knob"]
     assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ins_mode_knob"
     assert [action["target"] for action in repaired.actions] == ["ins_mode_knob"]
+    assert "vars.engine_crank_left_complete==true" not in repaired.message
     assert "S10" not in repaired.message
     assert "S12" in repaired.message
 
@@ -10160,6 +10168,7 @@ def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails
     assert repaired.metadata["s10_left_engine_completion_guardrail_applied"] is True
     assert repaired.metadata["diagnosis"]["step_id"] == "S12"
     assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
     assert repaired.metadata["fallback_overlay_used"] is False
     assert repaired.metadata["s10_left_engine_completion_overlay_reason"] == "no_verifiable_evidence_ref"
     assert repaired.metadata["final_overlay_targets"] == []

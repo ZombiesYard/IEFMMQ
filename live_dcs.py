@@ -92,6 +92,7 @@ from core.harness_validation import (
     HarnessCompletionAdvance,
     HarnessTextGuidanceRule,
     plan_harness_action,
+    validate_final_evidence_consistency,
 )
 from core.help_orchestrator import (
     HelpCycleDecisionResult,
@@ -5992,6 +5993,56 @@ class LiveDcsTutorLoop:
             response.metadata["manual_throttle_guidance_original_explanations"] = original_explanations
         return True, "manual_throttle_keyboard_guidance"
 
+    def _apply_final_evidence_consistency_metadata(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+        *,
+        accepted_step_id: str | None,
+        accepted_missing_conditions: Sequence[str],
+    ) -> bool:
+        if not accepted_missing_conditions:
+            return False
+        context = request.context if isinstance(request.context, Mapping) else {}
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        try:
+            evidence_packet = build_evidence_packet(context)
+        except Exception:
+            evidence_packet = None
+        targets = _overlay_targets_from_actions(response.actions)
+        if not targets:
+            help_response = response.metadata.get("help_response")
+            targets = _help_response_overlay_targets(help_response)
+        result = validate_final_evidence_consistency(
+            accepted_step_id=accepted_step_id,
+            accepted_overlay_targets=targets,
+            accepted_missing_conditions=accepted_missing_conditions,
+            latest_vars=vars_map,
+            evidence_packet=evidence_packet,
+        )
+        if result.accepted:
+            return False
+
+        response.metadata["validator_rejected"] = True
+        response.metadata["repair_applied"] = True
+        response.metadata["rejected_missing_conditions"] = list(result.rejected_missing_conditions)
+        response.metadata["final_evidence_consistency_validator_applied"] = True
+        response.metadata["final_evidence_consistency_reasons"] = list(result.reasons)
+        response.metadata.setdefault("final_action_plan_source", result.final_action_plan_source)
+        if isinstance(accepted_step_id, str) and accepted_step_id:
+            response.metadata.setdefault("rejected_model_step_id", accepted_step_id)
+
+        existing_reasons = response.metadata.get("harness_validation_reasons")
+        merged_reasons = (
+            [item for item in existing_reasons if isinstance(item, str) and item]
+            if isinstance(existing_reasons, list)
+            else []
+        )
+        merged_reasons.extend(result.reasons)
+        response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
+        return True
+
     def _rewrite_procedural_guidance_response(
         self,
         response: TutorResponse,
@@ -6003,13 +6054,20 @@ class LiveDcsTutorLoop:
             return False, "missing_deterministic_hint"
         inferred_step_id = hint.get("inferred_step_id")
         missing_conditions = hint.get("missing_conditions")
-        missing_set = {
+        missing_list = [
             item for item in missing_conditions
             if isinstance(item, str) and item
-        } if isinstance(missing_conditions, (list, tuple)) else set()
+        ] if isinstance(missing_conditions, (list, tuple)) else []
+        missing_set = set(missing_list)
 
         vars_selected = context.get("vars")
         vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        final_consistency_rejected = self._apply_final_evidence_consistency_metadata(
+            response,
+            request,
+            accepted_step_id=inferred_step_id if isinstance(inferred_step_id, str) else None,
+            accepted_missing_conditions=missing_list,
+        )
         vision_fact_summary = context.get("vision_fact_summary")
         vision_summary = vision_fact_summary if isinstance(vision_fact_summary, Mapping) else {}
         vision_seen_or_fresh: set[str] = set()
@@ -6100,6 +6158,17 @@ class LiveDcsTutorLoop:
             response.metadata["s09_comm1_completion_guardrail_applied"] = True
             response.metadata["s09_comm1_completion_s10_overlay_applied"] = fallback_used
             response.metadata["s09_comm1_completion_s10_overlay_reason"] = fallback_reason
+            final_targets = _overlay_targets_from_actions(response.actions)
+            response.metadata["harness_action_plan"] = {
+                "step_id": "S10",
+                "overlay_step_id": "S10",
+                "targets": list(final_targets),
+                "text_only": not bool(final_targets),
+                "source": response.metadata.get(
+                    "final_action_plan_source",
+                    "final_evidence_consistency_validator",
+                ),
+            }
         elif inferred_step_id == "S09" and "vars.comm1_freq_134_000==true" in missing_set:
             reason = "s09_comm1_frequency_guidance"
             if self.lang == "zh":
@@ -6380,6 +6449,8 @@ class LiveDcsTutorLoop:
         response.explanations = [rewritten]
         response.metadata["procedural_guidance_rewritten"] = True
         response.metadata["procedural_guidance_rewrite_reason"] = reason
+        if final_consistency_rejected:
+            response.metadata["procedural_guidance_rewrite_source"] = "final_evidence_consistency_validator"
         if reason.startswith(("s20_refuel_probe_", "s21_refuel_probe_")):
             response.metadata["refuel_probe_motion_guidance_rewritten"] = True
         if original_message != rewritten:
