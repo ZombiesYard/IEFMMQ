@@ -1062,7 +1062,11 @@ def _supports_later_avionics(digest: TelemetryWindowDigest) -> bool:
     return False
 
 
-def _telemetry_progression_candidates(digest: TelemetryWindowDigest) -> tuple[tuple[str, str, str, str, bool], ...]:
+def _telemetry_progression_candidates(
+    digest: TelemetryWindowDigest,
+    *,
+    deterministic_step_id: str | None = None,
+) -> tuple[tuple[str, str, str, str, bool], ...]:
     changed = _changed_var_map(digest)
     out: list[tuple[str, str, str, str, bool]] = []
 
@@ -1070,11 +1074,18 @@ def _telemetry_progression_candidates(digest: TelemetryWindowDigest) -> tuple[tu
     if probe is not None:
         first = _coerce_number(probe.get("first_value"))
         last = _coerce_number(probe.get("last_value"))
+        transition_count = _coerce_number(probe.get("transition_count")) or 0
         if last is not None and last >= 60000:
             out.append(("S21", "changed_vars", "ext_refuel_probe_value", "", False))
         elif last is not None and last <= 5000:
             out.append(("S22", "changed_vars", "ext_refuel_probe_value", "", False))
-        elif first is not None and last is not None and last > first:
+        elif (
+            deterministic_step_id == "S20"
+            and transition_count > 0
+            and first is not None
+            and last is not None
+            and last > first
+        ):
             out.append((
                 "S20",
                 "changed_vars",
@@ -1082,7 +1093,13 @@ def _telemetry_progression_candidates(digest: TelemetryWindowDigest) -> tuple[tu
                 "refueling probe extending in progress",
                 True,
             ))
-        elif first is not None and last is not None and last < first:
+        elif (
+            deterministic_step_id == "S21"
+            and transition_count > 0
+            and first is not None
+            and last is not None
+            and last < first
+        ):
             out.append((
                 "S21",
                 "changed_vars",
@@ -1168,6 +1185,7 @@ def build_step_candidates(
             )
         )
 
+    deterministic_step_id = packet.deterministic_candidate.step_id
     telemetry_digest = packet.telemetry_window_digest
     if telemetry_digest.frame_count:
         if _has_first_frame_false(telemetry_digest, "battery_on") and _supports_later_avionics(telemetry_digest):
@@ -1240,7 +1258,10 @@ def build_step_candidates(
                 )
             )
 
-        for step_id, ref_kind, var_name, reason, suppress_targets in _telemetry_progression_candidates(telemetry_digest):
+        for step_id, ref_kind, var_name, reason, suppress_targets in _telemetry_progression_candidates(
+            telemetry_digest,
+            deterministic_step_id=deterministic_step_id,
+        ):
             _append(
                 StepCandidate(
                     step_id=step_id,
@@ -1257,7 +1278,6 @@ def build_step_candidates(
                 )
             )
 
-    deterministic_step_id = packet.deterministic_candidate.step_id
     if isinstance(deterministic_step_id, str) and deterministic_step_id:
         _append(
             StepCandidate(

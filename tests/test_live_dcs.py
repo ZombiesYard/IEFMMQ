@@ -5476,6 +5476,7 @@ def test_procedural_guidance_waits_without_highlight_for_s21_probe_retracting(tm
                 "deterministic_step_hint": {
                     "inferred_step_id": "S21",
                     "missing_conditions": ["vars.ext_refuel_probe_value in [0,5000]"],
+                    "action_hint": {"target": "refuel_probe_switch"},
                 },
             },
         )
@@ -5504,7 +5505,15 @@ def test_procedural_guidance_waits_without_highlight_for_s21_probe_retracting(tm
         assert "正在收起" in response.message
         assert "等待" in response.message
         assert "vars.ext_refuel_probe_value" not in response.message
+        assert all("vars.ext_refuel_probe_value" not in item for item in response.explanations)
         assert response.metadata["help_response"]["overlay"]["targets"] == []
+        assert all(
+            "vars.ext_refuel_probe_value" not in item
+            for item in response.metadata["help_response"]["explanations"]
+        )
+        planned, plan_reason = loop._apply_harness_validation_action_plan(response, request)
+        assert planned is False
+        assert plan_reason == "refuel_probe_motion_wait_already_rewritten"
         assert loop._should_use_deterministic_overlay_fallback(response, request, None) is False
     finally:
         loop.close()
@@ -5547,6 +5556,7 @@ def test_procedural_guidance_waits_without_highlight_for_s20_probe_extending(tmp
                 "deterministic_step_hint": {
                     "inferred_step_id": "S20",
                     "missing_conditions": ["vars.ext_refuel_probe_value in [60000,65535]"],
+                    "action_hint": {"target": "refuel_probe_switch"},
                 },
             },
         )
@@ -5566,7 +5576,134 @@ def test_procedural_guidance_waits_without_highlight_for_s20_probe_extending(tmp
         assert "正在伸出" in response.message
         assert "等待" in response.message
         assert "refuel_probe_switch" not in response.message
+        assert all("refuel_probe_switch" not in item for item in response.explanations)
+        planned, plan_reason = loop._apply_harness_validation_action_plan(response, request)
+        assert planned is False
+        assert plan_reason == "refuel_probe_motion_wait_already_rewritten"
         assert loop._should_use_deterministic_overlay_fallback(response, request, None) is False
+    finally:
+        loop.close()
+
+
+def test_procedural_guidance_advances_to_s22_when_s21_probe_retracted(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s21_probe_retracted.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {
+                    "probe_switch_value": 1,
+                    "ext_refuel_probe_value": 4652,
+                    "probe_retracted": True,
+                },
+                "gates": {
+                    "S22.completion": {
+                        "status": "blocked",
+                        "step_id": "S22",
+                        "reason_code": "s22_requires_launch_bar_extended",
+                        "reason": "Launch bar must be extended.",
+                    }
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S21",
+                    "missing_conditions": ["vars.ext_refuel_probe_value in [0,5000]"],
+                    "gate_blockers": [
+                        {
+                            "ref": "S22.completion",
+                            "reason_code": "s22_requires_launch_bar_extended",
+                            "reason": "Launch bar must be extended.",
+                        }
+                    ],
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="当前 S21 尚未完成，请先满足：vars.ext_refuel_probe_value in [0,5000]。",
+            actions=[{"kind": "highlight", "target": "refuel_probe_switch"}],
+            explanations=["当前 S21 尚未完成，请先满足：vars.ext_refuel_probe_value in [0,5000]。"],
+            metadata={"next": {"step_id": "S21"}},
+        )
+
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+
+        assert rewritten is True
+        assert reason == "s21_refuel_probe_retracted_complete"
+        assert response.metadata["next"]["step_id"] == "S22"
+        assert response.metadata["diagnosis"]["step_id"] == "S22"
+        assert response.metadata["help_response"]["next"]["step_id"] == "S22"
+        assert response.metadata["help_response"]["overlay"]["targets"] == []
+        assert response.metadata["refuel_probe_completion_s22_overlay_applied"] is True
+        assert response.actions
+        assert response.actions[0]["target"] == "launch_bar_switch"
+        assert "vars.ext_refuel_probe_value" not in response.message
+    finally:
+        loop.close()
+
+
+def test_procedural_guidance_advances_to_s21_when_s20_probe_extended(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s20_probe_extended.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "vars": {
+                    "probe_switch_value": 0,
+                    "ext_refuel_probe_value": 65000,
+                    "probe_extended": True,
+                },
+                "gates": {
+                    "S21.completion": {
+                        "status": "blocked",
+                        "step_id": "S21",
+                        "reason_code": "s21_requires_probe_retracted",
+                        "reason": "Refueling probe must be fully retracted.",
+                    }
+                },
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S20",
+                    "missing_conditions": ["vars.ext_refuel_probe_value in [60000,65535]"],
+                },
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="当前 S20 尚未完成，请先操作 refuel_probe_switch。",
+            actions=[{"kind": "highlight", "target": "refuel_probe_switch"}],
+            explanations=["当前 S20 尚未完成，请先操作 refuel_probe_switch。"],
+            metadata={"next": {"step_id": "S20"}},
+        )
+
+        rewritten, reason = loop._rewrite_procedural_guidance_response(response, request)
+
+        assert rewritten is True
+        assert reason == "s20_refuel_probe_extended_complete"
+        assert response.metadata["next"]["step_id"] == "S21"
+        assert response.metadata["diagnosis"]["step_id"] == "S21"
+        assert response.metadata["refuel_probe_completion_s21_overlay_applied"] is True
+        assert response.actions
+        assert response.actions[0]["target"] == "refuel_probe_switch"
+        assert "尚未完成" not in response.message
     finally:
         loop.close()
 

@@ -5306,6 +5306,8 @@ class LiveDcsTutorLoop:
 
         inferred_step_id = hint.get("inferred_step_id")
         overlay_step_id = hint.get("overlay_step_id")
+        if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
+            return False, "refuel_probe_motion_wait_already_rewritten"
         if response.metadata.get("completion_conflict_rewritten") is True:
             return False, "completion_conflict_already_rewritten"
         response_mapping_meta = response.metadata.get("response_mapping")
@@ -6002,6 +6004,25 @@ class LiveDcsTutorLoop:
                 response.metadata["diagnosis"] = {"step_id": "S20", "error_category": "OM"}
                 response.metadata["next"] = {"step_id": "S20"}
                 _set_text_only_help_response("S20", rewritten)
+            elif probe_motion_state == "s20_extended":
+                reason = "s20_refuel_probe_extended_complete"
+                if self.lang == "zh":
+                    rewritten = "受油管已经完全伸出，S20 已完成。下一步进入 S21，收起受油管。"
+                else:
+                    rewritten = "The refueling probe is fully extended, so S20 is complete. Continue to S21 by retracting the probe."
+                response.actions = []
+                response.metadata["diagnosis"] = {"step_id": "S21", "error_category": "OM"}
+                response.metadata["next"] = {"step_id": "S21"}
+                _set_text_only_help_response("S21", rewritten)
+                fallback_used, fallback_reason = self._apply_safe_fallback_overlay(
+                    response,
+                    request,
+                    override_inferred_step_id="S21",
+                    override_overlay_step_id="S21",
+                    ignore_request_allowlist=True,
+                )
+                response.metadata["refuel_probe_completion_s21_overlay_applied"] = fallback_used
+                response.metadata["refuel_probe_completion_s21_overlay_reason"] = fallback_reason
             elif probe_motion_state == "s21_retracting":
                 reason = "s21_refuel_probe_retracting_wait"
                 if self.lang == "zh":
