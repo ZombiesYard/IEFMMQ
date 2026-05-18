@@ -5528,6 +5528,33 @@ class LiveDcsTutorLoop:
             if isinstance(raw_not_seen, (list, tuple, set)):
                 vision_not_seen_fact_ids = [item for item in raw_not_seen if isinstance(item, str) and item]
 
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        state_action_evidence_packet = None
+        if inferred_step_id in {"S20", "S21"}:
+            try:
+                state_action_evidence_packet = build_evidence_packet(self._context_with_full_pack_gates(context))
+            except Exception as exc:
+                response.metadata["state_action_evidence_packet_error"] = f"{type(exc).__name__}: {exc}"
+        recent_action_targets: list[str] = []
+        recent_actions = context.get("recent_actions")
+        if isinstance(recent_actions, Mapping):
+            raw_recent_buttons = recent_actions.get("recent_buttons")
+            if isinstance(raw_recent_buttons, (list, tuple, set)):
+                recent_action_targets.extend(item for item in raw_recent_buttons if isinstance(item, str) and item)
+        if state_action_evidence_packet is not None:
+            packet_targets = getattr(
+                getattr(state_action_evidence_packet, "recent_action_evidence", None),
+                "target_ids",
+                (),
+            )
+            if isinstance(packet_targets, (list, tuple, set)):
+                recent_action_targets.extend(item for item in packet_targets if isinstance(item, str) and item)
+        hint_recent_targets = hint.get("recent_ui_targets")
+        if isinstance(hint_recent_targets, (list, tuple, set)):
+            recent_action_targets.extend(item for item in hint_recent_targets if isinstance(item, str) and item)
+        recent_action_targets = _dedupe_strings(recent_action_targets)
+
         missing_conditions = hint.get("missing_conditions")
         missing_set = {
             item for item in missing_conditions
@@ -5715,6 +5742,9 @@ class LiveDcsTutorLoop:
                 HarnessActionHintFactRule(step_id="S19", fact_id="fcsmc_intermediate_result_visible")
             ],
             text_guidance_rules=manual_text_guidance_rules,
+            latest_vars=vars_map,
+            evidence_packet=state_action_evidence_packet,
+            recent_action_targets=recent_action_targets,
         )
         plan_guidance = plan.guidance
         if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
@@ -5778,16 +5808,16 @@ class LiveDcsTutorLoop:
                 if original_explanations and original_explanations != response.explanations:
                     response.metadata["harness_validator_original_explanations"] = original_explanations
                     response.metadata["manual_throttle_guidance_original_explanations"] = original_explanations
+            response.metadata["help_response"] = {
+                "diagnosis": {"step_id": plan.step_id, "error_category": "OM"},
+                "next": {"step_id": plan.step_id},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": list(response.explanations) or ([response.message] if response.message else []),
+            }
             if plan.step_id in {"S05", "S11"}:
                 response.metadata["manual_throttle_guidance_rewritten"] = True
                 response.metadata["manual_throttle_guidance_step_id"] = plan.step_id
                 response.metadata["manual_throttle_guidance_original_actions"] = original_actions
-                response.metadata["help_response"] = {
-                    "diagnosis": {"step_id": plan.step_id, "error_category": "OM"},
-                    "next": {"step_id": plan.step_id},
-                    "overlay": {"targets": [], "evidence": []},
-                    "explanations": [response.message],
-                }
                 return True, "manual_throttle_keyboard_guidance"
             return True, final_action_plan_source
 

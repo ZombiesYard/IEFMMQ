@@ -6013,6 +6013,83 @@ def test_harness_validation_action_plan_records_s26_repair_metadata() -> None:
         loop.close()
 
 
+def test_harness_validation_action_plan_waits_without_highlight_for_s20_probe_moving() -> None:
+    response = TutorResponse(
+        message="Extend the refuel probe.",
+        explanations=["Extend the refuel probe."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "refuel_probe_switch",
+                "element_id": "pnt_probe",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S20"},
+            "diagnosis": {"step_id": "S20", "error_category": "OM"},
+            "help_response": {
+                "diagnosis": {"step_id": "S20", "error_category": "OM"},
+                "next": {"step_id": "S20"},
+                "overlay": {
+                    "targets": ["refuel_probe_switch"],
+                    "evidence": [
+                        {
+                            "target": "refuel_probe_switch",
+                            "type": "gate",
+                            "ref": "GATES.S20.completion",
+                            "quote": "blocked",
+                        }
+                    ],
+                },
+                "explanations": ["Extend the refuel probe."],
+            },
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "vars": {
+                "probe_switch_value": 0,
+                "ext_refuel_probe_value": 12000,
+                "probe_extended": False,
+            },
+            "telemetry_window_frames": [
+                {"seq": 1, "t_wall": 1.0, "vars": {"ext_refuel_probe_value": 8000}},
+                {"seq": 2, "t_wall": 2.0, "vars": {"ext_refuel_probe_value": 12000}},
+            ],
+            "overlay_target_allowlist": ["refuel_probe_switch"],
+            "gates": {"S20.completion": {"status": "blocked"}},
+            "deterministic_step_hint": {
+                "inferred_step_id": "S20",
+                "overlay_step_id": "S20",
+                "missing_conditions": ["vars.ext_refuel_probe_value in [60000,65535]"],
+            },
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "state_action_planner_wait"
+        assert response.actions == []
+        assert response.metadata["harness_action_plan"]["text_only"] is True
+        assert response.metadata["final_action_plan_source"] == "state_action_planner_wait"
+        assert response.metadata["help_response"]["overlay"]["targets"] == []
+    finally:
+        loop.close()
+
+
 def test_harness_validation_action_plan_rewrites_manual_throttle_to_text_only() -> None:
     response = TutorResponse(
         message="Highlight throttle.",
