@@ -4933,6 +4933,8 @@ class LiveDcsTutorLoop:
                 if isinstance(item, str) and item
             }
         inferred_step_id = hint.get("inferred_step_id")
+        if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
+            return False, "refuel_probe_motion_wait_already_rewritten"
         action_hint = hint.get("action_hint")
         if bool(hint.get("requires_visual_confirmation")) is True:
             if isinstance(action_hint, Mapping):

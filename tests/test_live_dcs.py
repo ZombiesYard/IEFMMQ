@@ -5575,8 +5575,14 @@ def test_procedural_guidance_waits_without_highlight_for_s20_probe_extending(tmp
         assert response.actions == []
         assert "正在伸出" in response.message
         assert "等待" in response.message
+        assert "vars.ext_refuel_probe_value" not in response.message
         assert "refuel_probe_switch" not in response.message
+        assert all("vars.ext_refuel_probe_value" not in item for item in response.explanations)
         assert all("refuel_probe_switch" not in item for item in response.explanations)
+        assert all(
+            "vars.ext_refuel_probe_value" not in item
+            for item in response.metadata["help_response"]["explanations"]
+        )
         planned, plan_reason = loop._apply_harness_validation_action_plan(response, request)
         assert planned is False
         assert plan_reason == "refuel_probe_motion_wait_already_rewritten"
@@ -5617,6 +5623,7 @@ def test_procedural_guidance_advances_to_s22_when_s21_probe_retracted(tmp_path: 
                 "deterministic_step_hint": {
                     "inferred_step_id": "S21",
                     "missing_conditions": ["vars.ext_refuel_probe_value in [0,5000]"],
+                    "action_hint": {"target": "refuel_probe_switch"},
                     "gate_blockers": [
                         {
                             "ref": "S22.completion",
@@ -5647,6 +5654,15 @@ def test_procedural_guidance_advances_to_s22_when_s21_probe_retracted(tmp_path: 
         assert response.actions
         assert response.actions[0]["target"] == "launch_bar_switch"
         assert "vars.ext_refuel_probe_value" not in response.message
+        assert all("vars.ext_refuel_probe_value" not in item for item in response.explanations)
+        assert all(
+            "vars.ext_refuel_probe_value" not in item
+            for item in response.metadata["help_response"]["explanations"]
+        )
+        overridden, override_reason = loop._apply_action_hint_overlay_override(response, request)
+        assert overridden is False
+        assert override_reason == "refuel_probe_motion_wait_already_rewritten"
+        assert response.actions[0]["target"] == "launch_bar_switch"
     finally:
         loop.close()
 
@@ -5703,6 +5719,12 @@ def test_procedural_guidance_advances_to_s21_when_s20_probe_extended(tmp_path: P
         assert response.metadata["refuel_probe_completion_s21_overlay_applied"] is True
         assert response.actions
         assert response.actions[0]["target"] == "refuel_probe_switch"
+        assert "vars.ext_refuel_probe_value" not in response.message
+        assert all("vars.ext_refuel_probe_value" not in item for item in response.explanations)
+        assert all(
+            "vars.ext_refuel_probe_value" not in item
+            for item in response.metadata["help_response"]["explanations"]
+        )
         assert "尚未完成" not in response.message
     finally:
         loop.close()
