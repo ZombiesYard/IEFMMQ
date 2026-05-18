@@ -2534,6 +2534,50 @@ def _s08_power_condition_missing(missing_set: set[str]) -> bool:
     return any(f"vars.{var_name}==true" in missing_set for var_name, _target, _reason in _S08_POWER_SEQUENCE)
 
 
+def _s08_power_condition_missing_for_target(
+    target: str | None,
+    missing_set: set[str],
+    vars_map: Mapping[str, Any],
+) -> bool:
+    for var_name, power_target, _reason in _S08_POWER_SEQUENCE:
+        if target != power_target:
+            continue
+        return f"vars.{var_name}==true" in missing_set or (
+            var_name in vars_map and vars_map.get(var_name) is not True
+        )
+    return False
+
+
+def _s08_power_guidance_for_target(target: str | None, lang: str) -> str | None:
+    if lang == "zh":
+        by_target = {
+            "left_mdi_brightness_selector": (
+                "左 DDI/显示器还未开启。请先将左 DDI 亮度/电源选择旋钮调到 NIGHT/DAY；"
+                "屏幕亮起后再继续页面导航。"
+            ),
+            "right_mdi_brightness_selector": (
+                "右 DDI/显示器还未开启。请先将右 DDI 亮度/电源选择旋钮调到 NIGHT/DAY；"
+                "屏幕亮起后再继续页面导航。"
+            ),
+            "ampcd_off_brightness_knob": "左右 DDI 已经上电。下一步请调高 AMPCD 亮度旋钮点亮 AMPCD。",
+            "hud_symbology_brightness_knob": "DDI 和 AMPCD 已经上电。下一步请调高 HUD 亮度。",
+        }
+    else:
+        by_target = {
+            "left_mdi_brightness_selector": (
+                "The left DDI/display is not powered yet. Set the left DDI brightness selector "
+                "to NIGHT/DAY; once the display is visible, continue page navigation."
+            ),
+            "right_mdi_brightness_selector": (
+                "The right DDI/display is not powered yet. Set the right DDI brightness selector "
+                "to NIGHT/DAY; once the display is visible, continue page navigation."
+            ),
+            "ampcd_off_brightness_knob": "Both DDIs are powered. Increase the AMPCD brightness knob next.",
+            "hud_symbology_brightness_knob": "DDIs and AMPCD are powered. Increase HUD symbology brightness next.",
+        }
+    return by_target.get(target)
+
+
 def _visual_fact_ref_from_context(context: Mapping[str, Any], fact_id: str | None) -> str | None:
     if not isinstance(fact_id, str) or not fact_id:
         return None
@@ -2641,6 +2685,30 @@ def _s08_clean_unconfirmed_page_navigation_help_response(
     cleaned_overlay["evidence"] = cleaned_evidence
     cleaned_help_response["overlay"] = cleaned_overlay
     return cleaned_help_response, True
+
+
+def _s08_clean_unconfirmed_page_navigation_action_refs(
+    context: Mapping[str, Any],
+    actions: Sequence[Any],
+) -> tuple[list[Any], bool]:
+    cleaned_actions: list[Any] = []
+    changed = False
+    for action in actions:
+        if not isinstance(action, Mapping):
+            cleaned_actions.append(action)
+            continue
+        cleaned_action = dict(action)
+        refs = cleaned_action.get("evidence_refs")
+        if isinstance(refs, list):
+            filtered_refs = _s08_filter_unconfirmed_page_navigation_refs(context, refs)
+            if filtered_refs != refs:
+                changed = True
+                if filtered_refs:
+                    cleaned_action["evidence_refs"] = filtered_refs
+                else:
+                    cleaned_action.pop("evidence_refs", None)
+        cleaned_actions.append(cleaned_action)
+    return cleaned_actions, changed
 
 
 def _s08_visual_fact_ref_for_seen_target(
@@ -5904,6 +5972,14 @@ class LiveDcsTutorLoop:
             recent_action_targets=recent_action_targets,
         )
         plan_guidance = plan.guidance
+        if (
+            inferred_step_id == "S08"
+            and len(plan.targets) == 1
+            and _s08_power_condition_missing_for_target(plan.targets[0], missing_set, vars_map)
+        ):
+            s08_power_guidance = _s08_power_guidance_for_target(plan.targets[0], self.lang)
+            if isinstance(s08_power_guidance, str) and s08_power_guidance:
+                plan_guidance = s08_power_guidance
         if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
             plan_guidance = s18_visual_hint_reason
         emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"
@@ -6046,9 +6122,40 @@ class LiveDcsTutorLoop:
                 context,
                 response.metadata.get("help_response"),
             )
-            if evidence_cleaned and cleaned_help_response is not None:
-                response.metadata["help_response"] = cleaned_help_response
-                response.metadata["s08_unconfirmed_visual_evidence_filtered"] = True
+            cleaned_actions, action_refs_cleaned = _s08_clean_unconfirmed_page_navigation_action_refs(
+                context,
+                response.actions,
+            )
+            if evidence_cleaned or action_refs_cleaned:
+                if action_refs_cleaned:
+                    response.actions = cleaned_actions
+                    response.metadata["s08_unconfirmed_visual_action_evidence_refs_filtered"] = True
+                if (
+                    inferred_step_id == "S08"
+                    and len(plan.targets) == 1
+                    and _s08_power_condition_missing_for_target(plan.targets[0], missing_set, vars_map)
+                ):
+                    s08_power_guidance = _s08_power_guidance_for_target(plan.targets[0], self.lang)
+                    if isinstance(s08_power_guidance, str) and s08_power_guidance:
+                        original_message = response.message
+                        original_explanations = list(response.explanations)
+                        response.message = s08_power_guidance
+                        response.explanations = [s08_power_guidance]
+                        if cleaned_help_response is not None:
+                            cleaned_help_response = copy.deepcopy(cleaned_help_response)
+                            cleaned_help_response["explanations"] = [s08_power_guidance]
+                        elif isinstance(response.metadata.get("help_response"), Mapping):
+                            cleaned_help_response = copy.deepcopy(dict(response.metadata["help_response"]))
+                            cleaned_help_response["explanations"] = [s08_power_guidance]
+                        if original_message != response.message:
+                            response.metadata["harness_validator_original_message"] = original_message
+                        if original_explanations and original_explanations != response.explanations:
+                            response.metadata["harness_validator_original_explanations"] = original_explanations
+                        response.metadata["s08_unconfirmed_visual_message_rewritten"] = True
+                if cleaned_help_response is not None:
+                    response.metadata["help_response"] = cleaned_help_response
+                if evidence_cleaned:
+                    response.metadata["s08_unconfirmed_visual_evidence_filtered"] = True
                 return True, "s08_unconfirmed_visual_evidence_filtered"
             return False, "already_valid"
         if not plan.targets:
@@ -7075,6 +7182,8 @@ class LiveDcsTutorLoop:
         ignore_request_allowlist: bool = False,
     ) -> tuple[dict[str, Any] | None, str]:
         context = request.context if isinstance(request.context, Mapping) else {}
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
         hint = context.get("deterministic_step_hint")
         if not isinstance(hint, Mapping):
             return None, "missing_deterministic_hint"
@@ -7359,6 +7468,15 @@ class LiveDcsTutorLoop:
         if len(quote) > 120:
             quote = quote[:117].rstrip() + "..."
 
+        fallback_guidance = None
+        missing_set = {item for item in missing_conditions if isinstance(item, str) and item}
+        if (
+            overlay_step_id == "S08"
+            and len(fallback_targets_list) == 1
+            and _s08_power_condition_missing_for_target(fallback_target, missing_set, vars_map)
+        ):
+            fallback_guidance = _s08_power_guidance_for_target(fallback_target, self.lang)
+
         fallback_help_obj = {
             "diagnosis": {
                 "step_id": inferred_step_id,
@@ -7381,7 +7499,9 @@ class LiveDcsTutorLoop:
                 ],
             },
             "explanations": [
-                (
+                fallback_guidance
+                if isinstance(fallback_guidance, str) and fallback_guidance
+                else (
                     f"请先操作 {', '.join(fallback_targets_list)}。"
                     if self.lang == "zh"
                     else f"Please operate {', '.join(fallback_targets_list)} first."
