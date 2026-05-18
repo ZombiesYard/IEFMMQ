@@ -7851,6 +7851,98 @@ def test_live_inference_advances_sticky_s09_when_comm1_value_is_complete(tmp_pat
     assert "vars.comm1_freq_134_000==true" not in stabilized.missing_conditions
 
 
+def test_live_inference_advances_sticky_s10_when_left_engine_is_complete(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_sticky_s10_left_engine_complete.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s10-sticky-left-complete",
+        lang="zh",
+    )
+    try:
+        loop._sticky_inference_step_id = "S10"
+        loop._sticky_inference_missing_conditions = ("vars.engine_crank_left_complete==true",)
+        loop._last_inferred_step_id = "S10"
+
+        stabilized = loop._stabilize_live_inference(
+            StepInferenceResult("S10", ("vars.engine_crank_left_complete==true",)),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "left_ddi_on": True,
+                "right_ddi_on": True,
+                "mpcd_on": True,
+                "hud_on": True,
+                "right_engine_nominal_start_params": True,
+                "comm1_freq_134_000": True,
+                "engine_crank_left": False,
+                "engine_crank_left_complete": True,
+                "rpm_l": 64,
+                "rpm_l_gte_25": True,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "left_engine_idle_ready": True,
+                "throttle_l_not_off": True,
+                "ins_mode": 0,
+                "ins_fast_align_complete": False,
+            },
+            recent_ui_targets=[],
+        )
+    finally:
+        loop.close()
+
+    assert stabilized.inferred_step_id == "S12"
+    assert "vars.engine_crank_left_complete==true" not in stabilized.missing_conditions
+
+
+def test_live_inference_treats_stable_left_engine_params_as_s10_complete(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_sticky_s10_left_engine_stable_params.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s10-sticky-left-stable-params",
+        lang="zh",
+    )
+    try:
+        loop._sticky_inference_step_id = "S10"
+        loop._sticky_inference_missing_conditions = ("vars.engine_crank_left_complete==true",)
+        loop._last_inferred_step_id = "S10"
+
+        stabilized = loop._stabilize_live_inference(
+            StepInferenceResult("S10", ("vars.engine_crank_left_complete==true",)),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "left_ddi_on": True,
+                "right_ddi_on": True,
+                "mpcd_on": True,
+                "hud_on": True,
+                "right_engine_nominal_start_params": True,
+                "comm1_freq_134_000": True,
+                "engine_crank_left": False,
+                "engine_crank_left_complete": False,
+                "rpm_l": 64,
+                "rpm_l_gte_25": True,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "left_engine_idle_ready": True,
+                "throttle_l_not_off": True,
+                "ins_mode": 0,
+                "ins_fast_align_complete": False,
+            },
+            recent_ui_targets=[],
+        )
+    finally:
+        loop.close()
+
+    assert stabilized.inferred_step_id == "S12"
+    assert "vars.engine_crank_left_complete==true" not in stabilized.missing_conditions
+
+
 def test_live_loop_ignores_stale_s19_visual_facts_for_s21(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s21_ignores_stale_s19_vlm.jsonl"
     frame = _bios_frame(1, 10.0, apu_switch=1)
@@ -9866,6 +9958,215 @@ def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
     assert repaired.metadata["final_overlay_targets"] == ["eng_crank_switch"]
     assert "134.000" in repaired.message
     assert "S10" in repaired.message
+
+
+def test_live_help_fixture_310_s10_left_engine_complete_advances_past_crank() -> None:
+    request = TutorRequest(
+        request_id="issue-310-s10-left-complete",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": True,
+                "right_engine_nominal_start_params": True,
+                "engine_crank_left": False,
+                "engine_crank_left_complete": True,
+                "rpm_l": 64,
+                "rpm_l_gte_25": True,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "left_engine_idle_ready": True,
+                "throttle_l_not_off": True,
+            },
+            "gates": {
+                "S10.completion": {
+                    "status": "blocked",
+                    "reason": "Left engine start must have begun.",
+                    "reason_code": "s10_requires_engine_crank_left_complete",
+                },
+                "S12.completion": {
+                    "status": "blocked",
+                    "reason": "INS mode must be set to GND/CV.",
+                    "reason_code": "s12_requires_ins_mode_set",
+                },
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S10",
+                "overlay_step_id": "S10",
+                "missing_conditions": ["vars.engine_crank_left_complete==true"],
+                "step_ui_targets": ["eng_crank_switch"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["eng_crank_switch"],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前处于 S10 步骤。请将 ENG CRANK 开关拨到 LEFT 位置以启动左发动机。",
+        actions=[
+            {
+                "type": "highlight",
+                "target": "eng_crank_switch",
+                "intent": "guide",
+                "evidence_refs": ["GATES.S10.completion"],
+            }
+        ],
+        explanations=["当前处于 S10 步骤。请将 ENG CRANK 开关拨到 LEFT 位置以启动左发动机。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S10", "error_category": "OM"},
+                "next": {"step_id": "S10"},
+                "overlay": {
+                    "targets": ["eng_crank_switch"],
+                    "evidence": [
+                        {
+                            "target": "eng_crank_switch",
+                            "type": "gate",
+                            "ref": "GATES.S10.completion",
+                            "quote": "Left engine start must have begun.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["当前处于 S10 步骤。请将 ENG CRANK 开关拨到 LEFT 位置以启动左发动机。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S12"
+    assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["s10_left_engine_completion_guardrail_applied"] is True
+    assert repaired.metadata["rejected_model_step_id"] == "S10"
+    assert repaired.metadata["fallback_overlay_used"] is True
+    assert repaired.metadata["final_action_plan"]["source"] == "s10_left_engine_completion_guardrail"
+    assert repaired.metadata["final_overlay_targets"] == ["ins_mode_knob"]
+    assert repaired.metadata["help_response"]["overlay"]["targets"] == ["ins_mode_knob"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ins_mode_knob"
+    assert [action["target"] for action in repaired.actions] == ["ins_mode_knob"]
+    assert "S10" not in repaired.message
+    assert "S12" in repaired.message
+
+
+def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fallback_calls: list[tuple[str | None, str | None]] = []
+    original_builder = LiveDcsTutorLoop._build_safe_fallback_overlay_help_obj
+
+    def failing_s10_completion_fallback(
+        self: LiveDcsTutorLoop,
+        request: TutorRequest,
+        *,
+        override_inferred_step_id: str | None = None,
+        override_overlay_step_id: str | None = None,
+        ignore_request_allowlist: bool = False,
+    ) -> tuple[dict[str, Any] | None, str]:
+        fallback_calls.append((override_inferred_step_id, override_overlay_step_id))
+        if override_inferred_step_id == "S12":
+            return None, "no_verifiable_evidence_ref"
+        return original_builder(
+            self,
+            request,
+            override_inferred_step_id=override_inferred_step_id,
+            override_overlay_step_id=override_overlay_step_id,
+            ignore_request_allowlist=ignore_request_allowlist,
+        )
+
+    monkeypatch.setattr(
+        LiveDcsTutorLoop,
+        "_build_safe_fallback_overlay_help_obj",
+        failing_s10_completion_fallback,
+    )
+
+    request = TutorRequest(
+        request_id="issue-310-s10-left-complete-fallback-fails",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": True,
+                "right_engine_nominal_start_params": True,
+                "engine_crank_left": False,
+                "engine_crank_left_complete": True,
+                "rpm_l": 64,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "throttle_l_not_off": True,
+            },
+            "gates": {
+                "S10.completion": {
+                    "status": "blocked",
+                    "reason": "Left engine start must have begun.",
+                    "reason_code": "s10_requires_engine_crank_left_complete",
+                },
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S10",
+                "overlay_step_id": "S10",
+                "missing_conditions": ["vars.engine_crank_left_complete==true"],
+                "step_ui_targets": ["eng_crank_switch"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["eng_crank_switch"],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前处于 S10 步骤。请将 ENG CRANK 开关拨到 LEFT 位置以启动左发动机。",
+        actions=[
+            {
+                "type": "highlight",
+                "target": "eng_crank_switch",
+                "intent": "guide",
+                "evidence_refs": ["GATES.S10.completion"],
+            }
+        ],
+        explanations=["当前处于 S10 步骤。请将 ENG CRANK 开关拨到 LEFT 位置以启动左发动机。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S10", "error_category": "OM"},
+                "next": {"step_id": "S10"},
+                "overlay": {
+                    "targets": ["eng_crank_switch"],
+                    "evidence": [
+                        {
+                            "target": "eng_crank_switch",
+                            "type": "gate",
+                            "ref": "GATES.S10.completion",
+                            "quote": "Left engine start must have begun.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["当前处于 S10 步骤。请将 ENG CRANK 开关拨到 LEFT 位置以启动左发动机。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["s10_left_engine_completion_guardrail_applied"] is True
+    assert repaired.metadata["diagnosis"]["step_id"] == "S12"
+    assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["fallback_overlay_used"] is False
+    assert repaired.metadata["s10_left_engine_completion_overlay_reason"] == "no_verifiable_evidence_ref"
+    assert repaired.metadata["final_overlay_targets"] == []
+    assert fallback_calls == [("S12", "S12")]
+    assert "eng_crank_switch" not in [action["target"] for action in repaired.actions]
+    assert "S10" not in repaired.message
+    assert "S12" in repaired.message
 
 
 def test_live_help_fixture_294_s09_uses_stage_action_hint_for_next_digit() -> None:

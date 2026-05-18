@@ -2332,6 +2332,15 @@ def _s09_comm1_frequency_complete(vars_selected: Mapping[str, Any]) -> bool:
     return value == 13400
 
 
+def _left_engine_start_complete(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("engine_crank_left_complete") is True:
+        return True
+    return (
+        vars_selected.get("rpm_l_gte_60") is True
+        and vars_selected.get("left_engine_nominal_start_params") is True
+    )
+
+
 def _missing_conditions_satisfied_by_vars(
     missing_conditions: Sequence[str],
     vars_selected: Mapping[str, Any],
@@ -2347,6 +2356,8 @@ def _missing_conditions_satisfied_by_vars(
         if "==true" in condition:
             checked = True
             if var_name == "comm1_freq_134_000" and _s09_comm1_frequency_complete(vars_selected):
+                continue
+            if var_name == "engine_crank_left_complete" and _left_engine_start_complete(vars_selected):
                 continue
             if vars_selected.get(var_name) is not True:
                 return False
@@ -4225,36 +4236,75 @@ class LiveDcsTutorLoop:
         sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
         if current_idx is None:
             return inference
+        if (
+            current_step_id in {"S09", "S10"}
+            and _missing_conditions_satisfied_by_vars(inference.missing_conditions, vars_selected)
+        ):
+            advanced = self._infer_after_completed_step(
+                current_step_id,
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
         if sticky_idx is None or current_idx >= sticky_idx:
             self._sticky_inference_step_id = current_step_id
             self._sticky_inference_missing_conditions = tuple(inference.missing_conditions)
             return inference
         if (
             isinstance(sticky_step_id, str)
-            and sticky_step_id == "S09"
-            and _s09_comm1_frequency_complete(vars_selected)
+            and sticky_step_id in {"S09", "S10"}
             and _missing_conditions_satisfied_by_vars(self._sticky_inference_missing_conditions, vars_selected)
         ):
-            next_idx = sticky_idx + 1
-            if 0 <= next_idx < len(self.pack_steps):
-                advanced = infer_step_id(
-                    self.pack_steps[next_idx:],
-                    vars_selected,
-                    recent_ui_targets or (),
-                    precondition_gates=self.precondition_gates,
-                    completion_gates=self.completion_gates,
-                    scenario_profile=self.scenario_profile,
-                    pack_path=self.pack_path,
-                    vision_facts=None,
-                )
-                if isinstance(advanced.inferred_step_id, str) and advanced.inferred_step_id:
-                    self._sticky_inference_step_id = advanced.inferred_step_id
-                    self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
-                    return advanced
+            advanced = self._infer_after_completed_step(
+                sticky_step_id,
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
         return StepInferenceResult(
             inferred_step_id=sticky_step_id,
             missing_conditions=self._sticky_inference_missing_conditions,
         )
+
+    def _infer_after_completed_step(
+        self,
+        step_id: str,
+        vars_selected: Mapping[str, Any],
+        *,
+        recent_ui_targets: Sequence[str] | None = None,
+        vision_facts: Any = None,
+    ) -> StepInferenceResult | None:
+        idx = self._step_order_index.get(step_id)
+        if idx is None:
+            return None
+        next_idx = idx + 1
+        if next_idx < 0 or next_idx >= len(self.pack_steps):
+            return None
+        vars_for_advance = vars_selected
+        if step_id == "S10" and _left_engine_start_complete(vars_selected):
+            vars_for_advance = dict(vars_selected)
+            vars_for_advance["engine_crank_left_complete"] = True
+        advanced = infer_step_id(
+            self.pack_steps[next_idx:],
+            vars_for_advance,
+            recent_ui_targets or (),
+            precondition_gates=self.precondition_gates,
+            completion_gates=self.completion_gates,
+            scenario_profile=self.scenario_profile,
+            pack_path=self.pack_path,
+            vision_facts=vision_facts,
+        )
+        if isinstance(advanced.inferred_step_id, str) and advanced.inferred_step_id:
+            return advanced
+        return None
 
     def _infer_preliminary_step_for_vision_facts(self, obs: Observation) -> StepInferenceResult:
         payload = obs.payload if isinstance(obs.payload, Mapping) else {}
@@ -5370,6 +5420,8 @@ class LiveDcsTutorLoop:
             return False, "refuel_probe_motion_wait_already_rewritten"
         if response.metadata.get("s09_comm1_completion_guardrail_applied") is True:
             return False, "s09_comm1_completion_already_rewritten"
+        if response.metadata.get("s10_left_engine_completion_guardrail_applied") is True:
+            return False, "s10_left_engine_completion_already_rewritten"
         if response.metadata.get("completion_conflict_rewritten") is True:
             return False, "completion_conflict_already_rewritten"
         response_mapping_meta = response.metadata.get("response_mapping")
@@ -6060,6 +6112,101 @@ class LiveDcsTutorLoop:
                     "You are on S09. Set COMM1 preset 1 to 134.000 MHz: pull the UFC COMM1 "
                     "channel selector, enter 1-3-4-0-0-0, then press ENT."
                 )
+        elif inferred_step_id == "S10" and _left_engine_start_complete(vars_map):
+            reason = "s10_left_engine_start_complete"
+            recent_actions = context.get("recent_actions")
+            recent_buttons = (
+                [
+                    item for item in recent_actions.get("recent_buttons", [])
+                    if isinstance(item, str) and item
+                ]
+                if isinstance(recent_actions, Mapping)
+                else []
+            )
+            advanced = self._infer_after_completed_step(
+                "S10",
+                vars_map,
+                recent_ui_targets=recent_buttons,
+                vision_facts=context.get("vision_facts"),
+            )
+            next_step_id = (
+                advanced.inferred_step_id
+                if advanced is not None and isinstance(advanced.inferred_step_id, str)
+                else self._next_step_id_after("S10")
+            )
+            if not isinstance(next_step_id, str) or not next_step_id:
+                next_step_id = "S11"
+            if self.lang == "zh":
+                rewritten = f"左发动机启动条件已满足。现在进入 {next_step_id}。"
+            else:
+                rewritten = f"The left-engine start condition is already satisfied. Continue to {next_step_id}."
+            original_actions = copy.deepcopy([dict(action) for action in response.actions if isinstance(action, Mapping)])
+            response.actions = []
+            response.metadata["diagnosis"] = {"step_id": next_step_id, "error_category": "OM"}
+            response.metadata["next"] = {"step_id": next_step_id}
+            response.metadata["validator_rejected"] = True
+            response.metadata["repair_applied"] = True
+            response.metadata["rejected_model_step_id"] = "S10"
+            response.metadata["final_action_plan_source"] = "s10_left_engine_completion_guardrail"
+            if original_actions:
+                response.metadata["s10_left_engine_completion_original_actions"] = original_actions
+                rejected_targets = [
+                    action.get("target")
+                    for action in original_actions
+                    if isinstance(action.get("target"), str)
+                ]
+                if rejected_targets:
+                    response.metadata["rejected_model_targets"] = _dedupe_strings(rejected_targets)
+                    response.metadata["rejected_model_target"] = response.metadata["rejected_model_targets"][0]
+            fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
+                request,
+                override_inferred_step_id=next_step_id,
+                override_overlay_step_id=next_step_id,
+                ignore_request_allowlist=True,
+            )
+            fallback_used = False
+            if isinstance(fallback_help_obj, Mapping):
+                planned_help_obj = copy.deepcopy(dict(fallback_help_obj))
+                planned_help_obj["diagnosis"] = {"step_id": next_step_id, "error_category": "OM"}
+                planned_help_obj["next"] = {"step_id": next_step_id}
+                planned_help_obj["explanations"] = [rewritten]
+                mapped = map_help_response_to_tutor_response(
+                    planned_help_obj,
+                    request=request,
+                    status=response.status,
+                    max_overlay_targets=self.max_overlay_targets,
+                    ui_map_path=self.ui_map_path,
+                    lang=self.lang,
+                )
+                mapped_meta = dict(mapped.metadata)
+                if mapped_meta:
+                    response.metadata["fallback_response_mapping"] = mapped_meta
+                if mapped.actions:
+                    response.actions = list(mapped.actions)
+                    response.metadata["help_response"] = planned_help_obj
+                    fallback_used = True
+                else:
+                    mapping_errors = mapped_meta.get("mapping_errors")
+                    fallback_reason = (
+                        f"fallback_mapping_failed:{'|'.join(str(item) for item in mapping_errors[:3])}"
+                        if isinstance(mapping_errors, list) and mapping_errors
+                        else "fallback_mapping_failed"
+                    )
+                    _set_text_only_help_response(next_step_id, rewritten)
+            else:
+                _set_text_only_help_response(next_step_id, rewritten)
+            final_targets = _overlay_targets_from_actions(response.actions)
+            response.metadata["harness_action_plan"] = {
+                "step_id": next_step_id,
+                "overlay_step_id": next_step_id,
+                "targets": list(final_targets),
+                "text_only": not bool(final_targets),
+                "source": "s10_left_engine_completion_guardrail",
+            }
+            response.metadata["s10_left_engine_completion_guardrail_applied"] = True
+            response.metadata["s10_left_engine_completion_next_step_id"] = next_step_id
+            response.metadata["s10_left_engine_completion_overlay_applied"] = fallback_used
+            response.metadata["s10_left_engine_completion_overlay_reason"] = fallback_reason
         elif inferred_step_id == "S12":
             if "vars.ins_fast_align_complete==true" in missing_set and (
                 vars_map.get("ins_mode_cv_or_gnd") is True or vars_map.get("ins_mode_set") is True
@@ -6820,8 +6967,14 @@ class LiveDcsTutorLoop:
         self._rewrite_terminal_state_conflict_response(response, request)
         self._rewrite_procedural_guidance_response(response, request)
 
-        fallback_overlay_used = False
-        fallback_overlay_reason = "all_steps_complete" if terminal_state_short_circuited else "not_needed"
+        fallback_overlay_used = bool(response.metadata.get("s10_left_engine_completion_overlay_applied"))
+        fallback_overlay_reason = (
+            response.metadata.get("s10_left_engine_completion_overlay_reason")
+            if fallback_overlay_used
+            else ("all_steps_complete" if terminal_state_short_circuited else "not_needed")
+        )
+        if not isinstance(fallback_overlay_reason, str) or not fallback_overlay_reason:
+            fallback_overlay_reason = "not_needed"
         harness_validation_used, harness_validation_reason = self._apply_harness_validation_action_plan(
             response,
             request,
@@ -6855,7 +7008,12 @@ class LiveDcsTutorLoop:
             request,
             mapped_meta,
         )
-        if should_apply_safe_fallback and not action_hint_override_used and not harness_validation_used:
+        if (
+            should_apply_safe_fallback
+            and not action_hint_override_used
+            and not harness_validation_used
+            and response.metadata.get("s10_left_engine_completion_guardrail_applied") is not True
+        ):
             fallback_overlay_used, fallback_overlay_reason = self._apply_safe_fallback_overlay(
                 response,
                 request,
