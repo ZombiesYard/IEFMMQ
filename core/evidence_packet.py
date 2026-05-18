@@ -1062,40 +1062,57 @@ def _supports_later_avionics(digest: TelemetryWindowDigest) -> bool:
     return False
 
 
-def _telemetry_progression_candidates(digest: TelemetryWindowDigest) -> tuple[tuple[str, str, str], ...]:
+def _telemetry_progression_candidates(digest: TelemetryWindowDigest) -> tuple[tuple[str, str, str, str, bool], ...]:
     changed = _changed_var_map(digest)
-    out: list[tuple[str, str, str]] = []
+    out: list[tuple[str, str, str, str, bool]] = []
 
     probe = changed.get("ext_refuel_probe_value")
     if probe is not None:
+        first = _coerce_number(probe.get("first_value"))
         last = _coerce_number(probe.get("last_value"))
         if last is not None and last >= 60000:
-            out.append(("S21", "changed_vars", "ext_refuel_probe_value"))
+            out.append(("S21", "changed_vars", "ext_refuel_probe_value", "", False))
         elif last is not None and last <= 5000:
-            out.append(("S22", "changed_vars", "ext_refuel_probe_value"))
+            out.append(("S22", "changed_vars", "ext_refuel_probe_value", "", False))
+        elif first is not None and last is not None and last > first:
+            out.append((
+                "S20",
+                "changed_vars",
+                "ext_refuel_probe_value",
+                "refueling probe extending in progress",
+                True,
+            ))
+        elif first is not None and last is not None and last < first:
+            out.append((
+                "S21",
+                "changed_vars",
+                "ext_refuel_probe_value",
+                "refueling probe retracting in progress",
+                True,
+            ))
 
     launch_bar = changed.get("launch_bar_switch_value")
     if launch_bar is not None:
         last = _coerce_number(launch_bar.get("last_value"))
         if last == 1:
-            out.append(("S23", "changed_vars", "launch_bar_switch_value"))
+            out.append(("S23", "changed_vars", "launch_bar_switch_value", "", False))
         elif last == 0:
-            out.append(("S24", "changed_vars", "launch_bar_switch_value"))
+            out.append(("S24", "changed_vars", "launch_bar_switch_value", "", False))
 
     hook = changed.get("hook_handle_value")
     if hook is not None:
         last = _coerce_number(hook.get("last_value"))
         if last == 1:
-            out.append(("S25", "changed_vars", "hook_handle_value"))
+            out.append(("S25", "changed_vars", "hook_handle_value", "", False))
         elif last == 0:
-            out.append(("S26", "changed_vars", "hook_handle_value"))
+            out.append(("S26", "changed_vars", "hook_handle_value", "", False))
 
     pitot = changed.get("pitot_heat_on")
     if pitot is not None and pitot.get("last_value") is True:
-        out.append(("S27", "changed_vars", "pitot_heat_on"))
+        out.append(("S27", "changed_vars", "pitot_heat_on", "", False))
     changed = _changed_var_map(digest)
 
-    def _age(item: tuple[str, str, str]) -> float:
+    def _age(item: tuple[str, str, str, str, bool]) -> float:
         changed_item = changed.get(item[2])
         if changed_item is None:
             return 999999.0
@@ -1223,7 +1240,7 @@ def build_step_candidates(
                 )
             )
 
-        for step_id, ref_kind, var_name in _telemetry_progression_candidates(telemetry_digest):
+        for step_id, ref_kind, var_name, reason, suppress_targets in _telemetry_progression_candidates(telemetry_digest):
             _append(
                 StepCandidate(
                     step_id=step_id,
@@ -1233,8 +1250,10 @@ def build_step_candidates(
                     refuting_evidence_refs=(),
                     confidence=0.7,
                     missing_conditions=(),
-                    proposed_next_action_target_ids=_targets_for_step(step_id, step_harness_specs),
-                    reason=_candidate_reason("telemetry_window", step_id),
+                    proposed_next_action_target_ids=(
+                        () if suppress_targets else _targets_for_step(step_id, step_harness_specs)
+                    ),
+                    reason=reason or _candidate_reason("telemetry_window", step_id),
                 )
             )
 
