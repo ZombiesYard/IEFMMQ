@@ -39,6 +39,10 @@ _PROMPT_LEAK_MARKERS = (
     "system prompt",
 )
 _TRAILING_PUNCTUATION = ".,;:!?)"
+_INTERNAL_PREDICATE_RE = re.compile(
+    r"\b(?:payload\.)?vars\.[A-Za-z0-9_]+"
+    r"(?:\s*(?:==|!=|>=|<=|>|<|\bin\b)\s*(?:\[[^\]]*\]|[^\s,;。.!?]+))?"
+)
 
 
 class ModelTransportSecurityError(ValueError):
@@ -169,6 +173,8 @@ def sanitize_public_model_text(value: Any, *, lang: str) -> Any:
     if not isinstance(value, str):
         return value
     redacted = redact_sensitive_text(value)
+    predicate_marker = "the unmet condition" if lang == "en" else "该步骤的未满足条件"
+    redacted = _INTERNAL_PREDICATE_RE.sub(predicate_marker, redacted)
     if looks_like_prompt_leak(redacted):
         if lang == "en":
             return "Potential prompt/source leakage was blocked. Re-trigger Help after confirming the current step."

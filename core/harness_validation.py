@@ -168,16 +168,22 @@ def _completion_gate_satisfied(evidence_packet: Any, step_id: str | None) -> boo
     if not isinstance(step_id, str) or not step_id:
         return False
     gate_evidence = getattr(evidence_packet, "gate_evidence", None)
+    gate_id = f"{step_id}.completion"
     for gate in getattr(gate_evidence, "satisfied_gates", ()):
         if not isinstance(gate, Mapping):
             continue
-        if gate.get("gate_id") != f"{step_id}.completion":
+        if gate.get("gate_id") != gate_id:
             continue
+        if gate.get("reason_code") == "no_rules":
+            return False
         status = gate.get("status")
         if status == "satisfied":
             return True
-        if (status == "allowed" or gate.get("allowed") is True) and gate.get("reason_code") != "no_rules":
+        if status == "allowed" or gate.get("allowed") is True:
             return True
+    satisfied_ids = getattr(gate_evidence, "satisfied_gate_ids", ())
+    if gate_id in set(_strings(satisfied_ids if isinstance(satisfied_ids, (list, tuple, set)) else None)):
+        return True
     return False
 
 

@@ -3478,6 +3478,34 @@ def test_normalize_observable_text_only_response_rewrites_visual_analysis_unavai
         loop.close()
 
 
+def test_annotate_response_audit_metadata_sanitizes_public_predicates(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_public_predicate_sanitize.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        response = TutorResponse(
+            status="ok",
+            message="当前 S04 尚未完成，请先满足：vars.right_engine_nominal_start_params==true。",
+            explanations=["需要 vars.rpm_r>=25 后继续。"],
+            metadata={},
+        )
+
+        loop._annotate_response_audit_metadata(response)
+
+        assert "vars." not in response.message
+        assert all("vars." not in item for item in response.explanations)
+        assert "vars." not in response.metadata["final_public_response"]["message"]
+        assert all("vars." not in item for item in response.metadata["final_public_response"]["explanations"])
+    finally:
+        loop.close()
+
+
 def test_should_use_deterministic_overlay_fallback_for_observable_text_only_step(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_overlay_fallback_observable.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 19.5, apu_switch=0)])

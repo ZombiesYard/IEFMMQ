@@ -4632,6 +4632,17 @@ class LiveDcsTutorLoop:
 
     def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
         self._capture_model_raw_help_response(response)
+        sanitized_message = sanitize_public_model_text(response.message, lang=self.lang)
+        response.message = sanitized_message if isinstance(sanitized_message, str) else response.message
+        response.explanations = [
+            item
+            for item in (
+                sanitize_public_model_text(raw, lang=self.lang)
+                for raw in response.explanations
+                if isinstance(raw, str)
+            )
+            if isinstance(item, str)
+        ]
 
         final_public_response: dict[str, Any] = {
             "message": response.message,

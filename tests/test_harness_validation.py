@@ -191,6 +191,31 @@ def test_final_evidence_consistency_rejects_allowed_completion_gate_but_ignores_
     assert accepted.accepted is True
 
 
+def test_final_evidence_consistency_rejects_late_allowed_completion_gate_after_detail_window() -> None:
+    gates = {
+        f"S{idx:02d}.completion": {
+            "status": "allowed",
+            "allowed": True,
+            "step_id": f"S{idx:02d}",
+            "gate_type": "completion",
+            "reason_code": "ok",
+        }
+        for idx in range(1, 25)
+    }
+    packet = build_evidence_packet({"vars": {}, "gates": gates})
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S18",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[],
+        latest_vars={},
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert "completion_gate_already_satisfied:S18" in result.reasons
+
+
 def test_plan_harness_action_repairs_invalid_target_to_step_spec_target() -> None:
     plan = plan_harness_action(
         step_specs={"S20": _spec("S20", ("refuel_probe_switch",))},
