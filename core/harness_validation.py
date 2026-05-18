@@ -72,6 +72,15 @@ class EvidenceConsistencyResult:
     reasons: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class _StateActionPlan:
+    targets: tuple[str, ...]
+    guidance: str | None
+    text_only: bool
+    source: str
+    reasons: tuple[str, ...] = ()
+
+
 def _strings(raw: Sequence[str] | set[str] | tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
     if not isinstance(raw, (list, tuple, set)):
         return ()
@@ -371,6 +380,194 @@ def _valid_evidence_refs(
     return valid, tuple(f"unknown_evidence_ref:{ref}" for ref in invalid)
 
 
+def _coerce_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _coerce_int(value: Any) -> int | None:
+    number = _coerce_float(value)
+    return int(number) if number is not None else None
+
+
+def _latest_vars(latest_vars: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    return latest_vars if isinstance(latest_vars, Mapping) else {}
+
+
+def _normalize_ufc_scratchpad_text(vars_map: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    for key in (
+        "ufc_scratchpad_string_1_display",
+        "ufc_scratchpad_string_2_display",
+        "ufc_scratchpad_number_display",
+    ):
+        value = vars_map.get(key)
+        if isinstance(value, str):
+            parts.append(value)
+    return "".join(parts).replace("。", ".").upper()
+
+
+def _s09_comm1_frequency_complete(vars_map: Mapping[str, Any]) -> bool:
+    if vars_map.get("comm1_freq_134_000") is True:
+        return True
+    value = _coerce_int(vars_map.get("comm1_freq_value"))
+    return value == 13400
+
+
+def _s09_state_action_plan(
+    vars_map: Mapping[str, Any],
+    *,
+    spec: StepHarnessSpec | None,
+    recent_action_targets: Sequence[str] | None,
+) -> _StateActionPlan | None:
+    allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
+    if not allowed or _s09_comm1_frequency_complete(vars_map):
+        return None
+
+    scratchpad_text = _normalize_ufc_scratchpad_text(vars_map)
+    compact = scratchpad_text.replace(" ", "")
+    payload = compact[3:] if compact.startswith("1--") else compact
+    recent = set(_strings(recent_action_targets))
+
+    def _target(name: str, guidance: str) -> _StateActionPlan | None:
+        if name not in allowed:
+            return None
+        return _StateActionPlan(
+            targets=(name,),
+            guidance=guidance,
+            text_only=False,
+            source="state_action_planner",
+            reasons=(f"s09_state_target:{name}",),
+        )
+
+    if payload.endswith("134.000"):
+        return _target("ufc_ent_button", "The UFC scratchpad shows 134.000; press ENT to commit the COMM1 preset.")
+    if payload.endswith("13.400") or payload.endswith("1.340") or payload.endswith(".134") or payload.endswith("1.34"):
+        return _target("ufc_key_0", "COMM1 preset entry is partway through 134.000; press 0 next.")
+    if payload.endswith(".13"):
+        return _target("ufc_key_4", "COMM1 preset entry shows 13; press 4 next.")
+    if payload.endswith(".1"):
+        return _target("ufc_key_3", "COMM1 preset entry shows 1; press 3 next.")
+    if payload.endswith("305.000") or payload.endswith("305000"):
+        return _target("ufc_key_1", "COMM1 preset 1 is open with the old 305.000 value; press 1 next.")
+    if vars_map.get("ufc_comm1_pull_pressed") is True or "ufc_comm1_channel_selector_pull" in recent:
+        return _target("ufc_key_1", "COMM1 preset entry is open; start typing 134.000 with key 1.")
+    return _target("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector before entering 134.000.")
+
+
+def _changed_var(evidence_packet: Any, var_name: str) -> Mapping[str, Any] | None:
+    digest = getattr(evidence_packet, "telemetry_window_digest", None)
+    for item in getattr(digest, "changed_vars", ()):
+        if isinstance(item, Mapping) and item.get("var") == var_name:
+            return item
+    return None
+
+
+def _probe_motion_state(
+    step_id: str | None,
+    vars_map: Mapping[str, Any],
+    *,
+    evidence_packet: Any = None,
+) -> str | None:
+    probe_value = _coerce_float(vars_map.get("ext_refuel_probe_value"))
+    switch_value = _coerce_int(vars_map.get("probe_switch_value"))
+    changed = _changed_var(evidence_packet, "ext_refuel_probe_value")
+    first_value = _coerce_float(changed.get("first_value")) if isinstance(changed, Mapping) else None
+    last_value = _coerce_float(changed.get("last_value")) if isinstance(changed, Mapping) else None
+    is_extending = first_value is not None and last_value is not None and last_value > first_value
+    is_retracting = first_value is not None and last_value is not None and last_value < first_value
+
+    if step_id == "S20":
+        if switch_value == 0 and probe_value is not None and 0 < probe_value < 60000 and is_extending:
+            return "s20_extending"
+    if step_id == "S21":
+        near_retract_threshold = probe_value is not None and 5000 < probe_value <= 7000
+        if switch_value == 1 and probe_value is not None and probe_value > 5000 and (
+            is_retracting or near_retract_threshold
+        ):
+            return "s21_retracting"
+    return None
+
+
+def _state_action_plan(
+    *,
+    step_id: str | None,
+    spec: StepHarnessSpec | None,
+    latest_vars: Mapping[str, Any] | None,
+    evidence_packet: Any = None,
+    recent_action_targets: Sequence[str] | None = None,
+    vision_seen_fact_ids: Sequence[str] | None = None,
+    vision_fresh_fact_ids: Sequence[str] | None = None,
+    vision_not_seen_fact_ids: Sequence[str] | None = None,
+) -> _StateActionPlan | None:
+    vars_map = _latest_vars(latest_vars)
+    if step_id == "S09":
+        return _s09_state_action_plan(
+            vars_map,
+            spec=spec,
+            recent_action_targets=recent_action_targets,
+        )
+
+    motion_state = _probe_motion_state(step_id, vars_map, evidence_packet=evidence_packet)
+    if motion_state == "s20_extending":
+        return _StateActionPlan(
+            targets=(),
+            guidance="The refueling probe is extending. Wait until it is fully extended before continuing.",
+            text_only=True,
+            source="state_action_planner_wait",
+            reasons=("probe_motion:s20_extending",),
+        )
+    if motion_state == "s21_retracting":
+        return _StateActionPlan(
+            targets=(),
+            guidance="The refueling probe is retracting. Wait until it is fully stowed before continuing.",
+            text_only=True,
+            source="state_action_planner_wait",
+            reasons=("probe_motion:s21_retracting",),
+        )
+
+    seen_or_fresh = set(_strings(vision_seen_fact_ids)) | set(_strings(vision_fresh_fact_ids))
+    not_seen = set(_strings(vision_not_seen_fact_ids))
+    allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
+    if step_id == "S18" and "bit_root_page_visible" in seen_or_fresh and "fcsmc_page_visible" in not_seen:
+        if "right_mdi_pb5" in allowed:
+            return _StateActionPlan(
+                targets=("right_mdi_pb5",),
+                guidance="BIT root is visible; press Right DDI PB5/FCS-MC to enter the FCS-MC BIT page.",
+                text_only=False,
+                source="state_action_planner",
+                reasons=("s18_bit_root_to_pb5",),
+            )
+    if step_id == "S19":
+        if "fcsmc_in_test_visible" in seen_or_fresh:
+            return _StateActionPlan(
+                targets=(),
+                guidance="The FCS BIT is already running. Release the switch and wait for the final GO result.",
+                text_only=True,
+                source="state_action_planner_wait",
+                reasons=("s19_in_test_wait",),
+            )
+        if "fcsmc_intermediate_result_visible" in seen_or_fresh:
+            targets = tuple(target for target in ("fcs_bit_switch", "right_mdi_pb5") if target in allowed)
+            if targets:
+                return _StateActionPlan(
+                    targets=targets,
+                    guidance="Hold the FCS BIT switch up while pressing Right DDI PB5 to start the BIT.",
+                    text_only=False,
+                    source="state_action_planner",
+                    reasons=("s19_intermediate_start_bit",),
+                )
+    return None
+
+
 def plan_harness_action(
     *,
     step_specs: Mapping[str, StepHarnessSpec],
@@ -392,6 +589,9 @@ def plan_harness_action(
     action_hint_step_ids: Sequence[str] | None = None,
     action_hint_fact_rules: Sequence[HarnessActionHintFactRule] | None = None,
     text_guidance_rules: Sequence[HarnessTextGuidanceRule] | None = None,
+    latest_vars: Mapping[str, Any] | None = None,
+    evidence_packet: Any = None,
+    recent_action_targets: Sequence[str] | None = None,
 ) -> HarnessActionPlan:
     reasons: list[str] = []
     rejected_model_step_id: str | None = None
@@ -429,6 +629,32 @@ def plan_harness_action(
 
     spec = step_specs.get(selected_overlay_step_id or "") if selected_overlay_step_id else None
     proposed_targets = _strings(proposed_overlay_targets)
+    state_plan = _state_action_plan(
+        step_id=selected_step_id,
+        spec=spec,
+        latest_vars=latest_vars,
+        evidence_packet=evidence_packet,
+        recent_action_targets=recent_action_targets,
+        vision_seen_fact_ids=vision_seen_fact_ids,
+        vision_fresh_fact_ids=vision_fresh_fact_ids,
+        vision_not_seen_fact_ids=vision_not_seen_fact_ids,
+    )
+    if state_plan is not None and state_plan.text_only:
+        return HarnessActionPlan(
+            step_id=selected_step_id,
+            overlay_step_id=selected_overlay_step_id,
+            targets=(),
+            evidence_refs=(),
+            guidance=state_plan.guidance,
+            text_only=True,
+            validator_rejected=True,
+            repair_applied=True,
+            rejected_model_step_id=rejected_model_step_id,
+            rejected_model_targets=proposed_targets,
+            final_action_plan_source=state_plan.source,
+            reasons=tuple((*reasons, *state_plan.reasons)),
+        )
+
     text_guidance = _text_guidance_for_targets(
         selected_step_id,
         proposed_targets,
@@ -467,12 +693,23 @@ def plan_harness_action(
             use_hint = True
             source = hint_rule_source
 
+    if state_plan is not None and len(state_plan.targets) > 1 and hinted_targets != state_plan.targets:
+        if use_hint and hinted_targets:
+            reasons.append(
+                "action_hint_incomplete_for_state_plan:" + ",".join(hinted_targets)
+            )
+        use_hint = False
+
     if completion_advance is not None:
         base_targets = spec.allowed_overlay_targets if spec is not None else ()
     elif use_hint:
         base_targets = hinted_targets
         if source == "model":
             source = "validator_action_hint"
+    elif state_plan is not None:
+        base_targets = state_plan.targets
+        source = state_plan.source
+        reasons.extend(state_plan.reasons)
     else:
         base_targets = proposed_targets
 
@@ -492,6 +729,29 @@ def plan_harness_action(
             if target not in hinted_target_set
         )
         reasons.extend(f"action_hint_target_mismatch:{target}" for target in rejected_model_targets)
+    elif state_plan is not None and proposed_targets:
+        planned_target_set = set(state_plan.targets)
+        rejected_model_targets = tuple(
+            target for target in proposed_targets
+            if target not in planned_target_set
+        )
+        reasons.extend(f"state_action_target_mismatch:{target}" for target in rejected_model_targets)
+
+    if state_plan is not None and not use_hint and tuple(targets) != state_plan.targets:
+        return HarnessActionPlan(
+            step_id=selected_step_id,
+            overlay_step_id=selected_overlay_step_id,
+            targets=(),
+            evidence_refs=(),
+            guidance=state_plan.guidance,
+            text_only=True,
+            validator_rejected=True,
+            repair_applied=True,
+            rejected_model_step_id=rejected_model_step_id,
+            rejected_model_targets=rejected_model_targets or proposed_targets,
+            final_action_plan_source=state_plan.source,
+            reasons=tuple(reasons),
+        )
 
     if not targets and spec is not None and spec.allowed_overlay_targets and max_overlay_targets > 0:
         repaired_targets, repair_reasons = _filter_targets(
@@ -526,6 +786,13 @@ def plan_harness_action(
         hint_reason = action_hint.get("reason")
         if isinstance(hint_reason, str) and hint_reason:
             guidance = hint_reason
+    if (
+        not use_hint
+        and state_plan is not None
+        and isinstance(state_plan.guidance, str)
+        and state_plan.guidance
+    ):
+        guidance = state_plan.guidance
 
     return HarnessActionPlan(
         step_id=selected_step_id,
