@@ -9916,6 +9916,20 @@ def _fixture_request_and_model_response(fixture: dict[str, Any]) -> tuple[TutorR
     return request, response
 
 
+def _public_response_text(response: TutorResponse) -> str:
+    final_public = response.metadata.get("final_public_response")
+    if not isinstance(final_public, dict):
+        return ""
+    parts: list[str] = []
+    message = final_public.get("message")
+    if isinstance(message, str):
+        parts.append(message)
+    explanations = final_public.get("explanations")
+    if isinstance(explanations, list):
+        parts.extend(item for item in explanations if isinstance(item, str))
+    return "\n".join(parts)
+
+
 def test_live_help_fixture_311_replays_real_s09_comm1_complete_fixture() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/168fc73d-f98c-498e-a35c-fef91b06ee2e.fixture.json"
@@ -9933,6 +9947,7 @@ def test_live_help_fixture_311_replays_real_s09_comm1_complete_fixture() -> None
     assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S10"
     assert "ufc_comm1_channel_selector_pull" not in repaired.metadata["final_overlay_targets"]
     assert "vars.comm1_freq_134_000==true" not in repaired.message
+    assert "vars.comm1_freq_134_000==true" not in _public_response_text(repaired)
 
 
 def test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture() -> None:
@@ -9954,6 +9969,7 @@ def test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture() -
     }
     assert "eng_crank_switch" not in repaired.metadata["final_overlay_targets"]
     assert "vars.engine_crank_left_complete==true" not in repaired.message
+    assert "vars.engine_crank_left_complete==true" not in _public_response_text(repaired)
 
 
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
@@ -10137,6 +10153,126 @@ def test_live_help_fixture_310_s10_left_engine_complete_advances_past_crank() ->
     assert "vars.engine_crank_left_complete==true" not in repaired.message
     assert "S10" not in repaired.message
     assert "S12" in repaired.message
+
+
+def test_final_evidence_validator_rechecks_repaired_fallback_step() -> None:
+    request = TutorRequest(
+        request_id="issue-311-final-fallback-recheck",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": True,
+                "right_engine_nominal_start_params": True,
+                "engine_crank_left": False,
+                "engine_crank_left_complete": True,
+                "rpm_l": 64,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "throttle_l_not_off": True,
+                "ins_mode": 2,
+                "ins_mode_set": True,
+                "ins_mode_cv_or_gnd": True,
+                "ins_fast_align_complete": True,
+                "radar_mode_opr": False,
+            },
+            "gates": {
+                "S10.completion": {
+                    "status": "blocked",
+                    "reason": "Left engine start must have begun.",
+                    "reason_code": "s10_requires_engine_crank_left_complete",
+                },
+                "S12.completion": {
+                    "status": "satisfied",
+                    "step_id": "S12",
+                    "gate_type": "completion",
+                },
+                "S13.completion": {
+                    "status": "blocked",
+                    "step_id": "S13",
+                    "gate_type": "completion",
+                    "reason": "Radar knob must be set to OPR.",
+                    "reason_code": "s13_requires_radar_mode_opr",
+                },
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S10",
+                "overlay_step_id": "S10",
+                "missing_conditions": ["vars.engine_crank_left_complete==true"],
+                "step_ui_targets": ["eng_crank_switch"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["eng_crank_switch", "ins_mode_knob", "radar_mode_knob"],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前处于 S12 步骤。请将 INS 旋钮转到 CV 或 GND。",
+        actions=[
+            {
+                "type": "highlight",
+                "target": "ins_mode_knob",
+                "intent": "guide",
+                "evidence_refs": ["GATES.S12.completion"],
+            }
+        ],
+        explanations=["当前处于 S12 步骤。请将 INS 旋钮转到 CV 或 GND。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "repair",
+            "diagnosis": {"step_id": "S12", "error_category": "OM"},
+            "next": {"step_id": "S12"},
+            "harness_action_plan": {
+                "step_id": "S12",
+                "overlay_step_id": "S12",
+                "targets": ["ins_mode_knob"],
+                "text_only": False,
+                "source": "deterministic_step:S12",
+            },
+            "help_response": {
+                "diagnosis": {"step_id": "S12", "error_category": "OM"},
+                "next": {"step_id": "S12"},
+                "overlay": {
+                    "targets": ["ins_mode_knob"],
+                    "evidence": [
+                        {
+                            "target": "ins_mode_knob",
+                            "type": "gate",
+                            "ref": "GATES.S12.completion",
+                            "quote": "INS alignment must be complete.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["当前处于 S12 步骤。请将 INS 旋钮转到 CV 或 GND。"],
+            },
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-final-fallback-recheck",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        used, reason = loop._enforce_final_evidence_consistency_after_repairs(response, request)
+    finally:
+        loop.close()
+
+    assert used is True
+    assert reason == "final_evidence_consistency_validator"
+    assert response.metadata["diagnosis"]["step_id"] == "S13"
+    assert response.metadata["next"]["step_id"] == "S13"
+    assert response.metadata["harness_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert response.metadata["harness_action_plan"]["targets"] == ["radar_mode_knob"]
+    assert [action["target"] for action in response.actions] == ["radar_mode_knob"]
+    assert "ins_mode_knob" not in [action["target"] for action in response.actions]
 
 
 def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails(

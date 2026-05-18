@@ -6205,13 +6205,17 @@ class LiveDcsTutorLoop:
         if not isinstance(inferred_step_id, str) or not inferred_step_id:
             return False, "missing_inferred_step_id"
         final_step_id = self._final_response_step_id(response)
-        if final_step_id != inferred_step_id:
-            return False, "final_step_already_advanced"
-        missing_list = self._deterministic_missing_conditions_from_context(context)
+        if not isinstance(final_step_id, str) or not final_step_id:
+            return False, "missing_final_step_id"
+        missing_list = (
+            self._deterministic_missing_conditions_from_context(context)
+            if final_step_id == inferred_step_id
+            else []
+        )
         rejected = self._apply_final_evidence_consistency_metadata(
             response,
             request,
-            accepted_step_id=inferred_step_id,
+            accepted_step_id=final_step_id,
             accepted_missing_conditions=missing_list,
         )
         if not rejected:
@@ -6219,7 +6223,7 @@ class LiveDcsTutorLoop:
         return self._rewrite_final_evidence_consistency_conflict_response(
             response,
             request,
-            rejected_step_id=inferred_step_id,
+            rejected_step_id=final_step_id,
             rejected_missing_conditions=response.metadata.get("rejected_missing_conditions", []),
         )
 
