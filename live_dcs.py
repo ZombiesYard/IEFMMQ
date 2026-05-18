@@ -622,6 +622,8 @@ _SAFE_REQUEST_METADATA_FIELDS: tuple[str, ...] = (
     "state_harness_conflicts",
     "state_harness_telemetry_status",
     "evidence_packet_summary",
+    "evidence_snapshot",
+    "snapshot_ids",
     "help_cycle_id",
     "generation_mode",
     "vision_used",
@@ -646,6 +648,9 @@ def _sanitize_request_metadata_for_event(raw: Any) -> dict[str, Any]:
         value = raw.get(key)
         if key == "evidence_packet_summary":
             sanitized[key] = _sanitize_evidence_packet_summary_for_event(value)
+            continue
+        if key == "evidence_snapshot":
+            sanitized[key] = _sanitize_evidence_snapshot_for_event(value)
             continue
         if isinstance(value, Mapping):
             sanitized[key] = dict(value)
@@ -805,7 +810,7 @@ def _sanitize_telemetry_window_digest_for_event(raw: Any) -> dict[str, Any]:
             sanitized[key] = value
         elif value is None:
             sanitized[key] = None
-    for key in ("frame_count", "latest_seq"):
+    for key in ("frame_count", "first_seq", "latest_seq"):
         value = raw.get(key)
         if isinstance(value, int) and not isinstance(value, bool):
             sanitized[key] = value
@@ -964,11 +969,36 @@ def _sanitize_evidence_packet_summary_for_event(raw: Any) -> dict[str, Any]:
         sanitized["telemetry_window_digest"] = {
             key: value
             for key, value in telemetry_window_digest.items()
-            if key in {"frame_count", "latest_seq", "changed_var_count", "contradiction_count"}
+            if key in {"frame_count", "first_seq", "latest_seq", "changed_var_count", "contradiction_count"}
             and (isinstance(value, int) or value is None)
             and not isinstance(value, bool)
         }
     return sanitized
+
+
+def _sanitize_evidence_snapshot_for_event(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        return {}
+    allowed_keys = {
+        "schema_version",
+        "snapshot_id",
+        "source_observation_id",
+        "source_observation_seq",
+        "source_observation_t_wall",
+        "telemetry_window_frame_count",
+        "telemetry_window_first_seq",
+        "telemetry_window_latest_seq",
+        "telemetry_window_latest_t_wall",
+        "candidate_generation_snapshot_id",
+        "model_request_snapshot_id",
+        "validator_snapshot_id",
+        "final_decision_snapshot_id",
+    }
+    return {
+        key: _copy_event_field(value)
+        for key, value in raw.items()
+        if key in allowed_keys
+    }
 
 
 def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
@@ -993,6 +1023,11 @@ def _sanitize_request_context_for_event(raw: Any) -> dict[str, Any]:
         sanitized["evidence_packet_summary"] = _sanitize_evidence_packet_summary_for_event(
             raw.get("evidence_packet_summary")
         )
+    if "evidence_snapshot" in raw:
+        sanitized["evidence_snapshot"] = _sanitize_evidence_snapshot_for_event(raw.get("evidence_snapshot"))
+    if "snapshot_ids" in raw:
+        snapshot_ids = raw.get("snapshot_ids")
+        sanitized["snapshot_ids"] = dict(snapshot_ids) if isinstance(snapshot_ids, Mapping) else {}
     if "vision" in raw:
         sanitized["vision"] = _sanitize_vision_context_for_event(raw.get("vision"))
     if "vision_facts" in raw:
@@ -1294,6 +1329,65 @@ def _stable_hash_json(data: Mapping[str, Any]) -> str:
         default=str,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _snapshot_ids_from_evidence_snapshot(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    snapshot = raw if isinstance(raw, Mapping) else {}
+    snapshot_id = snapshot.get("snapshot_id")
+    ids = {
+        "candidate_generation": snapshot.get("candidate_generation_snapshot_id") or snapshot_id,
+        "model_request": snapshot.get("model_request_snapshot_id") or snapshot_id,
+        "validator": snapshot.get("validator_snapshot_id") or snapshot_id,
+        "final_decision": snapshot.get("final_decision_snapshot_id") or snapshot_id,
+    }
+    return {key: value for key, value in ids.items() if isinstance(value, str) and value}
+
+
+def _build_evidence_snapshot(
+    *,
+    observation_id: str | None,
+    observation_seq: int | None,
+    observation_t_wall: float | None,
+    telemetry_window_digest: Mapping[str, Any],
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "schema_version": "evidence_snapshot.v1",
+        "source_observation_id": observation_id,
+        "source_observation_seq": observation_seq,
+        "source_observation_t_wall": observation_t_wall,
+        "telemetry_window_frame_count": telemetry_window_digest.get("frame_count"),
+        "telemetry_window_first_seq": telemetry_window_digest.get("first_seq"),
+        "telemetry_window_latest_seq": telemetry_window_digest.get("latest_seq"),
+        "telemetry_window_latest_t_wall": telemetry_window_digest.get("latest_t_wall"),
+    }
+    snapshot_id = _stable_hash_json(base)
+    base["snapshot_id"] = snapshot_id
+    base["candidate_generation_snapshot_id"] = snapshot_id
+    base["model_request_snapshot_id"] = snapshot_id
+    base["validator_snapshot_id"] = snapshot_id
+    base["final_decision_snapshot_id"] = snapshot_id
+    return base
+
+
+def _deterministic_hint_consistency(
+    *,
+    request_hint: Any,
+    response_hint: Any,
+    evidence_snapshot: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not isinstance(response_hint, Mapping):
+        return {"deterministic_hint_matches_request": True}
+    if not isinstance(request_hint, Mapping):
+        return {"deterministic_hint_matches_request": False}
+
+    keys = ("inferred_step_id", "overlay_step_id", "missing_conditions")
+    matches = all(response_hint.get(key) == request_hint.get(key) for key in keys)
+    result = {"deterministic_hint_matches_request": matches}
+    if not matches:
+        snapshot_id = evidence_snapshot.get("model_request_snapshot_id") or evidence_snapshot.get("snapshot_id")
+        if isinstance(snapshot_id, str) and snapshot_id:
+            result["superseded_by_snapshot"] = snapshot_id
+    return result
 
 
 def _coerce_float(value: Any) -> float | None:
@@ -1889,6 +1983,25 @@ def _build_harness_trace_metadata(
 ) -> dict[str, Any]:
     context = request.context if isinstance(request.context, Mapping) else {}
     response_metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+    evidence_snapshot = (
+        dict(context.get("evidence_snapshot"))
+        if isinstance(context.get("evidence_snapshot"), Mapping)
+        else {}
+    )
+    snapshot_ids = _snapshot_ids_from_evidence_snapshot(evidence_snapshot)
+    hint_consistency = _deterministic_hint_consistency(
+        request_hint=context.get("deterministic_step_hint"),
+        response_hint=response_metadata.get("deterministic_step_hint"),
+        evidence_snapshot=evidence_snapshot,
+    )
+    if (
+        hint_consistency.get("deterministic_hint_matches_request") is False
+        and isinstance(response_metadata.get("deterministic_step_hint"), Mapping)
+    ):
+        response.metadata["deterministic_step_hint"] = dict(response_metadata["deterministic_step_hint"])
+        superseded_by = hint_consistency.get("superseded_by_snapshot")
+        if isinstance(superseded_by, str) and superseded_by:
+            response.metadata["deterministic_step_hint"]["superseded_by_snapshot"] = superseded_by
     raw_candidates = context.get("candidate_steps")
     candidates = [
         candidate
@@ -1921,6 +2034,19 @@ def _build_harness_trace_metadata(
     else:
         final_plan.setdefault("targets", list(final_targets))
         final_plan.setdefault("source", response_metadata.get("final_action_plan_source"))
+    original_final_snapshot_id = final_plan.get("evidence_snapshot_id")
+    final_snapshot_id = snapshot_ids.get("final_decision")
+    if isinstance(final_snapshot_id, str) and final_snapshot_id:
+        if (
+            isinstance(original_final_snapshot_id, str)
+            and original_final_snapshot_id
+            and original_final_snapshot_id != final_snapshot_id
+        ):
+            hint_consistency["final_action_plan_matches_snapshot"] = False
+            hint_consistency["final_action_plan_superseded_by_snapshot"] = final_snapshot_id
+        else:
+            hint_consistency.setdefault("final_action_plan_matches_snapshot", True)
+        final_plan["evidence_snapshot_id"] = final_snapshot_id
 
     chosen_step_id = final_plan.get("step_id")
     chosen_candidate = None
@@ -1958,6 +2084,9 @@ def _build_harness_trace_metadata(
     trace = {
         "schema_version": "v1",
         "evidence_packet_summary": dict(context.get("evidence_packet_summary", {})),
+        "evidence_snapshot": evidence_snapshot,
+        "snapshot_ids": snapshot_ids,
+        "evidence_snapshot_consistency": hint_consistency,
         "candidates": candidates,
         "chosen_candidate": chosen_candidate,
         "rejected_candidates": rejected_candidates,
@@ -1994,6 +2123,9 @@ def _build_harness_trace_metadata(
     response.metadata["vlm_call_status"] = vlm_call["status"]
     response.metadata["vlm_call_reason"] = vlm_call["reason"]
     response.metadata["final_overlay_targets"] = list(final_targets)
+    response.metadata["evidence_snapshot"] = dict(evidence_snapshot)
+    response.metadata["snapshot_ids"] = dict(snapshot_ids)
+    response.metadata["evidence_snapshot_consistency"] = dict(hint_consistency)
     response.metadata["final_action_plan"] = dict(final_plan)
     response.metadata["harness_trace"] = trace
     return trace
@@ -3912,6 +4044,7 @@ class LiveDcsTutorLoop:
         vision_context["main_help_multimodal_attached"] = False
 
         now_t_wall = _coerce_float(payload.get("t_wall"))
+        observation_seq = _coerce_int(payload.get("seq"))
         recent_frames = self.recent_ring.snapshot(now_t_wall=now_t_wall) if now_t_wall is not None else self.recent_ring.snapshot()
         telemetry_window_frames_raw = (
             self.telemetry_window_ring.snapshot(now_t_wall=now_t_wall)
@@ -4043,7 +4176,15 @@ class LiveDcsTutorLoop:
             "recent_actions": recent_actions,
             "telemetry_window_frames": telemetry_window_frames,
             "deterministic_step_hint": deterministic_hint,
-            "telemetry": {"t_wall": now_t_wall} if now_t_wall is not None else {},
+            "telemetry": {
+                key: value
+                for key, value in {
+                    "t_wall": now_t_wall,
+                    "observation_seq": observation_seq,
+                    "observation_id": obs.observation_id,
+                }.items()
+                if value is not None
+            },
             "vision": vision_context,
             "vision_facts": list(vision_fact_context.get("vision_facts", [])),
             "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
@@ -4051,6 +4192,18 @@ class LiveDcsTutorLoop:
         evidence_packet = build_evidence_packet(preliminary_harness_context)
         state_harness = evidence_packet.to_state_harness_dict()
         evidence_packet_summary = evidence_packet.compact_summary()
+        state_window_digest = (
+            state_harness.get("telemetry_window_digest")
+            if isinstance(state_harness.get("telemetry_window_digest"), Mapping)
+            else {}
+        )
+        evidence_snapshot = _build_evidence_snapshot(
+            observation_id=obs.observation_id,
+            observation_seq=observation_seq,
+            observation_t_wall=now_t_wall,
+            telemetry_window_digest=state_window_digest,
+        )
+        snapshot_ids = _snapshot_ids_from_evidence_snapshot(evidence_snapshot)
         candidate_step_payload = [
             candidate.to_dict()
             for candidate in build_step_candidates(
@@ -4104,6 +4257,8 @@ class LiveDcsTutorLoop:
             "overlay_target_allowlist": overlay_target_allowlist,
             "state_harness": state_harness,
             "evidence_packet_summary": evidence_packet_summary,
+            "evidence_snapshot": evidence_snapshot,
+            "snapshot_ids": snapshot_ids,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
             "rag_topk": rag_topk,
@@ -4169,6 +4324,8 @@ class LiveDcsTutorLoop:
                     else None
                 ),
                 "evidence_packet_summary": evidence_packet_summary,
+                "evidence_snapshot": evidence_snapshot,
+                "snapshot_ids": snapshot_ids,
             },
         )
 

@@ -178,6 +178,19 @@ def _frame_vars_are_full_snapshot(raw: Mapping[str, Any]) -> bool:
     return isinstance(raw.get("vars"), Mapping) and not isinstance(raw.get("delta"), Mapping)
 
 
+def _frame_seq_range(frames: tuple[dict[str, Any], ...]) -> tuple[int | None, int | None]:
+    first_seq: int | None = None
+    latest_seq: int | None = None
+    for frame in frames:
+        seq = _coerce_int(frame.get("seq"))
+        if seq is None:
+            continue
+        if first_seq is None:
+            first_seq = seq
+        latest_seq = seq
+    return first_seq, latest_seq
+
+
 def _latest_frame_meta(frames: tuple[dict[str, Any], ...]) -> tuple[int | None, int | float | None]:
     latest_seq: int | None = None
     latest_t_wall: int | float | None = None
@@ -256,6 +269,7 @@ class TelemetryEvidence:
 class TelemetryWindowDigest:
     window_duration_s: float | None
     frame_count: int
+    first_seq: int | None
     latest_seq: int | None
     latest_t_wall: int | float | None
     changed_vars: tuple[dict[str, Any], ...]
@@ -270,6 +284,7 @@ class TelemetryWindowDigest:
         return {
             "window_duration_s": self.window_duration_s,
             "frame_count": self.frame_count,
+            "first_seq": self.first_seq,
             "latest_seq": self.latest_seq,
             "latest_t_wall": self.latest_t_wall,
             "changed_vars": [dict(item) for item in self.changed_vars],
@@ -285,6 +300,7 @@ class TelemetryWindowDigest:
         return {
             "window_duration_s": self.window_duration_s,
             "frame_count": self.frame_count,
+            "first_seq": self.first_seq,
             "latest_seq": self.latest_seq,
             "latest_t_wall": self.latest_t_wall,
             "changed_vars": [dict(item) for item in self.changed_vars[:12]],
@@ -299,6 +315,7 @@ class TelemetryWindowDigest:
     def compact_summary(self) -> dict[str, Any]:
         return {
             "frame_count": self.frame_count,
+            "first_seq": self.first_seq,
             "latest_seq": self.latest_seq,
             "changed_var_count": len(self.changed_vars),
             "contradiction_count": len(self.contradictions),
@@ -512,12 +529,16 @@ def _build_telemetry_evidence(context: Mapping[str, Any]) -> TelemetryEvidence:
     vision = vision_raw if isinstance(vision_raw, Mapping) else {}
     telemetry_raw = context.get("telemetry")
     telemetry = telemetry_raw if isinstance(telemetry_raw, Mapping) else {}
-    seq = _coerce_int(vision.get("observation_seq"))
+    telemetry_seq = _coerce_int(telemetry.get("observation_seq"))
+    vision_seq = _coerce_int(vision.get("observation_seq"))
+    seq = vision_seq
+    if seq is None:
+        seq = telemetry_seq
     t_wall = _coerce_number(telemetry.get("t_wall"))
 
     bootstrap_like = (
         missing_count >= 20
-        or (isinstance(seq, int) and seq <= 3)
+        or (isinstance(vision_seq, int) and vision_seq <= 3)
         or (
             vars_map.get("battery_on") is False
             and vars_map.get("power_available") is False
@@ -562,7 +583,8 @@ def _build_telemetry_window_digest(context: Mapping[str, Any]) -> TelemetryWindo
         )
 
     frame_tuple = tuple(frames)
-    latest_seq, latest_t_wall = _latest_frame_meta(frame_tuple)
+    first_seq, latest_seq = _frame_seq_range(frame_tuple)
+    _, latest_t_wall = _latest_frame_meta(frame_tuple)
     t_values = [frame["t_wall"] for frame in frame_tuple if _coerce_number(frame.get("t_wall")) is not None]
     window_duration_s = None
     if len(t_values) >= 2:
@@ -711,6 +733,7 @@ def _build_telemetry_window_digest(context: Mapping[str, Any]) -> TelemetryWindo
     return TelemetryWindowDigest(
         window_duration_s=window_duration_s,
         frame_count=len(frame_tuple),
+        first_seq=first_seq,
         latest_seq=latest_seq,
         latest_t_wall=latest_t_wall,
         changed_vars=tuple(changed_vars[:24]),
