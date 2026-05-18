@@ -7814,6 +7814,43 @@ def test_live_inference_advances_sticky_s09_when_comm1_is_complete(tmp_path: Pat
     assert "vars.comm1_freq_134_000==true" not in stabilized.missing_conditions
 
 
+def test_live_inference_advances_sticky_s09_when_comm1_value_is_complete(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_sticky_s09_value_complete.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s09-sticky-value-complete",
+        lang="zh",
+    )
+    try:
+        loop._sticky_inference_step_id = "S09"
+        loop._sticky_inference_missing_conditions = ("vars.comm1_freq_134_000==true",)
+        loop._last_inferred_step_id = "S09"
+
+        stabilized = loop._stabilize_live_inference(
+            StepInferenceResult("S08", ("vision_facts.fcs_page_visible==seen",)),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "left_ddi_on": True,
+                "right_ddi_on": True,
+                "mpcd_on": True,
+                "hud_on": True,
+                "right_engine_nominal_start_params": True,
+                "comm1_freq_value": 13400,
+                "engine_crank_left_complete": False,
+            },
+            recent_ui_targets=[],
+        )
+    finally:
+        loop.close()
+
+    assert stabilized.inferred_step_id == "S10"
+    assert "vars.comm1_freq_134_000==true" not in stabilized.missing_conditions
+
+
 def test_live_loop_ignores_stale_s19_visual_facts_for_s21(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s21_ignores_stale_s19_vlm.jsonl"
     frame = _bios_frame(1, 10.0, apu_switch=1)

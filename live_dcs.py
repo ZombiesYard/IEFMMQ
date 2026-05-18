@@ -2346,6 +2346,8 @@ def _missing_conditions_satisfied_by_vars(
         var_name = matched.group(1)
         if "==true" in condition:
             checked = True
+            if var_name == "comm1_freq_134_000" and _s09_comm1_frequency_complete(vars_selected):
+                continue
             if vars_selected.get(var_name) is not True:
                 return False
         else:
