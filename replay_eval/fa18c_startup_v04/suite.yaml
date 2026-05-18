@@ -35,7 +35,7 @@ coverage:
     test_id: tests/test_live_dcs.py::test_live_fixture_s18_bit_root_repairs_pb18_to_pb5
     reason: BIT-root visual sub-state repairs PB18 to PB5.
   - step_id: S21
-    state_category: recent_action_gate_conflict
+    state_category: stale_telemetry
     source: live_fixture_regression
     issue: 306
     fixture: artifacts/live_fixtures/99b112ae-ea07-4f5f-a561-71e99fdc2581.fixture.json

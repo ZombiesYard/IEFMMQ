@@ -67,6 +67,7 @@ def test_harness_coverage_matrix_marks_all_s01_s33_categories() -> None:
 
     assert matrix["step_count"] == 33
     assert matrix["missing_cell_count"] == 0
+    assert matrix["contract_only_cell_count"] > 0
     assert matrix["state_categories"] == [
         "normal_progression",
         "omission_missing_action",
@@ -83,8 +84,10 @@ def test_harness_coverage_matrix_marks_all_s01_s33_categories() -> None:
     for step_id, row in matrix["steps"].items():
         for category in matrix["state_categories"]:
             cell = row[category]
-            assert cell["status"] in {"covered", "not_applicable"}, (step_id, category, cell)
+            assert cell["status"] in {"covered", "contract_only", "not_applicable"}, (step_id, category, cell)
             assert cell["sources"] or cell["reason"], (step_id, category, cell)
+    assert matrix["steps"]["S01"]["vlm_not_required"]["status"] == "contract_only"
+    assert matrix["steps"]["S01"]["vlm_unavailable"]["status"] == "not_applicable"
 
 
 def test_replay_eval_report_includes_issue_312_fixture_regression_sources(tmp_path: Path) -> None:
@@ -105,6 +108,7 @@ def test_replay_eval_report_includes_issue_312_fixture_regression_sources(tmp_pa
     assert set(issue_sources) >= {294, 298, 300, 306, 310}
     for issue in (294, 298, 300, 306, 310):
         assert all((REPO_ROOT / fixture).exists() for fixture in issue_sources[issue])
+    assert matrix["steps"]["S01"]["vlm_unavailable"]["status"] == "not_applicable"
 
 
 def test_run_replay_eval_suite_is_stable_across_repeated_runs(tmp_path: Path) -> None:
@@ -819,6 +823,7 @@ def test_run_replay_eval_suite_continues_after_case_error(tmp_path: Path) -> Non
     assert failed_case["error"]["stage"] == "execution"
     assert failed_case["error"]["type"] == "RuntimeError"
     assert failed_case["error"]["message"] == "synthetic case failure"
+    assert report["coverage_matrix"]["steps"]["S02"]["normal_progression"]["status"] != "covered"
     passed_case_ids = [case["case_id"] for case in report["cases"] if case["status"] == "passed"]
     assert "noop_2min" in passed_case_ids
     assert len(passed_case_ids) >= 1
