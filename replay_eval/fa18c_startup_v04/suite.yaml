@@ -12,6 +12,42 @@ defaults:
   max_frames: 2
   vision_sync_window_ms: 100
   vision_trigger_wait_ms: 0
+coverage:
+  - step_id: S09
+    state_category: vlm_not_required
+    source: live_fixture_regression
+    issue: 294
+    fixture: artifacts/live_fixtures/8931fe82-2c72-4fbe-ab49-c78690820773.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_294_s09_uses_stage_action_hint_for_next_digit
+    reason: S09/S10 non-visual help must not be driven by stale S08 VLM evidence.
+  - step_id: S21
+    state_category: vlm_not_required
+    source: live_fixture_regression
+    issue: 298
+    fixture: artifacts/live_fixtures/c2849a41-0f9b-4440-b926-52a9695cd871.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_loop_ignores_stale_s19_visual_facts_for_s21
+    reason: S20/S21 four-down checks must ignore stale visual facts and skip VLM.
+  - step_id: S18
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 300
+    fixture: artifacts/live_fixtures/644fac65-eb37-4de1-a591-fd1de392c647.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_fixture_s18_bit_root_repairs_pb18_to_pb5
+    reason: BIT-root visual sub-state repairs PB18 to PB5.
+  - step_id: S21
+    state_category: recent_action_gate_conflict
+    source: live_fixture_regression
+    issue: 306
+    fixture: artifacts/live_fixtures/99b112ae-ea07-4f5f-a561-71e99fdc2581.fixture.json
+    test_id: tests/test_live_dcs.py::test_procedural_guidance_waits_without_highlight_for_s21_probe_retracting
+    reason: Probe retracting motion must produce wait/no-highlight guidance instead of a raw missing predicate.
+  - step_id: S10
+    state_category: completion_already_true
+    source: live_fixture_regression
+    issue: 310
+    fixture: artifacts/live_fixtures/c3c775ce-7a4d-4e7f-a841-3a022528138e.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture
+    reason: Latest telemetry with engine_crank_left_complete=true must advance past S10.
 cases:
   - case_id: noop_2min
     input: cases/noop_2min/dcs_bios_raw.jsonl

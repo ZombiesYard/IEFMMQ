@@ -11,10 +11,25 @@ from adapters.action_executor import OverlayActionExecutor
 from adapters.dcs.tutor_text import NoopTutorTextSender
 from adapters.evidence_refs import collect_evidence_refs_from_context, infer_evidence_type_from_ref
 from adapters.pack_gates import normalize_scenario_profile
+from adapters.step_harness_specs import load_step_harness_specs
 from adapters.vision_frames import DEFAULT_FRAME_CHANNEL, FrameDirectoryVisionPort
 from adapters.vision_prompting import DEFAULT_LAYOUT_ID
 from core.event_store import JsonlEventStore
 from core.types import TutorRequest, TutorResponse
+
+
+HARNESS_COVERAGE_STATE_CATEGORIES: tuple[str, ...] = (
+    "normal_progression",
+    "omission_missing_action",
+    "completion_already_true",
+    "stale_telemetry",
+    "recent_action_gate_conflict",
+    "wrong_target_prevention",
+    "vlm_not_required",
+    "vlm_required",
+    "vlm_unavailable",
+    "vlm_failed",
+)
 
 
 def _repo_root() -> Path:
@@ -75,6 +90,14 @@ def _normalize_string_list(raw: Any, *, field_name: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _ensure_optional_positive_issue(raw: Any, *, field_name: str) -> int | None:
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+        raise ValueError(f"{field_name} must be a positive integer when provided")
+    return raw
+
+
 def _extract_optional_bool(raw: Any) -> bool | None:
     if isinstance(raw, bool):
         return raw
@@ -96,6 +119,41 @@ def _ensure_scenario_profile(raw: Any, *, field_name: str) -> str:
         return normalize_scenario_profile(value)
     except ValueError as exc:
         raise ValueError(f"{field_name}: {exc}") from exc
+
+
+def _normalize_coverage_tags(
+    raw: Any,
+    *,
+    field_name: str,
+    default_case_id: str | None = None,
+) -> tuple[ReplayEvalCoverageTag, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError(f"{field_name} must be a list")
+    tags: list[ReplayEvalCoverageTag] = []
+    for idx, item in enumerate(raw):
+        item_field = f"{field_name}[{idx}]"
+        if not isinstance(item, Mapping):
+            raise ValueError(f"{item_field} must be a mapping")
+        state_category = _ensure_text(item.get("state_category"), field_name=f"{item_field}.state_category")
+        if state_category not in HARNESS_COVERAGE_STATE_CATEGORIES:
+            allowed = ", ".join(HARNESS_COVERAGE_STATE_CATEGORIES)
+            raise ValueError(f"{item_field}.state_category must be one of {{{allowed}}}")
+        case_id = _extract_optional_text(item.get("case_id")) or default_case_id
+        tags.append(
+            ReplayEvalCoverageTag(
+                step_id=_ensure_text(item.get("step_id"), field_name=f"{item_field}.step_id"),
+                state_category=state_category,
+                source=_ensure_text(item.get("source"), field_name=f"{item_field}.source"),
+                case_id=case_id,
+                issue=_ensure_optional_positive_issue(item.get("issue"), field_name=f"{item_field}.issue"),
+                fixture=_extract_optional_text(item.get("fixture")),
+                test_id=_extract_optional_text(item.get("test_id")),
+                reason=_extract_optional_text(item.get("reason")),
+            )
+        )
+    return tuple(tags)
 
 
 @dataclass(frozen=True)
@@ -122,6 +180,18 @@ class ReplayEvalExpectation:
 
 
 @dataclass(frozen=True)
+class ReplayEvalCoverageTag:
+    step_id: str
+    state_category: str
+    source: str
+    case_id: str | None = None
+    issue: int | None = None
+    fixture: str | None = None
+    test_id: str | None = None
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
 class ReplayEvalCase:
     case_id: str
     input_path: Path
@@ -130,6 +200,7 @@ class ReplayEvalCase:
     max_frames: int
     expectation: ReplayEvalExpectation
     vision: ReplayEvalVisionConfig | None = None
+    coverage_tags: tuple[ReplayEvalCoverageTag, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -146,6 +217,7 @@ class ReplayEvalSuite:
     lang: str
     scenario_profile: str
     cases: tuple[ReplayEvalCase, ...]
+    coverage_tags: tuple[ReplayEvalCoverageTag, ...] = ()
 
 
 class ReplayEvalOracleModel:
@@ -284,6 +356,7 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
         raw.get("scenario_profile", defaults.get("scenario_profile", "airfield")),
         field_name="scenario_profile",
     )
+    suite_coverage_tags = _normalize_coverage_tags(raw.get("coverage"), field_name="suite.coverage")
 
     pack_path = _resolve_required_path(
         suite_dir=suite_dir,
@@ -438,6 +511,11 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
                 max_frames=max_frames,
                 expectation=expectation,
                 vision=vision_config,
+                coverage_tags=_normalize_coverage_tags(
+                    item.get("coverage"),
+                    field_name=f"{case_id}.coverage",
+                    default_case_id=case_id,
+                ),
             )
         )
 
@@ -454,6 +532,7 @@ def load_replay_eval_suite(path: str | Path) -> ReplayEvalSuite:
         lang=lang,
         scenario_profile=scenario_profile,
         cases=tuple(cases),
+        coverage_tags=suite_coverage_tags,
     )
 
 
@@ -683,6 +762,296 @@ def _build_summary(case_results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _coverage_source_dict(tag: ReplayEvalCoverageTag | Mapping[str, Any]) -> dict[str, Any]:
+    if isinstance(tag, ReplayEvalCoverageTag):
+        raw: dict[str, Any] = {
+            "source": tag.source,
+            "case_id": tag.case_id,
+            "issue": tag.issue,
+            "fixture": tag.fixture,
+            "test_id": tag.test_id,
+            "reason": tag.reason,
+        }
+    else:
+        raw = dict(tag)
+    return {key: value for key, value in raw.items() if value is not None}
+
+
+def _new_coverage_cell(*, status: str = "missing", reason: str | None = None) -> dict[str, Any]:
+    return {"status": status, "sources": [], "reason": reason}
+
+
+def _add_coverage_source(
+    steps: dict[str, dict[str, dict[str, Any]]],
+    *,
+    step_id: str,
+    state_category: str,
+    source: Mapping[str, Any],
+) -> None:
+    row = steps.get(step_id)
+    if row is None or state_category not in row:
+        return
+    cell = row[state_category]
+    cell["status"] = "covered"
+    cell["reason"] = None
+    source_dict = _coverage_source_dict(source)
+    if source_dict not in cell["sources"]:
+        cell["sources"].append(source_dict)
+
+
+def _mark_coverage_not_applicable(
+    steps: dict[str, dict[str, dict[str, Any]]],
+    *,
+    step_id: str,
+    state_category: str,
+    reason: str,
+) -> None:
+    row = steps.get(step_id)
+    if row is None or state_category not in row:
+        return
+    cell = row[state_category]
+    if cell["status"] == "covered":
+        return
+    cell["status"] = "not_applicable"
+    cell["reason"] = reason
+
+
+def _all_suite_coverage_tags(suite: ReplayEvalSuite) -> tuple[ReplayEvalCoverageTag, ...]:
+    tags: list[ReplayEvalCoverageTag] = list(suite.coverage_tags)
+    for case in suite.cases:
+        tags.extend(case.coverage_tags)
+        tags.append(
+            ReplayEvalCoverageTag(
+                step_id=case.expectation.step_id,
+                state_category="normal_progression",
+                source="replay_eval_case",
+                case_id=case.case_id,
+                reason="case asserts final harness outcome",
+            )
+        )
+        if case.expectation.vision_status == "vision_unavailable":
+            tags.append(
+                ReplayEvalCoverageTag(
+                    step_id=case.expectation.step_id,
+                    state_category="vlm_unavailable",
+                    source="replay_eval_case",
+                    case_id=case.case_id,
+                    reason="case asserts vision unavailable outcome",
+                )
+            )
+    return tuple(tags)
+
+
+def _build_case_only_coverage_matrix(suite: ReplayEvalSuite, *, reason: str) -> dict[str, Any]:
+    step_ids = sorted(
+        {
+            tag.step_id
+            for tag in _all_suite_coverage_tags(suite)
+            if isinstance(tag.step_id, str) and tag.step_id
+        },
+        key=lambda step_id: (int(step_id[1:]) if step_id.startswith("S") and step_id[1:].isdigit() else 10_000, step_id),
+    )
+    steps = {
+        step_id: {
+            category: _new_coverage_cell(status="not_applicable", reason=reason)
+            for category in HARNESS_COVERAGE_STATE_CATEGORIES
+        }
+        for step_id in step_ids
+    }
+    for tag in _all_suite_coverage_tags(suite):
+        _add_coverage_source(
+            steps,
+            step_id=tag.step_id,
+            state_category=tag.state_category,
+            source=_coverage_source_dict(tag),
+        )
+    return {
+        "schema_version": "harness_coverage_matrix.v1",
+        "step_count": len(step_ids),
+        "state_categories": list(HARNESS_COVERAGE_STATE_CATEGORIES),
+        "missing_cell_count": 0,
+        "missing_cells": [],
+        "steps": steps,
+    }
+
+
+def build_harness_coverage_matrix(suite: ReplayEvalSuite) -> dict[str, Any]:
+    if not suite.pack_path.exists():
+        return _build_case_only_coverage_matrix(
+            suite,
+            reason=f"pack_path unavailable for spec-derived coverage: {suite.pack_path}",
+        )
+    step_specs = load_step_harness_specs(suite.pack_path, scenario_profile=suite.scenario_profile)
+    ordered_step_ids = sorted(
+        step_specs.keys(),
+        key=lambda step_id: (int(step_id[1:]) if step_id.startswith("S") and step_id[1:].isdigit() else 10_000, step_id),
+    )
+    steps: dict[str, dict[str, dict[str, Any]]] = {
+        step_id: {
+            category: _new_coverage_cell()
+            for category in HARNESS_COVERAGE_STATE_CATEGORIES
+        }
+        for step_id in ordered_step_ids
+    }
+
+    for step_id in ordered_step_ids:
+        spec = step_specs[step_id]
+        _add_coverage_source(
+            steps,
+            step_id=step_id,
+            state_category="normal_progression",
+            source={
+                "source": "coldstart_state_matrix",
+                "state_kind": "just_completed",
+                "reason": "synthetic replay input advances through this step",
+            },
+        )
+        _add_coverage_source(
+            steps,
+            step_id=step_id,
+            state_category="omission_missing_action",
+            source={
+                "source": "coldstart_state_matrix",
+                "state_kind": "blocked",
+                "reason": "synthetic replay input leaves this step incomplete",
+            },
+        )
+        if spec.completion_predicates:
+            _add_coverage_source(
+                steps,
+                step_id=step_id,
+                state_category="completion_already_true",
+                source={
+                    "source": "final_evidence_consistency_contract",
+                    "reason": "step declares completion predicates checked by final validator",
+                },
+            )
+        else:
+            _mark_coverage_not_applicable(
+                steps,
+                step_id=step_id,
+                state_category="completion_already_true",
+                reason="step has no declared completion predicate",
+            )
+
+        if spec.telemetry_facts:
+            _add_coverage_source(
+                steps,
+                step_id=step_id,
+                state_category="stale_telemetry",
+                source={
+                    "source": "state_harness_telemetry_contract",
+                    "reason": "step declares telemetry facts tracked in evidence packet",
+                },
+            )
+        else:
+            _mark_coverage_not_applicable(
+                steps,
+                step_id=step_id,
+                state_category="stale_telemetry",
+                reason="step has no telemetry facts",
+            )
+
+        if spec.recent_action_facts:
+            _add_coverage_source(
+                steps,
+                step_id=step_id,
+                state_category="recent_action_gate_conflict",
+                source={
+                    "source": "recent_action_fact_contract",
+                    "reason": "step declares recent action facts for gate conflict handling",
+                },
+            )
+        else:
+            _mark_coverage_not_applicable(
+                steps,
+                step_id=step_id,
+                state_category="recent_action_gate_conflict",
+                reason="step has no recent-action fact contract",
+            )
+
+        if spec.allowed_overlay_targets:
+            _add_coverage_source(
+                steps,
+                step_id=step_id,
+                state_category="wrong_target_prevention",
+                source={
+                    "source": "harness_action_planner_allowlist",
+                    "reason": "step declares allowed overlay targets enforced by action planner",
+                },
+            )
+        else:
+            _mark_coverage_not_applicable(
+                steps,
+                step_id=step_id,
+                state_category="wrong_target_prevention",
+                reason="step does not allow overlay targets",
+            )
+
+        visual_step = bool(spec.requires_visual_confirmation or spec.vision_facts)
+        if visual_step:
+            _mark_coverage_not_applicable(
+                steps,
+                step_id=step_id,
+                state_category="vlm_not_required",
+                reason="step requires visual confirmation or declares vision facts",
+            )
+            for category, source_name in (
+                ("vlm_required", "step_harness_visual_contract"),
+                ("vlm_unavailable", "vision_unavailable_fallback_contract"),
+                ("vlm_failed", "vision_failure_trace_contract"),
+            ):
+                _add_coverage_source(
+                    steps,
+                    step_id=step_id,
+                    state_category=category,
+                    source={
+                        "source": source_name,
+                        "reason": "visual step is covered by replay-eval VLM status contract",
+                    },
+                )
+        else:
+            _add_coverage_source(
+                steps,
+                step_id=step_id,
+                state_category="vlm_not_required",
+                source={
+                    "source": "step_harness_non_visual_contract",
+                    "reason": "step has no visual confirmation requirement",
+                },
+            )
+            for category in ("vlm_required", "vlm_unavailable", "vlm_failed"):
+                _mark_coverage_not_applicable(
+                    steps,
+                    step_id=step_id,
+                    state_category=category,
+                    reason="step has no visual confirmation requirement",
+                )
+
+    for tag in _all_suite_coverage_tags(suite):
+        _add_coverage_source(
+            steps,
+            step_id=tag.step_id,
+            state_category=tag.state_category,
+            source=_coverage_source_dict(tag),
+        )
+
+    missing_cells = [
+        {"step_id": step_id, "state_category": category}
+        for step_id, row in steps.items()
+        for category, cell in row.items()
+        if cell["status"] == "missing"
+    ]
+    return {
+        "schema_version": "harness_coverage_matrix.v1",
+        "step_count": len(ordered_step_ids),
+        "state_categories": list(HARNESS_COVERAGE_STATE_CATEGORIES),
+        "missing_cell_count": len(missing_cells),
+        "missing_cells": missing_cells,
+        "steps": steps,
+    }
+
+
 def _default_model_factory(case: ReplayEvalCase, *, lang: str) -> ReplayEvalOracleModel:
     return ReplayEvalOracleModel(case, lang=lang)
 
@@ -894,6 +1263,7 @@ def run_replay_eval_suite(
         "lang": suite.lang,
         "model_provider": provider_name,
         "summary": _build_summary(case_results),
+        "coverage_matrix": build_harness_coverage_matrix(suite),
         "cases": case_results,
     }
     if report_path is None:
@@ -909,11 +1279,14 @@ def run_replay_eval_suite(
 
 
 __all__ = [
+    "HARNESS_COVERAGE_STATE_CATEGORIES",
     "ReplayEvalCase",
+    "ReplayEvalCoverageTag",
     "ReplayEvalExpectation",
     "ReplayEvalOracleModel",
     "ReplayEvalSuite",
     "ReplayEvalVisionConfig",
+    "build_harness_coverage_matrix",
     "load_replay_eval_suite",
     "run_replay_eval_suite",
 ]
