@@ -1580,6 +1580,7 @@ def _text_claims_step_complete(text: str, step_id: str) -> bool:
     escaped = re.escape(normalized_step)
     negative_patterns = (
         rf"\b{escaped}\b[^.。;；\n]{{0,80}}(?:尚未完成|未完成|not complete|incomplete)",
+        rf"\b{escaped}\b[^.。;；\n]{{0,80}}(?:请|(?<![已经])按下|(?<![已经])操作|(?<![已经])点击|press|operate|set|move)[^.。;；\n]{{0,80}}(?:以|to)?\s*完成",
         rf"(?:当前步骤|current step)[^.。;；\n]{{0,80}}(?:尚未完成|未完成|not complete|incomplete)",
     )
     if any(re.search(pattern, normalized_text) is not None for pattern in negative_patterns):
@@ -2731,6 +2732,60 @@ def _build_procedural_action_hint(
     if vars_selected.get("ufc_comm1_pull_pressed") is True:
         return _hint("ufc_key_1", "COMM1 preset entry has been opened on the UFC scratchpad; press 1 to begin entering 134.000.")
     return _hint("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector to open preset 1 in the scratchpad before entering 134.000.")
+
+
+def _s12_fast_align_action_hint_allowed(
+    *,
+    context: Mapping[str, Any],
+    hint: Mapping[str, Any],
+    missing_conditions: set[str],
+    action_hint: Any,
+) -> bool:
+    if not isinstance(action_hint, Mapping) or action_hint.get("target") != "ampcd_pb19":
+        return False
+    if "vars.ins_fast_align_complete==true" not in missing_conditions:
+        return False
+    if any("vars.ins_mode" in item for item in missing_conditions):
+        return False
+
+    mode_reason_codes = {"s12_requires_ins_mode_gnd", "s12_requires_ins_mode_cv"}
+    gates = context.get("gates")
+    if isinstance(gates, Mapping):
+        gate = gates.get("S12.completion")
+        if isinstance(gate, Mapping):
+            reason_code = gate.get("reason_code")
+            if gate.get("status") == "blocked" and reason_code in mode_reason_codes:
+                return False
+
+    gate_blockers = hint.get("gate_blockers")
+    if isinstance(gate_blockers, (list, tuple)):
+        for blocker in gate_blockers:
+            if not isinstance(blocker, Mapping):
+                continue
+            reason_code = blocker.get("reason_code")
+            raw_var = blocker.get("var")
+            if reason_code in mode_reason_codes or (
+                isinstance(raw_var, str) and "ins_mode" in raw_var
+            ):
+                return False
+
+    vars_map = context.get("vars")
+    vars_selected = vars_map if isinstance(vars_map, Mapping) else {}
+    scenario_profile = context.get("scenario_profile")
+    if not isinstance(scenario_profile, str) or not scenario_profile:
+        scenario_profile = hint.get("scenario_profile")
+
+    ins_mode = vars_selected.get("ins_mode")
+    if isinstance(ins_mode, (int, float)) and not isinstance(ins_mode, bool):
+        normalized_mode = int(ins_mode)
+        if scenario_profile == "carrier":
+            return normalized_mode == 1
+        return normalized_mode == 2
+
+    return (
+        vars_selected.get("ins_mode_cv_or_gnd") is True
+        or vars_selected.get("ins_mode_set") is True
+    )
 
 
 def _resolve_overlay_step_id(
@@ -5299,6 +5354,14 @@ class LiveDcsTutorLoop:
                     evidence_refs = [bit_root_ref]
         if inferred_step_id == "S18" and not s18_bit_root_to_fcsmc_allowed:
             return False, "legacy_s18_action_hint_guardrail"
+        action_hint_step_ids = ["S08", "S17", "S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"]
+        if inferred_step_id == "S12" and _s12_fast_align_action_hint_allowed(
+            context=context,
+            hint=hint,
+            missing_conditions=missing_set,
+            action_hint=action_hint,
+        ):
+            action_hint_step_ids.append("S12")
         manual_text_guidance_rules: list[HarnessTextGuidanceRule] = []
         include_s05_manual_guidance = (
             "vars.throttle_r_not_off==true" in missing_set
@@ -5370,7 +5433,7 @@ class LiveDcsTutorLoop:
                     source="validator_s19_final_go",
                 )
             ],
-            action_hint_step_ids=["S08", "S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"],
+            action_hint_step_ids=action_hint_step_ids,
             action_hint_fact_rules=[
                 HarnessActionHintFactRule(
                     step_id="S18",
@@ -5782,6 +5845,11 @@ class LiveDcsTutorLoop:
         elif inferred_step_id == "S12":
             if "vars.ins_fast_align_complete==true" in missing_set and (
                 vars_map.get("ins_mode_cv_or_gnd") is True or vars_map.get("ins_mode_set") is True
+            ) and _s12_fast_align_action_hint_allowed(
+                context=context,
+                hint=hint,
+                missing_conditions=missing_set,
+                action_hint={"target": "ampcd_pb19"},
             ):
                 reason = "s12_ampcd_pb19_fast_align_guidance"
                 if self.lang == "zh":
