@@ -57,12 +57,40 @@ def _sample_cycle_events(request_id: str = "req-288") -> list[dict[str, Any]]:
                 "step_id": "S03",
                 "telemetry_window_digest": {"frame_count": 2, "status": "ok"},
             },
+            "evidence_snapshot": {
+                "schema_version": "evidence_snapshot.v1",
+                "snapshot_id": "snapshot-288",
+                "source_observation_id": observation_id,
+                "source_observation_seq": 1,
+                "telemetry_window_first_seq": 1,
+                "telemetry_window_latest_seq": 2,
+                "candidate_generation_snapshot_id": "snapshot-288",
+                "model_request_snapshot_id": "snapshot-288",
+                "validator_snapshot_id": "snapshot-288",
+                "final_decision_snapshot_id": "snapshot-288",
+            },
+            "snapshot_ids": {
+                "candidate_generation": "snapshot-288",
+                "model_request": "snapshot-288",
+            },
             "vision_fact_summary": {"seen_fact_ids": ["apu_ready_light"], "frame_ids": ["frame-1"]},
         },
         "metadata": {
             "help_cycle_id": help_cycle_id,
             "vision_fact_status": "available",
             "vision_frame_ids": ["frame-1"],
+            "evidence_snapshot": {
+                "schema_version": "evidence_snapshot.v1",
+                "snapshot_id": "snapshot-288",
+                "source_observation_id": observation_id,
+                "source_observation_seq": 1,
+                "telemetry_window_first_seq": 1,
+                "telemetry_window_latest_seq": 2,
+                "candidate_generation_snapshot_id": "snapshot-288",
+                "model_request_snapshot_id": "snapshot-288",
+                "validator_snapshot_id": "snapshot-288",
+                "final_decision_snapshot_id": "snapshot-288",
+            },
         },
     }
     response_payload = {
@@ -82,6 +110,24 @@ def _sample_cycle_events(request_id: str = "req-288") -> list[dict[str, Any]]:
             },
             "harness_trace": {
                 "schema_version": "v1",
+                "evidence_snapshot": {
+                    "schema_version": "evidence_snapshot.v1",
+                    "snapshot_id": "snapshot-288",
+                    "source_observation_id": observation_id,
+                    "source_observation_seq": 1,
+                    "telemetry_window_first_seq": 1,
+                    "telemetry_window_latest_seq": 2,
+                    "candidate_generation_snapshot_id": "snapshot-288",
+                    "model_request_snapshot_id": "snapshot-288",
+                    "validator_snapshot_id": "snapshot-288",
+                    "final_decision_snapshot_id": "snapshot-288",
+                },
+                "snapshot_ids": {
+                    "candidate_generation": "snapshot-288",
+                    "model_request": "snapshot-288",
+                    "validator": "snapshot-288",
+                    "final_decision": "snapshot-288",
+                },
                 "evidence_packet_summary": {
                     "step_id": "S03",
                     "telemetry_window_digest": {"frame_count": 2, "status": "ok"},
@@ -128,6 +174,13 @@ def test_extract_live_replay_fixture_from_request_id_includes_harness_path(tmp_p
     assert fixture["cycle"]["tutor_response"]["in_reply_to"] == "req-288"
     assert fixture["context"]["evidence_packet_summary"]["step_id"] == "S03"
     assert fixture["context"]["telemetry_window_digest"] == {"frame_count": 2, "status": "ok"}
+    assert fixture["context"]["evidence_snapshot"]["source_observation_seq"] == 1
+    assert fixture["context"]["snapshot_ids"] == {
+        "candidate_generation": "snapshot-288",
+        "model_request": "snapshot-288",
+        "validator": "snapshot-288",
+        "final_decision": "snapshot-288",
+    }
     assert fixture["harness"]["candidate_steps"][0]["step_id"] == "S03"
     assert fixture["harness"]["trace"]["validator_result"]["rejected"] is False
     assert fixture["expectations"] == {

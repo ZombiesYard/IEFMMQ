@@ -742,13 +742,29 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     }
     telemetry_window_digest = request.context["state_harness"]["telemetry_window_digest"]
     assert telemetry_window_digest["frame_count"] >= 1
+    assert telemetry_window_digest["first_seq"] == 0
     assert telemetry_window_digest["latest_seq"] == 1
     assert "telemetry_window_digest" in request.context["evidence_packet_summary"]
     assert isinstance(request.context["evidence_packet_summary"]["blocked_gate_count"], int)
     assert request.metadata["evidence_packet_summary"] == request.context["evidence_packet_summary"]
+    evidence_snapshot = request.context["evidence_snapshot"]
+    assert evidence_snapshot["source_observation_seq"] == 1
+    assert evidence_snapshot["telemetry_window_latest_seq"] == 1
+    assert evidence_snapshot["candidate_generation_snapshot_id"]
+    assert (
+        request.metadata["evidence_snapshot"]["model_request_snapshot_id"]
+        == evidence_snapshot["model_request_snapshot_id"]
+    )
     tutor_request_payload = next(event.payload for event in events if event.kind == "tutor_request")
     assert tutor_request_payload["context"]["evidence_packet_summary"] == request.context["evidence_packet_summary"]
     assert tutor_request_payload["metadata"]["evidence_packet_summary"] == request.context["evidence_packet_summary"]
+    assert tutor_request_payload["context"]["evidence_snapshot"]["source_observation_seq"] == 1
+    assert tutor_request_payload["metadata"]["evidence_snapshot"]["source_observation_seq"] == 1
+    assert (
+        tutor_request_payload["context"]["snapshot_ids"]["candidate_generation"]
+        == evidence_snapshot["candidate_generation_snapshot_id"]
+    )
+    assert tutor_request_payload["context"]["state_harness"]["telemetry_window_digest"]["first_seq"] == 0
     assert request.context["overlay_target_allowlist"] == ["apu_switch"]
 
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
@@ -756,6 +772,12 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     trace = response_meta["harness_trace"]
     assert trace["schema_version"] == "v1"
     assert trace["evidence_packet_summary"] == request.context["evidence_packet_summary"]
+    assert trace["evidence_snapshot"] == request.context["evidence_snapshot"]
+    assert trace["snapshot_ids"]["candidate_generation"] == evidence_snapshot["candidate_generation_snapshot_id"]
+    assert trace["snapshot_ids"]["model_request"] == evidence_snapshot["model_request_snapshot_id"]
+    assert trace["snapshot_ids"]["validator"] == evidence_snapshot["validator_snapshot_id"]
+    assert trace["snapshot_ids"]["final_decision"] == evidence_snapshot["final_decision_snapshot_id"]
+    assert trace["final_action_plan"]["evidence_snapshot_id"] == evidence_snapshot["final_decision_snapshot_id"]
     assert trace["candidates"][0]["step_id"] == candidate_steps[0]["step_id"]
     assert trace["model_decision"]["step_id"] == "S03"
     assert trace["final_overlay_targets"] == ["apu_switch"]
@@ -767,6 +789,148 @@ def test_live_loop_offline_single_sample_runs_help_response_and_actions(tmp_path
     assert len(executor.calls[0]) == 1
     assert executor.calls[0][0]["type"] == "overlay"
     assert executor.calls[0][0]["target"] == "apu_switch"
+    assert "evidence_snapshot" not in executor.calls[0][0]
+    assert "snapshot_ids" not in executor.calls[0][0]
+
+
+def test_harness_trace_marks_response_hint_superseded_when_snapshot_differs() -> None:
+    request = TutorRequest(
+        request_id="cycle-315",
+        actor="learner",
+        intent="help",
+        message="help",
+        observation_ref="obs-new",
+        context={
+            "candidate_steps": [{"step_id": "S09", "source": "deterministic"}],
+            "evidence_packet_summary": {"telemetry_status": "nominal"},
+            "evidence_snapshot": {
+                "schema_version": "evidence_snapshot.v1",
+                "snapshot_id": "snapshot-new",
+                "source_observation_id": "obs-new",
+                "source_observation_seq": 20,
+                "telemetry_window_latest_seq": 20,
+                "candidate_generation_snapshot_id": "snapshot-new",
+                "model_request_snapshot_id": "snapshot-new",
+                "validator_snapshot_id": "snapshot-new",
+                "final_decision_snapshot_id": "snapshot-new",
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+            },
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        message="Tune COMM1.",
+        actions=[{"type": "overlay", "target": "ufc_key_1"}],
+        explanations=["Tune COMM1."],
+        metadata={
+            "generation_mode": "model",
+            "deterministic_step_hint": {
+                "inferred_step_id": "S08",
+                "missing_conditions": ["vision_facts.fcs_page_visible==seen"],
+            },
+            "harness_action_plan": {
+                "step_id": "S09",
+                "targets": ["ufc_key_1"],
+                "source": "model",
+                "evidence_snapshot_id": "snapshot-old",
+            },
+            "help_response": {
+                "next": {"step_id": "S09"},
+                "overlay": {"targets": ["ufc_key_1"], "evidence": []},
+            },
+        },
+    )
+
+    trace = _build_harness_trace_metadata(
+        request=request,
+        response=response,
+        vision_selection=HelpCycleVisionSelection(
+            status="vision_not_required",
+            observation_ref=None,
+            observation_seq=20,
+            observation_t_wall_s=20.0,
+            observation_t_wall_ms=20000,
+            trigger_wall_ms=20000,
+            sync_window_ms=250,
+            vision_used=False,
+            frame_id=None,
+            sync_status="not_required",
+            sync_delta_ms=None,
+            frame_stale=None,
+            frame_ids=[],
+            selected_frames=[],
+            pre_trigger_frame=None,
+            trigger_frame=None,
+            sync_miss_reason=None,
+        ),
+        vision_fact_context={"status": "vision_not_required", "vision_fact_summary": {}, "vision_facts": []},
+    )
+
+    assert response.metadata["deterministic_step_hint"]["superseded_by_snapshot"] == "snapshot-new"
+    assert response.metadata["evidence_snapshot_consistency"]["deterministic_hint_matches_request"] is False
+    assert response.metadata["evidence_snapshot_consistency"]["final_action_plan_matches_snapshot"] is False
+    assert (
+        response.metadata["evidence_snapshot_consistency"]["final_action_plan_superseded_by_snapshot"]
+        == "snapshot-new"
+    )
+    assert trace["evidence_snapshot_consistency"]["deterministic_hint_matches_request"] is False
+    assert trace["final_action_plan"]["evidence_snapshot_id"] == "snapshot-new"
+
+
+def test_harness_trace_uses_empty_snapshot_ids_when_snapshot_is_absent() -> None:
+    request = TutorRequest(
+        request_id="legacy-cycle",
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "candidate_steps": [{"step_id": "S03", "source": "deterministic"}],
+            "deterministic_step_hint": {"inferred_step_id": "S03", "missing_conditions": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        message="Start APU.",
+        actions=[{"type": "overlay", "target": "apu_switch"}],
+        explanations=["Start APU."],
+        metadata={
+            "generation_mode": "model",
+            "harness_action_plan": {"step_id": "S03", "targets": ["apu_switch"], "source": "model"},
+            "help_response": {"next": {"step_id": "S03"}, "overlay": {"targets": ["apu_switch"]}},
+        },
+    )
+
+    trace = _build_harness_trace_metadata(
+        request=request,
+        response=response,
+        vision_selection=HelpCycleVisionSelection(
+            status="vision_not_required",
+            observation_ref=None,
+            observation_seq=None,
+            observation_t_wall_s=None,
+            observation_t_wall_ms=None,
+            trigger_wall_ms=1000,
+            sync_window_ms=250,
+            vision_used=False,
+            frame_id=None,
+            sync_status="not_required",
+            sync_delta_ms=None,
+            frame_stale=None,
+            frame_ids=[],
+            selected_frames=[],
+            pre_trigger_frame=None,
+            trigger_frame=None,
+            sync_miss_reason=None,
+        ),
+        vision_fact_context={"status": "vision_not_required", "vision_fact_summary": {}, "vision_facts": []},
+    )
+
+    assert trace["snapshot_ids"] == {}
+    assert response.metadata["snapshot_ids"] == {}
+    assert "evidence_snapshot_id" not in trace["final_action_plan"]
 
 
 def test_live_loop_telemetry_window_uses_canonical_vars_not_raw_delta_keys(tmp_path: Path) -> None:

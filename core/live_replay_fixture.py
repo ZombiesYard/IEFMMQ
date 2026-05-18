@@ -33,6 +33,17 @@ def _as_list(raw: Any) -> list[Any]:
     return list(raw) if isinstance(raw, list) else []
 
 
+def _merged_dicts(*sources: Any) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for source in sources:
+        if not isinstance(source, Mapping):
+            continue
+        for key, value in source.items():
+            if isinstance(key, str) and value is not None:
+                merged[key] = value
+    return merged
+
+
 def _nonempty_text(raw: Any) -> str | None:
     if not isinstance(raw, str):
         return None
@@ -321,6 +332,19 @@ def extract_live_replay_fixture(
     trace = _as_mapping(response_metadata.get("harness_trace"))
     if not evidence_packet_summary:
         evidence_packet_summary = _as_dict(trace.get("evidence_packet_summary"))
+    request_metadata = _as_mapping(request_payload.get("metadata"))
+    evidence_snapshot = _merged_dicts(
+        response_metadata.get("evidence_snapshot"),
+        request_metadata.get("evidence_snapshot"),
+        request_context.get("evidence_snapshot"),
+        trace.get("evidence_snapshot"),
+    )
+    snapshot_ids = _merged_dicts(
+        response_metadata.get("snapshot_ids"),
+        request_metadata.get("snapshot_ids"),
+        request_context.get("snapshot_ids"),
+        trace.get("snapshot_ids"),
+    )
     telemetry_window_digest = _as_dict(evidence_packet_summary.get("telemetry_window_digest"))
 
     observation_ref = _nonempty_text(request_payload.get("observation_ref"))
@@ -402,6 +426,8 @@ def extract_live_replay_fixture(
                 "vision_facts": _as_list(response_metadata.get("vision_facts")),
             },
             "evidence_packet_summary": evidence_packet_summary,
+            "evidence_snapshot": evidence_snapshot,
+            "snapshot_ids": snapshot_ids,
             "telemetry_window_digest": telemetry_window_digest,
             "vision_fact_observations": [
                 _jsonable(dict(item)) for item in vision_fact_observations if isinstance(item, Mapping)
