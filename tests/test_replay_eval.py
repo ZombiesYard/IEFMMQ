@@ -15,6 +15,7 @@ from simtutor.replay_eval import (
     ReplayEvalOracleModel,
     ReplayEvalSuite,
     _extract_case_outcome,
+    build_harness_coverage_matrix,
     load_replay_eval_suite,
     run_replay_eval_suite,
 )
@@ -57,6 +58,76 @@ def test_run_replay_eval_suite_oracle_emits_fixed_summary(tmp_path: Path) -> Non
     assert summary["harness_trace_coverage"] == 1.0
     assert len(report["cases"]) == 5
     assert {case["status"] for case in report["cases"]}.issubset({"passed", "failed"})
+
+
+def test_harness_coverage_matrix_marks_all_s01_s33_categories() -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+
+    matrix = build_harness_coverage_matrix(suite)
+
+    assert matrix["step_count"] == 33
+    assert matrix["missing_cell_count"] == 0
+    assert matrix["contract_only_cell_count"] > 0
+    assert matrix["state_categories"] == [
+        "normal_progression",
+        "omission_missing_action",
+        "completion_already_true",
+        "stale_telemetry",
+        "moving_settling_control",
+        "recent_action_gate_conflict",
+        "wrong_target_prevention",
+        "vlm_not_required",
+        "vlm_required",
+        "vlm_unavailable",
+        "vlm_failed",
+    ]
+    assert sorted(matrix["steps"].keys()) == [f"S{i:02d}" for i in range(1, 34)]
+    for step_id, row in matrix["steps"].items():
+        for category in matrix["state_categories"]:
+            cell = row[category]
+            assert cell["status"] in {
+                "covered",
+                "contract_only",
+                "regression_reference",
+                "not_applicable",
+            }, (step_id, category, cell)
+            assert cell["sources"] or cell["reason"], (step_id, category, cell)
+    assert matrix["steps"]["S01"]["vlm_not_required"]["status"] == "contract_only"
+    assert matrix["steps"]["S01"]["vlm_unavailable"]["status"] == "not_applicable"
+    assert matrix["steps"]["S21"]["moving_settling_control"]["status"] in {
+        "contract_only",
+        "regression_reference",
+    }
+
+    unexecuted_matrix = build_harness_coverage_matrix(suite, case_results=[])
+    assert unexecuted_matrix["covered_cell_count"] == 0
+    assert unexecuted_matrix["regression_reference_cell_count"] >= 0
+
+
+def test_replay_eval_report_includes_issue_312_fixture_regression_sources(tmp_path: Path) -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+
+    report = run_replay_eval_suite(suite, output_dir=tmp_path / "issue312")
+    matrix = report["coverage_matrix"]
+
+    issue_sources: dict[int, set[str]] = {}
+    for row in matrix["steps"].values():
+        for cell in row.values():
+            for source in cell.get("sources", []):
+                issue = source.get("issue")
+                fixture = source.get("fixture")
+                if isinstance(issue, int) and isinstance(fixture, str):
+                    issue_sources.setdefault(issue, set()).add(fixture)
+
+    assert set(issue_sources) >= {294, 298, 300, 306, 310}
+    for issue in (294, 298, 300, 306, 310):
+        assert all((REPO_ROOT / fixture).exists() for fixture in issue_sources[issue])
+    assert matrix["steps"]["S01"]["vlm_unavailable"]["status"] == "not_applicable"
+    assert matrix["steps"]["S21"]["moving_settling_control"]["status"] == "contract_only"
+    assert any(
+        source.get("issue") == 306
+        for source in matrix["steps"]["S21"]["moving_settling_control"]["sources"]
+    )
 
 
 def test_run_replay_eval_suite_is_stable_across_repeated_runs(tmp_path: Path) -> None:
@@ -771,6 +842,7 @@ def test_run_replay_eval_suite_continues_after_case_error(tmp_path: Path) -> Non
     assert failed_case["error"]["stage"] == "execution"
     assert failed_case["error"]["type"] == "RuntimeError"
     assert failed_case["error"]["message"] == "synthetic case failure"
+    assert report["coverage_matrix"]["steps"]["S02"]["normal_progression"]["status"] != "covered"
     passed_case_ids = [case["case_id"] for case in report["cases"] if case["status"] == "passed"]
     assert "noop_2min" in passed_case_ids
     assert len(passed_case_ids) >= 1
