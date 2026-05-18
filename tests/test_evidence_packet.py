@@ -500,6 +500,87 @@ def test_telemetry_window_candidates_cover_four_down_progression_from_telemetry_
     assert all(item["supporting_evidence_refs"][0].startswith("TELEMETRY_WINDOW.") for item in candidates if item["source"] == "telemetry_window")
 
 
+def test_telemetry_window_candidates_mark_refuel_probe_motion_in_progress() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "probe_switch_value": 1,
+                "ext_refuel_probe_value": 5606,
+                "probe_retracted": False,
+            },
+            "telemetry_window_frames": [
+                {"seq": 9675, "t_wall": 100.0, "vars": {"ext_refuel_probe_value": 6200}},
+                {"seq": 9676, "t_wall": 100.1, "vars": {"ext_refuel_probe_value": 5606}},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S21",
+                "missing_conditions": ["vars.ext_refuel_probe_value in [0,5000]"],
+            },
+        }
+    )
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_candidate = next(
+        item
+        for item in candidates
+        if item["source"] == "telemetry_window" and item["step_id"] == "S21"
+    )
+
+    assert telemetry_candidate["reason"] == "refueling probe retracting in progress"
+    assert telemetry_candidate["proposed_next_action_target_ids"] == []
+
+
+def test_telemetry_window_candidates_mark_refuel_probe_extension_in_progress() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "probe_switch_value": 0,
+                "ext_refuel_probe_value": 12000,
+                "probe_extended": False,
+            },
+            "telemetry_window_frames": [
+                {"seq": 901, "t_wall": 40.0, "vars": {"ext_refuel_probe_value": 8000}},
+                {"seq": 902, "t_wall": 40.1, "vars": {"ext_refuel_probe_value": 12000}},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S20",
+                "missing_conditions": ["vars.ext_refuel_probe_value in [60000,65535]"],
+            },
+        }
+    )
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_candidate = next(
+        item
+        for item in candidates
+        if item["source"] == "telemetry_window" and item["step_id"] == "S20"
+    )
+
+    assert telemetry_candidate["reason"] == "refueling probe extending in progress"
+    assert telemetry_candidate["proposed_next_action_target_ids"] == []
+
+
+def test_telemetry_window_candidates_advance_after_refuel_probe_retracted() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "probe_switch_value": 1,
+                "ext_refuel_probe_value": 4652,
+                "probe_retracted": True,
+            },
+            "telemetry_window_frames": [
+                {"seq": 9676, "t_wall": 100.0, "vars": {"ext_refuel_probe_value": 5606}},
+                {"seq": 9678, "t_wall": 100.2, "vars": {"ext_refuel_probe_value": 4652}},
+            ],
+        }
+    )
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_steps = [item["step_id"] for item in candidates if item["source"] == "telemetry_window"]
+
+    assert telemetry_steps[0] == "S22"
+
+
 def test_telemetry_window_sparse_delta_does_not_mark_first_frame_only_value() -> None:
     packet = build_evidence_packet(
         {

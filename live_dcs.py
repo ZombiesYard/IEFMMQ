@@ -2491,6 +2491,51 @@ def _s08_visual_hint_from_seen_evidence_refs(
     return None
 
 
+def _state_harness_changed_var(context: Mapping[str, Any], var_name: str) -> Mapping[str, Any] | None:
+    state_harness = context.get("state_harness")
+    if not isinstance(state_harness, Mapping):
+        return None
+    digest = state_harness.get("telemetry_window_digest")
+    if not isinstance(digest, Mapping):
+        return None
+    changed_vars = digest.get("changed_vars")
+    if not isinstance(changed_vars, (list, tuple)):
+        return None
+    for item in changed_vars:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("var") == var_name:
+            return item
+    return None
+
+
+def _refuel_probe_motion_state(context: Mapping[str, Any], step_id: str | None) -> str | None:
+    vars_selected = context.get("vars")
+    vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+    probe_value = _coerce_float(vars_map.get("ext_refuel_probe_value"))
+    switch_value = _coerce_int(vars_map.get("probe_switch_value"))
+    changed = _state_harness_changed_var(context, "ext_refuel_probe_value")
+    first_value = _coerce_float(changed.get("first_value")) if isinstance(changed, Mapping) else None
+    last_value = _coerce_float(changed.get("last_value")) if isinstance(changed, Mapping) else None
+    is_extending = first_value is not None and last_value is not None and last_value > first_value
+    is_retracting = first_value is not None and last_value is not None and last_value < first_value
+
+    if step_id == "S20":
+        if vars_map.get("probe_extended") is True or (probe_value is not None and probe_value >= 60000):
+            return "s20_extended"
+        if switch_value == 0 and probe_value is not None and 0 < probe_value < 60000 and is_extending:
+            return "s20_extending"
+    elif step_id == "S21":
+        if vars_map.get("probe_retracted") is True or (probe_value is not None and probe_value <= 5000):
+            return "s21_retracted"
+        near_retract_threshold = probe_value is not None and 5000 < probe_value <= 7000
+        if switch_value == 1 and probe_value is not None and probe_value > 5000 and (
+            is_retracting or near_retract_threshold
+        ):
+            return "s21_retracting"
+    return None
+
+
 def _build_procedural_action_hint(
     *,
     inferred_step_id: str | None,
@@ -4789,6 +4834,8 @@ class LiveDcsTutorLoop:
     ) -> bool:
         if bool(response.metadata.get("bootstrap_low_confidence_guardrail_applied")):
             return False
+        if bool(response.metadata.get("refuel_probe_motion_guidance_rewritten")):
+            return False
         if response.actions:
             return False
         if response.status == "error":
@@ -4886,6 +4933,8 @@ class LiveDcsTutorLoop:
                 if isinstance(item, str) and item
             }
         inferred_step_id = hint.get("inferred_step_id")
+        if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
+            return False, "refuel_probe_motion_wait_already_rewritten"
         action_hint = hint.get("action_hint")
         if bool(hint.get("requires_visual_confirmation")) is True:
             if isinstance(action_hint, Mapping):
@@ -5259,6 +5308,8 @@ class LiveDcsTutorLoop:
 
         inferred_step_id = hint.get("inferred_step_id")
         overlay_step_id = hint.get("overlay_step_id")
+        if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
+            return False, "refuel_probe_motion_wait_already_rewritten"
         if response.metadata.get("completion_conflict_rewritten") is True:
             return False, "completion_conflict_already_rewritten"
         response_mapping_meta = response.metadata.get("response_mapping")
@@ -5857,6 +5908,16 @@ class LiveDcsTutorLoop:
             vision_seen_or_fresh.update(item for item in raw_fact_ids if isinstance(item, str) and item)
         rewritten: str | None = None
         reason = "not_applicable"
+
+        def _set_text_only_help_response(step_id: str, text: str) -> None:
+            help_response = response.metadata.get("help_response")
+            rewritten_help_response = dict(help_response) if isinstance(help_response, Mapping) else {}
+            rewritten_help_response["diagnosis"] = {"step_id": step_id, "error_category": "OM"}
+            rewritten_help_response["next"] = {"step_id": step_id}
+            rewritten_help_response["overlay"] = {"targets": [], "evidence": []}
+            rewritten_help_response["explanations"] = [text]
+            response.metadata["help_response"] = rewritten_help_response
+
         if inferred_step_id == "S02":
             if "vars.fire_test_a_complete==true" in missing_set:
                 reason = "s02_fire_test_a_guidance"
@@ -5933,6 +5994,66 @@ class LiveDcsTutorLoop:
                     rewritten = "INS 已设置到对准模式。现在请到 AMPCD 按 PB19，启动快速 INS 校准。"
                 else:
                     rewritten = "INS is already set for alignment. Press AMPCD PB19 now to start fast INS alignment."
+        elif inferred_step_id in {"S20", "S21"}:
+            probe_motion_state = _refuel_probe_motion_state(context, inferred_step_id)
+            if probe_motion_state == "s20_extending":
+                reason = "s20_refuel_probe_extending_wait"
+                if self.lang == "zh":
+                    rewritten = "受油管正在伸出。请等待它完全伸出后，再继续四落检查。"
+                else:
+                    rewritten = "The refueling probe is extending. Wait until it is fully extended before continuing the four-down check."
+                response.actions = []
+                response.metadata["diagnosis"] = {"step_id": "S20", "error_category": "OM"}
+                response.metadata["next"] = {"step_id": "S20"}
+                _set_text_only_help_response("S20", rewritten)
+            elif probe_motion_state == "s20_extended":
+                reason = "s20_refuel_probe_extended_complete"
+                if self.lang == "zh":
+                    rewritten = "受油管已经完全伸出，S20 已完成。下一步进入 S21，收起受油管。"
+                else:
+                    rewritten = "The refueling probe is fully extended, so S20 is complete. Continue to S21 by retracting the probe."
+                response.actions = []
+                response.metadata["diagnosis"] = {"step_id": "S21", "error_category": "OM"}
+                response.metadata["next"] = {"step_id": "S21"}
+                _set_text_only_help_response("S21", rewritten)
+                fallback_used, fallback_reason = self._apply_safe_fallback_overlay(
+                    response,
+                    request,
+                    override_inferred_step_id="S21",
+                    override_overlay_step_id="S21",
+                    ignore_request_allowlist=True,
+                )
+                response.metadata["refuel_probe_completion_s21_overlay_applied"] = fallback_used
+                response.metadata["refuel_probe_completion_s21_overlay_reason"] = fallback_reason
+            elif probe_motion_state == "s21_retracting":
+                reason = "s21_refuel_probe_retracting_wait"
+                if self.lang == "zh":
+                    rewritten = "受油管正在收起，已经接近收起阈值。请等待它完全收好后，再继续下一步。"
+                else:
+                    rewritten = "The refueling probe is retracting and is near the stowed threshold. Wait until it is fully stowed before continuing."
+                response.actions = []
+                response.metadata["diagnosis"] = {"step_id": "S21", "error_category": "OM"}
+                response.metadata["next"] = {"step_id": "S21"}
+                _set_text_only_help_response("S21", rewritten)
+            elif probe_motion_state == "s21_retracted":
+                reason = "s21_refuel_probe_retracted_complete"
+                if self.lang == "zh":
+                    rewritten = "受油管已经完全收起，S21 已完成。下一步进入 S22，准备放下 launch bar。"
+                else:
+                    rewritten = "The refueling probe is fully stowed, so S21 is complete. Continue to S22 by extending the launch bar."
+                response.actions = []
+                response.metadata["diagnosis"] = {"step_id": "S22", "error_category": "OM"}
+                response.metadata["next"] = {"step_id": "S22"}
+                _set_text_only_help_response("S22", rewritten)
+                fallback_used, fallback_reason = self._apply_safe_fallback_overlay(
+                    response,
+                    request,
+                    override_inferred_step_id="S22",
+                    override_overlay_step_id="S22",
+                    ignore_request_allowlist=True,
+                )
+                response.metadata["refuel_probe_completion_s22_overlay_applied"] = fallback_used
+                response.metadata["refuel_probe_completion_s22_overlay_reason"] = fallback_reason
         elif inferred_step_id == "S19":
             if "fcsmc_final_go_result_visible" in vision_seen_or_fresh:
                 reason = "s19_final_go_complete"
@@ -6032,6 +6153,8 @@ class LiveDcsTutorLoop:
         response.explanations = [rewritten]
         response.metadata["procedural_guidance_rewritten"] = True
         response.metadata["procedural_guidance_rewrite_reason"] = reason
+        if reason.startswith(("s20_refuel_probe_", "s21_refuel_probe_")):
+            response.metadata["refuel_probe_motion_guidance_rewritten"] = True
         if original_message != rewritten:
             response.metadata["procedural_guidance_original_message"] = original_message
         if original_explanations and original_explanations != [rewritten]:
