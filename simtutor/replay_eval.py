@@ -23,6 +23,7 @@ HARNESS_COVERAGE_STATE_CATEGORIES: tuple[str, ...] = (
     "omission_missing_action",
     "completion_already_true",
     "stale_telemetry",
+    "moving_settling_control",
     "recent_action_gate_conflict",
     "wrong_target_prevention",
     "vlm_not_required",
@@ -801,6 +802,27 @@ def _mark_coverage_contract(
         cell["sources"].append(source_dict)
 
 
+def _add_regression_reference(
+    steps: dict[str, dict[str, dict[str, Any]]],
+    *,
+    step_id: str,
+    state_category: str,
+    source: Mapping[str, Any],
+) -> None:
+    row = steps.get(step_id)
+    if row is None or state_category not in row:
+        return
+    cell = row[state_category]
+    if cell["status"] == "not_applicable":
+        return
+    if cell["status"] not in {"covered", "contract_only"}:
+        cell["status"] = "regression_reference"
+        cell["reason"] = None
+    source_dict = _coverage_source_dict(source)
+    if source_dict not in cell["sources"]:
+        cell["sources"].append(source_dict)
+
+
 def _add_coverage_source(
     steps: dict[str, dict[str, dict[str, Any]]],
     *,
@@ -856,7 +878,7 @@ def _all_suite_coverage_tags(
     case_results: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[ReplayEvalCoverageTag, ...]:
     case_statuses = _case_result_statuses(case_results)
-    tags: list[ReplayEvalCoverageTag] = list(suite.coverage_tags)
+    tags: list[ReplayEvalCoverageTag] = []
     for case in suite.cases:
         if case_statuses.get(case.case_id) == "passed":
             tags.extend(case.coverage_tags)
@@ -900,6 +922,13 @@ def _build_case_only_coverage_matrix(
             state_category=tag.state_category,
             source=_coverage_source_dict(tag),
         )
+    for tag in suite.coverage_tags:
+        _add_regression_reference(
+            steps,
+            step_id=tag.step_id,
+            state_category=tag.state_category,
+            source=_coverage_source_dict(tag),
+        )
     covered_count = sum(
         1
         for row in steps.values()
@@ -912,6 +941,12 @@ def _build_case_only_coverage_matrix(
         for cell in row.values()
         if cell["status"] == "contract_only"
     )
+    regression_reference_count = sum(
+        1
+        for row in steps.values()
+        for cell in row.values()
+        if cell["status"] == "regression_reference"
+    )
     return {
         "schema_version": "harness_coverage_matrix.v1",
         "step_count": len(step_ids),
@@ -920,6 +955,7 @@ def _build_case_only_coverage_matrix(
         "missing_cells": [],
         "covered_cell_count": covered_count,
         "contract_only_cell_count": contract_only_count,
+        "regression_reference_cell_count": regression_reference_count,
         "scenario_profiles": [suite.scenario_profile],
         "steps": steps,
     }
@@ -967,6 +1003,7 @@ def build_harness_coverage_matrix(
         has_recent_action_facts = any(spec.recent_action_facts for spec in specs_for_step)
         has_allowed_overlay_targets = any(spec.allowed_overlay_targets for spec in specs_for_step)
         visual_step = any(spec.requires_visual_confirmation or spec.vision_facts for spec in specs_for_step)
+        has_moving_settling_control = step_id in {"S20", "S21"}
         _mark_coverage_contract(
             steps,
             step_id=step_id,
@@ -1021,6 +1058,24 @@ def build_harness_coverage_matrix(
                 step_id=step_id,
                 state_category="stale_telemetry",
                 reason="step has no telemetry facts",
+            )
+
+        if has_moving_settling_control:
+            _mark_coverage_contract(
+                steps,
+                step_id=step_id,
+                state_category="moving_settling_control",
+                source={
+                    "source": "refuel_probe_motion_contract",
+                    "reason": "step can be in motion/settling while the refuel probe moves toward its threshold",
+                },
+            )
+        else:
+            _mark_coverage_not_applicable(
+                steps,
+                step_id=step_id,
+                state_category="moving_settling_control",
+                reason="step has no moving/settling control contract",
             )
 
         if has_recent_action_facts:
@@ -1105,6 +1160,13 @@ def build_harness_coverage_matrix(
             state_category=tag.state_category,
             source=_coverage_source_dict(tag),
         )
+    for tag in suite.coverage_tags:
+        _add_regression_reference(
+            steps,
+            step_id=tag.step_id,
+            state_category=tag.state_category,
+            source=_coverage_source_dict(tag),
+        )
 
     missing_cells = [
         {"step_id": step_id, "state_category": category}
@@ -1124,6 +1186,12 @@ def build_harness_coverage_matrix(
         for cell in row.values()
         if cell["status"] == "contract_only"
     )
+    regression_reference_count = sum(
+        1
+        for row in steps.values()
+        for cell in row.values()
+        if cell["status"] == "regression_reference"
+    )
     return {
         "schema_version": "harness_coverage_matrix.v1",
         "step_count": len(ordered_step_ids),
@@ -1132,6 +1200,7 @@ def build_harness_coverage_matrix(
         "missing_cells": missing_cells,
         "covered_cell_count": covered_count,
         "contract_only_cell_count": contract_only_count,
+        "regression_reference_cell_count": regression_reference_count,
         "scenario_profiles": list(scenario_profiles),
         "steps": steps,
     }

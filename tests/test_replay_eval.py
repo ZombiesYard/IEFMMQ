@@ -73,6 +73,7 @@ def test_harness_coverage_matrix_marks_all_s01_s33_categories() -> None:
         "omission_missing_action",
         "completion_already_true",
         "stale_telemetry",
+        "moving_settling_control",
         "recent_action_gate_conflict",
         "wrong_target_prevention",
         "vlm_not_required",
@@ -84,10 +85,23 @@ def test_harness_coverage_matrix_marks_all_s01_s33_categories() -> None:
     for step_id, row in matrix["steps"].items():
         for category in matrix["state_categories"]:
             cell = row[category]
-            assert cell["status"] in {"covered", "contract_only", "not_applicable"}, (step_id, category, cell)
+            assert cell["status"] in {
+                "covered",
+                "contract_only",
+                "regression_reference",
+                "not_applicable",
+            }, (step_id, category, cell)
             assert cell["sources"] or cell["reason"], (step_id, category, cell)
     assert matrix["steps"]["S01"]["vlm_not_required"]["status"] == "contract_only"
     assert matrix["steps"]["S01"]["vlm_unavailable"]["status"] == "not_applicable"
+    assert matrix["steps"]["S21"]["moving_settling_control"]["status"] in {
+        "contract_only",
+        "regression_reference",
+    }
+
+    unexecuted_matrix = build_harness_coverage_matrix(suite, case_results=[])
+    assert unexecuted_matrix["covered_cell_count"] == 0
+    assert unexecuted_matrix["regression_reference_cell_count"] >= 0
 
 
 def test_replay_eval_report_includes_issue_312_fixture_regression_sources(tmp_path: Path) -> None:
@@ -109,6 +123,11 @@ def test_replay_eval_report_includes_issue_312_fixture_regression_sources(tmp_pa
     for issue in (294, 298, 300, 306, 310):
         assert all((REPO_ROOT / fixture).exists() for fixture in issue_sources[issue])
     assert matrix["steps"]["S01"]["vlm_unavailable"]["status"] == "not_applicable"
+    assert matrix["steps"]["S21"]["moving_settling_control"]["status"] == "contract_only"
+    assert any(
+        source.get("issue") == 306
+        for source in matrix["steps"]["S21"]["moving_settling_control"]["sources"]
+    )
 
 
 def test_run_replay_eval_suite_is_stable_across_repeated_runs(tmp_path: Path) -> None:
