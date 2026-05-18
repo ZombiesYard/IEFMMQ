@@ -1620,7 +1620,13 @@ def _classify_vision_fallback_reason(
     if vision_fact_status == "vision_unavailable" and vision_selection.vision_used:
         return VISION_UNAVAILABLE
 
-    model_next_step_id = _extract_model_next_step_id(response_metadata)
+    model_next_step_id = None
+    if isinstance(response_metadata, Mapping):
+        raw_help_response = response_metadata.get("model_raw_help_response")
+        if isinstance(raw_help_response, Mapping):
+            model_next_step_id = _help_response_step_id(raw_help_response)
+    if model_next_step_id is None:
+        model_next_step_id = _extract_model_next_step_id(response_metadata)
     if (
         isinstance(fused_step_id, str)
         and fused_step_id
@@ -4797,6 +4803,9 @@ class LiveDcsTutorLoop:
         if not normalized_missing:
             return False
 
+        if response.metadata.get("provider") == "replay_eval_oracle":
+            return False
+
         model_next_step_id = _extract_model_next_step_id(response.metadata)
         text_parts = [response.message, *response.explanations]
         combined = " ".join(part for part in text_parts if isinstance(part, str) and part).lower()
@@ -4953,6 +4962,8 @@ class LiveDcsTutorLoop:
         mapped_meta: Mapping[str, Any] | None,
     ) -> bool:
         if bool(response.metadata.get("bootstrap_low_confidence_guardrail_applied")):
+            return False
+        if response.metadata.get("provider") == "replay_eval_oracle":
             return False
         if bool(response.metadata.get("refuel_probe_motion_guidance_rewritten")):
             return False
@@ -5191,8 +5202,12 @@ class LiveDcsTutorLoop:
 
         response.metadata["action_hint_overlay_override_used"] = True
         response.metadata["action_hint_overlay_override_target"] = action_target
-        response.metadata["action_hint_overlay_override_reason"] = override_reason
-        return True, override_reason
+        response.metadata["action_hint_overlay_override_fallback_reason"] = response.metadata.get(
+            "presentation_fallback_reason",
+            override_reason,
+        )
+        response.metadata["action_hint_overlay_override_reason"] = "validator_action_hint"
+        return True, "validator_action_hint"
 
     def _apply_s08_visual_recovery_overlay_override(
         self,
@@ -5430,6 +5445,8 @@ class LiveDcsTutorLoop:
         overlay_step_id = hint.get("overlay_step_id")
         if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
             return False, "refuel_probe_motion_wait_already_rewritten"
+        if response.metadata.get("provider") == "replay_eval_oracle":
+            return False, "replay_eval_oracle"
         if response.metadata.get("s09_comm1_completion_guardrail_applied") is True:
             return False, "s09_comm1_completion_already_rewritten"
         if response.metadata.get("s10_left_engine_completion_guardrail_applied") is True:
@@ -5702,17 +5719,25 @@ class LiveDcsTutorLoop:
         plan_guidance = plan.guidance
         if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
             plan_guidance = s18_visual_hint_reason
+        emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"
+        final_action_plan_source = (
+            "emergency_presentation_fallback"
+            if emergency_presentation_fallback
+            else plan.final_action_plan_source
+        )
 
         response.metadata["validator_rejected"] = bool(plan.validator_rejected)
         response.metadata["repair_applied"] = bool(response.metadata.get("repair_applied")) or bool(plan.repair_applied)
-        response.metadata["final_action_plan_source"] = plan.final_action_plan_source
+        response.metadata["final_action_plan_source"] = final_action_plan_source
+        if emergency_presentation_fallback:
+            response.metadata["emergency_presentation_fallback_plan_source"] = plan.final_action_plan_source
         response.metadata["harness_validation_reasons"] = list(plan.reasons)
         response.metadata["harness_action_plan"] = {
             "step_id": plan.step_id,
             "overlay_step_id": plan.overlay_step_id,
             "targets": list(plan.targets),
             "text_only": plan.text_only,
-            "source": plan.final_action_plan_source,
+            "source": final_action_plan_source,
         }
         if s08_visual_hint_used:
             response.metadata["visual_hint_target"] = s08_visual_hint_target
@@ -5764,7 +5789,7 @@ class LiveDcsTutorLoop:
                     "explanations": [response.message],
                 }
                 return True, "manual_throttle_keyboard_guidance"
-            return True, plan.final_action_plan_source
+            return True, final_action_plan_source
 
         current_targets = [
             target
@@ -5923,7 +5948,7 @@ class LiveDcsTutorLoop:
         elif mapped.explanations and response.metadata.get("procedural_guidance_rewritten") is not True:
             response.message = mapped.explanations[0]
             response.explanations = list(mapped.explanations)
-        return True, fallback_reason
+        return True, final_action_plan_source
 
     def _rewrite_manual_throttle_guidance_response(
         self,
@@ -6054,6 +6079,38 @@ class LiveDcsTutorLoop:
         merged_reasons.extend(result.reasons)
         response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
         return True
+
+    def _fallback_evidence_conflict_reason(
+        self,
+        request: TutorRequest,
+        *,
+        step_id: str,
+        missing_conditions: Sequence[str],
+        include_completion_gate: bool = False,
+    ) -> str | None:
+        if not missing_conditions and not include_completion_gate:
+            return None
+        context = request.context if isinstance(request.context, Mapping) else {}
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        evidence_context = self._context_with_full_pack_gates(context)
+        try:
+            evidence_packet = build_evidence_packet(evidence_context)
+        except Exception:
+            evidence_packet = None
+        result = validate_final_evidence_consistency(
+            accepted_step_id=step_id,
+            accepted_overlay_targets=[],
+            accepted_missing_conditions=missing_conditions,
+            latest_vars=vars_map,
+            evidence_packet=evidence_packet,
+        )
+        if result.accepted:
+            return None
+        reasons = [item for item in result.reasons if isinstance(item, str) and item]
+        if not reasons:
+            return "evidence_conflict"
+        return f"evidence_conflict:{'|'.join(reasons[:3])}"
 
     def _context_with_full_pack_gates(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
         vars_selected = context.get("vars")
@@ -6400,6 +6457,7 @@ class LiveDcsTutorLoop:
                 override_inferred_step_id="S10",
                 override_overlay_step_id="S10",
                 ignore_request_allowlist=True,
+                annotate_presentation_metadata=False,
             )
             response.metadata["s09_comm1_completion_guardrail_applied"] = True
             response.metadata["s09_comm1_completion_s10_overlay_applied"] = fallback_used
@@ -6564,6 +6622,7 @@ class LiveDcsTutorLoop:
                     override_inferred_step_id="S21",
                     override_overlay_step_id="S21",
                     ignore_request_allowlist=True,
+                    annotate_presentation_metadata=False,
                 )
                 response.metadata["refuel_probe_completion_s21_overlay_applied"] = fallback_used
                 response.metadata["refuel_probe_completion_s21_overlay_reason"] = fallback_reason
@@ -6593,6 +6652,7 @@ class LiveDcsTutorLoop:
                     override_inferred_step_id="S22",
                     override_overlay_step_id="S22",
                     ignore_request_allowlist=True,
+                    annotate_presentation_metadata=False,
                 )
                 response.metadata["refuel_probe_completion_s22_overlay_applied"] = fallback_used
                 response.metadata["refuel_probe_completion_s22_overlay_reason"] = fallback_reason
@@ -6621,6 +6681,7 @@ class LiveDcsTutorLoop:
                     override_inferred_step_id="S20",
                     override_overlay_step_id="S20",
                     ignore_request_allowlist=True,
+                    annotate_presentation_metadata=False,
                 )
                 response.metadata["s19_final_go_guardrail_applied"] = True
                 response.metadata["s19_final_go_guardrail_reason"] = reason
@@ -6647,6 +6708,7 @@ class LiveDcsTutorLoop:
                     override_inferred_step_id="S19",
                     override_overlay_step_id="S19",
                     ignore_request_allowlist=True,
+                    annotate_presentation_metadata=False,
                 )
                 response.metadata["s19_intermediate_guardrail_applied"] = True
                 response.metadata["s19_intermediate_overlay_applied"] = fallback_used
@@ -6843,6 +6905,15 @@ class LiveDcsTutorLoop:
         ] if isinstance(gate_blockers_raw, (list, tuple)) else []
         if overridden_inferred_step:
             gate_blockers = []
+
+        conflict_reason = self._fallback_evidence_conflict_reason(
+            request,
+            step_id=inferred_step_id,
+            missing_conditions=missing_conditions,
+            include_completion_gate=True,
+        )
+        if conflict_reason is not None:
+            return None, conflict_reason
 
         if inferred_step_id == "S33" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
@@ -7107,6 +7178,28 @@ class LiveDcsTutorLoop:
         }
         return fallback_help_obj, f"deterministic_step:{inferred_step_id}"
 
+    def _presentation_fallback_plan_source(
+        self,
+        request: TutorRequest,
+        targets: Sequence[str],
+    ) -> str:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        target_set = set(_dedupe_strings(target for target in targets if isinstance(target, str) and target))
+        if isinstance(hint, Mapping) and target_set:
+            action_hint = hint.get("action_hint")
+            if isinstance(action_hint, Mapping):
+                hinted_targets: set[str] = set()
+                raw_targets = action_hint.get("targets")
+                if isinstance(raw_targets, list):
+                    hinted_targets.update(item for item in raw_targets if isinstance(item, str) and item)
+                raw_target = action_hint.get("target")
+                if isinstance(raw_target, str) and raw_target:
+                    hinted_targets.add(raw_target)
+                if target_set.issubset(hinted_targets):
+                    return "validator_action_hint"
+        return "validator_repair"
+
     def _apply_safe_fallback_overlay(
         self,
         response: TutorResponse,
@@ -7115,6 +7208,7 @@ class LiveDcsTutorLoop:
         override_inferred_step_id: str | None = None,
         override_overlay_step_id: str | None = None,
         ignore_request_allowlist: bool = False,
+        annotate_presentation_metadata: bool = True,
     ) -> tuple[bool, str]:
         fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
             request,
@@ -7152,7 +7246,40 @@ class LiveDcsTutorLoop:
             response.explanations = list(mapped.explanations)
         elif mapped.explanations and original_explanations and list(mapped.explanations) != original_explanations:
             response.metadata["fallback_explanations"] = list(mapped.explanations)
-        return True, fallback_reason
+
+        fallback_targets = _help_response_overlay_targets(fallback_help_obj)
+        fallback_step_id = _help_response_step_id(fallback_help_obj)
+        emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"
+        presentation_plan_source = (
+            "emergency_presentation_fallback"
+            if emergency_presentation_fallback
+            else self._presentation_fallback_plan_source(request, fallback_targets)
+        )
+        if annotate_presentation_metadata:
+            response.metadata["presentation_fallback_plan_source"] = presentation_plan_source
+            response.metadata["presentation_fallback_reason"] = fallback_reason
+            response.metadata["final_action_plan_source"] = presentation_plan_source
+            response.metadata["harness_action_plan"] = {
+                "step_id": fallback_step_id,
+                "overlay_step_id": fallback_step_id,
+                "targets": list(fallback_targets),
+                "text_only": not bool(fallback_targets),
+                "source": presentation_plan_source,
+            }
+            diagnosis = fallback_help_obj.get("diagnosis")
+            if isinstance(diagnosis, Mapping):
+                response.metadata["diagnosis"] = dict(diagnosis)
+            next_payload = fallback_help_obj.get("next")
+            if isinstance(next_payload, Mapping):
+                response.metadata["next"] = dict(next_payload)
+            response.metadata["help_response"] = copy.deepcopy(dict(fallback_help_obj))
+        if emergency_presentation_fallback:
+            response.metadata["emergency_presentation_fallback_plan_source"] = (
+                self._presentation_fallback_plan_source(request, fallback_targets)
+            )
+            response.metadata["emergency_presentation_fallback_reason"] = fallback_reason
+            return True, "emergency_presentation_fallback"
+        return True, presentation_plan_source
 
     def _rewrite_s18_visual_completion_to_s19(
         self,
