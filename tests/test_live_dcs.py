@@ -4387,6 +4387,7 @@ def test_harness_validation_does_not_trust_s08_tac_evidence_ref_when_fact_not_se
                     "intent": "highlight",
                     "target": "left_mdi_brightness_selector",
                     "element_id": "pnt_51",
+                    "evidence_refs": ["VISION_FACTS.tac_page_visible@frame-tac"],
                 }
             ],
             explanations=["The left DDI is showing TAC; navigate toward the FCS page."],
@@ -4424,6 +4425,13 @@ def test_harness_validation_does_not_trust_s08_tac_evidence_ref_when_fact_not_se
         help_response = response.metadata["help_response"]
         evidence = help_response["overlay"]["evidence"]
         assert all(item.get("ref") != "VISION_FACTS.tac_page_visible@frame-tac" for item in evidence)
+        assert response.message is not None
+        assert "not powered" in response.message
+        assert all(
+            "VISION_FACTS.tac_page_visible" not in ref
+            for action in response.actions
+            for ref in action.get("evidence_refs", [])
+        )
     finally:
         loop.close()
 
@@ -10256,6 +10264,25 @@ def test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture() -
     assert "eng_crank_switch" not in repaired.metadata["final_overlay_targets"]
     assert "vars.engine_crank_left_complete==true" not in repaired.message
     assert "vars.engine_crank_left_complete==true" not in _public_response_text(repaired)
+
+
+def test_live_help_fixture_315_repairs_unconfirmed_s08_tac_public_response() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/c2ddd0ad-eb91-416e-a3a8-be16816a9d49.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response, vision_status="available")
+
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["message_category"] == "harness_validator_repair"
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "left_mdi_brightness_selector"
+    public_text = _public_response_text(repaired)
+    assert "TAC page" not in public_text
+    assert "FCS page" not in public_text
+    assert "not powered" in public_text or "未开启" in public_text
+    final_public_json = json.dumps(repaired.metadata["final_public_response"], ensure_ascii=False)
+    assert "VISION_FACTS.tac_page_visible" not in final_public_json
 
 
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
