@@ -3430,8 +3430,9 @@ def test_normalize_observable_text_only_response_rewrites_bad_visual_excuse(tmp_
         loop._normalize_observable_text_only_response(response, request)
 
         assert response.metadata["observable_text_rewritten"] is True
-        assert response.message == "降级提示：你大概率卡在 S05，请先满足：vars.rpm_r>=25。"
-        assert response.explanations == ["降级提示：你大概率卡在 S05，请先满足：vars.rpm_r>=25。"]
+        assert response.message == "降级提示：你大概率卡在 S05，请先完成该步骤的未满足条件。"
+        assert response.explanations == ["降级提示：你大概率卡在 S05，请先完成该步骤的未满足条件。"]
+        assert "vars.rpm_r" not in response.message
     finally:
         loop.close()
 
@@ -3472,7 +3473,35 @@ def test_normalize_observable_text_only_response_rewrites_visual_analysis_unavai
         loop._normalize_observable_text_only_response(response, request)
 
         assert response.metadata["observable_text_rewritten"] is True
-        assert response.message == "降级提示：你大概率卡在 S08，请先满足：vision_facts.fcs_page_visible==seen。"
+        assert response.message == "降级提示：你大概率卡在 S08，请先完成该步骤的未满足条件。"
+    finally:
+        loop.close()
+
+
+def test_annotate_response_audit_metadata_sanitizes_public_predicates(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_public_predicate_sanitize.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        response = TutorResponse(
+            status="ok",
+            message="当前 S04 尚未完成，请先满足：vars.right_engine_nominal_start_params==true。",
+            explanations=["需要 vars.rpm_r>=25 后继续。"],
+            metadata={},
+        )
+
+        loop._annotate_response_audit_metadata(response)
+
+        assert "vars." not in response.message
+        assert all("vars." not in item for item in response.explanations)
+        assert "vars." not in response.metadata["final_public_response"]["message"]
+        assert all("vars." not in item for item in response.metadata["final_public_response"]["explanations"])
     finally:
         loop.close()
 
@@ -9880,6 +9909,98 @@ def _validate_compact_live_help_response(
         loop.close()
 
 
+def _load_live_help_fixture(path: str) -> dict[str, Any]:
+    return json.loads((Path(__file__).resolve().parents[1] / path).read_text(encoding="utf-8"))
+
+
+def _fixture_request_and_model_response(fixture: dict[str, Any]) -> tuple[TutorRequest, TutorResponse]:
+    request_payload = fixture["cycle"]["tutor_request"]
+    context = dict(request_payload.get("context", {}))
+    observations = fixture.get("context", {}).get("observations", [])
+    if observations and isinstance(observations[0], dict):
+        payload = observations[0].get("payload")
+        if isinstance(payload, dict) and isinstance(payload.get("vars"), dict):
+            context.setdefault("vars", payload["vars"])
+    request = TutorRequest(
+        request_id=request_payload["request_id"],
+        message=request_payload.get("message"),
+        observation_ref=request_payload.get("observation_ref"),
+        context=context,
+        metadata=dict(request_payload.get("metadata", {})),
+    )
+    help_response = fixture["model_io"]["help_response"]
+    explanations = [item for item in help_response.get("explanations", []) if isinstance(item, str)]
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message=explanations[0] if explanations else None,
+        actions=[],
+        explanations=explanations,
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": help_response,
+        },
+    )
+    return request, response
+
+
+def _public_response_text(response: TutorResponse) -> str:
+    final_public = response.metadata.get("final_public_response")
+    if not isinstance(final_public, dict):
+        return ""
+    parts: list[str] = []
+    message = final_public.get("message")
+    if isinstance(message, str):
+        parts.append(message)
+    explanations = final_public.get("explanations")
+    if isinstance(explanations, list):
+        parts.extend(item for item in explanations if isinstance(item, str))
+    return "\n".join(parts)
+
+
+def test_live_help_fixture_311_replays_real_s09_comm1_complete_fixture() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/168fc73d-f98c-498e-a35c-fef91b06ee2e.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S10"
+    assert repaired.metadata["next"]["step_id"] == "S10"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.comm1_freq_134_000==true"]
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S10"
+    assert "ufc_comm1_channel_selector_pull" not in repaired.metadata["final_overlay_targets"]
+    assert "vars.comm1_freq_134_000==true" not in repaired.message
+    assert "vars.comm1_freq_134_000==true" not in _public_response_text(repaired)
+
+
+def test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/c3c775ce-7a4d-4e7f-a841-3a022528138e.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] != "S10"
+    assert repaired.metadata["next"]["step_id"] != "S10"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
+    assert repaired.metadata["final_action_plan"]["source"] in {
+        "final_evidence_consistency_validator",
+        "s10_left_engine_completion_guardrail",
+    }
+    assert "eng_crank_switch" not in repaired.metadata["final_overlay_targets"]
+    assert "vars.engine_crank_left_complete==true" not in repaired.message
+    assert "vars.engine_crank_left_complete==true" not in _public_response_text(repaired)
+
+
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
     request = TutorRequest(
         request_id="issue-294-s09-complete",
@@ -9954,8 +10075,13 @@ def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
     assert [action["target"] for action in repaired.actions] == ["eng_crank_switch"]
     assert repaired.metadata["diagnosis"]["step_id"] == "S10"
     assert repaired.metadata["next"]["step_id"] == "S10"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.comm1_freq_134_000==true"]
     assert repaired.metadata["s09_comm1_completion_guardrail_applied"] is True
     assert repaired.metadata["final_overlay_targets"] == ["eng_crank_switch"]
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert "vars.comm1_freq_134_000==true" not in repaired.message
     assert "134.000" in repaired.message
     assert "S10" in repaired.message
 
@@ -10042,6 +10168,9 @@ def test_live_help_fixture_310_s10_left_engine_complete_advances_past_crank() ->
 
     assert repaired.metadata["diagnosis"]["step_id"] == "S12"
     assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
     assert repaired.metadata["s10_left_engine_completion_guardrail_applied"] is True
     assert repaired.metadata["rejected_model_step_id"] == "S10"
     assert repaired.metadata["fallback_overlay_used"] is True
@@ -10050,8 +10179,125 @@ def test_live_help_fixture_310_s10_left_engine_complete_advances_past_crank() ->
     assert repaired.metadata["help_response"]["overlay"]["targets"] == ["ins_mode_knob"]
     assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ins_mode_knob"
     assert [action["target"] for action in repaired.actions] == ["ins_mode_knob"]
+    assert "vars.engine_crank_left_complete==true" not in repaired.message
     assert "S10" not in repaired.message
     assert "S12" in repaired.message
+
+
+def test_final_evidence_validator_rechecks_repaired_fallback_step() -> None:
+    request = TutorRequest(
+        request_id="issue-311-final-fallback-recheck",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": True,
+                "right_engine_nominal_start_params": True,
+                "engine_crank_left": False,
+                "engine_crank_left_complete": True,
+                "rpm_l": 64,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "throttle_l_not_off": True,
+                "ins_mode": 2,
+                "ins_mode_set": True,
+                "ins_mode_cv_or_gnd": True,
+                "ins_fast_align_complete": True,
+                "radar_mode_opr": False,
+            },
+            "gates": {
+                "S10.completion": {
+                    "status": "blocked",
+                    "reason": "Left engine start must have begun.",
+                    "reason_code": "s10_requires_engine_crank_left_complete",
+                },
+                "S13.completion": {
+                    "status": "blocked",
+                    "step_id": "S13",
+                    "gate_type": "completion",
+                    "reason": "Radar knob must be set to OPR.",
+                    "reason_code": "s13_requires_radar_mode_opr",
+                },
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S10",
+                "overlay_step_id": "S10",
+                "missing_conditions": ["vars.engine_crank_left_complete==true"],
+                "step_ui_targets": ["eng_crank_switch"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["eng_crank_switch", "ins_mode_knob", "radar_mode_knob"],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前处于 S12 步骤。请将 INS 旋钮转到 CV 或 GND。",
+        actions=[
+            {
+                "type": "highlight",
+                "target": "ins_mode_knob",
+                "intent": "guide",
+                "evidence_refs": ["GATES.S12.completion"],
+            }
+        ],
+        explanations=["当前处于 S12 步骤。请将 INS 旋钮转到 CV 或 GND。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "repair",
+            "diagnosis": {"step_id": "S12", "error_category": "OM"},
+            "next": {"step_id": "S12"},
+            "harness_action_plan": {
+                "step_id": "S12",
+                "overlay_step_id": "S12",
+                "targets": ["ins_mode_knob"],
+                "text_only": False,
+                "source": "deterministic_step:S12",
+            },
+            "help_response": {
+                "diagnosis": {"step_id": "S12", "error_category": "OM"},
+                "next": {"step_id": "S12"},
+                "overlay": {
+                    "targets": ["ins_mode_knob"],
+                    "evidence": [
+                        {
+                            "target": "ins_mode_knob",
+                            "type": "gate",
+                            "ref": "GATES.S12.completion",
+                            "quote": "INS alignment must be complete.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["当前处于 S12 步骤。请将 INS 旋钮转到 CV 或 GND。"],
+            },
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-final-fallback-recheck",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        used, reason = loop._enforce_final_evidence_consistency_after_repairs(response, request)
+    finally:
+        loop.close()
+
+    assert used is True
+    assert reason == "final_evidence_consistency_validator"
+    assert response.metadata["diagnosis"]["step_id"] == "S13"
+    assert response.metadata["next"]["step_id"] == "S13"
+    assert response.metadata["harness_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert response.metadata["harness_action_plan"]["targets"] == ["radar_mode_knob"]
+    assert "completion_gate_already_satisfied:S12" in response.metadata["final_evidence_consistency_reasons"]
+    assert [action["target"] for action in response.actions] == ["radar_mode_knob"]
+    assert "ins_mode_knob" not in [action["target"] for action in response.actions]
 
 
 def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails(
@@ -10160,6 +10406,8 @@ def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails
     assert repaired.metadata["s10_left_engine_completion_guardrail_applied"] is True
     assert repaired.metadata["diagnosis"]["step_id"] == "S12"
     assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
+    assert repaired.metadata["final_action_plan"]["source"] == "s10_left_engine_completion_guardrail"
     assert repaired.metadata["fallback_overlay_used"] is False
     assert repaired.metadata["s10_left_engine_completion_overlay_reason"] == "no_verifiable_evidence_ref"
     assert repaired.metadata["final_overlay_targets"] == []
@@ -10919,7 +11167,8 @@ def test_live_loop_clears_conflicting_overlay_before_fallback_rebuilds_current_s
     assert response.metadata["fallback_overlay_used"] is True
     assert response.actions
     assert response.actions[0]["target"] == "eng_crank_switch"
-    assert response.message == "S10 is not complete yet. Please operate eng_crank_switch first, then satisfy: vars.engine_crank_left_complete==true."
+    assert response.message == "S10 is not complete yet. Please operate eng_crank_switch first and confirm that step is complete."
+    assert "vars.engine_crank_left_complete" not in response.message
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "eng_crank_switch"
 
 def test_build_vision_selection_uses_observation_time_for_audit_anchor(tmp_path: Path) -> None:

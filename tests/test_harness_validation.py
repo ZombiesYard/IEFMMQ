@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from core.harness_validation import (
+    validate_final_evidence_consistency,
     HarnessActionHintFactRule,
     HarnessCompletionAdvance,
     HarnessTextGuidanceRule,
     plan_harness_action,
 )
+from core.evidence_packet import build_evidence_packet
 from core.step_harness import RecoveryActionPolicy, SignalQualityRequirement, StepHarnessSpec
 
 
@@ -34,6 +36,184 @@ def _spec(
         declared_ui_targets=targets,
         overlay_enabled=overlay_enabled,
     )
+
+
+def test_final_evidence_consistency_rejects_missing_condition_satisfied_by_telemetry() -> None:
+    context = {
+        "vars": {"comm1_freq_134_000": True},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S09",
+            "overlay_step_id": "S09",
+            "missing_conditions": ["vars.comm1_freq_134_000==true"],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S09",
+        accepted_overlay_targets=["ufc_comm1_channel_selector_pull"],
+        accepted_missing_conditions=["vars.comm1_freq_134_000==true"],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert result.validator_rejected is True
+    assert result.repair_applied is True
+    assert result.rejected_missing_conditions == ("vars.comm1_freq_134_000==true",)
+    assert "missing_condition_satisfied_by_latest_telemetry:vars.comm1_freq_134_000==true" in result.reasons
+
+
+def test_final_evidence_consistency_rejects_numeric_missing_condition_satisfied_by_telemetry() -> None:
+    context = {
+        "vars": {"rpm_r": 26, "ext_refuel_probe_value": 1200},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S05",
+            "overlay_step_id": "S05",
+            "missing_conditions": [
+                "vars.rpm_r>=25",
+                "vars.ext_refuel_probe_value in [0,5000]",
+            ],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S05",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[
+            "vars.rpm_r>=25",
+            "vars.ext_refuel_probe_value in [0,5000]",
+        ],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert result.rejected_missing_conditions == (
+        "vars.rpm_r>=25",
+        "vars.ext_refuel_probe_value in [0,5000]",
+    )
+
+
+def test_final_evidence_consistency_does_not_use_stale_last_seen_true_when_latest_false() -> None:
+    context = {
+        "vars": {"apu_start_support_complete": False},
+        "telemetry_window_frames": [
+            {"seq": 1, "t_wall": 1.0, "vars": {"apu_start_support_complete": True}},
+            {"seq": 2, "t_wall": 2.0, "vars": {"apu_start_support_complete": False}},
+        ],
+        "deterministic_step_hint": {
+            "inferred_step_id": "S03",
+            "overlay_step_id": "S03",
+            "missing_conditions": ["vars.apu_start_support_complete==true"],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S03",
+        accepted_overlay_targets=["apu_switch"],
+        accepted_missing_conditions=["vars.apu_start_support_complete==true"],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is True
+    assert result.rejected_missing_conditions == ()
+
+
+def test_final_evidence_consistency_rejects_already_satisfied_completion_gate() -> None:
+    context = {
+        "vars": {},
+        "gates": {"S03.completion": {"status": "satisfied", "step_id": "S03", "gate_type": "completion"}},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S03",
+            "overlay_step_id": "S03",
+            "missing_conditions": [],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S03",
+        accepted_overlay_targets=["apu_switch"],
+        accepted_missing_conditions=[],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert result.rejected_missing_conditions == ()
+    assert "completion_gate_already_satisfied:S03" in result.reasons
+
+
+def test_final_evidence_consistency_rejects_allowed_completion_gate_but_ignores_no_rules() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {},
+            "gates": {
+                "S03.completion": {
+                    "status": "allowed",
+                    "allowed": True,
+                    "step_id": "S03",
+                    "gate_type": "completion",
+                    "reason_code": "ok",
+                },
+                "S04.completion": {
+                    "status": "allowed",
+                    "allowed": True,
+                    "step_id": "S04",
+                    "gate_type": "completion",
+                    "reason_code": "no_rules",
+                },
+            },
+        }
+    )
+
+    rejected = validate_final_evidence_consistency(
+        accepted_step_id="S03",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[],
+        latest_vars={},
+        evidence_packet=packet,
+    )
+    accepted = validate_final_evidence_consistency(
+        accepted_step_id="S04",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[],
+        latest_vars={},
+        evidence_packet=packet,
+    )
+
+    assert rejected.accepted is False
+    assert "completion_gate_already_satisfied:S03" in rejected.reasons
+    assert accepted.accepted is True
+
+
+def test_final_evidence_consistency_rejects_late_allowed_completion_gate_after_detail_window() -> None:
+    gates = {
+        f"S{idx:02d}.completion": {
+            "status": "allowed",
+            "allowed": True,
+            "step_id": f"S{idx:02d}",
+            "gate_type": "completion",
+            "reason_code": "ok",
+        }
+        for idx in range(1, 25)
+    }
+    packet = build_evidence_packet({"vars": {}, "gates": gates})
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S18",
+        accepted_overlay_targets=[],
+        accepted_missing_conditions=[],
+        latest_vars={},
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert "completion_gate_already_satisfied:S18" in result.reasons
 
 
 def test_plan_harness_action_repairs_invalid_target_to_step_spec_target() -> None:

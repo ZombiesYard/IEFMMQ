@@ -831,7 +831,7 @@ def _build_gate_evidence(context: Mapping[str, Any]) -> GateEvidence:
         blocked_gate_ids=tuple(item["gate_id"] for item in blocked),
         satisfied_gate_ids=tuple(item["gate_id"] for item in satisfied),
         blocked_gates=tuple(blocked[:16]),
-        satisfied_gates=tuple(satisfied[:16]),
+        satisfied_gates=tuple(satisfied),
     )
 
 
