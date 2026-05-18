@@ -4981,6 +4981,17 @@ def test_build_procedural_action_hint_for_s09_advances_through_ufc_entry_sequenc
         inferred_step_id="S09",
         vars_selected={
             "comm1_freq_134_000": False,
+            "ufc_comm1_pull_pressed": True,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "    .13",
+        },
+        allowed_targets=allowed,
+    )["target"] == "ufc_key_4"
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": False,
             "ufc_scratchpad_string_1_display": "1-",
             "ufc_scratchpad_string_2_display": "-",
             "ufc_scratchpad_number_display": "    .13",
@@ -5007,6 +5018,16 @@ def test_build_procedural_action_hint_for_s09_advances_through_ufc_entry_sequenc
         },
         allowed_targets=allowed,
     )["target"] == "ufc_ent_button"
+    assert _build_procedural_action_hint(
+        inferred_step_id="S09",
+        vars_selected={
+            "comm1_freq_134_000": True,
+            "ufc_scratchpad_string_1_display": " 1",
+            "ufc_scratchpad_string_2_display": "--",
+            "ufc_scratchpad_number_display": " 134.000",
+        },
+        allowed_targets=allowed,
+    ) is None
 
 
 def test_build_procedural_action_hint_for_s14_prefers_obogs_control_before_flow() -> None:
@@ -7756,6 +7777,43 @@ def test_live_loop_does_not_complete_s08_navigation_from_expired_visual_fact(tmp
     assert active == ["S08"]
 
 
+def test_live_inference_advances_sticky_s09_when_comm1_is_complete(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_sticky_s09_complete.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s09-sticky-complete",
+        lang="zh",
+    )
+    try:
+        loop._sticky_inference_step_id = "S09"
+        loop._sticky_inference_missing_conditions = ("vars.comm1_freq_134_000==true",)
+        loop._last_inferred_step_id = "S09"
+
+        stabilized = loop._stabilize_live_inference(
+            StepInferenceResult("S08", ("vision_facts.fcs_page_visible==seen",)),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "left_ddi_on": True,
+                "right_ddi_on": True,
+                "mpcd_on": True,
+                "hud_on": True,
+                "right_engine_nominal_start_params": True,
+                "comm1_freq_134_000": True,
+                "engine_crank_left_complete": False,
+            },
+            recent_ui_targets=[],
+        )
+    finally:
+        loop.close()
+
+    assert stabilized.inferred_step_id == "S10"
+    assert "vars.comm1_freq_134_000==true" not in stabilized.missing_conditions
+
+
 def test_live_loop_ignores_stale_s19_visual_facts_for_s21(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s21_ignores_stale_s19_vlm.jsonl"
     frame = _bios_frame(1, 10.0, apu_switch=1)
@@ -9691,6 +9749,176 @@ def _validate_compact_live_help_response(
         return result.response
     finally:
         loop.close()
+
+
+def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
+    request = TutorRequest(
+        request_id="issue-294-s09-complete",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": True,
+                "comm1_freq_value": 13400,
+                "ufc_scratchpad_number_display": " 134.000",
+                "ufc_scratchpad_string_1_display": " 1",
+                "ufc_scratchpad_string_2_display": "--",
+            },
+            "gates": {
+                "S09.completion": {"status": "allowed"},
+                "S10.completion": {
+                    "status": "blocked",
+                    "reason": "Left engine start must have begun.",
+                    "reason_code": "s10_requires_engine_crank_left_complete",
+                },
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_ui_targets": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button",
+                ],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["eng_crank_switch"],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="请继续设置 COMM1。",
+        actions=[],
+        explanations=["请继续设置 COMM1。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S09", "error_category": "CO"},
+                "next": {"step_id": "S09"},
+                "overlay": {
+                    "targets": ["ufc_comm1_channel_selector_pull"],
+                    "evidence": [
+                        {
+                            "target": "ufc_comm1_channel_selector_pull",
+                            "type": "var",
+                            "ref": "VARS.comm1_freq_134_000",
+                            "quote": "COMM1 is already tuned.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["请继续设置 COMM1。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert [action["target"] for action in repaired.actions] == ["eng_crank_switch"]
+    assert repaired.metadata["diagnosis"]["step_id"] == "S10"
+    assert repaired.metadata["next"]["step_id"] == "S10"
+    assert repaired.metadata["s09_comm1_completion_guardrail_applied"] is True
+    assert repaired.metadata["final_overlay_targets"] == ["eng_crank_switch"]
+    assert "134.000" in repaired.message
+    assert "S10" in repaired.message
+
+
+def test_live_help_fixture_294_s09_uses_stage_action_hint_for_next_digit() -> None:
+    request = TutorRequest(
+        request_id="issue-294-s09-next-key",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": False,
+                "ufc_comm1_pull_pressed": True,
+                "ufc_scratchpad_number_display": "    .13",
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+            },
+            "gates": {
+                "S09.completion": {
+                    "status": "blocked",
+                    "reason": "COMM1 preset 1 must be programmed to 134.000 MHz.",
+                    "reason_code": "s09_requires_comm1_freq_134_000",
+                }
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_ui_targets": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button",
+                ],
+                "action_hint": {
+                    "target": "ufc_key_4",
+                    "reason": "COMM1 preset entry shows 13; press 4 next.",
+                },
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="请拉出 COMM1。",
+        actions=[],
+        explanations=["请拉出 COMM1。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S09", "error_category": "OM"},
+                "next": {"step_id": "S09"},
+                "overlay": {
+                    "targets": ["ufc_comm1_channel_selector_pull"],
+                    "evidence": [
+                        {
+                            "target": "ufc_comm1_channel_selector_pull",
+                            "type": "var",
+                            "ref": "VARS.comm1_freq_134_000",
+                            "quote": "COMM1 is not tuned.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["请拉出 COMM1。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert [action["target"] for action in repaired.actions] == ["ufc_key_4"]
+    assert repaired.metadata["final_action_plan"]["source"] == "validator_action_hint"
+    assert "action_hint_target_mismatch:ufc_comm1_channel_selector_pull" in repaired.metadata[
+        "harness_validation_reasons"
+    ]
+    assert repaired.metadata["help_response"]["overlay"]["targets"] == ["ufc_key_4"]
+    assert repaired.message == "COMM1 preset entry shows 13; press 4 next."
 
 
 def test_live_help_fixture_299_s12_aligns_pb19_message_and_overlay() -> None:

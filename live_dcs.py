@@ -2325,6 +2325,34 @@ def _normalize_ufc_scratchpad_text(vars_selected: Mapping[str, Any]) -> str:
     return "".join(parts).replace("。", ".").upper()
 
 
+def _s09_comm1_frequency_complete(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("comm1_freq_134_000") is True:
+        return True
+    value = _coerce_int(vars_selected.get("comm1_freq_value"))
+    return value == 13400
+
+
+def _missing_conditions_satisfied_by_vars(
+    missing_conditions: Sequence[str],
+    vars_selected: Mapping[str, Any],
+) -> bool:
+    checked = False
+    for condition in missing_conditions:
+        if not isinstance(condition, str) or not condition:
+            continue
+        matched = _MISSING_CONDITION_VAR_RE.search(condition)
+        if matched is None:
+            return False
+        var_name = matched.group(1)
+        if "==true" in condition:
+            checked = True
+            if vars_selected.get(var_name) is not True:
+                return False
+        else:
+            return False
+    return checked
+
+
 def _vision_summary_seen_or_fresh(
     summary: Mapping[str, Any] | None,
     fact_id: str,
@@ -2754,7 +2782,7 @@ def _build_procedural_action_hint(
 
     if inferred_step_id != "S09":
         return None
-    if vars_selected.get("comm1_freq_134_000") is True:
+    if _s09_comm1_frequency_complete(vars_selected):
         return None
 
     allowed = {item for item in allowed_targets if isinstance(item, str) and item}
@@ -2770,8 +2798,6 @@ def _build_procedural_action_hint(
             return None
         return {"target": target, "reason": reason}
 
-    if vars_selected.get("ufc_comm1_pull_pressed") is True and "305.000" not in payload:
-        return _hint("ufc_key_1", "COMM1 preset entry is already open on the UFC scratchpad; start typing 134.000 with key 1.")
     if payload.endswith("134.000"):
         return _hint("ufc_ent_button", "The UFC scratchpad already shows 134.000 for COMM1 preset 1; press ENT to commit the frequency.")
     if payload.endswith("13.400") or payload.endswith("1.340") or payload.endswith(".134") or payload.endswith("1.34"):
@@ -2782,6 +2808,8 @@ def _build_procedural_action_hint(
         return _hint("ufc_key_3", "COMM1 preset entry shows 1; press 3 next.")
     if payload.endswith("305.000") or payload.endswith("305000"):
         return _hint("ufc_key_1", "COMM1 preset 1 is open on the scratchpad with the old 305.000 value; press 1 to begin entering 134.000.")
+    if vars_selected.get("ufc_comm1_pull_pressed") is True and "305.000" not in payload:
+        return _hint("ufc_key_1", "COMM1 preset entry is already open on the UFC scratchpad; start typing 134.000 with key 1.")
     if vars_selected.get("ufc_comm1_pull_pressed") is True:
         return _hint("ufc_key_1", "COMM1 preset entry has been opened on the UFC scratchpad; press 1 to begin entering 134.000.")
     return _hint("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector to open preset 1 in the scratchpad before entering 134.000.")
@@ -3894,7 +3922,11 @@ class LiveDcsTutorLoop:
             pack_path=self.pack_path,
             vision_facts=vision_fact_context.get("vision_facts"),
         )
-        inference = self._stabilize_live_inference(inference, vars_selected)
+        inference = self._stabilize_live_inference(
+            inference,
+            vars_selected,
+            recent_ui_targets=recent_buttons,
+        )
 
         new_step_id = inference.inferred_step_id
         if new_step_id != self._last_inferred_step_id:
@@ -4177,6 +4209,8 @@ class LiveDcsTutorLoop:
         self,
         inference: StepInferenceResult,
         vars_selected: Mapping[str, Any],
+        *,
+        recent_ui_targets: Sequence[str] | None = None,
     ) -> StepInferenceResult:
         if self._should_reset_sticky_inference(vars_selected):
             self._clear_live_progress_state()
@@ -4193,6 +4227,28 @@ class LiveDcsTutorLoop:
             self._sticky_inference_step_id = current_step_id
             self._sticky_inference_missing_conditions = tuple(inference.missing_conditions)
             return inference
+        if (
+            isinstance(sticky_step_id, str)
+            and sticky_step_id == "S09"
+            and _s09_comm1_frequency_complete(vars_selected)
+            and _missing_conditions_satisfied_by_vars(self._sticky_inference_missing_conditions, vars_selected)
+        ):
+            next_idx = sticky_idx + 1
+            if 0 <= next_idx < len(self.pack_steps):
+                advanced = infer_step_id(
+                    self.pack_steps[next_idx:],
+                    vars_selected,
+                    recent_ui_targets or (),
+                    precondition_gates=self.precondition_gates,
+                    completion_gates=self.completion_gates,
+                    scenario_profile=self.scenario_profile,
+                    pack_path=self.pack_path,
+                    vision_facts=None,
+                )
+                if isinstance(advanced.inferred_step_id, str) and advanced.inferred_step_id:
+                    self._sticky_inference_step_id = advanced.inferred_step_id
+                    self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                    return advanced
         return StepInferenceResult(
             inferred_step_id=sticky_step_id,
             missing_conditions=self._sticky_inference_missing_conditions,
@@ -5310,6 +5366,8 @@ class LiveDcsTutorLoop:
         overlay_step_id = hint.get("overlay_step_id")
         if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
             return False, "refuel_probe_motion_wait_already_rewritten"
+        if response.metadata.get("s09_comm1_completion_guardrail_applied") is True:
+            return False, "s09_comm1_completion_already_rewritten"
         if response.metadata.get("completion_conflict_rewritten") is True:
             return False, "completion_conflict_already_rewritten"
         response_mapping_meta = response.metadata.get("response_mapping")
@@ -5482,7 +5540,7 @@ class LiveDcsTutorLoop:
                     evidence_refs = [bit_root_ref]
         if inferred_step_id == "S18" and not s18_bit_root_to_fcsmc_allowed:
             return False, "legacy_s18_action_hint_guardrail"
-        action_hint_step_ids = ["S08", "S17", "S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"]
+        action_hint_step_ids = ["S08", "S09", "S17", "S20", "S21", "S22", "S23", "S24", "S25", "S26", "S27"]
         if inferred_step_id == "S12" and _s12_fast_align_action_hint_allowed(
             context=context,
             hint=hint,
@@ -5968,6 +6026,26 @@ class LiveDcsTutorLoop:
                         "You are on S03. Left-click the APU switch to ON, then wait for "
                         "the green APU READY light."
                     )
+        elif inferred_step_id == "S09" and _s09_comm1_frequency_complete(vars_map):
+            reason = "s09_comm1_frequency_complete"
+            if self.lang == "zh":
+                rewritten = "COMM1 预置 1 已经是 134.000 MHz，S09 已完成。下一步进入 S10，启动左发。"
+            else:
+                rewritten = "COMM1 preset 1 is already set to 134.000 MHz, so S09 is complete. Continue to S10 by starting the left engine."
+            response.actions = []
+            response.metadata["diagnosis"] = {"step_id": "S10", "error_category": "OM"}
+            response.metadata["next"] = {"step_id": "S10"}
+            _set_text_only_help_response("S10", rewritten)
+            fallback_used, fallback_reason = self._apply_safe_fallback_overlay(
+                response,
+                request,
+                override_inferred_step_id="S10",
+                override_overlay_step_id="S10",
+                ignore_request_allowlist=True,
+            )
+            response.metadata["s09_comm1_completion_guardrail_applied"] = True
+            response.metadata["s09_comm1_completion_s10_overlay_applied"] = fallback_used
+            response.metadata["s09_comm1_completion_s10_overlay_reason"] = fallback_reason
         elif inferred_step_id == "S09" and "vars.comm1_freq_134_000==true" in missing_set:
             reason = "s09_comm1_frequency_guidance"
             if self.lang == "zh":
