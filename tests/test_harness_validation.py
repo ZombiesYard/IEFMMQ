@@ -744,7 +744,7 @@ def test_plan_harness_action_returns_text_only_when_probe_is_already_moving() ->
     cases = [
         (
             "S20",
-            {"probe_switch_value": 0, "ext_refuel_probe_value": 12000},
+            {"probe_switch_value": 2, "ext_refuel_probe_value": 12000},
             [
                 {"seq": 1, "t_wall": 1.0, "vars": {"ext_refuel_probe_value": 8000}},
                 {"seq": 2, "t_wall": 2.0, "vars": {"ext_refuel_probe_value": 12000}},

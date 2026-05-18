@@ -6829,6 +6829,197 @@ def test_live_loop_stabilizes_inference_without_power_reset(tmp_path: Path) -> N
     assert reset.inferred_step_id == "S01"
 
 
+def test_live_inference_latches_refuel_probe_cycle_after_observed_s20_completion(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_refuel_probe_latch.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-refuel-probe-latch",
+    )
+    try:
+        extended = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S21",
+                missing_conditions=("vars.ext_refuel_probe_value in [0,5000]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": True,
+                "probe_retracted": False,
+                "ext_refuel_probe_value": 65535,
+                "launch_bar_switch_value": 0,
+            },
+        )
+        retracted = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S20",
+                missing_conditions=("vars.ext_refuel_probe_value in [60000,65535]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": False,
+                "probe_retracted": True,
+                "ext_refuel_probe_value": 0,
+                "launch_bar_switch_value": 0,
+            },
+        )
+    finally:
+        loop.close()
+
+    assert extended.inferred_step_id == "S21"
+    assert retracted.inferred_step_id == "S22"
+    assert retracted.inferred_step_id != "S20"
+
+
+def test_live_inference_does_not_skip_s20_from_initial_retracted_probe(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_refuel_probe_initial_retracted.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-refuel-probe-initial",
+    )
+    try:
+        result = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S20",
+                missing_conditions=("vars.ext_refuel_probe_value in [60000,65535]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": False,
+                "probe_retracted": True,
+                "ext_refuel_probe_value": 0,
+                "launch_bar_switch_value": 0,
+            },
+        )
+    finally:
+        loop.close()
+
+    assert result.inferred_step_id == "S20"
+    assert result.missing_conditions == ("vars.ext_refuel_probe_value in [60000,65535]",)
+
+
+def test_live_inference_ignores_probe_motion_seen_before_s20(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_refuel_probe_early_motion.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-refuel-probe-early",
+    )
+    try:
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S19",
+                missing_conditions=("vision_facts.fcsmc_final_go_result_visible==seen",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": True,
+                "probe_retracted": False,
+                "ext_refuel_probe_value": 65535,
+            },
+        )
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S19",
+                missing_conditions=("vision_facts.fcsmc_final_go_result_visible==seen",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": False,
+                "probe_retracted": True,
+                "ext_refuel_probe_value": 0,
+            },
+        )
+        result = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S20",
+                missing_conditions=("vars.ext_refuel_probe_value in [60000,65535]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": False,
+                "probe_retracted": True,
+                "ext_refuel_probe_value": 0,
+            },
+        )
+    finally:
+        loop.close()
+
+    assert result.inferred_step_id == "S20"
+    assert loop._refuel_probe_s20_latched_complete is False
+    assert loop._refuel_probe_s21_latched_complete is False
+
+
+def test_live_inference_requires_probe_to_remain_retracted_for_s21_latch(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_refuel_probe_reextended.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-refuel-probe-reextended",
+    )
+    try:
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S21",
+                missing_conditions=("vars.ext_refuel_probe_value in [0,5000]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": True,
+                "probe_retracted": False,
+                "ext_refuel_probe_value": 65535,
+            },
+        )
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S20",
+                missing_conditions=("vars.ext_refuel_probe_value in [60000,65535]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": False,
+                "probe_retracted": True,
+                "ext_refuel_probe_value": 0,
+            },
+        )
+        reextended = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S20",
+                missing_conditions=("vars.ext_refuel_probe_value in [60000,65535]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "probe_extended": True,
+                "probe_retracted": False,
+                "ext_refuel_probe_value": 65535,
+            },
+        )
+    finally:
+        loop.close()
+
+    assert reextended.inferred_step_id == "S21"
+    assert loop._refuel_probe_s20_latched_complete is True
+    assert loop._refuel_probe_s21_latched_complete is False
+
+
 def test_live_dcs_cli_parses_raw_bios_source_args() -> None:
     parser = build_arg_parser()
     args = parser.parse_args(
@@ -11849,6 +12040,8 @@ def test_ingest_observation_clears_live_progress_state_on_power_loss(tmp_path: P
         loop._sticky_inference_missing_conditions = ("vars.pitot_heat_on==true",)
         loop._last_inferred_step_id = "S19"
         loop._step_interacted_targets = {"launch_bar_switch"}
+        loop._refuel_probe_s20_latched_complete = True
+        loop._refuel_probe_s21_latched_complete = True
 
         loop._ingest_observation(
             Observation(
@@ -11871,6 +12064,8 @@ def test_ingest_observation_clears_live_progress_state_on_power_loss(tmp_path: P
     assert loop._sticky_inference_missing_conditions == ()
     assert loop._last_inferred_step_id is None
     assert loop._step_interacted_targets == set()
+    assert loop._refuel_probe_s20_latched_complete is False
+    assert loop._refuel_probe_s21_latched_complete is False
 
 
 def test_low_confidence_bootstrap_suppresses_early_battery_overlay(tmp_path: Path) -> None:
