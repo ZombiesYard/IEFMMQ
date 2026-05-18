@@ -1318,6 +1318,14 @@ def _coerce_int(value: Any) -> int | None:
     return None
 
 
+def _is_pressed_delta_value(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return False
+
+
 def _json_safe_scalar(value: Any) -> str | int | float | bool | None:
     if value is None or isinstance(value, (str, bool, int)):
         return value
@@ -4181,22 +4189,91 @@ class LiveDcsTutorLoop:
             vision_facts=None,
         )
 
+    def _next_step_id_after(self, step_id: str | None) -> str | None:
+        idx = self._step_order_index.get(step_id) if isinstance(step_id, str) else None
+        if idx is None:
+            return None
+        next_idx = idx + 1
+        if next_idx < 0 or next_idx >= len(self.candidate_steps):
+            return None
+        next_step_id = self.candidate_steps[next_idx]
+        return next_step_id if isinstance(next_step_id, str) and next_step_id else None
+
+    def _s08_page_navigation_recently_completed(self) -> bool:
+        bit_root_fact = self._vision_fact_snapshot.get("bit_root_page_visible")
+        if not (isinstance(bit_root_fact, Mapping) and bit_root_fact.get("state") == "seen"):
+            return False
+        fcs_fact = self._vision_fact_snapshot.get("fcs_page_visible")
+        if isinstance(fcs_fact, Mapping) and fcs_fact.get("state") == "seen":
+            return True
+        supt_fact = self._vision_fact_snapshot.get("supt_page_visible")
+        return (
+            isinstance(supt_fact, Mapping)
+            and supt_fact.get("state") == "seen"
+            and self._recent_target_after_fact("left_mdi_pb15", supt_fact)
+        )
+
+    def _recent_target_after_fact(self, target: str, fact: Mapping[str, Any]) -> bool:
+        observed_at_wall_ms = _coerce_int(fact.get("observed_at_wall_ms"))
+        if observed_at_wall_ms is None:
+            return False
+        recent_deltas = build_prompt_recent_deltas(self.recent_ring.snapshot(), self.mapper, max_items=20)
+        for item in recent_deltas:
+            if item.get("mapped_ui_target") != target:
+                continue
+            t_wall = _coerce_float(item.get("t_wall"))
+            if t_wall is None:
+                continue
+            if int(round(t_wall * 1000.0)) >= observed_at_wall_ms and _is_pressed_delta_value(item.get("to")):
+                return True
+        return False
+
     def _active_step_ids_for_vision_facts(
         self,
         preliminary_inference: StepInferenceResult,
+        *,
+        now_wall_ms: int | None = None,
     ) -> list[str]:
-        out: list[str] = []
+        if isinstance(now_wall_ms, int) and now_wall_ms >= 0:
+            self._vision_fact_snapshot = prune_expired_facts(
+                self._vision_fact_snapshot,
+                now_wall_ms=now_wall_ms,
+            )
         current_step_id = preliminary_inference.inferred_step_id
-        if isinstance(current_step_id, str) and current_step_id:
-            out.append(current_step_id)
-
+        last_step_id = self._last_inferred_step_id
         sticky_missing_has_visual_hold = any(
             isinstance(item, str) and item.startswith("vision_facts.")
             for item in self._sticky_inference_missing_conditions
         )
         sticky_step_id = self._sticky_inference_step_id
         sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
+
+        if (
+            current_step_id == "S08"
+            and last_step_id == "S08"
+            and self._s08_page_navigation_recently_completed()
+        ):
+            current_step_id = self._next_step_id_after("S08")
+
         current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
+        last_idx = self._step_order_index.get(last_step_id) if isinstance(last_step_id, str) else None
+        if current_idx is not None and last_idx is not None and current_idx < last_idx:
+            if (
+                last_step_id == "S19"
+                and not (
+                    sticky_missing_has_visual_hold
+                    and sticky_step_id == last_step_id
+                )
+            ):
+                current_step_id = self._next_step_id_after(last_step_id) or last_step_id
+            else:
+                current_step_id = last_step_id
+            current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
+
+        out: list[str] = []
+        if isinstance(current_step_id, str) and current_step_id:
+            out.append(current_step_id)
+
         if (
             sticky_missing_has_visual_hold
             and isinstance(sticky_step_id, str)
@@ -6727,7 +6804,10 @@ class LiveDcsTutorLoop:
         )
         help_cycle_id = str(uuid4())
         preliminary_inference = self._infer_preliminary_step_for_vision_facts(obs)
-        vision_fact_active_step_ids = self._active_step_ids_for_vision_facts(preliminary_inference)
+        vision_fact_active_step_ids = self._active_step_ids_for_vision_facts(
+            preliminary_inference,
+            now_wall_ms=vision_selection.trigger_wall_ms,
+        )
         vision_fact_context = self._extract_vision_fact_context(
             vision_selection=vision_selection,
             help_cycle_id=help_cycle_id,
