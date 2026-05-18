@@ -64,6 +64,58 @@ def test_final_evidence_consistency_rejects_missing_condition_satisfied_by_telem
     assert "missing_condition_satisfied_by_latest_telemetry:vars.comm1_freq_134_000==true" in result.reasons
 
 
+def test_final_evidence_consistency_does_not_use_stale_last_seen_true_when_latest_false() -> None:
+    context = {
+        "vars": {"apu_start_support_complete": False},
+        "telemetry_window_frames": [
+            {"seq": 1, "t_wall": 1.0, "vars": {"apu_start_support_complete": True}},
+            {"seq": 2, "t_wall": 2.0, "vars": {"apu_start_support_complete": False}},
+        ],
+        "deterministic_step_hint": {
+            "inferred_step_id": "S03",
+            "overlay_step_id": "S03",
+            "missing_conditions": ["vars.apu_start_support_complete==true"],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S03",
+        accepted_overlay_targets=["apu_switch"],
+        accepted_missing_conditions=["vars.apu_start_support_complete==true"],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is True
+    assert result.rejected_missing_conditions == ()
+
+
+def test_final_evidence_consistency_rejects_already_satisfied_completion_gate() -> None:
+    context = {
+        "vars": {},
+        "gates": {"S03.completion": {"status": "satisfied", "step_id": "S03", "gate_type": "completion"}},
+        "deterministic_step_hint": {
+            "inferred_step_id": "S03",
+            "overlay_step_id": "S03",
+            "missing_conditions": [],
+        },
+    }
+    packet = build_evidence_packet(context)
+
+    result = validate_final_evidence_consistency(
+        accepted_step_id="S03",
+        accepted_overlay_targets=["apu_switch"],
+        accepted_missing_conditions=[],
+        latest_vars=context["vars"],
+        evidence_packet=packet,
+    )
+
+    assert result.accepted is False
+    assert result.rejected_missing_conditions == ()
+    assert "completion_gate_already_satisfied:S03" in result.reasons
+
+
 def test_plan_harness_action_repairs_invalid_target_to_step_spec_target() -> None:
     plan = plan_harness_action(
         step_specs={"S20": _spec("S20", ("refuel_probe_switch",))},

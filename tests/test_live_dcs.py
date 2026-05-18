@@ -9880,6 +9880,82 @@ def _validate_compact_live_help_response(
         loop.close()
 
 
+def _load_live_help_fixture(path: str) -> dict[str, Any]:
+    return json.loads((Path(__file__).resolve().parents[1] / path).read_text(encoding="utf-8"))
+
+
+def _fixture_request_and_model_response(fixture: dict[str, Any]) -> tuple[TutorRequest, TutorResponse]:
+    request_payload = fixture["cycle"]["tutor_request"]
+    context = dict(request_payload.get("context", {}))
+    observations = fixture.get("context", {}).get("observations", [])
+    if observations and isinstance(observations[0], dict):
+        payload = observations[0].get("payload")
+        if isinstance(payload, dict) and isinstance(payload.get("vars"), dict):
+            context.setdefault("vars", payload["vars"])
+    request = TutorRequest(
+        request_id=request_payload["request_id"],
+        message=request_payload.get("message"),
+        observation_ref=request_payload.get("observation_ref"),
+        context=context,
+        metadata=dict(request_payload.get("metadata", {})),
+    )
+    help_response = fixture["model_io"]["help_response"]
+    explanations = [item for item in help_response.get("explanations", []) if isinstance(item, str)]
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message=explanations[0] if explanations else None,
+        actions=[],
+        explanations=explanations,
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": help_response,
+        },
+    )
+    return request, response
+
+
+def test_live_help_fixture_311_replays_real_s09_comm1_complete_fixture() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/168fc73d-f98c-498e-a35c-fef91b06ee2e.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S10"
+    assert repaired.metadata["next"]["step_id"] == "S10"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.comm1_freq_134_000==true"]
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S10"
+    assert "ufc_comm1_channel_selector_pull" not in repaired.metadata["final_overlay_targets"]
+    assert "vars.comm1_freq_134_000==true" not in repaired.message
+
+
+def test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/c3c775ce-7a4d-4e7f-a841-3a022528138e.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] != "S10"
+    assert repaired.metadata["next"]["step_id"] != "S10"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
+    assert repaired.metadata["final_action_plan"]["source"] in {
+        "final_evidence_consistency_validator",
+        "s10_left_engine_completion_guardrail",
+    }
+    assert "eng_crank_switch" not in repaired.metadata["final_overlay_targets"]
+    assert "vars.engine_crank_left_complete==true" not in repaired.message
+
+
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
     request = TutorRequest(
         request_id="issue-294-s09-complete",
@@ -9959,6 +10035,7 @@ def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
     assert repaired.metadata["rejected_missing_conditions"] == ["vars.comm1_freq_134_000==true"]
     assert repaired.metadata["s09_comm1_completion_guardrail_applied"] is True
     assert repaired.metadata["final_overlay_targets"] == ["eng_crank_switch"]
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
     assert "vars.comm1_freq_134_000==true" not in repaired.message
     assert "134.000" in repaired.message
     assert "S10" in repaired.message
@@ -10169,6 +10246,7 @@ def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails
     assert repaired.metadata["diagnosis"]["step_id"] == "S12"
     assert repaired.metadata["next"]["step_id"] == "S12"
     assert repaired.metadata["rejected_missing_conditions"] == ["vars.engine_crank_left_complete==true"]
+    assert repaired.metadata["final_action_plan"]["source"] == "s10_left_engine_completion_guardrail"
     assert repaired.metadata["fallback_overlay_used"] is False
     assert repaired.metadata["s10_left_engine_completion_overlay_reason"] == "no_verifiable_evidence_ref"
     assert repaired.metadata["final_overlay_targets"] == []

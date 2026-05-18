@@ -5423,6 +5423,8 @@ class LiveDcsTutorLoop:
             return False, "s09_comm1_completion_already_rewritten"
         if response.metadata.get("s10_left_engine_completion_guardrail_applied") is True:
             return False, "s10_left_engine_completion_already_rewritten"
+        if response.metadata.get("final_evidence_consistency_repair_applied") is True:
+            return False, "final_evidence_consistency_already_rewritten"
         if response.metadata.get("completion_conflict_rewritten") is True:
             return False, "completion_conflict_already_rewritten"
         response_mapping_meta = response.metadata.get("response_mapping")
@@ -6001,8 +6003,6 @@ class LiveDcsTutorLoop:
         accepted_step_id: str | None,
         accepted_missing_conditions: Sequence[str],
     ) -> bool:
-        if not accepted_missing_conditions:
-            return False
         context = request.context if isinstance(request.context, Mapping) else {}
         vars_selected = context.get("vars")
         vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
@@ -6043,6 +6043,186 @@ class LiveDcsTutorLoop:
         response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
         return True
 
+    def _deterministic_missing_conditions_from_context(self, context: Mapping[str, Any]) -> list[str]:
+        hint = context.get("deterministic_step_hint")
+        if isinstance(hint, Mapping):
+            missing_conditions = hint.get("missing_conditions")
+            if isinstance(missing_conditions, (list, tuple)):
+                out = [item for item in missing_conditions if isinstance(item, str) and item]
+                if out:
+                    return out
+        state_harness = context.get("state_harness")
+        if isinstance(state_harness, Mapping):
+            deterministic = state_harness.get("deterministic_candidate")
+            if isinstance(deterministic, Mapping):
+                missing_conditions = deterministic.get("missing_conditions")
+                if isinstance(missing_conditions, (list, tuple)):
+                    return [item for item in missing_conditions if isinstance(item, str) and item]
+        return []
+
+    def _rewrite_final_evidence_consistency_conflict_response(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+        *,
+        rejected_step_id: str,
+        rejected_missing_conditions: Sequence[str],
+    ) -> tuple[bool, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        recent_actions = context.get("recent_actions")
+        recent_buttons = (
+            [
+                item for item in recent_actions.get("recent_buttons", [])
+                if isinstance(item, str) and item
+            ]
+            if isinstance(recent_actions, Mapping)
+            else []
+        )
+        advanced = self._infer_after_completed_step(
+            rejected_step_id,
+            vars_map,
+            recent_ui_targets=recent_buttons,
+            vision_facts=context.get("vision_facts"),
+        )
+        next_step_id = (
+            advanced.inferred_step_id
+            if advanced is not None and isinstance(advanced.inferred_step_id, str)
+            else self._next_step_id_after(rejected_step_id)
+        )
+        if not isinstance(next_step_id, str) or not next_step_id:
+            next_step_id = rejected_step_id
+
+        if self.lang == "zh":
+            rewritten = f"{rejected_step_id} 的最新证据已经满足。现在进入 {next_step_id}。"
+        else:
+            rewritten = f"The latest evidence satisfies {rejected_step_id}. Continue to {next_step_id}."
+
+        original_actions = copy.deepcopy([dict(action) for action in response.actions if isinstance(action, Mapping)])
+        if original_actions:
+            response.metadata["final_evidence_consistency_original_actions"] = original_actions
+            rejected_targets = [
+                action.get("target")
+                for action in original_actions
+                if isinstance(action.get("target"), str)
+            ]
+            if rejected_targets:
+                response.metadata["rejected_model_targets"] = _dedupe_strings(rejected_targets)
+                response.metadata["rejected_model_target"] = response.metadata["rejected_model_targets"][0]
+
+        response.actions = []
+        response.message = rewritten
+        response.explanations = [rewritten]
+        response.metadata["diagnosis"] = {"step_id": next_step_id, "error_category": "OM"}
+        response.metadata["next"] = {"step_id": next_step_id}
+        response.metadata["final_action_plan_source"] = "final_evidence_consistency_validator"
+        response.metadata["rejected_model_step_id"] = rejected_step_id
+        response.metadata["rejected_missing_conditions"] = [
+            item for item in rejected_missing_conditions if isinstance(item, str) and item
+        ]
+
+        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
+            request,
+            override_inferred_step_id=next_step_id,
+            override_overlay_step_id=next_step_id,
+            ignore_request_allowlist=True,
+        )
+        fallback_used = False
+        if isinstance(fallback_help_obj, Mapping):
+            planned_help_obj = copy.deepcopy(dict(fallback_help_obj))
+            planned_help_obj["diagnosis"] = {"step_id": next_step_id, "error_category": "OM"}
+            planned_help_obj["next"] = {"step_id": next_step_id}
+            planned_help_obj["explanations"] = [rewritten]
+            mapped = map_help_response_to_tutor_response(
+                planned_help_obj,
+                request=request,
+                status=response.status,
+                max_overlay_targets=self.max_overlay_targets,
+                ui_map_path=self.ui_map_path,
+                lang=self.lang,
+            )
+            mapped_meta = dict(mapped.metadata)
+            if mapped_meta:
+                response.metadata["final_evidence_consistency_mapping"] = mapped_meta
+            if mapped.actions:
+                response.actions = list(mapped.actions)
+                response.metadata["help_response"] = planned_help_obj
+                fallback_used = True
+            else:
+                fallback_reason = "fallback_mapping_failed"
+                response.metadata["help_response"] = {
+                    "diagnosis": {"step_id": next_step_id, "error_category": "OM"},
+                    "next": {"step_id": next_step_id},
+                    "overlay": {"targets": [], "evidence": []},
+                    "explanations": [rewritten],
+                }
+        else:
+            response.metadata["help_response"] = {
+                "diagnosis": {"step_id": next_step_id, "error_category": "OM"},
+                "next": {"step_id": next_step_id},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": [rewritten],
+            }
+
+        final_targets = _overlay_targets_from_actions(response.actions)
+        response.metadata["harness_action_plan"] = {
+            "step_id": next_step_id,
+            "overlay_step_id": next_step_id,
+            "targets": list(final_targets),
+            "text_only": not bool(final_targets),
+            "source": "final_evidence_consistency_validator",
+        }
+        response.metadata["final_evidence_consistency_repair_applied"] = True
+        response.metadata["final_evidence_consistency_overlay_applied"] = fallback_used
+        response.metadata["final_evidence_consistency_overlay_reason"] = fallback_reason
+        return True, "final_evidence_consistency_validator"
+
+    def _final_response_step_id(self, response: TutorResponse) -> str | None:
+        final_plan = response.metadata.get("harness_action_plan") or response.metadata.get("final_action_plan")
+        if isinstance(final_plan, Mapping):
+            step_id = final_plan.get("step_id")
+            if isinstance(step_id, str) and step_id:
+                return step_id
+        for key in ("next", "diagnosis"):
+            raw = response.metadata.get(key)
+            if isinstance(raw, Mapping):
+                step_id = raw.get("step_id")
+                if isinstance(step_id, str) and step_id:
+                    return step_id
+        return None
+
+    def _enforce_final_evidence_consistency_after_repairs(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> tuple[bool, str]:
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        if not isinstance(hint, Mapping):
+            return False, "missing_deterministic_hint"
+        inferred_step_id = hint.get("inferred_step_id")
+        if not isinstance(inferred_step_id, str) or not inferred_step_id:
+            return False, "missing_inferred_step_id"
+        final_step_id = self._final_response_step_id(response)
+        if final_step_id != inferred_step_id:
+            return False, "final_step_already_advanced"
+        missing_list = self._deterministic_missing_conditions_from_context(context)
+        rejected = self._apply_final_evidence_consistency_metadata(
+            response,
+            request,
+            accepted_step_id=inferred_step_id,
+            accepted_missing_conditions=missing_list,
+        )
+        if not rejected:
+            return False, "final_evidence_consistent"
+        return self._rewrite_final_evidence_consistency_conflict_response(
+            response,
+            request,
+            rejected_step_id=inferred_step_id,
+            rejected_missing_conditions=response.metadata.get("rejected_missing_conditions", []),
+        )
+
     def _rewrite_procedural_guidance_response(
         self,
         response: TutorResponse,
@@ -6053,11 +6233,7 @@ class LiveDcsTutorLoop:
         if not isinstance(hint, Mapping):
             return False, "missing_deterministic_hint"
         inferred_step_id = hint.get("inferred_step_id")
-        missing_conditions = hint.get("missing_conditions")
-        missing_list = [
-            item for item in missing_conditions
-            if isinstance(item, str) and item
-        ] if isinstance(missing_conditions, (list, tuple)) else []
+        missing_list = self._deterministic_missing_conditions_from_context(context)
         missing_set = set(missing_list)
 
         vars_selected = context.get("vars")
@@ -6441,6 +6617,13 @@ class LiveDcsTutorLoop:
                     response.metadata["help_response"] = rewritten_help_response
 
         if not rewritten:
+            if final_consistency_rejected and isinstance(inferred_step_id, str):
+                return self._rewrite_final_evidence_consistency_conflict_response(
+                    response,
+                    request,
+                    rejected_step_id=inferred_step_id,
+                    rejected_missing_conditions=missing_list,
+                )
             return False, reason
 
         original_message = response.message
@@ -7096,6 +7279,13 @@ class LiveDcsTutorLoop:
         if manual_throttle_rewritten:
             fallback_overlay_used = False
             fallback_overlay_reason = manual_throttle_reason
+        final_consistency_used, final_consistency_reason = self._enforce_final_evidence_consistency_after_repairs(
+            response,
+            request,
+        )
+        if final_consistency_used:
+            fallback_overlay_used = bool(response.actions)
+            fallback_overlay_reason = final_consistency_reason
 
         if mapped_meta:
             mapping_failure_codes = classify_mapping_failure(mapped_meta)

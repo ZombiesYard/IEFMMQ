@@ -89,9 +89,6 @@ def _telemetry_digest_has_true_var(evidence_packet: Any, var_name: str) -> bool:
     stable_true = getattr(digest, "stable_true_vars", ())
     if var_name in set(_strings(stable_true if isinstance(stable_true, (list, tuple, set)) else None)):
         return True
-    last_seen_true = getattr(digest, "last_seen_true", ())
-    if isinstance(last_seen_true, (list, tuple)):
-        return any(isinstance(item, Mapping) and item.get("var") == var_name for item in last_seen_true)
     return False
 
 
@@ -107,6 +104,8 @@ def _predicate_satisfied_by_latest_evidence(
     var_name = matched.group(1)
     if latest_vars.get(var_name) is True:
         return True
+    if latest_vars.get(var_name) is False:
+        return False
     return _telemetry_digest_has_true_var(evidence_packet, var_name)
 
 
@@ -114,8 +113,12 @@ def _completion_gate_satisfied(evidence_packet: Any, step_id: str | None) -> boo
     if not isinstance(step_id, str) or not step_id:
         return False
     gate_evidence = getattr(evidence_packet, "gate_evidence", None)
-    satisfied = getattr(gate_evidence, "satisfied_gate_ids", ())
-    return f"{step_id}.completion" in set(_strings(satisfied if isinstance(satisfied, (list, tuple, set)) else None))
+    for gate in getattr(gate_evidence, "satisfied_gates", ()):
+        if not isinstance(gate, Mapping):
+            continue
+        if gate.get("gate_id") == f"{step_id}.completion" and gate.get("status") == "satisfied":
+            return True
+    return False
 
 
 def validate_final_evidence_consistency(
