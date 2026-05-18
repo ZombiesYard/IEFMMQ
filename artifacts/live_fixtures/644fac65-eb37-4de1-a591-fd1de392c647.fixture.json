@@ -1,0 +1,4083 @@
+{
+  "context": {
+    "evidence_packet_summary": {
+      "blocked_gate_count": 6,
+      "conflicts": [],
+      "recent_action_count": 1,
+      "telemetry_missing_source_count": 4,
+      "telemetry_status": "nominal",
+      "telemetry_window_digest": {
+        "changed_var_count": 1,
+        "contradiction_count": 0,
+        "frame_count": 20,
+        "latest_seq": 9824
+      },
+      "vision_fresh_count": 6,
+      "vision_seen_count": 6,
+      "vision_status": "available"
+    },
+    "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+    "observations": [
+      {
+        "attachments": [],
+        "metadata": {
+          "delta_count": 1,
+          "delta_dropped_count": 0,
+          "from_addr": "192.168.0.105:59431",
+          "raw_delta_count": 1,
+          "seq": 9824
+        },
+        "observation_id": "632353de-03a7-49bd-883d-4c8c17969c2b",
+        "payload": {
+          "delta_summary": {
+            "changed_keys_sample": [
+              "HYD_IND_BRAKE"
+            ],
+            "delta_count": 1,
+            "dropped_stats": {
+              "dropped_by_reason": {},
+              "dropped_total": 0
+            },
+            "raw_delta_count": 1,
+            "recent_key_changes_topk": [
+              {
+                "count": 1,
+                "importance": 1,
+                "key": "HYD_IND_BRAKE",
+                "ui_targets": [],
+                "value": 41565
+              }
+            ],
+            "truncated": false
+          },
+          "recent_ui_targets": [],
+          "seq": 9824,
+          "t_wall": 1779045062.6004815,
+          "vars": {
+            "annunciator_panel_activity": true,
+            "apu_on": false,
+            "apu_ready": false,
+            "apu_start_support_complete": true,
+            "attitude_source_auto": true,
+            "battery_on": true,
+            "bingo_fuel_set": false,
+            "bleed_air_cycle_complete": true,
+            "bleed_air_norm": true,
+            "comm1_channel_numeric": 1,
+            "comm1_freq_134_000": true,
+            "comm1_freq_value": 13400,
+            "comm2_channel_numeric": 1,
+            "comm2_freq_value": 30500,
+            "engine_crank_left": false,
+            "engine_crank_left_complete": true,
+            "engine_crank_right": false,
+            "engine_crank_right_complete": true,
+            "ext_pwr_on": true,
+            "ext_refuel_probe_value": 0,
+            "fcs_bit_switch_up": false,
+            "fcs_reset_complete": true,
+            "fcs_reset_pressed": false,
+            "ff_l": 700,
+            "ff_r": 700,
+            "fire_test_a_active": false,
+            "fire_test_a_complete": true,
+            "fire_test_active": false,
+            "fire_test_b_active": false,
+            "fire_test_b_complete": true,
+            "fire_test_complete": true,
+            "flap_auto": true,
+            "flap_configured": true,
+            "flap_full": false,
+            "flap_half": false,
+            "flap_mode_value": 2,
+            "hook_extended": true,
+            "hook_handle_value": 1,
+            "hook_retracted": false,
+            "hud_on": true,
+            "ins_fast_align_complete": true,
+            "ins_fast_align_pressed": false,
+            "ins_mode": 2,
+            "ins_mode_cv_or_gnd": true,
+            "ins_mode_set": true,
+            "l_gen_on": true,
+            "launch_bar_extended": false,
+            "launch_bar_retracted": true,
+            "launch_bar_switch_value": 0,
+            "left_ddi_on": true,
+            "left_engine_idle_ready": true,
+            "left_engine_nominal_start_params": true,
+            "lights_test_active": false,
+            "lights_test_complete": true,
+            "mpcd_on": true,
+            "noz_l": 76.3103685053788,
+            "noz_r": 76.3103685053788,
+            "obogs_flow_on": true,
+            "obogs_ready": true,
+            "obogs_switch_on": true,
+            "oil_l": 60,
+            "oil_r": 60,
+            "parking_brake_released": false,
+            "pitot_heat_on": false,
+            "power_available": true,
+            "probe_cycle_complete": true,
+            "probe_extended": false,
+            "probe_retracted": true,
+            "probe_switch_value": 1,
+            "r_gen_on": true,
+            "radar_altimeter_bug_set": false,
+            "radar_altimeter_bug_value": 0.0,
+            "radar_mode_opr": true,
+            "radar_on": true,
+            "right_ddi_on": true,
+            "right_engine_nominal_start_params": true,
+            "rpm_l": 64,
+            "rpm_l_gte_25": true,
+            "rpm_l_gte_60": true,
+            "rpm_r": 64,
+            "rpm_r_gte_25": true,
+            "rpm_r_gte_60": true,
+            "standby_altimeter_set": true,
+            "standby_attitude_uncaged": false,
+            "takeoff_trim_pressed": false,
+            "takeoff_trim_set": true,
+            "temp_l": 296,
+            "temp_r": 296,
+            "throttle_l_not_off": true,
+            "throttle_r_idle_complete": true,
+            "throttle_r_not_off": true,
+            "ufc_comm1_pull_pressed": false,
+            "ufc_ent_pressed": false,
+            "ufc_key_0_pressed": false,
+            "ufc_key_1_pressed": false,
+            "ufc_key_3_pressed": false,
+            "ufc_key_4_pressed": false,
+            "ufc_scratchpad_number_display": "        ",
+            "ufc_scratchpad_string_1_display": "  ",
+            "ufc_scratchpad_string_2_display": "  ",
+            "vars_source_missing": [
+              "ins_fast_align_pressed",
+              "ufc_scratchpad_number_display",
+              "ufc_scratchpad_string_1_display",
+              "ufc_scratchpad_string_2_display"
+            ]
+          }
+        },
+        "procedure_hint": null,
+        "source": "dcs_bios_raw",
+        "tags": [],
+        "timestamp": "2026-05-17T19:11:02.600481+00:00",
+        "version": "v1"
+      }
+    ],
+    "telemetry_window_digest": {
+      "changed_var_count": 1,
+      "contradiction_count": 0,
+      "frame_count": 20,
+      "latest_seq": 9824
+    },
+    "vision": {
+      "frame_ids": [
+        "1779045062695_000060"
+      ],
+      "request": null,
+      "response": {
+        "frame_id": "1779045062695_000060",
+        "frame_ids": [
+          "1779045062695_000060"
+        ],
+        "frame_stale": false,
+        "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+        "observation_seq": 9824,
+        "observation_t_wall_ms": 1779045062600,
+        "observation_t_wall_s": 1779045062.6004815,
+        "pre_trigger_frame": null,
+        "selected_frames": [
+          {
+            "capture_wall_ms": 1779045062695,
+            "channel": "composite_panel",
+            "frame_id": "1779045062695_000060",
+            "frame_seq": 60,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779045062695_000060_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779045062695_000060.png",
+            "sync_delta_ms": 92,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          }
+        ],
+        "status": "partial",
+        "sync_delta_ms": 92,
+        "sync_miss_reason": "missing_pre_trigger_frame",
+        "sync_status": "matched_future_fallback",
+        "sync_window_ms": 250,
+        "trigger_frame": {
+          "capture_wall_ms": 1779045062695,
+          "channel": "composite_panel",
+          "frame_id": "1779045062695_000060",
+          "frame_seq": 60,
+          "frame_stale": false,
+          "height": 1440,
+          "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779045062695_000060_vlm.png",
+          "layout_id": "fa18c_composite_panel_v2",
+          "role": "trigger_frame",
+          "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779045062695_000060.png",
+          "sync_delta_ms": 92,
+          "sync_miss_reason": null,
+          "sync_status": "matched_future_fallback",
+          "width": 3440
+        },
+        "trigger_wall_ms": 1779045062603,
+        "vision_used": true
+      },
+      "vision_fact_summary": {
+        "frame_ids": [
+          "1779045062695_000060"
+        ],
+        "fresh_fact_ids": [
+          "fcs_page_visible",
+          "bit_root_page_visible",
+          "hsi_page_visible",
+          "hsi_map_layer_visible",
+          "ins_grnd_alignment_text_visible",
+          "ins_ok_text_visible"
+        ],
+        "not_seen_fact_ids": [
+          "tac_page_visible",
+          "supt_page_visible",
+          "fcs_page_x_marks_visible",
+          "fcsmc_page_visible",
+          "fcsmc_intermediate_result_visible",
+          "fcsmc_in_test_visible",
+          "fcsmc_final_go_result_visible"
+        ],
+        "seen_fact_ids": [
+          "fcs_page_visible",
+          "bit_root_page_visible",
+          "hsi_page_visible",
+          "hsi_map_layer_visible",
+          "ins_grnd_alignment_text_visible",
+          "ins_ok_text_visible"
+        ],
+        "status": "available",
+        "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+        "uncertain_fact_ids": []
+      },
+      "vision_facts": [
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "tac_page_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "supt_page_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "fcs_page_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "fcs_page_x_marks_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "bit_root_page_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "fcsmc_page_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "fcsmc_intermediate_result_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "fcsmc_in_test_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 600000,
+          "expires_at_wall_ms": 1779045662603,
+          "fact_id": "fcsmc_final_go_result_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "not_seen",
+          "sticky": true
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "hsi_page_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "hsi_map_layer_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "ins_grnd_alignment_text_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "seen",
+          "sticky": false
+        },
+        {
+          "evidence_note": "",
+          "expires_after_ms": 2000,
+          "expires_at_wall_ms": 1779045064603,
+          "fact_id": "ins_ok_text_visible",
+          "observed_at_wall_ms": 1779045062603,
+          "source_frame_id": "1779045062695_000060",
+          "state": "seen",
+          "sticky": false
+        }
+      ]
+    },
+    "vision_fact_observations": [
+      {
+        "attachments": [],
+        "metadata": {
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "observation_kind": "vision_fact"
+        },
+        "observation_id": "94cc6830-d10f-48b0-9fd4-1ca53c185941",
+        "payload": {
+          "facts": [
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "tac_page_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "supt_page_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcs_page_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcs_page_x_marks_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "bit_root_page_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcsmc_page_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcsmc_intermediate_result_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "fcsmc_in_test_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 600000,
+              "fact_id": "fcsmc_final_go_result_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "not_seen",
+              "sticky": true
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "hsi_page_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "hsi_map_layer_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "ins_grnd_alignment_text_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "seen",
+              "sticky": false
+            },
+            {
+              "evidence_note": "",
+              "expires_after_ms": 2000,
+              "fact_id": "ins_ok_text_visible",
+              "observed_at_wall_ms": 1779045062603,
+              "result_kind": null,
+              "source_frame_id": "1779045062695_000060",
+              "state": "seen",
+              "sticky": false
+            }
+          ],
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "metadata": {
+            "coerced_source_frame_fact_ids": [],
+            "coerced_source_frame_fact_ids_alias_of": "ignored_legacy_source_frame_fact_ids",
+            "configured_fact_count": 13,
+            "ignored_legacy_source_frame_fact_ids": [],
+            "ignored_model_fact_fields": {},
+            "raw_fact_count": 13,
+            "raw_llm_text": "{\"facts\":[{\"fact_id\":\"tac_page_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"supt_page_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcs_page_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcs_page_x_marks_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"bit_root_page_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_page_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_intermediate_result_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_in_test_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"fcsmc_final_go_result_visible\",\"state\":\"not_seen\",\"evidence_note\":\"\"},{\"fact_id\":\"hsi_page_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"hsi_map_layer_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"ins_grnd_alignment_text_visible\",\"state\":\"seen\",\"evidence_note\":\"\"},{\"fact_id\":\"ins_ok_text_visible\",\"state\":\"seen\",\"evidence_note\":\"\"}]}",
+            "sanitized_fact_count": 13,
+            "skipped_incomplete_mapping_fact_count": 0,
+            "skipped_non_mapping_fact_count": 0,
+            "skipped_unknown_fact_id_count": 0,
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779045062695_000060"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcs_page_x_marks_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+              "uncertain_fact_ids": []
+            }
+          },
+          "observation_id": "94cc6830-d10f-48b0-9fd4-1ca53c185941",
+          "schema_version": "v2",
+          "session_id": "sess-live",
+          "source": "vision_fact_extractor",
+          "summary": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+          "timestamp": "2026-05-17T19:11:09.515912+00:00",
+          "trigger_wall_ms": 1779045062603
+        },
+        "procedure_hint": null,
+        "source": "vision_fact_extractor",
+        "tags": [],
+        "timestamp": "2026-05-17T19:11:09.515912+00:00",
+        "version": "v1"
+      }
+    ]
+  },
+  "cycle": {
+    "events": [
+      {
+        "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "kind": "tutor_request",
+        "lineno": 10258,
+        "metadata": {
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "layout_id": "fa18c_composite_panel_v2",
+          "sync_delta_ms": 92,
+          "vision_fact_extractor_used": true,
+          "vision_fact_status": "available",
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_status": "partial",
+          "vision_used": true
+        },
+        "payload": {
+          "actor": "learner",
+          "context": {
+            "delta_dropped_count": 0,
+            "deterministic_step_hint": {
+              "action_hint": {
+                "target": "right_mdi_pb5"
+              },
+              "gate_blocker_count": 0,
+              "inferred_step_id": "S18",
+              "missing_conditions_count": 1,
+              "observability": "partial",
+              "observability_status": "partial",
+              "overlay_step_id": "S18",
+              "recent_ui_targets": [
+                "takeoff_trim_button"
+              ],
+              "requires_visual_confirmation": true,
+              "scenario_profile": "airfield",
+              "step_ui_targets": [
+                "right_mdi_pb18",
+                "right_mdi_pb5"
+              ]
+            },
+            "evidence_packet_summary": {
+              "blocked_gate_count": 6,
+              "conflicts": [],
+              "recent_action_count": 1,
+              "telemetry_missing_source_count": 4,
+              "telemetry_status": "nominal",
+              "telemetry_window_digest": {
+                "changed_var_count": 1,
+                "contradiction_count": 0,
+                "frame_count": 20,
+                "latest_seq": 9824
+              },
+              "vision_fresh_count": 6,
+              "vision_seen_count": 6,
+              "vision_status": "available"
+            },
+            "grounding_missing": false,
+            "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+            "grounding_reason": null,
+            "rag_topk": [
+              {
+                "chunk_id": "fa18c_startup_master_1",
+                "doc_id": "fa18c_startup_master",
+                "page_or_heading": "Master Step Table",
+                "score": 24.051345417769785,
+                "section": "Master Step Table",
+                "snippet_id": "fa18c_startup_master_1"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_105",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 106,
+                "score": 20.74820609602476,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_105"
+              },
+              {
+                "chunk_id": "fa18c_error_coding_guide_10",
+                "doc_id": "fa18c_error_coding_guide",
+                "page_or_heading": "3. Step Criticality",
+                "score": 20.169931721198378,
+                "section": "3. Step Criticality",
+                "snippet_id": "fa18c_error_coding_guide_10"
+              },
+              {
+                "chunk_id": "fa18c_coldstart_quiz_12",
+                "doc_id": "fa18c_coldstart_quiz",
+                "page_or_heading": "Q12. Sequence Mini-Task 2",
+                "score": 18.21894244493854,
+                "section": "Q12. Sequence Mini-Task 2",
+                "snippet_id": "fa18c_coldstart_quiz_12"
+              },
+              {
+                "chunk_id": "fa18c_fcs_bit_procedure_note_0",
+                "doc_id": "fa18c_fcs_bit_procedure_note",
+                "score": 18.196064173149253,
+                "snippet_id": "fa18c_fcs_bit_procedure_note_0"
+              }
+            ],
+            "scenario_profile": "airfield",
+            "state_harness": {
+              "conflicts": [],
+              "deterministic_candidate": {
+                "missing_conditions": [
+                  "vision_facts.fcsmc_page_visible==seen"
+                ],
+                "overlay_step_id": "S18",
+                "role": "candidate_not_authoritative",
+                "step_id": "S18"
+              },
+              "telemetry_evidence": {
+                "confidence": "medium",
+                "early_vars": {
+                  "battery_on": true,
+                  "fire_test_a_complete": true,
+                  "fire_test_b_complete": true,
+                  "power_available": true
+                },
+                "observation_seq": 9824,
+                "source_status": "nominal",
+                "vars_source_missing_count": 4
+              },
+              "telemetry_window_digest": {
+                "changed_vars": [
+                  {
+                    "first_value": true,
+                    "last_value": false,
+                    "latest_transition_age_s": 0.89,
+                    "transition_count": 1,
+                    "var": "takeoff_trim_pressed"
+                  }
+                ],
+                "contradictions": [],
+                "first_frame_only_values": [],
+                "frame_count": 20,
+                "last_seen_true": [
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "battery_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "fire_test_a_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "fire_test_b_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "fire_test_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "flap_auto"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "hud_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "left_ddi_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 9824,
+                    "var": "mpcd_on"
+                  }
+                ],
+                "latest_seq": 9824,
+                "latest_t_wall": 1779045062.6004815,
+                "stable_false_vars": [
+                  "fcs_bit_switch_up",
+                  "pitot_heat_on"
+                ],
+                "stable_true_vars": [
+                  "battery_on",
+                  "fire_test_a_complete",
+                  "fire_test_b_complete",
+                  "fire_test_complete",
+                  "flap_auto",
+                  "hud_on",
+                  "left_ddi_on",
+                  "mpcd_on",
+                  "power_available",
+                  "right_ddi_on"
+                ],
+                "unknown_or_missing_vars": [
+                  "ins_fast_align_pressed",
+                  "ufc_scratchpad_number_display",
+                  "ufc_scratchpad_string_1_display",
+                  "ufc_scratchpad_string_2_display"
+                ],
+                "window_duration_s": 0.928
+              },
+              "vision_evidence": {
+                "confidence": "high",
+                "fresh_fact_ids": [
+                  "bit_root_page_visible",
+                  "fcs_page_visible",
+                  "hsi_map_layer_visible",
+                  "hsi_page_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "late_display_anchors": [
+                  "bit_root_page_visible",
+                  "fcs_page_visible",
+                  "hsi_map_layer_visible",
+                  "hsi_page_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "fcs_page_x_marks_visible",
+                  "fcsmc_final_go_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_page_visible",
+                  "supt_page_visible",
+                  "tac_page_visible"
+                ],
+                "seen_fact_ids": [
+                  "bit_root_page_visible",
+                  "fcs_page_visible",
+                  "hsi_map_layer_visible",
+                  "hsi_page_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "source_status": "available",
+                "visual_candidate_steps": [
+                  "S08",
+                  "S09",
+                  "S12",
+                  "S13"
+                ]
+              }
+            },
+            "vision": {
+              "frame_id": "1779045062695_000060",
+              "frame_ids": [
+                "1779045062695_000060"
+              ],
+              "frame_stale": false,
+              "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+              "observation_seq": 9824,
+              "observation_t_wall_ms": 1779045062600,
+              "observation_t_wall_s": 1779045062.6004815,
+              "status": "partial",
+              "sync_delta_ms": 92,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_wall_ms": 1779045062603,
+              "vision_used": true
+            },
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779045062695_000060"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcs_page_x_marks_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": [
+              {
+                "fact_id": "tac_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "supt_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcs_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcs_page_x_marks_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "bit_root_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_intermediate_result_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_in_test_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "fcsmc_final_go_result_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "hsi_page_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "hsi_map_layer_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "ins_grnd_alignment_text_visible",
+                "frame_ids": null,
+                "status": null
+              },
+              {
+                "fact_id": "ins_ok_text_visible",
+                "frame_ids": null,
+                "status": null
+              }
+            ]
+          },
+          "intent": "help",
+          "message": "[REDACTED_USER_MESSAGE]",
+          "metadata": {
+            "evidence_packet_summary": {
+              "blocked_gate_count": 6,
+              "conflicts": [],
+              "recent_action_count": 1,
+              "telemetry_missing_source_count": 4,
+              "telemetry_status": "nominal",
+              "telemetry_window_digest": {
+                "changed_var_count": 1,
+                "contradiction_count": 0,
+                "frame_count": 20,
+                "latest_seq": 9824
+              },
+              "vision_fresh_count": 6,
+              "vision_seen_count": 6,
+              "vision_status": "available"
+            },
+            "frame_id": "1779045062695_000060",
+            "fused_missing_conditions": [
+              "vision_facts.fcsmc_page_visible==seen"
+            ],
+            "fused_step_id": "S18",
+            "grounding_cache_hit": false,
+            "grounding_error_type": null,
+            "grounding_missing": false,
+            "grounding_missing_requested": false,
+            "grounding_policy_filtered_out_count": 0,
+            "grounding_policy_id": null,
+            "grounding_policy_version": null,
+            "grounding_reason": null,
+            "grounding_reason_requested": null,
+            "grounding_snippet_ids": [
+              "fa18c_startup_master_1"
+            ],
+            "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+            "layout_id": "fa18c_composite_panel_v2",
+            "prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+            "prompt_tokens_est": 1134,
+            "prompt_trimmed": true,
+            "scenario_profile": "airfield",
+            "source_chunk_refs": [
+              "fa18c_startup_master/fa18c_startup_master_1",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_105",
+              "fa18c_error_coding_guide/fa18c_error_coding_guide_10",
+              "fa18c_coldstart_quiz/fa18c_coldstart_quiz_12",
+              "fa18c_fcs_bit_procedure_note/fa18c_fcs_bit_procedure_note_0"
+            ],
+            "state_harness_conflicts": [],
+            "state_harness_telemetry_status": "nominal",
+            "sync_delta_ms": 92,
+            "vision_fact_seen_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "vision_fact_status": "available",
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779045062695_000060"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcs_page_x_marks_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+              "uncertain_fact_ids": []
+            },
+            "vision_fallback_reason": null,
+            "vision_frame_ids": [
+              "1779045062695_000060"
+            ],
+            "vision_status": "partial",
+            "vision_used": true
+          },
+          "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+          "request_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "timestamp": "2026-05-17T19:11:09.548436+00:00",
+          "version": "v1"
+        },
+        "related_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "vision_refs": [
+          "1779045062695_000060"
+        ]
+      },
+      {
+        "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "kind": "overlay_requested",
+        "lineno": 10259,
+        "metadata": {
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "generation_mode": "model",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 92,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "action": "clear",
+          "attempt_count": 1,
+          "cmd_id": "e4a2e205-effd-4c66-a329-1826b6278e11",
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "generation_mode": "model",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 92,
+          "target": "pnt_234",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "kind": "overlay_requested",
+        "lineno": 10260,
+        "metadata": {
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "generation_mode": "model",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 92,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "action": "highlight",
+          "attempt_count": 1,
+          "cmd_id": "67155107-0c4f-4bbd-abc5-44b8ae03a3d7",
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "generation_mode": "model",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 92,
+          "target": "pnt_96",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "kind": "tutor_response",
+        "lineno": 10261,
+        "metadata": {
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "generation_mode": "model",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 92,
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        },
+        "payload": {
+          "actions": [
+            {
+              "element_id": "pnt_96",
+              "evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "right_mdi_pb18"
+              ],
+              "frame_id": "1779045062695_000060",
+              "fused_missing_conditions": [
+                "vision_facts.fcsmc_page_visible==seen"
+              ],
+              "fused_step_id": "S18",
+              "generation_mode": "model",
+              "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "model",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 92,
+              "target": "right_mdi_pb18",
+              "type": "overlay",
+              "vision_fact_extractor_used": true,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779045062695_000060"
+                ],
+                "fresh_fact_ids": [
+                  "fcs_page_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "tac_page_visible",
+                  "supt_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "fcsmc_page_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_final_go_result_visible"
+                ],
+                "seen_fact_ids": [
+                  "fcs_page_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "status": "available",
+                "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_used": true,
+              "vlm_call_reason": "missing_pre_trigger_frame",
+              "vlm_call_status": "called"
+            }
+          ],
+          "actor": "tutor",
+          "explanations": [
+            "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+            "待视觉确认：当前步骤只有部分可观测证据，请按高亮执行后进行目视确认。"
+          ],
+          "in_reply_to": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "message": "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+          "metadata": {
+            "allowed_evidence_ref_count": 131,
+            "dcs_tutor_text": {
+              "clear_view": false,
+              "cmd_id": "ad311d68-a2cd-4f97-9771-2eecc2759a82",
+              "display_time_s": 12.0,
+              "reason": null,
+              "status": "ok",
+              "text": "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+            },
+            "delta_dropped_count": 0,
+            "deterministic_inference_error": null,
+            "deterministic_step_hint": {
+              "inferred_step_id": "S18",
+              "missing_conditions": [
+                "vision_facts.fcsmc_page_visible==seen"
+              ],
+              "observability": "partial",
+              "observability_status": "partial",
+              "recent_ui_targets": [
+                "takeoff_trim_button"
+              ],
+              "requires_visual_confirmation": true,
+              "step_evidence_requirements": [
+                "delta",
+                "gate",
+                "visual"
+              ],
+              "step_ui_targets": [
+                "right_mdi_pb18",
+                "right_mdi_pb5"
+              ]
+            },
+            "diagnosis": {
+              "error_category": "CO",
+              "step_id": "S18"
+            },
+            "evidence_guardrail_applied": false,
+            "evidence_guardrail_reasons": [],
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "evidence_strength": "limited",
+            "fallback_overlay_reason": "not_needed",
+            "fallback_overlay_used": false,
+            "final_action_plan": {
+              "overlay_step_id": null,
+              "source": "model",
+              "step_id": "S18",
+              "targets": [
+                "right_mdi_pb18"
+              ],
+              "text_only": false
+            },
+            "final_overlay_targets": [
+              "right_mdi_pb18"
+            ],
+            "final_public_response": {
+              "actions": [
+                {
+                  "element_id": "pnt_96",
+                  "evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+                  ],
+                  "evidence_required": true,
+                  "final_overlay_targets": [
+                    "right_mdi_pb18"
+                  ],
+                  "frame_id": "1779045062695_000060",
+                  "fused_missing_conditions": [
+                    "vision_facts.fcsmc_page_visible==seen"
+                  ],
+                  "fused_step_id": "S18",
+                  "generation_mode": "model",
+                  "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+                  "intent": "highlight",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "message_category": "model",
+                  "style": {
+                    "color": "#00ffcc",
+                    "style": "highlight",
+                    "thickness": 2
+                  },
+                  "sync_delta_ms": 92,
+                  "target": "right_mdi_pb18",
+                  "type": "overlay",
+                  "vision_fact_extractor_used": true,
+                  "vision_fact_summary": {
+                    "frame_ids": [
+                      "1779045062695_000060"
+                    ],
+                    "fresh_fact_ids": [
+                      "fcs_page_visible",
+                      "bit_root_page_visible",
+                      "hsi_page_visible",
+                      "hsi_map_layer_visible",
+                      "ins_grnd_alignment_text_visible",
+                      "ins_ok_text_visible"
+                    ],
+                    "not_seen_fact_ids": [
+                      "tac_page_visible",
+                      "supt_page_visible",
+                      "fcs_page_x_marks_visible",
+                      "fcsmc_page_visible",
+                      "fcsmc_intermediate_result_visible",
+                      "fcsmc_in_test_visible",
+                      "fcsmc_final_go_result_visible"
+                    ],
+                    "seen_fact_ids": [
+                      "fcs_page_visible",
+                      "bit_root_page_visible",
+                      "hsi_page_visible",
+                      "hsi_map_layer_visible",
+                      "ins_grnd_alignment_text_visible",
+                      "ins_ok_text_visible"
+                    ],
+                    "status": "available",
+                    "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+                    "uncertain_fact_ids": []
+                  },
+                  "vision_fallback_reason": null,
+                  "vision_used": true,
+                  "vlm_call_reason": "missing_pre_trigger_frame",
+                  "vlm_call_status": "called"
+                }
+              ],
+              "diagnosis": {
+                "error_category": "CO",
+                "step_id": "S18"
+              },
+              "explanations": [
+                "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+                "待视觉确认：当前步骤只有部分可观测证据，请按高亮执行后进行目视确认。"
+              ],
+              "message": "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+              "next": {
+                "step_id": "S18"
+              }
+            },
+            "frame_id": "1779045062695_000060",
+            "fused_missing_conditions": [
+              "vision_facts.fcsmc_page_visible==seen"
+            ],
+            "fused_step_id": "S18",
+            "generation_mode": "model",
+            "generation_prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+            "generation_prompt_tokens_est": 1134,
+            "generation_prompt_trimmed": true,
+            "harness_trace": {
+              "candidates": [
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "left_mdi_brightness_selector",
+                    "right_mdi_brightness_selector",
+                    "ampcd_off_brightness_knob",
+                    "hud_symbology_brightness_knob",
+                    "left_mdi_pb18",
+                    "left_mdi_pb15",
+                    "right_mdi_pb18",
+                    "right_mdi_pb5"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S08",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible",
+                    "VISION_FACTS.ins_grnd_alignment_text_visible",
+                    "VISION_FACTS.ins_ok_text_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S09",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible",
+                    "VISION_FACTS.ins_grnd_alignment_text_visible",
+                    "VISION_FACTS.ins_ok_text_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "ins_mode_knob",
+                    "ampcd_pb19"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S12",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible",
+                    "VISION_FACTS.ins_grnd_alignment_text_visible",
+                    "VISION_FACTS.ins_ok_text_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.86,
+                  "proposed_next_action_target_ids": [
+                    "radar_mode_knob"
+                  ],
+                  "role": "candidate",
+                  "source": "visual_anchor",
+                  "step_id": "S13",
+                  "supporting_evidence_refs": [
+                    "VISION_FACTS.bit_root_page_visible",
+                    "VISION_FACTS.fcs_page_visible",
+                    "VISION_FACTS.hsi_map_layer_visible",
+                    "VISION_FACTS.hsi_page_visible",
+                    "VISION_FACTS.ins_grnd_alignment_text_visible",
+                    "VISION_FACTS.ins_ok_text_visible"
+                  ]
+                },
+                {
+                  "confidence": 0.55,
+                  "proposed_next_action_target_ids": [
+                    "right_mdi_pb18",
+                    "right_mdi_pb5"
+                  ],
+                  "role": "candidate_not_authoritative",
+                  "source": "deterministic",
+                  "step_id": "S18",
+                  "supporting_evidence_refs": []
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "refuel_probe_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S20",
+                  "supporting_evidence_refs": [
+                    "GATES.S20.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "launch_bar_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S22",
+                  "supporting_evidence_refs": [
+                    "GATES.S22.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "arresting_hook_handle"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S25",
+                  "supporting_evidence_refs": [
+                    "GATES.S25.completion"
+                  ]
+                }
+              ],
+              "chosen_candidate": {
+                "confidence": 0.55,
+                "proposed_next_action_target_ids": [
+                  "right_mdi_pb18",
+                  "right_mdi_pb5"
+                ],
+                "role": "candidate_not_authoritative",
+                "source": "deterministic",
+                "step_id": "S18",
+                "supporting_evidence_refs": []
+              },
+              "evidence_packet_summary": {
+                "blocked_gate_count": 6,
+                "conflicts": [],
+                "recent_action_count": 1,
+                "telemetry_missing_source_count": 4,
+                "telemetry_status": "nominal",
+                "telemetry_window_digest": {
+                  "changed_var_count": 1,
+                  "contradiction_count": 0,
+                  "frame_count": 20,
+                  "latest_seq": 9824
+                },
+                "vision_fresh_count": 6,
+                "vision_seen_count": 6,
+                "vision_status": "available"
+              },
+              "final_action_plan": {
+                "overlay_step_id": null,
+                "source": "model",
+                "step_id": "S18",
+                "targets": [
+                  "right_mdi_pb18"
+                ],
+                "text_only": false
+              },
+              "final_overlay_targets": [
+                "right_mdi_pb18"
+              ],
+              "message_category": "model",
+              "model_decision": {
+                "evidence_refs": [
+                  "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+                ],
+                "generation_mode": "model",
+                "overlay_targets": [
+                  "right_mdi_pb18"
+                ],
+                "status": "ok",
+                "step_id": "S18"
+              },
+              "rejected_candidates": [],
+              "repair_result": {
+                "applied": false,
+                "evidence_ref_repair": {
+                  "details": [],
+                  "repair_applied": false
+                },
+                "json_repaired": false,
+                "path": null
+              },
+              "schema_version": "v1",
+              "validator_result": {
+                "fallback_overlay_reason": "not_needed",
+                "fallback_overlay_used": false,
+                "reasons": [],
+                "rejected": false,
+                "rejected_model_step_id": null
+              },
+              "vlm_call": {
+                "extractor_used": true,
+                "frame_ids": [
+                  "1779045062695_000060"
+                ],
+                "reason": "missing_pre_trigger_frame",
+                "status": "called",
+                "sync_delta_ms": 92,
+                "sync_status": "matched_future_fallback",
+                "vision_fact_status": "available",
+                "vision_status": "partial"
+              }
+            },
+            "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+            "help_response": {
+              "diagnosis": {
+                "error_category": "CO",
+                "step_id": "S18"
+              },
+              "explanations": [
+                "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+              ],
+              "next": {
+                "step_id": "S18"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+                    "target": "right_mdi_pb18",
+                    "type": "visual"
+                  }
+                ],
+                "targets": [
+                  "right_mdi_pb18"
+                ]
+              }
+            },
+            "help_response_pre_guardrail": {
+              "diagnosis": {
+                "error_category": "CO",
+                "step_id": "S18"
+              },
+              "explanations": [
+                "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+              ],
+              "next": {
+                "step_id": "S18"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+                    "target": "right_mdi_pb18",
+                    "type": "visual"
+                  }
+                ],
+                "targets": [
+                  "right_mdi_pb18"
+                ]
+              }
+            },
+            "json_repair_reasons": [],
+            "json_repaired": false,
+            "latency_ms": 4976,
+            "layout_id": "fa18c_composite_panel_v2",
+            "main_help_multimodal_input_enabled": false,
+            "message_category": "model",
+            "model": "simtutor-base",
+            "model_raw_diagnosis": {
+              "error_category": "CO",
+              "step_id": "S18"
+            },
+            "model_raw_explanations": [
+              "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+            ],
+            "model_raw_help_response": {
+              "diagnosis": {
+                "error_category": "CO",
+                "step_id": "S18"
+              },
+              "explanations": [
+                "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+              ],
+              "next": {
+                "step_id": "S18"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+                    "target": "right_mdi_pb18",
+                    "type": "visual"
+                  }
+                ],
+                "targets": [
+                  "right_mdi_pb18"
+                ]
+              }
+            },
+            "model_raw_next": {
+              "step_id": "S18"
+            },
+            "multimodal_candidate_frame_ids": [
+              "1779045062695_000060"
+            ],
+            "multimodal_capability_enabled": true,
+            "multimodal_failed_frame_ids": [],
+            "multimodal_failure_reason": null,
+            "multimodal_fallback_to_text": false,
+            "multimodal_frame_failures": {},
+            "multimodal_frame_ids": [],
+            "multimodal_image_count": 0,
+            "multimodal_images_built": false,
+            "multimodal_input_present": true,
+            "multimodal_path_attempted": false,
+            "multimodal_path_success": false,
+            "multimodal_primary_frame_id": "1779045062695_000060",
+            "next": {
+              "step_id": "S18"
+            },
+            "observability_status": "partial",
+            "prompt_budget_used": 5509,
+            "prompt_build": {
+              "allowed_evidence_refs": [
+                "RAG_SNIPPETS.fa18c_startup_master_1",
+                "VISION_FACTS.tac_page_visible@1779045062695_000060",
+                "VISION_FACTS.supt_page_visible@1779045062695_000060"
+              ],
+              "delta_summary_items": 0,
+              "delta_summary_top_k": 20,
+              "evidence_refs_count": 3,
+              "grounding_applied": true,
+              "grounding_missing": false,
+              "grounding_missing_requested": false,
+              "grounding_reason": null,
+              "max_overlay_targets": 4,
+              "max_prompt_chars": 9000,
+              "max_prompt_tokens_est": 2400,
+              "preferred_overlay_target": "right_mdi_pb5",
+              "prompt_chars": 4534,
+              "prompt_tokens_est": 1134,
+              "prompt_trimmed": true,
+              "rag_snippet_count": 1,
+              "rag_snippet_ids": [
+                "fa18c_startup_master_1"
+              ],
+              "state_harness_conflicts": [],
+              "state_harness_telemetry_status": "nominal",
+              "state_harness_visual_candidate_steps": [
+                "S08",
+                "S09",
+                "S12",
+                "S13"
+              ],
+              "trim_reasons": [
+                "trimmed_delta_summary",
+                "trimmed_step_enum",
+                "trimmed_vars",
+                "trimmed_overlay_enum",
+                "trimmed_rag_snippets",
+                "compact_template"
+              ],
+              "vision_fact_seen_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "vision_fact_status": "available"
+            },
+            "prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+            "prompt_tokens_est": 1134,
+            "prompt_trimmed": true,
+            "provider": "openai_compat",
+            "repair_applied": false,
+            "repair_details": {
+              "details": [],
+              "dropped_unrepairable_evidence": 0,
+              "repair_applied": false,
+              "repaired_evidence_types": 0
+            },
+            "request_prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+            "request_prompt_tokens_est": 1134,
+            "request_prompt_trimmed": true,
+            "requires_visual_confirmation": true,
+            "response_mapping": {
+              "allowed_evidence_ref_count": 131,
+              "diagnosis": {
+                "error_category": "CO",
+                "step_id": "S18"
+              },
+              "evidence_strength": "limited",
+              "next": {
+                "step_id": "S18"
+              },
+              "observability_status": "partial",
+              "requires_visual_confirmation": true
+            },
+            "retry_count": 0,
+            "retry_reason": null,
+            "scenario_profile": "airfield",
+            "state_key": "4cdcbec64e13f45f354882cc675b61de8be35a03b1f971de2affc68af69a89b4",
+            "sync_delta_ms": 92,
+            "vision": {
+              "frame_id": "1779045062695_000060",
+              "frame_ids": [
+                "1779045062695_000060"
+              ],
+              "frame_stale": false,
+              "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+              "observation_seq": 9824,
+              "observation_t_wall_ms": 1779045062600,
+              "observation_t_wall_s": 1779045062.6004815,
+              "pre_trigger_frame": null,
+              "selected_frames": [
+                {
+                  "capture_wall_ms": 1779045062695,
+                  "channel": "composite_panel",
+                  "frame_id": "1779045062695_000060",
+                  "frame_seq": 60,
+                  "frame_stale": false,
+                  "height": 1440,
+                  "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779045062695_000060_vlm.png",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "role": "trigger_frame",
+                  "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779045062695_000060.png",
+                  "sync_delta_ms": 92,
+                  "sync_miss_reason": null,
+                  "sync_status": "matched_future_fallback",
+                  "width": 3440
+                }
+              ],
+              "status": "partial",
+              "sync_delta_ms": 92,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_frame": {
+                "capture_wall_ms": 1779045062695,
+                "channel": "composite_panel",
+                "frame_id": "1779045062695_000060",
+                "frame_seq": 60,
+                "frame_stale": false,
+                "height": 1440,
+                "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779045062695_000060_vlm.png",
+                "layout_id": "fa18c_composite_panel_v2",
+                "role": "trigger_frame",
+                "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779045062695_000060.png",
+                "sync_delta_ms": 92,
+                "sync_miss_reason": null,
+                "sync_status": "matched_future_fallback",
+                "width": 3440
+              },
+              "trigger_wall_ms": 1779045062603,
+              "vision_used": true
+            },
+            "vision_fact_active_step_ids": [
+              "S08"
+            ],
+            "vision_fact_extractor_used": true,
+            "vision_fact_status": "available",
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779045062695_000060"
+              ],
+              "fresh_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "not_seen_fact_ids": [
+                "tac_page_visible",
+                "supt_page_visible",
+                "fcs_page_x_marks_visible",
+                "fcsmc_page_visible",
+                "fcsmc_intermediate_result_visible",
+                "fcsmc_in_test_visible",
+                "fcsmc_final_go_result_visible"
+              ],
+              "seen_fact_ids": [
+                "fcs_page_visible",
+                "bit_root_page_visible",
+                "hsi_page_visible",
+                "hsi_map_layer_visible",
+                "ins_grnd_alignment_text_visible",
+                "ins_ok_text_visible"
+              ],
+              "status": "available",
+              "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": [
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "tac_page_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "supt_page_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "fcs_page_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "fcs_page_x_marks_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "bit_root_page_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "fcsmc_page_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "fcsmc_intermediate_result_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "fcsmc_in_test_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 600000,
+                "expires_at_wall_ms": 1779045662603,
+                "fact_id": "fcsmc_final_go_result_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "not_seen",
+                "sticky": true
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "hsi_page_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "hsi_map_layer_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "ins_grnd_alignment_text_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "seen",
+                "sticky": false
+              },
+              {
+                "evidence_note": "",
+                "expires_after_ms": 2000,
+                "expires_at_wall_ms": 1779045064603,
+                "fact_id": "ins_ok_text_visible",
+                "observed_at_wall_ms": 1779045062603,
+                "source_frame_id": "1779045062695_000060",
+                "state": "seen",
+                "sticky": false
+              }
+            ],
+            "vision_fallback_reason": null,
+            "vision_frame_ids": [
+              "1779045062695_000060"
+            ],
+            "vision_status": "partial",
+            "vision_used": true,
+            "vlm_call_reason": "missing_pre_trigger_frame",
+            "vlm_call_status": "called"
+          },
+          "response_id": "f07478b3-a031-4eee-83b7-12e621ade1fd",
+          "status": "ok",
+          "timestamp": "2026-05-17T19:11:14.526667+00:00",
+          "version": "v1"
+        },
+        "related_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "vision_refs": [
+          "1779045062695_000060"
+        ]
+      }
+    ],
+    "tutor_request": {
+      "actor": "learner",
+      "context": {
+        "delta_dropped_count": 0,
+        "deterministic_step_hint": {
+          "action_hint": {
+            "target": "right_mdi_pb5"
+          },
+          "gate_blocker_count": 0,
+          "inferred_step_id": "S18",
+          "missing_conditions_count": 1,
+          "observability": "partial",
+          "observability_status": "partial",
+          "overlay_step_id": "S18",
+          "recent_ui_targets": [
+            "takeoff_trim_button"
+          ],
+          "requires_visual_confirmation": true,
+          "scenario_profile": "airfield",
+          "step_ui_targets": [
+            "right_mdi_pb18",
+            "right_mdi_pb5"
+          ]
+        },
+        "evidence_packet_summary": {
+          "blocked_gate_count": 6,
+          "conflicts": [],
+          "recent_action_count": 1,
+          "telemetry_missing_source_count": 4,
+          "telemetry_status": "nominal",
+          "telemetry_window_digest": {
+            "changed_var_count": 1,
+            "contradiction_count": 0,
+            "frame_count": 20,
+            "latest_seq": 9824
+          },
+          "vision_fresh_count": 6,
+          "vision_seen_count": 6,
+          "vision_status": "available"
+        },
+        "grounding_missing": false,
+        "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+        "grounding_reason": null,
+        "rag_topk": [
+          {
+            "chunk_id": "fa18c_startup_master_1",
+            "doc_id": "fa18c_startup_master",
+            "page_or_heading": "Master Step Table",
+            "score": 24.051345417769785,
+            "section": "Master Step Table",
+            "snippet_id": "fa18c_startup_master_1"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_105",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 106,
+            "score": 20.74820609602476,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_105"
+          },
+          {
+            "chunk_id": "fa18c_error_coding_guide_10",
+            "doc_id": "fa18c_error_coding_guide",
+            "page_or_heading": "3. Step Criticality",
+            "score": 20.169931721198378,
+            "section": "3. Step Criticality",
+            "snippet_id": "fa18c_error_coding_guide_10"
+          },
+          {
+            "chunk_id": "fa18c_coldstart_quiz_12",
+            "doc_id": "fa18c_coldstart_quiz",
+            "page_or_heading": "Q12. Sequence Mini-Task 2",
+            "score": 18.21894244493854,
+            "section": "Q12. Sequence Mini-Task 2",
+            "snippet_id": "fa18c_coldstart_quiz_12"
+          },
+          {
+            "chunk_id": "fa18c_fcs_bit_procedure_note_0",
+            "doc_id": "fa18c_fcs_bit_procedure_note",
+            "score": 18.196064173149253,
+            "snippet_id": "fa18c_fcs_bit_procedure_note_0"
+          }
+        ],
+        "scenario_profile": "airfield",
+        "state_harness": {
+          "conflicts": [],
+          "deterministic_candidate": {
+            "missing_conditions": [
+              "vision_facts.fcsmc_page_visible==seen"
+            ],
+            "overlay_step_id": "S18",
+            "role": "candidate_not_authoritative",
+            "step_id": "S18"
+          },
+          "telemetry_evidence": {
+            "confidence": "medium",
+            "early_vars": {
+              "battery_on": true,
+              "fire_test_a_complete": true,
+              "fire_test_b_complete": true,
+              "power_available": true
+            },
+            "observation_seq": 9824,
+            "source_status": "nominal",
+            "vars_source_missing_count": 4
+          },
+          "telemetry_window_digest": {
+            "changed_vars": [
+              {
+                "first_value": true,
+                "last_value": false,
+                "latest_transition_age_s": 0.89,
+                "transition_count": 1,
+                "var": "takeoff_trim_pressed"
+              }
+            ],
+            "contradictions": [],
+            "first_frame_only_values": [],
+            "frame_count": 20,
+            "last_seen_true": [
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "battery_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "fire_test_a_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "fire_test_b_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "fire_test_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "flap_auto"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "hud_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "left_ddi_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 9824,
+                "var": "mpcd_on"
+              }
+            ],
+            "latest_seq": 9824,
+            "latest_t_wall": 1779045062.6004815,
+            "stable_false_vars": [
+              "fcs_bit_switch_up",
+              "pitot_heat_on"
+            ],
+            "stable_true_vars": [
+              "battery_on",
+              "fire_test_a_complete",
+              "fire_test_b_complete",
+              "fire_test_complete",
+              "flap_auto",
+              "hud_on",
+              "left_ddi_on",
+              "mpcd_on",
+              "power_available",
+              "right_ddi_on"
+            ],
+            "unknown_or_missing_vars": [
+              "ins_fast_align_pressed",
+              "ufc_scratchpad_number_display",
+              "ufc_scratchpad_string_1_display",
+              "ufc_scratchpad_string_2_display"
+            ],
+            "window_duration_s": 0.928
+          },
+          "vision_evidence": {
+            "confidence": "high",
+            "fresh_fact_ids": [
+              "bit_root_page_visible",
+              "fcs_page_visible",
+              "hsi_map_layer_visible",
+              "hsi_page_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "late_display_anchors": [
+              "bit_root_page_visible",
+              "fcs_page_visible",
+              "hsi_map_layer_visible",
+              "hsi_page_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "fcs_page_x_marks_visible",
+              "fcsmc_final_go_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_page_visible",
+              "supt_page_visible",
+              "tac_page_visible"
+            ],
+            "seen_fact_ids": [
+              "bit_root_page_visible",
+              "fcs_page_visible",
+              "hsi_map_layer_visible",
+              "hsi_page_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "source_status": "available",
+            "visual_candidate_steps": [
+              "S08",
+              "S09",
+              "S12",
+              "S13"
+            ]
+          }
+        },
+        "vision": {
+          "frame_id": "1779045062695_000060",
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "frame_stale": false,
+          "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+          "observation_seq": 9824,
+          "observation_t_wall_ms": 1779045062600,
+          "observation_t_wall_s": 1779045062.6004815,
+          "status": "partial",
+          "sync_delta_ms": 92,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_wall_ms": 1779045062603,
+          "vision_used": true
+        },
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "fresh_fact_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "not_seen_fact_ids": [
+            "tac_page_visible",
+            "supt_page_visible",
+            "fcs_page_x_marks_visible",
+            "fcsmc_page_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_final_go_result_visible"
+          ],
+          "seen_fact_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "status": "available",
+          "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": [
+          {
+            "fact_id": "tac_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "supt_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcs_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcs_page_x_marks_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "bit_root_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_intermediate_result_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_in_test_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "hsi_page_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "hsi_map_layer_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "ins_grnd_alignment_text_visible",
+            "frame_ids": null,
+            "status": null
+          },
+          {
+            "fact_id": "ins_ok_text_visible",
+            "frame_ids": null,
+            "status": null
+          }
+        ]
+      },
+      "intent": "help",
+      "message": "[REDACTED_USER_MESSAGE]",
+      "metadata": {
+        "evidence_packet_summary": {
+          "blocked_gate_count": 6,
+          "conflicts": [],
+          "recent_action_count": 1,
+          "telemetry_missing_source_count": 4,
+          "telemetry_status": "nominal",
+          "telemetry_window_digest": {
+            "changed_var_count": 1,
+            "contradiction_count": 0,
+            "frame_count": 20,
+            "latest_seq": 9824
+          },
+          "vision_fresh_count": 6,
+          "vision_seen_count": 6,
+          "vision_status": "available"
+        },
+        "frame_id": "1779045062695_000060",
+        "fused_missing_conditions": [
+          "vision_facts.fcsmc_page_visible==seen"
+        ],
+        "fused_step_id": "S18",
+        "grounding_cache_hit": false,
+        "grounding_error_type": null,
+        "grounding_missing": false,
+        "grounding_missing_requested": false,
+        "grounding_policy_filtered_out_count": 0,
+        "grounding_policy_id": null,
+        "grounding_policy_version": null,
+        "grounding_reason": null,
+        "grounding_reason_requested": null,
+        "grounding_snippet_ids": [
+          "fa18c_startup_master_1"
+        ],
+        "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "layout_id": "fa18c_composite_panel_v2",
+        "prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+        "prompt_tokens_est": 1134,
+        "prompt_trimmed": true,
+        "scenario_profile": "airfield",
+        "source_chunk_refs": [
+          "fa18c_startup_master/fa18c_startup_master_1",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_105",
+          "fa18c_error_coding_guide/fa18c_error_coding_guide_10",
+          "fa18c_coldstart_quiz/fa18c_coldstart_quiz_12",
+          "fa18c_fcs_bit_procedure_note/fa18c_fcs_bit_procedure_note_0"
+        ],
+        "state_harness_conflicts": [],
+        "state_harness_telemetry_status": "nominal",
+        "sync_delta_ms": 92,
+        "vision_fact_seen_ids": [
+          "fcs_page_visible",
+          "bit_root_page_visible",
+          "hsi_page_visible",
+          "hsi_map_layer_visible",
+          "ins_grnd_alignment_text_visible",
+          "ins_ok_text_visible"
+        ],
+        "vision_fact_status": "available",
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "fresh_fact_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "not_seen_fact_ids": [
+            "tac_page_visible",
+            "supt_page_visible",
+            "fcs_page_x_marks_visible",
+            "fcsmc_page_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_final_go_result_visible"
+          ],
+          "seen_fact_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "status": "available",
+          "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+          "uncertain_fact_ids": []
+        },
+        "vision_fallback_reason": null,
+        "vision_frame_ids": [
+          "1779045062695_000060"
+        ],
+        "vision_status": "partial",
+        "vision_used": true
+      },
+      "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+      "request_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+      "timestamp": "2026-05-17T19:11:09.548436+00:00",
+      "version": "v1"
+    },
+    "tutor_response": {
+      "actions": [
+        {
+          "element_id": "pnt_96",
+          "evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+          ],
+          "evidence_required": true,
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "frame_id": "1779045062695_000060",
+          "fused_missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "fused_step_id": "S18",
+          "generation_mode": "model",
+          "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+          "intent": "highlight",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "style": {
+            "color": "#00ffcc",
+            "style": "highlight",
+            "thickness": 2
+          },
+          "sync_delta_ms": 92,
+          "target": "right_mdi_pb18",
+          "type": "overlay",
+          "vision_fact_extractor_used": true,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "fresh_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "not_seen_fact_ids": [
+              "tac_page_visible",
+              "supt_page_visible",
+              "fcs_page_x_marks_visible",
+              "fcsmc_page_visible",
+              "fcsmc_intermediate_result_visible",
+              "fcsmc_in_test_visible",
+              "fcsmc_final_go_result_visible"
+            ],
+            "seen_fact_ids": [
+              "fcs_page_visible",
+              "bit_root_page_visible",
+              "hsi_page_visible",
+              "hsi_map_layer_visible",
+              "ins_grnd_alignment_text_visible",
+              "ins_ok_text_visible"
+            ],
+            "status": "available",
+            "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_used": true,
+          "vlm_call_reason": "missing_pre_trigger_frame",
+          "vlm_call_status": "called"
+        }
+      ],
+      "actor": "tutor",
+      "explanations": [
+        "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+        "待视觉确认：当前步骤只有部分可观测证据，请按高亮执行后进行目视确认。"
+      ],
+      "in_reply_to": "644fac65-eb37-4de1-a591-fd1de392c647",
+      "message": "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+      "metadata": {
+        "allowed_evidence_ref_count": 131,
+        "dcs_tutor_text": {
+          "clear_view": false,
+          "cmd_id": "ad311d68-a2cd-4f97-9771-2eecc2759a82",
+          "display_time_s": 12.0,
+          "reason": null,
+          "status": "ok",
+          "text": "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+        },
+        "delta_dropped_count": 0,
+        "deterministic_inference_error": null,
+        "deterministic_step_hint": {
+          "inferred_step_id": "S18",
+          "missing_conditions": [
+            "vision_facts.fcsmc_page_visible==seen"
+          ],
+          "observability": "partial",
+          "observability_status": "partial",
+          "recent_ui_targets": [
+            "takeoff_trim_button"
+          ],
+          "requires_visual_confirmation": true,
+          "step_evidence_requirements": [
+            "delta",
+            "gate",
+            "visual"
+          ],
+          "step_ui_targets": [
+            "right_mdi_pb18",
+            "right_mdi_pb5"
+          ]
+        },
+        "diagnosis": {
+          "error_category": "CO",
+          "step_id": "S18"
+        },
+        "evidence_guardrail_applied": false,
+        "evidence_guardrail_reasons": [],
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "evidence_strength": "limited",
+        "fallback_overlay_reason": "not_needed",
+        "fallback_overlay_used": false,
+        "final_action_plan": {
+          "overlay_step_id": null,
+          "source": "model",
+          "step_id": "S18",
+          "targets": [
+            "right_mdi_pb18"
+          ],
+          "text_only": false
+        },
+        "final_overlay_targets": [
+          "right_mdi_pb18"
+        ],
+        "final_public_response": {
+          "actions": [
+            {
+              "element_id": "pnt_96",
+              "evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "right_mdi_pb18"
+              ],
+              "frame_id": "1779045062695_000060",
+              "fused_missing_conditions": [
+                "vision_facts.fcsmc_page_visible==seen"
+              ],
+              "fused_step_id": "S18",
+              "generation_mode": "model",
+              "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "model",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 92,
+              "target": "right_mdi_pb18",
+              "type": "overlay",
+              "vision_fact_extractor_used": true,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779045062695_000060"
+                ],
+                "fresh_fact_ids": [
+                  "fcs_page_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "not_seen_fact_ids": [
+                  "tac_page_visible",
+                  "supt_page_visible",
+                  "fcs_page_x_marks_visible",
+                  "fcsmc_page_visible",
+                  "fcsmc_intermediate_result_visible",
+                  "fcsmc_in_test_visible",
+                  "fcsmc_final_go_result_visible"
+                ],
+                "seen_fact_ids": [
+                  "fcs_page_visible",
+                  "bit_root_page_visible",
+                  "hsi_page_visible",
+                  "hsi_map_layer_visible",
+                  "ins_grnd_alignment_text_visible",
+                  "ins_ok_text_visible"
+                ],
+                "status": "available",
+                "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_used": true,
+              "vlm_call_reason": "missing_pre_trigger_frame",
+              "vlm_call_status": "called"
+            }
+          ],
+          "diagnosis": {
+            "error_category": "CO",
+            "step_id": "S18"
+          },
+          "explanations": [
+            "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+            "待视觉确认：当前步骤只有部分可观测证据，请按高亮执行后进行目视确认。"
+          ],
+          "message": "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。",
+          "next": {
+            "step_id": "S18"
+          }
+        },
+        "frame_id": "1779045062695_000060",
+        "fused_missing_conditions": [
+          "vision_facts.fcsmc_page_visible==seen"
+        ],
+        "fused_step_id": "S18",
+        "generation_mode": "model",
+        "generation_prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+        "generation_prompt_tokens_est": 1134,
+        "generation_prompt_trimmed": true,
+        "harness_trace": {
+          "candidates": [
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+                "left_mdi_pb18",
+                "left_mdi_pb15",
+                "right_mdi_pb18",
+                "right_mdi_pb5"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S08",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible",
+                "VISION_FACTS.ins_grnd_alignment_text_visible",
+                "VISION_FACTS.ins_ok_text_visible"
+              ]
+            },
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S09",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible",
+                "VISION_FACTS.ins_grnd_alignment_text_visible",
+                "VISION_FACTS.ins_ok_text_visible"
+              ]
+            },
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "ins_mode_knob",
+                "ampcd_pb19"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S12",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible",
+                "VISION_FACTS.ins_grnd_alignment_text_visible",
+                "VISION_FACTS.ins_ok_text_visible"
+              ]
+            },
+            {
+              "confidence": 0.86,
+              "proposed_next_action_target_ids": [
+                "radar_mode_knob"
+              ],
+              "role": "candidate",
+              "source": "visual_anchor",
+              "step_id": "S13",
+              "supporting_evidence_refs": [
+                "VISION_FACTS.bit_root_page_visible",
+                "VISION_FACTS.fcs_page_visible",
+                "VISION_FACTS.hsi_map_layer_visible",
+                "VISION_FACTS.hsi_page_visible",
+                "VISION_FACTS.ins_grnd_alignment_text_visible",
+                "VISION_FACTS.ins_ok_text_visible"
+              ]
+            },
+            {
+              "confidence": 0.55,
+              "proposed_next_action_target_ids": [
+                "right_mdi_pb18",
+                "right_mdi_pb5"
+              ],
+              "role": "candidate_not_authoritative",
+              "source": "deterministic",
+              "step_id": "S18",
+              "supporting_evidence_refs": []
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "refuel_probe_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S20",
+              "supporting_evidence_refs": [
+                "GATES.S20.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "launch_bar_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S22",
+              "supporting_evidence_refs": [
+                "GATES.S22.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "arresting_hook_handle"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S25",
+              "supporting_evidence_refs": [
+                "GATES.S25.completion"
+              ]
+            }
+          ],
+          "chosen_candidate": {
+            "confidence": 0.55,
+            "proposed_next_action_target_ids": [
+              "right_mdi_pb18",
+              "right_mdi_pb5"
+            ],
+            "role": "candidate_not_authoritative",
+            "source": "deterministic",
+            "step_id": "S18",
+            "supporting_evidence_refs": []
+          },
+          "evidence_packet_summary": {
+            "blocked_gate_count": 6,
+            "conflicts": [],
+            "recent_action_count": 1,
+            "telemetry_missing_source_count": 4,
+            "telemetry_status": "nominal",
+            "telemetry_window_digest": {
+              "changed_var_count": 1,
+              "contradiction_count": 0,
+              "frame_count": 20,
+              "latest_seq": 9824
+            },
+            "vision_fresh_count": 6,
+            "vision_seen_count": 6,
+            "vision_status": "available"
+          },
+          "final_action_plan": {
+            "overlay_step_id": null,
+            "source": "model",
+            "step_id": "S18",
+            "targets": [
+              "right_mdi_pb18"
+            ],
+            "text_only": false
+          },
+          "final_overlay_targets": [
+            "right_mdi_pb18"
+          ],
+          "message_category": "model",
+          "model_decision": {
+            "evidence_refs": [
+              "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+            ],
+            "generation_mode": "model",
+            "overlay_targets": [
+              "right_mdi_pb18"
+            ],
+            "status": "ok",
+            "step_id": "S18"
+          },
+          "rejected_candidates": [],
+          "repair_result": {
+            "applied": false,
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "json_repaired": false,
+            "path": null
+          },
+          "schema_version": "v1",
+          "validator_result": {
+            "fallback_overlay_reason": "not_needed",
+            "fallback_overlay_used": false,
+            "reasons": [],
+            "rejected": false,
+            "rejected_model_step_id": null
+          },
+          "vlm_call": {
+            "extractor_used": true,
+            "frame_ids": [
+              "1779045062695_000060"
+            ],
+            "reason": "missing_pre_trigger_frame",
+            "status": "called",
+            "sync_delta_ms": 92,
+            "sync_status": "matched_future_fallback",
+            "vision_fact_status": "available",
+            "vision_status": "partial"
+          }
+        },
+        "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+        "help_response": {
+          "diagnosis": {
+            "error_category": "CO",
+            "step_id": "S18"
+          },
+          "explanations": [
+            "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+          ],
+          "next": {
+            "step_id": "S18"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+                "target": "right_mdi_pb18",
+                "type": "visual"
+              }
+            ],
+            "targets": [
+              "right_mdi_pb18"
+            ]
+          }
+        },
+        "help_response_pre_guardrail": {
+          "diagnosis": {
+            "error_category": "CO",
+            "step_id": "S18"
+          },
+          "explanations": [
+            "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+          ],
+          "next": {
+            "step_id": "S18"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+                "target": "right_mdi_pb18",
+                "type": "visual"
+              }
+            ],
+            "targets": [
+              "right_mdi_pb18"
+            ]
+          }
+        },
+        "json_repair_reasons": [],
+        "json_repaired": false,
+        "latency_ms": 4976,
+        "layout_id": "fa18c_composite_panel_v2",
+        "main_help_multimodal_input_enabled": false,
+        "message_category": "model",
+        "model": "simtutor-base",
+        "model_raw_diagnosis": {
+          "error_category": "CO",
+          "step_id": "S18"
+        },
+        "model_raw_explanations": [
+          "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+        ],
+        "model_raw_help_response": {
+          "diagnosis": {
+            "error_category": "CO",
+            "step_id": "S18"
+          },
+          "explanations": [
+            "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+          ],
+          "next": {
+            "step_id": "S18"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+                "target": "right_mdi_pb18",
+                "type": "visual"
+              }
+            ],
+            "targets": [
+              "right_mdi_pb18"
+            ]
+          }
+        },
+        "model_raw_next": {
+          "step_id": "S18"
+        },
+        "multimodal_candidate_frame_ids": [
+          "1779045062695_000060"
+        ],
+        "multimodal_capability_enabled": true,
+        "multimodal_failed_frame_ids": [],
+        "multimodal_failure_reason": null,
+        "multimodal_fallback_to_text": false,
+        "multimodal_frame_failures": {},
+        "multimodal_frame_ids": [],
+        "multimodal_image_count": 0,
+        "multimodal_images_built": false,
+        "multimodal_input_present": true,
+        "multimodal_path_attempted": false,
+        "multimodal_path_success": false,
+        "multimodal_primary_frame_id": "1779045062695_000060",
+        "next": {
+          "step_id": "S18"
+        },
+        "observability_status": "partial",
+        "prompt_budget_used": 5509,
+        "prompt_build": {
+          "allowed_evidence_refs": [
+            "RAG_SNIPPETS.fa18c_startup_master_1",
+            "VISION_FACTS.tac_page_visible@1779045062695_000060",
+            "VISION_FACTS.supt_page_visible@1779045062695_000060"
+          ],
+          "delta_summary_items": 0,
+          "delta_summary_top_k": 20,
+          "evidence_refs_count": 3,
+          "grounding_applied": true,
+          "grounding_missing": false,
+          "grounding_missing_requested": false,
+          "grounding_reason": null,
+          "max_overlay_targets": 4,
+          "max_prompt_chars": 9000,
+          "max_prompt_tokens_est": 2400,
+          "preferred_overlay_target": "right_mdi_pb5",
+          "prompt_chars": 4534,
+          "prompt_tokens_est": 1134,
+          "prompt_trimmed": true,
+          "rag_snippet_count": 1,
+          "rag_snippet_ids": [
+            "fa18c_startup_master_1"
+          ],
+          "state_harness_conflicts": [],
+          "state_harness_telemetry_status": "nominal",
+          "state_harness_visual_candidate_steps": [
+            "S08",
+            "S09",
+            "S12",
+            "S13"
+          ],
+          "trim_reasons": [
+            "trimmed_delta_summary",
+            "trimmed_step_enum",
+            "trimmed_vars",
+            "trimmed_overlay_enum",
+            "trimmed_rag_snippets",
+            "compact_template"
+          ],
+          "vision_fact_seen_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "vision_fact_status": "available"
+        },
+        "prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+        "prompt_tokens_est": 1134,
+        "prompt_trimmed": true,
+        "provider": "openai_compat",
+        "repair_applied": false,
+        "repair_details": {
+          "details": [],
+          "dropped_unrepairable_evidence": 0,
+          "repair_applied": false,
+          "repaired_evidence_types": 0
+        },
+        "request_prompt_hash": "498722bb1f0fcd694f3089cdc3f168577bf40ca563b52d902cd2444dc83e977d",
+        "request_prompt_tokens_est": 1134,
+        "request_prompt_trimmed": true,
+        "requires_visual_confirmation": true,
+        "response_mapping": {
+          "allowed_evidence_ref_count": 131,
+          "diagnosis": {
+            "error_category": "CO",
+            "step_id": "S18"
+          },
+          "evidence_strength": "limited",
+          "next": {
+            "step_id": "S18"
+          },
+          "observability_status": "partial",
+          "requires_visual_confirmation": true
+        },
+        "retry_count": 0,
+        "retry_reason": null,
+        "scenario_profile": "airfield",
+        "state_key": "4cdcbec64e13f45f354882cc675b61de8be35a03b1f971de2affc68af69a89b4",
+        "sync_delta_ms": 92,
+        "vision": {
+          "frame_id": "1779045062695_000060",
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "frame_stale": false,
+          "observation_ref": "632353de-03a7-49bd-883d-4c8c17969c2b",
+          "observation_seq": 9824,
+          "observation_t_wall_ms": 1779045062600,
+          "observation_t_wall_s": 1779045062.6004815,
+          "pre_trigger_frame": null,
+          "selected_frames": [
+            {
+              "capture_wall_ms": 1779045062695,
+              "channel": "composite_panel",
+              "frame_id": "1779045062695_000060",
+              "frame_seq": 60,
+              "frame_stale": false,
+              "height": 1440,
+              "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779045062695_000060_vlm.png",
+              "layout_id": "fa18c_composite_panel_v2",
+              "role": "trigger_frame",
+              "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779045062695_000060.png",
+              "sync_delta_ms": 92,
+              "sync_miss_reason": null,
+              "sync_status": "matched_future_fallback",
+              "width": 3440
+            }
+          ],
+          "status": "partial",
+          "sync_delta_ms": 92,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_frame": {
+            "capture_wall_ms": 1779045062695,
+            "channel": "composite_panel",
+            "frame_id": "1779045062695_000060",
+            "frame_seq": 60,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779045062695_000060_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779045062695_000060.png",
+            "sync_delta_ms": 92,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          },
+          "trigger_wall_ms": 1779045062603,
+          "vision_used": true
+        },
+        "vision_fact_active_step_ids": [
+          "S08"
+        ],
+        "vision_fact_extractor_used": true,
+        "vision_fact_status": "available",
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779045062695_000060"
+          ],
+          "fresh_fact_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "not_seen_fact_ids": [
+            "tac_page_visible",
+            "supt_page_visible",
+            "fcs_page_x_marks_visible",
+            "fcsmc_page_visible",
+            "fcsmc_intermediate_result_visible",
+            "fcsmc_in_test_visible",
+            "fcsmc_final_go_result_visible"
+          ],
+          "seen_fact_ids": [
+            "fcs_page_visible",
+            "bit_root_page_visible",
+            "hsi_page_visible",
+            "hsi_map_layer_visible",
+            "ins_grnd_alignment_text_visible",
+            "ins_ok_text_visible"
+          ],
+          "status": "available",
+          "summary_text": "seen=fcs_page_visible,bit_root_page_visible,hsi_page_visible,hsi_map_layer_visible,ins_grnd_alignment_text_visible,ins_ok_text_visible; not_seen=tac_page_visible,supt_page_visible,fcs_page_x_marks_visible,fcsmc_page_visible,fcsmc_intermediate_result_visible,fcsmc_in_test_visible,fcsmc_final_go_result_visible",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": [
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "tac_page_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "supt_page_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "fcs_page_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "fcs_page_x_marks_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "bit_root_page_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "fcsmc_page_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "fcsmc_intermediate_result_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "fcsmc_in_test_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 600000,
+            "expires_at_wall_ms": 1779045662603,
+            "fact_id": "fcsmc_final_go_result_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "not_seen",
+            "sticky": true
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "hsi_page_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "hsi_map_layer_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "ins_grnd_alignment_text_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "seen",
+            "sticky": false
+          },
+          {
+            "evidence_note": "",
+            "expires_after_ms": 2000,
+            "expires_at_wall_ms": 1779045064603,
+            "fact_id": "ins_ok_text_visible",
+            "observed_at_wall_ms": 1779045062603,
+            "source_frame_id": "1779045062695_000060",
+            "state": "seen",
+            "sticky": false
+          }
+        ],
+        "vision_fallback_reason": null,
+        "vision_frame_ids": [
+          "1779045062695_000060"
+        ],
+        "vision_status": "partial",
+        "vision_used": true,
+        "vlm_call_reason": "missing_pre_trigger_frame",
+        "vlm_call_status": "called"
+      },
+      "response_id": "f07478b3-a031-4eee-83b7-12e621ade1fd",
+      "status": "ok",
+      "timestamp": "2026-05-17T19:11:14.526667+00:00",
+      "version": "v1"
+    }
+  },
+  "expectations": {
+    "expected_final_step_id": "S18",
+    "expected_overlay_target_ids": [
+      "right_mdi_pb18"
+    ],
+    "final_response_source": "model",
+    "llm_decision_status": "accepted",
+    "vlm_call_status": "called"
+  },
+  "extraction_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+  "harness": {
+    "candidate_steps": [
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "left_mdi_brightness_selector",
+          "right_mdi_brightness_selector",
+          "ampcd_off_brightness_knob",
+          "hud_symbology_brightness_knob",
+          "left_mdi_pb18",
+          "left_mdi_pb15",
+          "right_mdi_pb18",
+          "right_mdi_pb5"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S08",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible",
+          "VISION_FACTS.ins_grnd_alignment_text_visible",
+          "VISION_FACTS.ins_ok_text_visible"
+        ]
+      },
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_1",
+          "ufc_key_3",
+          "ufc_key_4",
+          "ufc_key_0",
+          "ufc_ent_button"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible",
+          "VISION_FACTS.ins_grnd_alignment_text_visible",
+          "VISION_FACTS.ins_ok_text_visible"
+        ]
+      },
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "ins_mode_knob",
+          "ampcd_pb19"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S12",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible",
+          "VISION_FACTS.ins_grnd_alignment_text_visible",
+          "VISION_FACTS.ins_ok_text_visible"
+        ]
+      },
+      {
+        "confidence": 0.86,
+        "proposed_next_action_target_ids": [
+          "radar_mode_knob"
+        ],
+        "role": "candidate",
+        "source": "visual_anchor",
+        "step_id": "S13",
+        "supporting_evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible",
+          "VISION_FACTS.fcs_page_visible",
+          "VISION_FACTS.hsi_map_layer_visible",
+          "VISION_FACTS.hsi_page_visible",
+          "VISION_FACTS.ins_grnd_alignment_text_visible",
+          "VISION_FACTS.ins_ok_text_visible"
+        ]
+      },
+      {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "right_mdi_pb18",
+          "right_mdi_pb5"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S18",
+        "supporting_evidence_refs": []
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "refuel_probe_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S20",
+        "supporting_evidence_refs": [
+          "GATES.S20.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "launch_bar_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S22",
+        "supporting_evidence_refs": [
+          "GATES.S22.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "arresting_hook_handle"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S25",
+        "supporting_evidence_refs": [
+          "GATES.S25.completion"
+        ]
+      }
+    ],
+    "final_action_plan": {
+      "overlay_step_id": null,
+      "source": "model",
+      "step_id": "S18",
+      "targets": [
+        "right_mdi_pb18"
+      ],
+      "text_only": false
+    },
+    "model_decision": {
+      "evidence_refs": [
+        "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+      ],
+      "generation_mode": "model",
+      "overlay_targets": [
+        "right_mdi_pb18"
+      ],
+      "status": "ok",
+      "step_id": "S18"
+    },
+    "repair_result": {
+      "applied": false,
+      "evidence_ref_repair": {
+        "details": [],
+        "repair_applied": false
+      },
+      "json_repaired": false,
+      "path": null
+    },
+    "trace": {
+      "candidates": [
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "right_mdi_pb18",
+            "right_mdi_pb5"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S08",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible",
+            "VISION_FACTS.ins_grnd_alignment_text_visible",
+            "VISION_FACTS.ins_ok_text_visible"
+          ]
+        },
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+            "ufc_ent_button"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S09",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible",
+            "VISION_FACTS.ins_grnd_alignment_text_visible",
+            "VISION_FACTS.ins_ok_text_visible"
+          ]
+        },
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "ins_mode_knob",
+            "ampcd_pb19"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S12",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible",
+            "VISION_FACTS.ins_grnd_alignment_text_visible",
+            "VISION_FACTS.ins_ok_text_visible"
+          ]
+        },
+        {
+          "confidence": 0.86,
+          "proposed_next_action_target_ids": [
+            "radar_mode_knob"
+          ],
+          "role": "candidate",
+          "source": "visual_anchor",
+          "step_id": "S13",
+          "supporting_evidence_refs": [
+            "VISION_FACTS.bit_root_page_visible",
+            "VISION_FACTS.fcs_page_visible",
+            "VISION_FACTS.hsi_map_layer_visible",
+            "VISION_FACTS.hsi_page_visible",
+            "VISION_FACTS.ins_grnd_alignment_text_visible",
+            "VISION_FACTS.ins_ok_text_visible"
+          ]
+        },
+        {
+          "confidence": 0.55,
+          "proposed_next_action_target_ids": [
+            "right_mdi_pb18",
+            "right_mdi_pb5"
+          ],
+          "role": "candidate_not_authoritative",
+          "source": "deterministic",
+          "step_id": "S18",
+          "supporting_evidence_refs": []
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "refuel_probe_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S20",
+          "supporting_evidence_refs": [
+            "GATES.S20.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "launch_bar_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S22",
+          "supporting_evidence_refs": [
+            "GATES.S22.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "arresting_hook_handle"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S25",
+          "supporting_evidence_refs": [
+            "GATES.S25.completion"
+          ]
+        }
+      ],
+      "chosen_candidate": {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "right_mdi_pb18",
+          "right_mdi_pb5"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S18",
+        "supporting_evidence_refs": []
+      },
+      "evidence_packet_summary": {
+        "blocked_gate_count": 6,
+        "conflicts": [],
+        "recent_action_count": 1,
+        "telemetry_missing_source_count": 4,
+        "telemetry_status": "nominal",
+        "telemetry_window_digest": {
+          "changed_var_count": 1,
+          "contradiction_count": 0,
+          "frame_count": 20,
+          "latest_seq": 9824
+        },
+        "vision_fresh_count": 6,
+        "vision_seen_count": 6,
+        "vision_status": "available"
+      },
+      "final_action_plan": {
+        "overlay_step_id": null,
+        "source": "model",
+        "step_id": "S18",
+        "targets": [
+          "right_mdi_pb18"
+        ],
+        "text_only": false
+      },
+      "final_overlay_targets": [
+        "right_mdi_pb18"
+      ],
+      "message_category": "model",
+      "model_decision": {
+        "evidence_refs": [
+          "VISION_FACTS.bit_root_page_visible@1779045062695_000060"
+        ],
+        "generation_mode": "model",
+        "overlay_targets": [
+          "right_mdi_pb18"
+        ],
+        "status": "ok",
+        "step_id": "S18"
+      },
+      "rejected_candidates": [],
+      "repair_result": {
+        "applied": false,
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "json_repaired": false,
+        "path": null
+      },
+      "schema_version": "v1",
+      "validator_result": {
+        "fallback_overlay_reason": "not_needed",
+        "fallback_overlay_used": false,
+        "reasons": [],
+        "rejected": false,
+        "rejected_model_step_id": null
+      },
+      "vlm_call": {
+        "extractor_used": true,
+        "frame_ids": [
+          "1779045062695_000060"
+        ],
+        "reason": "missing_pre_trigger_frame",
+        "status": "called",
+        "sync_delta_ms": 92,
+        "sync_status": "matched_future_fallback",
+        "vision_fact_status": "available",
+        "vision_status": "partial"
+      }
+    },
+    "validator_result": {
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "reasons": [],
+      "rejected": false,
+      "rejected_model_step_id": null
+    }
+  },
+  "help_cycle_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+  "model_io": {
+    "help_response": {
+      "diagnosis": {
+        "error_category": "CO",
+        "step_id": "S18"
+      },
+      "explanations": [
+        "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+      ],
+      "next": {
+        "step_id": "S18"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.95,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+            "target": "right_mdi_pb18",
+            "type": "visual"
+          }
+        ],
+        "targets": [
+          "right_mdi_pb18"
+        ]
+      }
+    },
+    "model_raw_help_response": {
+      "diagnosis": {
+        "error_category": "CO",
+        "step_id": "S18"
+      },
+      "explanations": [
+        "当前处于 S18 阶段，右 DDI 显示 BIT root 页面。请左键点击右 MDI PB18 进入 FCS-MC 页面。"
+      ],
+      "next": {
+        "step_id": "S18"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.95,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "VISION_FACTS.bit_root_page_visible@1779045062695_000060",
+            "target": "right_mdi_pb18",
+            "type": "visual"
+          }
+        ],
+        "targets": [
+          "right_mdi_pb18"
+        ]
+      }
+    },
+    "raw_llm_text_attempt_count": 0,
+    "raw_llm_text_present": false
+  },
+  "request_id": "644fac65-eb37-4de1-a591-fd1de392c647",
+  "request_id_missing": false,
+  "schema_version": "live_help_replay_fixture.v1",
+  "source_log": {
+    "event_count": 13303,
+    "malformed_lines": [],
+    "path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/logs/live_help_harness_smoke_20260517_190017.jsonl"
+  }
+}
