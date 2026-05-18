@@ -7188,6 +7188,283 @@ def test_live_loop_keeps_unresolved_visual_sticky_hold_for_regressed_preliminary
     assert advanced == ["S20"]
 
 
+def test_live_loop_suppresses_stale_visual_preliminary_behind_progress(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_stale_visual_preliminary.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-stale-visual-preliminary",
+    )
+    try:
+        loop._last_inferred_step_id = "S16"
+        loop._sticky_inference_step_id = "S08"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()))
+    finally:
+        loop.close()
+
+    assert active == ["S16"]
+
+
+def test_live_loop_floors_stale_preliminary_to_non_visual_progress(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_non_visual_progress_floor.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-non-visual-progress-floor",
+    )
+    try:
+        loop._last_inferred_step_id = "S14"
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()))
+    finally:
+        loop.close()
+
+    assert active == ["S14"]
+
+
+def test_live_loop_preserves_visual_priority_progress_floor_with_nonvisual_hold(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_visual_progress_floor.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-visual-progress-floor",
+    )
+    try:
+        loop._last_inferred_step_id = "S15"
+        loop._sticky_inference_step_id = "S15"
+        loop._sticky_inference_missing_conditions = ("vars.fcs_reset_complete==true",)
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()))
+    finally:
+        loop.close()
+
+    assert active == ["S15"]
+
+
+def test_live_loop_advances_past_visual_progress_without_visual_hold(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_completed_visual_progress.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-completed-visual-progress",
+    )
+    try:
+        loop._last_inferred_step_id = "S19"
+        loop._sticky_inference_step_id = "S19"
+        loop._sticky_inference_missing_conditions = ("vars.ext_refuel_probe_value>=60000",)
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()))
+    finally:
+        loop.close()
+
+    assert active == ["S20"]
+
+
+def test_live_loop_treats_completed_s08_page_navigation_as_s09_for_vision_gate(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_completed_s08_navigation.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-s08-nav-complete",
+    )
+    try:
+        loop._last_inferred_step_id = "S08"
+        loop._sticky_inference_step_id = "S08"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+        loop.recent_ring.add_delta({"LEFT_DDI_PB_15": 1}, t_wall=10.1, seq=2)
+        loop._vision_fact_snapshot = {
+            "bit_root_page_visible": {
+                "fact_id": "bit_root_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 10000,
+            },
+            "supt_page_visible": {
+                "fact_id": "supt_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 10000,
+            }
+        }
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()), now_wall_ms=10000)
+    finally:
+        loop.close()
+
+    assert active == ["S09"]
+
+
+def test_live_loop_does_not_complete_s08_navigation_from_pb15_before_supt_fact(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_early_pb15_s08_navigation.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-early-pb15-s08-nav",
+    )
+    try:
+        loop._last_inferred_step_id = "S08"
+        loop._sticky_inference_step_id = "S08"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+        loop.recent_ring.add_delta({"LEFT_DDI_PB_15": 1}, t_wall=9.0, seq=1)
+        loop._vision_fact_snapshot = {
+            "bit_root_page_visible": {
+                "fact_id": "bit_root_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 10000,
+            },
+            "supt_page_visible": {
+                "fact_id": "supt_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 10000,
+            },
+        }
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()), now_wall_ms=11000)
+    finally:
+        loop.close()
+
+    assert active == ["S08"]
+
+
+def test_live_loop_does_not_complete_s08_navigation_from_pb15_release_after_supt_fact(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_pb15_release_s08_navigation.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-pb15-release-s08-nav",
+    )
+    try:
+        loop._last_inferred_step_id = "S08"
+        loop._sticky_inference_step_id = "S08"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+        loop.recent_ring.add_delta({"LEFT_DDI_PB_15": 1}, t_wall=9.0, seq=1)
+        loop.recent_ring.add_delta({"LEFT_DDI_PB_15": 0}, t_wall=10.1, seq=2)
+        loop._vision_fact_snapshot = {
+            "bit_root_page_visible": {
+                "fact_id": "bit_root_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 10000,
+            },
+            "supt_page_visible": {
+                "fact_id": "supt_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 10000,
+            },
+        }
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()), now_wall_ms=11000)
+    finally:
+        loop.close()
+
+    assert active == ["S08"]
+
+
+def test_live_loop_does_not_complete_s08_navigation_without_bit_root(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_incomplete_s08_navigation.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-incomplete-s08-nav",
+    )
+    try:
+        loop._last_inferred_step_id = "S08"
+        loop._sticky_inference_step_id = "S08"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+        loop._step_interacted_targets = {"left_mdi_pb15"}
+        loop._vision_fact_snapshot = {
+            "supt_page_visible": {
+                "fact_id": "supt_page_visible",
+                "state": "seen",
+                "source_frame_id": "old-s08-frame",
+                "sticky": False,
+            }
+        }
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()), now_wall_ms=10000)
+    finally:
+        loop.close()
+
+    assert active == ["S08"]
+
+
+def test_live_loop_does_not_complete_s08_navigation_from_expired_visual_fact(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_expired_s08_navigation.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-expired-s08-nav",
+    )
+    try:
+        loop._last_inferred_step_id = "S08"
+        loop._sticky_inference_step_id = "S08"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_visible==seen",)
+        loop._step_interacted_targets = {"left_mdi_pb15"}
+        loop.recent_ring.add_delta({"LEFT_DDI_PB_15": 1}, t_wall=9.5, seq=1)
+        loop._vision_fact_snapshot = {
+            "bit_root_page_visible": {
+                "fact_id": "bit_root_page_visible",
+                "state": "seen",
+                "source_frame_id": "fresh-bit-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 9500,
+                "expires_at_wall_ms": 12000,
+            },
+            "supt_page_visible": {
+                "fact_id": "supt_page_visible",
+                "state": "seen",
+                "source_frame_id": "expired-s08-frame",
+                "sticky": False,
+                "observed_at_wall_ms": 8000,
+                "expires_at_wall_ms": 9000,
+            }
+        }
+
+        active = loop._active_step_ids_for_vision_facts(StepInferenceResult("S08", ()), now_wall_ms=10000)
+    finally:
+        loop.close()
+
+    assert active == ["S08"]
+
+
 def test_live_loop_ignores_stale_s19_visual_facts_for_s21(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_s21_ignores_stale_s19_vlm.jsonl"
     frame = _bios_frame(1, 10.0, apu_switch=1)
