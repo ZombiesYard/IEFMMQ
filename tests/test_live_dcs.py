@@ -2136,7 +2136,8 @@ def test_live_loop_filters_help_overlay_targets_by_request_allowlist(tmp_path: P
     assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_code"] == ALLOWLIST_FAIL
     assert tutor_response_payloads[0]["metadata"]["response_mapping_failure_stage"] == "response_mapping"
     assert tutor_response_payloads[0]["metadata"]["fallback_overlay_used"] is True
-    assert tutor_response_payloads[0]["metadata"]["fallback_overlay_reason"].startswith("deterministic_step:")
+    assert tutor_response_payloads[0]["metadata"]["fallback_overlay_reason"] == "validator_repair"
+    assert tutor_response_payloads[0]["metadata"]["harness_validator_fallback_reason"].startswith("deterministic_step:")
 
 
 def test_resolve_step_overlay_allowlist_treats_tuple_hint_blockers_as_hard() -> None:
@@ -3037,7 +3038,8 @@ def test_live_loop_uses_safe_fallback_overlay_when_model_response_is_error(tmp_p
     meta = tutor_response_payload["metadata"]
     assert meta["fallback_overlay_used"] is True
     assert isinstance(meta["fallback_overlay_reason"], str)
-    assert meta["fallback_overlay_reason"].startswith("deterministic_step:")
+    assert meta["fallback_overlay_reason"] == "emergency_presentation_fallback"
+    assert meta["final_action_plan"]["source"] == "emergency_presentation_fallback"
 
 
 def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_overlay(tmp_path: Path) -> None:
@@ -3102,7 +3104,8 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
     tutor_response_payload = next(event.payload for event in events if event.kind == "tutor_response")
     meta = tutor_response_payload["metadata"]
     assert meta["fallback_overlay_used"] is True
-    assert meta["fallback_overlay_reason"] == "deterministic_step:S03"
+    assert meta["fallback_overlay_reason"] == "validator_action_hint"
+    assert meta["presentation_fallback_reason"] == "deterministic_step:S03"
     response_mapping = meta["response_mapping"]
     assert response_mapping["rejected_targets_by_request_allowlist"] == ["eng_crank_switch"]
     assert "overlay_target_not_in_request_allowlist" in response_mapping["mapping_errors"]
@@ -3209,6 +3212,9 @@ def test_safe_fallback_overlay_is_pack_driven_for_s01_s25(tmp_path: Path) -> Non
             if isinstance(requirements, list) and requirements:
                 can_verify = any(item in verifiable_types for item in requirements if isinstance(item, str))
             expected_overlay = bool(step_targets) and can_verify
+            if fallback_reason.startswith("evidence_conflict:"):
+                assert fallback_help_obj is None, step_id
+                continue
             if expected_overlay:
                 assert isinstance(fallback_help_obj, dict), step_id
                 assert fallback_reason == f"deterministic_step:{step_id}"
@@ -3868,8 +3874,9 @@ def test_harness_validation_repairs_s08_selector_to_supt_visual_hint(tmp_path: P
         used, reason = loop._apply_harness_validation_action_plan(response, request)
 
         assert used is True
-        assert reason == "deterministic_step:S08"
+        assert reason == "validator_action_hint"
         assert [action["target"] for action in response.actions] == ["left_mdi_pb15"]
+        assert response.metadata["harness_validator_fallback_reason"] == "deterministic_step:S08"
         assert response.metadata["s08_visual_hint_repair_applied"] is True
         assert response.metadata["rejected_model_target"] == "left_mdi_brightness_selector"
         assert response.metadata["visual_hint_target"] == "left_mdi_pb15"
@@ -4424,7 +4431,8 @@ def test_s08_dual_visual_missing_overrides_model_left_nav_to_right_display_recov
         override_used, override_reason = loop._apply_s08_visual_recovery_overlay_override(response, request)
 
         assert override_used is True
-        assert override_reason == "deterministic_step:S08"
+        assert override_reason == "validator_repair"
+        assert response.metadata["presentation_fallback_reason"] == "deterministic_step:S08"
         assert [action["target"] for action in response.actions][:3] == [
             "right_mdi_brightness_selector",
             "left_mdi_pb18",
@@ -4725,7 +4733,7 @@ def test_action_hint_overlay_override_rewrites_s19_fcsmc_step_to_fcs_bit_switch(
         override_used, override_reason = loop._apply_action_hint_overlay_override(response, request)
 
         assert override_used is True
-        assert override_reason == "deterministic_step:S19"
+        assert override_reason == "validator_action_hint"
         assert response.actions
         assert response.actions[0]["target"] == "fcs_bit_switch"
         assert "Hold the FCS BIT switch up" in response.message
@@ -4733,6 +4741,7 @@ def test_action_hint_overlay_override_rewrites_s19_fcsmc_step_to_fcs_bit_switch(
         assert response.metadata["action_hint_overlay_override_used"] is True
         assert response.metadata["action_hint_overlay_override_target"] == "fcs_bit_switch"
         assert response.metadata["action_hint_overlay_override_kind"] == "action_hint"
+        assert response.metadata["action_hint_overlay_override_fallback_reason"] == "deterministic_step:S19"
     finally:
         loop.close()
 
@@ -5918,7 +5927,7 @@ def test_action_hint_overlay_override_uses_split_s26_pitot_target() -> None:
         used, reason = loop._apply_action_hint_overlay_override(response, request)
 
         assert used is True
-        assert reason == "deterministic_step:S26"
+        assert reason == "validator_action_hint"
         assert response.actions[0]["target"] == "pitot_heater_switch"
         assert response.metadata["action_hint_overlay_override_target"] == "pitot_heater_switch"
         assert response.message == "Turn pitot heat ON."
@@ -5994,7 +6003,7 @@ def test_harness_validation_action_plan_records_s26_repair_metadata() -> None:
         used, reason = loop._apply_harness_validation_action_plan(response, request)
 
         assert used is True
-        assert reason == "deterministic_step:S26"
+        assert reason == "validator_action_hint"
         assert response.actions[0]["target"] == "pitot_heater_switch"
         assert response.metadata["validator_rejected"] is True
         assert response.metadata["repair_applied"] is True
@@ -9071,7 +9080,8 @@ def test_live_loop_uses_deterministic_fallback_when_visual_model_disagrees_with_
     assert response.actions
     assert response.actions[0]["target"] == "standby_altimeter_pressure_knob"
     assert response.metadata["fallback_overlay_used"] is True
-    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S30"
+    assert response.metadata["fallback_overlay_reason"] == "validator_repair"
+    assert response.metadata["harness_validator_fallback_reason"] == "deterministic_step:S30"
     assert response.metadata["vision_fallback_reason"] is None
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "standby_altimeter_pressure_knob"
 
@@ -9636,7 +9646,8 @@ def test_live_loop_replaces_stale_s08_overlay_with_s09_action_hint(tmp_path: Pat
     assert response.actions
     assert response.actions[0]["target"] == "ufc_comm1_channel_selector_pull"
     assert response.metadata["fallback_overlay_used"] is True
-    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S08"
+    assert response.metadata["fallback_overlay_reason"] == "validator_action_hint"
+    assert response.metadata["harness_validator_fallback_reason"] == "deterministic_step:S08"
     assert response.metadata["response_mapping"]["rejected_targets_by_request_allowlist"] == ["left_mdi_pb15"]
     assert response.metadata["response_mapping"]["mapping_error"] == "overlay_target_not_in_request_allowlist"
 
@@ -9711,7 +9722,9 @@ def test_live_loop_overrides_s18_root_menu_overlay_with_action_hint_when_vision_
     assert response.actions
     assert response.actions[0]["target"] == "right_mdi_pb5"
     assert response.metadata["fallback_overlay_used"] is True
-    assert response.metadata["fallback_overlay_reason"] == "deterministic_step:S18"
+    assert response.metadata["fallback_overlay_reason"] == "validator_action_hint"
+    assert response.metadata["presentation_fallback_reason"] == "deterministic_step:S18"
+    assert response.metadata["final_action_plan"]["source"] == "validator_action_hint"
     assert response.metadata.get("action_hint_overlay_override_used") is not True
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
 
@@ -10415,6 +10428,203 @@ def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails
     assert "eng_crank_switch" not in [action["target"] for action in repaired.actions]
     assert "S10" not in repaired.message
     assert "S12" in repaired.message
+
+
+def test_safe_fallback_overlay_rejects_missing_condition_satisfied_by_latest_telemetry() -> None:
+    request = TutorRequest(
+        request_id="issue-313-satisfied-missing-no-direct-fallback",
+        message="help",
+        context={
+            "vars": {"comm1_freq_134_000": True},
+            "gates": {"S09.completion": {"status": "allowed", "allowed": True}},
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_ui_targets": ["ufc_comm1_channel_selector_pull"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["ufc_comm1_channel_selector_pull"],
+            "rag_topk": [],
+        },
+    )
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-issue-313-satisfied-missing",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        fallback_help_obj, reason = loop._build_safe_fallback_overlay_help_obj(request)
+    finally:
+        loop.close()
+
+    assert fallback_help_obj is None
+    assert reason.startswith("evidence_conflict:")
+
+
+def test_safe_fallback_overlay_rejects_already_satisfied_completion_gate() -> None:
+    request = TutorRequest(
+        request_id="issue-313-satisfied-gate-no-direct-fallback",
+        message="help",
+        context={
+            "vars": {"comm1_freq_134_000": True},
+            "gates": {"S09.completion": {"status": "allowed", "allowed": True}},
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": [],
+                "step_ui_targets": ["ufc_comm1_channel_selector_pull"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["ufc_comm1_channel_selector_pull"],
+            "rag_topk": [],
+        },
+    )
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-issue-313-satisfied-gate",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        fallback_help_obj, reason = loop._build_safe_fallback_overlay_help_obj(request)
+    finally:
+        loop.close()
+
+    assert fallback_help_obj is None
+    assert reason.startswith("evidence_conflict:")
+    assert "completion_gate_already_satisfied:S09" in reason
+
+
+def test_safe_fallback_overlay_rechecks_override_step_against_latest_evidence() -> None:
+    request = TutorRequest(
+        request_id="issue-313-override-step-recheck",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": True,
+                "engine_crank_left_complete": True,
+                "rpm_l": 64,
+                "rpm_l_gte_60": True,
+                "left_engine_nominal_start_params": True,
+                "throttle_l_not_off": True,
+            },
+            "gates": {"S10.completion": {"status": "allowed", "allowed": True}},
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_ui_targets": ["ufc_comm1_channel_selector_pull"],
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["eng_crank_switch"],
+            "rag_topk": [],
+        },
+    )
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-issue-313-override-recheck",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        fallback_help_obj, reason = loop._build_safe_fallback_overlay_help_obj(
+            request,
+            override_inferred_step_id="S10",
+            override_overlay_step_id="S10",
+            ignore_request_allowlist=True,
+        )
+    finally:
+        loop.close()
+
+    assert fallback_help_obj is None
+    assert reason.startswith("evidence_conflict:")
+    assert "completion_gate_already_satisfied:S10" in reason
+
+
+def test_model_error_fallback_overlay_uses_emergency_presentation_source() -> None:
+    request = TutorRequest(
+        request_id="issue-313-model-error-presentation-fallback",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": False,
+                "ufc_comm1_pull_pressed": True,
+                "ufc_scratchpad_number_display": "    .13",
+            },
+            "gates": {
+                "S09.completion": {
+                    "status": "blocked",
+                    "reason": "COMM1 preset 1 must be programmed to 134.000 MHz.",
+                    "reason_code": "s09_requires_comm1_freq_134_000",
+                }
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_ui_targets": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button",
+                ],
+                "action_hint": {
+                    "target": "ufc_key_4",
+                    "reason": "COMM1 preset entry shows 13; press 4 next.",
+                },
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="error",
+        in_reply_to=request.request_id,
+        message="降级提示：模型响应不可用。",
+        actions=[],
+        explanations=[],
+        metadata={
+            "provider": "fallback",
+            "error_type": "ValueError",
+            "error": "invalid model JSON",
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["fallback_overlay_used"] is True
+    assert repaired.metadata["final_action_plan"]["source"] == "emergency_presentation_fallback"
+    assert repaired.metadata["emergency_presentation_fallback_plan_source"] == "validator_action_hint"
+    assert repaired.metadata["final_action_plan"]["targets"] == ["ufc_key_4"]
+    assert repaired.metadata["harness_trace"]["final_action_plan"]["source"] == "emergency_presentation_fallback"
+    assert repaired.metadata["harness_trace"]["final_action_plan"]["targets"] == ["ufc_key_4"]
+    assert "validator_result" in repaired.metadata["harness_trace"]
+    assert "repair_result" in repaired.metadata["harness_trace"]
+    assert [action["target"] for action in repaired.actions] == ["ufc_key_4"]
+    assert not str(repaired.metadata["fallback_overlay_reason"]).startswith("deterministic_step:")
 
 
 def test_live_help_fixture_294_s09_uses_stage_action_hint_for_next_digit() -> None:
