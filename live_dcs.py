@@ -2494,6 +2494,16 @@ def _refuel_probe_retracted(vars_selected: Mapping[str, Any]) -> bool:
     return probe_value is not None and probe_value <= 5000
 
 
+def _refuel_probe_completion_latches_from_context(context: Mapping[str, Any]) -> dict[str, bool]:
+    raw_latches = context.get("refuel_probe_completion_latches")
+    if not isinstance(raw_latches, Mapping):
+        return {}
+    return {
+        "s20_latched_complete": raw_latches.get("s20_latched_complete") is True,
+        "s21_latched_complete": raw_latches.get("s21_latched_complete") is True,
+    }
+
+
 def _missing_conditions_satisfied_by_vars(
     missing_conditions: Sequence[str],
     vars_selected: Mapping[str, Any],
@@ -3807,6 +3817,12 @@ class LiveDcsTutorLoop:
         if self._refuel_probe_s20_latched_complete and _refuel_probe_retracted(vars_selected):
             self._refuel_probe_s21_latched_complete = True
 
+    def _refuel_probe_completion_latches_dict(self) -> dict[str, bool]:
+        return {
+            "s20_latched_complete": self._refuel_probe_s20_latched_complete,
+            "s21_latched_complete": self._refuel_probe_s21_latched_complete,
+        }
+
     def _ensure_knowledge(self) -> KnowledgePort:
         if self.knowledge is None:
             self.knowledge = LocalKnowledgeAdapter(
@@ -4372,11 +4388,13 @@ class LiveDcsTutorLoop:
         if isinstance(action_hint, Mapping):
             deterministic_hint["action_hint"] = dict(action_hint)
 
+        refuel_probe_completion_latches = self._refuel_probe_completion_latches_dict()
         context = {
             "vars": vars_selected,
             "gates": gates,
             "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
+            "refuel_probe_completion_latches": refuel_probe_completion_latches,
             "pack_path": str(self.pack_path),
             "telemetry_map_path": str(self.telemetry_map_path),
             "candidate_steps": candidate_step_payload,
@@ -4464,6 +4482,7 @@ class LiveDcsTutorLoop:
             "recent_buttons": recent_buttons,
             "candidate_steps": candidate_step_payload,
             "overlay_target_allowlist": self.overlay_allowlist,
+            "refuel_probe_completion_latches": refuel_probe_completion_latches,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
             "vision": {
@@ -6531,6 +6550,29 @@ class LiveDcsTutorLoop:
         if not targets:
             help_response = response.metadata.get("help_response")
             targets = _help_response_overlay_targets(help_response)
+        latched_reason = self._refuel_probe_latched_completion_conflict(context, accepted_step_id)
+        if latched_reason is not None:
+            rejected_missing = [
+                item for item in accepted_missing_conditions if isinstance(item, str) and item
+            ]
+            response.metadata["validator_rejected"] = True
+            response.metadata["repair_applied"] = True
+            response.metadata["rejected_missing_conditions"] = rejected_missing
+            response.metadata["final_evidence_consistency_validator_applied"] = True
+            response.metadata["final_evidence_consistency_reasons"] = [latched_reason]
+            response.metadata.setdefault("final_action_plan_source", "final_evidence_consistency_validator")
+            if isinstance(accepted_step_id, str) and accepted_step_id:
+                response.metadata.setdefault("rejected_model_step_id", accepted_step_id)
+
+            existing_reasons = response.metadata.get("harness_validation_reasons")
+            merged_reasons = (
+                [item for item in existing_reasons if isinstance(item, str) and item]
+                if isinstance(existing_reasons, list)
+                else []
+            )
+            merged_reasons.append(latched_reason)
+            response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
+            return True
         result = validate_final_evidence_consistency(
             accepted_step_id=accepted_step_id,
             accepted_overlay_targets=targets,
@@ -6568,11 +6610,14 @@ class LiveDcsTutorLoop:
         missing_conditions: Sequence[str],
         include_completion_gate: bool = False,
     ) -> str | None:
-        if not missing_conditions and not include_completion_gate:
-            return None
         context = request.context if isinstance(request.context, Mapping) else {}
         vars_selected = context.get("vars")
         vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        latched_reason = self._refuel_probe_latched_completion_conflict(context, step_id)
+        if latched_reason is not None:
+            return f"evidence_conflict:{latched_reason}"
+        if not missing_conditions and not include_completion_gate:
+            return None
         evidence_context = self._context_with_full_pack_gates(context)
         try:
             evidence_packet = build_evidence_packet(evidence_context)
@@ -6591,6 +6636,29 @@ class LiveDcsTutorLoop:
         if not reasons:
             return "evidence_conflict"
         return f"evidence_conflict:{'|'.join(reasons[:3])}"
+
+    def _refuel_probe_latched_completion_conflict(
+        self,
+        context: Mapping[str, Any],
+        step_id: str | None,
+    ) -> str | None:
+        if step_id not in {"S20", "S21"}:
+            return None
+        latches = _refuel_probe_completion_latches_from_context(context)
+        vars_selected = context.get("vars")
+        vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        if (
+            step_id == "S20"
+            and latches.get("s20_latched_complete")
+            and _refuel_probe_extended(vars_map)
+        ):
+            return "refuel_probe_latched_completion:S20"
+        if (
+            latches.get("s21_latched_complete")
+            and _refuel_probe_retracted(vars_map)
+        ):
+            return "refuel_probe_latched_completion:S21"
+        return None
 
     def _context_with_full_pack_gates(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
         vars_selected = context.get("vars")
