@@ -2259,6 +2259,12 @@ def _build_harness_trace_metadata(
         "message_category": message_category,
         "vlm_call": vlm_call,
     }
+    vlm_skipped_preliminary_step = response_metadata.get("vlm_skipped_preliminary_step")
+    if isinstance(vlm_skipped_preliminary_step, str) and vlm_skipped_preliminary_step:
+        trace["vlm_skipped_preliminary_step"] = vlm_skipped_preliminary_step
+    final_step_requires_visual = response_metadata.get("final_step_requires_visual")
+    if isinstance(final_step_requires_visual, str) and final_step_requires_visual:
+        trace["final_step_requires_visual"] = final_step_requires_visual
     response.metadata["message_category"] = message_category
     response.metadata["vlm_call_status"] = vlm_call["status"]
     response.metadata["vlm_call_reason"] = vlm_call["reason"]
@@ -5540,6 +5546,31 @@ class LiveDcsTutorLoop:
             ]
         response.metadata["final_public_response"] = final_public_response
         response.metadata["final_public_instruction_category"] = final_public_response["instruction_category"]
+
+    def _annotate_final_visual_step_vlm_skip(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> None:
+        if response.metadata.get("vision_fact_status") != VISION_NOT_REQUIRED:
+            return
+        final_plan = response.metadata.get("harness_action_plan") or response.metadata.get("final_action_plan")
+        if not isinstance(final_plan, Mapping):
+            return
+        final_step_id = final_plan.get("step_id")
+        if not isinstance(final_step_id, str) or final_step_id not in self.vision_priority_step_set:
+            return
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        preliminary_step_id = request.metadata.get("fused_step_id")
+        if not isinstance(preliminary_step_id, str) or not preliminary_step_id:
+            preliminary_step_id = hint.get("inferred_step_id") if isinstance(hint, Mapping) else None
+        if not isinstance(preliminary_step_id, str) or not preliminary_step_id:
+            return
+        if preliminary_step_id != "S17" or final_step_id != "S18":
+            return
+        response.metadata["vlm_skipped_preliminary_step"] = preliminary_step_id
+        response.metadata["final_step_requires_visual"] = final_step_id
 
     def _normalize_observable_text_only_response(
         self,
@@ -9119,6 +9150,7 @@ class LiveDcsTutorLoop:
             fallback_overlay_used = bool(response.actions)
             fallback_overlay_reason = final_consistency_reason
         self._rewrite_public_target_id_action_text(response, request)
+        self._annotate_final_visual_step_vlm_skip(response, request)
 
         if mapped_meta:
             mapping_failure_codes = classify_mapping_failure(mapped_meta)
