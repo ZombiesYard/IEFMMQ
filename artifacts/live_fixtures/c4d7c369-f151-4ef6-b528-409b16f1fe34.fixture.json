@@ -1,0 +1,166 @@
+{
+  "context": {
+    "observation_ref": "685a3d7f-d0d7-4ec5-a719-03f0a460b998",
+    "observations": [
+      {
+        "observation_id": "685a3d7f-d0d7-4ec5-a719-03f0a460b998",
+        "payload": {
+          "seq": 6214,
+          "t_wall": 1779209302.552865,
+          "recent_ui_targets": [],
+          "vars": {
+            "battery_on": true,
+            "power_available": true,
+            "hud_on": true,
+            "left_ddi_on": true,
+            "right_ddi_on": true,
+            "mpcd_on": true,
+            "comm1_freq_134_000": true,
+            "right_engine_nominal_start_params": true,
+            "engine_crank_left_complete": true,
+            "rpm_l": 26,
+            "rpm_l_gte_25": true,
+            "rpm_l_gte_60": false,
+            "left_engine_idle_ready": false,
+            "left_engine_nominal_start_params": false,
+            "throttle_l_not_off": false,
+            "ins_mode": 0,
+            "ins_mode_set": false,
+            "ins_mode_cv_or_gnd": false,
+            "ins_fast_align_complete": false,
+            "radar_mode_opr": false
+          }
+        }
+      }
+    ]
+  },
+  "cycle": {
+    "tutor_request": {
+      "request_id": "c4d7c369-f151-4ef6-b528-409b16f1fe34",
+      "message": "help",
+      "observation_ref": "685a3d7f-d0d7-4ec5-a719-03f0a460b998",
+      "context": {
+        "scenario_profile": "airfield",
+        "deterministic_step_hint": {
+          "inferred_step_id": "S11",
+          "overlay_step_id": "S11",
+          "observability": "observable",
+          "observability_status": "observable",
+          "requires_visual_confirmation": false,
+          "missing_conditions_count": 1,
+          "step_ui_targets": []
+        },
+        "state_harness": {
+          "conflicts": [],
+          "telemetry_evidence": {
+            "source_status": "nominal",
+            "confidence": "medium",
+            "observation_seq": 6214
+          },
+          "vision_evidence": {
+            "source_status": "vision_not_required",
+            "confidence": "low",
+            "seen_fact_ids": [],
+            "fresh_fact_ids": []
+          },
+          "deterministic_candidate": {
+            "step_id": "S11",
+            "overlay_step_id": "S11",
+            "missing_conditions": [
+              "vars.rpm_l>=25"
+            ],
+            "role": "candidate_not_authoritative"
+          },
+          "telemetry_window_digest": {
+            "frame_count": 20,
+            "first_seq": 6195,
+            "latest_seq": 6214,
+            "stable_true_vars": [
+              "battery_on",
+              "hud_on",
+              "left_ddi_on",
+              "mpcd_on",
+              "power_available",
+              "right_ddi_on"
+            ],
+            "stable_false_vars": [],
+            "contradictions": [],
+            "changed_vars": [
+              {
+                "var": "rpm_l",
+                "first_value": 25,
+                "last_value": 26,
+                "transition_count": 1
+              }
+            ]
+          }
+        },
+        "evidence_packet_summary": {
+          "telemetry_status": "nominal",
+          "vision_status": "vision_not_required",
+          "blocked_gate_count": 7,
+          "recent_action_count": 0,
+          "conflicts": []
+        },
+        "vision_fact_summary": {
+          "status": "vision_not_required",
+          "seen_fact_ids": [],
+          "fresh_fact_ids": []
+        },
+        "vision_facts": [],
+        "overlay_target_allowlist": [
+          "ins_mode_knob",
+          "ampcd_pb19"
+        ],
+        "rag_topk": []
+      },
+      "metadata": {}
+    },
+    "tutor_response": {
+      "metadata": {
+        "vision": {
+          "status": "partial",
+          "vision_used": true,
+          "frame_ids": [
+            "1779209302604_000294"
+          ],
+          "sync_miss_reason": "missing_pre_trigger_frame"
+        },
+        "vision_fact_summary": {
+          "status": "vision_not_required",
+          "frame_ids": [
+            "1779209302604_000294"
+          ],
+          "fresh_fact_ids": [],
+          "seen_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "summary_text": "no_active_vision_facts"
+        },
+        "vision_facts": []
+      }
+    }
+  },
+  "model_io": {
+    "help_response": {
+      "diagnosis": {
+        "step_id": "S11",
+        "error_category": "OM"
+      },
+      "next": {
+        "step_id": "S11"
+      },
+      "overlay": {
+        "targets": [],
+        "evidence": []
+      },
+      "explanations": [
+        "当前处于 S11 步骤，需要将左油门杆从 OFF 推至 IDLE。由于无法高亮真实油门杆，请使用键盘热键：按住 Right Alt 并按 Home 将左油门推至 IDLE。"
+      ]
+    }
+  },
+  "expectations": {
+    "expected_final_step_id": "S11",
+    "expected_overlay_target_ids": [],
+    "final_response_source": "model"
+  }
+}

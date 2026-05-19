@@ -6466,7 +6466,7 @@ class LiveDcsTutorLoop:
             "step_id": plan.step_id,
             "overlay_step_id": plan.overlay_step_id,
             "targets": list(plan.targets),
-            "text_only": plan.text_only,
+            "text_only": plan.text_only or not bool(plan.targets),
             "source": final_action_plan_source,
         }
         if s08_visual_hint_used:
@@ -6861,6 +6861,9 @@ class LiveDcsTutorLoop:
                 precondition_only.append(condition)
         return completion_only, precondition_only
 
+    def _completion_gate_condition_count(self, step_id: str | None) -> int:
+        return len(self._gate_missing_condition_keys_for_step(step_id, "completion"))
+
     def _record_final_evidence_precondition_metadata(
         self,
         response: TutorResponse,
@@ -6911,6 +6914,60 @@ class LiveDcsTutorLoop:
             else []
         )
         merged_reasons.extend(precondition_reasons)
+        response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
+
+    def _record_final_evidence_partial_completion_metadata(
+        self,
+        response: TutorResponse,
+        *,
+        completion_missing_conditions: Sequence[str],
+        latest_vars: Mapping[str, Any],
+        evidence_packet: Any,
+    ) -> None:
+        if not completion_missing_conditions:
+            return
+        partial_result = validate_final_evidence_consistency(
+            accepted_step_id=None,
+            accepted_overlay_targets=[],
+            accepted_missing_conditions=completion_missing_conditions,
+            latest_vars=latest_vars,
+            evidence_packet=evidence_packet,
+        )
+        satisfied = [
+            item for item in partial_result.rejected_missing_conditions
+            if isinstance(item, str) and item
+        ]
+        if not satisfied:
+            return
+        response.metadata["final_evidence_consistency_partial_completion_satisfied"] = True
+        existing_conditions = response.metadata.get("partial_completion_satisfied_conditions")
+        merged_conditions = (
+            [item for item in existing_conditions if isinstance(item, str) and item]
+            if isinstance(existing_conditions, list)
+            else []
+        )
+        merged_conditions.extend(satisfied)
+        response.metadata["partial_completion_satisfied_conditions"] = _dedupe_strings(merged_conditions)
+        partial_reasons = [
+            f"partial_completion_satisfied_not_complete:{condition}" for condition in satisfied
+        ]
+        existing_partial_reasons = response.metadata.get("final_evidence_consistency_partial_completion_reasons")
+        merged_partial_reasons = (
+            [item for item in existing_partial_reasons if isinstance(item, str) and item]
+            if isinstance(existing_partial_reasons, list)
+            else []
+        )
+        merged_partial_reasons.extend(partial_reasons)
+        response.metadata["final_evidence_consistency_partial_completion_reasons"] = _dedupe_strings(
+            merged_partial_reasons
+        )
+        existing_reasons = response.metadata.get("harness_validation_reasons")
+        merged_reasons = (
+            [item for item in existing_reasons if isinstance(item, str) and item]
+            if isinstance(existing_reasons, list)
+            else []
+        )
+        merged_reasons.extend(partial_reasons)
         response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
 
     def _apply_final_evidence_consistency_metadata(
@@ -6972,6 +7029,23 @@ class LiveDcsTutorLoop:
             latest_vars=vars_map,
             evidence_packet=evidence_packet,
         )
+        completion_condition_count = self._completion_gate_condition_count(accepted_step_id)
+        if completion_condition_count > 1:
+            completion_gate_result = validate_final_evidence_consistency(
+                accepted_step_id=accepted_step_id,
+                accepted_overlay_targets=targets,
+                accepted_missing_conditions=[],
+                latest_vars=vars_map,
+                evidence_packet=evidence_packet,
+            )
+            if completion_gate_result.accepted:
+                self._record_final_evidence_partial_completion_metadata(
+                    response,
+                    completion_missing_conditions=completion_missing_conditions,
+                    latest_vars=vars_map,
+                    evidence_packet=evidence_packet,
+                )
+            completion_missing_conditions = []
         result = validate_final_evidence_consistency(
             accepted_step_id=accepted_step_id,
             accepted_overlay_targets=targets,
@@ -7019,6 +7093,8 @@ class LiveDcsTutorLoop:
         if latched_reason is not None:
             return f"evidence_conflict:{latched_reason}"
         completion_missing_conditions, _ = self._split_completion_missing_conditions(step_id, missing_conditions)
+        if self._completion_gate_condition_count(step_id) > 1:
+            completion_missing_conditions = []
         if not completion_missing_conditions and not include_completion_gate:
             return None
         evidence_context = self._context_with_full_pack_gates(context)
