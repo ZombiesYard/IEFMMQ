@@ -7417,6 +7417,194 @@ def test_live_build_request_serializes_refuel_probe_latch_history(tmp_path: Path
     assert retracted_state_key != extended_state_key
 
 
+def test_live_build_request_serializes_four_down_transition_latch_history(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_four_down_latch_request.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-four-down-latch-request",
+    )
+    try:
+        loop._refuel_probe_s20_latched_complete = True
+        loop._refuel_probe_s21_latched_complete = True
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S22",
+                missing_conditions=("vars.launch_bar_switch_value in [1,1]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "launch_bar_switch_value": 0,
+                "hook_handle_value": 1,
+            },
+        )
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S22",
+                missing_conditions=("vars.launch_bar_switch_value in [1,1]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "launch_bar_switch_value": 1,
+                "hook_handle_value": 1,
+            },
+        )
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S23",
+                missing_conditions=("vars.launch_bar_switch_value in [0,0]",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "launch_bar_switch_value": 0,
+                "hook_handle_value": 1,
+            },
+        )
+        before_hook_latch_obs = Observation(
+            source="mock",
+            payload={
+                "seq": 1,
+                "t_wall": 10.0,
+                "vars": {
+                    "battery_on": True,
+                    "power_available": True,
+                    "launch_bar_switch_value": 0,
+                    "hook_handle_value": 1,
+                },
+            },
+        )
+        before_hook_latch_vision = loop._build_vision_selection(
+            observation=before_hook_latch_obs,
+            trigger_t_wall=10.0,
+        )
+        before_hook_latch_request, _prompt_meta, before_hook_latch_state_key = loop._build_request(
+            before_hook_latch_obs,
+            vision_selection=before_hook_latch_vision,
+            vision_fact_context=loop._extract_vision_fact_context(vision_selection=before_hook_latch_vision),
+        )
+
+        hook_initial_down = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S24",
+                missing_conditions=("session.hook_down_transition_observed==true",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "launch_bar_switch_value": 0,
+                "hook_handle_value": 1,
+            },
+        )
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S24",
+                missing_conditions=("session.hook_down_transition_observed==true",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "launch_bar_switch_value": 0,
+                "hook_handle_value": 0,
+            },
+        )
+        hook_transition_down = loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S24",
+                missing_conditions=("session.hook_down_transition_observed==true",),
+            ),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "launch_bar_switch_value": 0,
+                "hook_handle_value": 1,
+            },
+        )
+
+        hook_cold_loop = LiveDcsTutorLoop(
+            source=ReplayBiosReceiver(replay_path),
+            model=FailingModel(),
+            action_executor=RecordingExecutor(),
+            session_id="sess-four-down-hook-cold",
+        )
+        try:
+            hook_cold_s25 = hook_cold_loop._stabilize_live_inference(
+                StepInferenceResult(
+                    inferred_step_id="S25",
+                    missing_conditions=("vars.hook_handle_value in [0,0]",),
+                ),
+                {
+                    "battery_on": True,
+                    "power_available": True,
+                    "launch_bar_switch_value": 0,
+                    "hook_handle_value": 1,
+                },
+            )
+        finally:
+            hook_cold_loop.close()
+        launch_bar_cold_loop = LiveDcsTutorLoop(
+            source=ReplayBiosReceiver(replay_path),
+            model=FailingModel(),
+            action_executor=RecordingExecutor(),
+            session_id="sess-four-down-launch-cold",
+        )
+        try:
+            launch_bar_cold_s23 = launch_bar_cold_loop._stabilize_live_inference(
+                StepInferenceResult(
+                    inferred_step_id="S23",
+                    missing_conditions=("vars.launch_bar_switch_value in [0,0]",),
+                ),
+                {
+                    "battery_on": True,
+                    "power_available": True,
+                    "launch_bar_switch_value": 1,
+                },
+            )
+        finally:
+            launch_bar_cold_loop.close()
+
+        obs = Observation(
+            source="mock",
+            payload={
+                "seq": 1,
+                "t_wall": 10.0,
+                "vars": {
+                    "battery_on": True,
+                    "power_available": True,
+                    "launch_bar_switch_value": 0,
+                    "hook_handle_value": 1,
+                },
+            },
+        )
+        vision_selection = loop._build_vision_selection(observation=obs, trigger_t_wall=10.0)
+        request, _prompt_meta, _state_key = loop._build_request(
+            obs,
+            vision_selection=vision_selection,
+            vision_fact_context=loop._extract_vision_fact_context(vision_selection=vision_selection),
+        )
+    finally:
+        loop.close()
+
+    assert hook_initial_down.inferred_step_id == "S24"
+    assert hook_cold_s25.inferred_step_id == "S24"
+    assert launch_bar_cold_s23.inferred_step_id == "S22"
+    assert hook_transition_down.inferred_step_id == "S25"
+    assert before_hook_latch_request.context["four_down_completion_latches"]["s24_latched_complete"] is False
+    assert request.context["four_down_completion_latches"] == {
+        "s20_latched_complete": True,
+        "s21_latched_complete": True,
+        "s22_latched_complete": True,
+        "s23_latched_complete": True,
+        "s24_latched_complete": True,
+        "s25_latched_complete": False,
+    }
+    assert before_hook_latch_state_key != _state_key
+
+
 def test_live_dcs_cli_parses_raw_bios_source_args() -> None:
     parser = build_arg_parser()
     args = parser.parse_args(
@@ -10976,6 +11164,29 @@ def _public_response_text(response: TutorResponse) -> str:
     return "\n".join(parts)
 
 
+def _assert_live_fixture_expectations(fixture: dict[str, Any], response: TutorResponse) -> None:
+    expectations = fixture.get("expectations")
+    assert isinstance(expectations, dict)
+    expected_step = expectations.get("expected_final_step_id")
+    if isinstance(expected_step, str) and expected_step:
+        assert response.metadata["diagnosis"]["step_id"] == expected_step
+        assert response.metadata["next"]["step_id"] == expected_step
+        assert response.metadata["final_public_response"]["next"]["step_id"] == expected_step
+    expected_targets = expectations.get("expected_overlay_target_ids")
+    if isinstance(expected_targets, list):
+        assert response.metadata["final_overlay_targets"] == [
+            item for item in expected_targets if isinstance(item, str)
+        ]
+    expected_source = expectations.get("final_response_source")
+    if isinstance(expected_source, str) and expected_source:
+        assert response.metadata["final_action_plan"]["source"] == expected_source
+    if expectations.get("llm_decision_status") == "repaired":
+        assert response.metadata["repair_applied"] is True
+    expected_vlm_status = expectations.get("vlm_call_status")
+    if isinstance(expected_vlm_status, str) and expected_vlm_status:
+        assert response.metadata["vlm_call_status"] == expected_vlm_status
+
+
 def test_live_help_fixture_311_replays_real_s09_comm1_complete_fixture() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/168fc73d-f98c-498e-a35c-fef91b06ee2e.fixture.json"
@@ -11167,6 +11378,7 @@ def test_live_help_fixture_306_1ab3_retracted_after_latch_advances_to_s22() -> N
 
     repaired = _validate_compact_live_help_response(request=request, response=response)
 
+    _assert_live_fixture_expectations(fixture, repaired)
     assert repaired.metadata["diagnosis"]["step_id"] == "S22"
     assert repaired.metadata["next"]["step_id"] == "S22"
     assert repaired.metadata["validator_rejected"] is True
@@ -11188,6 +11400,7 @@ def test_live_help_fixture_306_2e04_extended_probe_advances_to_s21() -> None:
 
     repaired = _validate_compact_live_help_response(request=request, response=response)
 
+    _assert_live_fixture_expectations(fixture, repaired)
     assert repaired.metadata["diagnosis"]["step_id"] == "S21"
     assert repaired.metadata["next"]["step_id"] == "S21"
     assert repaired.metadata["validator_rejected"] is True
@@ -11199,6 +11412,62 @@ def test_live_help_fixture_306_2e04_extended_probe_advances_to_s21() -> None:
     public_text = _public_response_text(repaired)
     assert "S20 未完成" not in public_text
     assert "收起" in public_text
+
+
+def test_live_help_fixture_306_20c_retracted_probe_latch_advances_to_s22() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/20c79783-092e-4128-ad47-5fa7d3774ed7.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S22"
+    assert repaired.metadata["next"]["step_id"] == "S22"
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_overlay_targets"] == ["launch_bar_switch"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "launch_bar_switch"
+
+
+def test_live_help_fixture_306_6232_launch_bar_cycle_stops_at_s24_without_hook_latch() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/6232bd96-95f8-4905-9ae9-8f27e4515c3d.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S24"
+    assert repaired.metadata["next"]["step_id"] == "S24"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_overlay_targets"] == ["arresting_hook_handle"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "arresting_hook_handle"
+    public_text = _public_response_text(repaired)
+    assert "S23" not in public_text
+    assert "S25" not in public_text
+
+
+def test_live_help_fixture_306_da08_s25_hook_guidance_matches_retract_direction() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/da08da4a-0909-4acb-a2e6-7027324fa989.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S25"
+    assert repaired.metadata["next"]["step_id"] == "S25"
+    assert repaired.metadata["final_overlay_targets"] == ["arresting_hook_handle"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "arresting_hook_handle"
+    public_text = _public_response_text(repaired)
+    assert "抬起" in public_text or "收起" in public_text
+    assert "放下阻钩" not in public_text
+    assert "伸出阻钩" not in public_text
 
 
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
