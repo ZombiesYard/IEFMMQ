@@ -11699,18 +11699,18 @@ def test_live_help_fixture_315_s17_complete_advances_to_s18_actionable_text() ->
     assert repaired.metadata["diagnosis"]["step_id"] == "S18"
     assert repaired.metadata["next"]["step_id"] == "S18"
     assert repaired.metadata["final_action_plan"]["step_id"] == "S18"
-    assert repaired.metadata["final_action_plan"]["text_only"] is True
-    assert repaired.metadata["final_overlay_targets"] == []
+    assert repaired.metadata["final_action_plan"]["text_only"] is False
+    assert repaired.metadata["final_overlay_targets"] == ["right_mdi_pb18"]
+    assert [action["target"] for action in repaired.actions] == ["right_mdi_pb18"]
     assert repaired.metadata["harness_trace"]["model_decision"]["step_id"] == "S17"
     assert repaired.metadata["harness_trace"]["repair_result"]["path"] == "final_evidence_consistency_validator"
     final_public = repaired.metadata["final_public_response"]
-    assert final_public["instruction_category"] == "text-only/manual"
+    assert final_public["actions"][0]["target"] == "right_mdi_pb18"
     public_text = _public_response_text(repaired)
     assert "最新证据" not in public_text
     assert "evidence" not in public_text.lower()
     assert "S18" in public_text
-    assert "PB5" in public_text
-    assert "FCS-MC" in public_text
+    assert "PB18" in public_text
     assert "takeoff_trim_button" not in public_text
 
 
@@ -11765,7 +11765,7 @@ def test_live_help_fixture_315_final_repair_restamps_s12_action_metadata() -> No
     assert "vars.rpm_l>=25" not in json.dumps(final_public_action)
 
 
-def test_live_help_fixture_315_s18_text_only_plan_records_reason() -> None:
+def test_live_help_fixture_315_s18_advancement_uses_actionable_overlay() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/82d871be-26ac-41f4-a722-8141efcd8f87.fixture.json"
     )
@@ -11777,13 +11777,41 @@ def test_live_help_fixture_315_s18_text_only_plan_records_reason() -> None:
     assert repaired.metadata["diagnosis"]["step_id"] == "S18"
     final_plan = repaired.metadata["final_action_plan"]
     assert final_plan["step_id"] == "S18"
-    assert final_plan["text_only"] is True
-    assert final_plan["targets"] == []
-    assert final_plan["text_only_reason"] == "text-only/manual"
-    assert isinstance(final_plan["text_only_detail"], str) and final_plan["text_only_detail"]
+    assert final_plan["text_only"] is False
+    assert final_plan["targets"] == ["right_mdi_pb18"]
+    assert repaired.metadata["final_evidence_consistency_overlay_applied"] is True
+    assert repaired.metadata["final_evidence_consistency_overlay_reason"] == "s18_unknown_page_to_pb18"
+    assert repaired.metadata["final_overlay_targets"] == ["right_mdi_pb18"]
+    assert [action["target"] for action in repaired.actions] == ["right_mdi_pb18"]
     assert repaired.metadata["fused_step_id"] == "S18"
     assert repaired.metadata["fused_missing_conditions"] == []
-    assert "PB5" in _public_response_text(repaired)
+    public_text = _public_response_text(repaired)
+    assert "PB18" in public_text
+    assert "takeoff_trim_button" not in public_text
+
+
+def test_live_help_fixture_315_s18_advancement_uses_pb5_when_bit_root_seen() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/82d871be-26ac-41f4-a722-8141efcd8f87.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+    request.context = dict(request.context)
+    summary = dict(request.context.get("vision_fact_summary") or {})
+    summary["seen_fact_ids"] = ["bit_root_page_visible"]
+    summary["fresh_fact_ids"] = []
+    summary["not_seen_fact_ids"] = []
+    request.context["vision_fact_summary"] = summary
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S18"
+    assert repaired.metadata["final_action_plan"]["targets"] == ["right_mdi_pb5"]
+    assert repaired.metadata["final_overlay_targets"] == ["right_mdi_pb5"]
+    assert [action["target"] for action in repaired.actions] == ["right_mdi_pb5"]
+    assert repaired.metadata["final_evidence_consistency_overlay_reason"] == "s18_bit_root_to_pb5"
+    public_text = _public_response_text(repaired)
+    assert "PB5" in public_text
+    assert "PB18" not in public_text
 
 
 def test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance() -> None:

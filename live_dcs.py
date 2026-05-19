@@ -7580,36 +7580,111 @@ class LiveDcsTutorLoop:
                 ]
             fallback_reason = "s08_visual_recovery"
         else:
-            fallback_request = request
-            completed_latch_by_step = {
-                "S20": "s20_latched_complete",
-                "S22": "s22_latched_complete",
-                "S24": "s24_latched_complete",
-            }
-            completed_latch = completed_latch_by_step.get(rejected_step_id)
-            if completed_latch is not None and next_step_id in {"S21", "S23", "S25"}:
-                patched_context = dict(context)
-                patched_latches = _four_down_completion_latches_from_context(patched_context)
-                patched_latches[completed_latch] = True
-                patched_context["four_down_completion_latches"] = patched_latches
-                fallback_request = TutorRequest(
-                    request_id=request.request_id,
-                    timestamp=request.timestamp,
-                    actor=request.actor,
-                    intent=request.intent,
-                    version=request.version,
-                    message=request.message,
-                    observation_ref=request.observation_ref,
-                    context=patched_context,
-                    metadata=dict(request.metadata),
+            if next_step_id == "S18":
+                summary = context.get("vision_fact_summary")
+                bit_root_seen = _vision_summary_seen_or_fresh(summary, "bit_root_page_visible")
+                if bit_root_seen and "right_mdi_pb5" in self.overlay_allowset:
+                    s18_target = "right_mdi_pb5"
+                    s18_guidance = (
+                        "S17 已完成。现在进入 S18：右 DDI 已在 BIT root 页面；请左键按 PB5/FCS-MC 进入 FCS-MC BIT 页面。"
+                        if self.lang == "zh"
+                        else "S17 is complete. Continue to S18: the right DDI is on the BIT root page; left-click PB5/FCS-MC to enter the FCS-MC BIT page."
+                    )
+                    allowed_refs = _collect_request_evidence_refs(context)
+                    visual_ref = _visual_fact_ref_from_context(context, "bit_root_page_visible")
+                    s18_ref = next(
+                        (
+                            ref for ref in (
+                                visual_ref,
+                                "VARS.takeoff_trim_set",
+                                "GATES.S17.completion",
+                                "GATES.S18.completion",
+                            )
+                            if isinstance(ref, str) and ref in allowed_refs
+                        ),
+                        visual_ref if isinstance(visual_ref, str) and visual_ref else "GATES.S18.completion",
+                    )
+                    s18_evidence_type = "visual" if s18_ref.startswith("VISION_FACTS.") else "gate"
+                    if s18_ref.startswith("VARS."):
+                        s18_evidence_type = "var"
+                    s18_quote = "S18 BIT root page is visible; PB5 enters FCS-MC."
+                    fallback_reason = "s18_bit_root_to_pb5"
+                else:
+                    s18_target = "right_mdi_pb18"
+                    s18_guidance = (
+                        "S17 已完成。现在进入 S18：右 DDI 的 BIT 页面状态尚未确认；请先左键按右 DDI PB18/MENU 恢复到 BIT 页面。"
+                        if self.lang == "zh"
+                        else "S17 is complete. Continue to S18: the right DDI BIT page state is not confirmed; left-click right DDI PB18/MENU to recover the BIT page first."
+                    )
+                    allowed_refs = _collect_request_evidence_refs(context)
+                    s18_ref = next(
+                        (
+                            ref for ref in (
+                                "GATES.S18.completion",
+                                "VARS.takeoff_trim_set",
+                                "GATES.S17.completion",
+                            )
+                            if ref in allowed_refs
+                        ),
+                        "GATES.S18.completion",
+                    )
+                    s18_evidence_type = "gate"
+                    if s18_ref.startswith("VARS."):
+                        s18_evidence_type = "var"
+                    s18_quote = "S18 requires right DDI BIT/FCS-MC page navigation."
+                    fallback_reason = "s18_unknown_page_to_pb18"
+                if s18_target in self.overlay_allowset:
+                    fallback_help_obj = {
+                        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+                        "next": {"step_id": "S18"},
+                        "overlay": {
+                            "targets": [s18_target],
+                            "evidence": [
+                                {
+                                    "target": s18_target,
+                                    "type": s18_evidence_type,
+                                    "ref": s18_ref,
+                                    "quote": s18_quote,
+                                    "grounding_confidence": 0.51,
+                                }
+                            ],
+                        },
+                        "explanations": [s18_guidance],
+                    }
+                else:
+                    fallback_help_obj = None
+                    fallback_reason = f"target_not_in_runtime_allowlist:{s18_target}"
+            else:
+                fallback_request = request
+                completed_latch_by_step = {
+                    "S20": "s20_latched_complete",
+                    "S22": "s22_latched_complete",
+                    "S24": "s24_latched_complete",
+                }
+                completed_latch = completed_latch_by_step.get(rejected_step_id)
+                if completed_latch is not None and next_step_id in {"S21", "S23", "S25"}:
+                    patched_context = dict(context)
+                    patched_latches = _four_down_completion_latches_from_context(patched_context)
+                    patched_latches[completed_latch] = True
+                    patched_context["four_down_completion_latches"] = patched_latches
+                    fallback_request = TutorRequest(
+                        request_id=request.request_id,
+                        timestamp=request.timestamp,
+                        actor=request.actor,
+                        intent=request.intent,
+                        version=request.version,
+                        message=request.message,
+                        observation_ref=request.observation_ref,
+                        context=patched_context,
+                        metadata=dict(request.metadata),
+                    )
+                    response.metadata["final_evidence_consistency_completion_advance_latches"] = dict(patched_latches)
+                fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
+                    fallback_request,
+                    override_inferred_step_id=next_step_id,
+                    override_overlay_step_id=next_step_id,
+                    ignore_request_allowlist=True,
                 )
-                response.metadata["final_evidence_consistency_completion_advance_latches"] = dict(patched_latches)
-            fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
-                fallback_request,
-                override_inferred_step_id=next_step_id,
-                override_overlay_step_id=next_step_id,
-                ignore_request_allowlist=True,
-            )
         fallback_used = False
         if isinstance(fallback_help_obj, Mapping):
             planned_help_obj = copy.deepcopy(dict(fallback_help_obj))
