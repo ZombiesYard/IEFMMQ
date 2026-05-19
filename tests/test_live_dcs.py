@@ -11783,6 +11783,10 @@ def test_live_help_fixture_315_s18_advancement_uses_actionable_overlay() -> None
     assert repaired.metadata["final_evidence_consistency_overlay_reason"] == "s18_unknown_page_to_pb18"
     assert repaired.metadata["final_overlay_targets"] == ["right_mdi_pb18"]
     assert [action["target"] for action in repaired.actions] == ["right_mdi_pb18"]
+    assert repaired.metadata["vlm_skipped_preliminary_step"] == "S17"
+    assert repaired.metadata["final_step_requires_visual"] == "S18"
+    assert repaired.metadata["harness_trace"]["vlm_skipped_preliminary_step"] == "S17"
+    assert repaired.metadata["harness_trace"]["final_step_requires_visual"] == "S18"
     assert repaired.metadata["fused_step_id"] == "S18"
     assert repaired.metadata["fused_missing_conditions"] == []
     public_text = _public_response_text(repaired)
@@ -11812,6 +11816,51 @@ def test_live_help_fixture_315_s18_advancement_uses_pb5_when_bit_root_seen() -> 
     public_text = _public_response_text(repaired)
     assert "PB5" in public_text
     assert "PB18" not in public_text
+
+
+def test_live_help_visual_skip_trace_does_not_mark_s14_to_s15() -> None:
+    request = TutorRequest(
+        request_id="s14-to-s15-no-visual-skip-trace",
+        intent="help",
+        message="help",
+        context={
+            "vars": {},
+            "gates": {},
+            "deterministic_step_hint": {
+                "inferred_step_id": "S14",
+                "missing_conditions": ["vars.obogs_ready==true"],
+            },
+        },
+        metadata={"fused_step_id": "S14"},
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="S14 is complete; continue to S15.",
+        actions=[],
+        explanations=["S14 is complete; continue to S15."],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "harness_action_plan": {
+                "step_id": "S15",
+                "overlay_step_id": "S15",
+                "targets": [],
+                "text_only": True,
+                "source": "final_evidence_consistency_validator",
+            },
+            "diagnosis": {"step_id": "S15", "error_category": "OM"},
+            "next": {"step_id": "S15"},
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["final_action_plan"]["step_id"] == "S15"
+    assert "vlm_skipped_preliminary_step" not in repaired.metadata
+    assert "final_step_requires_visual" not in repaired.metadata
+    assert "vlm_skipped_preliminary_step" not in repaired.metadata["harness_trace"]
+    assert "final_step_requires_visual" not in repaired.metadata["harness_trace"]
 
 
 def test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance() -> None:
