@@ -11126,6 +11126,7 @@ def _validate_compact_live_help_response(
     vision_status: str = "vision_not_required",
     vision_selection: HelpCycleVisionSelection | None = None,
     vision_fact_context: dict[str, Any] | None = None,
+    max_overlay_targets: int | None = None,
 ) -> TutorResponse:
     if vision_selection is None:
         vision_selection = HelpCycleVisionSelection(
@@ -11160,6 +11161,7 @@ def _validate_compact_live_help_response(
         session_id=f"sess-{request.request_id}",
         rag_top_k=0,
         lang="zh",
+        **({"max_overlay_targets": max_overlay_targets} if max_overlay_targets is not None else {}),
     )
     try:
         result = loop._validate_and_repair_live_help_response(
@@ -11446,7 +11448,7 @@ def test_live_help_fixture_312_s11_completion_advances_to_s12() -> None:
     assert repaired.metadata["harness_trace"]["vlm_call"]["frame_capture_selected"] is True
     assert repaired.metadata["harness_trace"]["vlm_call"]["extractor_used"] is False
     public_text = _public_response_text(repaired)
-    assert "ins_mode_knob" in public_text
+    assert "INS" in public_text
     assert "RPM >= 25" not in public_text
 
 
@@ -12883,6 +12885,92 @@ def test_live_help_fixture_294_s09_uses_stage_action_hint_for_next_digit() -> No
     assert repaired.message == "COMM1 preset entry shows 13; press 4 next."
 
 
+def test_live_help_fixture_314_s09_advances_after_recent_selector_interaction() -> None:
+    request = TutorRequest(
+        request_id="186759d2-5ded-4fca-98b8-bdaf13176721",
+        message="help",
+        context={
+            "vars": {
+                "comm1_freq_134_000": False,
+                "comm1_freq_value": 30500,
+                "ufc_comm1_pull_pressed": False,
+                "ufc_scratchpad_number_display": "",
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_ui_targets": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_1",
+                    "ufc_key_3",
+                    "ufc_key_4",
+                    "ufc_key_0",
+                    "ufc_ent_button",
+                ],
+                "step_interacted_targets": ["ufc_comm1_channel_selector_pull"],
+                "action_hint": {"target": "ufc_comm1_channel_selector_pull"},
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ],
+            "rag_topk": [],
+            "vision_fact_summary": {"status": "vision_not_required", "seen_fact_ids": [], "fresh_fact_ids": []},
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="UFC COMM1 拉出：左键。",
+        actions=[],
+        explanations=["UFC COMM1 拉出：左键。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S09", "error_category": "OM"},
+                "next": {"step_id": "S09"},
+                "overlay": {
+                    "targets": ["ufc_comm1_channel_selector_pull"],
+                    "evidence": [
+                        {
+                            "target": "ufc_comm1_channel_selector_pull",
+                            "type": "var",
+                            "ref": "VARS.comm1_freq_134_000",
+                            "quote": "COMM1 is not tuned.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": ["UFC COMM1 拉出：左键。"],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(
+        request=request,
+        response=response,
+        max_overlay_targets=4,
+    )
+
+    assert repaired.metadata["final_overlay_targets"] == [
+        "ufc_key_1",
+        "ufc_key_3",
+        "ufc_key_4",
+        "ufc_key_0",
+    ]
+    assert "ufc_comm1_channel_selector_pull" not in repaired.metadata["final_overlay_targets"]
+    assert "134.000" in repaired.message
+    assert "1-3-4-0-0-0" in repaired.message
+
+
 def test_live_help_fixture_299_s12_aligns_pb19_message_and_overlay() -> None:
     request = TutorRequest(
         request_id="2c936164-c567-4865-997c-ce65b827209d",
@@ -12951,6 +13039,81 @@ def test_live_help_fixture_299_s12_aligns_pb19_message_and_overlay() -> None:
     assert repaired.metadata["final_public_response"]["message"] == repaired.message
     assert repaired.metadata["final_public_response"]["explanations"] == [repaired.message]
     assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ampcd_pb19"
+
+
+def test_live_help_fixture_314_s12_pb19_hint_repairs_without_vars_snapshot() -> None:
+    request = TutorRequest(
+        request_id="22fec7a4-958a-449b-aae3-0ccc18daa84b",
+        message="help",
+        context={
+            "scenario_profile": "airfield",
+            "state_harness": {
+                "deterministic_candidate": {
+                    "step_id": "S12",
+                    "overlay_step_id": "S12",
+                    "missing_conditions": ["vars.rpm_l_gte_60==true"],
+                },
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S12",
+                "overlay_step_id": "S12",
+                "scenario_profile": "airfield",
+                "recent_ui_targets": ["ins_mode_knob"],
+                "step_ui_targets": ["ins_mode_knob", "ampcd_pb19"],
+                "action_hint": {"target": "ampcd_pb19"},
+                "observability_status": "observable",
+                "requires_visual_confirmation": False,
+            },
+            "overlay_target_allowlist": ["ins_mode_knob", "ampcd_pb19"],
+            "rag_topk": [{"snippet_id": "DCS FA-18C Early Access Guide EN_115"}],
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message="当前处于 S12 步骤。请右键旋转 INS 模式旋钮至下一挡位（通常为 GND 或 CV），以开始 INS 对准。",
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "ins_mode_knob",
+                "evidence_refs": ["GATES.S12.completion"],
+            }
+        ],
+        explanations=["当前处于 S12 步骤。请右键旋转 INS 模式旋钮至下一挡位（通常为 GND 或 CV），以开始 INS 对准。"],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": "S12", "error_category": "OM"},
+                "next": {"step_id": "S12"},
+                "overlay": {
+                    "targets": ["ins_mode_knob"],
+                    "evidence": [
+                        {
+                            "target": "ins_mode_knob",
+                            "type": "gate",
+                            "ref": "GATES.S12.completion",
+                            "quote": "INS mode must be set for alignment.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": [
+                    "当前处于 S12 步骤。请右键旋转 INS 模式旋钮至下一挡位（通常为 GND 或 CV），以开始 INS 对准。"
+                ],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert [action["target"] for action in repaired.actions] == ["ampcd_pb19"]
+    assert repaired.metadata["final_overlay_targets"] == ["ampcd_pb19"]
+    assert repaired.metadata["final_action_plan"]["source"] == "validator_action_hint"
+    assert "PB19" in repaired.message
+    assert "GND 或 CV" not in repaired.message
+    assert "action_hint_target_mismatch:ins_mode_knob" in repaired.metadata["harness_validation_reasons"]
 
 
 def test_live_help_fixture_299_s12_carrier_keeps_ins_knob_until_cv_mode() -> None:
@@ -13618,7 +13781,10 @@ def test_live_loop_clears_conflicting_overlay_before_fallback_rebuilds_current_s
     assert response.metadata["fallback_overlay_used"] is True
     assert response.actions
     assert response.actions[0]["target"] == "eng_crank_switch"
-    assert response.message == "S10 is not complete yet. Please operate eng_crank_switch first and confirm that step is complete."
+    assert response.message == (
+        "S10 is not complete yet. You are on S10. Set the Engine Crank switch "
+        "to LEFT/L with a left-click to start the left engine."
+    )
     assert "vars.engine_crank_left_complete" not in response.message
     assert response.metadata["final_public_response"]["actions"][0]["target"] == "eng_crank_switch"
 

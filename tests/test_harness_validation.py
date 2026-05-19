@@ -751,6 +751,125 @@ def test_plan_harness_action_keeps_s08_all_displays_off_single_target_when_max_b
     assert "state_action_target_mismatch:right_mdi_brightness_selector" in plan.reasons
 
 
+def test_plan_harness_action_treats_hsi_visual_fact_as_ampcd_visible() -> None:
+    specs = {
+        "S08": _spec(
+            "S08",
+            (
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S08"].allowed_overlay_targets)
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S08",
+        model_step_id="S08",
+        proposed_overlay_targets=["ampcd_off_brightness_knob"],
+        candidate_step_ids=["S08"],
+        runtime_overlay_targets=allowed_targets,
+        request_overlay_targets=allowed_targets,
+        max_overlay_targets=4,
+        latest_vars={
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": False,
+            "hud_on": False,
+        },
+        vision_seen_fact_ids=["hsi_page_visible", "hsi_map_layer_visible"],
+        action_hint={"target": "ampcd_off_brightness_knob"},
+        action_hint_step_ids=["S08"],
+    )
+
+    assert plan.targets == ("hud_symbology_brightness_knob",)
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "s08_mpcd_visual_alive" in plan.reasons
+    assert "state_action_target_mismatch:ampcd_off_brightness_knob" in plan.reasons
+
+
+def test_plan_harness_action_does_not_include_ampcd_when_hsi_seen_and_telemetry_all_off() -> None:
+    specs = {
+        "S08": _spec(
+            "S08",
+            (
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S08"].allowed_overlay_targets)
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S08",
+        model_step_id="S08",
+        proposed_overlay_targets=["ampcd_off_brightness_knob"],
+        candidate_step_ids=["S08"],
+        runtime_overlay_targets=allowed_targets,
+        request_overlay_targets=allowed_targets,
+        max_overlay_targets=4,
+        latest_vars={
+            "left_ddi_on": False,
+            "right_ddi_on": False,
+            "mpcd_on": False,
+            "hud_on": False,
+        },
+        vision_seen_fact_ids=["hsi_page_visible"],
+        action_hint={"target": "ampcd_off_brightness_knob"},
+        action_hint_step_ids=["S08"],
+    )
+
+    assert "ampcd_off_brightness_knob" not in plan.targets
+    assert plan.targets == ("left_mdi_brightness_selector",)
+    assert "s08_mpcd_visual_alive" in plan.reasons
+
+
+def test_plan_harness_action_waits_when_s08_power_target_was_recently_used_without_progress() -> None:
+    specs = {
+        "S08": _spec(
+            "S08",
+            (
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S08"].allowed_overlay_targets)
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S08",
+        model_step_id="S08",
+        proposed_overlay_targets=["hud_symbology_brightness_knob"],
+        candidate_step_ids=["S08"],
+        runtime_overlay_targets=allowed_targets,
+        request_overlay_targets=allowed_targets,
+        max_overlay_targets=4,
+        latest_vars={
+            "left_ddi_on": True,
+            "right_ddi_on": True,
+            "mpcd_on": True,
+            "hud_on": False,
+        },
+        recent_action_targets=["hud_symbology_brightness_knob"],
+        action_hint={"target": "hud_symbology_brightness_knob"},
+        action_hint_step_ids=["S08"],
+    )
+
+    assert plan.targets == ()
+    assert plan.text_only is True
+    assert plan.final_action_plan_source == "state_action_planner_wait"
+    assert "s08_recent_power_target_no_progress:hud_symbology_brightness_knob" in plan.reasons
+
+
 def test_plan_harness_action_uses_s09_scratchpad_state_without_live_hint() -> None:
     specs = {
         "S09": _spec(

@@ -413,6 +413,13 @@ _S08_DISPLAY_POWER_TARGETS = (
 
 _S08_DISPLAY_POWER_VARS = ("left_ddi_on", "right_ddi_on", "mpcd_on", "hud_on")
 
+_S08_DISPLAY_POWER_STEPS = (
+    ("left_ddi_on", "left_mdi_brightness_selector", "Left DDI is still off. Turn up the left DDI brightness selector."),
+    ("right_ddi_on", "right_mdi_brightness_selector", "Right DDI is still off. Turn up the right DDI brightness selector."),
+    ("mpcd_on", "ampcd_off_brightness_knob", "AMPCD is still reported off. Turn the AMPCD brightness knob up."),
+    ("hud_on", "hud_symbology_brightness_knob", "HUD is still reported off. Turn the HUD symbology brightness knob up."),
+)
+
 _S09_NUMERIC_SEQUENCE_TARGETS = ("ufc_key_1", "ufc_key_3", "ufc_key_4", "ufc_key_0")
 
 
@@ -421,14 +428,66 @@ def _s08_state_action_plan(
     *,
     spec: StepHarnessSpec | None,
     max_overlay_targets: int,
+    recent_action_targets: Sequence[str] | None,
+    vision_seen_fact_ids: Sequence[str] | None,
+    vision_fresh_fact_ids: Sequence[str] | None,
 ) -> _StateActionPlan | None:
     allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
     if not allowed:
         return None
-    if not all(vars_map.get(var_name) is False for var_name in _S08_DISPLAY_POWER_VARS):
+    seen_or_fresh = set(_strings(vision_seen_fact_ids)) | set(_strings(vision_fresh_fact_ids))
+    recent = set(_strings(recent_action_targets))
+    mpcd_visually_alive = bool({"hsi_page_visible", "hsi_map_layer_visible"} & seen_or_fresh)
+    effective_vars = dict(vars_map)
+    s08_reasons: tuple[str, ...] = ()
+    if mpcd_visually_alive and vars_map.get("mpcd_on") is False:
+        effective_vars["mpcd_on"] = True
+        s08_reasons = ("s08_mpcd_visual_alive",)
+
+    raw_all_displays_off = all(vars_map.get(var_name) is False for var_name in _S08_DISPLAY_POWER_VARS)
+    effective_all_displays_off = all(effective_vars.get(var_name) is False for var_name in _S08_DISPLAY_POWER_VARS)
+    if not effective_all_displays_off:
+        for var_name, target, guidance in _S08_DISPLAY_POWER_STEPS:
+            if effective_vars.get(var_name) is not False:
+                continue
+            if target not in allowed:
+                return _StateActionPlan(
+                    targets=(),
+                    guidance=guidance,
+                    text_only=True,
+                    source="state_action_planner",
+                    reasons=(*s08_reasons, f"s08_power_target_unavailable:{target}"),
+                )
+            if target in recent:
+                return _StateActionPlan(
+                    targets=(),
+                    guidance=(
+                        f"{target} was just highlighted or operated, but telemetry still reports no progress. "
+                        "Wait briefly, turn it further if needed, and visually confirm the display before repeating the same highlight."
+                    ),
+                    text_only=True,
+                    source="state_action_planner_wait",
+                    reasons=(*s08_reasons, f"s08_recent_power_target_no_progress:{target}"),
+                )
+            return _StateActionPlan(
+                targets=(target,),
+                guidance=guidance,
+                text_only=False,
+                source="state_action_planner",
+                reasons=(*s08_reasons, f"s08_power_target:{target}"),
+            )
         return None
-    if max_overlay_targets < len(_S08_DISPLAY_POWER_TARGETS):
-        target = next((item for item in _S08_DISPLAY_POWER_TARGETS if item in allowed), None)
+    power_targets = (
+        tuple(
+            target
+            for var_name, target, _guidance in _S08_DISPLAY_POWER_STEPS
+            if effective_vars.get(var_name) is False
+        )
+        if raw_all_displays_off and s08_reasons
+        else _S08_DISPLAY_POWER_TARGETS
+    )
+    if max_overlay_targets < len(power_targets):
+        target = next((item for item in power_targets if item in allowed), None)
         if target is None:
             return None
         return _StateActionPlan(
@@ -439,29 +498,71 @@ def _s08_state_action_plan(
             ),
             text_only=False,
             source="state_action_planner",
-            reasons=("s08_all_displays_off_single_power_target",),
+            reasons=(*s08_reasons, "s08_all_displays_off_single_power_target"),
         )
-    if not all(target in allowed for target in _S08_DISPLAY_POWER_TARGETS):
+    if not all(target in allowed for target in power_targets):
         return _StateActionPlan(
-            targets=_S08_DISPLAY_POWER_TARGETS,
+            targets=power_targets,
             guidance=(
                 "All displays are still off. Power the left DDI, right DDI, AMPCD, and HUD brightness controls; "
                 "DDI warm-up can lag, so wait for the displays before page navigation."
             ),
             text_only=True,
             source="state_action_planner",
-            reasons=("s08_all_displays_off_power_targets_unavailable",),
+            reasons=(*s08_reasons, "s08_all_displays_off_power_targets_unavailable"),
         )
     return _StateActionPlan(
-        targets=_S08_DISPLAY_POWER_TARGETS,
+        targets=power_targets,
         guidance=(
             "All displays are still off. Power the left DDI, right DDI, AMPCD, and HUD brightness controls; "
             "DDI warm-up can lag, so wait for the displays before page navigation."
         ),
         text_only=False,
         source="state_action_planner",
-        reasons=("s08_all_displays_off_power_targets",),
+        reasons=(*s08_reasons, "s08_all_displays_off_power_targets"),
     )
+
+
+def _s12_state_action_plan(
+    vars_map: Mapping[str, Any],
+    *,
+    spec: StepHarnessSpec | None,
+    scenario_profile: str | None,
+) -> _StateActionPlan | None:
+    allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
+    if not allowed or vars_map.get("ins_fast_align_complete") is True:
+        return None
+    raw_mode = vars_map.get("ins_mode")
+    mode = int(raw_mode) if isinstance(raw_mode, (int, float)) and not isinstance(raw_mode, bool) else None
+    profile = scenario_profile if isinstance(scenario_profile, str) else None
+    if profile == "carrier":
+        mode_ready = mode == 1
+    elif profile == "airfield":
+        mode_ready = mode == 2 or vars_map.get("ins_mode_set") is True
+    else:
+        mode_ready = vars_map.get("ins_mode_cv_or_gnd") is True or vars_map.get("ins_mode_set") is True
+
+    if mode_ready and "ampcd_pb19" in allowed:
+        return _StateActionPlan(
+            targets=("ampcd_pb19",),
+            guidance="INS mode is already set for alignment; press AMPCD PB19 to start fast INS alignment.",
+            text_only=False,
+            source="state_action_planner",
+            reasons=("s12_ins_mode_set_to_ampcd_pb19",),
+        )
+    has_mode_evidence = any(
+        key in vars_map
+        for key in ("ins_mode", "ins_mode_set", "ins_mode_cv_or_gnd")
+    )
+    if profile == "airfield" and has_mode_evidence and mode != 2 and "ins_mode_knob" in allowed:
+        return _StateActionPlan(
+            targets=("ins_mode_knob",),
+            guidance="Set the INS mode knob to GND for airfield startup.",
+            text_only=False,
+            source="state_action_planner",
+            reasons=("s12_airfield_ins_knob_to_gnd",),
+        )
+    return None
 
 
 def _normalize_ufc_scratchpad_text(vars_map: Mapping[str, Any]) -> str:
@@ -601,6 +702,7 @@ def _state_action_plan(
     vision_fresh_fact_ids: Sequence[str] | None = None,
     vision_not_seen_fact_ids: Sequence[str] | None = None,
     max_overlay_targets: int = 1,
+    scenario_profile: str | None = None,
 ) -> _StateActionPlan | None:
     vars_map = _latest_vars(latest_vars)
     if step_id == "S08":
@@ -608,6 +710,9 @@ def _state_action_plan(
             vars_map,
             spec=spec,
             max_overlay_targets=max_overlay_targets,
+            recent_action_targets=recent_action_targets,
+            vision_seen_fact_ids=vision_seen_fact_ids,
+            vision_fresh_fact_ids=vision_fresh_fact_ids,
         )
     if step_id == "S09":
         return _s09_state_action_plan(
@@ -615,6 +720,12 @@ def _state_action_plan(
             spec=spec,
             recent_action_targets=recent_action_targets,
             max_overlay_targets=max_overlay_targets,
+        )
+    if step_id == "S12":
+        return _s12_state_action_plan(
+            vars_map,
+            spec=spec,
+            scenario_profile=scenario_profile,
         )
     allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
     if step_id == "S10" and vars_map.get("engine_crank_left_complete") is not True:
@@ -740,6 +851,7 @@ def plan_harness_action(
     latest_vars: Mapping[str, Any] | None = None,
     evidence_packet: Any = None,
     recent_action_targets: Sequence[str] | None = None,
+    scenario_profile: str | None = None,
 ) -> HarnessActionPlan:
     reasons: list[str] = []
     rejected_model_step_id: str | None = None
@@ -796,6 +908,7 @@ def plan_harness_action(
         vision_fresh_fact_ids=vision_fresh_fact_ids,
         vision_not_seen_fact_ids=vision_not_seen_fact_ids,
         max_overlay_targets=max_overlay_targets,
+        scenario_profile=scenario_profile,
     )
     if state_plan is not None and state_plan.text_only:
         return HarnessActionPlan(
@@ -851,11 +964,14 @@ def plan_harness_action(
             use_hint = True
             source = hint_rule_source
 
-    if state_plan is not None and len(state_plan.targets) > 1 and hinted_targets != state_plan.targets:
-        if use_hint and hinted_targets:
-            reasons.append(
-                "action_hint_incomplete_for_state_plan:" + ",".join(hinted_targets)
+    if state_plan is not None and hinted_targets and hinted_targets != state_plan.targets:
+        if use_hint:
+            reason_prefix = (
+                "action_hint_incomplete_for_state_plan"
+                if len(state_plan.targets) > 1
+                else "action_hint_mismatch_for_state_plan"
             )
+            reasons.append(f"{reason_prefix}:" + ",".join(hinted_targets))
         use_hint = False
 
     if completion_advance is not None:
