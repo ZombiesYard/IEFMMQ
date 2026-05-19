@@ -2504,6 +2504,48 @@ def _refuel_probe_completion_latches_from_context(context: Mapping[str, Any]) ->
     }
 
 
+def _four_down_completion_latches_from_context(context: Mapping[str, Any]) -> dict[str, bool]:
+    raw_latches = context.get("four_down_completion_latches")
+    legacy_refuel = _refuel_probe_completion_latches_from_context(context)
+    out = {
+        "s20_latched_complete": legacy_refuel.get("s20_latched_complete") is True,
+        "s21_latched_complete": legacy_refuel.get("s21_latched_complete") is True,
+        "s22_latched_complete": False,
+        "s23_latched_complete": False,
+        "s24_latched_complete": False,
+        "s25_latched_complete": False,
+    }
+    if isinstance(raw_latches, Mapping):
+        for step_id in ("s20", "s21", "s22", "s23", "s24", "s25"):
+            key = f"{step_id}_latched_complete"
+            out[key] = raw_latches.get(key) is True
+    return out
+
+
+def _launch_bar_extended(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("launch_bar_extended") is True:
+        return True
+    return _coerce_int(vars_selected.get("launch_bar_switch_value")) == 1
+
+
+def _launch_bar_retracted(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("launch_bar_retracted") is True:
+        return True
+    return _coerce_int(vars_selected.get("launch_bar_switch_value")) == 0
+
+
+def _hook_down(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("hook_extended") is True:
+        return True
+    return _coerce_int(vars_selected.get("hook_handle_value")) == 1
+
+
+def _hook_up(vars_selected: Mapping[str, Any]) -> bool:
+    if vars_selected.get("hook_retracted") is True:
+        return True
+    return _coerce_int(vars_selected.get("hook_handle_value")) == 0
+
+
 def _missing_conditions_satisfied_by_vars(
     missing_conditions: Sequence[str],
     vars_selected: Mapping[str, Any],
@@ -3797,6 +3839,14 @@ class LiveDcsTutorLoop:
         self._sticky_inference_missing_conditions: tuple[str, ...] = ()
         self._refuel_probe_s20_latched_complete = False
         self._refuel_probe_s21_latched_complete = False
+        self._launch_bar_s22_latched_complete = False
+        self._launch_bar_s23_latched_complete = False
+        self._hook_s24_latched_complete = False
+        self._hook_s25_latched_complete = False
+        self._four_down_first_incomplete_seen: dict[str, bool] = {
+            "S22": False,
+            "S24": False,
+        }
         self._pending_help_trigger_t_wall: float | None = None
         self._stats = LiveLoopStats()
 
@@ -3826,6 +3876,14 @@ class LiveDcsTutorLoop:
         self._sticky_inference_missing_conditions = ()
         self._refuel_probe_s20_latched_complete = False
         self._refuel_probe_s21_latched_complete = False
+        self._launch_bar_s22_latched_complete = False
+        self._launch_bar_s23_latched_complete = False
+        self._hook_s24_latched_complete = False
+        self._hook_s25_latched_complete = False
+        self._four_down_first_incomplete_seen = {
+            "S22": False,
+            "S24": False,
+        }
 
     def _remember_step_interactions(self, targets: Sequence[str] | None) -> None:
         if not isinstance(self._last_inferred_step_id, str) or not self._last_inferred_step_id:
@@ -3839,6 +3897,11 @@ class LiveDcsTutorLoop:
         s20_idx = self._step_order_index.get("S20")
         return idx is not None and s20_idx is not None and idx >= s20_idx
 
+    def _step_reached_for_four_down_latch(self, step_id: str | None, start_step_id: str) -> bool:
+        idx = self._step_order_index.get(step_id) if isinstance(step_id, str) else None
+        start_idx = self._step_order_index.get(start_step_id)
+        return idx is not None and start_idx is not None and idx >= start_idx
+
     def _update_refuel_probe_completion_latches(
         self,
         vars_selected: Mapping[str, Any],
@@ -3850,17 +3913,91 @@ class LiveDcsTutorLoop:
             or self._step_reached_for_refuel_probe_latch(self._sticky_inference_step_id)
         ):
             return
-        if self._refuel_probe_s21_latched_complete and not _refuel_probe_retracted(vars_selected):
+        has_probe_evidence = (
+            "probe_retracted" in vars_selected
+            or "probe_extended" in vars_selected
+            or "ext_refuel_probe_value" in vars_selected
+        )
+        if (
+            has_probe_evidence
+            and self._refuel_probe_s21_latched_complete
+            and not _refuel_probe_retracted(vars_selected)
+        ):
             self._refuel_probe_s21_latched_complete = False
         if _refuel_probe_extended(vars_selected):
             self._refuel_probe_s20_latched_complete = True
         if self._refuel_probe_s20_latched_complete and _refuel_probe_retracted(vars_selected):
             self._refuel_probe_s21_latched_complete = True
+        self._update_four_down_switch_completion_latches(vars_selected, current_step_id=current_step_id)
+
+    def _update_four_down_switch_completion_latches(
+        self,
+        vars_selected: Mapping[str, Any],
+        *,
+        current_step_id: str | None = None,
+    ) -> None:
+        if (
+            self._step_reached_for_four_down_latch(current_step_id, "S22")
+            or self._step_reached_for_four_down_latch(self._sticky_inference_step_id, "S22")
+        ):
+            has_launch_bar_evidence = (
+                "launch_bar_switch_value" in vars_selected
+                or "launch_bar_extended" in vars_selected
+                or "launch_bar_retracted" in vars_selected
+            )
+            if (
+                has_launch_bar_evidence
+                and self._launch_bar_s23_latched_complete
+                and not _launch_bar_retracted(vars_selected)
+            ):
+                self._launch_bar_s23_latched_complete = False
+            if not self._launch_bar_s22_latched_complete:
+                if _launch_bar_extended(vars_selected):
+                    if self._four_down_first_incomplete_seen.get("S22") is True:
+                        self._launch_bar_s22_latched_complete = True
+                else:
+                    self._four_down_first_incomplete_seen["S22"] = True
+            if self._launch_bar_s22_latched_complete and _launch_bar_retracted(vars_selected):
+                self._launch_bar_s23_latched_complete = True
+
+        if (
+            self._step_reached_for_four_down_latch(current_step_id, "S24")
+            or self._step_reached_for_four_down_latch(self._sticky_inference_step_id, "S24")
+        ):
+            has_hook_evidence = (
+                "hook_handle_value" in vars_selected
+                or "hook_extended" in vars_selected
+                or "hook_retracted" in vars_selected
+            )
+            if (
+                has_hook_evidence
+                and self._hook_s25_latched_complete
+                and not _hook_up(vars_selected)
+            ):
+                self._hook_s25_latched_complete = False
+            if not self._hook_s24_latched_complete:
+                if _hook_down(vars_selected):
+                    if self._four_down_first_incomplete_seen.get("S24") is True:
+                        self._hook_s24_latched_complete = True
+                else:
+                    self._four_down_first_incomplete_seen["S24"] = True
+            if self._hook_s24_latched_complete and _hook_up(vars_selected):
+                self._hook_s25_latched_complete = True
 
     def _refuel_probe_completion_latches_dict(self) -> dict[str, bool]:
         return {
             "s20_latched_complete": self._refuel_probe_s20_latched_complete,
             "s21_latched_complete": self._refuel_probe_s21_latched_complete,
+        }
+
+    def _four_down_completion_latches_dict(self) -> dict[str, bool]:
+        return {
+            "s20_latched_complete": self._refuel_probe_s20_latched_complete,
+            "s21_latched_complete": self._refuel_probe_s21_latched_complete,
+            "s22_latched_complete": self._launch_bar_s22_latched_complete,
+            "s23_latched_complete": self._launch_bar_s23_latched_complete,
+            "s24_latched_complete": self._hook_s24_latched_complete,
+            "s25_latched_complete": self._hook_s25_latched_complete,
         }
 
     def _ensure_knowledge(self) -> KnowledgePort:
@@ -4429,12 +4566,14 @@ class LiveDcsTutorLoop:
             deterministic_hint["action_hint"] = dict(action_hint)
 
         refuel_probe_completion_latches = self._refuel_probe_completion_latches_dict()
+        four_down_completion_latches = self._four_down_completion_latches_dict()
         context = {
             "vars": vars_selected,
             "gates": gates,
             "recent_deltas": recent_deltas,
             "recent_actions": recent_actions,
             "refuel_probe_completion_latches": refuel_probe_completion_latches,
+            "four_down_completion_latches": four_down_completion_latches,
             "pack_path": str(self.pack_path),
             "telemetry_map_path": str(self.telemetry_map_path),
             "candidate_steps": candidate_step_payload,
@@ -4523,6 +4662,7 @@ class LiveDcsTutorLoop:
             "candidate_steps": candidate_step_payload,
             "overlay_target_allowlist": self.overlay_allowlist,
             "refuel_probe_completion_latches": refuel_probe_completion_latches,
+            "four_down_completion_latches": four_down_completion_latches,
             "deterministic_step_hint": deterministic_hint,
             "scenario_profile": self.scenario_profile,
             "vision": {
@@ -4613,6 +4753,75 @@ class LiveDcsTutorLoop:
                 self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
                 return advanced
         if (
+            self._launch_bar_s23_latched_complete
+            and _launch_bar_retracted(vars_selected)
+            and current_step_id in {"S22", "S23"}
+        ):
+            advanced = self._infer_after_completed_step(
+                "S23",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            advanced = self._clamp_four_down_transition_advance("S23", advanced)
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if current_step_id == "S23" and not self._launch_bar_s22_latched_complete:
+            forced = StepInferenceResult(
+                inferred_step_id="S22",
+                missing_conditions=("session.launch_bar_extension_transition_observed==true",),
+            )
+            self._sticky_inference_step_id = forced.inferred_step_id
+            self._sticky_inference_missing_conditions = tuple(forced.missing_conditions)
+            return forced
+        if self._launch_bar_s22_latched_complete and current_step_id == "S22":
+            advanced = self._infer_after_completed_step(
+                "S22",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if current_step_id == "S25" and not self._hook_s24_latched_complete:
+            forced = StepInferenceResult(
+                inferred_step_id="S24",
+                missing_conditions=("session.hook_down_transition_observed==true",),
+            )
+            self._sticky_inference_step_id = forced.inferred_step_id
+            self._sticky_inference_missing_conditions = tuple(forced.missing_conditions)
+            return forced
+        if (
+            self._hook_s25_latched_complete
+            and _hook_up(vars_selected)
+            and current_step_id in {"S24", "S25"}
+        ):
+            advanced = self._infer_after_completed_step(
+                "S25",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if self._hook_s24_latched_complete and current_step_id == "S24":
+            advanced = self._infer_after_completed_step(
+                "S24",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if (
             current_step_id == "S19"
             and _s19_final_go_hold_satisfied_by_facts(
                 inference.missing_conditions,
@@ -4683,6 +4892,25 @@ class LiveDcsTutorLoop:
             inferred_step_id=sticky_step_id,
             missing_conditions=self._sticky_inference_missing_conditions,
         )
+
+    def _clamp_four_down_transition_advance(
+        self,
+        completed_step_id: str,
+        advanced: StepInferenceResult | None,
+    ) -> StepInferenceResult | None:
+        if advanced is None:
+            return None
+        if (
+            completed_step_id == "S23"
+            and isinstance(advanced.inferred_step_id, str)
+            and self._step_order_index.get(advanced.inferred_step_id, -1) > self._step_order_index.get("S24", -1)
+            and not self._hook_s24_latched_complete
+        ):
+            return StepInferenceResult(
+                inferred_step_id="S24",
+                missing_conditions=("session.hook_down_transition_observed==true",),
+            )
+        return advanced
 
     def _infer_after_completed_step(
         self,
@@ -6581,7 +6809,10 @@ class LiveDcsTutorLoop:
         if not targets:
             help_response = response.metadata.get("help_response")
             targets = _help_response_overlay_targets(help_response)
-        latched_reason = self._refuel_probe_latched_completion_conflict(context, accepted_step_id)
+        forced_step_id = self._four_down_forced_step_from_context(context, accepted_step_id)
+        latched_reason = self._four_down_latched_completion_conflict(context, accepted_step_id)
+        if forced_step_id is not None:
+            latched_reason = f"four_down_missing_prior_latch:{forced_step_id}"
         if latched_reason is not None:
             rejected_missing = [
                 item for item in accepted_missing_conditions if isinstance(item, str) and item
@@ -6594,6 +6825,8 @@ class LiveDcsTutorLoop:
             response.metadata.setdefault("final_action_plan_source", "final_evidence_consistency_validator")
             if isinstance(accepted_step_id, str) and accepted_step_id:
                 response.metadata.setdefault("rejected_model_step_id", accepted_step_id)
+            if forced_step_id is not None:
+                response.metadata["final_evidence_consistency_forced_step_id"] = forced_step_id
 
             existing_reasons = response.metadata.get("harness_validation_reasons")
             merged_reasons = (
@@ -6644,7 +6877,10 @@ class LiveDcsTutorLoop:
         context = request.context if isinstance(request.context, Mapping) else {}
         vars_selected = context.get("vars")
         vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
-        latched_reason = self._refuel_probe_latched_completion_conflict(context, step_id)
+        forced_step_id = self._four_down_forced_step_from_context(context, step_id)
+        if forced_step_id is not None:
+            return f"evidence_conflict:four_down_missing_prior_latch:{forced_step_id}"
+        latched_reason = self._four_down_latched_completion_conflict(context, step_id)
         if latched_reason is not None:
             return f"evidence_conflict:{latched_reason}"
         if not missing_conditions and not include_completion_gate:
@@ -6668,27 +6904,69 @@ class LiveDcsTutorLoop:
             return "evidence_conflict"
         return f"evidence_conflict:{'|'.join(reasons[:3])}"
 
-    def _refuel_probe_latched_completion_conflict(
+    def _four_down_forced_step_from_context(
         self,
         context: Mapping[str, Any],
         step_id: str | None,
     ) -> str | None:
-        if step_id not in {"S20", "S21"}:
+        if step_id == "S23":
+            latches = _four_down_completion_latches_from_context(context)
+            if not latches.get("s22_latched_complete"):
+                return "S22"
             return None
-        latches = _refuel_probe_completion_latches_from_context(context)
+        if step_id != "S25":
+            return None
+        latches = _four_down_completion_latches_from_context(context)
+        if not latches.get("s24_latched_complete"):
+            return "S24"
+        return None
+
+    def _four_down_latched_completion_conflict(
+        self,
+        context: Mapping[str, Any],
+        step_id: str | None,
+    ) -> str | None:
+        if step_id not in {"S20", "S21", "S22", "S23", "S24", "S25"}:
+            return None
+        latches = _four_down_completion_latches_from_context(context)
         vars_selected = context.get("vars")
         vars_map = vars_selected if isinstance(vars_selected, Mapping) else {}
+        if step_id in {"S20", "S21"}:
+            if (
+                step_id == "S20"
+                and latches.get("s20_latched_complete")
+                and _refuel_probe_extended(vars_map)
+            ):
+                return "refuel_probe_latched_completion:S20"
+            if (
+                latches.get("s21_latched_complete")
+                and _refuel_probe_retracted(vars_map)
+            ):
+                return "refuel_probe_latched_completion:S21"
         if (
-            step_id == "S20"
-            and latches.get("s20_latched_complete")
-            and _refuel_probe_extended(vars_map)
+            step_id == "S22"
+            and latches.get("s22_latched_complete")
+            and _launch_bar_extended(vars_map)
         ):
-            return "refuel_probe_latched_completion:S20"
+            return "four_down_latched_completion:S22"
         if (
-            latches.get("s21_latched_complete")
-            and _refuel_probe_retracted(vars_map)
+            latches.get("s23_latched_complete")
+            and _launch_bar_retracted(vars_map)
+            and step_id in {"S22", "S23"}
         ):
-            return "refuel_probe_latched_completion:S21"
+            return "four_down_latched_completion:S23"
+        if (
+            step_id == "S24"
+            and latches.get("s24_latched_complete")
+            and _hook_down(vars_map)
+        ):
+            return "four_down_latched_completion:S24"
+        if (
+            latches.get("s25_latched_complete")
+            and _hook_up(vars_map)
+            and step_id in {"S24", "S25"}
+        ):
+            return "four_down_latched_completion:S25"
         return None
 
     def _context_with_full_pack_gates(self, context: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -6746,18 +7024,24 @@ class LiveDcsTutorLoop:
             if isinstance(recent_actions, Mapping)
             else []
         )
-        advanced = self._infer_after_completed_step(
-            rejected_step_id,
-            vars_map,
-            recent_ui_targets=recent_buttons,
-            vision_facts=context.get("vision_facts"),
-        )
+        forced_step_id = response.metadata.get("final_evidence_consistency_forced_step_id")
+        advanced = None
+        if not isinstance(forced_step_id, str) or not forced_step_id:
+            advanced = self._infer_after_completed_step(
+                rejected_step_id,
+                vars_map,
+                recent_ui_targets=recent_buttons,
+                vision_facts=context.get("vision_facts"),
+            )
         s08_visual_recovery = rejected_step_id == "S08" and _s08_visual_recovery_needed(context)
-        next_step_id = (
-            advanced.inferred_step_id
-            if advanced is not None and isinstance(advanced.inferred_step_id, str)
-            else self._next_step_id_after(rejected_step_id)
-        )
+        if isinstance(forced_step_id, str) and forced_step_id:
+            next_step_id = forced_step_id
+        else:
+            next_step_id = (
+                advanced.inferred_step_id
+                if advanced is not None and isinstance(advanced.inferred_step_id, str)
+                else self._next_step_id_after(rejected_step_id)
+            )
         s08_visual_hint = _s08_visual_hint_from_vision_summary(context) if s08_visual_recovery else None
         s08_visual_target = s08_visual_hint[0] if s08_visual_hint is not None else "left_mdi_pb18"
         s08_visual_evidence_ref = (
@@ -6779,6 +7063,10 @@ class LiveDcsTutorLoop:
             rewritten = "当前仍在 S08：左 DDI 还在 TAC 页面，FCS 页面尚未出现。请先按左 DDI PB18 进入 SUPT，再进入 FCS。"
         elif s08_visual_recovery:
             rewritten = "You are still on S08: the left DDI is on TAC and the FCS page is not visible. Press Left DDI PB18 to reach SUPT, then enter FCS."
+        elif next_step_id == "S24" and response.metadata.get("final_evidence_consistency_forced_step_id") == "S24" and self.lang == "zh":
+            rewritten = "现在进入 S24。请放下阻钩手柄，确认阻钩已伸出。"
+        elif next_step_id == "S24" and response.metadata.get("final_evidence_consistency_forced_step_id") == "S24":
+            rewritten = "Continue to S24. Lower the arresting hook handle and confirm the hook is down."
         elif self.lang == "zh":
             rewritten = f"{rejected_step_id} 的最新证据已经满足。现在进入 {next_step_id}。"
         else:
@@ -7577,14 +7865,20 @@ class LiveDcsTutorLoop:
         if overridden_inferred_step:
             gate_blockers = []
 
-        conflict_reason = self._fallback_evidence_conflict_reason(
-            request,
-            step_id=inferred_step_id,
-            missing_conditions=missing_conditions,
-            include_completion_gate=True,
+        latches = _four_down_completion_latches_from_context(context)
+        ignore_static_completion_conflict = (
+            inferred_step_id == "S24"
+            and not latches.get("s24_latched_complete")
         )
-        if conflict_reason is not None:
-            return None, conflict_reason
+        if not ignore_static_completion_conflict:
+            conflict_reason = self._fallback_evidence_conflict_reason(
+                request,
+                step_id=inferred_step_id,
+                missing_conditions=missing_conditions,
+                include_completion_gate=True,
+            )
+            if conflict_reason is not None:
+                return None, conflict_reason
 
         if inferred_step_id == "S33" and not missing_conditions and not gate_blockers:
             return None, "all_steps_complete"
@@ -7826,6 +8120,20 @@ class LiveDcsTutorLoop:
             and _s08_power_condition_missing_for_target(fallback_target, missing_set, vars_map)
         ):
             fallback_guidance = _s08_power_guidance_for_target(fallback_target, self.lang)
+        elif self.lang == "zh" and overlay_step_id in {"S22", "S23", "S24", "S25"}:
+            fallback_guidance = {
+                "S22": "请放下 launch bar，确认 launch bar 已伸出。",
+                "S23": "请收起 launch bar，确认 launch bar 已收回。",
+                "S24": "请放下阻钩手柄，确认阻钩已伸出。",
+                "S25": "请抬起阻钩手柄，确认阻钩已收起。",
+            }[overlay_step_id]
+        elif overlay_step_id in {"S22", "S23", "S24", "S25"}:
+            fallback_guidance = {
+                "S22": "Extend the launch bar and confirm it is down.",
+                "S23": "Retract the launch bar after confirming extension.",
+                "S24": "Lower the arresting hook handle and confirm the hook is down.",
+                "S25": "Raise the arresting hook handle and confirm the hook is up.",
+            }[overlay_step_id]
 
         fallback_help_obj = {
             "diagnosis": {
