@@ -8287,6 +8287,135 @@ def test_live_loop_ignores_stale_s19_visual_facts_for_s20(tmp_path: Path) -> Non
     assert stats["vision_cycles"] == 0
 
 
+def test_live_loop_advances_satisfied_s19_visual_hold_before_vlm_gate(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s20_satisfied_s19_visual_hold.jsonl"
+    frame = _bios_frame(1, 10.0, apu_switch=1)
+    frame["bios"]["EXT_REFUEL_PROBE_SW"] = 0
+    frame["delta"]["EXT_REFUEL_PROBE_SW"] = 0
+    _write_replay(replay_path, [frame])
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "sess-s19-hold-satisfied"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="10000_000654",
+                    capture_wall_ms=10000,
+                    frame_seq=654,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "10000_000654.png"),
+                )
+            ]
+
+    class FailingIfCalledVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):  # pragma: no cover
+            del vision, session_id, trigger_wall_ms
+            raise AssertionError("VLM extractor should not be called after S19 visual hold is satisfied")
+
+        def close(self) -> None:
+            return
+
+    class RequestHintModel:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        def explain_error(self, observation: Observation, request=None) -> TutorResponse:
+            self.calls.append({"observation": observation, "request": request})
+            hint = request.context["deterministic_step_hint"]
+            step_id = hint["inferred_step_id"]
+            target = hint.get("action_hint", {}).get("target") or hint["step_ui_targets"][0]
+            return TutorResponse(
+                status="ok",
+                in_reply_to=request.request_id,
+                message=f"Operate {target}.",
+                actions=[],
+                explanations=[f"Operate {target}."],
+                metadata={
+                    "provider": "mock_qwen",
+                    "help_response": {
+                        "diagnosis": {"step_id": step_id, "error_category": "OM"},
+                        "next": {"step_id": step_id},
+                        "overlay": {
+                            "targets": [target],
+                            "evidence": [
+                                {
+                                    "target": target,
+                                    "type": "gate",
+                                    "ref": f"GATES.{step_id}.completion",
+                                    "quote": "Current gate remains incomplete.",
+                                    "grounding_confidence": 0.95,
+                                }
+                            ],
+                        },
+                        "explanations": [f"Operate {target}."],
+                    },
+                },
+            )
+
+    source = ReplayBiosReceiver(replay_path, speed=0.0)
+    model = RequestHintModel()
+    loop = LiveDcsTutorLoop(
+        source=source,
+        model=model,
+        action_executor=RecordingExecutor(),
+        session_id="sess-s19-hold-satisfied",
+        vision_port=StaticVisionPort(),
+        vision_session_id="sess-s19-hold-satisfied",
+        vision_mode="replay",
+        vision_fact_extractor=FailingIfCalledVisionFactExtractor(),
+    )
+    loop._infer_preliminary_step_for_vision_facts = lambda obs: StepInferenceResult(
+        "S19",
+        ("vision_facts.fcsmc_final_go_result_visible==seen",),
+    )
+    loop._last_inferred_step_id = "S19"
+    loop._sticky_inference_step_id = "S19"
+    loop._sticky_inference_missing_conditions = ("vision_facts.fcsmc_final_go_result_visible==seen",)
+    loop._vision_fact_snapshot = {
+        "fcsmc_final_go_result_visible": {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "state": "seen",
+            "source_frame_id": "old-s19-frame",
+            "sticky": True,
+            "expires_after_ms": 600000,
+            "observed_at_wall_ms": 9000,
+            "expires_at_wall_ms": 609000,
+        }
+    }
+    try:
+        obs = source.get_observation()
+        assert obs is not None
+        loop._ingest_observation(obs)
+        response, _report = loop.run_help_cycle(trigger_t_wall=10.0)
+        stats = loop.stats.to_dict()
+    finally:
+        loop.close()
+
+    assert response is not None
+    request = model.calls[0]["request"]
+    assert request.metadata["vision_fact_status"] == "vision_not_required"
+    assert request.metadata["vision_fact_active_step_ids"] == ["S20"]
+    assert request.context["vision_facts"] == []
+    assert request.context["deterministic_step_hint"]["inferred_step_id"] == "S20"
+    assert response.metadata["final_action_plan"]["step_id"] == "S20"
+    assert response.actions[0]["target"] == "refuel_probe_switch"
+    assert response.metadata["vlm_call_status"] == "not_required"
+    assert response.metadata["harness_trace"]["vlm_call"]["extractor_called"] is False
+    assert stats["vision_cycles"] == 0
+
+
 def test_live_loop_keeps_unresolved_visual_sticky_hold_for_regressed_preliminary_step(tmp_path: Path) -> None:
     replay_path = tmp_path / "bios_visual_sticky_regression.jsonl"
     _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
@@ -8308,6 +8437,41 @@ def test_live_loop_keeps_unresolved_visual_sticky_hold_for_regressed_preliminary
 
     assert regressed == ["S17", "S19"]
     assert advanced == ["S20"]
+
+
+def test_live_loop_advances_satisfied_s19_sticky_hold_for_regressed_preliminary_step(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s19_sticky_satisfied_regression.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=1)])
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path, speed=0.0),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-sticky-visual-satisfied-regression",
+    )
+    try:
+        loop._last_inferred_step_id = "S19"
+        loop._sticky_inference_step_id = "S19"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcsmc_final_go_result_visible==seen",)
+        loop._vision_fact_snapshot = {
+            "fcsmc_final_go_result_visible": {
+                "fact_id": "fcsmc_final_go_result_visible",
+                "state": "seen",
+                "source_frame_id": "old-s19-frame",
+                "sticky": True,
+                "observed_at_wall_ms": 9000,
+                "expires_at_wall_ms": 609000,
+            }
+        }
+
+        active = loop._active_step_ids_for_vision_facts(
+            StepInferenceResult("S17", ()),
+            now_wall_ms=10000,
+        )
+    finally:
+        loop.close()
+
+    assert active == ["S20"]
 
 
 def test_live_loop_suppresses_stale_visual_preliminary_behind_progress(tmp_path: Path) -> None:

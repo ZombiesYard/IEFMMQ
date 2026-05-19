@@ -2519,6 +2519,21 @@ def _missing_conditions_satisfied_by_vars(
     return checked
 
 
+def _s19_final_go_hold_satisfied_by_facts(
+    missing_conditions: Sequence[str],
+    vision_facts: Mapping[str, Any],
+) -> bool:
+    conditions = [item for item in missing_conditions if isinstance(item, str) and item]
+    if conditions != ["vision_facts.fcsmc_final_go_result_visible==seen"]:
+        return False
+    fact = vision_facts.get("fcsmc_final_go_result_visible")
+    return (
+        isinstance(fact, Mapping)
+        and fact.get("state") in {"seen", "fresh"}
+        and fact.get("sticky") is True
+    )
+
+
 def _vision_summary_seen_or_fresh(
     summary: Mapping[str, Any] | None,
     fact_id: str,
@@ -4539,6 +4554,23 @@ class LiveDcsTutorLoop:
                 self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
                 return advanced
         if (
+            current_step_id == "S19"
+            and _s19_final_go_hold_satisfied_by_facts(
+                inference.missing_conditions,
+                self._vision_fact_snapshot,
+            )
+        ):
+            advanced = self._infer_after_completed_step(
+                "S19",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if (
             current_step_id in {"S09", "S10"}
             and _missing_conditions_satisfied_by_vars(inference.missing_conditions, vars_selected)
         ):
@@ -4563,6 +4595,23 @@ class LiveDcsTutorLoop:
         ):
             advanced = self._infer_after_completed_step(
                 sticky_step_id,
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            if advanced is not None:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
+        if (
+            sticky_step_id == "S19"
+            and _s19_final_go_hold_satisfied_by_facts(
+                self._sticky_inference_missing_conditions,
+                self._vision_fact_snapshot,
+            )
+        ):
+            advanced = self._infer_after_completed_step(
+                "S19",
                 vars_selected,
                 recent_ui_targets=recent_ui_targets,
                 vision_facts=None,
@@ -4702,6 +4751,16 @@ class LiveDcsTutorLoop:
         )
         sticky_step_id = self._sticky_inference_step_id
         sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
+        s19_final_go_hold_satisfied = _s19_final_go_hold_satisfied_by_facts(
+            preliminary_inference.missing_conditions,
+            self._vision_fact_snapshot,
+        ) or (
+            sticky_step_id == "S19"
+            and _s19_final_go_hold_satisfied_by_facts(
+                self._sticky_inference_missing_conditions,
+                self._vision_fact_snapshot,
+            )
+        )
 
         if (
             current_step_id == "S08"
@@ -4709,6 +4768,8 @@ class LiveDcsTutorLoop:
             and self._s08_page_navigation_recently_completed()
         ):
             current_step_id = self._next_step_id_after("S08")
+        if current_step_id == "S19" and s19_final_go_hold_satisfied:
+            current_step_id = self._next_step_id_after(current_step_id) or current_step_id
 
         current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
         last_idx = self._step_order_index.get(last_step_id) if isinstance(last_step_id, str) else None
@@ -4725,12 +4786,17 @@ class LiveDcsTutorLoop:
                 current_step_id = last_step_id
             current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
 
+        if current_step_id == "S19" and s19_final_go_hold_satisfied:
+            current_step_id = self._next_step_id_after(current_step_id) or current_step_id
+            current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
+
         out: list[str] = []
         if isinstance(current_step_id, str) and current_step_id:
             out.append(current_step_id)
 
         if (
             sticky_missing_has_visual_hold
+            and not s19_final_go_hold_satisfied
             and isinstance(sticky_step_id, str)
             and sticky_step_id in self.vision_priority_step_set
             and current_idx is not None
