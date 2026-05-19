@@ -1836,6 +1836,32 @@ def _build_help_cycle_audit_fields(
     response_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     fused_step_id, fused_missing_conditions = _extract_fused_step_audit(request)
+    if isinstance(response_metadata, Mapping):
+        final_plan = response_metadata.get("final_action_plan")
+        if not isinstance(final_plan, Mapping):
+            final_plan = response_metadata.get("harness_action_plan")
+        final_plan_source = (
+            final_plan.get("source")
+            if isinstance(final_plan, Mapping) and isinstance(final_plan.get("source"), str)
+            else response_metadata.get("final_action_plan_source")
+        )
+        final_step_id = final_plan.get("step_id") if isinstance(final_plan, Mapping) else None
+        if (
+            isinstance(final_step_id, str)
+            and final_step_id
+            and (
+                response_metadata.get("validator_rejected") is True
+                or response_metadata.get("repair_applied") is True
+                or final_plan_source in {
+                    "final_evidence_consistency_validator",
+                    "validator_action_hint",
+                    "validator_repair",
+                    "validator_text_only_guidance",
+                }
+            )
+        ):
+            fused_step_id = final_step_id
+            fused_missing_conditions = []
     vision_fact_metadata = vision_fact_context.get("metadata")
     vision_fact_extractor_used = (
         bool(vision_fact_metadata.get("extractor_used")) if isinstance(vision_fact_metadata, Mapping) else False
@@ -7636,6 +7662,10 @@ class LiveDcsTutorLoop:
             "text_only": not bool(final_targets),
             "source": "final_evidence_consistency_validator",
         }
+        if not final_targets:
+            final_action_plan["text_only_reason"] = _final_public_instruction_category(response)
+            if isinstance(fallback_reason, str) and fallback_reason:
+                final_action_plan["text_only_detail"] = fallback_reason
         response.metadata["harness_action_plan"] = dict(final_action_plan)
         response.metadata["final_action_plan"] = dict(final_action_plan)
         response.metadata["final_evidence_consistency_repair_applied"] = True
@@ -9060,6 +9090,7 @@ class LiveDcsTutorLoop:
             response.actions,
             trace_metadata=trace_metadata,
         )
+        self._annotate_response_audit_metadata(response)
         return HelpCycleDecisionResult(
             response=response,
             fallback_overlay_used=fallback_overlay_used,

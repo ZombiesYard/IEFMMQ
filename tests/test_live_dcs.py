@@ -11714,6 +11714,78 @@ def test_live_help_fixture_315_s17_complete_advances_to_s18_actionable_text() ->
     assert "takeoff_trim_button" not in public_text
 
 
+def test_live_help_fixture_315_final_repair_restamps_s17_action_metadata() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/c87638b0-4cd5-443c-8531-2849f716a2ee.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+    request.context = dict(request.context)
+    request.context["gates"] = {
+        "S17.completion": {"status": "blocked", "reason": "Takeoff trim must be set."},
+        "S17.precondition": {"status": "allowed"},
+    }
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S17"
+    assert repaired.metadata["final_overlay_targets"] == ["takeoff_trim_button"]
+    assert [action["target"] for action in repaired.actions] == ["takeoff_trim_button"]
+    assert repaired.metadata["fused_step_id"] == "S17"
+    assert repaired.metadata["fused_missing_conditions"] == []
+    assert repaired.actions[0]["fused_step_id"] == "S17"
+    assert repaired.actions[0]["fused_missing_conditions"] == []
+    final_public_action = repaired.metadata["final_public_response"]["actions"][0]
+    assert final_public_action["target"] == "takeoff_trim_button"
+    assert final_public_action["fused_step_id"] == "S17"
+    assert final_public_action["fused_missing_conditions"] == []
+    assert "vars.flap_auto==true" not in json.dumps(final_public_action)
+
+
+def test_live_help_fixture_315_final_repair_restamps_s12_action_metadata() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/0e86f7a8-9916-4246-b0d5-379048b0e9d2.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S12"
+    assert repaired.metadata["final_overlay_targets"] == ["ins_mode_knob"]
+    assert [action["target"] for action in repaired.actions] == ["ins_mode_knob"]
+    assert repaired.metadata["fused_step_id"] == "S12"
+    assert repaired.metadata["fused_missing_conditions"] == []
+    assert repaired.actions[0]["fused_step_id"] == "S12"
+    assert repaired.actions[0]["fused_missing_conditions"] == []
+    final_public_action = repaired.metadata["final_public_response"]["actions"][0]
+    assert final_public_action["target"] == "ins_mode_knob"
+    assert final_public_action["fused_step_id"] == "S12"
+    assert final_public_action["fused_missing_conditions"] == []
+    assert "vars.rpm_l>=25" not in json.dumps(final_public_action)
+
+
+def test_live_help_fixture_315_s18_text_only_plan_records_reason() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/82d871be-26ac-41f4-a722-8141efcd8f87.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S18"
+    final_plan = repaired.metadata["final_action_plan"]
+    assert final_plan["step_id"] == "S18"
+    assert final_plan["text_only"] is True
+    assert final_plan["targets"] == []
+    assert final_plan["text_only_reason"] == "text-only/manual"
+    assert isinstance(final_plan["text_only_detail"], str) and final_plan["text_only_detail"]
+    assert repaired.metadata["fused_step_id"] == "S18"
+    assert repaired.metadata["fused_missing_conditions"] == []
+    assert "PB5" in _public_response_text(repaired)
+
+
 def test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json"
