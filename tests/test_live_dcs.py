@@ -11769,6 +11769,110 @@ def test_final_evidence_validator_rechecks_repaired_fallback_step() -> None:
     assert "ins_mode_knob" not in [action["target"] for action in response.actions]
 
 
+@pytest.mark.parametrize(
+    ("next_step_id", "target", "expected_text"),
+    [
+        ("S28", "parking_brake_handle", "parking brake"),
+        ("S29", "ifei_up_button", "bingo"),
+        ("S30", "standby_altimeter_pressure_knob", "standby pressure altimeter"),
+        ("S31", "radar_altimeter_bug_knob", "radar altimeter"),
+        ("S32", "standby_attitude_cage_knob", "standby attitude"),
+    ],
+)
+def test_final_evidence_consistency_repair_uses_repaired_action_guidance(
+    monkeypatch: pytest.MonkeyPatch,
+    next_step_id: str,
+    target: str,
+    expected_text: str,
+) -> None:
+    request = TutorRequest(
+        request_id=f"issue-315-final-public-guidance-{next_step_id.lower()}",
+        message="help",
+        context={
+            "vars": {},
+            "gates": {
+                f"{next_step_id}.completion": {"status": "blocked", "reason": f"{target} still needs action."},
+                f"{next_step_id}.precondition": {"status": "allowed"},
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S26",
+                "overlay_step_id": "S26",
+                "missing_conditions": ["vars.pitot_heat_on==true"],
+                "step_ui_targets": ["pitot_heat_switch"],
+            },
+            "overlay_target_allowlist": [target],
+            "rag_topk": [],
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message=f"S26 latest evidence satisfied. Now entering {next_step_id}.",
+        actions=[],
+        explanations=[f"S26 latest evidence satisfied. Now entering {next_step_id}."],
+        metadata={
+            "provider": "fallback",
+            "generation_mode": "fallback",
+            "diagnosis": {"step_id": "S26", "error_category": "OM"},
+            "next": {"step_id": "S26"},
+            "help_response": {
+                "diagnosis": {"step_id": "S26", "error_category": "OM"},
+                "next": {"step_id": "S26"},
+                "overlay": {"targets": [], "evidence": []},
+                "explanations": [f"S26 latest evidence satisfied. Now entering {next_step_id}."],
+            },
+            "final_public_response": {
+                "message": f"S26 latest evidence satisfied. Now entering {next_step_id}.",
+                "explanations": [f"S26 latest evidence satisfied. Now entering {next_step_id}."],
+                "diagnosis": {"step_id": "S26", "error_category": "OM"},
+                "next": {"step_id": "S26"},
+                "actions": [],
+            },
+        },
+    )
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-issue-315-final-public-guidance",
+        rag_top_k=0,
+        lang="en",
+    )
+    monkeypatch.setattr(
+        loop,
+        "_infer_after_completed_step",
+        lambda *args, **kwargs: StepInferenceResult(next_step_id, (f"vars.{target}_complete==true",)),
+    )
+    try:
+        used, reason = loop._rewrite_final_evidence_consistency_conflict_response(
+            response,
+            request,
+            rejected_step_id="S26",
+            rejected_missing_conditions=["vars.pitot_heat_on==true"],
+        )
+    finally:
+        loop.close()
+
+    assert used is True
+    assert reason == "final_evidence_consistency_validator"
+    assert response.metadata["next"]["step_id"] == next_step_id
+    assert response.metadata["harness_action_plan"]["targets"] == [target]
+    assert response.metadata["final_action_plan"]["step_id"] == next_step_id
+    assert response.metadata["final_action_plan"]["targets"] == [target]
+    assert response.metadata["final_action_plan_source"] == "final_evidence_consistency_validator"
+    assert [action["target"] for action in response.actions] == [target]
+    assert response.actions[0]["evidence_refs"] == [f"GATES.{next_step_id}.completion"]
+    assert response.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == response.actions[0]["evidence_refs"][0]
+    assert "latest evidence satisfied" not in response.message
+    assert expected_text in response.message.lower()
+    assert response.metadata["help_response"]["explanations"] == [response.message]
+    final_public = response.metadata["final_public_response"]
+    assert final_public["message"] == response.message
+    assert final_public["next"]["step_id"] == next_step_id
+    assert final_public["actions"][0]["target"] == target
+    assert "latest evidence satisfied" not in json.dumps(final_public)
+
+
 def test_live_help_fixture_310_does_not_fall_back_to_s10_when_next_overlay_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
