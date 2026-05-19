@@ -8208,8 +8208,14 @@ class LiveDcsTutorLoop:
             fallback_targets_list = [candidate_targets[0]]
         fallback_target = fallback_targets_list[0]
 
+        missing_condition_refs: list[str] = []
+        for condition in missing_conditions:
+            if not isinstance(condition, str):
+                continue
+            matched = _MISSING_CONDITION_VAR_RE.search(condition)
+            if matched is not None:
+                missing_condition_refs.append(f"VARS.{matched.group(1)}")
         candidate_refs: list[str] = []
-        gate_blockers = hint.get("gate_blockers")
         if isinstance(gate_blockers, (list, tuple)):
             for blocker in gate_blockers:
                 if not isinstance(blocker, Mapping):
@@ -8217,11 +8223,15 @@ class LiveDcsTutorLoop:
                 ref = blocker.get("ref")
                 if isinstance(ref, str) and ref:
                     candidate_refs.append(ref)
+        if overridden_inferred_step:
+            candidate_refs.extend(missing_condition_refs)
         candidate_refs.append(f"GATES.{inferred_step_id}.completion")
         candidate_refs.append(f"GATES.{inferred_step_id}.precondition")
         if overlay_step_id != inferred_step_id:
             candidate_refs.append(f"GATES.{overlay_step_id}.completion")
             candidate_refs.append(f"GATES.{overlay_step_id}.precondition")
+        if not overridden_inferred_step:
+            candidate_refs.extend(missing_condition_refs)
         gate_var_refs = step_fallback_profile.get("gate_var_refs")
         if isinstance(gate_var_refs, list):
             for ref in gate_var_refs:
