@@ -404,11 +404,21 @@ cockpit_elements:
     dcs_id: "pnt_291"
     aliases: ["Radar Altimeter Push to Test/Set Min Alt"]
     panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "雷达高度表告警高度旋钮：用鼠标滚轮调整，机场 200 ft，航母 40 ft。"
+      en: "Radar altimeter bug knob: use the mouse wheel; set 200 ft for airfield or 40 ft for carrier."
   standby_attitude_cage_knob:
     description: "Standby attitude indicator cage knob"
     dcs_id: "pnt_213"
     aliases: ["SAI Cage Knob"]
     panel_area: "right_instrument_panel"
+    interaction:
+      click_type: "wheel_up"
+    interaction_hint:
+      zh: "备用姿态仪 cage knob：用鼠标滚轮解锁。"
+      en: "Standby attitude cage knob: use the mouse wheel to uncage."
   attitude_source_selector:
     description: "HUD attitude source selector INS/AUTO/STBY"
     dcs_id: "pnt_148"

@@ -6423,6 +6423,24 @@ class LiveDcsTutorLoop:
                 if self.lang == "zh"
                 else "Enter COMM1 frequency 134.000 on the UFC: press 1-3-4-0-0-0, then ENT."
             )
+        if "s10_left_engine_left_click_guidance" in plan.reasons:
+            plan_guidance = (
+                "当前处于 S10。请将 Engine Crank 开关拨到 LEFT/L 位置：用左键点击 ENG CRANK 开关启动左发。"
+                if self.lang == "zh"
+                else "You are on S10. Set the Engine Crank switch to LEFT/L with a left-click to start the left engine."
+            )
+        elif "s31_radar_altimeter_mouse_wheel_guidance" in plan.reasons:
+            plan_guidance = (
+                "现在进入 S31。请用鼠标滚轮调整雷达高度表告警高度旋钮：机场 200 ft，航母 40 ft。"
+                if self.lang == "zh"
+                else "Continue to S31. Use the mouse wheel on the radar altimeter bug knob: 200 ft for airfield or 40 ft for carrier."
+            )
+        elif "s32_standby_attitude_mouse_wheel_guidance" in plan.reasons:
+            plan_guidance = (
+                "现在进入 S32。请用鼠标滚轮操作备用姿态仪 cage knob，解锁备用姿态仪。"
+                if self.lang == "zh"
+                else "Continue to S32. Use the mouse wheel on the standby attitude cage knob to uncage the standby attitude indicator."
+            )
         if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
             plan_guidance = s18_visual_hint_reason
         emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"
@@ -7177,6 +7195,10 @@ class LiveDcsTutorLoop:
             rewritten = "现在进入 S24。请放下阻钩手柄，确认阻钩已伸出。"
         elif next_step_id == "S24" and response.metadata.get("final_evidence_consistency_forced_step_id") == "S24":
             rewritten = "Continue to S24. Lower the arresting hook handle and confirm the hook is down."
+        elif next_step_id == "S33" and rejected_step_id == "S33" and self.lang == "zh":
+            rewritten = "姿态源选择器已经在 AUTO，S33 检查已满足；冷启动流程已完成，无需继续操作。"
+        elif next_step_id == "S33" and rejected_step_id == "S33":
+            rewritten = "The attitude source selector is already on AUTO, so S33 is satisfied; the cold-start flow is complete."
         elif self.lang == "zh":
             rewritten = f"{rejected_step_id} 的最新证据已经满足。现在进入 {next_step_id}。"
         else:
@@ -8258,16 +8280,16 @@ class LiveDcsTutorLoop:
                 "S28": "现在进入 S28。请释放停车刹车手柄，准备滑行。",
                 "S29": "现在进入 S29。请用 IFEI UP/DOWN 按钮设置 BINGO fuel。",
                 "S30": "现在进入 S30。请调整备用气压高度表到当前机场标高/QNH。",
-                "S31": "现在进入 S31。请设置雷达高度表告警高度：机场 200 ft，航母 40 ft。",
-                "S32": "现在进入 S32。请解锁备用姿态仪，让姿态指示器自由工作。",
+                "S31": "现在进入 S31。请用鼠标滚轮调整雷达高度表告警高度旋钮：机场 200 ft，航母 40 ft。",
+                "S32": "现在进入 S32。请用鼠标滚轮操作备用姿态仪 cage knob，解锁备用姿态仪。",
             }[overlay_step_id]
         elif overlay_step_id in {"S28", "S29", "S30", "S31", "S32"}:
             fallback_guidance = {
                 "S28": "Continue to S28. Release the parking brake handle when ready to taxi.",
                 "S29": "Continue to S29. Use the IFEI UP/DOWN buttons to set the BINGO fuel.",
                 "S30": "Continue to S30. Adjust the standby pressure altimeter to the local field elevation or QNH.",
-                "S31": "Continue to S31. Set the radar altimeter bug to 200 ft for airfield or 40 ft for carrier.",
-                "S32": "Continue to S32. Uncage the standby attitude indicator.",
+                "S31": "Continue to S31. Use the mouse wheel on the radar altimeter bug knob: 200 ft for airfield or 40 ft for carrier.",
+                "S32": "Continue to S32. Use the mouse wheel on the standby attitude cage knob to uncage the standby attitude indicator.",
             }[overlay_step_id]
 
         fallback_help_obj = {
