@@ -2787,6 +2787,16 @@ def _vision_summary_seen_or_fresh(
     return False
 
 
+def _vision_summary_not_seen(
+    summary: Mapping[str, Any] | None,
+    fact_id: str,
+) -> bool:
+    if not isinstance(summary, Mapping) or not fact_id:
+        return False
+    raw = summary.get("not_seen_fact_ids")
+    return isinstance(raw, (list, tuple, set)) and any(item == fact_id for item in raw)
+
+
 def _s19_final_go_seen_or_fresh(summary: Mapping[str, Any] | None) -> bool:
     return _vision_summary_seen_or_fresh(summary, "fcsmc_final_go_result_visible")
 
@@ -7744,7 +7754,32 @@ class LiveDcsTutorLoop:
             if next_step_id == "S18":
                 summary = context.get("vision_fact_summary")
                 bit_root_seen = _vision_summary_seen_or_fresh(summary, "bit_root_page_visible")
-                if bit_root_seen and "right_mdi_pb5" in self.overlay_allowset:
+                bit_root_not_seen = _vision_summary_not_seen(summary, "bit_root_page_visible")
+                if bit_root_not_seen:
+                    s18_target = "right_mdi_pb18"
+                    s18_guidance = (
+                        "S17 已完成。现在进入 S18：视觉证据显示右 DDI 不在 BIT root 页面；请先左键按右 DDI PB18/MENU 恢复到 BIT 页面。"
+                        if self.lang == "zh"
+                        else "S17 is complete. Continue to S18: visual evidence says the right DDI is not on the BIT root page; left-click right DDI PB18/MENU to recover the BIT page first."
+                    )
+                    allowed_refs = _collect_request_evidence_refs(context)
+                    s18_ref = next(
+                        (
+                            ref for ref in (
+                                "GATES.S18.completion",
+                                "VARS.takeoff_trim_set",
+                                "GATES.S17.completion",
+                            )
+                            if ref in allowed_refs
+                        ),
+                        "GATES.S18.completion",
+                    )
+                    s18_evidence_type = "gate"
+                    if s18_ref.startswith("VARS."):
+                        s18_evidence_type = "var"
+                    s18_quote = "S18 requires PB18/MENU recovery because BIT root is not visible."
+                    fallback_reason = "s18_not_bit_root_to_pb18"
+                elif bit_root_seen:
                     s18_target = "right_mdi_pb5"
                     s18_guidance = (
                         "S17 已完成。现在进入 S18：右 DDI 已在 BIT root 页面；请左键按 PB5/FCS-MC 进入 FCS-MC BIT 页面。"
@@ -7771,11 +7806,11 @@ class LiveDcsTutorLoop:
                     s18_quote = "S18 BIT root page is visible; PB5 enters FCS-MC."
                     fallback_reason = "s18_bit_root_to_pb5"
                 else:
-                    s18_target = "right_mdi_pb18"
+                    s18_target = "right_mdi_pb5"
                     s18_guidance = (
-                        "S17 已完成。现在进入 S18：右 DDI 的 BIT 页面状态尚未确认；请先左键按右 DDI PB18/MENU 恢复到 BIT 页面。"
+                        "S17 已完成。现在进入 S18：正常冷启动流程中右 DDI 通常位于 BIT root 页面；请左键按右 DDI PB5/FCS-MC 进入 FCS-MC BIT 页面。"
                         if self.lang == "zh"
-                        else "S17 is complete. Continue to S18: the right DDI BIT page state is not confirmed; left-click right DDI PB18/MENU to recover the BIT page first."
+                        else "S17 is complete. Continue to S18: in the normal cold-start flow the right DDI defaults to the BIT root page; left-click right DDI PB5/FCS-MC to enter the FCS-MC BIT page."
                     )
                     allowed_refs = _collect_request_evidence_refs(context)
                     s18_ref = next(
@@ -7792,8 +7827,8 @@ class LiveDcsTutorLoop:
                     s18_evidence_type = "gate"
                     if s18_ref.startswith("VARS."):
                         s18_evidence_type = "var"
-                    s18_quote = "S18 requires right DDI BIT/FCS-MC page navigation."
-                    fallback_reason = "s18_unknown_page_to_pb18"
+                    s18_quote = "S17 is complete; normal S18 cold-start flow continues with PB5/FCS-MC."
+                    fallback_reason = "s18_default_bit_root_to_pb5"
                 if s18_target in self.overlay_allowset:
                     fallback_help_obj = {
                         "diagnosis": {"step_id": "S18", "error_category": "OM"},

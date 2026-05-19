@@ -2343,7 +2343,7 @@
   "expectations": {
     "expected_final_step_id": "S18",
     "expected_overlay_target_ids": [
-      "right_mdi_pb18"
+      "right_mdi_pb5"
     ],
     "final_response_source": "final_evidence_consistency_validator",
     "llm_decision_status": "repaired",
