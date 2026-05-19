@@ -402,6 +402,54 @@ def _latest_vars(latest_vars: Mapping[str, Any] | None) -> Mapping[str, Any]:
     return latest_vars if isinstance(latest_vars, Mapping) else {}
 
 
+_S08_DISPLAY_POWER_TARGETS = (
+    "left_mdi_brightness_selector",
+    "right_mdi_brightness_selector",
+    "ampcd_off_brightness_knob",
+    "hud_symbology_brightness_knob",
+)
+
+_S08_DISPLAY_POWER_VARS = ("left_ddi_on", "right_ddi_on", "mpcd_on", "hud_on")
+
+_S09_NUMERIC_SEQUENCE_TARGETS = ("ufc_key_1", "ufc_key_3", "ufc_key_4", "ufc_key_0")
+
+
+def _s08_state_action_plan(
+    vars_map: Mapping[str, Any],
+    *,
+    spec: StepHarnessSpec | None,
+    max_overlay_targets: int,
+) -> _StateActionPlan | None:
+    allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
+    if not allowed:
+        return None
+    if max_overlay_targets < len(_S08_DISPLAY_POWER_TARGETS):
+        return None
+    if not all(vars_map.get(var_name) is False for var_name in _S08_DISPLAY_POWER_VARS):
+        return None
+    if not all(target in allowed for target in _S08_DISPLAY_POWER_TARGETS):
+        return _StateActionPlan(
+            targets=_S08_DISPLAY_POWER_TARGETS,
+            guidance=(
+                "All displays are still off. Power the left DDI, right DDI, AMPCD, and HUD brightness controls; "
+                "DDI warm-up can lag, so wait for the displays before page navigation."
+            ),
+            text_only=True,
+            source="state_action_planner",
+            reasons=("s08_all_displays_off_power_targets_unavailable",),
+        )
+    return _StateActionPlan(
+        targets=_S08_DISPLAY_POWER_TARGETS,
+        guidance=(
+            "All displays are still off. Power the left DDI, right DDI, AMPCD, and HUD brightness controls; "
+            "DDI warm-up can lag, so wait for the displays before page navigation."
+        ),
+        text_only=False,
+        source="state_action_planner",
+        reasons=("s08_all_displays_off_power_targets",),
+    )
+
+
 def _normalize_ufc_scratchpad_text(vars_map: Mapping[str, Any]) -> str:
     parts: list[str] = []
     for key in (
@@ -427,6 +475,7 @@ def _s09_state_action_plan(
     *,
     spec: StepHarnessSpec | None,
     recent_action_targets: Sequence[str] | None,
+    max_overlay_targets: int,
 ) -> _StateActionPlan | None:
     allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
     if not allowed or _s09_comm1_frequency_complete(vars_map):
@@ -448,6 +497,24 @@ def _s09_state_action_plan(
             reasons=(f"s09_state_target:{name}",),
         )
 
+    def _numeric_sequence(guidance: str) -> _StateActionPlan | None:
+        missing = tuple(target for target in _S09_NUMERIC_SEQUENCE_TARGETS if target not in allowed)
+        if missing:
+            return _StateActionPlan(
+                targets=_S09_NUMERIC_SEQUENCE_TARGETS,
+                guidance=guidance,
+                text_only=True,
+                source="state_action_planner",
+                reasons=tuple(f"s09_numeric_sequence_target_unavailable:{target}" for target in missing),
+            )
+        return _StateActionPlan(
+            targets=_S09_NUMERIC_SEQUENCE_TARGETS,
+            guidance=guidance,
+            text_only=False,
+            source="state_action_planner",
+            reasons=("s09_numeric_sequence_targets",),
+        )
+
     if payload.endswith("134.000"):
         return _target("ufc_ent_button", "The UFC scratchpad shows 134.000; press ENT to commit the COMM1 preset.")
     if payload.endswith("13.400") or payload.endswith("1.340") or payload.endswith(".134") or payload.endswith("1.34"):
@@ -456,11 +523,22 @@ def _s09_state_action_plan(
         return _target("ufc_key_4", "COMM1 preset entry shows 13; press 4 next.")
     if payload.endswith(".1"):
         return _target("ufc_key_3", "COMM1 preset entry shows 1; press 3 next.")
+    sequence_guidance = (
+        "Enter COMM1 frequency 134.000 with UFC keys 1-3-4-0-0-0, then press ENT."
+    )
     if payload.endswith("305.000") or payload.endswith("305000"):
-        return _target("ufc_key_1", "COMM1 preset 1 is open with the old 305.000 value; press 1 next.")
+        if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
+            return _target("ufc_key_1", "COMM1 preset 1 is open with the old 305.000 value; press 1 next.")
+        return _numeric_sequence(sequence_guidance)
     if vars_map.get("ufc_comm1_pull_pressed") is True or "ufc_comm1_channel_selector_pull" in recent:
-        return _target("ufc_key_1", "COMM1 preset entry is open; start typing 134.000 with key 1.")
-    return _target("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector before entering 134.000.")
+        if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
+            return _target("ufc_key_1", "COMM1 preset entry is open; start typing 134.000 with key 1.")
+        return _numeric_sequence(sequence_guidance)
+    if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
+        return _target("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector before entering 134.000.")
+    return _numeric_sequence(
+        "Pull the UFC COMM1 channel selector if needed, then enter frequency 134.000 with keys 1-3-4-0-0-0 and press ENT."
+    )
 
 
 def _changed_var(evidence_packet: Any, var_name: str) -> Mapping[str, Any] | None:
@@ -507,13 +585,21 @@ def _state_action_plan(
     vision_seen_fact_ids: Sequence[str] | None = None,
     vision_fresh_fact_ids: Sequence[str] | None = None,
     vision_not_seen_fact_ids: Sequence[str] | None = None,
+    max_overlay_targets: int = 1,
 ) -> _StateActionPlan | None:
     vars_map = _latest_vars(latest_vars)
+    if step_id == "S08":
+        return _s08_state_action_plan(
+            vars_map,
+            spec=spec,
+            max_overlay_targets=max_overlay_targets,
+        )
     if step_id == "S09":
         return _s09_state_action_plan(
             vars_map,
             spec=spec,
             recent_action_targets=recent_action_targets,
+            max_overlay_targets=max_overlay_targets,
         )
 
     motion_state = _probe_motion_state(step_id, vars_map, evidence_packet=evidence_packet)
@@ -638,6 +724,7 @@ def plan_harness_action(
         vision_seen_fact_ids=vision_seen_fact_ids,
         vision_fresh_fact_ids=vision_fresh_fact_ids,
         vision_not_seen_fact_ids=vision_not_seen_fact_ids,
+        max_overlay_targets=max_overlay_targets,
     )
     if state_plan is not None and state_plan.text_only:
         return HarnessActionPlan(

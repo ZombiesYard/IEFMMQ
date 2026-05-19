@@ -6050,6 +6050,22 @@ class LiveDcsTutorLoop:
             s08_power_guidance = _s08_power_guidance_for_target(plan.targets[0], self.lang)
             if isinstance(s08_power_guidance, str) and s08_power_guidance:
                 plan_guidance = s08_power_guidance
+        if "s08_all_displays_off_power_targets" in plan.reasons:
+            plan_guidance = (
+                "当前四个显示相关电源/亮度都还没有打开。请依次打开左 DDI、右 DDI、AMPCD 和 HUD 的亮度/电源控件；"
+                "DDI 点亮可能有短暂延迟，确认亮起后再继续导航。"
+                if self.lang == "zh"
+                else (
+                    "All four display power/brightness controls are still off. Power the left DDI, right DDI, "
+                    "AMPCD, and HUD controls; DDI warm-up can lag briefly, so wait for the displays before navigating."
+                )
+            )
+        if "s09_numeric_sequence_targets" in plan.reasons:
+            plan_guidance = (
+                "请在 UFC 输入 COMM1 频率 134.000：按 1-3-4-0-0-0，然后按 ENT。"
+                if self.lang == "zh"
+                else "Enter COMM1 frequency 134.000 on the UFC: press 1-3-4-0-0-0, then ENT."
+            )
         if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
             plan_guidance = s18_visual_hint_reason
         emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"

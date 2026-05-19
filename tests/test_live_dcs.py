@@ -6185,6 +6185,192 @@ def test_harness_validation_action_plan_records_s26_repair_metadata() -> None:
         loop.close()
 
 
+def test_harness_validation_action_plan_uses_s08_all_displays_off_targets() -> None:
+    response = TutorResponse(
+        message="Turn on the left DDI.",
+        explanations=["Turn on the left DDI."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "left_mdi_brightness_selector",
+                "element_id": "pnt_51",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S08"},
+            "diagnosis": {"step_id": "S08", "error_category": "OM"},
+            "help_response": {
+                "diagnosis": {"step_id": "S08", "error_category": "OM"},
+                "next": {"step_id": "S08"},
+                "overlay": {
+                    "targets": ["left_mdi_brightness_selector"],
+                    "evidence": [
+                        {
+                            "target": "left_mdi_brightness_selector",
+                            "type": "gate",
+                            "ref": "GATES.S08.completion",
+                            "quote": "blocked",
+                        }
+                    ],
+                },
+                "explanations": ["Turn on the left DDI."],
+            },
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": [],
+            "gates": [
+                {"gate_id": "S08.completion", "status": "blocked", "reason": "Displays must be powered."},
+                {"gate_id": "S08.precondition", "status": "allowed"},
+            ],
+            "vars": {
+                "left_ddi_on": False,
+                "right_ddi_on": False,
+                "mpcd_on": False,
+                "hud_on": False,
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S08",
+                "overlay_step_id": "S08",
+                "missing_conditions": [
+                    "vars.left_ddi_on==true",
+                    "vars.right_ddi_on==true",
+                    "vars.mpcd_on==true",
+                    "vars.hud_on==true",
+                ],
+                "step_evidence_requirements": ["var", "gate"],
+            },
+            "rag_topk": [],
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request.context["overlay_target_allowlist"] = list(loop.overlay_allowlist)
+
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "state_action_planner"
+        assert [action["target"] for action in response.actions] == [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+        ]
+        assert "DDI" in response.message
+        assert "页面" not in response.message
+        assert response.metadata["final_action_plan_source"] == "state_action_planner"
+    finally:
+        loop.close()
+
+
+def test_harness_validation_action_plan_uses_s09_initial_numeric_sequence_targets() -> None:
+    response = TutorResponse(
+        message="Pull COMM1.",
+        explanations=["Pull COMM1."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "ufc_comm1_channel_selector_pull",
+                "element_id": "pnt_301",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S09"},
+            "diagnosis": {"step_id": "S09", "error_category": "OM"},
+            "help_response": {
+                "diagnosis": {"step_id": "S09", "error_category": "OM"},
+                "next": {"step_id": "S09"},
+                "overlay": {
+                    "targets": ["ufc_comm1_channel_selector_pull"],
+                    "evidence": [
+                        {
+                            "target": "ufc_comm1_channel_selector_pull",
+                            "type": "gate",
+                            "ref": "GATES.S09.completion",
+                            "quote": "blocked",
+                        }
+                    ],
+                },
+                "explanations": ["Pull COMM1."],
+            },
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": [],
+            "gates": [
+                {"gate_id": "S09.completion", "status": "blocked", "reason": "COMM1 frequency is not 134.000."},
+                {"gate_id": "S09.precondition", "status": "allowed"},
+            ],
+            "vars": {
+                "comm1_freq_134_000": False,
+                "ufc_comm1_pull_pressed": True,
+                "ufc_scratchpad_string_1_display": "1-",
+                "ufc_scratchpad_string_2_display": "-",
+                "ufc_scratchpad_number_display": "305.000",
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_evidence_requirements": ["var", "gate"],
+            },
+            "rag_topk": [],
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request.context["overlay_target_allowlist"] = list(loop.overlay_allowlist)
+
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "state_action_planner"
+        assert [action["target"] for action in response.actions] == [
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+        ]
+        assert "134.000" in response.message
+        assert "1-3-4-0-0-0" in response.message
+        assert "ENT" in response.message
+        assert response.metadata["help_response"]["overlay"]["targets"] == [
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+        ]
+    finally:
+        loop.close()
+
+
 def test_harness_validation_action_plan_waits_without_highlight_for_s20_probe_moving() -> None:
     response = TutorResponse(
         message="Extend the refuel probe.",

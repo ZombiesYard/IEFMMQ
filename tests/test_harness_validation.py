@@ -590,6 +590,51 @@ def test_plan_harness_action_clears_unavailable_s18_state_target() -> None:
     assert "target_not_in_runtime_allowlist:right_mdi_pb5" in plan.reasons
 
 
+def test_plan_harness_action_uses_s08_all_displays_off_power_targets() -> None:
+    specs = {
+        "S08": _spec(
+            "S08",
+            (
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+                "left_mdi_pb18",
+                "left_mdi_pb15",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S08"].allowed_overlay_targets)
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S08",
+        model_step_id="S08",
+        proposed_overlay_targets=["left_mdi_brightness_selector"],
+        candidate_step_ids=["S08"],
+        runtime_overlay_targets=allowed_targets,
+        request_overlay_targets=allowed_targets,
+        max_overlay_targets=4,
+        latest_vars={
+            "left_ddi_on": False,
+            "right_ddi_on": False,
+            "mpcd_on": False,
+            "hud_on": False,
+        },
+    )
+
+    assert plan.targets == (
+        "left_mdi_brightness_selector",
+        "right_mdi_brightness_selector",
+        "ampcd_off_brightness_knob",
+        "hud_symbology_brightness_knob",
+    )
+    assert "left_mdi_pb18" not in plan.targets
+    assert "left_mdi_pb15" not in plan.targets
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "warm" in (plan.guidance or "").lower()
+
+
 def test_plan_harness_action_uses_s09_scratchpad_state_without_live_hint() -> None:
     specs = {
         "S09": _spec(
@@ -606,16 +651,6 @@ def test_plan_harness_action_uses_s09_scratchpad_state_without_live_hint() -> No
     }
     allowed_targets = list(specs["S09"].allowed_overlay_targets)
     cases = [
-        ({}, "ufc_comm1_channel_selector_pull"),
-        (
-            {
-                "ufc_comm1_pull_pressed": True,
-                "ufc_scratchpad_string_1_display": "1-",
-                "ufc_scratchpad_string_2_display": "-",
-                "ufc_scratchpad_number_display": "305.000",
-            },
-            "ufc_key_1",
-        ),
         (
             {
                 "ufc_scratchpad_string_1_display": "1-",
@@ -668,6 +703,52 @@ def test_plan_harness_action_uses_s09_scratchpad_state_without_live_hint() -> No
         assert plan.final_action_plan_source == "state_action_planner"
 
 
+def test_plan_harness_action_uses_s09_numeric_sequence_for_initial_entry() -> None:
+    specs = {
+        "S09": _spec(
+            "S09",
+            (
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_1",
+                "ufc_key_3",
+                "ufc_key_4",
+                "ufc_key_0",
+                "ufc_ent_button",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S09"].allowed_overlay_targets)
+    cases = [
+        {},
+        {
+            "ufc_comm1_pull_pressed": True,
+            "ufc_scratchpad_string_1_display": "1-",
+            "ufc_scratchpad_string_2_display": "-",
+            "ufc_scratchpad_number_display": "305.000",
+        },
+    ]
+
+    for vars_map in cases:
+        plan = plan_harness_action(
+            step_specs=specs,
+            inferred_step_id="S09",
+            model_step_id="S09",
+            proposed_overlay_targets=["ufc_comm1_channel_selector_pull"],
+            candidate_step_ids=["S09"],
+            runtime_overlay_targets=allowed_targets,
+            request_overlay_targets=allowed_targets,
+            max_overlay_targets=4,
+            latest_vars={"comm1_freq_134_000": False, **vars_map},
+            recent_action_targets=[],
+        )
+
+        assert plan.targets == ("ufc_key_1", "ufc_key_3", "ufc_key_4", "ufc_key_0")
+        assert plan.final_action_plan_source == "state_action_planner"
+        assert "134.000" in (plan.guidance or "")
+        assert "1-3-4-0-0-0" in (plan.guidance or "")
+        assert "ENT" in (plan.guidance or "")
+
+
 def test_plan_harness_action_uses_recent_action_for_s09_open_scratchpad() -> None:
     specs = {
         "S09": _spec(
@@ -692,12 +773,12 @@ def test_plan_harness_action_uses_recent_action_for_s09_open_scratchpad() -> Non
         candidate_step_ids=["S09"],
         runtime_overlay_targets=allowed_targets,
         request_overlay_targets=allowed_targets,
-        max_overlay_targets=1,
+        max_overlay_targets=4,
         latest_vars={"comm1_freq_134_000": False},
         recent_action_targets=["ufc_comm1_channel_selector_pull"],
     )
 
-    assert plan.targets == ("ufc_key_1",)
+    assert plan.targets == ("ufc_key_1", "ufc_key_3", "ufc_key_4", "ufc_key_0")
     assert plan.final_action_plan_source == "state_action_planner"
 
 
