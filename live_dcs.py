@@ -2576,7 +2576,11 @@ def _s19_final_go_hold_satisfied_by_facts(
     vision_facts: Mapping[str, Any],
 ) -> bool:
     conditions = [item for item in missing_conditions if isinstance(item, str) and item]
-    if conditions != ["vision_facts.fcsmc_final_go_result_visible==seen"]:
+    allowed_conditions = {
+        "vision_facts.fcsmc_page_visible==seen",
+        "vision_facts.fcsmc_final_go_result_visible==seen",
+    }
+    if not conditions or any(item not in allowed_conditions for item in conditions):
         return False
     fact = vision_facts.get("fcsmc_final_go_result_visible")
     return (

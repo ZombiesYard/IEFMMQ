@@ -8634,11 +8634,11 @@ def test_live_loop_advances_satisfied_s19_visual_hold_before_vlm_gate(tmp_path: 
     )
     loop._infer_preliminary_step_for_vision_facts = lambda obs: StepInferenceResult(
         "S19",
-        ("vision_facts.fcsmc_final_go_result_visible==seen",),
+        ("vision_facts.fcsmc_page_visible==seen",),
     )
     loop._last_inferred_step_id = "S19"
     loop._sticky_inference_step_id = "S19"
-    loop._sticky_inference_missing_conditions = ("vision_facts.fcsmc_final_go_result_visible==seen",)
+    loop._sticky_inference_missing_conditions = ("vision_facts.fcsmc_page_visible==seen",)
     loop._vision_fact_snapshot = {
         "fcsmc_final_go_result_visible": {
             "fact_id": "fcsmc_final_go_result_visible",
