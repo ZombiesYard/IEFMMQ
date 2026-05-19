@@ -11366,6 +11366,44 @@ def test_live_help_fixture_312_s11_completion_advances_to_s12() -> None:
     assert "RPM >= 25" not in public_text
 
 
+def test_live_help_fixture_311_keeps_s11_when_completion_is_partial() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/c4d7c369-f151-4ef6-b528-409b16f1fe34.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+    vars_map = request.context["vars"]
+    assert vars_map["rpm_l"] == 26
+    assert vars_map["rpm_l_gte_25"] is True
+    assert vars_map["left_engine_idle_ready"] is False
+    assert vars_map["throttle_l_not_off"] is False
+    response.metadata["diagnosis"] = {"step_id": "S11", "error_category": "OM"}
+    response.metadata["next"] = {"step_id": "S11"}
+
+    repaired = _validate_compact_live_help_response(
+        request=request,
+        response=response,
+        vision_selection=_fixture_vision_selection(fixture),
+        vision_fact_context=_fixture_vision_fact_context(fixture),
+    )
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S11"
+    assert repaired.metadata["next"]["step_id"] == "S11"
+    assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S11"
+    assert repaired.metadata["final_overlay_targets"] == []
+    assert repaired.actions == []
+    assert repaired.metadata.get("final_evidence_consistency_repair_applied") is not True
+    assert repaired.metadata.get("rejected_missing_conditions", []) == []
+    assert repaired.metadata["final_evidence_consistency_partial_completion_satisfied"] is True
+    assert repaired.metadata["partial_completion_satisfied_conditions"] == ["vars.rpm_l>=25"]
+    assert repaired.metadata["final_action_plan"]["step_id"] == "S11"
+    assert repaired.metadata["final_action_plan"]["targets"] == []
+    assert repaired.metadata["final_action_plan"]["text_only"] is True
+    public_text = _public_response_text(repaired)
+    assert "Right Alt" in public_text
+    assert "S12" not in public_text
+    assert "ins_mode_knob" not in public_text
+
+
 def test_final_evidence_split_uses_current_step_completion_predicates_only() -> None:
     loop = LiveDcsTutorLoop(
         source=_DelayedObservationSource(Observation()),
