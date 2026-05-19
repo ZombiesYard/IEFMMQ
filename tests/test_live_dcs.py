@@ -11105,7 +11105,11 @@ def test_safe_fallback_overlay_syncs_message_after_completion_conflict_repair() 
         message="当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。",
         explanations=["当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。"],
         actions=[],
-        metadata={"completion_conflict_rewritten": True},
+        metadata={
+            "completion_conflict_rewritten": True,
+            "rejected_model_targets": ["right_mdi_pb18"],
+            "rejected_model_target": "right_mdi_pb18",
+        },
     )
 
     loop = LiveDcsTutorLoop(

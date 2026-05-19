@@ -2770,6 +2770,22 @@ def _s08_clean_unconfirmed_page_navigation_action_refs(
     return cleaned_actions, changed
 
 
+def _message_mentions_any_target(text: str | None, targets: Sequence[str]) -> bool:
+    if not isinstance(text, str) or not text:
+        return False
+    folded = text.lower()
+    for target in targets:
+        if not isinstance(target, str) or not target:
+            continue
+        if target.lower() in folded:
+            return True
+        if target.endswith("_pb18") and "pb18" in folded:
+            return True
+        if target.endswith("_pb5") and "pb5" in folded:
+            return True
+    return False
+
+
 def _s08_visual_fact_ref_for_seen_target(
     context: Mapping[str, Any],
     evidence_refs: Sequence[str],
@@ -7891,14 +7907,27 @@ class LiveDcsTutorLoop:
             else self._presentation_fallback_plan_source(request, fallback_targets)
         )
         response.actions = list(mapped.actions)
-        should_sync_fallback_text = response.metadata.get("completion_conflict_rewritten") is True
+        original_explanations = list(response.explanations)
+        original_text = "\n".join(
+            item for item in [response.message, *original_explanations]
+            if isinstance(item, str) and item
+        )
+        current_targets = _overlay_targets_from_actions(response.actions)
+        rejected_targets = response.metadata.get("rejected_model_targets")
+        if not isinstance(rejected_targets, (list, tuple, set)):
+            rejected_target = response.metadata.get("rejected_model_target")
+            rejected_targets = [rejected_target] if isinstance(rejected_target, str) and rejected_target else []
+        should_sync_fallback_text = (
+            response.metadata.get("completion_conflict_rewritten") is True
+            and _message_mentions_any_target(original_text, rejected_targets)
+            and not _message_mentions_any_target(original_text, current_targets)
+        )
         if mapped.message and (not response.message or should_sync_fallback_text):
             if response.message and mapped.message != response.message:
                 response.metadata["fallback_original_message"] = response.message
             response.message = mapped.message
         elif mapped.message and mapped.message != response.message:
             response.metadata["fallback_message"] = mapped.message
-        original_explanations = list(response.explanations)
         if mapped.explanations and (not response.explanations or should_sync_fallback_text):
             if original_explanations and list(mapped.explanations) != original_explanations:
                 response.metadata["fallback_original_explanations"] = original_explanations
