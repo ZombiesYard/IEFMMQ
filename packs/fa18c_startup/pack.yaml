@@ -766,7 +766,7 @@ steps:
     ui_targets:
       - radar_mode_knob
     tutor_prompts:
-      - "After INS mode is set, rotate radar knob to OPR."
+      - "After INS mode is set, right-click the radar knob to the next detent and set it to OPR."
 
   - id: S14
     phase: P4

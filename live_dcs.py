@@ -157,6 +157,93 @@ _S08_POWER_SEQUENCE: tuple[tuple[str, str, str], ...] = (
         "DDIs and AMPCD are powered. Increase HUD symbology brightness next.",
     ),
 )
+
+_TARGET_ACTION_GUIDANCE_BY_STEP: dict[tuple[str, str], dict[str, str]] = {
+    ("S18", "right_mdi_pb5"): {
+        "zh": "请在右 DDI BIT 页面左键按 PB5/FCS-MC，进入 FCS-MC BIT 页面。",
+        "en": "On the right DDI BIT page, left-click PB5/FCS-MC to enter the FCS-MC BIT page.",
+    },
+    ("S13", "radar_mode_knob"): {
+        "zh": "请将 RADAR knob 设到 OPR：右键点击到下一挡。",
+        "en": "Set the radar knob to OPR with a right-click to the next detent.",
+    },
+    ("S20", "refuel_probe_switch"): {
+        "zh": "请右键将受油管开关拨到 EXTEND，开始四落检查。",
+        "en": "Right-click the refueling probe switch to EXTEND for the four-down check.",
+    },
+    ("S21", "refuel_probe_switch"): {
+        "zh": "请收回受油管，确认受油管完全收好。",
+        "en": "Retract the refueling probe and confirm it is fully stowed.",
+    },
+}
+
+_TARGET_ACTION_GUIDANCE: dict[str, dict[str, str]] = {
+    "fcs_bit_switch": {
+        "zh": "请按住 FCS BIT 开关向上，并按右 DDI PB5 启动 FCS BIT。",
+        "en": "Hold the FCS BIT switch up and press right DDI PB5 to start the FCS BIT.",
+    },
+}
+
+_CJK_RE = re.compile(r"[\u3400-\u9fff]")
+
+
+def _ui_map_target_interaction_hint(
+    ui_map_path: str | Path | None,
+    target: str,
+    *,
+    lang: str,
+) -> str | None:
+    path = Path(ui_map_path) if ui_map_path is not None else _default_ui_map_path()
+    try:
+        ui_map = _load_yaml_mapping(path, "ui_map.yaml")
+    except Exception:
+        return None
+    cockpit_elements = ui_map.get("cockpit_elements")
+    if not isinstance(cockpit_elements, Mapping):
+        return None
+    entry = cockpit_elements.get(target)
+    if not isinstance(entry, Mapping):
+        return None
+    hint = entry.get("interaction_hint")
+    if not isinstance(hint, Mapping):
+        return None
+    key = "zh" if lang == "zh" else "en"
+    value = hint.get(key)
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _localized_target_action_guidance(
+    target: str | None,
+    *,
+    step_id: str | None,
+    lang: str,
+    ui_map_path: str | Path | None = None,
+) -> str | None:
+    if not isinstance(target, str) or not target:
+        return None
+    language = "zh" if lang == "zh" else "en"
+    ui_hint = _ui_map_target_interaction_hint(ui_map_path, target, lang=lang)
+    if isinstance(ui_hint, str) and ui_hint:
+        return ui_hint
+    if isinstance(step_id, str) and step_id:
+        entry = _TARGET_ACTION_GUIDANCE_BY_STEP.get((step_id, target))
+        if isinstance(entry, Mapping):
+            guidance = entry.get(language)
+            if isinstance(guidance, str) and guidance:
+                return guidance
+    entry = _TARGET_ACTION_GUIDANCE.get(target)
+    if not isinstance(entry, Mapping):
+        return None
+    guidance = entry.get(language)
+    return guidance if isinstance(guidance, str) and guidance else None
+
+
+def _prefix_step_incomplete_guidance(step_id: str | None, guidance: str, *, lang: str) -> str:
+    if not isinstance(step_id, str) or not step_id:
+        return guidance
+    if lang == "zh":
+        return f"当前 {step_id} 尚未完成。{guidance}"
+    return f"{step_id} is not complete yet. {guidance}"
 from core.types import Event, Observation, TutorRequest, TutorResponse
 from core.vision_facts import (
     VisionFactsConfigError,
@@ -5294,6 +5381,63 @@ class LiveDcsTutorLoop:
         if isinstance(raw_diagnosis, Mapping):
             response.metadata.setdefault("model_raw_diagnosis", dict(raw_diagnosis))
 
+    def _rewrite_public_target_id_action_text(
+        self,
+        response: TutorResponse,
+        request: TutorRequest,
+    ) -> bool:
+        targets = [
+            action.get("target")
+            for action in response.actions
+            if isinstance(action, Mapping) and isinstance(action.get("target"), str)
+        ]
+        if len(targets) != 1:
+            return False
+        target = targets[0]
+        context = request.context if isinstance(request.context, Mapping) else {}
+        hint = context.get("deterministic_step_hint")
+        step_id = None
+        for payload in (response.metadata.get("next"), response.metadata.get("diagnosis"), hint):
+            if isinstance(payload, Mapping):
+                candidate = payload.get("step_id") or payload.get("inferred_step_id")
+                if isinstance(candidate, str) and candidate:
+                    step_id = candidate
+                    break
+        guidance = _localized_target_action_guidance(
+            target,
+            step_id=step_id,
+            lang=self.lang,
+            ui_map_path=self.ui_map_path,
+        )
+        if not isinstance(guidance, str) or not guidance:
+            return False
+
+        text_parts = [response.message, *response.explanations]
+        has_target_id = any(isinstance(part, str) and target in part for part in text_parts)
+        has_language_leak = (
+            self.lang == "zh"
+            and any(isinstance(part, str) and part.strip() and _CJK_RE.search(part) is None for part in text_parts)
+        )
+        if not has_target_id and not has_language_leak:
+            return False
+
+        rewritten = _prefix_step_incomplete_guidance(step_id, guidance, lang=self.lang)
+        original_message = response.message
+        original_explanations = list(response.explanations)
+        response.message = rewritten
+        response.explanations = [rewritten]
+        response.metadata["target_action_text_rewritten"] = True
+        response.metadata["target_action_text_rewrite_target"] = target
+        if original_message != rewritten:
+            response.metadata["target_action_text_original_message"] = original_message
+        if original_explanations and original_explanations != [rewritten]:
+            response.metadata["target_action_text_original_explanations"] = original_explanations
+        if isinstance(response.metadata.get("help_response"), Mapping):
+            help_response = copy.deepcopy(dict(response.metadata["help_response"]))
+            help_response["explanations"] = [rewritten]
+            response.metadata["help_response"] = help_response
+        return True
+
     def _annotate_response_audit_metadata(self, response: TutorResponse) -> None:
         self._capture_model_raw_help_response(response)
         sanitized_message = sanitize_public_model_text(response.message, lang=self.lang)
@@ -5511,20 +5655,33 @@ class LiveDcsTutorLoop:
                     "You are still on S08. The left DDI is only showing the FCS button, "
                     "but it has not entered the FCS page yet; press Left DDI PB15 to enter the FCS page first."
                 )
+        elif isinstance(action_target, str) and action_target:
+            action_guidance = _localized_target_action_guidance(
+                action_target,
+                step_id=inferred_step_id,
+                lang=self.lang,
+                ui_map_path=self.ui_map_path,
+            )
+            if isinstance(action_guidance, str) and action_guidance:
+                rewritten = _prefix_step_incomplete_guidance(
+                    inferred_step_id,
+                    action_guidance,
+                    lang=self.lang,
+                )
+            elif self.lang == "zh":
+                rewritten = f"当前 {inferred_step_id} 尚未完成。请先操作 {action_target}，并确认该步骤条件已满足。"
+            else:
+                rewritten = (
+                    f"{inferred_step_id} is not complete yet. "
+                    f"Please operate {action_target} first and confirm that step is complete."
+                )
         elif self.lang == "zh":
             rewritten = f"当前 {inferred_step_id} 尚未完成，请先完成该步骤的未满足条件。"
-            if isinstance(action_target, str) and action_target:
-                rewritten = f"当前 {inferred_step_id} 尚未完成。请先操作 {action_target}，并确认该步骤条件已满足。"
         else:
             rewritten = (
                 f"{inferred_step_id} is not complete yet. "
                 "Please complete the unmet conditions for that step."
             )
-            if isinstance(action_target, str) and action_target:
-                rewritten = (
-                    f"{inferred_step_id} is not complete yet. "
-                    f"Please operate {action_target} first and confirm that step is complete."
-                )
 
         response.message = rewritten
         response.explanations = [rewritten]
@@ -6435,6 +6592,12 @@ class LiveDcsTutorLoop:
                 if self.lang == "zh"
                 else "You are on S10. Set the Engine Crank switch to LEFT/L with a left-click to start the left engine."
             )
+        elif "s13_radar_opr_right_click_guidance" in plan.reasons:
+            plan_guidance = (
+                "现在进入 S13。请将 RADAR knob 设到 OPR：右键点击到下一挡。"
+                if self.lang == "zh"
+                else "Continue to S13. Set the radar knob to OPR with a right-click to the next detent."
+            )
         elif "s31_radar_altimeter_mouse_wheel_guidance" in plan.reasons:
             plan_guidance = (
                 "现在进入 S31。请用鼠标滚轮调整雷达高度表告警高度旋钮：机场 200 ft，航母 40 ft。"
@@ -6447,6 +6610,15 @@ class LiveDcsTutorLoop:
                 if self.lang == "zh"
                 else "Continue to S32. Use the mouse wheel on the standby attitude cage knob to uncage the standby attitude indicator."
             )
+        if self.lang == "zh" and len(plan.targets) == 1:
+            localized_plan_guidance = _localized_target_action_guidance(
+                plan.targets[0],
+                step_id=plan.step_id,
+                lang=self.lang,
+                ui_map_path=self.ui_map_path,
+            )
+            if isinstance(localized_plan_guidance, str) and localized_plan_guidance:
+                plan_guidance = localized_plan_guidance
         if s18_visual_hint_used and (not isinstance(plan_guidance, str) or not plan_guidance):
             plan_guidance = s18_visual_hint_reason
         emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"
@@ -8381,6 +8553,15 @@ class LiveDcsTutorLoop:
             and _s08_power_condition_missing_for_target(fallback_target, missing_set, vars_map)
         ):
             fallback_guidance = _s08_power_guidance_for_target(fallback_target, self.lang)
+        elif len(fallback_targets_list) == 1 and (
+            localized_fallback_guidance := _localized_target_action_guidance(
+                fallback_target,
+                step_id=overlay_step_id,
+                lang=self.lang,
+                ui_map_path=self.ui_map_path,
+            )
+        ):
+            fallback_guidance = localized_fallback_guidance
         elif self.lang == "zh" and overlay_step_id in {"S22", "S23", "S24", "S25"}:
             fallback_guidance = {
                 "S22": "请放下 launch bar，确认 launch bar 已伸出。",
@@ -8395,6 +8576,10 @@ class LiveDcsTutorLoop:
                 "S24": "Lower the arresting hook handle and confirm the hook is down.",
                 "S25": "Raise the arresting hook handle and confirm the hook is up.",
             }[overlay_step_id]
+        elif self.lang == "zh" and overlay_step_id == "S13":
+            fallback_guidance = "现在进入 S13。请将 RADAR knob 设到 OPR：右键点击到下一挡。"
+        elif overlay_step_id == "S13":
+            fallback_guidance = "Continue to S13. Set the radar knob to OPR with a right-click to the next detent."
         elif self.lang == "zh" and overlay_step_id in {"S28", "S29", "S30", "S31", "S32"}:
             fallback_guidance = {
                 "S28": "现在进入 S28。请释放停车刹车手柄，准备滑行。",
@@ -8777,6 +8962,7 @@ class LiveDcsTutorLoop:
         if final_consistency_used:
             fallback_overlay_used = bool(response.actions)
             fallback_overlay_reason = final_consistency_reason
+        self._rewrite_public_target_id_action_text(response, request)
 
         if mapped_meta:
             mapping_failure_codes = classify_mapping_failure(mapped_meta)

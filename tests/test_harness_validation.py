@@ -931,6 +931,13 @@ def test_plan_harness_action_owns_known_control_interaction_guidance() -> None:
             "s10_left_engine_left_click_guidance",
         ),
         (
+            "S13",
+            "radar_mode_knob",
+            {"radar_mode_opr": False},
+            ("radar", "OPR", "right-click"),
+            "s13_radar_opr_right_click_guidance",
+        ),
+        (
             "S31",
             "radar_altimeter_bug_knob",
             {"radar_altimeter_bug_set": False},

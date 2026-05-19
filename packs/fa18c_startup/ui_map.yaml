@@ -109,6 +109,14 @@ cockpit_elements:
     dcs_id: "pnt_416"
     aliases: ["Lights Test Switch"]
     panel_area: "right_console_lighting"
+    interaction:
+      user_label: "LIGHTS TEST switch"
+      action_verb: "hold"
+      click_type: "left"
+      target_state: "TEST"
+    interaction_hint:
+      zh: "LIGHTS TEST：左键按住执行灯光测试。"
+      en: "LIGHTS TEST: left-click and hold to run the light test."
   left_mdi_brightness_selector:
     description: "Left MDI Brightness Selector Knob OFF/NIGHT/DAY"
     dcs_id: "pnt_51"
@@ -256,11 +264,26 @@ cockpit_elements:
     dcs_id: "pnt_349"
     aliases: ["FCS RESET Button"]
     panel_area: "left_console_flight_controls"
+    interaction:
+      user_label: "FCS RESET button"
+      action_verb: "press"
+      click_type: "left"
+    interaction_hint:
+      zh: "FCS RESET：左键按下按钮。"
+      en: "FCS RESET: left-click the button."
   fcs_bit_switch:
     description: "FCS BIT switch on right wall"
     dcs_id: "pnt_470"
     aliases: ["FCS BIT Switch"]
     panel_area: "right_console_flight_controls"
+    interaction:
+      user_label: "FCS BIT switch"
+      action_verb: "hold"
+      click_type: "right"
+      target_state: "UP"
+    interaction_hint:
+      zh: "FCS BIT：右键向上按住。"
+      en: "FCS BIT: right-click and hold the switch up."
   ufc_comm1_channel_selector_rotate:
     description: "UFC COMM 1 channel selector rotate"
     dcs_id: "pnt_124"
@@ -331,13 +354,21 @@ cockpit_elements:
       click_type: "right"
       detent_direction: "counter_clockwise"
     interaction_hint:
-      zh: "RADAR：右键到下一挡。"
-      en: "RADAR: right-click to the next detent."
+      zh: "RADAR：右键到下一挡，设到 OPR。"
+      en: "RADAR: right-click to the next detent and set OPR."
   obogs_control_switch:
     description: "OBOGS control switch"
     dcs_id: "pnt_365"
     aliases: ["OBOGS Control Switch"]
     panel_area: "left_console_oxygen"
+    interaction:
+      user_label: "OBOGS control switch"
+      action_verb: "set"
+      click_type: "right"
+      target_state: "ON"
+    interaction_hint:
+      zh: "OBOGS control：右键拨到 ON。"
+      en: "OBOGS control: right-click the switch to ON."
   obogs_flow_knob:
     description: "OBOGS flow knob"
     dcs_id: "pnt_366"
@@ -353,6 +384,13 @@ cockpit_elements:
     dcs_id: "pnt_346"
     aliases: ["T/O TRIM Button"]
     panel_area: "left_console_flight_controls"
+    interaction:
+      user_label: "T/O TRIM button"
+      action_verb: "press"
+      click_type: "left"
+    interaction_hint:
+      zh: "T/O TRIM：左键按下按钮完成起飞配平。"
+      en: "T/O TRIM: left-click the button to set takeoff trim."
   refuel_probe_switch:
     description: "Probe control switch EXTEND/RETRACT/EMERG EXTD"
     dcs_id: "pnt_341"
@@ -379,6 +417,14 @@ cockpit_elements:
     dcs_id: "pnt_409"
     aliases: ["Pitot Heater Switch"]
     panel_area: "right_console_anti_ice"
+    interaction:
+      user_label: "PITOT HEAT switch"
+      action_verb: "set"
+      click_type: "right"
+      target_state: "ON"
+    interaction_hint:
+      zh: "PITOT HEAT：右键拨到 ON。"
+      en: "PITOT HEAT: right-click the switch to ON."
   parking_brake_handle:
     description: "Emergency/parking brake handle"
     dcs_id: "pnt_240"

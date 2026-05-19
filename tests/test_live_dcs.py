@@ -10487,6 +10487,64 @@ def test_completion_conflict_does_not_clear_s20_overlay_when_text_says_s19_compl
         loop.close()
 
 
+def test_completion_conflict_s13_radar_uses_opr_guidance(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_s13_radar_completion_conflict.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=0,
+        lang="zh",
+    )
+    try:
+        request = TutorRequest(
+            actor="learner",
+            intent="help",
+            message="help",
+            context={
+                "deterministic_step_hint": {
+                    "inferred_step_id": "S13",
+                    "missing_conditions": ["vars.radar_mode_opr==true"],
+                }
+            },
+        )
+        response = TutorResponse(
+            status="ok",
+            message="S13 已完成，继续下一步。",
+            actions=[
+                {
+                    "type": "overlay",
+                    "intent": "highlight",
+                    "target": "radar_mode_knob",
+                    "element_id": "pnt_440",
+                }
+            ],
+            explanations=["S13 已完成，继续下一步。"],
+            metadata={
+                "help_response": {
+                    "diagnosis": {"step_id": "S13", "error_category": "OM"},
+                    "next": {"step_id": "S13"},
+                    "overlay": {"targets": ["radar_mode_knob"], "evidence": []},
+                    "explanations": ["S13 已完成，继续下一步。"],
+                },
+                "next": {"step_id": "S13"},
+                "diagnosis": {"step_id": "S13", "error_category": "OM"},
+            },
+        )
+
+        rewritten = loop._rewrite_conflicting_step_completion_response(response, request)
+    finally:
+        loop.close()
+
+    assert rewritten is True
+    assert response.metadata["completion_conflict_rewritten"] is True
+    assert "radar_mode_knob" not in response.message
+    assert "RADAR" in response.message
+    assert "OPR" in response.message
+    assert "右键" in response.message
+
+
 def test_live_loop_short_circuits_terminal_state_without_calling_model(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -11537,6 +11595,24 @@ def test_live_help_fixture_314_s10_left_engine_uses_left_click_guidance() -> Non
     assert "R 位置" not in public_text
     assert "右键" not in public_text
     assert "right-click" not in public_text
+
+
+def test_live_help_fixture_314_s13_radar_opr_uses_detent_guidance() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/e96b29b7-b305-4444-beb3-60ddb0804b4b.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S13"
+    assert repaired.metadata["next"]["step_id"] == "S13"
+    assert repaired.metadata["final_overlay_targets"] == ["radar_mode_knob"]
+    public_text = _public_response_text(repaired)
+    assert "radar_mode_knob" not in public_text
+    assert "RADAR" in public_text or "Radar" in public_text
+    assert "OPR" in public_text
+    assert "右键" in public_text or "right-click" in public_text
 
 
 def test_live_help_fixture_314_s31_radar_altimeter_uses_mouse_wheel_guidance() -> None:
@@ -12773,7 +12849,7 @@ def test_live_help_fixture_299_s17_keeps_takeoff_trim_overlay() -> None:
             "overlay_target_allowlist": ["takeoff_trim_button"],
         },
     )
-    raw_message = "当前处于 S17 步骤，请按下 TAKEOFF TRIM 按钮以完成该步骤。"
+    raw_message = "请先操作 takeoff_trim_button。"
     response = TutorResponse(
         status="ok",
         in_reply_to=request.request_id,
@@ -12807,7 +12883,9 @@ def test_live_help_fixture_299_s17_keeps_takeoff_trim_overlay() -> None:
 
     assert [action["target"] for action in repaired.actions] == ["takeoff_trim_button"]
     assert repaired.metadata.get("completion_conflict_rewritten") is not True
-    assert "takeoff_trim_button" in repaired.message
+    assert "takeoff_trim_button" not in repaired.message
+    assert "T/O TRIM" in repaired.message
+    assert "按下" in repaired.message
     assert repaired.explanations == [repaired.message]
     assert repaired.metadata["next"]["step_id"] == "S17"
     assert repaired.metadata["diagnosis"]["step_id"] == "S17"
@@ -12816,6 +12894,79 @@ def test_live_help_fixture_299_s17_keeps_takeoff_trim_overlay() -> None:
     assert repaired.metadata["final_public_response"]["message"] == repaired.message
     assert repaired.metadata["final_public_response"]["explanations"] == [repaired.message]
     assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "takeoff_trim_button"
+
+
+@pytest.mark.parametrize(
+    ("step_id", "target", "missing_condition", "expected_tokens"),
+    [
+        ("S07", "lights_test_button", "vars.lights_test_complete==true", ("LIGHTS TEST", "左键", "按住")),
+        ("S14", "obogs_control_switch", "vars.obogs_switch_on==true", ("OBOGS", "右键", "ON")),
+        ("S15", "fcs_reset_button", "vars.fcs_reset_complete==true", ("FCS RESET", "左键", "按下")),
+        ("S26", "pitot_heater_switch", "vars.pitot_heat_on==true", ("PITOT HEAT", "右键", "ON")),
+    ],
+)
+def test_live_help_rewrites_generic_target_id_action_text_for_known_controls(
+    step_id: str,
+    target: str,
+    missing_condition: str,
+    expected_tokens: tuple[str, ...],
+) -> None:
+    request = TutorRequest(
+        request_id=f"generic-{step_id}-{target}",
+        message="help",
+        context={
+            "gates": {
+                f"{step_id}.completion": {
+                    "status": "blocked",
+                    "reason_code": f"{step_id.lower()}_requires_{target}",
+                }
+            },
+            "deterministic_step_hint": {
+                "inferred_step_id": step_id,
+                "overlay_step_id": step_id,
+                "missing_conditions": [missing_condition],
+                "step_ui_targets": [target],
+                "action_hint": {"target": target},
+            },
+            "overlay_target_allowlist": [target],
+        },
+    )
+    raw_message = f"请先操作 {target}。"
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message=raw_message,
+        actions=[],
+        explanations=[raw_message],
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": {
+                "diagnosis": {"step_id": step_id, "error_category": "OM"},
+                "next": {"step_id": step_id},
+                "overlay": {
+                    "targets": [target],
+                    "evidence": [
+                        {
+                            "target": target,
+                            "type": "gate",
+                            "ref": f"GATES.{step_id}.completion",
+                            "quote": "Step completion is blocked.",
+                            "grounding_confidence": 0.9,
+                        }
+                    ],
+                },
+                "explanations": [raw_message],
+            },
+        },
+    )
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+    public_text = _public_response_text(repaired)
+
+    assert [action["target"] for action in repaired.actions] == [target]
+    assert target not in public_text
+    assert all(token in public_text for token in expected_tokens)
 
 
 def test_completion_claim_parser_distinguishes_guidance_from_completion_claim() -> None:
