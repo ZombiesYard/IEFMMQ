@@ -5092,7 +5092,7 @@ class LiveDcsTutorLoop:
             precondition_gates=self.precondition_gates,
             completion_gates=self.completion_gates,
         )
-        return infer_step_id(
+        inference = infer_step_id(
             self.pack_steps,
             vars_selected,
             recent_buttons,
@@ -5102,6 +5102,11 @@ class LiveDcsTutorLoop:
             scenario_profile=self.scenario_profile,
             pack_path=self.pack_path,
             vision_facts=None,
+        )
+        return self._stabilize_live_inference(
+            inference,
+            vars_selected,
+            recent_ui_targets=recent_buttons,
         )
 
     def _next_step_id_after(self, step_id: str | None) -> str | None:
@@ -5160,6 +5165,10 @@ class LiveDcsTutorLoop:
             isinstance(item, str) and item.startswith("vision_facts.")
             for item in self._sticky_inference_missing_conditions
         )
+        current_missing_has_visual_hold = any(
+            isinstance(item, str) and item.startswith("vision_facts.")
+            for item in preliminary_inference.missing_conditions
+        )
         sticky_step_id = self._sticky_inference_step_id
         sticky_idx = self._step_order_index.get(sticky_step_id) if isinstance(sticky_step_id, str) else None
         s19_final_go_hold_satisfied = _s19_final_go_hold_satisfied_by_facts(
@@ -5180,6 +5189,15 @@ class LiveDcsTutorLoop:
         ):
             current_step_id = self._next_step_id_after("S08")
         if current_step_id == "S19" and s19_final_go_hold_satisfied:
+            current_step_id = self._next_step_id_after(current_step_id) or current_step_id
+        if (
+            current_step_id == "S19"
+            and not current_missing_has_visual_hold
+            and not (
+                sticky_step_id == "S19"
+                and sticky_missing_has_visual_hold
+            )
+        ):
             current_step_id = self._next_step_id_after(current_step_id) or current_step_id
 
         current_idx = self._step_order_index.get(current_step_id) if isinstance(current_step_id, str) else None
