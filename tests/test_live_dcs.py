@@ -11294,6 +11294,32 @@ def _public_response_text(response: TutorResponse) -> str:
     return "\n".join(parts)
 
 
+def test_final_public_instruction_category_flags_bare_target_leak() -> None:
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        lang="zh",
+    )
+    response = TutorResponse(
+        status="ok",
+        message="当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。",
+        explanations=["当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。"],
+        actions=[],
+        metadata={
+            "diagnosis": {"step_id": "S18", "error_category": "OM"},
+            "next": {"step_id": "S18"},
+        },
+    )
+    try:
+        loop._annotate_response_audit_metadata(response)
+    finally:
+        loop.close()
+
+    assert response.metadata["final_public_response"]["instruction_category"] == "invalid_bare_target"
+    assert response.metadata["final_public_instruction_category"] == "invalid_bare_target"
+
+
 def _assert_live_fixture_expectations(fixture: dict[str, Any], response: TutorResponse) -> None:
     expectations = fixture.get("expectations")
     assert isinstance(expectations, dict)
@@ -11659,6 +11685,33 @@ def test_live_help_fixture_314_s33_default_satisfied_uses_public_completion_mess
     assert "evidence" not in public_text.lower()
     assert "AUTO" in public_text
     assert "完成" in public_text
+
+
+def test_live_help_fixture_315_s17_complete_advances_to_s18_actionable_text() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/f92855c5-6ed1-4101-899c-72bd8d8e8e25.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S18"
+    assert repaired.metadata["next"]["step_id"] == "S18"
+    assert repaired.metadata["final_action_plan"]["step_id"] == "S18"
+    assert repaired.metadata["final_action_plan"]["text_only"] is True
+    assert repaired.metadata["final_overlay_targets"] == []
+    assert repaired.metadata["harness_trace"]["model_decision"]["step_id"] == "S17"
+    assert repaired.metadata["harness_trace"]["repair_result"]["path"] == "final_evidence_consistency_validator"
+    final_public = repaired.metadata["final_public_response"]
+    assert final_public["instruction_category"] == "text-only/manual"
+    public_text = _public_response_text(repaired)
+    assert "最新证据" not in public_text
+    assert "evidence" not in public_text.lower()
+    assert "S18" in public_text
+    assert "PB5" in public_text
+    assert "FCS-MC" in public_text
+    assert "takeoff_trim_button" not in public_text
 
 
 def test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance() -> None:

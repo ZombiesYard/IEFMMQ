@@ -222,15 +222,15 @@ def _localized_target_action_guidance(
     if not isinstance(target, str) or not target:
         return None
     language = "zh" if lang == "zh" else "en"
-    ui_hint = _ui_map_target_interaction_hint(ui_map_path, target, lang=lang)
-    if isinstance(ui_hint, str) and ui_hint:
-        return ui_hint
     if isinstance(step_id, str) and step_id:
         entry = _TARGET_ACTION_GUIDANCE_BY_STEP.get((step_id, target))
         if isinstance(entry, Mapping):
             guidance = entry.get(language)
             if isinstance(guidance, str) and guidance:
                 return guidance
+    ui_hint = _ui_map_target_interaction_hint(ui_map_path, target, lang=lang)
+    if isinstance(ui_hint, str) and ui_hint:
+        return ui_hint
     entry = _TARGET_ACTION_GUIDANCE.get(target)
     if not isinstance(entry, Mapping):
         return None
@@ -2006,6 +2006,33 @@ def _message_category_from_response(response: TutorResponse) -> str:
     if generation_mode == "fallback" or response.status == "error":
         return "fallback"
     return "model"
+
+
+def _final_public_instruction_category(response: TutorResponse) -> str:
+    metadata = response.metadata if isinstance(response.metadata, Mapping) else {}
+    text = " ".join(
+        item
+        for item in [response.message, *response.explanations]
+        if isinstance(item, str) and item
+    )
+    lowered = text.lower()
+    if "最新证据已经满足" in text or "latest evidence satisfies" in lowered:
+        return "invalid_internal_progress"
+    if re.search(r"(?:请先操作|please operate)\s+[A-Za-z][A-Za-z0-9_]+", text, re.IGNORECASE):
+        return "invalid_bare_target"
+    if response.actions:
+        return "actionable"
+    if any(marker in text for marker in ("PB", "Right Alt", "Right Shift", "左键", "右键", "按住", "点击")) or any(
+        marker in lowered for marker in ("press ", "click", "mouse wheel", "hotkey", "fcs-mc")
+    ):
+        return "text-only/manual"
+    if metadata.get("terminal_state_rewritten") is True or any(
+        marker in text for marker in ("已完成", "无需继续操作", "已满足")
+    ) or any(marker in lowered for marker in ("complete", "no further action", "no action is needed")):
+        return "completed"
+    if "等待" in text or "wait" in lowered:
+        return "wait"
+    return "text-only/manual"
 
 
 def _vlm_call_trace(
@@ -5455,6 +5482,7 @@ class LiveDcsTutorLoop:
         final_public_response: dict[str, Any] = {
             "message": response.message,
             "explanations": [item for item in response.explanations if isinstance(item, str)],
+            "instruction_category": _final_public_instruction_category(response),
         }
         next_payload = response.metadata.get("next")
         if isinstance(next_payload, Mapping):
@@ -5467,6 +5495,7 @@ class LiveDcsTutorLoop:
                 dict(action) for action in response.actions if isinstance(action, Mapping)
             ]
         response.metadata["final_public_response"] = final_public_response
+        response.metadata["final_public_instruction_category"] = final_public_response["instruction_category"]
 
     def _normalize_observable_text_only_response(
         self,
@@ -7457,6 +7486,10 @@ class LiveDcsTutorLoop:
             rewritten = "姿态源选择器已经在 AUTO，S33 检查已满足；冷启动流程已完成，无需继续操作。"
         elif next_step_id == "S33" and rejected_step_id == "S33":
             rewritten = "The attitude source selector is already on AUTO, so S33 is satisfied; the cold-start flow is complete."
+        elif next_step_id == "S18" and self.lang == "zh":
+            rewritten = "S17 已完成。现在进入 S18：请在右 DDI 上进入 BIT 页面，并按 PB5/FCS-MC 进入 FCS-MC BIT 页面。"
+        elif next_step_id == "S18":
+            rewritten = "S17 is complete. Continue to S18: use the right DDI BIT page and press PB5/FCS-MC to enter the FCS-MC BIT page."
         elif self.lang == "zh":
             rewritten = f"{rejected_step_id} 的最新证据已经满足。现在进入 {next_step_id}。"
         else:
