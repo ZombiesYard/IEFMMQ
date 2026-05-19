@@ -788,22 +788,56 @@ def _state_action_plan(
 
     seen_or_fresh = set(_strings(vision_seen_fact_ids)) | set(_strings(vision_fresh_fact_ids))
     not_seen = set(_strings(vision_not_seen_fact_ids))
-    if step_id == "S18" and "bit_root_page_visible" in seen_or_fresh:
+    if step_id == "S18":
+        if "bit_root_page_visible" in not_seen:
+            if "right_mdi_pb18" in allowed:
+                return _StateActionPlan(
+                    targets=("right_mdi_pb18",),
+                    guidance=(
+                        "Right DDI is not on the BIT root page; press Right DDI PB18/MENU "
+                        "to recover the BIT page first."
+                    ),
+                    text_only=False,
+                    source="state_action_planner",
+                    reasons=("s18_not_bit_root_to_pb18",),
+                )
+            return _StateActionPlan(
+                targets=(),
+                guidance=(
+                    "Right DDI is not on the BIT root page; PB18/MENU is required for recovery, "
+                    "but that target is not available."
+                ),
+                text_only=True,
+                source="state_action_planner",
+                reasons=("target_not_allowed:right_mdi_pb18",),
+            )
         if "right_mdi_pb5" in allowed:
+            reason = (
+                "s18_bit_root_to_pb5"
+                if "bit_root_page_visible" in seen_or_fresh
+                else "s18_default_bit_root_to_pb5"
+            )
+            guidance = (
+                "BIT root is visible; press Right DDI PB5/FCS-MC to enter the FCS-MC BIT page."
+                if "bit_root_page_visible" in seen_or_fresh
+                else (
+                    "In the normal cold-start flow the right DDI defaults to the BIT root page; "
+                    "press Right DDI PB5/FCS-MC to enter the FCS-MC BIT page."
+                )
+            )
             return _StateActionPlan(
                 targets=("right_mdi_pb5",),
-                guidance="BIT root is visible; press Right DDI PB5/FCS-MC to enter the FCS-MC BIT page.",
+                guidance=guidance,
                 text_only=False,
                 source="state_action_planner",
-                reasons=("s18_bit_root_to_pb5",),
+                reasons=(reason,),
             )
-    if step_id == "S18" and "right_mdi_pb18" in allowed:
         return _StateActionPlan(
-            targets=("right_mdi_pb18",),
-            guidance="Right DDI BIT page state is not confirmed; press Right DDI PB18/MENU to recover the BIT page first.",
-            text_only=False,
+            targets=(),
+            guidance="S18 requires Right DDI PB5/FCS-MC, but that target is not available.",
+            text_only=True,
             source="state_action_planner",
-            reasons=("s18_unknown_page_to_pb18",),
+            reasons=("target_not_allowed:right_mdi_pb5",),
         )
     if step_id == "S19":
         if "fcsmc_in_test_visible" in seen_or_fresh:
