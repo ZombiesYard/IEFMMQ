@@ -3277,8 +3277,8 @@ def test_live_loop_replaces_rejected_future_step_overlay_with_safe_current_step_
         "You are on S03. Left-click the APU switch to ON, then wait for the green APU READY light."
     )
     assert tutor_response_payload["explanations"] == [tutor_response_payload["message"]]
-    assert meta["fallback_message"] == "Please operate apu_switch first."
-    assert "Please operate apu_switch first." in meta["fallback_explanations"]
+    assert meta["fallback_message"] == "Set APU to ON with a left-click."
+    assert "Set APU to ON with a left-click." in meta["fallback_explanations"]
     assert meta["model_raw_help_response"]["next"]["step_id"] == "S04"
     assert meta["final_public_response"]["message"] == tutor_response_payload["message"]
 
@@ -9738,7 +9738,8 @@ def test_live_loop_audit_fields_flow_into_request_response_and_overlay(monkeypat
     assert request_meta["vision_fallback_reason"] is None
     assert request_meta["layout_id"] == "fa18c_composite_panel_v2"
     assert response_meta["fused_step_id"] == request_meta["fused_step_id"]
-    assert response_meta["fused_missing_conditions"] == request_meta["fused_missing_conditions"]
+    assert request_meta["fused_missing_conditions"] == ["vars.fire_test_b_complete==true"]
+    assert response_meta["fused_missing_conditions"] == []
     assert overlay_payload["vision_used"] is True
     assert overlay_payload["frame_id"] == "10000_000123"
     assert overlay_payload["sync_delta_ms"] == 0
@@ -13114,6 +13115,30 @@ def test_live_help_fixture_314_s12_pb19_hint_repairs_without_vars_snapshot() -> 
     assert "PB19" in repaired.message
     assert "GND 或 CV" not in repaired.message
     assert "action_hint_target_mismatch:ins_mode_knob" in repaired.metadata["harness_validation_reasons"]
+
+
+def test_live_help_fixture_315_s12_uses_pb19_after_ins_mode_set() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/22fec7a4-958a-449b-aae3-0ccc18daa84b.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["final_action_plan"]["targets"] == ["ampcd_pb19"]
+    assert "PB19" in repaired.message
+    assert "GND 或 CV" not in repaired.message
+    assert "action_hint_target_mismatch:ins_mode_knob" in repaired.metadata["harness_validation_reasons"]
+    assert "precondition_satisfied:vars.rpm_l_gte_60==true" in repaired.metadata[
+        "harness_validation_reasons"
+    ]
+    final_public_actions = repaired.metadata["final_public_response"]["actions"]
+    assert [action["target"] for action in final_public_actions] == ["ampcd_pb19"]
+    for action in final_public_actions:
+        assert action["fused_step_id"] == "S12"
+        assert action["fused_missing_conditions"] == []
+        assert "vars.rpm_l_gte_60==true" not in action["fused_missing_conditions"]
 
 
 def test_live_help_fixture_299_s12_carrier_keeps_ins_knob_until_cv_mode() -> None:
