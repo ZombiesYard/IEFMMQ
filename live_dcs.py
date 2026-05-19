@@ -2535,15 +2535,21 @@ def _launch_bar_retracted(vars_selected: Mapping[str, Any]) -> bool:
 
 
 def _hook_down(vars_selected: Mapping[str, Any]) -> bool:
+    raw_value = _coerce_int(vars_selected.get("hook_handle_value"))
+    if raw_value is not None:
+        return raw_value == 0
     if vars_selected.get("hook_extended") is True:
         return True
-    return _coerce_int(vars_selected.get("hook_handle_value")) == 1
+    return False
 
 
 def _hook_up(vars_selected: Mapping[str, Any]) -> bool:
+    raw_value = _coerce_int(vars_selected.get("hook_handle_value"))
+    if raw_value is not None:
+        return raw_value == 1
     if vars_selected.get("hook_retracted") is True:
         return True
-    return _coerce_int(vars_selected.get("hook_handle_value")) == 0
+    return False
 
 
 def _missing_conditions_satisfied_by_vars(
@@ -6931,6 +6937,8 @@ class LiveDcsTutorLoop:
         latched_reason = self._four_down_latched_completion_conflict(context, accepted_step_id)
         if forced_step_id is not None:
             latched_reason = f"four_down_missing_prior_latch:{forced_step_id}"
+        else:
+            response.metadata.pop("final_evidence_consistency_forced_step_id", None)
         if latched_reason is not None:
             rejected_missing = [
                 item for item in accepted_missing_conditions if isinstance(item, str) and item
@@ -7037,6 +7045,8 @@ class LiveDcsTutorLoop:
         context: Mapping[str, Any],
         step_id: str | None,
     ) -> str | None:
+        if not isinstance(context.get("four_down_completion_latches"), Mapping):
+            return None
         if step_id == "S23":
             latches = _four_down_completion_latches_from_context(context)
             if not latches.get("s22_latched_complete"):
@@ -7245,8 +7255,32 @@ class LiveDcsTutorLoop:
                 ]
             fallback_reason = "s08_visual_recovery"
         else:
+            fallback_request = request
+            completed_latch_by_step = {
+                "S20": "s20_latched_complete",
+                "S22": "s22_latched_complete",
+                "S24": "s24_latched_complete",
+            }
+            completed_latch = completed_latch_by_step.get(rejected_step_id)
+            if completed_latch is not None and next_step_id in {"S21", "S23", "S25"}:
+                patched_context = dict(context)
+                patched_latches = _four_down_completion_latches_from_context(patched_context)
+                patched_latches[completed_latch] = True
+                patched_context["four_down_completion_latches"] = patched_latches
+                fallback_request = TutorRequest(
+                    request_id=request.request_id,
+                    timestamp=request.timestamp,
+                    actor=request.actor,
+                    intent=request.intent,
+                    version=request.version,
+                    message=request.message,
+                    observation_ref=request.observation_ref,
+                    context=patched_context,
+                    metadata=dict(request.metadata),
+                )
+                response.metadata["final_evidence_consistency_completion_advance_latches"] = dict(patched_latches)
             fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
-                request,
+                fallback_request,
                 override_inferred_step_id=next_step_id,
                 override_overlay_step_id=next_step_id,
                 ignore_request_allowlist=True,

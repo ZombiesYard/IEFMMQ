@@ -7521,7 +7521,7 @@ def test_live_build_request_serializes_four_down_transition_latch_history(tmp_pa
                 "battery_on": True,
                 "power_available": True,
                 "launch_bar_switch_value": 0,
-                "hook_handle_value": 1,
+                "hook_handle_value": 0,
             },
         )
 
@@ -7535,13 +7535,13 @@ def test_live_build_request_serializes_four_down_transition_latch_history(tmp_pa
             hook_cold_s25 = hook_cold_loop._stabilize_live_inference(
                 StepInferenceResult(
                     inferred_step_id="S25",
-                    missing_conditions=("vars.hook_handle_value in [0,0]",),
+                    missing_conditions=("vars.hook_handle_value in [1,1]",),
                 ),
                 {
                     "battery_on": True,
                     "power_available": True,
                     "launch_bar_switch_value": 0,
-                    "hook_handle_value": 1,
+                    "hook_handle_value": 0,
                 },
             )
         finally:
@@ -7576,7 +7576,7 @@ def test_live_build_request_serializes_four_down_transition_latch_history(tmp_pa
                     "battery_on": True,
                     "power_available": True,
                     "launch_bar_switch_value": 0,
-                    "hook_handle_value": 1,
+                    "hook_handle_value": 0,
                 },
             },
         )
@@ -11573,7 +11573,7 @@ def test_live_help_fixture_306_6232_launch_bar_cycle_stops_at_s24_without_hook_l
     assert "S25" not in public_text
 
 
-def test_live_help_fixture_306_da08_s25_hook_guidance_matches_retract_direction() -> None:
+def test_live_help_fixture_306_da08_hook_up_advances_to_s26_after_polarity_fix() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/da08da4a-0909-4acb-a2e6-7027324fa989.fixture.json"
     )
@@ -11582,14 +11582,34 @@ def test_live_help_fixture_306_da08_s25_hook_guidance_matches_retract_direction(
     repaired = _validate_compact_live_help_response(request=request, response=response)
 
     _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S26"
+    assert repaired.metadata["next"]["step_id"] == "S26"
+    assert repaired.metadata["final_overlay_targets"] == ["pitot_heater_switch"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "pitot_heater_switch"
+    public_text = _public_response_text(repaired)
+    assert "放下阻钩" not in public_text
+    assert "伸出阻钩" not in public_text
+
+
+def test_live_help_fixture_306_7ea8_hook_down_advances_to_s25_without_trace_mismatch() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/7ea8bf09-dfe7-4e7b-a23f-6407af510e2a.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
     assert repaired.metadata["diagnosis"]["step_id"] == "S25"
     assert repaired.metadata["next"]["step_id"] == "S25"
+    final_plan = repaired.metadata["final_action_plan"]
+    assert final_plan["step_id"] == "S25"
+    assert final_plan["overlay_step_id"] == "S25"
     assert repaired.metadata["final_overlay_targets"] == ["arresting_hook_handle"]
     assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "arresting_hook_handle"
     public_text = _public_response_text(repaired)
     assert "抬起" in public_text or "收起" in public_text
     assert "放下阻钩" not in public_text
-    assert "伸出阻钩" not in public_text
 
 
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:

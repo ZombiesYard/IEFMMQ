@@ -1142,9 +1142,9 @@ def _telemetry_progression_candidates(
     hook = changed.get("hook_handle_value")
     if hook is not None:
         last = _coerce_number(hook.get("last_value"))
-        if last == 1:
+        if last == 0:
             out.append(("S25", "changed_vars", "hook_handle_value", "", False))
-        elif last == 0:
+        elif last == 1:
             out.append(("S26", "changed_vars", "hook_handle_value", "", False))
 
     pitot = changed.get("pitot_heat_on")

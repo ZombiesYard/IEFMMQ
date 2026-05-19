@@ -496,8 +496,39 @@ def test_telemetry_window_candidates_cover_four_down_progression_from_telemetry_
     candidates = [item.to_dict() for item in build_step_candidates(packet)]
     telemetry_steps = [item["step_id"] for item in candidates if item["source"] == "telemetry_window"]
 
-    assert telemetry_steps[:4] == ["S21", "S23", "S25", "S27"]
+    assert telemetry_steps[:4] == ["S21", "S23", "S26", "S27"]
     assert all(item["supporting_evidence_refs"][0].startswith("TELEMETRY_WINDOW.") for item in candidates if item["source"] == "telemetry_window")
+
+
+def test_telemetry_window_candidates_treat_hook_zero_as_down() -> None:
+    packet = build_evidence_packet(
+        {
+            "vars": {
+                "hook_handle_value": 0,
+            },
+            "telemetry_window_frames": [
+                {
+                    "seq": 30,
+                    "t_wall": 60.0,
+                    "vars": {
+                        "hook_handle_value": 1,
+                    },
+                },
+                {
+                    "seq": 31,
+                    "t_wall": 64.0,
+                    "vars": {
+                        "hook_handle_value": 0,
+                    },
+                },
+            ],
+        }
+    )
+
+    candidates = [item.to_dict() for item in build_step_candidates(packet)]
+    telemetry_steps = [item["step_id"] for item in candidates if item["source"] == "telemetry_window"]
+
+    assert telemetry_steps[0] == "S25"
 
 
 def test_telemetry_window_candidates_mark_refuel_probe_motion_in_progress() -> None:

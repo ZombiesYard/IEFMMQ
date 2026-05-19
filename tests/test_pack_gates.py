@@ -294,7 +294,7 @@ def test_evaluate_pack_gates_allows_bios_observable_steps_s14_s16_s20_to_s33() -
                 flap_auto=True,
                 ext_refuel_probe_value=65000,
                 launch_bar_switch_value=1,
-                hook_handle_value=1,
+                hook_handle_value=0,
                 pitot_heat_on=True,
                 parking_brake_released=True,
                 bingo_fuel_set=True,
@@ -323,7 +323,7 @@ def test_evaluate_pack_gates_allows_bios_observable_steps_s14_s16_s20_to_s33() -
         assert gates[gate_id]["allowed"] is True
 
     cycle_back_gates = evaluate_pack_gates(
-        observations=[_obs_with_vars(ext_refuel_probe_value=0, launch_bar_switch_value=0, hook_handle_value=0)],
+        observations=[_obs_with_vars(ext_refuel_probe_value=0, launch_bar_switch_value=0, hook_handle_value=1)],
         precondition_gates=cfg["precondition_gates"],
         completion_gates=cfg["completion_gates"],
     )

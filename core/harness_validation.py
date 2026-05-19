@@ -21,6 +21,8 @@ _VARS_PREDICATE_RE = re.compile(
     r"^\s*(?:payload\.)?vars\.([A-Za-z0-9_]+)\s*(==|!=|>=|<=|>|<|\bin\b)\s*(.+?)\s*$"
 )
 
+_MOTION_CYCLE_STEP_IDS = {"S20", "S21", "S22", "S23", "S24", "S25"}
+
 
 @dataclass(frozen=True)
 class HarnessActionPlan:
@@ -732,6 +734,15 @@ def plan_harness_action(
         overlay_step_id if isinstance(overlay_step_id, str) and overlay_step_id else selected_step_id
     )
     source = "model"
+    overlay_step_aligned = False
+    if (
+        selected_step_id in _MOTION_CYCLE_STEP_IDS
+        and selected_overlay_step_id in _MOTION_CYCLE_STEP_IDS
+        and selected_overlay_step_id != selected_step_id
+    ):
+        reasons.append(f"overlay_step_aligned_to_step_id:{selected_overlay_step_id}")
+        selected_overlay_step_id = selected_step_id
+        overlay_step_aligned = True
 
     completion_advance = _completion_advance_for_seen_fact(
         selected_step_id,
@@ -912,7 +923,7 @@ def plan_harness_action(
         source = "validator_repair"
 
     guidance = None
-    if use_hint and isinstance(action_hint, Mapping):
+    if use_hint and not overlay_step_aligned and isinstance(action_hint, Mapping):
         hint_reason = action_hint.get("reason")
         if isinstance(hint_reason, str) and hint_reason:
             guidance = hint_reason
