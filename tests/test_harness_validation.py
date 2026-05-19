@@ -894,6 +894,52 @@ def test_plan_harness_action_clears_unavailable_s09_state_target_instead_of_repa
     assert plan.final_action_plan_source == "state_action_planner"
 
 
+def test_plan_harness_action_owns_known_control_interaction_guidance() -> None:
+    cases = [
+        (
+            "S10",
+            "eng_crank_switch",
+            {"engine_crank_left_complete": False},
+            ("LEFT", "left-click"),
+            "s10_left_engine_left_click_guidance",
+        ),
+        (
+            "S31",
+            "radar_altimeter_bug_knob",
+            {"radar_altimeter_bug_set": False},
+            ("mouse wheel", "200 ft", "40 ft"),
+            "s31_radar_altimeter_mouse_wheel_guidance",
+        ),
+        (
+            "S32",
+            "standby_attitude_cage_knob",
+            {"standby_attitude_uncaged": False},
+            ("mouse wheel", "standby attitude"),
+            "s32_standby_attitude_mouse_wheel_guidance",
+        ),
+    ]
+
+    for step_id, target, vars_map, expected_parts, expected_reason in cases:
+        plan = plan_harness_action(
+            step_specs={step_id: _spec(step_id, (target,))},
+            inferred_step_id=step_id,
+            model_step_id=step_id,
+            proposed_overlay_targets=[target],
+            candidate_step_ids=[step_id],
+            runtime_overlay_targets=[target],
+            request_overlay_targets=[target],
+            max_overlay_targets=1,
+            latest_vars=vars_map,
+        )
+
+        assert plan.targets == (target,)
+        assert plan.final_action_plan_source == "state_action_planner"
+        assert expected_reason in plan.reasons
+        guidance = plan.guidance or ""
+        for expected in expected_parts:
+            assert expected in guidance
+
+
 def test_plan_harness_action_returns_text_only_when_probe_is_already_moving() -> None:
     cases = [
         (

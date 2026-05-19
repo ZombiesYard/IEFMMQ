@@ -11377,6 +11377,69 @@ def test_live_help_fixture_314_s18_pb5_repair_rewrites_public_message() -> None:
     assert "PB18" not in public_text
 
 
+def test_live_help_fixture_314_s10_left_engine_uses_left_click_guidance() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/3de0e688-8bc4-4df1-b062-72f3134bc775.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["final_overlay_targets"] == ["eng_crank_switch"]
+    public_text = _public_response_text(repaired)
+    assert "LEFT" in public_text or "L 位置" in public_text
+    assert "左键" in public_text or "left-click" in public_text
+    assert "R 位置" not in public_text
+    assert "右键" not in public_text
+    assert "right-click" not in public_text
+
+
+def test_live_help_fixture_314_s31_radar_altimeter_uses_mouse_wheel_guidance() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/5a7d5df7-2f08-4321-9a4a-6858131b4e6e.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["final_overlay_targets"] == ["radar_altimeter_bug_knob"]
+    public_text = _public_response_text(repaired)
+    assert "滚轮" in public_text or "mouse wheel" in public_text or "mouse-wheel" in public_text
+    assert "200" in public_text and "40" in public_text
+
+
+def test_live_help_fixture_314_s32_standby_attitude_uses_mouse_wheel_guidance() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/ffb5e69b-664b-47d8-9150-57d7cd75d233.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["final_overlay_targets"] == ["standby_attitude_cage_knob"]
+    public_text = _public_response_text(repaired)
+    assert "滚轮" in public_text or "mouse wheel" in public_text or "mouse-wheel" in public_text
+    assert "备用姿态" in public_text or "standby attitude" in public_text.lower()
+
+
+def test_live_help_fixture_314_s33_default_satisfied_uses_public_completion_message() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/7bea22f8-a4d1-4744-917b-f7ddc957f709.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S33"
+    assert repaired.metadata["next"]["step_id"] == "S33"
+    assert repaired.metadata["final_overlay_targets"] == []
+    public_text = _public_response_text(repaired)
+    assert "最新证据" not in public_text
+    assert "evidence" not in public_text.lower()
+    assert "AUTO" in public_text
+    assert "完成" in public_text
+
+
 def test_safe_fallback_overlay_syncs_message_after_completion_conflict_repair() -> None:
     request = TutorRequest(
         actor="learner",

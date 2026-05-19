@@ -614,6 +614,37 @@ def _state_action_plan(
             recent_action_targets=recent_action_targets,
             max_overlay_targets=max_overlay_targets,
         )
+    allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
+    if step_id == "S10" and vars_map.get("engine_crank_left_complete") is not True:
+        if "eng_crank_switch" in allowed:
+            return _StateActionPlan(
+                targets=("eng_crank_switch",),
+                guidance="Set the engine crank switch to LEFT with a left-click to start the left engine.",
+                text_only=False,
+                source="state_action_planner",
+                reasons=("s10_left_engine_left_click_guidance",),
+            )
+    if step_id == "S31" and vars_map.get("radar_altimeter_bug_set") is not True:
+        if "radar_altimeter_bug_knob" in allowed:
+            return _StateActionPlan(
+                targets=("radar_altimeter_bug_knob",),
+                guidance=(
+                    "Use the mouse wheel on the radar altimeter bug knob to set 200 ft "
+                    "for airfield or 40 ft for carrier."
+                ),
+                text_only=False,
+                source="state_action_planner",
+                reasons=("s31_radar_altimeter_mouse_wheel_guidance",),
+            )
+    if step_id == "S32" and vars_map.get("standby_attitude_uncaged") is not True:
+        if "standby_attitude_cage_knob" in allowed:
+            return _StateActionPlan(
+                targets=("standby_attitude_cage_knob",),
+                guidance="Use the mouse wheel on the standby attitude cage knob to uncage the standby attitude indicator.",
+                text_only=False,
+                source="state_action_planner",
+                reasons=("s32_standby_attitude_mouse_wheel_guidance",),
+            )
 
     motion_state = _probe_motion_state(step_id, vars_map, evidence_packet=evidence_packet)
     if motion_state == "s20_extending":
@@ -635,7 +666,6 @@ def _state_action_plan(
 
     seen_or_fresh = set(_strings(vision_seen_fact_ids)) | set(_strings(vision_fresh_fact_ids))
     not_seen = set(_strings(vision_not_seen_fact_ids))
-    allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
     if step_id == "S18" and "bit_root_page_visible" in seen_or_fresh and "fcsmc_page_visible" in not_seen:
         if "right_mdi_pb5" in allowed:
             return _StateActionPlan(

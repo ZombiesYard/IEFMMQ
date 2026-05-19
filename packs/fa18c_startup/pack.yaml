@@ -1068,7 +1068,7 @@ steps:
     ui_targets:
       - radar_altimeter_bug_knob
     tutor_prompts:
-      - "Set radar altimeter bug to 200 ft (airfield) or 40 ft (carrier)."
+      - "Use the mouse wheel on the radar altimeter bug knob to set 200 ft (airfield) or 40 ft (carrier)."
 
   - id: S32
     phase: P6
@@ -1084,7 +1084,7 @@ steps:
     ui_targets:
       - standby_attitude_cage_knob
     tutor_prompts:
-      - "Uncage the standby attitude indicator."
+      - "Use the mouse wheel on the standby attitude cage knob to uncage the standby attitude indicator."
 
   - id: S33
     phase: P6

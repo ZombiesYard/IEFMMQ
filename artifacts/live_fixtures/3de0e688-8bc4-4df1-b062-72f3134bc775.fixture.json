@@ -1,0 +1,3333 @@
+{
+  "context": {
+    "evidence_packet_summary": {
+      "blocked_gate_count": 7,
+      "conflicts": [],
+      "recent_action_count": 3,
+      "telemetry_missing_source_count": 1,
+      "telemetry_status": "nominal",
+      "telemetry_window_digest": {
+        "changed_var_count": 5,
+        "contradiction_count": 0,
+        "first_seq": 4826,
+        "frame_count": 20,
+        "latest_seq": 4845
+      },
+      "vision_fresh_count": 0,
+      "vision_seen_count": 0,
+      "vision_status": "vision_not_required"
+    },
+    "evidence_snapshot": {
+      "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "schema_version": "evidence_snapshot.v1",
+      "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+      "source_observation_seq": 4845,
+      "source_observation_t_wall": 1779198382.0057023,
+      "telemetry_window_first_seq": 4826,
+      "telemetry_window_frame_count": 20,
+      "telemetry_window_latest_seq": 4845,
+      "telemetry_window_latest_t_wall": 1779198382.0057023,
+      "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+    },
+    "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+    "observations": [
+      {
+        "attachments": [],
+        "metadata": {
+          "delta_count": 1,
+          "delta_dropped_count": 0,
+          "from_addr": "192.168.0.105:64396",
+          "raw_delta_count": 1,
+          "seq": 4845
+        },
+        "observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+        "payload": {
+          "delta_summary": {
+            "changed_keys_sample": [
+              "HYD_IND_BRAKE"
+            ],
+            "delta_count": 1,
+            "dropped_stats": {
+              "dropped_by_reason": {},
+              "dropped_total": 0
+            },
+            "raw_delta_count": 1,
+            "recent_key_changes_topk": [
+              {
+                "count": 1,
+                "importance": 1,
+                "key": "HYD_IND_BRAKE",
+                "ui_targets": [],
+                "value": 41456
+              }
+            ],
+            "truncated": false
+          },
+          "recent_ui_targets": [],
+          "seq": 4845,
+          "t_wall": 1779198382.0057023,
+          "vars": {
+            "annunciator_panel_activity": true,
+            "apu_on": true,
+            "apu_ready": true,
+            "apu_start_support_complete": true,
+            "attitude_source_auto": true,
+            "battery_on": true,
+            "bingo_fuel_set": false,
+            "bleed_air_cycle_complete": true,
+            "bleed_air_norm": true,
+            "comm1_channel_numeric": 1,
+            "comm1_freq_134_000": true,
+            "comm1_freq_value": 13400,
+            "comm2_channel_numeric": 1,
+            "comm2_freq_value": 30500,
+            "engine_crank_left": false,
+            "engine_crank_left_complete": false,
+            "engine_crank_right": false,
+            "engine_crank_right_complete": true,
+            "ext_pwr_on": true,
+            "ext_refuel_probe_value": 0,
+            "fcs_bit_switch_up": false,
+            "fcs_reset_complete": false,
+            "fcs_reset_pressed": false,
+            "ff_l": 0,
+            "ff_r": 700,
+            "fire_test_a_active": false,
+            "fire_test_a_complete": true,
+            "fire_test_active": false,
+            "fire_test_b_active": false,
+            "fire_test_b_complete": true,
+            "fire_test_complete": true,
+            "flap_auto": false,
+            "flap_configured": false,
+            "flap_full": true,
+            "flap_half": false,
+            "flap_mode_value": 0,
+            "hook_extended": true,
+            "hook_handle_value": 1,
+            "hook_retracted": false,
+            "hud_on": true,
+            "ins_fast_align_complete": false,
+            "ins_fast_align_pressed": false,
+            "ins_mode": 0,
+            "ins_mode_cv_or_gnd": false,
+            "ins_mode_set": false,
+            "l_gen_on": true,
+            "launch_bar_extended": false,
+            "launch_bar_retracted": true,
+            "launch_bar_switch_value": 0,
+            "left_ddi_on": true,
+            "left_engine_idle_ready": false,
+            "left_engine_nominal_start_params": false,
+            "lights_test_active": false,
+            "lights_test_complete": true,
+            "mpcd_on": true,
+            "noz_l": 0.0,
+            "noz_r": 76.3103685053788,
+            "obogs_flow_on": true,
+            "obogs_ready": false,
+            "obogs_switch_on": false,
+            "oil_l": 0,
+            "oil_r": 60,
+            "parking_brake_released": false,
+            "pitot_heat_on": false,
+            "power_available": true,
+            "probe_cycle_complete": true,
+            "probe_extended": false,
+            "probe_retracted": true,
+            "probe_switch_value": 1,
+            "r_gen_on": true,
+            "radar_altimeter_bug_set": false,
+            "radar_altimeter_bug_value": 0.0,
+            "radar_mode_opr": false,
+            "radar_on": false,
+            "right_ddi_on": true,
+            "right_engine_nominal_start_params": true,
+            "rpm_l": 0,
+            "rpm_l_gte_25": false,
+            "rpm_l_gte_60": false,
+            "rpm_r": 64,
+            "rpm_r_gte_25": true,
+            "rpm_r_gte_60": true,
+            "standby_altimeter_set": true,
+            "standby_attitude_uncaged": false,
+            "takeoff_trim_pressed": false,
+            "takeoff_trim_set": false,
+            "temp_l": 10,
+            "temp_r": 322,
+            "throttle_l_not_off": false,
+            "throttle_r_idle_complete": true,
+            "throttle_r_not_off": true,
+            "ufc_comm1_pull_pressed": false,
+            "ufc_ent_pressed": false,
+            "ufc_key_0_pressed": false,
+            "ufc_key_1_pressed": false,
+            "ufc_key_3_pressed": false,
+            "ufc_key_4_pressed": false,
+            "ufc_scratchpad_number_display": " 134.000",
+            "ufc_scratchpad_string_1_display": " 1",
+            "ufc_scratchpad_string_2_display": "--",
+            "vars_source_missing": [
+              "ins_fast_align_pressed"
+            ]
+          }
+        },
+        "procedure_hint": null,
+        "source": "dcs_bios_raw",
+        "tags": [],
+        "timestamp": "2026-05-19T13:46:22.005702+00:00",
+        "version": "v1"
+      }
+    ],
+    "snapshot_ids": {
+      "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+    },
+    "telemetry_window_digest": {
+      "changed_var_count": 5,
+      "contradiction_count": 0,
+      "first_seq": 4826,
+      "frame_count": 20,
+      "latest_seq": 4845
+    },
+    "vision": {
+      "frame_ids": [
+        "1779198382295_000234"
+      ],
+      "request": null,
+      "response": {
+        "frame_id": "1779198382295_000234",
+        "frame_ids": [
+          "1779198382295_000234"
+        ],
+        "frame_stale": false,
+        "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+        "observation_seq": 4845,
+        "observation_t_wall_ms": 1779198382006,
+        "observation_t_wall_s": 1779198382.0057023,
+        "pre_trigger_frame": null,
+        "selected_frames": [
+          {
+            "capture_wall_ms": 1779198382295,
+            "channel": "composite_panel",
+            "frame_id": "1779198382295_000234",
+            "frame_seq": 234,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198382295_000234_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198382295_000234.png",
+            "sync_delta_ms": 67,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          }
+        ],
+        "status": "partial",
+        "sync_delta_ms": 67,
+        "sync_miss_reason": "missing_pre_trigger_frame",
+        "sync_status": "matched_future_fallback",
+        "sync_window_ms": 250,
+        "trigger_frame": {
+          "capture_wall_ms": 1779198382295,
+          "channel": "composite_panel",
+          "frame_id": "1779198382295_000234",
+          "frame_seq": 234,
+          "frame_stale": false,
+          "height": 1440,
+          "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198382295_000234_vlm.png",
+          "layout_id": "fa18c_composite_panel_v2",
+          "role": "trigger_frame",
+          "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198382295_000234.png",
+          "sync_delta_ms": 67,
+          "sync_miss_reason": null,
+          "sync_status": "matched_future_fallback",
+          "width": 3440
+        },
+        "trigger_wall_ms": 1779198382228,
+        "vision_used": true
+      },
+      "vision_fact_summary": {
+        "frame_ids": [
+          "1779198382295_000234"
+        ],
+        "fresh_fact_ids": [],
+        "not_seen_fact_ids": [],
+        "seen_fact_ids": [],
+        "status": "vision_not_required",
+        "summary_text": "no_active_vision_facts",
+        "uncertain_fact_ids": []
+      },
+      "vision_facts": []
+    },
+    "vision_fact_observations": []
+  },
+  "cycle": {
+    "events": [
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "tutor_request",
+        "lineno": 5388,
+        "metadata": {
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_status": "vision_not_required",
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_status": "partial",
+          "vision_used": true
+        },
+        "payload": {
+          "actor": "learner",
+          "context": {
+            "delta_dropped_count": 0,
+            "deterministic_step_hint": {
+              "gate_blocker_count": 1,
+              "inferred_step_id": "S10",
+              "missing_conditions_count": 1,
+              "observability": "observable",
+              "observability_status": "observable",
+              "overlay_step_id": "S10",
+              "recent_ui_targets": [
+                "ufc_ent_button",
+                "ufc_comm1_channel_selector_rotate",
+                "ufc_comm1_channel_selector_pull"
+              ],
+              "requires_visual_confirmation": false,
+              "scenario_profile": "airfield",
+              "step_ui_targets": [
+                "eng_crank_switch"
+              ]
+            },
+            "evidence_packet_summary": {
+              "blocked_gate_count": 7,
+              "conflicts": [],
+              "recent_action_count": 3,
+              "telemetry_missing_source_count": 1,
+              "telemetry_status": "nominal",
+              "telemetry_window_digest": {
+                "changed_var_count": 5,
+                "contradiction_count": 0,
+                "first_seq": 4826,
+                "frame_count": 20,
+                "latest_seq": 4845
+              },
+              "vision_fresh_count": 0,
+              "vision_seen_count": 0,
+              "vision_status": "vision_not_required"
+            },
+            "evidence_snapshot": {
+              "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "schema_version": "evidence_snapshot.v1",
+              "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+              "source_observation_seq": 4845,
+              "source_observation_t_wall": 1779198382.0057023,
+              "telemetry_window_first_seq": 4826,
+              "telemetry_window_frame_count": 20,
+              "telemetry_window_latest_seq": 4845,
+              "telemetry_window_latest_t_wall": 1779198382.0057023,
+              "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "grounding_missing": false,
+            "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+            "grounding_reason": null,
+            "rag_topk": [
+              {
+                "chunk_id": "fa18c_startup_master_1",
+                "doc_id": "fa18c_startup_master",
+                "page_or_heading": "Master Step Table",
+                "score": 38.93446879639516,
+                "section": "Master Step Table",
+                "snippet_id": "fa18c_startup_master_1"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_153",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 154,
+                "score": 34.98159536679122,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_153"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_142",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 143,
+                "score": 32.73748860454453,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_142"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_201",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 202,
+                "score": 29.556704359662675,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_201"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_46",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 47,
+                "score": 26.97209623444198,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_46"
+              }
+            ],
+            "scenario_profile": "airfield",
+            "snapshot_ids": {
+              "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "state_harness": {
+              "conflicts": [],
+              "deterministic_candidate": {
+                "missing_conditions": [
+                  "vars.engine_crank_left_complete==true"
+                ],
+                "overlay_step_id": "S10",
+                "role": "candidate_not_authoritative",
+                "step_id": "S10"
+              },
+              "telemetry_evidence": {
+                "confidence": "medium",
+                "early_vars": {
+                  "battery_on": true,
+                  "fire_test_a_complete": true,
+                  "fire_test_b_complete": true,
+                  "power_available": true
+                },
+                "observation_seq": 4845,
+                "source_status": "nominal",
+                "vars_source_missing_count": 1
+              },
+              "telemetry_window_digest": {
+                "changed_vars": [
+                  {
+                    "first_value": false,
+                    "last_value": true,
+                    "latest_transition_age_s": 0.838,
+                    "transition_count": 1,
+                    "var": "comm1_freq_134_000"
+                  },
+                  {
+                    "first_value": 30500,
+                    "last_value": 13400,
+                    "latest_transition_age_s": 0.838,
+                    "transition_count": 1,
+                    "var": "comm1_freq_value"
+                  },
+                  {
+                    "first_value": false,
+                    "last_value": false,
+                    "latest_transition_age_s": 0.167,
+                    "transition_count": 2,
+                    "var": "ufc_ent_pressed"
+                  },
+                  {
+                    "first_value": " 134.000",
+                    "last_value": " 134.000",
+                    "latest_transition_age_s": 0.566,
+                    "transition_count": 2,
+                    "var": "ufc_scratchpad_number_display"
+                  },
+                  {
+                    "first_value": "['ins_fast_align_pressed']",
+                    "last_value": "['ins_fast_align_pressed']",
+                    "latest_transition_age_s": 0.566,
+                    "transition_count": 2,
+                    "var": "vars_source_missing"
+                  }
+                ],
+                "contradictions": [],
+                "first_frame_only_values": [],
+                "first_seq": 4826,
+                "frame_count": 20,
+                "last_seen_true": [
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "battery_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "fire_test_a_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "fire_test_b_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "fire_test_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "hud_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "left_ddi_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "mpcd_on"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 4845,
+                    "var": "power_available"
+                  }
+                ],
+                "latest_seq": 4845,
+                "latest_t_wall": 1779198382.0057023,
+                "stable_false_vars": [
+                  "fcs_bit_switch_up",
+                  "flap_auto",
+                  "pitot_heat_on"
+                ],
+                "stable_true_vars": [
+                  "battery_on",
+                  "fire_test_a_complete",
+                  "fire_test_b_complete",
+                  "fire_test_complete",
+                  "hud_on",
+                  "left_ddi_on",
+                  "mpcd_on",
+                  "power_available",
+                  "right_ddi_on"
+                ],
+                "unknown_or_missing_vars": [
+                  "ins_fast_align_pressed"
+                ],
+                "window_duration_s": 1.285
+              },
+              "vision_evidence": {
+                "confidence": "low",
+                "fresh_fact_ids": [],
+                "late_display_anchors": [],
+                "not_seen_fact_ids": [],
+                "seen_fact_ids": [],
+                "source_status": "vision_not_required",
+                "visual_candidate_steps": []
+              }
+            },
+            "vision": {
+              "frame_id": "1779198382295_000234",
+              "frame_ids": [
+                "1779198382295_000234"
+              ],
+              "frame_stale": false,
+              "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+              "observation_seq": 4845,
+              "observation_t_wall_ms": 1779198382006,
+              "observation_t_wall_s": 1779198382.0057023,
+              "status": "partial",
+              "sync_delta_ms": 67,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_wall_ms": 1779198382228,
+              "vision_used": true
+            },
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779198382295_000234"
+              ],
+              "fresh_fact_ids": [],
+              "not_seen_fact_ids": [],
+              "seen_fact_ids": [],
+              "status": "vision_not_required",
+              "summary_text": "no_active_vision_facts",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": []
+          },
+          "intent": "help",
+          "message": "[REDACTED_USER_MESSAGE]",
+          "metadata": {
+            "evidence_packet_summary": {
+              "blocked_gate_count": 7,
+              "conflicts": [],
+              "recent_action_count": 3,
+              "telemetry_missing_source_count": 1,
+              "telemetry_status": "nominal",
+              "telemetry_window_digest": {
+                "changed_var_count": 5,
+                "contradiction_count": 0,
+                "first_seq": 4826,
+                "frame_count": 20,
+                "latest_seq": 4845
+              },
+              "vision_fresh_count": 0,
+              "vision_seen_count": 0,
+              "vision_status": "vision_not_required"
+            },
+            "evidence_snapshot": {
+              "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "schema_version": "evidence_snapshot.v1",
+              "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+              "source_observation_seq": 4845,
+              "source_observation_t_wall": 1779198382.0057023,
+              "telemetry_window_first_seq": 4826,
+              "telemetry_window_frame_count": 20,
+              "telemetry_window_latest_seq": 4845,
+              "telemetry_window_latest_t_wall": 1779198382.0057023,
+              "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "frame_id": "1779198382295_000234",
+            "fused_missing_conditions": [
+              "vars.engine_crank_left_complete==true"
+            ],
+            "fused_step_id": "S10",
+            "grounding_cache_hit": false,
+            "grounding_error_type": null,
+            "grounding_missing": false,
+            "grounding_missing_requested": false,
+            "grounding_policy_filtered_out_count": 0,
+            "grounding_policy_id": null,
+            "grounding_policy_version": null,
+            "grounding_reason": null,
+            "grounding_reason_requested": null,
+            "grounding_snippet_ids": [
+              "fa18c_startup_master_1",
+              "DCS FA-18C Early Access Guide EN_153",
+              "DCS FA-18C Early Access Guide EN_142",
+              "DCS FA-18C Early Access Guide EN_201",
+              "DCS FA-18C Early Access Guide EN_46"
+            ],
+            "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+            "layout_id": "fa18c_composite_panel_v2",
+            "prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+            "prompt_tokens_est": 5487,
+            "prompt_trimmed": true,
+            "scenario_profile": "airfield",
+            "snapshot_ids": {
+              "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "source_chunk_refs": [
+              "fa18c_startup_master/fa18c_startup_master_1",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_153",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_142",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_201",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_46"
+            ],
+            "state_harness_conflicts": [],
+            "state_harness_telemetry_status": "nominal",
+            "sync_delta_ms": 67,
+            "vision_fact_seen_ids": [],
+            "vision_fact_status": "vision_not_required",
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779198382295_000234"
+              ],
+              "fresh_fact_ids": [],
+              "not_seen_fact_ids": [],
+              "seen_fact_ids": [],
+              "status": "vision_not_required",
+              "summary_text": "no_active_vision_facts",
+              "uncertain_fact_ids": []
+            },
+            "vision_fallback_reason": null,
+            "vision_frame_ids": [
+              "1779198382295_000234"
+            ],
+            "vision_status": "partial",
+            "vision_used": true
+          },
+          "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+          "request_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "timestamp": "2026-05-19T13:46:22.760142+00:00",
+          "version": "v1"
+        },
+        "related_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "vision_refs": [
+          "1779198382295_000234"
+        ]
+      },
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "overlay_requested",
+        "lineno": 5389,
+        "metadata": {
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "action": "clear",
+          "attempt_count": 1,
+          "cmd_id": "0d87f76b-b67f-479d-8362-059e0b932527",
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 67,
+          "target": "pnt_111",
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "overlay_requested",
+        "lineno": 5390,
+        "metadata": {
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "action": "clear",
+          "attempt_count": 1,
+          "cmd_id": "000140d6-3f67-44a5-a8dc-697c3b4b5717",
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 67,
+          "target": "pnt_113",
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "overlay_requested",
+        "lineno": 5391,
+        "metadata": {
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "action": "clear",
+          "attempt_count": 1,
+          "cmd_id": "28832c14-c6f7-4269-9774-ce57bd852fbd",
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 67,
+          "target": "pnt_114",
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "overlay_requested",
+        "lineno": 5392,
+        "metadata": {
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "action": "clear",
+          "attempt_count": 1,
+          "cmd_id": "3e3dd5fb-a306-4580-83b1-d09da06d2bb5",
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 67,
+          "target": "pnt_120",
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "overlay_requested",
+        "lineno": 5393,
+        "metadata": {
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "action": "highlight",
+          "attempt_count": 1,
+          "cmd_id": "cb4fc6d6-ea50-430b-807e-fbb9c7e2d6eb",
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "schema_version": "v2",
+          "sync_delta_ms": 67,
+          "target": "pnt_377",
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "kind": "tutor_response",
+        "lineno": 5394,
+        "metadata": {
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "sync_delta_ms": 67,
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "actions": [
+            {
+              "element_id": "pnt_377",
+              "evidence_refs": [
+                "GATES.S10.completion"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "eng_crank_switch"
+              ],
+              "frame_id": "1779198382295_000234",
+              "fused_missing_conditions": [
+                "vars.engine_crank_left_complete==true"
+              ],
+              "fused_step_id": "S10",
+              "generation_mode": "model",
+              "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "model",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 67,
+              "target": "eng_crank_switch",
+              "type": "overlay",
+              "vision_fact_cached_count": 1,
+              "vision_fact_extractor_used": false,
+              "vision_fact_ignored_count": 1,
+              "vision_fact_sticky_count": 1,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779198382295_000234"
+                ],
+                "fresh_fact_ids": [],
+                "not_seen_fact_ids": [],
+                "seen_fact_ids": [],
+                "status": "vision_not_required",
+                "summary_text": "no_active_vision_facts",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_frame_capture_selected": true,
+              "vision_used": true,
+              "vlm_call_reason": "vision_not_required_for_step",
+              "vlm_call_status": "not_required"
+            }
+          ],
+          "actor": "tutor",
+          "explanations": [
+            "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+          ],
+          "in_reply_to": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "message": "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。",
+          "metadata": {
+            "allowed_evidence_ref_count": 125,
+            "dcs_tutor_text": {
+              "clear_view": false,
+              "cmd_id": "3f5a8bf9-7a57-460e-b444-29453a4742f4",
+              "display_time_s": 12.0,
+              "reason": null,
+              "status": "ok",
+              "text": "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+            },
+            "delta_dropped_count": 0,
+            "deterministic_inference_error": null,
+            "deterministic_step_hint": {
+              "inferred_step_id": "S08",
+              "missing_conditions": [
+                "vision_facts.fcs_page_visible==seen",
+                "vision_facts.bit_root_page_visible==seen"
+              ],
+              "observability": "observable",
+              "observability_status": "observable",
+              "recent_ui_targets": [
+                "ufc_ent_button",
+                "ufc_comm1_channel_selector_rotate",
+                "ufc_comm1_channel_selector_pull"
+              ],
+              "requires_visual_confirmation": false,
+              "step_evidence_requirements": [
+                "var",
+                "gate",
+                "delta"
+              ],
+              "step_ui_targets": [
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+                "left_mdi_pb18",
+                "left_mdi_pb15",
+                "right_mdi_pb18",
+                "right_mdi_pb5"
+              ],
+              "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "diagnosis": {
+              "error_category": "OM",
+              "step_id": "S10"
+            },
+            "evidence_guardrail_applied": false,
+            "evidence_guardrail_reasons": [],
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "evidence_snapshot": {
+              "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "schema_version": "evidence_snapshot.v1",
+              "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+              "source_observation_seq": 4845,
+              "source_observation_t_wall": 1779198382.0057023,
+              "telemetry_window_first_seq": 4826,
+              "telemetry_window_frame_count": 20,
+              "telemetry_window_latest_seq": 4845,
+              "telemetry_window_latest_t_wall": 1779198382.0057023,
+              "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "evidence_snapshot_consistency": {
+              "deterministic_hint_matches_request": false,
+              "final_action_plan_matches_snapshot": true,
+              "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "fallback_overlay_reason": "not_needed",
+            "fallback_overlay_used": false,
+            "final_action_plan": {
+              "evidence_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "overlay_step_id": "S10",
+              "source": "model",
+              "step_id": "S10",
+              "targets": [
+                "eng_crank_switch"
+              ],
+              "text_only": false
+            },
+            "final_action_plan_source": "model",
+            "final_overlay_targets": [
+              "eng_crank_switch"
+            ],
+            "final_public_response": {
+              "actions": [
+                {
+                  "element_id": "pnt_377",
+                  "evidence_refs": [
+                    "GATES.S10.completion"
+                  ],
+                  "evidence_required": true,
+                  "final_overlay_targets": [
+                    "eng_crank_switch"
+                  ],
+                  "frame_id": "1779198382295_000234",
+                  "fused_missing_conditions": [
+                    "vars.engine_crank_left_complete==true"
+                  ],
+                  "fused_step_id": "S10",
+                  "generation_mode": "model",
+                  "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+                  "intent": "highlight",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "message_category": "model",
+                  "style": {
+                    "color": "#00ffcc",
+                    "style": "highlight",
+                    "thickness": 2
+                  },
+                  "sync_delta_ms": 67,
+                  "target": "eng_crank_switch",
+                  "type": "overlay",
+                  "vision_fact_cached_count": 1,
+                  "vision_fact_extractor_used": false,
+                  "vision_fact_ignored_count": 1,
+                  "vision_fact_sticky_count": 1,
+                  "vision_fact_summary": {
+                    "frame_ids": [
+                      "1779198382295_000234"
+                    ],
+                    "fresh_fact_ids": [],
+                    "not_seen_fact_ids": [],
+                    "seen_fact_ids": [],
+                    "status": "vision_not_required",
+                    "summary_text": "no_active_vision_facts",
+                    "uncertain_fact_ids": []
+                  },
+                  "vision_fallback_reason": null,
+                  "vision_frame_capture_selected": true,
+                  "vision_used": true,
+                  "vlm_call_reason": "vision_not_required_for_step",
+                  "vlm_call_status": "not_required"
+                }
+              ],
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S10"
+              },
+              "explanations": [
+                "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+              ],
+              "message": "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。",
+              "next": {
+                "step_id": "S10"
+              }
+            },
+            "frame_id": "1779198382295_000234",
+            "fused_missing_conditions": [
+              "vars.engine_crank_left_complete==true"
+            ],
+            "fused_step_id": "S10",
+            "generation_mode": "model",
+            "generation_prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+            "generation_prompt_tokens_est": 5487,
+            "generation_prompt_trimmed": true,
+            "harness_action_plan": {
+              "overlay_step_id": "S10",
+              "source": "model",
+              "step_id": "S10",
+              "targets": [
+                "eng_crank_switch"
+              ],
+              "text_only": false
+            },
+            "harness_trace": {
+              "candidates": [
+                {
+                  "confidence": 0.55,
+                  "proposed_next_action_target_ids": [
+                    "eng_crank_switch"
+                  ],
+                  "role": "candidate_not_authoritative",
+                  "source": "deterministic",
+                  "step_id": "S10",
+                  "supporting_evidence_refs": [
+                    "GATES.S10.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "eng_crank_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S10",
+                  "supporting_evidence_refs": [
+                    "GATES.S10.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S11",
+                  "supporting_evidence_refs": [
+                    "GATES.S11.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "ins_mode_knob",
+                    "ampcd_pb19"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S12",
+                  "supporting_evidence_refs": [
+                    "GATES.S12.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "radar_mode_knob"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S13",
+                  "supporting_evidence_refs": [
+                    "GATES.S13.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.5,
+                  "proposed_next_action_target_ids": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_ent_button"
+                  ],
+                  "role": "candidate",
+                  "source": "recent_action",
+                  "step_id": "S09",
+                  "supporting_evidence_refs": [
+                    "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+                    "RECENT_ACTIONS.ufc_ent_button"
+                  ]
+                }
+              ],
+              "chosen_candidate": {
+                "confidence": 0.55,
+                "proposed_next_action_target_ids": [
+                  "eng_crank_switch"
+                ],
+                "role": "candidate_not_authoritative",
+                "source": "deterministic",
+                "step_id": "S10",
+                "supporting_evidence_refs": [
+                  "GATES.S10.completion"
+                ]
+              },
+              "evidence_packet_summary": {
+                "blocked_gate_count": 7,
+                "conflicts": [],
+                "recent_action_count": 3,
+                "telemetry_missing_source_count": 1,
+                "telemetry_status": "nominal",
+                "telemetry_window_digest": {
+                  "changed_var_count": 5,
+                  "contradiction_count": 0,
+                  "first_seq": 4826,
+                  "frame_count": 20,
+                  "latest_seq": 4845
+                },
+                "vision_fresh_count": 0,
+                "vision_seen_count": 0,
+                "vision_status": "vision_not_required"
+              },
+              "evidence_snapshot": {
+                "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "schema_version": "evidence_snapshot.v1",
+                "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+                "source_observation_seq": 4845,
+                "source_observation_t_wall": 1779198382.0057023,
+                "telemetry_window_first_seq": 4826,
+                "telemetry_window_frame_count": 20,
+                "telemetry_window_latest_seq": 4845,
+                "telemetry_window_latest_t_wall": 1779198382.0057023,
+                "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+              },
+              "evidence_snapshot_consistency": {
+                "deterministic_hint_matches_request": false,
+                "final_action_plan_matches_snapshot": true,
+                "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+              },
+              "final_action_plan": {
+                "evidence_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "overlay_step_id": "S10",
+                "source": "model",
+                "step_id": "S10",
+                "targets": [
+                  "eng_crank_switch"
+                ],
+                "text_only": false
+              },
+              "final_overlay_targets": [
+                "eng_crank_switch"
+              ],
+              "message_category": "model",
+              "model_decision": {
+                "evidence_refs": [
+                  "GATES.S10.completion"
+                ],
+                "generation_mode": "model",
+                "overlay_targets": [
+                  "eng_crank_switch"
+                ],
+                "status": "ok",
+                "step_id": "S10"
+              },
+              "rejected_candidates": [],
+              "repair_result": {
+                "applied": false,
+                "evidence_ref_repair": {
+                  "details": [],
+                  "repair_applied": false
+                },
+                "json_repaired": false,
+                "path": null
+              },
+              "schema_version": "v1",
+              "snapshot_ids": {
+                "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+                "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+              },
+              "validator_result": {
+                "fallback_overlay_reason": "not_needed",
+                "fallback_overlay_used": false,
+                "reasons": [],
+                "rejected": false,
+                "rejected_model_step_id": null
+              },
+              "vlm_call": {
+                "cached_fact_count": 1,
+                "extractor_called": false,
+                "extractor_used": false,
+                "frame_capture_selected": true,
+                "frame_ids": [
+                  "1779198382295_000234"
+                ],
+                "ignored_fact_count": 1,
+                "reason": "vision_not_required_for_step",
+                "status": "not_required",
+                "sticky_fact_count": 1,
+                "sync_delta_ms": 67,
+                "sync_status": "matched_future_fallback",
+                "vision_fact_status": "vision_not_required",
+                "vision_status": "partial"
+              }
+            },
+            "harness_validation_reasons": [],
+            "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+            "help_response": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S10"
+              },
+              "explanations": [
+                "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+              ],
+              "next": {
+                "step_id": "S10"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "GATES.S10.completion",
+                    "target": "eng_crank_switch",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "eng_crank_switch"
+                ]
+              }
+            },
+            "help_response_pre_guardrail": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S10"
+              },
+              "explanations": [
+                "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+              ],
+              "next": {
+                "step_id": "S10"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "GATES.S10.completion",
+                    "target": "eng_crank_switch",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "eng_crank_switch"
+                ]
+              }
+            },
+            "json_repair_reasons": [],
+            "json_repaired": false,
+            "latency_ms": 4169,
+            "layout_id": "fa18c_composite_panel_v2",
+            "main_help_multimodal_input_enabled": false,
+            "message_category": "model",
+            "model": "simtutor-base",
+            "model_raw_diagnosis": {
+              "error_category": "OM",
+              "step_id": "S10"
+            },
+            "model_raw_explanations": [
+              "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+            ],
+            "model_raw_help_response": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S10"
+              },
+              "explanations": [
+                "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+              ],
+              "next": {
+                "step_id": "S10"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "GATES.S10.completion",
+                    "target": "eng_crank_switch",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "eng_crank_switch"
+                ]
+              }
+            },
+            "model_raw_next": {
+              "step_id": "S10"
+            },
+            "multimodal_candidate_frame_ids": [
+              "1779198382295_000234"
+            ],
+            "multimodal_capability_enabled": true,
+            "multimodal_failed_frame_ids": [],
+            "multimodal_failure_reason": null,
+            "multimodal_fallback_to_text": false,
+            "multimodal_frame_failures": {},
+            "multimodal_frame_ids": [],
+            "multimodal_image_count": 0,
+            "multimodal_images_built": false,
+            "multimodal_input_present": true,
+            "multimodal_path_attempted": false,
+            "multimodal_path_success": false,
+            "multimodal_primary_frame_id": "1779198382295_000234",
+            "next": {
+              "step_id": "S10"
+            },
+            "observability_status": "observable",
+            "prompt_budget_used": 5565,
+            "prompt_build": {
+              "allowed_evidence_refs": [
+                "VARS.annunciator_panel_activity",
+                "VARS.apu_on",
+                "VARS.apu_ready",
+                "VARS.apu_start_support_complete",
+                "VARS.engine_crank_left_complete",
+                "GATES.S10.completion",
+                "GATES.S10.precondition",
+                "GATES.S11.completion",
+                "GATES.S11.precondition",
+                "GATES.S12.completion",
+                "GATES.S12.precondition",
+                "GATES.S13.completion",
+                "GATES.S13.precondition",
+                "RAG_SNIPPETS.fa18c_startup_master_1",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_153",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_142",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_201",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_46"
+              ],
+              "delta_summary_items": 0,
+              "delta_summary_top_k": 20,
+              "evidence_refs_count": 18,
+              "grounding_applied": true,
+              "grounding_missing": false,
+              "grounding_missing_requested": false,
+              "grounding_reason": null,
+              "max_overlay_targets": 4,
+              "max_prompt_chars": 9000,
+              "max_prompt_tokens_est": 2400,
+              "preferred_overlay_target": null,
+              "prompt_chars": 21945,
+              "prompt_tokens_est": 5487,
+              "prompt_trimmed": true,
+              "rag_snippet_count": 5,
+              "rag_snippet_ids": [
+                "fa18c_startup_master_1",
+                "DCS FA-18C Early Access Guide EN_153",
+                "DCS FA-18C Early Access Guide EN_142",
+                "DCS FA-18C Early Access Guide EN_201",
+                "DCS FA-18C Early Access Guide EN_46"
+              ],
+              "state_harness_conflicts": [],
+              "state_harness_telemetry_status": "nominal",
+              "state_harness_visual_candidate_steps": [],
+              "trim_reasons": [
+                "trimmed_delta_summary",
+                "trimmed_step_enum",
+                "trimmed_vars"
+              ],
+              "vision_fact_seen_ids": [],
+              "vision_fact_status": "vision_not_required"
+            },
+            "prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+            "prompt_tokens_est": 5487,
+            "prompt_trimmed": true,
+            "provider": "openai_compat",
+            "repair_applied": false,
+            "repair_details": {
+              "details": [],
+              "dropped_unrepairable_evidence": 0,
+              "repair_applied": false,
+              "repaired_evidence_types": 0
+            },
+            "request_prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+            "request_prompt_tokens_est": 5487,
+            "request_prompt_trimmed": true,
+            "requires_visual_confirmation": false,
+            "response_mapping": {
+              "allowed_evidence_ref_count": 125,
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S10"
+              },
+              "next": {
+                "step_id": "S10"
+              },
+              "observability_status": "observable",
+              "requires_visual_confirmation": false
+            },
+            "retry_count": 0,
+            "retry_reason": null,
+            "scenario_profile": "airfield",
+            "snapshot_ids": {
+              "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+              "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+            },
+            "state_key": "9b45dd2f5893da0fdc3bfbc35b828145f3725478e8a04ed2f8cc8b6dd6b47a93",
+            "sync_delta_ms": 67,
+            "validator_rejected": false,
+            "vision": {
+              "frame_id": "1779198382295_000234",
+              "frame_ids": [
+                "1779198382295_000234"
+              ],
+              "frame_stale": false,
+              "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+              "observation_seq": 4845,
+              "observation_t_wall_ms": 1779198382006,
+              "observation_t_wall_s": 1779198382.0057023,
+              "pre_trigger_frame": null,
+              "selected_frames": [
+                {
+                  "capture_wall_ms": 1779198382295,
+                  "channel": "composite_panel",
+                  "frame_id": "1779198382295_000234",
+                  "frame_seq": 234,
+                  "frame_stale": false,
+                  "height": 1440,
+                  "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198382295_000234_vlm.png",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "role": "trigger_frame",
+                  "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198382295_000234.png",
+                  "sync_delta_ms": 67,
+                  "sync_miss_reason": null,
+                  "sync_status": "matched_future_fallback",
+                  "width": 3440
+                }
+              ],
+              "status": "partial",
+              "sync_delta_ms": 67,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_frame": {
+                "capture_wall_ms": 1779198382295,
+                "channel": "composite_panel",
+                "frame_id": "1779198382295_000234",
+                "frame_seq": 234,
+                "frame_stale": false,
+                "height": 1440,
+                "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198382295_000234_vlm.png",
+                "layout_id": "fa18c_composite_panel_v2",
+                "role": "trigger_frame",
+                "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198382295_000234.png",
+                "sync_delta_ms": 67,
+                "sync_miss_reason": null,
+                "sync_status": "matched_future_fallback",
+                "width": 3440
+              },
+              "trigger_wall_ms": 1779198382228,
+              "vision_used": true
+            },
+            "vision_fact_active_step_ids": [
+              "S09"
+            ],
+            "vision_fact_cached_count": 1,
+            "vision_fact_extractor_used": false,
+            "vision_fact_ignored_count": 1,
+            "vision_fact_status": "vision_not_required",
+            "vision_fact_sticky_count": 1,
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779198382295_000234"
+              ],
+              "fresh_fact_ids": [],
+              "not_seen_fact_ids": [],
+              "seen_fact_ids": [],
+              "status": "vision_not_required",
+              "summary_text": "no_active_vision_facts",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": [],
+            "vision_fallback_reason": null,
+            "vision_frame_capture_selected": true,
+            "vision_frame_ids": [
+              "1779198382295_000234"
+            ],
+            "vision_status": "partial",
+            "vision_used": true,
+            "vlm_call_reason": "vision_not_required_for_step",
+            "vlm_call_status": "not_required"
+          },
+          "response_id": "7c0b30a6-fa03-44fb-888a-9ac55946862d",
+          "status": "ok",
+          "timestamp": "2026-05-19T13:46:26.930385+00:00",
+          "version": "v1"
+        },
+        "related_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "vision_refs": [
+          "1779198382295_000234"
+        ]
+      }
+    ],
+    "tutor_request": {
+      "actor": "learner",
+      "context": {
+        "delta_dropped_count": 0,
+        "deterministic_step_hint": {
+          "gate_blocker_count": 1,
+          "inferred_step_id": "S10",
+          "missing_conditions_count": 1,
+          "observability": "observable",
+          "observability_status": "observable",
+          "overlay_step_id": "S10",
+          "recent_ui_targets": [
+            "ufc_ent_button",
+            "ufc_comm1_channel_selector_rotate",
+            "ufc_comm1_channel_selector_pull"
+          ],
+          "requires_visual_confirmation": false,
+          "scenario_profile": "airfield",
+          "step_ui_targets": [
+            "eng_crank_switch"
+          ]
+        },
+        "evidence_packet_summary": {
+          "blocked_gate_count": 7,
+          "conflicts": [],
+          "recent_action_count": 3,
+          "telemetry_missing_source_count": 1,
+          "telemetry_status": "nominal",
+          "telemetry_window_digest": {
+            "changed_var_count": 5,
+            "contradiction_count": 0,
+            "first_seq": 4826,
+            "frame_count": 20,
+            "latest_seq": 4845
+          },
+          "vision_fresh_count": 0,
+          "vision_seen_count": 0,
+          "vision_status": "vision_not_required"
+        },
+        "evidence_snapshot": {
+          "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "schema_version": "evidence_snapshot.v1",
+          "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+          "source_observation_seq": 4845,
+          "source_observation_t_wall": 1779198382.0057023,
+          "telemetry_window_first_seq": 4826,
+          "telemetry_window_frame_count": 20,
+          "telemetry_window_latest_seq": 4845,
+          "telemetry_window_latest_t_wall": 1779198382.0057023,
+          "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "grounding_missing": false,
+        "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+        "grounding_reason": null,
+        "rag_topk": [
+          {
+            "chunk_id": "fa18c_startup_master_1",
+            "doc_id": "fa18c_startup_master",
+            "page_or_heading": "Master Step Table",
+            "score": 38.93446879639516,
+            "section": "Master Step Table",
+            "snippet_id": "fa18c_startup_master_1"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_153",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 154,
+            "score": 34.98159536679122,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_153"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_142",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 143,
+            "score": 32.73748860454453,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_142"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_201",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 202,
+            "score": 29.556704359662675,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_201"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_46",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 47,
+            "score": 26.97209623444198,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_46"
+          }
+        ],
+        "scenario_profile": "airfield",
+        "snapshot_ids": {
+          "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "state_harness": {
+          "conflicts": [],
+          "deterministic_candidate": {
+            "missing_conditions": [
+              "vars.engine_crank_left_complete==true"
+            ],
+            "overlay_step_id": "S10",
+            "role": "candidate_not_authoritative",
+            "step_id": "S10"
+          },
+          "telemetry_evidence": {
+            "confidence": "medium",
+            "early_vars": {
+              "battery_on": true,
+              "fire_test_a_complete": true,
+              "fire_test_b_complete": true,
+              "power_available": true
+            },
+            "observation_seq": 4845,
+            "source_status": "nominal",
+            "vars_source_missing_count": 1
+          },
+          "telemetry_window_digest": {
+            "changed_vars": [
+              {
+                "first_value": false,
+                "last_value": true,
+                "latest_transition_age_s": 0.838,
+                "transition_count": 1,
+                "var": "comm1_freq_134_000"
+              },
+              {
+                "first_value": 30500,
+                "last_value": 13400,
+                "latest_transition_age_s": 0.838,
+                "transition_count": 1,
+                "var": "comm1_freq_value"
+              },
+              {
+                "first_value": false,
+                "last_value": false,
+                "latest_transition_age_s": 0.167,
+                "transition_count": 2,
+                "var": "ufc_ent_pressed"
+              },
+              {
+                "first_value": " 134.000",
+                "last_value": " 134.000",
+                "latest_transition_age_s": 0.566,
+                "transition_count": 2,
+                "var": "ufc_scratchpad_number_display"
+              },
+              {
+                "first_value": "['ins_fast_align_pressed']",
+                "last_value": "['ins_fast_align_pressed']",
+                "latest_transition_age_s": 0.566,
+                "transition_count": 2,
+                "var": "vars_source_missing"
+              }
+            ],
+            "contradictions": [],
+            "first_frame_only_values": [],
+            "first_seq": 4826,
+            "frame_count": 20,
+            "last_seen_true": [
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "battery_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "fire_test_a_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "fire_test_b_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "fire_test_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "hud_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "left_ddi_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "mpcd_on"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 4845,
+                "var": "power_available"
+              }
+            ],
+            "latest_seq": 4845,
+            "latest_t_wall": 1779198382.0057023,
+            "stable_false_vars": [
+              "fcs_bit_switch_up",
+              "flap_auto",
+              "pitot_heat_on"
+            ],
+            "stable_true_vars": [
+              "battery_on",
+              "fire_test_a_complete",
+              "fire_test_b_complete",
+              "fire_test_complete",
+              "hud_on",
+              "left_ddi_on",
+              "mpcd_on",
+              "power_available",
+              "right_ddi_on"
+            ],
+            "unknown_or_missing_vars": [
+              "ins_fast_align_pressed"
+            ],
+            "window_duration_s": 1.285
+          },
+          "vision_evidence": {
+            "confidence": "low",
+            "fresh_fact_ids": [],
+            "late_display_anchors": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "source_status": "vision_not_required",
+            "visual_candidate_steps": []
+          }
+        },
+        "vision": {
+          "frame_id": "1779198382295_000234",
+          "frame_ids": [
+            "1779198382295_000234"
+          ],
+          "frame_stale": false,
+          "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+          "observation_seq": 4845,
+          "observation_t_wall_ms": 1779198382006,
+          "observation_t_wall_s": 1779198382.0057023,
+          "status": "partial",
+          "sync_delta_ms": 67,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_wall_ms": 1779198382228,
+          "vision_used": true
+        },
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779198382295_000234"
+          ],
+          "fresh_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "seen_fact_ids": [],
+          "status": "vision_not_required",
+          "summary_text": "no_active_vision_facts",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": []
+      },
+      "intent": "help",
+      "message": "[REDACTED_USER_MESSAGE]",
+      "metadata": {
+        "evidence_packet_summary": {
+          "blocked_gate_count": 7,
+          "conflicts": [],
+          "recent_action_count": 3,
+          "telemetry_missing_source_count": 1,
+          "telemetry_status": "nominal",
+          "telemetry_window_digest": {
+            "changed_var_count": 5,
+            "contradiction_count": 0,
+            "first_seq": 4826,
+            "frame_count": 20,
+            "latest_seq": 4845
+          },
+          "vision_fresh_count": 0,
+          "vision_seen_count": 0,
+          "vision_status": "vision_not_required"
+        },
+        "evidence_snapshot": {
+          "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "schema_version": "evidence_snapshot.v1",
+          "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+          "source_observation_seq": 4845,
+          "source_observation_t_wall": 1779198382.0057023,
+          "telemetry_window_first_seq": 4826,
+          "telemetry_window_frame_count": 20,
+          "telemetry_window_latest_seq": 4845,
+          "telemetry_window_latest_t_wall": 1779198382.0057023,
+          "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "frame_id": "1779198382295_000234",
+        "fused_missing_conditions": [
+          "vars.engine_crank_left_complete==true"
+        ],
+        "fused_step_id": "S10",
+        "grounding_cache_hit": false,
+        "grounding_error_type": null,
+        "grounding_missing": false,
+        "grounding_missing_requested": false,
+        "grounding_policy_filtered_out_count": 0,
+        "grounding_policy_id": null,
+        "grounding_policy_version": null,
+        "grounding_reason": null,
+        "grounding_reason_requested": null,
+        "grounding_snippet_ids": [
+          "fa18c_startup_master_1",
+          "DCS FA-18C Early Access Guide EN_153",
+          "DCS FA-18C Early Access Guide EN_142",
+          "DCS FA-18C Early Access Guide EN_201",
+          "DCS FA-18C Early Access Guide EN_46"
+        ],
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "layout_id": "fa18c_composite_panel_v2",
+        "prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+        "prompt_tokens_est": 5487,
+        "prompt_trimmed": true,
+        "scenario_profile": "airfield",
+        "snapshot_ids": {
+          "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "source_chunk_refs": [
+          "fa18c_startup_master/fa18c_startup_master_1",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_153",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_142",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_201",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_46"
+        ],
+        "state_harness_conflicts": [],
+        "state_harness_telemetry_status": "nominal",
+        "sync_delta_ms": 67,
+        "vision_fact_seen_ids": [],
+        "vision_fact_status": "vision_not_required",
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779198382295_000234"
+          ],
+          "fresh_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "seen_fact_ids": [],
+          "status": "vision_not_required",
+          "summary_text": "no_active_vision_facts",
+          "uncertain_fact_ids": []
+        },
+        "vision_fallback_reason": null,
+        "vision_frame_ids": [
+          "1779198382295_000234"
+        ],
+        "vision_status": "partial",
+        "vision_used": true
+      },
+      "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+      "request_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+      "timestamp": "2026-05-19T13:46:22.760142+00:00",
+      "version": "v1"
+    },
+    "tutor_response": {
+      "actions": [
+        {
+          "element_id": "pnt_377",
+          "evidence_refs": [
+            "GATES.S10.completion"
+          ],
+          "evidence_required": true,
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "frame_id": "1779198382295_000234",
+          "fused_missing_conditions": [
+            "vars.engine_crank_left_complete==true"
+          ],
+          "fused_step_id": "S10",
+          "generation_mode": "model",
+          "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+          "intent": "highlight",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "model",
+          "style": {
+            "color": "#00ffcc",
+            "style": "highlight",
+            "thickness": 2
+          },
+          "sync_delta_ms": 67,
+          "target": "eng_crank_switch",
+          "type": "overlay",
+          "vision_fact_cached_count": 1,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 1,
+          "vision_fact_sticky_count": 1,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        }
+      ],
+      "actor": "tutor",
+      "explanations": [
+        "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+      ],
+      "in_reply_to": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+      "message": "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。",
+      "metadata": {
+        "allowed_evidence_ref_count": 125,
+        "dcs_tutor_text": {
+          "clear_view": false,
+          "cmd_id": "3f5a8bf9-7a57-460e-b444-29453a4742f4",
+          "display_time_s": 12.0,
+          "reason": null,
+          "status": "ok",
+          "text": "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+        },
+        "delta_dropped_count": 0,
+        "deterministic_inference_error": null,
+        "deterministic_step_hint": {
+          "inferred_step_id": "S08",
+          "missing_conditions": [
+            "vision_facts.fcs_page_visible==seen",
+            "vision_facts.bit_root_page_visible==seen"
+          ],
+          "observability": "observable",
+          "observability_status": "observable",
+          "recent_ui_targets": [
+            "ufc_ent_button",
+            "ufc_comm1_channel_selector_rotate",
+            "ufc_comm1_channel_selector_pull"
+          ],
+          "requires_visual_confirmation": false,
+          "step_evidence_requirements": [
+            "var",
+            "gate",
+            "delta"
+          ],
+          "step_ui_targets": [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+            "left_mdi_pb18",
+            "left_mdi_pb15",
+            "right_mdi_pb18",
+            "right_mdi_pb5"
+          ],
+          "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "diagnosis": {
+          "error_category": "OM",
+          "step_id": "S10"
+        },
+        "evidence_guardrail_applied": false,
+        "evidence_guardrail_reasons": [],
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "evidence_snapshot": {
+          "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "schema_version": "evidence_snapshot.v1",
+          "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+          "source_observation_seq": 4845,
+          "source_observation_t_wall": 1779198382.0057023,
+          "telemetry_window_first_seq": 4826,
+          "telemetry_window_frame_count": 20,
+          "telemetry_window_latest_seq": 4845,
+          "telemetry_window_latest_t_wall": 1779198382.0057023,
+          "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "evidence_snapshot_consistency": {
+          "deterministic_hint_matches_request": false,
+          "final_action_plan_matches_snapshot": true,
+          "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "fallback_overlay_reason": "not_needed",
+        "fallback_overlay_used": false,
+        "final_action_plan": {
+          "evidence_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "overlay_step_id": "S10",
+          "source": "model",
+          "step_id": "S10",
+          "targets": [
+            "eng_crank_switch"
+          ],
+          "text_only": false
+        },
+        "final_action_plan_source": "model",
+        "final_overlay_targets": [
+          "eng_crank_switch"
+        ],
+        "final_public_response": {
+          "actions": [
+            {
+              "element_id": "pnt_377",
+              "evidence_refs": [
+                "GATES.S10.completion"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "eng_crank_switch"
+              ],
+              "frame_id": "1779198382295_000234",
+              "fused_missing_conditions": [
+                "vars.engine_crank_left_complete==true"
+              ],
+              "fused_step_id": "S10",
+              "generation_mode": "model",
+              "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "model",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 67,
+              "target": "eng_crank_switch",
+              "type": "overlay",
+              "vision_fact_cached_count": 1,
+              "vision_fact_extractor_used": false,
+              "vision_fact_ignored_count": 1,
+              "vision_fact_sticky_count": 1,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779198382295_000234"
+                ],
+                "fresh_fact_ids": [],
+                "not_seen_fact_ids": [],
+                "seen_fact_ids": [],
+                "status": "vision_not_required",
+                "summary_text": "no_active_vision_facts",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_frame_capture_selected": true,
+              "vision_used": true,
+              "vlm_call_reason": "vision_not_required_for_step",
+              "vlm_call_status": "not_required"
+            }
+          ],
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S10"
+          },
+          "explanations": [
+            "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+          ],
+          "message": "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。",
+          "next": {
+            "step_id": "S10"
+          }
+        },
+        "frame_id": "1779198382295_000234",
+        "fused_missing_conditions": [
+          "vars.engine_crank_left_complete==true"
+        ],
+        "fused_step_id": "S10",
+        "generation_mode": "model",
+        "generation_prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+        "generation_prompt_tokens_est": 5487,
+        "generation_prompt_trimmed": true,
+        "harness_action_plan": {
+          "overlay_step_id": "S10",
+          "source": "model",
+          "step_id": "S10",
+          "targets": [
+            "eng_crank_switch"
+          ],
+          "text_only": false
+        },
+        "harness_trace": {
+          "candidates": [
+            {
+              "confidence": 0.55,
+              "proposed_next_action_target_ids": [
+                "eng_crank_switch"
+              ],
+              "role": "candidate_not_authoritative",
+              "source": "deterministic",
+              "step_id": "S10",
+              "supporting_evidence_refs": [
+                "GATES.S10.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "eng_crank_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S10",
+              "supporting_evidence_refs": [
+                "GATES.S10.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S11",
+              "supporting_evidence_refs": [
+                "GATES.S11.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "ins_mode_knob",
+                "ampcd_pb19"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S12",
+              "supporting_evidence_refs": [
+                "GATES.S12.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "radar_mode_knob"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S13",
+              "supporting_evidence_refs": [
+                "GATES.S13.completion"
+              ]
+            },
+            {
+              "confidence": 0.5,
+              "proposed_next_action_target_ids": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_ent_button"
+              ],
+              "role": "candidate",
+              "source": "recent_action",
+              "step_id": "S09",
+              "supporting_evidence_refs": [
+                "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+                "RECENT_ACTIONS.ufc_ent_button"
+              ]
+            }
+          ],
+          "chosen_candidate": {
+            "confidence": 0.55,
+            "proposed_next_action_target_ids": [
+              "eng_crank_switch"
+            ],
+            "role": "candidate_not_authoritative",
+            "source": "deterministic",
+            "step_id": "S10",
+            "supporting_evidence_refs": [
+              "GATES.S10.completion"
+            ]
+          },
+          "evidence_packet_summary": {
+            "blocked_gate_count": 7,
+            "conflicts": [],
+            "recent_action_count": 3,
+            "telemetry_missing_source_count": 1,
+            "telemetry_status": "nominal",
+            "telemetry_window_digest": {
+              "changed_var_count": 5,
+              "contradiction_count": 0,
+              "first_seq": 4826,
+              "frame_count": 20,
+              "latest_seq": 4845
+            },
+            "vision_fresh_count": 0,
+            "vision_seen_count": 0,
+            "vision_status": "vision_not_required"
+          },
+          "evidence_snapshot": {
+            "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "schema_version": "evidence_snapshot.v1",
+            "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+            "source_observation_seq": 4845,
+            "source_observation_t_wall": 1779198382.0057023,
+            "telemetry_window_first_seq": 4826,
+            "telemetry_window_frame_count": 20,
+            "telemetry_window_latest_seq": 4845,
+            "telemetry_window_latest_t_wall": 1779198382.0057023,
+            "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+          },
+          "evidence_snapshot_consistency": {
+            "deterministic_hint_matches_request": false,
+            "final_action_plan_matches_snapshot": true,
+            "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+          },
+          "final_action_plan": {
+            "evidence_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "overlay_step_id": "S10",
+            "source": "model",
+            "step_id": "S10",
+            "targets": [
+              "eng_crank_switch"
+            ],
+            "text_only": false
+          },
+          "final_overlay_targets": [
+            "eng_crank_switch"
+          ],
+          "message_category": "model",
+          "model_decision": {
+            "evidence_refs": [
+              "GATES.S10.completion"
+            ],
+            "generation_mode": "model",
+            "overlay_targets": [
+              "eng_crank_switch"
+            ],
+            "status": "ok",
+            "step_id": "S10"
+          },
+          "rejected_candidates": [],
+          "repair_result": {
+            "applied": false,
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "json_repaired": false,
+            "path": null
+          },
+          "schema_version": "v1",
+          "snapshot_ids": {
+            "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+            "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+          },
+          "validator_result": {
+            "fallback_overlay_reason": "not_needed",
+            "fallback_overlay_used": false,
+            "reasons": [],
+            "rejected": false,
+            "rejected_model_step_id": null
+          },
+          "vlm_call": {
+            "cached_fact_count": 1,
+            "extractor_called": false,
+            "extractor_used": false,
+            "frame_capture_selected": true,
+            "frame_ids": [
+              "1779198382295_000234"
+            ],
+            "ignored_fact_count": 1,
+            "reason": "vision_not_required_for_step",
+            "status": "not_required",
+            "sticky_fact_count": 1,
+            "sync_delta_ms": 67,
+            "sync_status": "matched_future_fallback",
+            "vision_fact_status": "vision_not_required",
+            "vision_status": "partial"
+          }
+        },
+        "harness_validation_reasons": [],
+        "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+        "help_response": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S10"
+          },
+          "explanations": [
+            "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+          ],
+          "next": {
+            "step_id": "S10"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "GATES.S10.completion",
+                "target": "eng_crank_switch",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "eng_crank_switch"
+            ]
+          }
+        },
+        "help_response_pre_guardrail": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S10"
+          },
+          "explanations": [
+            "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+          ],
+          "next": {
+            "step_id": "S10"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "GATES.S10.completion",
+                "target": "eng_crank_switch",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "eng_crank_switch"
+            ]
+          }
+        },
+        "json_repair_reasons": [],
+        "json_repaired": false,
+        "latency_ms": 4169,
+        "layout_id": "fa18c_composite_panel_v2",
+        "main_help_multimodal_input_enabled": false,
+        "message_category": "model",
+        "model": "simtutor-base",
+        "model_raw_diagnosis": {
+          "error_category": "OM",
+          "step_id": "S10"
+        },
+        "model_raw_explanations": [
+          "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+        ],
+        "model_raw_help_response": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S10"
+          },
+          "explanations": [
+            "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+          ],
+          "next": {
+            "step_id": "S10"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "GATES.S10.completion",
+                "target": "eng_crank_switch",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "eng_crank_switch"
+            ]
+          }
+        },
+        "model_raw_next": {
+          "step_id": "S10"
+        },
+        "multimodal_candidate_frame_ids": [
+          "1779198382295_000234"
+        ],
+        "multimodal_capability_enabled": true,
+        "multimodal_failed_frame_ids": [],
+        "multimodal_failure_reason": null,
+        "multimodal_fallback_to_text": false,
+        "multimodal_frame_failures": {},
+        "multimodal_frame_ids": [],
+        "multimodal_image_count": 0,
+        "multimodal_images_built": false,
+        "multimodal_input_present": true,
+        "multimodal_path_attempted": false,
+        "multimodal_path_success": false,
+        "multimodal_primary_frame_id": "1779198382295_000234",
+        "next": {
+          "step_id": "S10"
+        },
+        "observability_status": "observable",
+        "prompt_budget_used": 5565,
+        "prompt_build": {
+          "allowed_evidence_refs": [
+            "VARS.annunciator_panel_activity",
+            "VARS.apu_on",
+            "VARS.apu_ready",
+            "VARS.apu_start_support_complete",
+            "VARS.engine_crank_left_complete",
+            "GATES.S10.completion",
+            "GATES.S10.precondition",
+            "GATES.S11.completion",
+            "GATES.S11.precondition",
+            "GATES.S12.completion",
+            "GATES.S12.precondition",
+            "GATES.S13.completion",
+            "GATES.S13.precondition",
+            "RAG_SNIPPETS.fa18c_startup_master_1",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_153",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_142",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_201",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_46"
+          ],
+          "delta_summary_items": 0,
+          "delta_summary_top_k": 20,
+          "evidence_refs_count": 18,
+          "grounding_applied": true,
+          "grounding_missing": false,
+          "grounding_missing_requested": false,
+          "grounding_reason": null,
+          "max_overlay_targets": 4,
+          "max_prompt_chars": 9000,
+          "max_prompt_tokens_est": 2400,
+          "preferred_overlay_target": null,
+          "prompt_chars": 21945,
+          "prompt_tokens_est": 5487,
+          "prompt_trimmed": true,
+          "rag_snippet_count": 5,
+          "rag_snippet_ids": [
+            "fa18c_startup_master_1",
+            "DCS FA-18C Early Access Guide EN_153",
+            "DCS FA-18C Early Access Guide EN_142",
+            "DCS FA-18C Early Access Guide EN_201",
+            "DCS FA-18C Early Access Guide EN_46"
+          ],
+          "state_harness_conflicts": [],
+          "state_harness_telemetry_status": "nominal",
+          "state_harness_visual_candidate_steps": [],
+          "trim_reasons": [
+            "trimmed_delta_summary",
+            "trimmed_step_enum",
+            "trimmed_vars"
+          ],
+          "vision_fact_seen_ids": [],
+          "vision_fact_status": "vision_not_required"
+        },
+        "prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+        "prompt_tokens_est": 5487,
+        "prompt_trimmed": true,
+        "provider": "openai_compat",
+        "repair_applied": false,
+        "repair_details": {
+          "details": [],
+          "dropped_unrepairable_evidence": 0,
+          "repair_applied": false,
+          "repaired_evidence_types": 0
+        },
+        "request_prompt_hash": "4c2c0787599f823ec7bd90bd6f3d97d2dff3341aae56327bed080bae8709b8b0",
+        "request_prompt_tokens_est": 5487,
+        "request_prompt_trimmed": true,
+        "requires_visual_confirmation": false,
+        "response_mapping": {
+          "allowed_evidence_ref_count": 125,
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S10"
+          },
+          "next": {
+            "step_id": "S10"
+          },
+          "observability_status": "observable",
+          "requires_visual_confirmation": false
+        },
+        "retry_count": 0,
+        "retry_reason": null,
+        "scenario_profile": "airfield",
+        "snapshot_ids": {
+          "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+          "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+        },
+        "state_key": "9b45dd2f5893da0fdc3bfbc35b828145f3725478e8a04ed2f8cc8b6dd6b47a93",
+        "sync_delta_ms": 67,
+        "validator_rejected": false,
+        "vision": {
+          "frame_id": "1779198382295_000234",
+          "frame_ids": [
+            "1779198382295_000234"
+          ],
+          "frame_stale": false,
+          "observation_ref": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+          "observation_seq": 4845,
+          "observation_t_wall_ms": 1779198382006,
+          "observation_t_wall_s": 1779198382.0057023,
+          "pre_trigger_frame": null,
+          "selected_frames": [
+            {
+              "capture_wall_ms": 1779198382295,
+              "channel": "composite_panel",
+              "frame_id": "1779198382295_000234",
+              "frame_seq": 234,
+              "frame_stale": false,
+              "height": 1440,
+              "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198382295_000234_vlm.png",
+              "layout_id": "fa18c_composite_panel_v2",
+              "role": "trigger_frame",
+              "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198382295_000234.png",
+              "sync_delta_ms": 67,
+              "sync_miss_reason": null,
+              "sync_status": "matched_future_fallback",
+              "width": 3440
+            }
+          ],
+          "status": "partial",
+          "sync_delta_ms": 67,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_frame": {
+            "capture_wall_ms": 1779198382295,
+            "channel": "composite_panel",
+            "frame_id": "1779198382295_000234",
+            "frame_seq": 234,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198382295_000234_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198382295_000234.png",
+            "sync_delta_ms": 67,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          },
+          "trigger_wall_ms": 1779198382228,
+          "vision_used": true
+        },
+        "vision_fact_active_step_ids": [
+          "S09"
+        ],
+        "vision_fact_cached_count": 1,
+        "vision_fact_extractor_used": false,
+        "vision_fact_ignored_count": 1,
+        "vision_fact_status": "vision_not_required",
+        "vision_fact_sticky_count": 1,
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779198382295_000234"
+          ],
+          "fresh_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "seen_fact_ids": [],
+          "status": "vision_not_required",
+          "summary_text": "no_active_vision_facts",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": [],
+        "vision_fallback_reason": null,
+        "vision_frame_capture_selected": true,
+        "vision_frame_ids": [
+          "1779198382295_000234"
+        ],
+        "vision_status": "partial",
+        "vision_used": true,
+        "vlm_call_reason": "vision_not_required_for_step",
+        "vlm_call_status": "not_required"
+      },
+      "response_id": "7c0b30a6-fa03-44fb-888a-9ac55946862d",
+      "status": "ok",
+      "timestamp": "2026-05-19T13:46:26.930385+00:00",
+      "version": "v1"
+    }
+  },
+  "expectations": {
+    "expected_final_step_id": "S10",
+    "expected_overlay_target_ids": [
+      "eng_crank_switch"
+    ],
+    "final_response_source": "model",
+    "llm_decision_status": "accepted",
+    "vlm_call_status": "not_required"
+  },
+  "extraction_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+  "harness": {
+    "candidate_steps": [
+      {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "eng_crank_switch"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S10",
+        "supporting_evidence_refs": [
+          "GATES.S10.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "eng_crank_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S10",
+        "supporting_evidence_refs": [
+          "GATES.S10.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S11",
+        "supporting_evidence_refs": [
+          "GATES.S11.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "ins_mode_knob",
+          "ampcd_pb19"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S12",
+        "supporting_evidence_refs": [
+          "GATES.S12.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "radar_mode_knob"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S13",
+        "supporting_evidence_refs": [
+          "GATES.S13.completion"
+        ]
+      },
+      {
+        "confidence": 0.5,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_ent_button"
+        ],
+        "role": "candidate",
+        "source": "recent_action",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+          "RECENT_ACTIONS.ufc_ent_button"
+        ]
+      }
+    ],
+    "final_action_plan": {
+      "evidence_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+      "overlay_step_id": "S10",
+      "source": "model",
+      "step_id": "S10",
+      "targets": [
+        "eng_crank_switch"
+      ],
+      "text_only": false
+    },
+    "model_decision": {
+      "evidence_refs": [
+        "GATES.S10.completion"
+      ],
+      "generation_mode": "model",
+      "overlay_targets": [
+        "eng_crank_switch"
+      ],
+      "status": "ok",
+      "step_id": "S10"
+    },
+    "repair_result": {
+      "applied": false,
+      "evidence_ref_repair": {
+        "details": [],
+        "repair_applied": false
+      },
+      "json_repaired": false,
+      "path": null
+    },
+    "trace": {
+      "candidates": [
+        {
+          "confidence": 0.55,
+          "proposed_next_action_target_ids": [
+            "eng_crank_switch"
+          ],
+          "role": "candidate_not_authoritative",
+          "source": "deterministic",
+          "step_id": "S10",
+          "supporting_evidence_refs": [
+            "GATES.S10.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "eng_crank_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S10",
+          "supporting_evidence_refs": [
+            "GATES.S10.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S11",
+          "supporting_evidence_refs": [
+            "GATES.S11.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "ins_mode_knob",
+            "ampcd_pb19"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S12",
+          "supporting_evidence_refs": [
+            "GATES.S12.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "radar_mode_knob"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S13",
+          "supporting_evidence_refs": [
+            "GATES.S13.completion"
+          ]
+        },
+        {
+          "confidence": 0.5,
+          "proposed_next_action_target_ids": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_ent_button"
+          ],
+          "role": "candidate",
+          "source": "recent_action",
+          "step_id": "S09",
+          "supporting_evidence_refs": [
+            "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+            "RECENT_ACTIONS.ufc_ent_button"
+          ]
+        }
+      ],
+      "chosen_candidate": {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "eng_crank_switch"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S10",
+        "supporting_evidence_refs": [
+          "GATES.S10.completion"
+        ]
+      },
+      "evidence_packet_summary": {
+        "blocked_gate_count": 7,
+        "conflicts": [],
+        "recent_action_count": 3,
+        "telemetry_missing_source_count": 1,
+        "telemetry_status": "nominal",
+        "telemetry_window_digest": {
+          "changed_var_count": 5,
+          "contradiction_count": 0,
+          "first_seq": 4826,
+          "frame_count": 20,
+          "latest_seq": 4845
+        },
+        "vision_fresh_count": 0,
+        "vision_seen_count": 0,
+        "vision_status": "vision_not_required"
+      },
+      "evidence_snapshot": {
+        "candidate_generation_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "final_decision_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "model_request_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "schema_version": "evidence_snapshot.v1",
+        "snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "source_observation_id": "5d5923c9-0c3f-437e-b3eb-4c177792e6d3",
+        "source_observation_seq": 4845,
+        "source_observation_t_wall": 1779198382.0057023,
+        "telemetry_window_first_seq": 4826,
+        "telemetry_window_frame_count": 20,
+        "telemetry_window_latest_seq": 4845,
+        "telemetry_window_latest_t_wall": 1779198382.0057023,
+        "validator_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+      },
+      "evidence_snapshot_consistency": {
+        "deterministic_hint_matches_request": false,
+        "final_action_plan_matches_snapshot": true,
+        "superseded_by_snapshot": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+      },
+      "final_action_plan": {
+        "evidence_snapshot_id": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "overlay_step_id": "S10",
+        "source": "model",
+        "step_id": "S10",
+        "targets": [
+          "eng_crank_switch"
+        ],
+        "text_only": false
+      },
+      "final_overlay_targets": [
+        "eng_crank_switch"
+      ],
+      "message_category": "model",
+      "model_decision": {
+        "evidence_refs": [
+          "GATES.S10.completion"
+        ],
+        "generation_mode": "model",
+        "overlay_targets": [
+          "eng_crank_switch"
+        ],
+        "status": "ok",
+        "step_id": "S10"
+      },
+      "rejected_candidates": [],
+      "repair_result": {
+        "applied": false,
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "json_repaired": false,
+        "path": null
+      },
+      "schema_version": "v1",
+      "snapshot_ids": {
+        "candidate_generation": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "final_decision": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "model_request": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6",
+        "validator": "3aa913998fe65b7162d469f60a7ad6f4f0e6e66e12e7e5027120aa1bce1575d6"
+      },
+      "validator_result": {
+        "fallback_overlay_reason": "not_needed",
+        "fallback_overlay_used": false,
+        "reasons": [],
+        "rejected": false,
+        "rejected_model_step_id": null
+      },
+      "vlm_call": {
+        "cached_fact_count": 1,
+        "extractor_called": false,
+        "extractor_used": false,
+        "frame_capture_selected": true,
+        "frame_ids": [
+          "1779198382295_000234"
+        ],
+        "ignored_fact_count": 1,
+        "reason": "vision_not_required_for_step",
+        "status": "not_required",
+        "sticky_fact_count": 1,
+        "sync_delta_ms": 67,
+        "sync_status": "matched_future_fallback",
+        "vision_fact_status": "vision_not_required",
+        "vision_status": "partial"
+      }
+    },
+    "validator_result": {
+      "fallback_overlay_reason": "not_needed",
+      "fallback_overlay_used": false,
+      "reasons": [],
+      "rejected": false,
+      "rejected_model_step_id": null
+    }
+  },
+  "help_cycle_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+  "model_io": {
+    "help_response": {
+      "diagnosis": {
+        "error_category": "OM",
+        "step_id": "S10"
+      },
+      "explanations": [
+        "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+      ],
+      "next": {
+        "step_id": "S10"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.95,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "GATES.S10.completion",
+            "target": "eng_crank_switch",
+            "type": "gate"
+          }
+        ],
+        "targets": [
+          "eng_crank_switch"
+        ]
+      }
+    },
+    "model_raw_help_response": {
+      "diagnosis": {
+        "error_category": "OM",
+        "step_id": "S10"
+      },
+      "explanations": [
+        "当前处于 S10 步骤，左发启动尚未开始。请将 eng_crank_switch 拨到 R 位置（右键点击）以启动左发。"
+      ],
+      "next": {
+        "step_id": "S10"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.95,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "GATES.S10.completion",
+            "target": "eng_crank_switch",
+            "type": "gate"
+          }
+        ],
+        "targets": [
+          "eng_crank_switch"
+        ]
+      }
+    },
+    "raw_llm_text_attempt_count": 0,
+    "raw_llm_text_present": false
+  },
+  "request_id": "3de0e688-8bc4-4df1-b062-72f3134bc775",
+  "request_id_missing": false,
+  "schema_version": "live_help_replay_fixture.v1",
+  "source_log": {
+    "event_count": 14472,
+    "malformed_lines": [],
+    "path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/logs/live_help_harness_smoke_20260519_134129.jsonl"
+  }
+}
