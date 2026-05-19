@@ -51,6 +51,12 @@ LATEST_ISSUE_312_FIXTURES = {
         "public_completion_message",
     "artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json":
         "raw_wrong_final_repaired",
+    "artifacts/live_fixtures/c4d7c369-f151-4ef6-b528-409b16f1fe34.fixture.json":
+        "partial_completion_no_advance",
+    "artifacts/live_fixtures/e96b29b7-b305-4444-beb3-60ddb0804b4b.fixture.json":
+        "s12_satisfied_advances_to_s13_radar_opr",
+    "artifacts/live_fixtures/614024be-1420-4188-91e9-f044acff9291.fixture.json":
+        "first_cycle_main_llm_latency_no_vlm",
 }
 
 TEXT_INTENT_REGRESSION_CLASSES = {
@@ -58,6 +64,8 @@ TEXT_INTENT_REGRESSION_CLASSES = {
     "wheel_interaction_radar_altimeter",
     "wheel_interaction_standby_attitude",
     "public_completion_message",
+    "partial_completion_no_advance",
+    "s12_satisfied_advances_to_s13_radar_opr",
 }
 
 
@@ -250,6 +258,55 @@ def test_replay_eval_report_records_latest_issue_312_fixture_regression_classes(
         "artifacts/live_fixtures/7bea22f8-a4d1-4744-917b-f7ddc957f709.fixture.json"
     ]
     assert s7bea["text_intent"] == "public_completion_no_internal_evidence"
+
+    sc4d = sources_by_fixture[
+        "artifacts/live_fixtures/c4d7c369-f151-4ef6-b528-409b16f1fe34.fixture.json"
+    ]
+    assert sc4d["action_mode"] == "text_only"
+    assert sc4d["text_intent"] == "left_throttle_text_only_no_s12"
+    sc4d_assertions = sc4d["fixture_assertions"]
+    assert sc4d_assertions["final_step_id"] == "S11"
+    assert sc4d_assertions["final_targets"] == []
+    assert sc4d_assertions["final_action_plan_source"] == "model"
+
+    se96 = sources_by_fixture[
+        "artifacts/live_fixtures/e96b29b7-b305-4444-beb3-60ddb0804b4b.fixture.json"
+    ]
+    assert se96["text_intent"] == "radar_opr_detent_guidance_not_target_only"
+    assert se96 in report["coverage_matrix"]["steps"]["S12"]["completion_already_true"]["sources"]
+    se96_assertions = se96["fixture_assertions"]
+    assert se96_assertions["raw_model_step_id"] == "S12"
+    assert se96_assertions["raw_model_targets"] == ["ampcd_pb19"]
+    assert se96_assertions["validator_rejected"] is True
+    assert se96_assertions["repair_applied"] is True
+    assert se96_assertions["final_action_plan_source"] == "final_evidence_consistency_validator"
+    assert se96_assertions["message_category"] == "harness_validator_repair"
+    assert se96_assertions["final_step_id"] == "S13"
+    assert se96_assertions["final_targets"] == ["radar_mode_knob"]
+    assert se96_assertions["vlm_call_status"] == "not_required"
+    assert se96_assertions["vision_fact_extractor_used"] is False
+    assert se96_assertions["frame_capture_only"] is True
+
+    s614 = sources_by_fixture[
+        "artifacts/live_fixtures/614024be-1420-4188-91e9-f044acff9291.fixture.json"
+    ]
+    assert s614["latency_class"] == "first_cycle_main_llm_latency"
+    s614_assertions = s614["fixture_assertions"]
+    assert s614_assertions["final_step_id"] == "S01"
+    assert s614_assertions["final_targets"] == ["battery_switch"]
+    assert s614_assertions["latency_ms"] == 3978
+    assert s614_assertions["latency_source"] == "main_llm_response"
+    assert s614_assertions["latency_telemetry_status"] == "low_confidence_bootstrap"
+    assert s614_assertions["latency_source_observation_seq"] == 1
+    assert s614_assertions["latency_telemetry_window_frame_count"] == 1
+    assert s614_assertions["latency_telemetry_window_first_seq"] == 1
+    assert s614_assertions["latency_telemetry_window_latest_seq"] == 1
+    assert s614_assertions["latency_multimodal_path_attempted"] is False
+    assert s614_assertions["latency_not_vlm_delay"] is True
+    assert s614_assertions["vlm_call_status"] == "not_required"
+    assert s614_assertions["vision_fact_extractor_used"] is False
+    assert s614_assertions["frame_capture_selected"] is True
+    assert s614_assertions["frame_capture_only"] is True
 
 
 def test_harness_coverage_matrix_keeps_suite_regressions_without_pack_specs(tmp_path: Path) -> None:

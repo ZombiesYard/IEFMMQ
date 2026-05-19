@@ -148,6 +148,34 @@ coverage:
     fixture: artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json
     test_id: tests/test_live_dcs.py::test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance
     reason: Matrix must expose raw S28 / parking-brake decision separately from final repaired S29 / IFEI action.
+  - step_id: S11
+    state_category: completion_already_true
+    source: live_fixture_regression
+    issue: 312
+    regression_class: partial_completion_no_advance
+    action_mode: text_only
+    text_intent: left_throttle_text_only_no_s12
+    fixture: artifacts/live_fixtures/c4d7c369-f151-4ef6-b528-409b16f1fe34.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_311_keeps_s11_when_completion_is_partial
+    reason: S11 partial RPM completion must stay on text-only left-throttle guidance until idle-ready evidence is true.
+  - step_id: S12
+    state_category: completion_already_true
+    source: live_fixture_regression
+    issue: 312
+    regression_class: s12_satisfied_advances_to_s13_radar_opr
+    text_intent: radar_opr_detent_guidance_not_target_only
+    fixture: artifacts/live_fixtures/e96b29b7-b305-4444-beb3-60ddb0804b4b.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_s13_radar_opr_uses_detent_guidance
+    reason: Already-satisfied S12 must repair forward to S13 and tell the user to set the Radar knob to OPR.
+  - step_id: S01
+    state_category: vlm_not_required
+    source: live_fixture_regression
+    issue: 312
+    regression_class: first_cycle_main_llm_latency_no_vlm
+    latency_class: first_cycle_main_llm_latency
+    fixture: artifacts/live_fixtures/614024be-1420-4188-91e9-f044acff9291.fixture.json
+    test_id: tests/test_replay_eval.py::test_replay_eval_report_records_latest_issue_312_fixture_regression_classes
+    reason: First-cycle low-confidence bootstrap latency must be recorded as main LLM response time, not VLM delay.
 cases:
   - case_id: noop_2min
     input: cases/noop_2min/dcs_bios_raw.jsonl

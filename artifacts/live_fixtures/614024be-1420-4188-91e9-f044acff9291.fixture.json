@@ -1,0 +1,3275 @@
+{
+  "context": {
+    "evidence_packet_summary": {
+      "blocked_gate_count": 7,
+      "conflicts": [],
+      "recent_action_count": 8,
+      "telemetry_missing_source_count": 28,
+      "telemetry_status": "low_confidence_bootstrap",
+      "telemetry_window_digest": {
+        "changed_var_count": 0,
+        "contradiction_count": 0,
+        "first_seq": 1,
+        "frame_count": 1,
+        "latest_seq": 1
+      },
+      "vision_fresh_count": 0,
+      "vision_seen_count": 0,
+      "vision_status": "vision_not_required"
+    },
+    "evidence_snapshot": {
+      "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "schema_version": "evidence_snapshot.v1",
+      "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+      "source_observation_seq": 1,
+      "source_observation_t_wall": 1779209004.800106,
+      "telemetry_window_first_seq": 1,
+      "telemetry_window_frame_count": 1,
+      "telemetry_window_latest_seq": 1,
+      "telemetry_window_latest_t_wall": 1779209004.800106,
+      "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+    },
+    "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+    "observations": [
+      {
+        "attachments": [],
+        "metadata": {
+          "delta_count": 502,
+          "delta_dropped_count": 13,
+          "from_addr": "192.168.0.105:56452",
+          "raw_delta_count": 502,
+          "seq": 1
+        },
+        "observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+        "payload": {
+          "delta_summary": {
+            "changed_keys_sample": [
+              "LEFT_DDI_BRT_CTL",
+              "LEFT_DDI_CONT_CTL",
+              "LEFT_DDI_PB_14",
+              "LEFT_DDI_PB_15",
+              "LEFT_DDI_PB_16",
+              "LEFT_DDI_PB_17",
+              "LEFT_DDI_PB_18",
+              "LEFT_DDI_PB_19"
+            ],
+            "delta_count": 489,
+            "dropped_stats": {
+              "dropped_by_reason": {
+                "blacklist": 13
+              },
+              "dropped_total": 13
+            },
+            "raw_delta_count": 502,
+            "recent_key_changes_topk": [
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "FIRE_TEST_SW",
+                "ui_targets": [
+                  "fire_test_switch"
+                ],
+                "value": 1
+              },
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "APU_CONTROL_SW",
+                "ui_targets": [
+                  "apu_switch"
+                ],
+                "value": 0
+              },
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "ENGINE_CRANK_SW",
+                "ui_targets": [
+                  "eng_crank_switch"
+                ],
+                "value": 1
+              },
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "BATTERY_SW",
+                "ui_targets": [
+                  "battery_switch"
+                ],
+                "value": 1
+              },
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "L_GEN_SW",
+                "ui_targets": [
+                  "generator_left_switch"
+                ],
+                "value": 1
+              },
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "R_GEN_SW",
+                "ui_targets": [
+                  "generator_right_switch"
+                ],
+                "value": 1
+              },
+              {
+                "count": 1,
+                "importance": 111,
+                "key": "BLEED_AIR_KNOB",
+                "ui_targets": [
+                  "bleed_air_knob"
+                ],
+                "value": 2
+              },
+              {
+                "count": 1,
+                "importance": 101,
+                "key": "IFEI_FF_L",
+                "ui_targets": [],
+                "value": "   "
+              },
+              {
+                "count": 1,
+                "importance": 101,
+                "key": "IFEI_FF_R",
+                "ui_targets": [],
+                "value": "   "
+              },
+              {
+                "count": 1,
+                "importance": 101,
+                "key": "IFEI_OIL_PRESS_L",
+                "ui_targets": [],
+                "value": "   "
+              },
+              {
+                "count": 1,
+                "importance": 101,
+                "key": "IFEI_OIL_PRESS_R",
+                "ui_targets": [],
+                "value": "   "
+              },
+              {
+                "count": 1,
+                "importance": 101,
+                "key": "IFEI_RPM_L",
+                "ui_targets": [],
+                "value": "   "
+              }
+            ],
+            "truncated": true
+          },
+          "recent_ui_targets": [
+            "left_mdi_brightness_control",
+            "left_mdi_contrast_control",
+            "left_mdi_pb15",
+            "left_mdi_pb18",
+            "ufc_comm1_channel_selector_pull",
+            "ufc_comm2_channel_selector_pull",
+            "ufc_key_0",
+            "ufc_key_1"
+          ],
+          "seq": 1,
+          "t_wall": 1779209004.800106,
+          "vars": {
+            "annunciator_panel_activity": false,
+            "apu_on": false,
+            "apu_ready": false,
+            "apu_start_support_complete": false,
+            "attitude_source_auto": true,
+            "battery_on": false,
+            "bingo_fuel_set": false,
+            "bleed_air_cycle_complete": false,
+            "bleed_air_norm": true,
+            "comm1_channel_numeric": 0,
+            "comm1_freq_134_000": false,
+            "comm1_freq_value": 30500,
+            "comm2_channel_numeric": 0,
+            "comm2_freq_value": 30500,
+            "engine_crank_left": false,
+            "engine_crank_left_complete": false,
+            "engine_crank_right": false,
+            "engine_crank_right_complete": false,
+            "ext_pwr_on": true,
+            "ext_refuel_probe_value": 0,
+            "fcs_bit_switch_up": false,
+            "fcs_reset_complete": false,
+            "fcs_reset_pressed": false,
+            "ff_l": null,
+            "ff_r": null,
+            "fire_test_a_active": false,
+            "fire_test_a_complete": true,
+            "fire_test_active": false,
+            "fire_test_b_active": false,
+            "fire_test_b_complete": true,
+            "fire_test_complete": true,
+            "flap_auto": false,
+            "flap_configured": false,
+            "flap_full": true,
+            "flap_half": false,
+            "flap_mode_value": 0,
+            "hook_extended": false,
+            "hook_handle_value": 1,
+            "hook_retracted": true,
+            "hud_on": false,
+            "ins_fast_align_complete": false,
+            "ins_fast_align_pressed": false,
+            "ins_mode": 0,
+            "ins_mode_cv_or_gnd": false,
+            "ins_mode_set": false,
+            "l_gen_on": true,
+            "launch_bar_extended": false,
+            "launch_bar_retracted": true,
+            "launch_bar_switch_value": 0,
+            "left_ddi_on": false,
+            "left_engine_idle_ready": false,
+            "left_engine_nominal_start_params": false,
+            "lights_test_active": false,
+            "lights_test_complete": false,
+            "mpcd_on": false,
+            "noz_l": 0.0,
+            "noz_r": 0.0,
+            "obogs_flow_on": true,
+            "obogs_ready": false,
+            "obogs_switch_on": false,
+            "oil_l": null,
+            "oil_r": null,
+            "parking_brake_released": false,
+            "pitot_heat_on": false,
+            "power_available": true,
+            "probe_cycle_complete": true,
+            "probe_extended": false,
+            "probe_retracted": true,
+            "probe_switch_value": 1,
+            "r_gen_on": true,
+            "radar_altimeter_bug_set": false,
+            "radar_altimeter_bug_value": 0.0,
+            "radar_mode_opr": false,
+            "radar_on": false,
+            "right_ddi_on": false,
+            "right_engine_nominal_start_params": false,
+            "rpm_l": null,
+            "rpm_l_gte_25": false,
+            "rpm_l_gte_60": false,
+            "rpm_r": null,
+            "rpm_r_gte_25": false,
+            "rpm_r_gte_60": false,
+            "standby_altimeter_set": true,
+            "standby_attitude_uncaged": false,
+            "takeoff_trim_pressed": false,
+            "takeoff_trim_set": false,
+            "temp_l": null,
+            "temp_r": null,
+            "throttle_l_not_off": true,
+            "throttle_r_idle_complete": true,
+            "throttle_r_not_off": true,
+            "ufc_comm1_pull_pressed": false,
+            "ufc_ent_pressed": false,
+            "ufc_key_0_pressed": false,
+            "ufc_key_1_pressed": false,
+            "ufc_key_3_pressed": false,
+            "ufc_key_4_pressed": false,
+            "ufc_scratchpad_number_display": "        ",
+            "ufc_scratchpad_string_1_display": "  ",
+            "ufc_scratchpad_string_2_display": "  ",
+            "vars_source_missing": [
+              "bingo_fuel_set",
+              "ff_l",
+              "ff_l_in_range",
+              "ff_r",
+              "ff_r_in_range",
+              "ins_fast_align_pressed",
+              "left_engine_idle_ready",
+              "left_engine_nominal_start_params",
+              "oil_l",
+              "oil_l_in_range",
+              "oil_r",
+              "oil_r_in_range",
+              "rpm_l",
+              "rpm_l_gte_25",
+              "rpm_l_gte_60",
+              "rpm_l_in_range",
+              "rpm_r",
+              "rpm_r_gte_25",
+              "rpm_r_gte_60",
+              "rpm_r_in_range",
+              "temp_l",
+              "temp_l_in_range",
+              "temp_r",
+              "temp_r_in_range",
+              "throttle_r_idle_complete",
+              "ufc_scratchpad_number_display",
+              "ufc_scratchpad_string_1_display",
+              "ufc_scratchpad_string_2_display"
+            ]
+          }
+        },
+        "procedure_hint": null,
+        "source": "dcs_bios_raw",
+        "tags": [],
+        "timestamp": "2026-05-19T16:43:24.800105+00:00",
+        "version": "v1"
+      }
+    ],
+    "snapshot_ids": {
+      "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+    },
+    "telemetry_window_digest": {
+      "changed_var_count": 0,
+      "contradiction_count": 0,
+      "first_seq": 1,
+      "frame_count": 1,
+      "latest_seq": 1
+    },
+    "vision": {
+      "frame_ids": [
+        "1779209004872_000276"
+      ],
+      "request": null,
+      "response": {
+        "frame_id": "1779209004872_000276",
+        "frame_ids": [
+          "1779209004872_000276"
+        ],
+        "frame_stale": false,
+        "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+        "observation_seq": 1,
+        "observation_t_wall_ms": 1779209004800,
+        "observation_t_wall_s": 1779209004.800106,
+        "pre_trigger_frame": null,
+        "selected_frames": [
+          {
+            "capture_wall_ms": 1779209004872,
+            "channel": "composite_panel",
+            "frame_id": "1779209004872_000276",
+            "frame_seq": 276,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779209004872_000276_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779209004872_000276.png",
+            "sync_delta_ms": 86,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          }
+        ],
+        "status": "partial",
+        "sync_delta_ms": 86,
+        "sync_miss_reason": "missing_pre_trigger_frame",
+        "sync_status": "matched_future_fallback",
+        "sync_window_ms": 250,
+        "trigger_frame": {
+          "capture_wall_ms": 1779209004872,
+          "channel": "composite_panel",
+          "frame_id": "1779209004872_000276",
+          "frame_seq": 276,
+          "frame_stale": false,
+          "height": 1440,
+          "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779209004872_000276_vlm.png",
+          "layout_id": "fa18c_composite_panel_v2",
+          "role": "trigger_frame",
+          "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779209004872_000276.png",
+          "sync_delta_ms": 86,
+          "sync_miss_reason": null,
+          "sync_status": "matched_future_fallback",
+          "width": 3440
+        },
+        "trigger_wall_ms": 1779209004786,
+        "vision_used": true
+      },
+      "vision_fact_summary": {
+        "frame_ids": [
+          "1779209004872_000276"
+        ],
+        "fresh_fact_ids": [],
+        "not_seen_fact_ids": [],
+        "seen_fact_ids": [],
+        "status": "vision_not_required",
+        "summary_text": "no_active_vision_facts",
+        "uncertain_fact_ids": []
+      },
+      "vision_facts": []
+    },
+    "vision_fact_observations": []
+  },
+  "cycle": {
+    "events": [
+      {
+        "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+        "kind": "tutor_request",
+        "lineno": 523,
+        "metadata": {
+          "frame_id": "1779209004872_000276",
+          "fused_missing_conditions": [
+            "vars.battery_on==true"
+          ],
+          "fused_step_id": "S01",
+          "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+          "layout_id": "fa18c_composite_panel_v2",
+          "sync_delta_ms": 86,
+          "vision_fact_cached_count": 0,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 0,
+          "vision_fact_status": "vision_not_required",
+          "vision_fact_sticky_count": 0,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779209004872_000276"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_status": "partial",
+          "vision_used": true
+        },
+        "payload": {
+          "actor": "learner",
+          "context": {
+            "delta_dropped_count": 13,
+            "deterministic_step_hint": {
+              "gate_blocker_count": 1,
+              "inferred_step_id": "S01",
+              "missing_conditions_count": 1,
+              "observability": "observable",
+              "observability_status": "observable",
+              "overlay_step_id": "S01",
+              "recent_ui_targets": [
+                "left_mdi_brightness_control",
+                "left_mdi_contrast_control",
+                "left_mdi_pb15",
+                "left_mdi_pb18",
+                "ufc_comm1_channel_selector_pull",
+                "ufc_comm2_channel_selector_pull",
+                "ufc_key_0",
+                "ufc_key_1"
+              ],
+              "requires_visual_confirmation": false,
+              "scenario_profile": "airfield",
+              "step_ui_targets": [
+                "battery_switch",
+                "generator_left_switch",
+                "generator_right_switch"
+              ]
+            },
+            "evidence_packet_summary": {
+              "blocked_gate_count": 7,
+              "conflicts": [],
+              "recent_action_count": 8,
+              "telemetry_missing_source_count": 28,
+              "telemetry_status": "low_confidence_bootstrap",
+              "telemetry_window_digest": {
+                "changed_var_count": 0,
+                "contradiction_count": 0,
+                "first_seq": 1,
+                "frame_count": 1,
+                "latest_seq": 1
+              },
+              "vision_fresh_count": 0,
+              "vision_seen_count": 0,
+              "vision_status": "vision_not_required"
+            },
+            "evidence_snapshot": {
+              "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "schema_version": "evidence_snapshot.v1",
+              "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+              "source_observation_seq": 1,
+              "source_observation_t_wall": 1779209004.800106,
+              "telemetry_window_first_seq": 1,
+              "telemetry_window_frame_count": 1,
+              "telemetry_window_latest_seq": 1,
+              "telemetry_window_latest_t_wall": 1779209004.800106,
+              "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "grounding_missing": false,
+            "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+            "grounding_reason": null,
+            "rag_topk": [
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_153",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 154,
+                "score": 48.65353017746378,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_153"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_38",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 39,
+                "score": 42.218890149785025,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_38"
+              },
+              {
+                "chunk_id": "fa18c_startup_master_1",
+                "doc_id": "fa18c_startup_master",
+                "page_or_heading": "Master Step Table",
+                "score": 39.47359427534396,
+                "section": "Master Step Table",
+                "snippet_id": "fa18c_startup_master_1"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_49",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 50,
+                "score": 37.23990347014751,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_49"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_142",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 143,
+                "score": 35.682364601561275,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_142"
+              }
+            ],
+            "scenario_profile": "airfield",
+            "snapshot_ids": {
+              "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "state_harness": {
+              "conflicts": [],
+              "deterministic_candidate": {
+                "missing_conditions": [
+                  "vars.battery_on==true"
+                ],
+                "overlay_step_id": "S01",
+                "role": "candidate_not_authoritative",
+                "step_id": "S01"
+              },
+              "telemetry_evidence": {
+                "confidence": "low",
+                "early_vars": {
+                  "battery_on": false,
+                  "fire_test_a_complete": true,
+                  "fire_test_b_complete": true,
+                  "power_available": true
+                },
+                "observation_seq": 1,
+                "source_status": "low_confidence_bootstrap",
+                "vars_source_missing_count": 28
+              },
+              "telemetry_window_digest": {
+                "changed_vars": [],
+                "contradictions": [],
+                "first_frame_only_values": [],
+                "first_seq": 1,
+                "frame_count": 1,
+                "last_seen_true": [
+                  {
+                    "age_s": 0.0,
+                    "seq": 1,
+                    "var": "fire_test_a_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 1,
+                    "var": "fire_test_b_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 1,
+                    "var": "fire_test_complete"
+                  },
+                  {
+                    "age_s": 0.0,
+                    "seq": 1,
+                    "var": "power_available"
+                  }
+                ],
+                "latest_seq": 1,
+                "latest_t_wall": 1779209004.800106,
+                "stable_false_vars": [
+                  "battery_on",
+                  "fcs_bit_switch_up",
+                  "flap_auto",
+                  "hud_on",
+                  "left_ddi_on",
+                  "mpcd_on",
+                  "pitot_heat_on",
+                  "right_ddi_on"
+                ],
+                "stable_true_vars": [
+                  "fire_test_a_complete",
+                  "fire_test_b_complete",
+                  "fire_test_complete",
+                  "power_available"
+                ],
+                "unknown_or_missing_vars": [
+                  "bingo_fuel_set",
+                  "ff_l",
+                  "ff_l_in_range",
+                  "ff_r",
+                  "ff_r_in_range",
+                  "ins_fast_align_pressed",
+                  "left_engine_idle_ready",
+                  "left_engine_nominal_start_params",
+                  "oil_l",
+                  "oil_l_in_range",
+                  "oil_r",
+                  "oil_r_in_range",
+                  "rpm_l",
+                  "rpm_l_gte_25",
+                  "rpm_l_gte_60",
+                  "rpm_l_in_range"
+                ],
+                "window_duration_s": null
+              },
+              "vision_evidence": {
+                "confidence": "low",
+                "fresh_fact_ids": [],
+                "late_display_anchors": [],
+                "not_seen_fact_ids": [],
+                "seen_fact_ids": [],
+                "source_status": "vision_not_required",
+                "visual_candidate_steps": []
+              }
+            },
+            "vision": {
+              "frame_id": "1779209004872_000276",
+              "frame_ids": [
+                "1779209004872_000276"
+              ],
+              "frame_stale": false,
+              "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+              "observation_seq": 1,
+              "observation_t_wall_ms": 1779209004800,
+              "observation_t_wall_s": 1779209004.800106,
+              "status": "partial",
+              "sync_delta_ms": 86,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_wall_ms": 1779209004786,
+              "vision_used": true
+            },
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779209004872_000276"
+              ],
+              "fresh_fact_ids": [],
+              "not_seen_fact_ids": [],
+              "seen_fact_ids": [],
+              "status": "vision_not_required",
+              "summary_text": "no_active_vision_facts",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": []
+          },
+          "intent": "help",
+          "message": "[REDACTED_USER_MESSAGE]",
+          "metadata": {
+            "evidence_packet_summary": {
+              "blocked_gate_count": 7,
+              "conflicts": [],
+              "recent_action_count": 8,
+              "telemetry_missing_source_count": 28,
+              "telemetry_status": "low_confidence_bootstrap",
+              "telemetry_window_digest": {
+                "changed_var_count": 0,
+                "contradiction_count": 0,
+                "first_seq": 1,
+                "frame_count": 1,
+                "latest_seq": 1
+              },
+              "vision_fresh_count": 0,
+              "vision_seen_count": 0,
+              "vision_status": "vision_not_required"
+            },
+            "evidence_snapshot": {
+              "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "schema_version": "evidence_snapshot.v1",
+              "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+              "source_observation_seq": 1,
+              "source_observation_t_wall": 1779209004.800106,
+              "telemetry_window_first_seq": 1,
+              "telemetry_window_frame_count": 1,
+              "telemetry_window_latest_seq": 1,
+              "telemetry_window_latest_t_wall": 1779209004.800106,
+              "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "frame_id": "1779209004872_000276",
+            "fused_missing_conditions": [
+              "vars.battery_on==true"
+            ],
+            "fused_step_id": "S01",
+            "grounding_cache_hit": false,
+            "grounding_error_type": null,
+            "grounding_missing": false,
+            "grounding_missing_requested": false,
+            "grounding_policy_filtered_out_count": 0,
+            "grounding_policy_id": null,
+            "grounding_policy_version": null,
+            "grounding_reason": null,
+            "grounding_reason_requested": null,
+            "grounding_snippet_ids": [
+              "DCS FA-18C Early Access Guide EN_153",
+              "DCS FA-18C Early Access Guide EN_38",
+              "fa18c_startup_master_1",
+              "DCS FA-18C Early Access Guide EN_49",
+              "DCS FA-18C Early Access Guide EN_142"
+            ],
+            "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+            "layout_id": "fa18c_composite_panel_v2",
+            "prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+            "prompt_tokens_est": 5536,
+            "prompt_trimmed": true,
+            "scenario_profile": "airfield",
+            "snapshot_ids": {
+              "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "source_chunk_refs": [
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_153",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_38",
+              "fa18c_startup_master/fa18c_startup_master_1",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_49",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_142"
+            ],
+            "state_harness_conflicts": [],
+            "state_harness_telemetry_status": "low_confidence_bootstrap",
+            "sync_delta_ms": 86,
+            "vision_fact_seen_ids": [],
+            "vision_fact_status": "vision_not_required",
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779209004872_000276"
+              ],
+              "fresh_fact_ids": [],
+              "not_seen_fact_ids": [],
+              "seen_fact_ids": [],
+              "status": "vision_not_required",
+              "summary_text": "no_active_vision_facts",
+              "uncertain_fact_ids": []
+            },
+            "vision_fallback_reason": null,
+            "vision_frame_ids": [
+              "1779209004872_000276"
+            ],
+            "vision_status": "partial",
+            "vision_used": true
+          },
+          "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+          "request_id": "614024be-1420-4188-91e9-f044acff9291",
+          "timestamp": "2026-05-19T16:43:25.119026+00:00",
+          "version": "v1"
+        },
+        "related_id": "614024be-1420-4188-91e9-f044acff9291",
+        "vision_refs": [
+          "1779209004872_000276"
+        ]
+      },
+      {
+        "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+        "kind": "overlay_requested",
+        "lineno": 524,
+        "metadata": {
+          "final_overlay_targets": [
+            "battery_switch"
+          ],
+          "frame_id": "1779209004872_000276",
+          "fused_missing_conditions": [
+            "vars.battery_on==true"
+          ],
+          "fused_step_id": "S01",
+          "generation_mode": "model",
+          "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "fallback_overlay",
+          "sync_delta_ms": 86,
+          "vision_fact_cached_count": 0,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 0,
+          "vision_fact_sticky_count": 0,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779209004872_000276"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "action": "highlight",
+          "attempt_count": 1,
+          "cmd_id": "458973ca-b2ae-4a6a-b122-6393bb780058",
+          "final_overlay_targets": [
+            "battery_switch"
+          ],
+          "frame_id": "1779209004872_000276",
+          "fused_missing_conditions": [
+            "vars.battery_on==true"
+          ],
+          "fused_step_id": "S01",
+          "generation_mode": "model",
+          "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "fallback_overlay",
+          "schema_version": "v2",
+          "sync_delta_ms": 86,
+          "target": "pnt_404",
+          "vision_fact_cached_count": 0,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 0,
+          "vision_fact_sticky_count": 0,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779209004872_000276"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "related_id": null,
+        "vision_refs": []
+      },
+      {
+        "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+        "kind": "tutor_response",
+        "lineno": 525,
+        "metadata": {
+          "final_overlay_targets": [
+            "battery_switch"
+          ],
+          "frame_id": "1779209004872_000276",
+          "fused_missing_conditions": [
+            "vars.battery_on==true"
+          ],
+          "fused_step_id": "S01",
+          "generation_mode": "model",
+          "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "fallback_overlay",
+          "sync_delta_ms": 86,
+          "vision_fact_cached_count": 0,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 0,
+          "vision_fact_sticky_count": 0,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779209004872_000276"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        },
+        "payload": {
+          "actions": [
+            {
+              "element_id": "pnt_404",
+              "evidence_refs": [
+                "GATES.S01.completion"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "battery_switch"
+              ],
+              "frame_id": "1779209004872_000276",
+              "fused_missing_conditions": [
+                "vars.battery_on==true"
+              ],
+              "fused_step_id": "S01",
+              "generation_mode": "model",
+              "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "fallback_overlay",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 86,
+              "target": "battery_switch",
+              "type": "overlay",
+              "vision_fact_cached_count": 0,
+              "vision_fact_extractor_used": false,
+              "vision_fact_ignored_count": 0,
+              "vision_fact_sticky_count": 0,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779209004872_000276"
+                ],
+                "fresh_fact_ids": [],
+                "not_seen_fact_ids": [],
+                "seen_fact_ids": [],
+                "status": "vision_not_required",
+                "summary_text": "no_active_vision_facts",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_frame_capture_selected": true,
+              "vision_used": true,
+              "vlm_call_reason": "vision_not_required_for_step",
+              "vlm_call_status": "not_required"
+            }
+          ],
+          "actor": "tutor",
+          "explanations": [
+            "请先操作 battery_switch。"
+          ],
+          "in_reply_to": "614024be-1420-4188-91e9-f044acff9291",
+          "message": "请先操作 battery_switch。",
+          "metadata": {
+            "allowed_evidence_ref_count": 153,
+            "bootstrap_low_confidence_guardrail_applied": true,
+            "bootstrap_low_confidence_guardrail_step_id": "S01",
+            "bootstrap_low_confidence_original_actions": [
+              {
+                "element_id": "pnt_404",
+                "evidence_refs": [
+                  "GATES.S01.completion"
+                ],
+                "evidence_required": true,
+                "intent": "highlight",
+                "style": {
+                  "color": "#00ffcc",
+                  "style": "highlight",
+                  "thickness": 2
+                },
+                "target": "battery_switch",
+                "type": "overlay"
+              }
+            ],
+            "bootstrap_low_confidence_original_explanations": [
+              "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+            ],
+            "bootstrap_low_confidence_original_message": "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。",
+            "bootstrap_low_confidence_vars_source_missing_count": 28,
+            "dcs_tutor_text": {
+              "clear_view": false,
+              "cmd_id": "8293aea1-8131-4b7b-ae05-5530e4129c29",
+              "display_time_s": 12.0,
+              "reason": null,
+              "status": "ok",
+              "text": "请先操作 battery_switch。"
+            },
+            "delta_dropped_count": 13,
+            "deterministic_inference_error": null,
+            "deterministic_step_hint": {
+              "inferred_step_id": "S01",
+              "missing_conditions": [
+                "vars.battery_on==true"
+              ],
+              "observability": "observable",
+              "observability_status": "observable",
+              "recent_ui_targets": [
+                "left_mdi_brightness_control",
+                "left_mdi_contrast_control",
+                "left_mdi_pb15",
+                "left_mdi_pb18",
+                "ufc_comm1_channel_selector_pull",
+                "ufc_comm2_channel_selector_pull",
+                "ufc_key_0",
+                "ufc_key_1"
+              ],
+              "requires_visual_confirmation": false,
+              "step_evidence_requirements": [
+                "var",
+                "gate",
+                "delta"
+              ],
+              "step_ui_targets": [
+                "battery_switch",
+                "generator_left_switch",
+                "generator_right_switch"
+              ],
+              "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "diagnosis": {
+              "error_category": "OM",
+              "step_id": "S01"
+            },
+            "evidence_guardrail_applied": false,
+            "evidence_guardrail_reasons": [],
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "evidence_snapshot": {
+              "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "schema_version": "evidence_snapshot.v1",
+              "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+              "source_observation_seq": 1,
+              "source_observation_t_wall": 1779209004.800106,
+              "telemetry_window_first_seq": 1,
+              "telemetry_window_frame_count": 1,
+              "telemetry_window_latest_seq": 1,
+              "telemetry_window_latest_t_wall": 1779209004.800106,
+              "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "evidence_snapshot_consistency": {
+              "deterministic_hint_matches_request": false,
+              "final_action_plan_matches_snapshot": true,
+              "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "fallback_overlay_reason": "model",
+            "fallback_overlay_used": true,
+            "final_action_plan": {
+              "evidence_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "overlay_step_id": "S01",
+              "source": "model",
+              "step_id": "S01",
+              "targets": [
+                "battery_switch"
+              ],
+              "text_only": false
+            },
+            "final_action_plan_source": "model",
+            "final_overlay_targets": [
+              "battery_switch"
+            ],
+            "final_public_response": {
+              "actions": [
+                {
+                  "element_id": "pnt_404",
+                  "evidence_refs": [
+                    "GATES.S01.completion"
+                  ],
+                  "evidence_required": true,
+                  "final_overlay_targets": [
+                    "battery_switch"
+                  ],
+                  "frame_id": "1779209004872_000276",
+                  "fused_missing_conditions": [
+                    "vars.battery_on==true"
+                  ],
+                  "fused_step_id": "S01",
+                  "generation_mode": "model",
+                  "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+                  "intent": "highlight",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "message_category": "fallback_overlay",
+                  "style": {
+                    "color": "#00ffcc",
+                    "style": "highlight",
+                    "thickness": 2
+                  },
+                  "sync_delta_ms": 86,
+                  "target": "battery_switch",
+                  "type": "overlay",
+                  "vision_fact_cached_count": 0,
+                  "vision_fact_extractor_used": false,
+                  "vision_fact_ignored_count": 0,
+                  "vision_fact_sticky_count": 0,
+                  "vision_fact_summary": {
+                    "frame_ids": [
+                      "1779209004872_000276"
+                    ],
+                    "fresh_fact_ids": [],
+                    "not_seen_fact_ids": [],
+                    "seen_fact_ids": [],
+                    "status": "vision_not_required",
+                    "summary_text": "no_active_vision_facts",
+                    "uncertain_fact_ids": []
+                  },
+                  "vision_fallback_reason": null,
+                  "vision_frame_capture_selected": true,
+                  "vision_used": true,
+                  "vlm_call_reason": "vision_not_required_for_step",
+                  "vlm_call_status": "not_required"
+                }
+              ],
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S01"
+              },
+              "explanations": [
+                "请先操作 battery_switch。"
+              ],
+              "message": "请先操作 battery_switch。",
+              "next": {
+                "step_id": "S01"
+              }
+            },
+            "frame_id": "1779209004872_000276",
+            "fused_missing_conditions": [
+              "vars.battery_on==true"
+            ],
+            "fused_step_id": "S01",
+            "generation_mode": "model",
+            "generation_prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+            "generation_prompt_tokens_est": 5536,
+            "generation_prompt_trimmed": true,
+            "harness_action_plan": {
+              "overlay_step_id": "S01",
+              "source": "model",
+              "step_id": "S01",
+              "targets": [
+                "battery_switch"
+              ],
+              "text_only": false
+            },
+            "harness_trace": {
+              "candidates": [
+                {
+                  "confidence": 0.55,
+                  "proposed_next_action_target_ids": [
+                    "battery_switch",
+                    "generator_left_switch",
+                    "generator_right_switch"
+                  ],
+                  "role": "candidate_not_authoritative",
+                  "source": "deterministic",
+                  "step_id": "S01",
+                  "supporting_evidence_refs": [
+                    "GATES.S01.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "battery_switch",
+                    "generator_left_switch",
+                    "generator_right_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S01",
+                  "supporting_evidence_refs": [
+                    "GATES.S01.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "apu_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S03",
+                  "supporting_evidence_refs": [
+                    "GATES.S03.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "eng_crank_switch"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S04",
+                  "supporting_evidence_refs": [
+                    "GATES.S04.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S05",
+                  "supporting_evidence_refs": [
+                    "GATES.S05.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.66,
+                  "proposed_next_action_target_ids": [
+                    "bleed_air_knob"
+                  ],
+                  "role": "candidate",
+                  "source": "gate_blocker",
+                  "step_id": "S06",
+                  "supporting_evidence_refs": [
+                    "GATES.S06.completion"
+                  ]
+                },
+                {
+                  "confidence": 0.5,
+                  "proposed_next_action_target_ids": [
+                    "left_mdi_pb15",
+                    "left_mdi_pb18"
+                  ],
+                  "role": "candidate",
+                  "source": "recent_action",
+                  "step_id": "S08",
+                  "supporting_evidence_refs": [
+                    "RECENT_ACTIONS.left_mdi_pb15",
+                    "RECENT_ACTIONS.left_mdi_pb18"
+                  ]
+                },
+                {
+                  "confidence": 0.5,
+                  "proposed_next_action_target_ids": [
+                    "ufc_comm1_channel_selector_pull",
+                    "ufc_key_0",
+                    "ufc_key_1"
+                  ],
+                  "role": "candidate",
+                  "source": "recent_action",
+                  "step_id": "S09",
+                  "supporting_evidence_refs": [
+                    "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+                    "RECENT_ACTIONS.ufc_key_0",
+                    "RECENT_ACTIONS.ufc_key_1"
+                  ]
+                }
+              ],
+              "chosen_candidate": {
+                "confidence": 0.55,
+                "proposed_next_action_target_ids": [
+                  "battery_switch",
+                  "generator_left_switch",
+                  "generator_right_switch"
+                ],
+                "role": "candidate_not_authoritative",
+                "source": "deterministic",
+                "step_id": "S01",
+                "supporting_evidence_refs": [
+                  "GATES.S01.completion"
+                ]
+              },
+              "evidence_packet_summary": {
+                "blocked_gate_count": 7,
+                "conflicts": [],
+                "recent_action_count": 8,
+                "telemetry_missing_source_count": 28,
+                "telemetry_status": "low_confidence_bootstrap",
+                "telemetry_window_digest": {
+                  "changed_var_count": 0,
+                  "contradiction_count": 0,
+                  "first_seq": 1,
+                  "frame_count": 1,
+                  "latest_seq": 1
+                },
+                "vision_fresh_count": 0,
+                "vision_seen_count": 0,
+                "vision_status": "vision_not_required"
+              },
+              "evidence_snapshot": {
+                "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "schema_version": "evidence_snapshot.v1",
+                "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+                "source_observation_seq": 1,
+                "source_observation_t_wall": 1779209004.800106,
+                "telemetry_window_first_seq": 1,
+                "telemetry_window_frame_count": 1,
+                "telemetry_window_latest_seq": 1,
+                "telemetry_window_latest_t_wall": 1779209004.800106,
+                "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+              },
+              "evidence_snapshot_consistency": {
+                "deterministic_hint_matches_request": false,
+                "final_action_plan_matches_snapshot": true,
+                "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+              },
+              "final_action_plan": {
+                "evidence_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "overlay_step_id": "S01",
+                "source": "model",
+                "step_id": "S01",
+                "targets": [
+                  "battery_switch"
+                ],
+                "text_only": false
+              },
+              "final_overlay_targets": [
+                "battery_switch"
+              ],
+              "message_category": "fallback_overlay",
+              "model_decision": {
+                "evidence_refs": [
+                  "GATES.S01.completion"
+                ],
+                "generation_mode": "model",
+                "overlay_targets": [
+                  "battery_switch"
+                ],
+                "status": "ok",
+                "step_id": "S01"
+              },
+              "rejected_candidates": [],
+              "repair_result": {
+                "applied": true,
+                "evidence_ref_repair": {
+                  "details": [],
+                  "repair_applied": false
+                },
+                "json_repaired": false,
+                "path": "model"
+              },
+              "schema_version": "v1",
+              "snapshot_ids": {
+                "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+                "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+              },
+              "validator_result": {
+                "fallback_overlay_reason": "model",
+                "fallback_overlay_used": true,
+                "reasons": [],
+                "rejected": false,
+                "rejected_model_step_id": null
+              },
+              "vlm_call": {
+                "cached_fact_count": 0,
+                "extractor_called": false,
+                "extractor_used": false,
+                "frame_capture_selected": true,
+                "frame_ids": [
+                  "1779209004872_000276"
+                ],
+                "ignored_fact_count": 0,
+                "reason": "vision_not_required_for_step",
+                "status": "not_required",
+                "sticky_fact_count": 0,
+                "sync_delta_ms": 86,
+                "sync_status": "matched_future_fallback",
+                "vision_fact_status": "vision_not_required",
+                "vision_status": "partial"
+              }
+            },
+            "harness_validation_reasons": [],
+            "harness_validator_fallback_reason": "deterministic_step:S01",
+            "harness_validator_mapping": {
+              "allowed_evidence_ref_count": 153,
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S01"
+              },
+              "next": {
+                "step_id": "S01"
+              },
+              "observability_status": "observable",
+              "requires_visual_confirmation": false
+            },
+            "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+            "help_response": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S01"
+              },
+              "explanations": [
+                "请先操作 battery_switch。"
+              ],
+              "next": {
+                "step_id": "S01"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.51,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "GATES.S01.completion",
+                    "target": "battery_switch",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "battery_switch"
+                ]
+              }
+            },
+            "help_response_pre_guardrail": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S01"
+              },
+              "explanations": [
+                "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+              ],
+              "next": {
+                "step_id": "S01"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "GATES.S01.completion",
+                    "target": "battery_switch",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "battery_switch"
+                ]
+              }
+            },
+            "json_repair_reasons": [],
+            "json_repaired": false,
+            "latency_ms": 3978,
+            "layout_id": "fa18c_composite_panel_v2",
+            "main_help_multimodal_input_enabled": false,
+            "message_category": "fallback_overlay",
+            "model": "simtutor-base",
+            "model_raw_diagnosis": {
+              "error_category": "OM",
+              "step_id": "S01"
+            },
+            "model_raw_explanations": [
+              "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+            ],
+            "model_raw_help_response": {
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S01"
+              },
+              "explanations": [
+                "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+              ],
+              "next": {
+                "step_id": "S01"
+              },
+              "overlay": {
+                "evidence": [
+                  {
+                    "grounding_confidence": 0.95,
+                    "quote": "[REDACTED_SOURCE_QUOTE]",
+                    "ref": "GATES.S01.completion",
+                    "target": "battery_switch",
+                    "type": "gate"
+                  }
+                ],
+                "targets": [
+                  "battery_switch"
+                ]
+              }
+            },
+            "model_raw_next": {
+              "step_id": "S01"
+            },
+            "multimodal_candidate_frame_ids": [
+              "1779209004872_000276"
+            ],
+            "multimodal_capability_enabled": true,
+            "multimodal_failed_frame_ids": [],
+            "multimodal_failure_reason": null,
+            "multimodal_fallback_to_text": false,
+            "multimodal_frame_failures": {},
+            "multimodal_frame_ids": [],
+            "multimodal_image_count": 0,
+            "multimodal_images_built": false,
+            "multimodal_input_present": true,
+            "multimodal_path_attempted": false,
+            "multimodal_path_success": false,
+            "multimodal_primary_frame_id": "1779209004872_000276",
+            "next": {
+              "step_id": "S01"
+            },
+            "observability_status": "observable",
+            "prompt_budget_used": 5474,
+            "prompt_build": {
+              "allowed_evidence_refs": [
+                "VARS.annunciator_panel_activity",
+                "VARS.apu_on",
+                "VARS.apu_ready",
+                "VARS.apu_start_support_complete",
+                "VARS.battery_on",
+                "GATES.S01.completion",
+                "GATES.S01.precondition",
+                "GATES.S03.completion",
+                "GATES.S04.completion",
+                "GATES.S04.precondition",
+                "GATES.S05.completion",
+                "GATES.S05.precondition",
+                "GATES.S06.completion",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_153",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_38",
+                "RAG_SNIPPETS.fa18c_startup_master_1",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_49",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_142"
+              ],
+              "delta_summary_items": 0,
+              "delta_summary_top_k": 20,
+              "evidence_refs_count": 18,
+              "grounding_applied": true,
+              "grounding_missing": false,
+              "grounding_missing_requested": false,
+              "grounding_reason": null,
+              "max_overlay_targets": 4,
+              "max_prompt_chars": 9000,
+              "max_prompt_tokens_est": 2400,
+              "preferred_overlay_target": "battery_switch",
+              "prompt_chars": 22142,
+              "prompt_tokens_est": 5536,
+              "prompt_trimmed": true,
+              "rag_snippet_count": 5,
+              "rag_snippet_ids": [
+                "DCS FA-18C Early Access Guide EN_153",
+                "DCS FA-18C Early Access Guide EN_38",
+                "fa18c_startup_master_1",
+                "DCS FA-18C Early Access Guide EN_49",
+                "DCS FA-18C Early Access Guide EN_142"
+              ],
+              "state_harness_conflicts": [],
+              "state_harness_telemetry_status": "low_confidence_bootstrap",
+              "state_harness_visual_candidate_steps": [],
+              "trim_reasons": [
+                "trimmed_delta_summary",
+                "trimmed_step_enum",
+                "trimmed_vars"
+              ],
+              "vision_fact_seen_ids": [],
+              "vision_fact_status": "vision_not_required"
+            },
+            "prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+            "prompt_tokens_est": 5536,
+            "prompt_trimmed": true,
+            "provider": "openai_compat",
+            "repair_applied": false,
+            "repair_details": {
+              "details": [],
+              "dropped_unrepairable_evidence": 0,
+              "repair_applied": false,
+              "repaired_evidence_types": 0
+            },
+            "request_prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+            "request_prompt_tokens_est": 5536,
+            "request_prompt_trimmed": true,
+            "requires_visual_confirmation": false,
+            "response_mapping": {
+              "allowed_evidence_ref_count": 153,
+              "diagnosis": {
+                "error_category": "OM",
+                "step_id": "S01"
+              },
+              "next": {
+                "step_id": "S01"
+              },
+              "observability_status": "observable",
+              "requires_visual_confirmation": false
+            },
+            "retry_count": 0,
+            "retry_reason": null,
+            "scenario_profile": "airfield",
+            "snapshot_ids": {
+              "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+              "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+            },
+            "state_key": "099ae84f26d22ee7bd95fccfdb0868baf0903b1bb5c49364bd0333a9db2cc0a3",
+            "sync_delta_ms": 86,
+            "validator_rejected": false,
+            "vision": {
+              "frame_id": "1779209004872_000276",
+              "frame_ids": [
+                "1779209004872_000276"
+              ],
+              "frame_stale": false,
+              "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+              "observation_seq": 1,
+              "observation_t_wall_ms": 1779209004800,
+              "observation_t_wall_s": 1779209004.800106,
+              "pre_trigger_frame": null,
+              "selected_frames": [
+                {
+                  "capture_wall_ms": 1779209004872,
+                  "channel": "composite_panel",
+                  "frame_id": "1779209004872_000276",
+                  "frame_seq": 276,
+                  "frame_stale": false,
+                  "height": 1440,
+                  "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779209004872_000276_vlm.png",
+                  "layout_id": "fa18c_composite_panel_v2",
+                  "role": "trigger_frame",
+                  "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779209004872_000276.png",
+                  "sync_delta_ms": 86,
+                  "sync_miss_reason": null,
+                  "sync_status": "matched_future_fallback",
+                  "width": 3440
+                }
+              ],
+              "status": "partial",
+              "sync_delta_ms": 86,
+              "sync_miss_reason": "missing_pre_trigger_frame",
+              "sync_status": "matched_future_fallback",
+              "sync_window_ms": 250,
+              "trigger_frame": {
+                "capture_wall_ms": 1779209004872,
+                "channel": "composite_panel",
+                "frame_id": "1779209004872_000276",
+                "frame_seq": 276,
+                "frame_stale": false,
+                "height": 1440,
+                "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779209004872_000276_vlm.png",
+                "layout_id": "fa18c_composite_panel_v2",
+                "role": "trigger_frame",
+                "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779209004872_000276.png",
+                "sync_delta_ms": 86,
+                "sync_miss_reason": null,
+                "sync_status": "matched_future_fallback",
+                "width": 3440
+              },
+              "trigger_wall_ms": 1779209004786,
+              "vision_used": true
+            },
+            "vision_fact_active_step_ids": [
+              "S01"
+            ],
+            "vision_fact_cached_count": 0,
+            "vision_fact_extractor_used": false,
+            "vision_fact_ignored_count": 0,
+            "vision_fact_status": "vision_not_required",
+            "vision_fact_sticky_count": 0,
+            "vision_fact_summary": {
+              "frame_ids": [
+                "1779209004872_000276"
+              ],
+              "fresh_fact_ids": [],
+              "not_seen_fact_ids": [],
+              "seen_fact_ids": [],
+              "status": "vision_not_required",
+              "summary_text": "no_active_vision_facts",
+              "uncertain_fact_ids": []
+            },
+            "vision_facts": [],
+            "vision_fallback_reason": null,
+            "vision_frame_capture_selected": true,
+            "vision_frame_ids": [
+              "1779209004872_000276"
+            ],
+            "vision_status": "partial",
+            "vision_used": true,
+            "vlm_call_reason": "vision_not_required_for_step",
+            "vlm_call_status": "not_required"
+          },
+          "response_id": "98de9798-7b38-41e2-8618-bf9390cc1471",
+          "status": "ok",
+          "timestamp": "2026-05-19T16:43:29.098996+00:00",
+          "version": "v1"
+        },
+        "related_id": "614024be-1420-4188-91e9-f044acff9291",
+        "vision_refs": [
+          "1779209004872_000276"
+        ]
+      }
+    ],
+    "tutor_request": {
+      "actor": "learner",
+      "context": {
+        "delta_dropped_count": 13,
+        "deterministic_step_hint": {
+          "gate_blocker_count": 1,
+          "inferred_step_id": "S01",
+          "missing_conditions_count": 1,
+          "observability": "observable",
+          "observability_status": "observable",
+          "overlay_step_id": "S01",
+          "recent_ui_targets": [
+            "left_mdi_brightness_control",
+            "left_mdi_contrast_control",
+            "left_mdi_pb15",
+            "left_mdi_pb18",
+            "ufc_comm1_channel_selector_pull",
+            "ufc_comm2_channel_selector_pull",
+            "ufc_key_0",
+            "ufc_key_1"
+          ],
+          "requires_visual_confirmation": false,
+          "scenario_profile": "airfield",
+          "step_ui_targets": [
+            "battery_switch",
+            "generator_left_switch",
+            "generator_right_switch"
+          ]
+        },
+        "evidence_packet_summary": {
+          "blocked_gate_count": 7,
+          "conflicts": [],
+          "recent_action_count": 8,
+          "telemetry_missing_source_count": 28,
+          "telemetry_status": "low_confidence_bootstrap",
+          "telemetry_window_digest": {
+            "changed_var_count": 0,
+            "contradiction_count": 0,
+            "first_seq": 1,
+            "frame_count": 1,
+            "latest_seq": 1
+          },
+          "vision_fresh_count": 0,
+          "vision_seen_count": 0,
+          "vision_status": "vision_not_required"
+        },
+        "evidence_snapshot": {
+          "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "schema_version": "evidence_snapshot.v1",
+          "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+          "source_observation_seq": 1,
+          "source_observation_t_wall": 1779209004.800106,
+          "telemetry_window_first_seq": 1,
+          "telemetry_window_frame_count": 1,
+          "telemetry_window_latest_seq": 1,
+          "telemetry_window_latest_t_wall": 1779209004.800106,
+          "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "grounding_missing": false,
+        "grounding_query": "[REDACTED_GROUNDING_QUERY]",
+        "grounding_reason": null,
+        "rag_topk": [
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_153",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 154,
+            "score": 48.65353017746378,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_153"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_38",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 39,
+            "score": 42.218890149785025,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_38"
+          },
+          {
+            "chunk_id": "fa18c_startup_master_1",
+            "doc_id": "fa18c_startup_master",
+            "page_or_heading": "Master Step Table",
+            "score": 39.47359427534396,
+            "section": "Master Step Table",
+            "snippet_id": "fa18c_startup_master_1"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_49",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 50,
+            "score": 37.23990347014751,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_49"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_142",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 143,
+            "score": 35.682364601561275,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_142"
+          }
+        ],
+        "scenario_profile": "airfield",
+        "snapshot_ids": {
+          "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "state_harness": {
+          "conflicts": [],
+          "deterministic_candidate": {
+            "missing_conditions": [
+              "vars.battery_on==true"
+            ],
+            "overlay_step_id": "S01",
+            "role": "candidate_not_authoritative",
+            "step_id": "S01"
+          },
+          "telemetry_evidence": {
+            "confidence": "low",
+            "early_vars": {
+              "battery_on": false,
+              "fire_test_a_complete": true,
+              "fire_test_b_complete": true,
+              "power_available": true
+            },
+            "observation_seq": 1,
+            "source_status": "low_confidence_bootstrap",
+            "vars_source_missing_count": 28
+          },
+          "telemetry_window_digest": {
+            "changed_vars": [],
+            "contradictions": [],
+            "first_frame_only_values": [],
+            "first_seq": 1,
+            "frame_count": 1,
+            "last_seen_true": [
+              {
+                "age_s": 0.0,
+                "seq": 1,
+                "var": "fire_test_a_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 1,
+                "var": "fire_test_b_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 1,
+                "var": "fire_test_complete"
+              },
+              {
+                "age_s": 0.0,
+                "seq": 1,
+                "var": "power_available"
+              }
+            ],
+            "latest_seq": 1,
+            "latest_t_wall": 1779209004.800106,
+            "stable_false_vars": [
+              "battery_on",
+              "fcs_bit_switch_up",
+              "flap_auto",
+              "hud_on",
+              "left_ddi_on",
+              "mpcd_on",
+              "pitot_heat_on",
+              "right_ddi_on"
+            ],
+            "stable_true_vars": [
+              "fire_test_a_complete",
+              "fire_test_b_complete",
+              "fire_test_complete",
+              "power_available"
+            ],
+            "unknown_or_missing_vars": [
+              "bingo_fuel_set",
+              "ff_l",
+              "ff_l_in_range",
+              "ff_r",
+              "ff_r_in_range",
+              "ins_fast_align_pressed",
+              "left_engine_idle_ready",
+              "left_engine_nominal_start_params",
+              "oil_l",
+              "oil_l_in_range",
+              "oil_r",
+              "oil_r_in_range",
+              "rpm_l",
+              "rpm_l_gte_25",
+              "rpm_l_gte_60",
+              "rpm_l_in_range"
+            ],
+            "window_duration_s": null
+          },
+          "vision_evidence": {
+            "confidence": "low",
+            "fresh_fact_ids": [],
+            "late_display_anchors": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "source_status": "vision_not_required",
+            "visual_candidate_steps": []
+          }
+        },
+        "vision": {
+          "frame_id": "1779209004872_000276",
+          "frame_ids": [
+            "1779209004872_000276"
+          ],
+          "frame_stale": false,
+          "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+          "observation_seq": 1,
+          "observation_t_wall_ms": 1779209004800,
+          "observation_t_wall_s": 1779209004.800106,
+          "status": "partial",
+          "sync_delta_ms": 86,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_wall_ms": 1779209004786,
+          "vision_used": true
+        },
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779209004872_000276"
+          ],
+          "fresh_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "seen_fact_ids": [],
+          "status": "vision_not_required",
+          "summary_text": "no_active_vision_facts",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": []
+      },
+      "intent": "help",
+      "message": "[REDACTED_USER_MESSAGE]",
+      "metadata": {
+        "evidence_packet_summary": {
+          "blocked_gate_count": 7,
+          "conflicts": [],
+          "recent_action_count": 8,
+          "telemetry_missing_source_count": 28,
+          "telemetry_status": "low_confidence_bootstrap",
+          "telemetry_window_digest": {
+            "changed_var_count": 0,
+            "contradiction_count": 0,
+            "first_seq": 1,
+            "frame_count": 1,
+            "latest_seq": 1
+          },
+          "vision_fresh_count": 0,
+          "vision_seen_count": 0,
+          "vision_status": "vision_not_required"
+        },
+        "evidence_snapshot": {
+          "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "schema_version": "evidence_snapshot.v1",
+          "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+          "source_observation_seq": 1,
+          "source_observation_t_wall": 1779209004.800106,
+          "telemetry_window_first_seq": 1,
+          "telemetry_window_frame_count": 1,
+          "telemetry_window_latest_seq": 1,
+          "telemetry_window_latest_t_wall": 1779209004.800106,
+          "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "frame_id": "1779209004872_000276",
+        "fused_missing_conditions": [
+          "vars.battery_on==true"
+        ],
+        "fused_step_id": "S01",
+        "grounding_cache_hit": false,
+        "grounding_error_type": null,
+        "grounding_missing": false,
+        "grounding_missing_requested": false,
+        "grounding_policy_filtered_out_count": 0,
+        "grounding_policy_id": null,
+        "grounding_policy_version": null,
+        "grounding_reason": null,
+        "grounding_reason_requested": null,
+        "grounding_snippet_ids": [
+          "DCS FA-18C Early Access Guide EN_153",
+          "DCS FA-18C Early Access Guide EN_38",
+          "fa18c_startup_master_1",
+          "DCS FA-18C Early Access Guide EN_49",
+          "DCS FA-18C Early Access Guide EN_142"
+        ],
+        "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+        "layout_id": "fa18c_composite_panel_v2",
+        "prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+        "prompt_tokens_est": 5536,
+        "prompt_trimmed": true,
+        "scenario_profile": "airfield",
+        "snapshot_ids": {
+          "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "source_chunk_refs": [
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_153",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_38",
+          "fa18c_startup_master/fa18c_startup_master_1",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_49",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_142"
+        ],
+        "state_harness_conflicts": [],
+        "state_harness_telemetry_status": "low_confidence_bootstrap",
+        "sync_delta_ms": 86,
+        "vision_fact_seen_ids": [],
+        "vision_fact_status": "vision_not_required",
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779209004872_000276"
+          ],
+          "fresh_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "seen_fact_ids": [],
+          "status": "vision_not_required",
+          "summary_text": "no_active_vision_facts",
+          "uncertain_fact_ids": []
+        },
+        "vision_fallback_reason": null,
+        "vision_frame_ids": [
+          "1779209004872_000276"
+        ],
+        "vision_status": "partial",
+        "vision_used": true
+      },
+      "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+      "request_id": "614024be-1420-4188-91e9-f044acff9291",
+      "timestamp": "2026-05-19T16:43:25.119026+00:00",
+      "version": "v1"
+    },
+    "tutor_response": {
+      "actions": [
+        {
+          "element_id": "pnt_404",
+          "evidence_refs": [
+            "GATES.S01.completion"
+          ],
+          "evidence_required": true,
+          "final_overlay_targets": [
+            "battery_switch"
+          ],
+          "frame_id": "1779209004872_000276",
+          "fused_missing_conditions": [
+            "vars.battery_on==true"
+          ],
+          "fused_step_id": "S01",
+          "generation_mode": "model",
+          "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+          "intent": "highlight",
+          "layout_id": "fa18c_composite_panel_v2",
+          "message_category": "fallback_overlay",
+          "style": {
+            "color": "#00ffcc",
+            "style": "highlight",
+            "thickness": 2
+          },
+          "sync_delta_ms": 86,
+          "target": "battery_switch",
+          "type": "overlay",
+          "vision_fact_cached_count": 0,
+          "vision_fact_extractor_used": false,
+          "vision_fact_ignored_count": 0,
+          "vision_fact_sticky_count": 0,
+          "vision_fact_summary": {
+            "frame_ids": [
+              "1779209004872_000276"
+            ],
+            "fresh_fact_ids": [],
+            "not_seen_fact_ids": [],
+            "seen_fact_ids": [],
+            "status": "vision_not_required",
+            "summary_text": "no_active_vision_facts",
+            "uncertain_fact_ids": []
+          },
+          "vision_fallback_reason": null,
+          "vision_frame_capture_selected": true,
+          "vision_used": true,
+          "vlm_call_reason": "vision_not_required_for_step",
+          "vlm_call_status": "not_required"
+        }
+      ],
+      "actor": "tutor",
+      "explanations": [
+        "请先操作 battery_switch。"
+      ],
+      "in_reply_to": "614024be-1420-4188-91e9-f044acff9291",
+      "message": "请先操作 battery_switch。",
+      "metadata": {
+        "allowed_evidence_ref_count": 153,
+        "bootstrap_low_confidence_guardrail_applied": true,
+        "bootstrap_low_confidence_guardrail_step_id": "S01",
+        "bootstrap_low_confidence_original_actions": [
+          {
+            "element_id": "pnt_404",
+            "evidence_refs": [
+              "GATES.S01.completion"
+            ],
+            "evidence_required": true,
+            "intent": "highlight",
+            "style": {
+              "color": "#00ffcc",
+              "style": "highlight",
+              "thickness": 2
+            },
+            "target": "battery_switch",
+            "type": "overlay"
+          }
+        ],
+        "bootstrap_low_confidence_original_explanations": [
+          "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+        ],
+        "bootstrap_low_confidence_original_message": "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。",
+        "bootstrap_low_confidence_vars_source_missing_count": 28,
+        "dcs_tutor_text": {
+          "clear_view": false,
+          "cmd_id": "8293aea1-8131-4b7b-ae05-5530e4129c29",
+          "display_time_s": 12.0,
+          "reason": null,
+          "status": "ok",
+          "text": "请先操作 battery_switch。"
+        },
+        "delta_dropped_count": 13,
+        "deterministic_inference_error": null,
+        "deterministic_step_hint": {
+          "inferred_step_id": "S01",
+          "missing_conditions": [
+            "vars.battery_on==true"
+          ],
+          "observability": "observable",
+          "observability_status": "observable",
+          "recent_ui_targets": [
+            "left_mdi_brightness_control",
+            "left_mdi_contrast_control",
+            "left_mdi_pb15",
+            "left_mdi_pb18",
+            "ufc_comm1_channel_selector_pull",
+            "ufc_comm2_channel_selector_pull",
+            "ufc_key_0",
+            "ufc_key_1"
+          ],
+          "requires_visual_confirmation": false,
+          "step_evidence_requirements": [
+            "var",
+            "gate",
+            "delta"
+          ],
+          "step_ui_targets": [
+            "battery_switch",
+            "generator_left_switch",
+            "generator_right_switch"
+          ],
+          "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "diagnosis": {
+          "error_category": "OM",
+          "step_id": "S01"
+        },
+        "evidence_guardrail_applied": false,
+        "evidence_guardrail_reasons": [],
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "evidence_snapshot": {
+          "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "schema_version": "evidence_snapshot.v1",
+          "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+          "source_observation_seq": 1,
+          "source_observation_t_wall": 1779209004.800106,
+          "telemetry_window_first_seq": 1,
+          "telemetry_window_frame_count": 1,
+          "telemetry_window_latest_seq": 1,
+          "telemetry_window_latest_t_wall": 1779209004.800106,
+          "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "evidence_snapshot_consistency": {
+          "deterministic_hint_matches_request": false,
+          "final_action_plan_matches_snapshot": true,
+          "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "fallback_overlay_reason": "model",
+        "fallback_overlay_used": true,
+        "final_action_plan": {
+          "evidence_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "overlay_step_id": "S01",
+          "source": "model",
+          "step_id": "S01",
+          "targets": [
+            "battery_switch"
+          ],
+          "text_only": false
+        },
+        "final_action_plan_source": "model",
+        "final_overlay_targets": [
+          "battery_switch"
+        ],
+        "final_public_response": {
+          "actions": [
+            {
+              "element_id": "pnt_404",
+              "evidence_refs": [
+                "GATES.S01.completion"
+              ],
+              "evidence_required": true,
+              "final_overlay_targets": [
+                "battery_switch"
+              ],
+              "frame_id": "1779209004872_000276",
+              "fused_missing_conditions": [
+                "vars.battery_on==true"
+              ],
+              "fused_step_id": "S01",
+              "generation_mode": "model",
+              "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+              "intent": "highlight",
+              "layout_id": "fa18c_composite_panel_v2",
+              "message_category": "fallback_overlay",
+              "style": {
+                "color": "#00ffcc",
+                "style": "highlight",
+                "thickness": 2
+              },
+              "sync_delta_ms": 86,
+              "target": "battery_switch",
+              "type": "overlay",
+              "vision_fact_cached_count": 0,
+              "vision_fact_extractor_used": false,
+              "vision_fact_ignored_count": 0,
+              "vision_fact_sticky_count": 0,
+              "vision_fact_summary": {
+                "frame_ids": [
+                  "1779209004872_000276"
+                ],
+                "fresh_fact_ids": [],
+                "not_seen_fact_ids": [],
+                "seen_fact_ids": [],
+                "status": "vision_not_required",
+                "summary_text": "no_active_vision_facts",
+                "uncertain_fact_ids": []
+              },
+              "vision_fallback_reason": null,
+              "vision_frame_capture_selected": true,
+              "vision_used": true,
+              "vlm_call_reason": "vision_not_required_for_step",
+              "vlm_call_status": "not_required"
+            }
+          ],
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S01"
+          },
+          "explanations": [
+            "请先操作 battery_switch。"
+          ],
+          "message": "请先操作 battery_switch。",
+          "next": {
+            "step_id": "S01"
+          }
+        },
+        "frame_id": "1779209004872_000276",
+        "fused_missing_conditions": [
+          "vars.battery_on==true"
+        ],
+        "fused_step_id": "S01",
+        "generation_mode": "model",
+        "generation_prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+        "generation_prompt_tokens_est": 5536,
+        "generation_prompt_trimmed": true,
+        "harness_action_plan": {
+          "overlay_step_id": "S01",
+          "source": "model",
+          "step_id": "S01",
+          "targets": [
+            "battery_switch"
+          ],
+          "text_only": false
+        },
+        "harness_trace": {
+          "candidates": [
+            {
+              "confidence": 0.55,
+              "proposed_next_action_target_ids": [
+                "battery_switch",
+                "generator_left_switch",
+                "generator_right_switch"
+              ],
+              "role": "candidate_not_authoritative",
+              "source": "deterministic",
+              "step_id": "S01",
+              "supporting_evidence_refs": [
+                "GATES.S01.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "battery_switch",
+                "generator_left_switch",
+                "generator_right_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S01",
+              "supporting_evidence_refs": [
+                "GATES.S01.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "apu_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S03",
+              "supporting_evidence_refs": [
+                "GATES.S03.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "eng_crank_switch"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S04",
+              "supporting_evidence_refs": [
+                "GATES.S04.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S05",
+              "supporting_evidence_refs": [
+                "GATES.S05.completion"
+              ]
+            },
+            {
+              "confidence": 0.66,
+              "proposed_next_action_target_ids": [
+                "bleed_air_knob"
+              ],
+              "role": "candidate",
+              "source": "gate_blocker",
+              "step_id": "S06",
+              "supporting_evidence_refs": [
+                "GATES.S06.completion"
+              ]
+            },
+            {
+              "confidence": 0.5,
+              "proposed_next_action_target_ids": [
+                "left_mdi_pb15",
+                "left_mdi_pb18"
+              ],
+              "role": "candidate",
+              "source": "recent_action",
+              "step_id": "S08",
+              "supporting_evidence_refs": [
+                "RECENT_ACTIONS.left_mdi_pb15",
+                "RECENT_ACTIONS.left_mdi_pb18"
+              ]
+            },
+            {
+              "confidence": 0.5,
+              "proposed_next_action_target_ids": [
+                "ufc_comm1_channel_selector_pull",
+                "ufc_key_0",
+                "ufc_key_1"
+              ],
+              "role": "candidate",
+              "source": "recent_action",
+              "step_id": "S09",
+              "supporting_evidence_refs": [
+                "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+                "RECENT_ACTIONS.ufc_key_0",
+                "RECENT_ACTIONS.ufc_key_1"
+              ]
+            }
+          ],
+          "chosen_candidate": {
+            "confidence": 0.55,
+            "proposed_next_action_target_ids": [
+              "battery_switch",
+              "generator_left_switch",
+              "generator_right_switch"
+            ],
+            "role": "candidate_not_authoritative",
+            "source": "deterministic",
+            "step_id": "S01",
+            "supporting_evidence_refs": [
+              "GATES.S01.completion"
+            ]
+          },
+          "evidence_packet_summary": {
+            "blocked_gate_count": 7,
+            "conflicts": [],
+            "recent_action_count": 8,
+            "telemetry_missing_source_count": 28,
+            "telemetry_status": "low_confidence_bootstrap",
+            "telemetry_window_digest": {
+              "changed_var_count": 0,
+              "contradiction_count": 0,
+              "first_seq": 1,
+              "frame_count": 1,
+              "latest_seq": 1
+            },
+            "vision_fresh_count": 0,
+            "vision_seen_count": 0,
+            "vision_status": "vision_not_required"
+          },
+          "evidence_snapshot": {
+            "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "schema_version": "evidence_snapshot.v1",
+            "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+            "source_observation_seq": 1,
+            "source_observation_t_wall": 1779209004.800106,
+            "telemetry_window_first_seq": 1,
+            "telemetry_window_frame_count": 1,
+            "telemetry_window_latest_seq": 1,
+            "telemetry_window_latest_t_wall": 1779209004.800106,
+            "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+          },
+          "evidence_snapshot_consistency": {
+            "deterministic_hint_matches_request": false,
+            "final_action_plan_matches_snapshot": true,
+            "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+          },
+          "final_action_plan": {
+            "evidence_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "overlay_step_id": "S01",
+            "source": "model",
+            "step_id": "S01",
+            "targets": [
+              "battery_switch"
+            ],
+            "text_only": false
+          },
+          "final_overlay_targets": [
+            "battery_switch"
+          ],
+          "message_category": "fallback_overlay",
+          "model_decision": {
+            "evidence_refs": [
+              "GATES.S01.completion"
+            ],
+            "generation_mode": "model",
+            "overlay_targets": [
+              "battery_switch"
+            ],
+            "status": "ok",
+            "step_id": "S01"
+          },
+          "rejected_candidates": [],
+          "repair_result": {
+            "applied": true,
+            "evidence_ref_repair": {
+              "details": [],
+              "repair_applied": false
+            },
+            "json_repaired": false,
+            "path": "model"
+          },
+          "schema_version": "v1",
+          "snapshot_ids": {
+            "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+            "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+          },
+          "validator_result": {
+            "fallback_overlay_reason": "model",
+            "fallback_overlay_used": true,
+            "reasons": [],
+            "rejected": false,
+            "rejected_model_step_id": null
+          },
+          "vlm_call": {
+            "cached_fact_count": 0,
+            "extractor_called": false,
+            "extractor_used": false,
+            "frame_capture_selected": true,
+            "frame_ids": [
+              "1779209004872_000276"
+            ],
+            "ignored_fact_count": 0,
+            "reason": "vision_not_required_for_step",
+            "status": "not_required",
+            "sticky_fact_count": 0,
+            "sync_delta_ms": 86,
+            "sync_status": "matched_future_fallback",
+            "vision_fact_status": "vision_not_required",
+            "vision_status": "partial"
+          }
+        },
+        "harness_validation_reasons": [],
+        "harness_validator_fallback_reason": "deterministic_step:S01",
+        "harness_validator_mapping": {
+          "allowed_evidence_ref_count": 153,
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S01"
+          },
+          "next": {
+            "step_id": "S01"
+          },
+          "observability_status": "observable",
+          "requires_visual_confirmation": false
+        },
+        "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+        "help_response": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S01"
+          },
+          "explanations": [
+            "请先操作 battery_switch。"
+          ],
+          "next": {
+            "step_id": "S01"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.51,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "GATES.S01.completion",
+                "target": "battery_switch",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "battery_switch"
+            ]
+          }
+        },
+        "help_response_pre_guardrail": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S01"
+          },
+          "explanations": [
+            "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+          ],
+          "next": {
+            "step_id": "S01"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "GATES.S01.completion",
+                "target": "battery_switch",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "battery_switch"
+            ]
+          }
+        },
+        "json_repair_reasons": [],
+        "json_repaired": false,
+        "latency_ms": 3978,
+        "layout_id": "fa18c_composite_panel_v2",
+        "main_help_multimodal_input_enabled": false,
+        "message_category": "fallback_overlay",
+        "model": "simtutor-base",
+        "model_raw_diagnosis": {
+          "error_category": "OM",
+          "step_id": "S01"
+        },
+        "model_raw_explanations": [
+          "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+        ],
+        "model_raw_help_response": {
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S01"
+          },
+          "explanations": [
+            "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+          ],
+          "next": {
+            "step_id": "S01"
+          },
+          "overlay": {
+            "evidence": [
+              {
+                "grounding_confidence": 0.95,
+                "quote": "[REDACTED_SOURCE_QUOTE]",
+                "ref": "GATES.S01.completion",
+                "target": "battery_switch",
+                "type": "gate"
+              }
+            ],
+            "targets": [
+              "battery_switch"
+            ]
+          }
+        },
+        "model_raw_next": {
+          "step_id": "S01"
+        },
+        "multimodal_candidate_frame_ids": [
+          "1779209004872_000276"
+        ],
+        "multimodal_capability_enabled": true,
+        "multimodal_failed_frame_ids": [],
+        "multimodal_failure_reason": null,
+        "multimodal_fallback_to_text": false,
+        "multimodal_frame_failures": {},
+        "multimodal_frame_ids": [],
+        "multimodal_image_count": 0,
+        "multimodal_images_built": false,
+        "multimodal_input_present": true,
+        "multimodal_path_attempted": false,
+        "multimodal_path_success": false,
+        "multimodal_primary_frame_id": "1779209004872_000276",
+        "next": {
+          "step_id": "S01"
+        },
+        "observability_status": "observable",
+        "prompt_budget_used": 5474,
+        "prompt_build": {
+          "allowed_evidence_refs": [
+            "VARS.annunciator_panel_activity",
+            "VARS.apu_on",
+            "VARS.apu_ready",
+            "VARS.apu_start_support_complete",
+            "VARS.battery_on",
+            "GATES.S01.completion",
+            "GATES.S01.precondition",
+            "GATES.S03.completion",
+            "GATES.S04.completion",
+            "GATES.S04.precondition",
+            "GATES.S05.completion",
+            "GATES.S05.precondition",
+            "GATES.S06.completion",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_153",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_38",
+            "RAG_SNIPPETS.fa18c_startup_master_1",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_49",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_142"
+          ],
+          "delta_summary_items": 0,
+          "delta_summary_top_k": 20,
+          "evidence_refs_count": 18,
+          "grounding_applied": true,
+          "grounding_missing": false,
+          "grounding_missing_requested": false,
+          "grounding_reason": null,
+          "max_overlay_targets": 4,
+          "max_prompt_chars": 9000,
+          "max_prompt_tokens_est": 2400,
+          "preferred_overlay_target": "battery_switch",
+          "prompt_chars": 22142,
+          "prompt_tokens_est": 5536,
+          "prompt_trimmed": true,
+          "rag_snippet_count": 5,
+          "rag_snippet_ids": [
+            "DCS FA-18C Early Access Guide EN_153",
+            "DCS FA-18C Early Access Guide EN_38",
+            "fa18c_startup_master_1",
+            "DCS FA-18C Early Access Guide EN_49",
+            "DCS FA-18C Early Access Guide EN_142"
+          ],
+          "state_harness_conflicts": [],
+          "state_harness_telemetry_status": "low_confidence_bootstrap",
+          "state_harness_visual_candidate_steps": [],
+          "trim_reasons": [
+            "trimmed_delta_summary",
+            "trimmed_step_enum",
+            "trimmed_vars"
+          ],
+          "vision_fact_seen_ids": [],
+          "vision_fact_status": "vision_not_required"
+        },
+        "prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+        "prompt_tokens_est": 5536,
+        "prompt_trimmed": true,
+        "provider": "openai_compat",
+        "repair_applied": false,
+        "repair_details": {
+          "details": [],
+          "dropped_unrepairable_evidence": 0,
+          "repair_applied": false,
+          "repaired_evidence_types": 0
+        },
+        "request_prompt_hash": "ddd9aba13dc750d1afcffa188dd33a3a1ab91e3a415b64ca4a824c2ff7865dbe",
+        "request_prompt_tokens_est": 5536,
+        "request_prompt_trimmed": true,
+        "requires_visual_confirmation": false,
+        "response_mapping": {
+          "allowed_evidence_ref_count": 153,
+          "diagnosis": {
+            "error_category": "OM",
+            "step_id": "S01"
+          },
+          "next": {
+            "step_id": "S01"
+          },
+          "observability_status": "observable",
+          "requires_visual_confirmation": false
+        },
+        "retry_count": 0,
+        "retry_reason": null,
+        "scenario_profile": "airfield",
+        "snapshot_ids": {
+          "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+          "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+        },
+        "state_key": "099ae84f26d22ee7bd95fccfdb0868baf0903b1bb5c49364bd0333a9db2cc0a3",
+        "sync_delta_ms": 86,
+        "validator_rejected": false,
+        "vision": {
+          "frame_id": "1779209004872_000276",
+          "frame_ids": [
+            "1779209004872_000276"
+          ],
+          "frame_stale": false,
+          "observation_ref": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+          "observation_seq": 1,
+          "observation_t_wall_ms": 1779209004800,
+          "observation_t_wall_s": 1779209004.800106,
+          "pre_trigger_frame": null,
+          "selected_frames": [
+            {
+              "capture_wall_ms": 1779209004872,
+              "channel": "composite_panel",
+              "frame_id": "1779209004872_000276",
+              "frame_seq": 276,
+              "frame_stale": false,
+              "height": 1440,
+              "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779209004872_000276_vlm.png",
+              "layout_id": "fa18c_composite_panel_v2",
+              "role": "trigger_frame",
+              "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779209004872_000276.png",
+              "sync_delta_ms": 86,
+              "sync_miss_reason": null,
+              "sync_status": "matched_future_fallback",
+              "width": 3440
+            }
+          ],
+          "status": "partial",
+          "sync_delta_ms": 86,
+          "sync_miss_reason": "missing_pre_trigger_frame",
+          "sync_status": "matched_future_fallback",
+          "sync_window_ms": 250,
+          "trigger_frame": {
+            "capture_wall_ms": 1779209004872,
+            "channel": "composite_panel",
+            "frame_id": "1779209004872_000276",
+            "frame_seq": 276,
+            "frame_stale": false,
+            "height": 1440,
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779209004872_000276_vlm.png",
+            "layout_id": "fa18c_composite_panel_v2",
+            "role": "trigger_frame",
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779209004872_000276.png",
+            "sync_delta_ms": 86,
+            "sync_miss_reason": null,
+            "sync_status": "matched_future_fallback",
+            "width": 3440
+          },
+          "trigger_wall_ms": 1779209004786,
+          "vision_used": true
+        },
+        "vision_fact_active_step_ids": [
+          "S01"
+        ],
+        "vision_fact_cached_count": 0,
+        "vision_fact_extractor_used": false,
+        "vision_fact_ignored_count": 0,
+        "vision_fact_status": "vision_not_required",
+        "vision_fact_sticky_count": 0,
+        "vision_fact_summary": {
+          "frame_ids": [
+            "1779209004872_000276"
+          ],
+          "fresh_fact_ids": [],
+          "not_seen_fact_ids": [],
+          "seen_fact_ids": [],
+          "status": "vision_not_required",
+          "summary_text": "no_active_vision_facts",
+          "uncertain_fact_ids": []
+        },
+        "vision_facts": [],
+        "vision_fallback_reason": null,
+        "vision_frame_capture_selected": true,
+        "vision_frame_ids": [
+          "1779209004872_000276"
+        ],
+        "vision_status": "partial",
+        "vision_used": true,
+        "vlm_call_reason": "vision_not_required_for_step",
+        "vlm_call_status": "not_required"
+      },
+      "response_id": "98de9798-7b38-41e2-8618-bf9390cc1471",
+      "status": "ok",
+      "timestamp": "2026-05-19T16:43:29.098996+00:00",
+      "version": "v1"
+    }
+  },
+  "expectations": {
+    "expected_final_step_id": "S01",
+    "expected_overlay_target_ids": [
+      "battery_switch"
+    ],
+    "final_response_source": "model",
+    "llm_decision_status": "repaired",
+    "vlm_call_status": "not_required"
+  },
+  "extraction_id": "614024be-1420-4188-91e9-f044acff9291",
+  "harness": {
+    "candidate_steps": [
+      {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "battery_switch",
+          "generator_left_switch",
+          "generator_right_switch"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S01",
+        "supporting_evidence_refs": [
+          "GATES.S01.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "battery_switch",
+          "generator_left_switch",
+          "generator_right_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S01",
+        "supporting_evidence_refs": [
+          "GATES.S01.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "apu_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S03",
+        "supporting_evidence_refs": [
+          "GATES.S03.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "eng_crank_switch"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S04",
+        "supporting_evidence_refs": [
+          "GATES.S04.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S05",
+        "supporting_evidence_refs": [
+          "GATES.S05.completion"
+        ]
+      },
+      {
+        "confidence": 0.66,
+        "proposed_next_action_target_ids": [
+          "bleed_air_knob"
+        ],
+        "role": "candidate",
+        "source": "gate_blocker",
+        "step_id": "S06",
+        "supporting_evidence_refs": [
+          "GATES.S06.completion"
+        ]
+      },
+      {
+        "confidence": 0.5,
+        "proposed_next_action_target_ids": [
+          "left_mdi_pb15",
+          "left_mdi_pb18"
+        ],
+        "role": "candidate",
+        "source": "recent_action",
+        "step_id": "S08",
+        "supporting_evidence_refs": [
+          "RECENT_ACTIONS.left_mdi_pb15",
+          "RECENT_ACTIONS.left_mdi_pb18"
+        ]
+      },
+      {
+        "confidence": 0.5,
+        "proposed_next_action_target_ids": [
+          "ufc_comm1_channel_selector_pull",
+          "ufc_key_0",
+          "ufc_key_1"
+        ],
+        "role": "candidate",
+        "source": "recent_action",
+        "step_id": "S09",
+        "supporting_evidence_refs": [
+          "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+          "RECENT_ACTIONS.ufc_key_0",
+          "RECENT_ACTIONS.ufc_key_1"
+        ]
+      }
+    ],
+    "final_action_plan": {
+      "evidence_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+      "overlay_step_id": "S01",
+      "source": "model",
+      "step_id": "S01",
+      "targets": [
+        "battery_switch"
+      ],
+      "text_only": false
+    },
+    "model_decision": {
+      "evidence_refs": [
+        "GATES.S01.completion"
+      ],
+      "generation_mode": "model",
+      "overlay_targets": [
+        "battery_switch"
+      ],
+      "status": "ok",
+      "step_id": "S01"
+    },
+    "repair_result": {
+      "applied": true,
+      "evidence_ref_repair": {
+        "details": [],
+        "repair_applied": false
+      },
+      "json_repaired": false,
+      "path": "model"
+    },
+    "trace": {
+      "candidates": [
+        {
+          "confidence": 0.55,
+          "proposed_next_action_target_ids": [
+            "battery_switch",
+            "generator_left_switch",
+            "generator_right_switch"
+          ],
+          "role": "candidate_not_authoritative",
+          "source": "deterministic",
+          "step_id": "S01",
+          "supporting_evidence_refs": [
+            "GATES.S01.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "battery_switch",
+            "generator_left_switch",
+            "generator_right_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S01",
+          "supporting_evidence_refs": [
+            "GATES.S01.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "apu_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S03",
+          "supporting_evidence_refs": [
+            "GATES.S03.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "eng_crank_switch"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S04",
+          "supporting_evidence_refs": [
+            "GATES.S04.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S05",
+          "supporting_evidence_refs": [
+            "GATES.S05.completion"
+          ]
+        },
+        {
+          "confidence": 0.66,
+          "proposed_next_action_target_ids": [
+            "bleed_air_knob"
+          ],
+          "role": "candidate",
+          "source": "gate_blocker",
+          "step_id": "S06",
+          "supporting_evidence_refs": [
+            "GATES.S06.completion"
+          ]
+        },
+        {
+          "confidence": 0.5,
+          "proposed_next_action_target_ids": [
+            "left_mdi_pb15",
+            "left_mdi_pb18"
+          ],
+          "role": "candidate",
+          "source": "recent_action",
+          "step_id": "S08",
+          "supporting_evidence_refs": [
+            "RECENT_ACTIONS.left_mdi_pb15",
+            "RECENT_ACTIONS.left_mdi_pb18"
+          ]
+        },
+        {
+          "confidence": 0.5,
+          "proposed_next_action_target_ids": [
+            "ufc_comm1_channel_selector_pull",
+            "ufc_key_0",
+            "ufc_key_1"
+          ],
+          "role": "candidate",
+          "source": "recent_action",
+          "step_id": "S09",
+          "supporting_evidence_refs": [
+            "RECENT_ACTIONS.ufc_comm1_channel_selector_pull",
+            "RECENT_ACTIONS.ufc_key_0",
+            "RECENT_ACTIONS.ufc_key_1"
+          ]
+        }
+      ],
+      "chosen_candidate": {
+        "confidence": 0.55,
+        "proposed_next_action_target_ids": [
+          "battery_switch",
+          "generator_left_switch",
+          "generator_right_switch"
+        ],
+        "role": "candidate_not_authoritative",
+        "source": "deterministic",
+        "step_id": "S01",
+        "supporting_evidence_refs": [
+          "GATES.S01.completion"
+        ]
+      },
+      "evidence_packet_summary": {
+        "blocked_gate_count": 7,
+        "conflicts": [],
+        "recent_action_count": 8,
+        "telemetry_missing_source_count": 28,
+        "telemetry_status": "low_confidence_bootstrap",
+        "telemetry_window_digest": {
+          "changed_var_count": 0,
+          "contradiction_count": 0,
+          "first_seq": 1,
+          "frame_count": 1,
+          "latest_seq": 1
+        },
+        "vision_fresh_count": 0,
+        "vision_seen_count": 0,
+        "vision_status": "vision_not_required"
+      },
+      "evidence_snapshot": {
+        "candidate_generation_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "final_decision_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "model_request_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "schema_version": "evidence_snapshot.v1",
+        "snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "source_observation_id": "1ee204de-f86d-472a-b5b4-64c9578c4b2c",
+        "source_observation_seq": 1,
+        "source_observation_t_wall": 1779209004.800106,
+        "telemetry_window_first_seq": 1,
+        "telemetry_window_frame_count": 1,
+        "telemetry_window_latest_seq": 1,
+        "telemetry_window_latest_t_wall": 1779209004.800106,
+        "validator_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+      },
+      "evidence_snapshot_consistency": {
+        "deterministic_hint_matches_request": false,
+        "final_action_plan_matches_snapshot": true,
+        "superseded_by_snapshot": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+      },
+      "final_action_plan": {
+        "evidence_snapshot_id": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "overlay_step_id": "S01",
+        "source": "model",
+        "step_id": "S01",
+        "targets": [
+          "battery_switch"
+        ],
+        "text_only": false
+      },
+      "final_overlay_targets": [
+        "battery_switch"
+      ],
+      "message_category": "fallback_overlay",
+      "model_decision": {
+        "evidence_refs": [
+          "GATES.S01.completion"
+        ],
+        "generation_mode": "model",
+        "overlay_targets": [
+          "battery_switch"
+        ],
+        "status": "ok",
+        "step_id": "S01"
+      },
+      "rejected_candidates": [],
+      "repair_result": {
+        "applied": true,
+        "evidence_ref_repair": {
+          "details": [],
+          "repair_applied": false
+        },
+        "json_repaired": false,
+        "path": "model"
+      },
+      "schema_version": "v1",
+      "snapshot_ids": {
+        "candidate_generation": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "final_decision": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "model_request": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb",
+        "validator": "8f77ac4e0ba9e7243e0e1cbe8cd71b4ef9d52c1a7b52e26bd477247ec844d3eb"
+      },
+      "validator_result": {
+        "fallback_overlay_reason": "model",
+        "fallback_overlay_used": true,
+        "reasons": [],
+        "rejected": false,
+        "rejected_model_step_id": null
+      },
+      "vlm_call": {
+        "cached_fact_count": 0,
+        "extractor_called": false,
+        "extractor_used": false,
+        "frame_capture_selected": true,
+        "frame_ids": [
+          "1779209004872_000276"
+        ],
+        "ignored_fact_count": 0,
+        "reason": "vision_not_required_for_step",
+        "status": "not_required",
+        "sticky_fact_count": 0,
+        "sync_delta_ms": 86,
+        "sync_status": "matched_future_fallback",
+        "vision_fact_status": "vision_not_required",
+        "vision_status": "partial"
+      }
+    },
+    "validator_result": {
+      "fallback_overlay_reason": "model",
+      "fallback_overlay_used": true,
+      "reasons": [],
+      "rejected": false,
+      "rejected_model_step_id": null
+    }
+  },
+  "help_cycle_id": "614024be-1420-4188-91e9-f044acff9291",
+  "model_io": {
+    "help_response": {
+      "diagnosis": {
+        "error_category": "OM",
+        "step_id": "S01"
+      },
+      "explanations": [
+        "请先操作 battery_switch。"
+      ],
+      "next": {
+        "step_id": "S01"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.51,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "GATES.S01.completion",
+            "target": "battery_switch",
+            "type": "gate"
+          }
+        ],
+        "targets": [
+          "battery_switch"
+        ]
+      }
+    },
+    "model_raw_help_response": {
+      "diagnosis": {
+        "error_category": "OM",
+        "step_id": "S01"
+      },
+      "explanations": [
+        "当前步骤 S01 未完成，电瓶开关未打开。请右键点击 battery_switch 将其拨到 ON 位置。"
+      ],
+      "next": {
+        "step_id": "S01"
+      },
+      "overlay": {
+        "evidence": [
+          {
+            "grounding_confidence": 0.95,
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "ref": "GATES.S01.completion",
+            "target": "battery_switch",
+            "type": "gate"
+          }
+        ],
+        "targets": [
+          "battery_switch"
+        ]
+      }
+    },
+    "raw_llm_text_attempt_count": 0,
+    "raw_llm_text_present": false
+  },
+  "request_id": "614024be-1420-4188-91e9-f044acff9291",
+  "request_id_missing": false,
+  "schema_version": "live_help_replay_fixture.v1",
+  "source_log": {
+    "event_count": 13409,
+    "malformed_lines": [],
+    "path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/logs/live_help_harness_smoke_20260519_164221.jsonl"
+  }
+}

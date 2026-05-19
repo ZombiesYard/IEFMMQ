@@ -105,6 +105,12 @@ def _extract_optional_bool(raw: Any) -> bool | None:
     return None
 
 
+def _extract_optional_int(raw: Any) -> int | None:
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        return None
+    return raw
+
+
 def _extract_optional_text(raw: Any) -> str | None:
     if not isinstance(raw, str):
         return None
@@ -153,6 +159,8 @@ def _normalize_coverage_tags(
                 test_id=_extract_optional_text(item.get("test_id")),
                 regression_class=_extract_optional_text(item.get("regression_class")),
                 text_intent=_extract_optional_text(item.get("text_intent")),
+                action_mode=_extract_optional_text(item.get("action_mode")),
+                latency_class=_extract_optional_text(item.get("latency_class")),
                 reason=_extract_optional_text(item.get("reason")),
             )
         )
@@ -193,6 +201,8 @@ class ReplayEvalCoverageTag:
     test_id: str | None = None
     regression_class: str | None = None
     text_intent: str | None = None
+    action_mode: str | None = None
+    latency_class: str | None = None
     reason: str | None = None
 
 
@@ -797,6 +807,16 @@ def _extract_live_fixture_assertions(fixture_path: Path) -> dict[str, Any]:
         raise ValueError(f"coverage fixture root is not a mapping: {fixture_path}")
 
     expectations = _as_mapping(raw.get("expectations"))
+    cycle = _as_mapping(raw.get("cycle"))
+    tutor_request = _as_mapping(cycle.get("tutor_request"))
+    request_context = _as_mapping(tutor_request.get("context"))
+    tutor_response = _as_mapping(cycle.get("tutor_response"))
+    response_metadata = _as_mapping(tutor_response.get("metadata"))
+    context = _as_mapping(raw.get("context"))
+    request_state_harness = _as_mapping(request_context.get("state_harness"))
+    telemetry_evidence = _as_mapping(request_state_harness.get("telemetry_evidence"))
+    evidence_packet_summary = _as_mapping(request_context.get("evidence_packet_summary"))
+    evidence_snapshot = _as_mapping(context.get("evidence_snapshot"))
     harness = _as_mapping(raw.get("harness"))
     trace = _as_mapping(harness.get("trace"))
     model_decision = _as_mapping(trace.get("model_decision") or harness.get("model_decision"))
@@ -810,12 +830,17 @@ def _extract_live_fixture_assertions(fixture_path: Path) -> dict[str, Any]:
         _extract_optional_text(final_plan.get("step_id"))
         or _extract_optional_text(expectations.get("expected_final_step_id"))
     )
-    final_targets = _string_list(final_plan.get("targets")) or _string_list(
-        expectations.get("expected_overlay_target_ids")
-    )
+    final_targets_raw = final_plan.get("targets")
+    has_final_targets = isinstance(final_targets_raw, (list, tuple))
+    final_targets = _string_list(final_targets_raw)
+    if not has_final_targets and isinstance(expectations.get("expected_overlay_target_ids"), list):
+        has_final_targets = True
+        final_targets = _string_list(expectations.get("expected_overlay_target_ids"))
     extractor_used = _extract_optional_bool(vlm_call.get("extractor_used"))
     extractor_called = _extract_optional_bool(vlm_call.get("extractor_called"))
     frame_capture_selected = _extract_optional_bool(vlm_call.get("frame_capture_selected"))
+    if frame_capture_selected is None:
+        frame_capture_selected = _extract_optional_bool(response_metadata.get("vision_frame_capture_selected"))
 
     assertions: dict[str, Any] = {}
     if raw_model_step_id is not None:
@@ -829,7 +854,9 @@ def _extract_live_fixture_assertions(fixture_path: Path) -> dict[str, Any]:
         repair_applied = _extract_optional_bool(repair_result.get("applied"))
         if repair_applied is not None:
             assertions["repair_applied"] = repair_applied
-    final_action_plan_source = _extract_optional_text(final_plan.get("source"))
+    final_action_plan_source = _extract_optional_text(final_plan.get("source")) or _extract_optional_text(
+        expectations.get("final_response_source")
+    )
     if final_action_plan_source is not None:
         assertions["final_action_plan_source"] = final_action_plan_source
     message_category = _extract_optional_text(trace.get("message_category"))
@@ -837,14 +864,22 @@ def _extract_live_fixture_assertions(fixture_path: Path) -> dict[str, Any]:
         assertions["message_category"] = message_category
     if final_step_id is not None:
         assertions["final_step_id"] = final_step_id
-    if final_targets:
+    if has_final_targets:
         assertions["final_targets"] = final_targets
     vlm_call_status = _extract_optional_text(vlm_call.get("status")) or _extract_optional_text(
         expectations.get("vlm_call_status")
+    ) or _extract_optional_text(
+        response_metadata.get("vlm_call_status")
     )
     if vlm_call_status is not None:
         assertions["vlm_call_status"] = vlm_call_status
-    vision_fact_extractor_used = extractor_used if extractor_used is not None else extractor_called
+    vision_fact_extractor_used = (
+        extractor_used
+        if extractor_used is not None
+        else extractor_called
+        if extractor_called is not None
+        else _extract_optional_bool(response_metadata.get("vision_fact_extractor_used"))
+    )
     if vision_fact_extractor_used is not None:
         assertions["vision_fact_extractor_used"] = vision_fact_extractor_used
     if extractor_called is not None:
@@ -855,6 +890,42 @@ def _extract_live_fixture_assertions(fixture_path: Path) -> dict[str, Any]:
         assertions["frame_capture_only"] = bool(
             frame_capture_selected and not bool(extractor_used) and not bool(extractor_called)
         )
+    latency_ms = _extract_optional_int(response_metadata.get("latency_ms"))
+    if latency_ms is not None:
+        assertions["latency_ms"] = latency_ms
+        assertions["latency_source"] = "main_llm_response"
+        telemetry_status = _extract_optional_text(telemetry_evidence.get("source_status")) or _extract_optional_text(
+            evidence_packet_summary.get("telemetry_status")
+        )
+        telemetry_window_digest = _as_mapping(evidence_packet_summary.get("telemetry_window_digest"))
+        source_observation_seq = _extract_optional_int(evidence_snapshot.get("source_observation_seq"))
+        multimodal_path_attempted = _extract_optional_bool(response_metadata.get("multimodal_path_attempted"))
+        telemetry_window_frame_count = _extract_optional_int(telemetry_window_digest.get("frame_count"))
+        telemetry_window_first_seq = _extract_optional_int(telemetry_window_digest.get("first_seq"))
+        telemetry_window_latest_seq = _extract_optional_int(telemetry_window_digest.get("latest_seq"))
+        if telemetry_status is not None:
+            assertions["latency_telemetry_status"] = telemetry_status
+        if source_observation_seq is not None:
+            assertions["latency_source_observation_seq"] = source_observation_seq
+        if multimodal_path_attempted is not None:
+            assertions["latency_multimodal_path_attempted"] = multimodal_path_attempted
+        if telemetry_window_frame_count is not None:
+            assertions["latency_telemetry_window_frame_count"] = telemetry_window_frame_count
+        if telemetry_window_first_seq is not None:
+            assertions["latency_telemetry_window_first_seq"] = telemetry_window_first_seq
+        if telemetry_window_latest_seq is not None:
+            assertions["latency_telemetry_window_latest_seq"] = telemetry_window_latest_seq
+        if (
+            vlm_call_status == "not_required"
+            and vision_fact_extractor_used is False
+            and telemetry_status == "low_confidence_bootstrap"
+            and source_observation_seq == 1
+            and telemetry_window_frame_count == 1
+            and telemetry_window_first_seq == 1
+            and telemetry_window_latest_seq == 1
+            and multimodal_path_attempted is False
+        ):
+            assertions["latency_not_vlm_delay"] = True
     return assertions
 
 
@@ -872,6 +943,8 @@ def _coverage_source_dict(
             "test_id": tag.test_id,
             "regression_class": tag.regression_class,
             "text_intent": tag.text_intent,
+            "action_mode": tag.action_mode,
+            "latency_class": tag.latency_class,
             "reason": tag.reason,
         }
     else:
