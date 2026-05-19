@@ -159,6 +159,22 @@ _S08_POWER_SEQUENCE: tuple[tuple[str, str, str], ...] = (
 )
 
 _TARGET_ACTION_GUIDANCE_BY_STEP: dict[tuple[str, str], dict[str, str]] = {
+    ("S08", "left_mdi_brightness_selector"): {
+        "zh": "左 DDI 还未开启。请将左 DDI 亮度/电源旋钮调到 NIGHT 或 DAY；屏幕点亮可能有短暂延迟。",
+        "en": "The left DDI is not powered. Set the left DDI brightness/power selector to NIGHT or DAY; illumination can lag briefly.",
+    },
+    ("S08", "right_mdi_brightness_selector"): {
+        "zh": "右 DDI 还未开启。请将右 DDI 亮度/电源旋钮调到 NIGHT 或 DAY；屏幕点亮可能有短暂延迟。",
+        "en": "The right DDI is not powered. Set the right DDI brightness/power selector to NIGHT or DAY; illumination can lag briefly.",
+    },
+    ("S08", "ampcd_off_brightness_knob"): {
+        "zh": "AMPCD 还未开启。请向上滚轮调高 AMPCD 亮度旋钮，并等待画面稳定点亮。",
+        "en": "The AMPCD is not powered. Mouse-wheel up on the AMPCD brightness knob and wait for the display to illuminate.",
+    },
+    ("S08", "hud_symbology_brightness_knob"): {
+        "zh": "HUD 还未开启。请向上滚轮调高 HUD 亮度，并目视确认 HUD 符号亮起。",
+        "en": "The HUD is not powered. Mouse-wheel up on the HUD brightness control and visually confirm HUD symbology appears.",
+    },
     ("S18", "right_mdi_pb5"): {
         "zh": "请在右 DDI BIT 页面左键按 PB5/FCS-MC，进入 FCS-MC BIT 页面。",
         "en": "On the right DDI BIT page, left-click PB5/FCS-MC to enter the FCS-MC BIT page.",
@@ -166,6 +182,22 @@ _TARGET_ACTION_GUIDANCE_BY_STEP: dict[tuple[str, str], dict[str, str]] = {
     ("S13", "radar_mode_knob"): {
         "zh": "请将 RADAR knob 设到 OPR：右键点击到下一挡。",
         "en": "Set the radar knob to OPR with a right-click to the next detent.",
+    },
+    ("S12", "ampcd_pb19"): {
+        "zh": "INS 已设置到对准模式。请左键按 AMPCD PB19，启动快速 INS 校准。",
+        "en": "INS is set for alignment. Left-click AMPCD PB19 to start fast INS alignment.",
+    },
+    ("S12", "ins_mode_knob"): {
+        "zh": "请将 INS 模式旋钮设置到对准挡位：机场冷启动用 GND，航母冷启动用 CV。",
+        "en": "Set the INS mode knob to the alignment detent: GND for airfield startup, CV for carrier startup.",
+    },
+    ("S09", "ufc_comm1_channel_selector_pull"): {
+        "zh": "请先拉出 UFC 的 COMM1 频道选择钮，打开预置 1 输入模式；目标频率是 134.000 MHz。",
+        "en": "Pull the UFC COMM1 channel selector to open preset 1 entry mode; the target frequency is 134.000 MHz.",
+    },
+    ("S10", "eng_crank_switch"): {
+        "zh": "当前处于 S10。请将 Engine Crank 开关拨到 LEFT/L 位置：用左键点击 ENG CRANK 开关启动左发。",
+        "en": "You are on S10. Set the Engine Crank switch to LEFT/L with a left-click to start the left engine.",
     },
     ("S20", "refuel_probe_switch"): {
         "zh": "请右键将受油管开关拨到 EXTEND，开始四落检查。",
@@ -3321,8 +3353,6 @@ def _s12_fast_align_action_hint_allowed(
 ) -> bool:
     if not isinstance(action_hint, Mapping) or action_hint.get("target") != "ampcd_pb19":
         return False
-    if "vars.ins_fast_align_complete==true" not in missing_conditions:
-        return False
     if any("vars.ins_mode" in item for item in missing_conditions):
         return False
 
@@ -3352,6 +3382,9 @@ def _s12_fast_align_action_hint_allowed(
     scenario_profile = context.get("scenario_profile")
     if not isinstance(scenario_profile, str) or not scenario_profile:
         scenario_profile = hint.get("scenario_profile")
+    recent_targets = set(_normalize_step_ui_targets(hint.get("recent_ui_targets")))
+    interacted_targets = set(_normalize_step_ui_targets(hint.get("step_interacted_targets")))
+    ins_mode_recently_handled = "ins_mode_knob" in (recent_targets | interacted_targets)
 
     ins_mode = vars_selected.get("ins_mode")
     if isinstance(ins_mode, (int, float)) and not isinstance(ins_mode, bool):
@@ -3359,6 +3392,13 @@ def _s12_fast_align_action_hint_allowed(
         if scenario_profile == "carrier":
             return normalized_mode == 1
         return normalized_mode == 2
+
+    if "vars.ins_fast_align_complete==true" not in missing_conditions:
+        return (
+            vars_selected.get("ins_mode_cv_or_gnd") is True
+            or vars_selected.get("ins_mode_set") is True
+            or (not bool(vars_selected) and ins_mode_recently_handled)
+        )
 
     return (
         vars_selected.get("ins_mode_cv_or_gnd") is True
@@ -5985,6 +6025,11 @@ class LiveDcsTutorLoop:
         inferred_step_id = hint.get("inferred_step_id")
         if response.metadata.get("refuel_probe_motion_guidance_rewritten") is True:
             return False, "refuel_probe_motion_wait_already_rewritten"
+        final_plan = response.metadata.get("harness_action_plan") or response.metadata.get("final_action_plan")
+        if inferred_step_id == "S08" and isinstance(final_plan, Mapping):
+            final_plan_source = final_plan.get("source")
+            if isinstance(final_plan_source, str) and final_plan_source.startswith("state_action_planner"):
+                return False, "state_action_planner_already_repaired"
         action_hint = hint.get("action_hint")
         if bool(hint.get("requires_visual_confirmation")) is True:
             if isinstance(action_hint, Mapping):
@@ -6472,6 +6517,9 @@ class LiveDcsTutorLoop:
         hint_recent_targets = hint.get("recent_ui_targets")
         if isinstance(hint_recent_targets, (list, tuple, set)):
             recent_action_targets.extend(item for item in hint_recent_targets if isinstance(item, str) and item)
+        hint_interacted_targets = hint.get("step_interacted_targets")
+        if isinstance(hint_interacted_targets, (list, tuple, set)):
+            recent_action_targets.extend(item for item in hint_interacted_targets if isinstance(item, str) and item)
         recent_action_targets = _dedupe_strings(recent_action_targets)
 
         missing_conditions = hint.get("missing_conditions")
@@ -6664,6 +6712,11 @@ class LiveDcsTutorLoop:
             latest_vars=vars_map,
             evidence_packet=state_action_evidence_packet,
             recent_action_targets=recent_action_targets,
+            scenario_profile=(
+                context.get("scenario_profile")
+                if isinstance(context.get("scenario_profile"), str)
+                else hint.get("scenario_profile") if isinstance(hint.get("scenario_profile"), str) else None
+            ),
         )
         plan_guidance = plan.guidance
         if (
@@ -6702,6 +6755,18 @@ class LiveDcsTutorLoop:
                 if self.lang == "zh"
                 else "Continue to S13. Set the radar knob to OPR with a right-click to the next detent."
             )
+        elif plan.step_id == "S12" and plan.targets == ("ampcd_pb19",):
+            plan_guidance = (
+                "INS 已设置到对准模式。请左键按 AMPCD PB19，启动快速 INS 校准。"
+                if self.lang == "zh"
+                else "INS is set for alignment. Left-click AMPCD PB19 to start fast INS alignment."
+            )
+        elif "s12_airfield_ins_knob_to_gnd" in plan.reasons:
+            plan_guidance = (
+                "当前处于 S12。机场冷启动请将 INS 模式旋钮设到 GND：右键点击到下一挡。"
+                if self.lang == "zh"
+                else "You are on S12. For airfield startup, set the INS mode knob to GND with a right-click to the next detent."
+            )
         elif "s31_radar_altimeter_mouse_wheel_guidance" in plan.reasons:
             plan_guidance = (
                 "现在进入 S31。请用鼠标滚轮调整雷达高度表告警高度旋钮：机场 200 ft，航母 40 ft。"
@@ -6714,7 +6779,14 @@ class LiveDcsTutorLoop:
                 if self.lang == "zh"
                 else "Continue to S32. Use the mouse wheel on the standby attitude cage knob to uncage the standby attitude indicator."
             )
-        if self.lang == "zh" and len(plan.targets) == 1:
+        skip_localized_target_hint = (
+            plan.step_id == "S08"
+            and any(
+                isinstance(reason, str) and reason.startswith("s08_power_target:")
+                for reason in plan.reasons
+            )
+        )
+        if self.lang == "zh" and len(plan.targets) == 1 and not skip_localized_target_hint:
             localized_plan_guidance = _localized_target_action_guidance(
                 plan.targets[0],
                 step_id=plan.step_id,
@@ -6792,6 +6864,31 @@ class LiveDcsTutorLoop:
                         if self.lang == "zh"
                         else "The FCS BIT is already running. Release the switch and wait for the final GO result."
                     )
+                elif any(
+                    isinstance(reason, str) and reason.startswith("s08_recent_power_target_no_progress:")
+                    for reason in plan.reasons
+                ):
+                    recent_target = next(
+                        (
+                            str(reason).split(":", 1)[1]
+                            for reason in plan.reasons
+                            if isinstance(reason, str)
+                            and reason.startswith("s08_recent_power_target_no_progress:")
+                        ),
+                        "",
+                    )
+                    if self.lang == "zh":
+                        if recent_target == "hud_symbology_brightness_knob":
+                            plan_guidance = "HUD 亮度控件刚刚已经提示或操作过，但 telemetry 仍显示 HUD 未点亮。请稍等片刻，必要时继续向上滚轮，并目视确认 HUD 亮起。"
+                        elif recent_target == "ampcd_off_brightness_knob":
+                            plan_guidance = "AMPCD 亮度控件刚刚已经提示或操作过，但 telemetry 仍显示 AMPCD 未点亮。请稍等片刻，必要时继续向上滚轮，并目视确认 AMPCD 亮起。"
+                        else:
+                            plan_guidance = "该显示亮度控件刚刚已经提示或操作过，但 telemetry 暂时还没有进展。请稍等片刻，并目视确认显示是否已经亮起。"
+                    else:
+                        plan_guidance = (
+                            "That display brightness control was just highlighted or operated, but telemetry still "
+                            "shows no progress. Wait briefly, turn it further if needed, and visually confirm the display."
+                        )
             if isinstance(plan_guidance, str) and plan_guidance:
                 original_message = response.message
                 original_explanations = list(response.explanations)
@@ -7004,9 +7101,17 @@ class LiveDcsTutorLoop:
         response.metadata["next"] = {"step_id": plan.step_id}
         response.metadata["help_response"] = planned_help_obj
         response.metadata["harness_validator_fallback_reason"] = fallback_reason
-        if isinstance(plan_guidance, str) and plan_guidance:
-            response.message = plan_guidance
-            response.explanations = [plan_guidance]
+        planned_public_guidance = plan_guidance if isinstance(plan_guidance, str) and plan_guidance else None
+        if planned_public_guidance is None:
+            planned_explanations = planned_help_obj.get("explanations")
+            if isinstance(planned_explanations, list):
+                planned_public_guidance = next(
+                    (item for item in planned_explanations if isinstance(item, str) and item),
+                    None,
+                )
+        if planned_public_guidance is not None:
+            response.message = planned_public_guidance
+            response.explanations = [planned_public_guidance]
         elif mapped.explanations and response.metadata.get("procedural_guidance_rewritten") is not True:
             response.message = mapped.explanations[0]
             response.explanations = list(mapped.explanations)
@@ -8740,6 +8845,17 @@ class LiveDcsTutorLoop:
             and _s08_power_condition_missing_for_target(fallback_target, missing_set, vars_map)
         ):
             fallback_guidance = _s08_power_guidance_for_target(fallback_target, self.lang)
+        elif (
+            overlay_step_id == "S08"
+            and len(fallback_targets_list) == 1
+            and fallback_target in {
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+            }
+        ):
+            fallback_guidance = _s08_power_guidance_for_target(fallback_target, self.lang)
         elif len(fallback_targets_list) == 1 and (
             localized_fallback_guidance := _localized_target_action_guidance(
                 fallback_target,
@@ -8898,6 +9014,10 @@ class LiveDcsTutorLoop:
             response.metadata.get("completion_conflict_rewritten") is True
             and _message_mentions_any_target(original_text, rejected_targets)
             and not _message_mentions_any_target(original_text, current_targets)
+        ) or (
+            presentation_plan_source == "validator_action_hint"
+            and fallback_step_id == "S12"
+            and fallback_targets == ["ampcd_pb19"]
         )
         if mapped.message and (not response.message or should_sync_fallback_text):
             if response.message and mapped.message != response.message:
