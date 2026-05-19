@@ -11150,6 +11150,25 @@ def _fixture_request_and_model_response(fixture: dict[str, Any]) -> tuple[TutorR
     return request, response
 
 
+def _fixture_request_and_raw_model_response(fixture: dict[str, Any]) -> tuple[TutorRequest, TutorResponse]:
+    request, _ = _fixture_request_and_model_response(fixture)
+    help_response = fixture["model_io"].get("model_raw_help_response") or fixture["model_io"]["help_response"]
+    explanations = [item for item in help_response.get("explanations", []) if isinstance(item, str)]
+    response = TutorResponse(
+        status="ok",
+        in_reply_to=request.request_id,
+        message=explanations[0] if explanations else None,
+        actions=[],
+        explanations=explanations,
+        metadata={
+            "provider": "mock_qwen",
+            "generation_mode": "model",
+            "help_response": help_response,
+        },
+    )
+    return request, response
+
+
 def _public_response_text(response: TutorResponse) -> str:
     final_public = response.metadata.get("final_public_response")
     if not isinstance(final_public, dict):
@@ -11438,6 +11457,47 @@ def test_live_help_fixture_314_s33_default_satisfied_uses_public_completion_mess
     assert "evidence" not in public_text.lower()
     assert "AUTO" in public_text
     assert "完成" in public_text
+
+
+def test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+    request.context = dict(request.context)
+    request.context["deterministic_step_hint"] = dict(request.context["deterministic_step_hint"])
+    request.context["deterministic_step_hint"]["gate_blockers"] = [
+        {
+            "ref": "GATES.S28.precondition",
+            "reason": "Old raw-step blocker must not be reused after repair.",
+        }
+    ]
+    request.context["gates"] = {
+        "S29.completion": {"status": "blocked", "reason": "BINGO fuel must be set on the IFEI."},
+        "S29.precondition": {"status": "allowed"},
+    }
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S29"
+    assert repaired.metadata["next"]["step_id"] == "S29"
+    assert repaired.metadata["final_action_plan"]["step_id"] == "S29"
+    assert repaired.metadata["final_action_plan"]["overlay_step_id"] == "S29"
+    assert repaired.metadata["final_overlay_targets"] == ["ifei_up_button"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ifei_up_button"
+    assert repaired.actions[0]["evidence_refs"] == ["VARS.bingo_fuel_set"]
+    assert repaired.metadata["help_response"]["overlay"]["evidence"][0]["ref"] == "VARS.bingo_fuel_set"
+    assert repaired.metadata["harness_trace"]["model_decision"]["step_id"] == "S28"
+    assert repaired.metadata["harness_trace"]["model_decision"]["overlay_targets"] == ["parking_brake_handle"]
+    assert repaired.metadata["harness_trace"]["validator_result"]["rejected"] is True
+    assert repaired.metadata["harness_trace"]["repair_result"]["path"] == "final_evidence_consistency_validator"
+    public_text = _public_response_text(repaired)
+    assert "BINGO" in public_text
+    assert "S20" not in public_text
+    assert "S22" not in public_text
+    assert "parking_brake_handle" not in public_text
+    assert "最新证据" not in public_text
 
 
 def test_safe_fallback_overlay_syncs_message_after_completion_conflict_repair() -> None:
