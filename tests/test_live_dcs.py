@@ -11045,6 +11045,93 @@ def test_live_help_fixture_315_repairs_unconfirmed_s08_tac_public_response() -> 
     assert "VISION_FACTS.tac_page_visible" not in final_public_json
 
 
+def test_live_help_fixture_314_keeps_s08_tac_bit_root_visual_recovery() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/3465ec45-e87c-48bd-8f1c-5f59d1abeafd.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response, vision_status="available")
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S08"
+    assert repaired.metadata["next"]["step_id"] == "S08"
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "left_mdi_pb18"
+    assert repaired.metadata["final_overlay_targets"] == ["left_mdi_pb18"]
+    assert "ufc_comm1_channel_selector_pull" not in repaired.metadata["final_overlay_targets"]
+    public_text = _public_response_text(repaired)
+    assert "S09" not in public_text
+    assert "COMM1" not in public_text
+
+
+def test_live_help_fixture_314_s18_pb5_repair_rewrites_public_message() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/9608382d-ee62-486f-9d90-0c9d74997241.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+    response.message = "当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。"
+    response.explanations = [response.message]
+
+    repaired = _validate_compact_live_help_response(request=request, response=response, vision_status="available")
+
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "right_mdi_pb5"
+    public_text = _public_response_text(repaired)
+    assert "right_mdi_pb5" in public_text or "PB5" in public_text
+    assert "right_mdi_pb18" not in public_text
+    assert "PB18" not in public_text
+
+
+def test_safe_fallback_overlay_syncs_message_after_completion_conflict_repair() -> None:
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": ["right_mdi_pb18", "right_mdi_pb5"],
+            "gates": [
+                {"gate_id": "S18.completion", "status": "blocked"},
+                {"gate_id": "S18.precondition", "status": "allowed"},
+            ],
+            "deterministic_step_hint": {
+                "inferred_step_id": "S18",
+                "overlay_step_id": "S18",
+                "action_hint": {"target": "right_mdi_pb5"},
+                "step_ui_targets": ["right_mdi_pb18", "right_mdi_pb5"],
+            },
+            "rag_topk": [],
+        },
+    )
+    response = TutorResponse(
+        status="ok",
+        message="当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。",
+        explanations=["当前 S18 尚未完成。请先操作 right_mdi_pb18，并确认该步骤条件已满足。"],
+        actions=[],
+        metadata={
+            "completion_conflict_rewritten": True,
+            "rejected_model_targets": ["right_mdi_pb18"],
+            "rejected_model_target": "right_mdi_pb18",
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+    )
+    try:
+        used, reason = loop._apply_safe_fallback_overlay(response, request)
+
+        assert used is True
+        assert reason == "validator_action_hint"
+        assert [action["target"] for action in response.actions] == ["right_mdi_pb5"]
+        assert "right_mdi_pb5" in response.message or "PB5" in response.message
+        assert "right_mdi_pb18" not in response.message
+        assert "PB18" not in response.message
+    finally:
+        loop.close()
+
+
 def test_live_help_fixture_306_1ab3_retracted_after_latch_advances_to_s22() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/1ab3eb59-6705-4a62-87d7-9fc15a2dcec0.fixture.json"

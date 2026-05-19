@@ -2657,6 +2657,26 @@ def _s08_visual_hint_from_vision_summary(context: Mapping[str, Any]) -> tuple[st
     return None
 
 
+def _s08_visual_recovery_needed(context: Mapping[str, Any]) -> bool:
+    summary = context.get("vision_fact_summary")
+    if not isinstance(summary, Mapping):
+        return False
+    seen_or_fresh: set[str] = set()
+    for key in ("seen_fact_ids", "fresh_fact_ids"):
+        raw_ids = summary.get(key)
+        if isinstance(raw_ids, (list, tuple, set)):
+            seen_or_fresh.update(item for item in raw_ids if isinstance(item, str) and item)
+    not_seen = {
+        item for item in summary.get("not_seen_fact_ids", [])
+        if isinstance(item, str) and item
+    } if isinstance(summary.get("not_seen_fact_ids"), (list, tuple, set)) else set()
+    return (
+        "tac_page_visible" in seen_or_fresh
+        and "bit_root_page_visible" in seen_or_fresh
+        and "fcs_page_visible" in not_seen
+    )
+
+
 def _s08_visual_evidence_ref_for_target(evidence_refs: Sequence[str], target: str | None) -> str | None:
     fact_id = _s08_visual_hint_fact_id_for_target(target)
     if fact_id is None:
@@ -2748,6 +2768,22 @@ def _s08_clean_unconfirmed_page_navigation_action_refs(
                     cleaned_action.pop("evidence_refs", None)
         cleaned_actions.append(cleaned_action)
     return cleaned_actions, changed
+
+
+def _message_mentions_any_target(text: str | None, targets: Sequence[str]) -> bool:
+    if not isinstance(text, str) or not text:
+        return False
+    folded = text.lower()
+    for target in targets:
+        if not isinstance(target, str) or not target:
+            continue
+        if target.lower() in folded:
+            return True
+        if target.endswith("_pb18") and "pb18" in folded:
+            return True
+        if target.endswith("_pb5") and "pb5" in folded:
+            return True
+    return False
 
 
 def _s08_visual_fact_ref_for_seen_target(
@@ -6721,15 +6757,22 @@ class LiveDcsTutorLoop:
             recent_ui_targets=recent_buttons,
             vision_facts=context.get("vision_facts"),
         )
+        s08_visual_recovery = rejected_step_id == "S08" and _s08_visual_recovery_needed(context)
         next_step_id = (
             advanced.inferred_step_id
             if advanced is not None and isinstance(advanced.inferred_step_id, str)
             else self._next_step_id_after(rejected_step_id)
         )
+        if s08_visual_recovery:
+            next_step_id = "S08"
         if not isinstance(next_step_id, str) or not next_step_id:
             next_step_id = rejected_step_id
 
-        if self.lang == "zh":
+        if s08_visual_recovery and self.lang == "zh":
+            rewritten = "当前仍在 S08：左 DDI 还在 TAC 页面，FCS 页面尚未出现。请先按左 DDI PB18 进入 SUPT，再进入 FCS。"
+        elif s08_visual_recovery:
+            rewritten = "You are still on S08: the left DDI is on TAC and the FCS page is not visible. Press Left DDI PB18 to reach SUPT, then enter FCS."
+        elif self.lang == "zh":
             rewritten = f"{rejected_step_id} 的最新证据已经满足。现在进入 {next_step_id}。"
         else:
             rewritten = f"The latest evidence satisfies {rejected_step_id}. Continue to {next_step_id}."
@@ -6757,12 +6800,37 @@ class LiveDcsTutorLoop:
             item for item in rejected_missing_conditions if isinstance(item, str) and item
         ]
 
-        fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
-            request,
-            override_inferred_step_id=next_step_id,
-            override_overlay_step_id=next_step_id,
-            ignore_request_allowlist=True,
-        )
+        if s08_visual_recovery:
+            visual_hint = _s08_visual_hint_from_vision_summary(context)
+            target = visual_hint[0] if visual_hint is not None else "left_mdi_pb18"
+            evidence_ref = visual_hint[2] if visual_hint is not None else _visual_fact_ref_from_context(
+                context,
+                "tac_page_visible",
+            )
+            fallback_help_obj = {
+                "diagnosis": {"step_id": "S08", "error_category": "OM"},
+                "next": {"step_id": "S08"},
+                "overlay": {"targets": [target], "evidence": []},
+                "explanations": [rewritten],
+            }
+            if isinstance(evidence_ref, str) and evidence_ref:
+                fallback_help_obj["overlay"]["evidence"] = [
+                    {
+                        "target": target,
+                        "type": "visual",
+                        "ref": evidence_ref,
+                        "quote": "VLM confirms S08 page recovery is still required.",
+                        "grounding_confidence": 0.95,
+                    }
+                ]
+            fallback_reason = "s08_visual_recovery"
+        else:
+            fallback_help_obj, fallback_reason = self._build_safe_fallback_overlay_help_obj(
+                request,
+                override_inferred_step_id=next_step_id,
+                override_overlay_step_id=next_step_id,
+                ignore_request_allowlist=True,
+            )
         fallback_used = False
         if isinstance(fallback_help_obj, Mapping):
             planned_help_obj = copy.deepcopy(dict(fallback_help_obj))
@@ -7830,17 +7898,6 @@ class LiveDcsTutorLoop:
                 return False, f"fallback_mapping_failed:{'|'.join(str(item) for item in mapping_errors[:3])}"
             return False, "fallback_mapping_failed"
 
-        response.actions = list(mapped.actions)
-        if mapped.message and not response.message:
-            response.message = mapped.message
-        elif mapped.message and mapped.message != response.message:
-            response.metadata["fallback_message"] = mapped.message
-        original_explanations = list(response.explanations)
-        if mapped.explanations and not response.explanations:
-            response.explanations = list(mapped.explanations)
-        elif mapped.explanations and original_explanations and list(mapped.explanations) != original_explanations:
-            response.metadata["fallback_explanations"] = list(mapped.explanations)
-
         fallback_targets = _help_response_overlay_targets(fallback_help_obj)
         fallback_step_id = _help_response_step_id(fallback_help_obj)
         emergency_presentation_fallback = response.status == "error" or response.metadata.get("provider") == "fallback"
@@ -7849,6 +7906,35 @@ class LiveDcsTutorLoop:
             if emergency_presentation_fallback
             else self._presentation_fallback_plan_source(request, fallback_targets)
         )
+        response.actions = list(mapped.actions)
+        original_explanations = list(response.explanations)
+        original_text = "\n".join(
+            item for item in [response.message, *original_explanations]
+            if isinstance(item, str) and item
+        )
+        current_targets = _overlay_targets_from_actions(response.actions)
+        rejected_targets = response.metadata.get("rejected_model_targets")
+        if not isinstance(rejected_targets, (list, tuple, set)):
+            rejected_target = response.metadata.get("rejected_model_target")
+            rejected_targets = [rejected_target] if isinstance(rejected_target, str) and rejected_target else []
+        should_sync_fallback_text = (
+            response.metadata.get("completion_conflict_rewritten") is True
+            and _message_mentions_any_target(original_text, rejected_targets)
+            and not _message_mentions_any_target(original_text, current_targets)
+        )
+        if mapped.message and (not response.message or should_sync_fallback_text):
+            if response.message and mapped.message != response.message:
+                response.metadata["fallback_original_message"] = response.message
+            response.message = mapped.message
+        elif mapped.message and mapped.message != response.message:
+            response.metadata["fallback_message"] = mapped.message
+        if mapped.explanations and (not response.explanations or should_sync_fallback_text):
+            if original_explanations and list(mapped.explanations) != original_explanations:
+                response.metadata["fallback_original_explanations"] = original_explanations
+            response.explanations = list(mapped.explanations)
+        elif mapped.explanations and original_explanations and list(mapped.explanations) != original_explanations:
+            response.metadata["fallback_explanations"] = list(mapped.explanations)
+
         if annotate_presentation_metadata:
             response.metadata["presentation_fallback_plan_source"] = presentation_plan_source
             response.metadata["presentation_fallback_reason"] = fallback_reason
