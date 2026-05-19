@@ -7349,6 +7349,82 @@ def test_live_inference_requires_probe_to_remain_retracted_for_s21_latch(tmp_pat
     assert loop._refuel_probe_s21_latched_complete is False
 
 
+def test_live_build_request_serializes_refuel_probe_latch_history(tmp_path: Path) -> None:
+    replay_path = tmp_path / "bios_refuel_probe_latch_request.jsonl"
+    _write_replay(replay_path, [_bios_frame(1, 10.0, apu_switch=0)])
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(replay_path),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-refuel-probe-latch-request",
+    )
+    try:
+        extended_vars = {
+            "battery_on": True,
+            "power_available": True,
+            "probe_extended": True,
+            "probe_retracted": False,
+            "ext_refuel_probe_value": 65535,
+            "launch_bar_switch_value": 0,
+        }
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S21",
+                missing_conditions=("vars.ext_refuel_probe_value in [0,5000]",),
+            ),
+            extended_vars,
+        )
+        extended_obs = Observation(
+            source="mock",
+            payload={"seq": 1, "t_wall": 10.0, "vars": extended_vars},
+        )
+        extended_vision = loop._build_vision_selection(observation=extended_obs, trigger_t_wall=10.0)
+        extended_request, _prompt_meta, extended_state_key = loop._build_request(
+            extended_obs,
+            vision_selection=extended_vision,
+            vision_fact_context=loop._extract_vision_fact_context(vision_selection=extended_vision),
+        )
+
+        retracted_vars = {
+            "battery_on": True,
+            "power_available": True,
+            "probe_extended": False,
+            "probe_retracted": True,
+            "probe_cycle_complete": True,
+            "ext_refuel_probe_value": 0,
+            "launch_bar_switch_value": 0,
+        }
+        loop._stabilize_live_inference(
+            StepInferenceResult(
+                inferred_step_id="S20",
+                missing_conditions=("vars.ext_refuel_probe_value in [60000,65535]",),
+            ),
+            retracted_vars,
+        )
+        retracted_obs = Observation(
+            source="mock",
+            payload={"seq": 2, "t_wall": 20.0, "vars": retracted_vars},
+        )
+        retracted_vision = loop._build_vision_selection(observation=retracted_obs, trigger_t_wall=20.0)
+        retracted_request, _prompt_meta, retracted_state_key = loop._build_request(
+            retracted_obs,
+            vision_selection=retracted_vision,
+            vision_fact_context=loop._extract_vision_fact_context(vision_selection=retracted_vision),
+        )
+    finally:
+        loop.close()
+
+    assert extended_request.context["refuel_probe_completion_latches"] == {
+        "s20_latched_complete": True,
+        "s21_latched_complete": False,
+    }
+    assert retracted_request.context["refuel_probe_completion_latches"] == {
+        "s20_latched_complete": True,
+        "s21_latched_complete": True,
+    }
+    assert retracted_state_key != extended_state_key
+
+
 def test_live_dcs_cli_parses_raw_bios_source_args() -> None:
     parser = build_arg_parser()
     args = parser.parse_args(
@@ -10967,6 +11043,48 @@ def test_live_help_fixture_315_repairs_unconfirmed_s08_tac_public_response() -> 
     assert "not powered" in public_text or "未开启" in public_text
     final_public_json = json.dumps(repaired.metadata["final_public_response"], ensure_ascii=False)
     assert "VISION_FACTS.tac_page_visible" not in final_public_json
+
+
+def test_live_help_fixture_306_1ab3_retracted_after_latch_advances_to_s22() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/1ab3eb59-6705-4a62-87d7-9fc15a2dcec0.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S22"
+    assert repaired.metadata["next"]["step_id"] == "S22"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S22"
+    assert repaired.metadata["final_overlay_targets"] == ["launch_bar_switch"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "launch_bar_switch"
+    public_text = _public_response_text(repaired)
+    assert "S20 未完成" not in public_text
+    assert "refuel_probe_switch" not in public_text
+
+
+def test_live_help_fixture_306_2e04_extended_probe_advances_to_s21() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/2e04fdab-43ce-45d6-82e5-a9b0863d6c84.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S21"
+    assert repaired.metadata["next"]["step_id"] == "S21"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_overlay_targets"] == ["refuel_probe_switch"]
+    assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S21"
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "refuel_probe_switch"
+    public_text = _public_response_text(repaired)
+    assert "S20 未完成" not in public_text
+    assert "收起" in public_text
 
 
 def test_live_help_fixture_294_s09_comm1_complete_advances_to_s10() -> None:
