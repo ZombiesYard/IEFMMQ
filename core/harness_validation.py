@@ -497,6 +497,11 @@ def _s09_state_action_plan(
     compact = scratchpad_text.replace(" ", "")
     payload = compact[3:] if compact.startswith("1--") else compact
     recent = set(_strings(recent_action_targets))
+    entry_mode_confirmed = (
+        vars_map.get("ufc_comm1_pull_pressed") is True
+        or "ufc_comm1_channel_selector_pull" in recent
+        or compact.startswith("1--")
+    )
 
     def _target(name: str, guidance: str) -> _StateActionPlan | None:
         if name not in allowed:
@@ -527,6 +532,8 @@ def _s09_state_action_plan(
             reasons=(reason,),
         )
 
+    if not entry_mode_confirmed:
+        return _target("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector before entering 134.000.")
     if payload.endswith("134.000"):
         return _target("ufc_ent_button", "The UFC scratchpad shows 134.000; press ENT to commit the COMM1 preset.")
     if payload.endswith("13.400") or payload.endswith("1.340") or payload.endswith(".134") or payload.endswith("1.34"):
@@ -542,16 +549,9 @@ def _s09_state_action_plan(
         if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
             return _target("ufc_key_1", "COMM1 preset 1 is open with the old 305.000 value; press 1 next.")
         return _numeric_sequence(sequence_guidance)
-    if vars_map.get("ufc_comm1_pull_pressed") is True or "ufc_comm1_channel_selector_pull" in recent:
-        if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
-            return _target("ufc_key_1", "COMM1 preset entry is open; start typing 134.000 with key 1.")
-        return _numeric_sequence(sequence_guidance)
     if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
-        return _target("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector before entering 134.000.")
-    return _numeric_sequence(
-        "Pull the UFC COMM1 channel selector if needed, then enter frequency 134.000 with keys 1-3-4-0-0-0 and press ENT.",
-        reason="s09_numeric_sequence_targets_selector_maybe_needed",
-    )
+        return _target("ufc_key_1", "COMM1 preset entry is open; start typing 134.000 with key 1.")
+    return _numeric_sequence(sequence_guidance)
 
 
 def _changed_var(evidence_packet: Any, var_name: str) -> Mapping[str, Any] | None:
