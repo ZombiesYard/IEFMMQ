@@ -151,6 +151,8 @@ def _normalize_coverage_tags(
                 issue=_ensure_optional_positive_issue(item.get("issue"), field_name=f"{item_field}.issue"),
                 fixture=_extract_optional_text(item.get("fixture")),
                 test_id=_extract_optional_text(item.get("test_id")),
+                regression_class=_extract_optional_text(item.get("regression_class")),
+                text_intent=_extract_optional_text(item.get("text_intent")),
                 reason=_extract_optional_text(item.get("reason")),
             )
         )
@@ -189,6 +191,8 @@ class ReplayEvalCoverageTag:
     issue: int | None = None
     fixture: str | None = None
     test_id: str | None = None
+    regression_class: str | None = None
+    text_intent: str | None = None
     reason: str | None = None
 
 
@@ -763,7 +767,102 @@ def _build_summary(case_results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _coverage_source_dict(tag: ReplayEvalCoverageTag | Mapping[str, Any]) -> dict[str, Any]:
+def _as_mapping(raw: Any) -> Mapping[str, Any]:
+    return raw if isinstance(raw, Mapping) else {}
+
+
+def _string_list(raw: Any) -> list[str]:
+    if not isinstance(raw, (list, tuple)):
+        return []
+    return [item for item in raw if isinstance(item, str) and item]
+
+
+def _resolve_fixture_path(*, suite_dir: Path | None, raw_path: str) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    if suite_dir is not None:
+        suite_candidate = suite_dir / candidate
+        if suite_candidate.exists():
+            return suite_candidate
+    return _repo_root() / candidate
+
+
+def _extract_live_fixture_assertions(fixture_path: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(fixture_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"coverage fixture could not be loaded: {fixture_path}") from exc
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"coverage fixture root is not a mapping: {fixture_path}")
+
+    expectations = _as_mapping(raw.get("expectations"))
+    harness = _as_mapping(raw.get("harness"))
+    trace = _as_mapping(harness.get("trace"))
+    model_decision = _as_mapping(trace.get("model_decision") or harness.get("model_decision"))
+    validator_result = _as_mapping(trace.get("validator_result") or harness.get("validator_result"))
+    repair_result = _as_mapping(trace.get("repair_result") or harness.get("repair_result"))
+    final_plan = _as_mapping(trace.get("final_action_plan") or harness.get("final_action_plan"))
+    vlm_call = _as_mapping(trace.get("vlm_call"))
+
+    raw_model_step_id = _extract_optional_text(model_decision.get("step_id"))
+    final_step_id = (
+        _extract_optional_text(final_plan.get("step_id"))
+        or _extract_optional_text(expectations.get("expected_final_step_id"))
+    )
+    final_targets = _string_list(final_plan.get("targets")) or _string_list(
+        expectations.get("expected_overlay_target_ids")
+    )
+    extractor_used = _extract_optional_bool(vlm_call.get("extractor_used"))
+    extractor_called = _extract_optional_bool(vlm_call.get("extractor_called"))
+    frame_capture_selected = _extract_optional_bool(vlm_call.get("frame_capture_selected"))
+
+    assertions: dict[str, Any] = {}
+    if raw_model_step_id is not None:
+        assertions["raw_model_step_id"] = raw_model_step_id
+        assertions["raw_model_targets"] = _string_list(model_decision.get("overlay_targets"))
+    if validator_result:
+        rejected = _extract_optional_bool(validator_result.get("rejected"))
+        if rejected is not None:
+            assertions["validator_rejected"] = rejected
+    if repair_result:
+        repair_applied = _extract_optional_bool(repair_result.get("applied"))
+        if repair_applied is not None:
+            assertions["repair_applied"] = repair_applied
+    final_action_plan_source = _extract_optional_text(final_plan.get("source"))
+    if final_action_plan_source is not None:
+        assertions["final_action_plan_source"] = final_action_plan_source
+    message_category = _extract_optional_text(trace.get("message_category"))
+    if message_category is not None:
+        assertions["message_category"] = message_category
+    if final_step_id is not None:
+        assertions["final_step_id"] = final_step_id
+    if final_targets:
+        assertions["final_targets"] = final_targets
+    vlm_call_status = _extract_optional_text(vlm_call.get("status")) or _extract_optional_text(
+        expectations.get("vlm_call_status")
+    )
+    if vlm_call_status is not None:
+        assertions["vlm_call_status"] = vlm_call_status
+    vision_fact_extractor_used = extractor_used if extractor_used is not None else extractor_called
+    if vision_fact_extractor_used is not None:
+        assertions["vision_fact_extractor_used"] = vision_fact_extractor_used
+    if extractor_called is not None:
+        assertions["vision_fact_extractor_called"] = extractor_called
+    if frame_capture_selected is not None:
+        assertions["frame_capture_selected"] = frame_capture_selected
+    if frame_capture_selected is not None and (extractor_used is not None or extractor_called is not None):
+        assertions["frame_capture_only"] = bool(
+            frame_capture_selected and not bool(extractor_used) and not bool(extractor_called)
+        )
+    return assertions
+
+
+def _coverage_source_dict(
+    tag: ReplayEvalCoverageTag | Mapping[str, Any],
+    *,
+    suite_dir: Path | None = None,
+) -> dict[str, Any]:
     if isinstance(tag, ReplayEvalCoverageTag):
         raw: dict[str, Any] = {
             "source": tag.source,
@@ -771,11 +870,18 @@ def _coverage_source_dict(tag: ReplayEvalCoverageTag | Mapping[str, Any]) -> dic
             "issue": tag.issue,
             "fixture": tag.fixture,
             "test_id": tag.test_id,
+            "regression_class": tag.regression_class,
+            "text_intent": tag.text_intent,
             "reason": tag.reason,
         }
     else:
         raw = dict(tag)
-    return {key: value for key, value in raw.items() if value is not None}
+    source = {key: value for key, value in raw.items() if value is not None}
+    fixture = source.get("fixture")
+    if isinstance(fixture, str) and fixture:
+        fixture_path = _resolve_fixture_path(suite_dir=suite_dir, raw_path=fixture)
+        source["fixture_assertions"] = _extract_live_fixture_assertions(fixture_path)
+    return source
 
 
 def _new_coverage_cell(*, status: str = "missing", reason: str | None = None) -> dict[str, Any]:
@@ -808,12 +914,13 @@ def _add_regression_reference(
     step_id: str,
     state_category: str,
     source: Mapping[str, Any],
+    allow_not_applicable: bool = False,
 ) -> None:
     row = steps.get(step_id)
     if row is None or state_category not in row:
         return
     cell = row[state_category]
-    if cell["status"] == "not_applicable":
+    if cell["status"] == "not_applicable" and not allow_not_applicable:
         return
     if cell["status"] not in {"covered", "contract_only"}:
         cell["status"] = "regression_reference"
@@ -903,7 +1010,7 @@ def _build_case_only_coverage_matrix(
     step_ids = sorted(
         {
             tag.step_id
-            for tag in _all_suite_coverage_tags(suite, case_results=case_results)
+            for tag in (*_all_suite_coverage_tags(suite, case_results=case_results), *suite.coverage_tags)
             if isinstance(tag.step_id, str) and tag.step_id
         },
         key=lambda step_id: (int(step_id[1:]) if step_id.startswith("S") and step_id[1:].isdigit() else 10_000, step_id),
@@ -920,14 +1027,15 @@ def _build_case_only_coverage_matrix(
             steps,
             step_id=tag.step_id,
             state_category=tag.state_category,
-            source=_coverage_source_dict(tag),
+            source=_coverage_source_dict(tag, suite_dir=suite.suite_path.parent),
         )
     for tag in suite.coverage_tags:
         _add_regression_reference(
             steps,
             step_id=tag.step_id,
             state_category=tag.state_category,
-            source=_coverage_source_dict(tag),
+            source=_coverage_source_dict(tag, suite_dir=suite.suite_path.parent),
+            allow_not_applicable=True,
         )
     covered_count = sum(
         1
@@ -1003,7 +1111,7 @@ def build_harness_coverage_matrix(
         has_recent_action_facts = any(spec.recent_action_facts for spec in specs_for_step)
         has_allowed_overlay_targets = any(spec.allowed_overlay_targets for spec in specs_for_step)
         visual_step = any(spec.requires_visual_confirmation or spec.vision_facts for spec in specs_for_step)
-        has_moving_settling_control = step_id in {"S20", "S21"}
+        has_moving_settling_control = step_id in {"S20", "S21", "S24", "S25"}
         _mark_coverage_contract(
             steps,
             step_id=step_id,
@@ -1066,8 +1174,8 @@ def build_harness_coverage_matrix(
                 step_id=step_id,
                 state_category="moving_settling_control",
                 source={
-                    "source": "refuel_probe_motion_contract",
-                    "reason": "step can be in motion/settling while the refuel probe moves toward its threshold",
+                    "source": "four_down_control_motion_contract",
+                    "reason": "step can be in transition/settling while a four-down control moves toward its threshold",
                 },
             )
         else:
@@ -1158,14 +1266,14 @@ def build_harness_coverage_matrix(
             steps,
             step_id=tag.step_id,
             state_category=tag.state_category,
-            source=_coverage_source_dict(tag),
+            source=_coverage_source_dict(tag, suite_dir=suite.suite_path.parent),
         )
     for tag in suite.coverage_tags:
         _add_regression_reference(
             steps,
             step_id=tag.step_id,
             state_category=tag.state_category,
-            source=_coverage_source_dict(tag),
+            source=_coverage_source_dict(tag, suite_dir=suite.suite_path.parent),
         )
 
     missing_cells = [
