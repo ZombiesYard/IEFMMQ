@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import live_dcs as live_dcs_module
 import pytest
 from adapters.step_inference import StepInferenceResult
-from core.types import TutorRequest, TutorResponse
+from core.types import Observation, TutorRequest, TutorResponse
 from core.types_v2 import VisionObservation
 from live_dcs import LiveDcsTutorLoop, ReplayBiosReceiver
 
@@ -50,6 +51,20 @@ def _bios_frame(seq: int, t_wall: float) -> dict[str, Any]:
         "aircraft": "FA-18C_hornet",
         "bios": {"BATTERY_SW": 2, "L_GEN_SW": 1, "R_GEN_SW": 1},
         "delta": {},
+    }
+
+
+def _issue_298_a7a6bf18_payload() -> dict[str, Any]:
+    return {
+        "seq": 11105,
+        "t_wall": 1779220674.6965468,
+        "vars": {
+            "battery_on": True,
+            "power_available": True,
+            "left_ddi_on": True,
+            "fcs_reset_complete": True,
+            "flap_auto": False,
+        },
     }
 
 
@@ -319,6 +334,159 @@ def test_issue_298_run_help_cycle_skips_extractor_for_stabilized_nonvisual_step(
     )
     assert response.metadata["vlm_call_status"] == "not_required"
     assert response.metadata["harness_trace"]["vlm_call"]["extractor_called"] is False
+
+
+def test_issue_298_a7a6bf18_s16_flap_ignores_sticky_s15_visual_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frame = _issue_298_a7a6bf18_payload()
+
+    class IdleSource:
+        def get_observation(self):  # pragma: no cover
+            return None
+
+        def close(self) -> None:
+            return
+
+    class StaticVisionPort:
+        def __init__(self) -> None:
+            self._polled = False
+
+        def start(self, session_id: str) -> None:
+            assert session_id == "issue-298-a7a6bf18-s16"
+
+        def stop(self) -> None:
+            return
+
+        def poll(self):
+            if self._polled:
+                return []
+            self._polled = True
+            return [
+                VisionObservation(
+                    frame_id="1779220674784_000406",
+                    capture_wall_ms=1779220674784,
+                    frame_seq=406,
+                    channel="composite_panel",
+                    layout_id="fa18c_composite_panel_v2",
+                    image_uri=str(tmp_path / "1779220674784_000406.png"),
+                )
+            ]
+
+    class FailingIfCalledVisionFactExtractor:
+        def extract(self, vision, *, session_id: str | None, trigger_wall_ms: int):  # pragma: no cover
+            del vision, session_id, trigger_wall_ms
+            raise AssertionError("VLM extractor should not be called for issue #298 S16/flap")
+
+        def close(self) -> None:
+            return
+
+    request_id = UUID("a7a6bf18-2fe7-42b6-abe9-c9a257117647")
+    monkeypatch.setattr(live_dcs_module, "uuid4", lambda: request_id)
+
+    model = _RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=IdleSource(),
+        model=model,
+        action_executor=_NoopExecutor(),
+        session_id="issue-298-a7a6bf18-s16",
+        vision_port=StaticVisionPort(),
+        vision_session_id="issue-298-a7a6bf18-s16",
+        vision_mode="replay",
+        vision_fact_extractor=FailingIfCalledVisionFactExtractor(),
+    )
+    loop._last_inferred_step_id = "S15"
+    loop._sticky_inference_step_id = "S15"
+    loop._sticky_inference_missing_conditions = ()
+    loop._vision_fact_snapshot = {
+        "fcs_page_visible": {
+            "fact_id": "fcs_page_visible",
+            "state": "seen",
+            "source_frame_id": "old-s15-frame",
+            "sticky": False,
+            "observed_at_wall_ms": 1779220670000,
+            "expires_at_wall_ms": 1779221270000,
+        },
+        "fcsmc_final_go_result_visible": {
+            "fact_id": "fcsmc_final_go_result_visible",
+            "state": "not_seen",
+            "source_frame_id": "old-s18-frame",
+            "sticky": True,
+            "observed_at_wall_ms": 1779220670000,
+            "expires_at_wall_ms": 1779221270000,
+        },
+    }
+
+    try:
+        obs = Observation(source="synthetic_issue_298", payload=frame)
+        loop._latest_raw_obs = obs
+        loop._latest_enriched_obs = obs
+        loop._accumulated_vars.update(frame["vars"])
+        loop.telemetry_window_ring.add_delta(frame["vars"], t_wall=frame["t_wall"], seq=frame["seq"])
+        response, _report = loop.run_help_cycle(trigger_t_wall=1779220674.7)
+        stats = loop.stats.to_dict()
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert model.requests[0].request_id == str(request_id)
+    assert model.requests[0].metadata["vision_fact_status"] == "vision_not_required"
+    assert model.requests[0].metadata["vision_fact_active_step_ids"] == ["S16"]
+    assert model.requests[0].metadata["vision_fact_extractor_used"] is False
+    assert model.requests[0].context["vision_facts"] == []
+    assert response.metadata["vision_fact_extractor_used"] is False
+    assert response.metadata["vlm_call_status"] == "not_required"
+    assert response.metadata["harness_trace"]["vlm_call"]["extractor_called"] is False
+    assert response.metadata["harness_trace"]["vlm_call"]["ignored_fact_count"] == 2
+    assert stats["vision_cycles"] == 0
+
+
+def test_issue_298_keeps_sticky_s15_visual_gate_until_fcs_reset_completes(tmp_path: Path) -> None:
+    loop = _loop(tmp_path, "issue-298-s15-still-needs-reset")
+    try:
+        loop._sticky_inference_step_id = "S15"
+        loop._sticky_inference_missing_conditions = ()
+
+        inference = loop._stabilize_live_inference(
+            StepInferenceResult("S08", ("vision_facts.fcs_page_visible==seen",)),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "left_ddi_on": True,
+                "fcs_reset_complete": False,
+                "flap_auto": False,
+            },
+            recent_ui_targets=[],
+        )
+    finally:
+        loop.close()
+
+    assert inference.inferred_step_id == "S15"
+
+
+def test_issue_298_keeps_sticky_s15_when_visual_hold_is_unresolved(tmp_path: Path) -> None:
+    loop = _loop(tmp_path, "issue-298-s15-visual-hold")
+    try:
+        loop._sticky_inference_step_id = "S15"
+        loop._sticky_inference_missing_conditions = ("vision_facts.fcs_page_x_marks_visible==seen",)
+
+        inference = loop._stabilize_live_inference(
+            StepInferenceResult("S08", ("vision_facts.fcs_page_visible==seen",)),
+            {
+                "battery_on": True,
+                "power_available": True,
+                "left_ddi_on": True,
+                "fcs_reset_complete": True,
+                "flap_auto": False,
+            },
+            recent_ui_targets=[],
+        )
+    finally:
+        loop.close()
+
+    assert inference.inferred_step_id == "S15"
+    assert inference.missing_conditions == ("vision_facts.fcs_page_x_marks_visible==seen",)
 
 
 def test_issue_298_does_not_remember_spoofed_final_plan_only_progress(tmp_path: Path) -> None:

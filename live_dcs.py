@@ -5084,6 +5084,31 @@ class LiveDcsTutorLoop:
                 self._sticky_inference_step_id = advanced.inferred_step_id
                 self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
                 return advanced
+        if (
+            sticky_step_id == "S15"
+            and sticky_idx is not None
+            and current_idx < sticky_idx
+            and vars_selected.get("fcs_reset_complete") is True
+            and not any(
+                isinstance(item, str) and item.startswith("vision_facts.")
+                for item in self._sticky_inference_missing_conditions
+            )
+        ):
+            advanced = self._infer_after_completed_step(
+                "S15",
+                vars_selected,
+                recent_ui_targets=recent_ui_targets,
+                vision_facts=None,
+            )
+            advanced_idx = (
+                self._step_order_index.get(advanced.inferred_step_id)
+                if advanced is not None
+                else None
+            )
+            if advanced_idx is not None and advanced_idx > sticky_idx:
+                self._sticky_inference_step_id = advanced.inferred_step_id
+                self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
+                return advanced
         return StepInferenceResult(
             inferred_step_id=sticky_step_id,
             missing_conditions=self._sticky_inference_missing_conditions,
