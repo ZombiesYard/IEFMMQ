@@ -237,6 +237,33 @@ def test_plan_harness_action_repairs_invalid_target_to_step_spec_target() -> Non
     assert "target_not_allowed:launch_bar_switch" in plan.reasons
 
 
+def test_plan_harness_action_aligns_four_down_overlay_step_with_plan_step() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S24": _spec("S24", ("arresting_hook_handle",)),
+            "S25": _spec("S25", ("arresting_hook_handle",)),
+        },
+        inferred_step_id="S24",
+        model_step_id="S24",
+        overlay_step_id="S25",
+        proposed_overlay_targets=["arresting_hook_handle"],
+        candidate_step_ids=["S24", "S25"],
+        runtime_overlay_targets=["arresting_hook_handle"],
+        request_overlay_targets=["arresting_hook_handle"],
+        allowed_evidence_refs=["GATES.S24.completion", "GATES.S25.completion"],
+        evidence_refs=["GATES.S24.completion"],
+        max_overlay_targets=1,
+        action_hint={"target": "arresting_hook_handle", "reason": "Raise the arresting hook handle."},
+        action_hint_step_ids=["S20", "S21", "S22", "S23", "S24", "S25"],
+    )
+
+    assert plan.step_id == "S24"
+    assert plan.overlay_step_id == "S24"
+    assert plan.targets == ("arresting_hook_handle",)
+    assert plan.guidance is None
+    assert "overlay_step_aligned_to_step_id:S25" in plan.reasons
+
+
 def test_plan_harness_action_advances_s19_final_go_to_s20() -> None:
     plan = plan_harness_action(
         step_specs={

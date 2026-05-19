@@ -154,8 +154,8 @@ vars:
   launch_bar_extended: "derived(vars.launch_bar_switch_value == 1)"
   launch_bar_retracted: "derived(vars.launch_bar_switch_value == 0)"
   hook_handle_value: "derived(num(bios.HOOK_LEVER))"
-  hook_extended: "derived(vars.hook_handle_value == 1)"
-  hook_retracted: "derived(vars.hook_handle_value == 0)"
+  hook_extended: "derived(vars.hook_handle_value == 0)"
+  hook_retracted: "derived(vars.hook_handle_value == 1)"
   pitot_heat_on: "bios.PITOT_HEAT_SW > 0"
   four_down_complete: "'unknown'"
 

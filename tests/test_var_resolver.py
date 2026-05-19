@@ -314,6 +314,34 @@ def test_var_resolver_marks_probe_extension_and_retraction_from_external_positio
     assert vars_retracted["probe_cycle_complete"] is True
 
 
+def test_var_resolver_pack_hook_lever_zero_is_down() -> None:
+    resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
+
+    down = resolver.resolve(
+        TelemetryFrame(
+            seq=1,
+            t_wall=1.0,
+            source="dcs_bios",
+            bios={"HOOK_LEVER": 0},
+        )
+    )
+    assert down["hook_handle_value"] == 0
+    assert down["hook_extended"] is True
+    assert down["hook_retracted"] is False
+
+    up = resolver.resolve(
+        TelemetryFrame(
+            seq=2,
+            t_wall=2.0,
+            source="dcs_bios",
+            bios={"HOOK_LEVER": 1},
+        )
+    )
+    assert up["hook_handle_value"] == 1
+    assert up["hook_extended"] is False
+    assert up["hook_retracted"] is True
+
+
 def test_var_resolver_pack_battery_on_requires_switch_value_2() -> None:
     resolver = VarResolver.from_yaml(PACK_TELEMETRY_MAP_PATH)
     frame_on = TelemetryFrame(

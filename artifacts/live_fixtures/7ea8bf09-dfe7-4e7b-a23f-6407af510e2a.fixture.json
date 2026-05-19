@@ -9,82 +9,68 @@
       "telemetry_window_digest": {
         "changed_var_count": 0,
         "contradiction_count": 0,
-        "first_seq": 10625,
+        "first_seq": 10858,
         "frame_count": 20,
-        "latest_seq": 10644
+        "latest_seq": 10877
       },
       "vision_fresh_count": 0,
       "vision_seen_count": 0,
       "vision_status": "vision_not_required"
     },
     "evidence_snapshot": {
-      "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-      "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-      "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+      "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+      "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+      "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
       "schema_version": "evidence_snapshot.v1",
-      "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-      "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-      "source_observation_seq": 10644,
-      "source_observation_t_wall": 1779192063.7441182,
-      "telemetry_window_first_seq": 10625,
+      "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+      "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+      "source_observation_seq": 10877,
+      "source_observation_t_wall": 1779198740.5223603,
+      "telemetry_window_first_seq": 10858,
       "telemetry_window_frame_count": 20,
-      "telemetry_window_latest_seq": 10644,
-      "telemetry_window_latest_t_wall": 1779192063.7441182,
-      "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+      "telemetry_window_latest_seq": 10877,
+      "telemetry_window_latest_t_wall": 1779198740.5223603,
+      "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
     },
-    "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
+    "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
     "observations": [
       {
         "attachments": [],
         "metadata": {
-          "delta_count": 3,
-          "delta_dropped_count": 0,
-          "from_addr": "192.168.0.105:56245",
-          "raw_delta_count": 3,
-          "seq": 10644
+          "delta_count": 2,
+          "delta_dropped_count": 1,
+          "from_addr": "192.168.0.105:64396",
+          "raw_delta_count": 2,
+          "seq": 10877
         },
-        "observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
+        "observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
         "payload": {
           "delta_summary": {
             "changed_keys_sample": [
-              "HYD_IND_BRAKE",
-              "IFEI_FUEL_DOWN",
-              "IFEI_FUEL_UP"
+              "HYD_IND_BRAKE"
             ],
-            "delta_count": 3,
+            "delta_count": 1,
             "dropped_stats": {
-              "dropped_by_reason": {},
-              "dropped_total": 0
+              "dropped_by_reason": {
+                "blacklist": 1
+              },
+              "dropped_total": 1
             },
-            "raw_delta_count": 3,
+            "raw_delta_count": 2,
             "recent_key_changes_topk": [
               {
                 "count": 1,
                 "importance": 1,
                 "key": "HYD_IND_BRAKE",
                 "ui_targets": [],
-                "value": 41357
-              },
-              {
-                "count": 1,
-                "importance": 1,
-                "key": "IFEI_FUEL_DOWN",
-                "ui_targets": [],
-                "value": "10580I"
-              },
-              {
-                "count": 1,
-                "importance": 1,
-                "key": "IFEI_FUEL_UP",
-                "ui_targets": [],
-                "value": "10580T"
+                "value": 41443
               }
             ],
             "truncated": false
           },
           "recent_ui_targets": [],
-          "seq": 10644,
-          "t_wall": 1779192063.7441182,
+          "seq": 10877,
+          "t_wall": 1779198740.5223603,
           "vars": {
             "annunciator_panel_activity": true,
             "apu_on": false,
@@ -122,9 +108,9 @@
             "flap_full": false,
             "flap_half": false,
             "flap_mode_value": 2,
-            "hook_extended": true,
-            "hook_handle_value": 1,
-            "hook_retracted": false,
+            "hook_extended": false,
+            "hook_handle_value": 0,
+            "hook_retracted": true,
             "hud_on": true,
             "ins_fast_align_complete": true,
             "ins_fast_align_pressed": false,
@@ -172,8 +158,8 @@
             "standby_attitude_uncaged": false,
             "takeoff_trim_pressed": false,
             "takeoff_trim_set": true,
-            "temp_l": 316,
-            "temp_r": 296,
+            "temp_l": 310,
+            "temp_r": 322,
             "throttle_l_not_off": true,
             "throttle_r_idle_complete": true,
             "throttle_r_not_off": true,
@@ -197,84 +183,84 @@
         "procedure_hint": null,
         "source": "dcs_bios_raw",
         "tags": [],
-        "timestamp": "2026-05-19T12:01:03.744118+00:00",
+        "timestamp": "2026-05-19T13:52:20.522360+00:00",
         "version": "v1"
       }
     ],
     "snapshot_ids": {
-      "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-      "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-      "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-      "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+      "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+      "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+      "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+      "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
     },
     "telemetry_window_digest": {
       "changed_var_count": 0,
       "contradiction_count": 0,
-      "first_seq": 10625,
+      "first_seq": 10858,
       "frame_count": 20,
-      "latest_seq": 10644
+      "latest_seq": 10877
     },
     "vision": {
       "frame_ids": [
-        "1779192063799_000210"
+        "1779198740607_000256"
       ],
       "request": null,
       "response": {
-        "frame_id": "1779192063799_000210",
+        "frame_id": "1779198740607_000256",
         "frame_ids": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ],
         "frame_stale": false,
-        "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-        "observation_seq": 10644,
-        "observation_t_wall_ms": 1779192063744,
-        "observation_t_wall_s": 1779192063.7441182,
+        "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+        "observation_seq": 10877,
+        "observation_t_wall_ms": 1779198740522,
+        "observation_t_wall_s": 1779198740.5223603,
         "pre_trigger_frame": null,
         "selected_frames": [
           {
-            "capture_wall_ms": 1779192063799,
+            "capture_wall_ms": 1779198740607,
             "channel": "composite_panel",
-            "frame_id": "1779192063799_000210",
-            "frame_seq": 210,
+            "frame_id": "1779198740607_000256",
+            "frame_seq": 256,
             "frame_stale": false,
             "height": 1440,
-            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779192063799_000210_vlm.png",
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198740607_000256_vlm.png",
             "layout_id": "fa18c_composite_panel_v2",
             "role": "trigger_frame",
-            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779192063799_000210.png",
-            "sync_delta_ms": 86,
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198740607_000256.png",
+            "sync_delta_ms": 81,
             "sync_miss_reason": null,
             "sync_status": "matched_future_fallback",
             "width": 3440
           }
         ],
         "status": "partial",
-        "sync_delta_ms": 86,
+        "sync_delta_ms": 81,
         "sync_miss_reason": "missing_pre_trigger_frame",
         "sync_status": "matched_future_fallback",
         "sync_window_ms": 250,
         "trigger_frame": {
-          "capture_wall_ms": 1779192063799,
+          "capture_wall_ms": 1779198740607,
           "channel": "composite_panel",
-          "frame_id": "1779192063799_000210",
-          "frame_seq": 210,
+          "frame_id": "1779198740607_000256",
+          "frame_seq": 256,
           "frame_stale": false,
           "height": 1440,
-          "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779192063799_000210_vlm.png",
+          "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198740607_000256_vlm.png",
           "layout_id": "fa18c_composite_panel_v2",
           "role": "trigger_frame",
-          "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779192063799_000210.png",
-          "sync_delta_ms": 86,
+          "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198740607_000256.png",
+          "sync_delta_ms": 81,
           "sync_miss_reason": null,
           "sync_status": "matched_future_fallback",
           "width": 3440
         },
-        "trigger_wall_ms": 1779192063713,
+        "trigger_wall_ms": 1779198740526,
         "vision_used": true
       },
       "vision_fact_summary": {
         "frame_ids": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ],
         "fresh_fact_ids": [],
         "not_seen_fact_ids": [],
@@ -290,18 +276,16 @@
   "cycle": {
     "events": [
       {
-        "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "kind": "tutor_request",
-        "lineno": 11218,
+        "lineno": 11526,
         "metadata": {
-          "frame_id": "1779192063799_000210",
-          "fused_missing_conditions": [
-            "vars.hook_handle_value in [0,0]"
-          ],
-          "fused_step_id": "S25",
-          "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+          "frame_id": "1779198740607_000256",
+          "fused_missing_conditions": [],
+          "fused_step_id": "S24",
+          "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
           "layout_id": "fa18c_composite_panel_v2",
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "vision_fact_cached_count": 1,
           "vision_fact_extractor_used": false,
           "vision_fact_ignored_count": 1,
@@ -309,7 +293,7 @@
           "vision_fact_sticky_count": 1,
           "vision_fact_summary": {
             "frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "fresh_fact_ids": [],
             "not_seen_fact_ids": [],
@@ -326,26 +310,14 @@
         "payload": {
           "actor": "learner",
           "context": {
-            "delta_dropped_count": 0,
-            "four_down_completion_latches": {
-              "s20_latched_complete": true,
-              "s21_latched_complete": true,
-              "s22_latched_complete": true,
-              "s23_latched_complete": true,
-              "s24_latched_complete": true,
-              "s25_latched_complete": false
-            },
-            "refuel_probe_completion_latches": {
-              "s20_latched_complete": true,
-              "s21_latched_complete": true
-            },
+            "delta_dropped_count": 1,
             "deterministic_step_hint": {
               "action_hint": {
                 "target": "arresting_hook_handle"
               },
               "gate_blocker_count": 1,
-              "inferred_step_id": "S25",
-              "missing_conditions_count": 1,
+              "inferred_step_id": "S24",
+              "missing_conditions_count": 0,
               "observability": "observable",
               "observability_status": "observable",
               "overlay_step_id": "S25",
@@ -365,89 +337,87 @@
               "telemetry_window_digest": {
                 "changed_var_count": 0,
                 "contradiction_count": 0,
-                "first_seq": 10625,
+                "first_seq": 10858,
                 "frame_count": 20,
-                "latest_seq": 10644
+                "latest_seq": 10877
               },
               "vision_fresh_count": 0,
               "vision_seen_count": 0,
               "vision_status": "vision_not_required"
             },
             "evidence_snapshot": {
-              "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+              "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
               "schema_version": "evidence_snapshot.v1",
-              "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-              "source_observation_seq": 10644,
-              "source_observation_t_wall": 1779192063.7441182,
-              "telemetry_window_first_seq": 10625,
+              "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+              "source_observation_seq": 10877,
+              "source_observation_t_wall": 1779198740.5223603,
+              "telemetry_window_first_seq": 10858,
               "telemetry_window_frame_count": 20,
-              "telemetry_window_latest_seq": 10644,
-              "telemetry_window_latest_t_wall": 1779192063.7441182,
-              "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "telemetry_window_latest_seq": 10877,
+              "telemetry_window_latest_t_wall": 1779198740.5223603,
+              "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
             "grounding_missing": false,
             "grounding_query": "[REDACTED_GROUNDING_QUERY]",
             "grounding_reason": null,
             "rag_topk": [
               {
-                "chunk_id": "fa18c_scoring_sheet_template_2",
-                "doc_id": "fa18c_scoring_sheet_template",
-                "page_or_heading": "2. Step-Level Coding",
-                "score": 25.039944761327018,
-                "section": "2. Step-Level Coding",
-                "snippet_id": "fa18c_scoring_sheet_template_2"
-              },
-              {
-                "chunk_id": "fa18c_nasatlx_vr_0",
-                "doc_id": "fa18c_nasatlx_vr",
-                "page_or_heading": "Task: F/A-18C Cold Start in DCS World (VR)",
-                "score": 21.88863349107637,
-                "section": "Task: F/A-18C Cold Start in DCS World (VR)",
-                "snippet_id": "fa18c_nasatlx_vr_0"
-              },
-              {
-                "chunk_id": "DCS FA-18C Early Access Guide EN_63",
-                "doc_id": "DCS FA-18C Early Access Guide EN",
-                "page_or_heading": 64,
-                "score": 20.974642355449337,
-                "snippet_id": "DCS FA-18C Early Access Guide EN_63"
-              },
-              {
                 "chunk_id": "fa18c_coldstart_quiz_1",
                 "doc_id": "fa18c_coldstart_quiz",
                 "page_or_heading": "Q1. Overall Goal",
-                "score": 18.834010694115808,
+                "score": 13.29554266378183,
                 "section": "Q1. Overall Goal",
                 "snippet_id": "fa18c_coldstart_quiz_1"
               },
               {
-                "chunk_id": "fa18c_nasatlx_vr_1",
-                "doc_id": "fa18c_nasatlx_vr",
-                "page_or_heading": "1. Mental Demand",
-                "score": 17.669751353263905,
-                "section": "1. Mental Demand",
-                "snippet_id": "fa18c_nasatlx_vr_1"
+                "chunk_id": "fa18c_error_coding_guide_10",
+                "doc_id": "fa18c_error_coding_guide",
+                "page_or_heading": "3. Step Criticality",
+                "score": 13.120994677243015,
+                "section": "3. Step Criticality",
+                "snippet_id": "fa18c_error_coding_guide_10"
+              },
+              {
+                "chunk_id": "DCS FA-18C Early Access Guide EN_92",
+                "doc_id": "DCS FA-18C Early Access Guide EN",
+                "page_or_heading": 93,
+                "score": 10.553560644586302,
+                "snippet_id": "DCS FA-18C Early Access Guide EN_92"
+              },
+              {
+                "chunk_id": "fa18c_coldstart_quiz_0",
+                "doc_id": "fa18c_coldstart_quiz",
+                "page_or_heading": "F/A-18C Cold Start – Knowledge Quiz",
+                "score": 10.102965691900046,
+                "section": "F/A-18C Cold Start – Knowledge Quiz",
+                "snippet_id": "fa18c_coldstart_quiz_0"
+              },
+              {
+                "chunk_id": "Appendix - Training Task Syllabus_3",
+                "doc_id": "Appendix - Training Task Syllabus",
+                "page_or_heading": "Phase P1 – Power-Up & Safety (S01–S03)",
+                "score": 9.718372888459161,
+                "section": "Phase P1 – Power-Up & Safety (S01–S03)",
+                "snippet_id": "Appendix - Training Task Syllabus_3"
               }
             ],
             "scenario_profile": "airfield",
             "snapshot_ids": {
-              "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
             "state_harness": {
               "conflicts": [],
               "deterministic_candidate": {
-                "missing_conditions": [
-                  "vars.hook_handle_value in [0,0]"
-                ],
+                "missing_conditions": [],
                 "overlay_step_id": "S25",
                 "role": "candidate_not_authoritative",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "telemetry_evidence": {
                 "confidence": "medium",
@@ -457,7 +427,7 @@
                   "fire_test_b_complete": true,
                   "power_available": true
                 },
-                "observation_seq": 10644,
+                "observation_seq": 10877,
                 "source_status": "nominal",
                 "vars_source_missing_count": 4
               },
@@ -465,52 +435,52 @@
                 "changed_vars": [],
                 "contradictions": [],
                 "first_frame_only_values": [],
-                "first_seq": 10625,
+                "first_seq": 10858,
                 "frame_count": 20,
                 "last_seen_true": [
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "battery_on"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "fire_test_a_complete"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "fire_test_b_complete"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "fire_test_complete"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "flap_auto"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "hud_on"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "left_ddi_on"
                   },
                   {
                     "age_s": 0.0,
-                    "seq": 10644,
+                    "seq": 10877,
                     "var": "mpcd_on"
                   }
                 ],
-                "latest_seq": 10644,
-                "latest_t_wall": 1779192063.7441182,
+                "latest_seq": 10877,
+                "latest_t_wall": 1779198740.5223603,
                 "stable_false_vars": [
                   "fcs_bit_switch_up",
                   "pitot_heat_on"
@@ -533,7 +503,7 @@
                   "ufc_scratchpad_string_1_display",
                   "ufc_scratchpad_string_2_display"
                 ],
-                "window_duration_s": 1.323
+                "window_duration_s": 1.625
               },
               "vision_evidence": {
                 "confidence": "low",
@@ -546,26 +516,26 @@
               }
             },
             "vision": {
-              "frame_id": "1779192063799_000210",
+              "frame_id": "1779198740607_000256",
               "frame_ids": [
-                "1779192063799_000210"
+                "1779198740607_000256"
               ],
               "frame_stale": false,
-              "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-              "observation_seq": 10644,
-              "observation_t_wall_ms": 1779192063744,
-              "observation_t_wall_s": 1779192063.7441182,
+              "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+              "observation_seq": 10877,
+              "observation_t_wall_ms": 1779198740522,
+              "observation_t_wall_s": 1779198740.5223603,
               "status": "partial",
-              "sync_delta_ms": 86,
+              "sync_delta_ms": 81,
               "sync_miss_reason": "missing_pre_trigger_frame",
               "sync_status": "matched_future_fallback",
               "sync_window_ms": 250,
-              "trigger_wall_ms": 1779192063713,
+              "trigger_wall_ms": 1779198740526,
               "vision_used": true
             },
             "vision_fact_summary": {
               "frame_ids": [
-                "1779192063799_000210"
+                "1779198740607_000256"
               ],
               "fresh_fact_ids": [],
               "not_seen_fact_ids": [],
@@ -588,34 +558,32 @@
               "telemetry_window_digest": {
                 "changed_var_count": 0,
                 "contradiction_count": 0,
-                "first_seq": 10625,
+                "first_seq": 10858,
                 "frame_count": 20,
-                "latest_seq": 10644
+                "latest_seq": 10877
               },
               "vision_fresh_count": 0,
               "vision_seen_count": 0,
               "vision_status": "vision_not_required"
             },
             "evidence_snapshot": {
-              "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+              "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
               "schema_version": "evidence_snapshot.v1",
-              "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-              "source_observation_seq": 10644,
-              "source_observation_t_wall": 1779192063.7441182,
-              "telemetry_window_first_seq": 10625,
+              "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+              "source_observation_seq": 10877,
+              "source_observation_t_wall": 1779198740.5223603,
+              "telemetry_window_first_seq": 10858,
               "telemetry_window_frame_count": 20,
-              "telemetry_window_latest_seq": 10644,
-              "telemetry_window_latest_t_wall": 1779192063.7441182,
-              "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "telemetry_window_latest_seq": 10877,
+              "telemetry_window_latest_t_wall": 1779198740.5223603,
+              "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
-            "frame_id": "1779192063799_000210",
-            "fused_missing_conditions": [
-              "vars.hook_handle_value in [0,0]"
-            ],
-            "fused_step_id": "S25",
+            "frame_id": "1779198740607_000256",
+            "fused_missing_conditions": [],
+            "fused_step_id": "S24",
             "grounding_cache_hit": false,
             "grounding_error_type": null,
             "grounding_missing": false,
@@ -626,39 +594,39 @@
             "grounding_reason": null,
             "grounding_reason_requested": null,
             "grounding_snippet_ids": [
-              "fa18c_scoring_sheet_template_2",
-              "fa18c_nasatlx_vr_0",
-              "DCS FA-18C Early Access Guide EN_63",
               "fa18c_coldstart_quiz_1",
-              "fa18c_nasatlx_vr_1"
+              "fa18c_error_coding_guide_10",
+              "DCS FA-18C Early Access Guide EN_92",
+              "fa18c_coldstart_quiz_0",
+              "Appendix - Training Task Syllabus_3"
             ],
-            "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+            "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
             "layout_id": "fa18c_composite_panel_v2",
-            "prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-            "prompt_tokens_est": 5547,
+            "prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+            "prompt_tokens_est": 5549,
             "prompt_trimmed": true,
             "scenario_profile": "airfield",
             "snapshot_ids": {
-              "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
             "source_chunk_refs": [
-              "fa18c_scoring_sheet_template/fa18c_scoring_sheet_template_2",
-              "fa18c_nasatlx_vr/fa18c_nasatlx_vr_0",
-              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_63",
               "fa18c_coldstart_quiz/fa18c_coldstart_quiz_1",
-              "fa18c_nasatlx_vr/fa18c_nasatlx_vr_1"
+              "fa18c_error_coding_guide/fa18c_error_coding_guide_10",
+              "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_92",
+              "fa18c_coldstart_quiz/fa18c_coldstart_quiz_0",
+              "Appendix - Training Task Syllabus/Appendix - Training Task Syllabus_3"
             ],
             "state_harness_conflicts": [],
             "state_harness_telemetry_status": "nominal",
-            "sync_delta_ms": 86,
+            "sync_delta_ms": 81,
             "vision_fact_seen_ids": [],
             "vision_fact_status": "vision_not_required",
             "vision_fact_summary": {
               "frame_ids": [
-                "1779192063799_000210"
+                "1779198740607_000256"
               ],
               "fresh_fact_ids": [],
               "not_seen_fact_ids": [],
@@ -669,46 +637,44 @@
             },
             "vision_fallback_reason": null,
             "vision_frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "vision_status": "partial",
             "vision_used": true
           },
-          "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-          "request_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
-          "timestamp": "2026-05-19T12:01:04.250942+00:00",
+          "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+          "request_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
+          "timestamp": "2026-05-19T13:52:21.047016+00:00",
           "version": "v1"
         },
-        "related_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "related_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "vision_refs": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ]
       },
       {
-        "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "kind": "overlay_requested",
-        "lineno": 11219,
+        "lineno": 11527,
         "metadata": {
           "final_overlay_targets": [
             "arresting_hook_handle"
           ],
-          "frame_id": "1779192063799_000210",
-          "fused_missing_conditions": [
-            "vars.hook_handle_value in [0,0]"
-          ],
-          "fused_step_id": "S25",
+          "frame_id": "1779198740607_000256",
+          "fused_missing_conditions": [],
+          "fused_step_id": "S24",
           "generation_mode": "model",
-          "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+          "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
           "layout_id": "fa18c_composite_panel_v2",
           "message_category": "harness_validator_repair",
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "vision_fact_cached_count": 1,
           "vision_fact_extractor_used": false,
           "vision_fact_ignored_count": 1,
           "vision_fact_sticky_count": 1,
           "vision_fact_summary": {
             "frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "fresh_fact_ids": [],
             "not_seen_fact_ids": [],
@@ -726,21 +692,19 @@
         "payload": {
           "action": "highlight",
           "attempt_count": 1,
-          "cmd_id": "ee35a2a7-e35e-4063-a5d8-b056dd993e56",
+          "cmd_id": "23df1432-2229-4b61-aa4f-526d2ab5cd64",
           "final_overlay_targets": [
             "arresting_hook_handle"
           ],
-          "frame_id": "1779192063799_000210",
-          "fused_missing_conditions": [
-            "vars.hook_handle_value in [0,0]"
-          ],
-          "fused_step_id": "S25",
+          "frame_id": "1779198740607_000256",
+          "fused_missing_conditions": [],
+          "fused_step_id": "S24",
           "generation_mode": "model",
-          "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+          "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
           "layout_id": "fa18c_composite_panel_v2",
           "message_category": "harness_validator_repair",
           "schema_version": "v2",
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "target": "pnt_293",
           "vision_fact_cached_count": 1,
           "vision_fact_extractor_used": false,
@@ -748,7 +712,7 @@
           "vision_fact_sticky_count": 1,
           "vision_fact_summary": {
             "frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "fresh_fact_ids": [],
             "not_seen_fact_ids": [],
@@ -767,30 +731,28 @@
         "vision_refs": []
       },
       {
-        "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "kind": "tutor_response",
-        "lineno": 11220,
+        "lineno": 11528,
         "metadata": {
           "final_overlay_targets": [
             "arresting_hook_handle"
           ],
-          "frame_id": "1779192063799_000210",
-          "fused_missing_conditions": [
-            "vars.hook_handle_value in [0,0]"
-          ],
-          "fused_step_id": "S25",
+          "frame_id": "1779198740607_000256",
+          "fused_missing_conditions": [],
+          "fused_step_id": "S24",
           "generation_mode": "model",
-          "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+          "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
           "layout_id": "fa18c_composite_panel_v2",
           "message_category": "harness_validator_repair",
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "vision_fact_cached_count": 1,
           "vision_fact_extractor_used": false,
           "vision_fact_ignored_count": 1,
           "vision_fact_sticky_count": 1,
           "vision_fact_summary": {
             "frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "fresh_fact_ids": [],
             "not_seen_fact_ids": [],
@@ -810,19 +772,17 @@
             {
               "element_id": "pnt_293",
               "evidence_refs": [
-                "GATES.S25.completion"
+                "GATES.S24.completion"
               ],
               "evidence_required": true,
               "final_overlay_targets": [
                 "arresting_hook_handle"
               ],
-              "frame_id": "1779192063799_000210",
-              "fused_missing_conditions": [
-                "vars.hook_handle_value in [0,0]"
-              ],
-              "fused_step_id": "S25",
+              "frame_id": "1779198740607_000256",
+              "fused_missing_conditions": [],
+              "fused_step_id": "S24",
               "generation_mode": "model",
-              "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+              "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
               "intent": "highlight",
               "layout_id": "fa18c_composite_panel_v2",
               "message_category": "harness_validator_repair",
@@ -831,7 +791,7 @@
                 "style": "highlight",
                 "thickness": 2
               },
-              "sync_delta_ms": 86,
+              "sync_delta_ms": 81,
               "target": "arresting_hook_handle",
               "type": "overlay",
               "vision_fact_cached_count": 1,
@@ -840,7 +800,7 @@
               "vision_fact_sticky_count": 1,
               "vision_fact_summary": {
                 "frame_ids": [
-                  "1779192063799_000210"
+                  "1779198740607_000256"
                 ],
                 "fresh_fact_ids": [],
                 "not_seen_fact_ids": [],
@@ -858,21 +818,21 @@
           ],
           "actor": "tutor",
           "explanations": [
-            "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+            "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
           ],
-          "in_reply_to": "da08da4a-0909-4acb-a2e6-7027324fa989",
-          "message": "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。",
+          "in_reply_to": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
+          "message": "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。",
           "metadata": {
-            "allowed_evidence_ref_count": 118,
+            "allowed_evidence_ref_count": 116,
             "dcs_tutor_text": {
               "clear_view": false,
-              "cmd_id": "a619baed-eed3-4f0c-b13c-788756b4806b",
+              "cmd_id": "20b050b9-6bcc-4f36-b8d5-9b4a522b5779",
               "display_time_s": 12.0,
               "reason": null,
               "status": "ok",
-              "text": "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+              "text": "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
             },
-            "delta_dropped_count": 0,
+            "delta_dropped_count": 1,
             "deterministic_inference_error": null,
             "deterministic_step_hint": {
               "inferred_step_id": "S08",
@@ -899,11 +859,11 @@
                 "right_mdi_pb18",
                 "right_mdi_pb5"
               ],
-              "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
             "diagnosis": {
               "error_category": "OM",
-              "step_id": "S25"
+              "step_id": "S24"
             },
             "evidence_guardrail_applied": false,
             "evidence_guardrail_reasons": [],
@@ -912,32 +872,32 @@
               "repair_applied": false
             },
             "evidence_snapshot": {
-              "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+              "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
               "schema_version": "evidence_snapshot.v1",
-              "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-              "source_observation_seq": 10644,
-              "source_observation_t_wall": 1779192063.7441182,
-              "telemetry_window_first_seq": 10625,
+              "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+              "source_observation_seq": 10877,
+              "source_observation_t_wall": 1779198740.5223603,
+              "telemetry_window_first_seq": 10858,
               "telemetry_window_frame_count": 20,
-              "telemetry_window_latest_seq": 10644,
-              "telemetry_window_latest_t_wall": 1779192063.7441182,
-              "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "telemetry_window_latest_seq": 10877,
+              "telemetry_window_latest_t_wall": 1779198740.5223603,
+              "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
             "evidence_snapshot_consistency": {
               "deterministic_hint_matches_request": false,
               "final_action_plan_matches_snapshot": true,
-              "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
             "fallback_overlay_reason": "not_needed",
             "fallback_overlay_used": false,
             "final_action_plan": {
-              "evidence_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+              "evidence_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
               "overlay_step_id": "S25",
               "source": "validator_action_hint",
-              "step_id": "S25",
+              "step_id": "S24",
               "targets": [
                 "arresting_hook_handle"
               ],
@@ -952,19 +912,17 @@
                 {
                   "element_id": "pnt_293",
                   "evidence_refs": [
-                    "GATES.S25.completion"
+                    "GATES.S24.completion"
                   ],
                   "evidence_required": true,
                   "final_overlay_targets": [
                     "arresting_hook_handle"
                   ],
-                  "frame_id": "1779192063799_000210",
-                  "fused_missing_conditions": [
-                    "vars.hook_handle_value in [0,0]"
-                  ],
-                  "fused_step_id": "S25",
+                  "frame_id": "1779198740607_000256",
+                  "fused_missing_conditions": [],
+                  "fused_step_id": "S24",
                   "generation_mode": "model",
-                  "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+                  "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
                   "intent": "highlight",
                   "layout_id": "fa18c_composite_panel_v2",
                   "message_category": "harness_validator_repair",
@@ -973,7 +931,7 @@
                     "style": "highlight",
                     "thickness": 2
                   },
-                  "sync_delta_ms": 86,
+                  "sync_delta_ms": 81,
                   "target": "arresting_hook_handle",
                   "type": "overlay",
                   "vision_fact_cached_count": 1,
@@ -982,7 +940,7 @@
                   "vision_fact_sticky_count": 1,
                   "vision_fact_summary": {
                     "frame_ids": [
-                      "1779192063799_000210"
+                      "1779198740607_000256"
                     ],
                     "fresh_fact_ids": [],
                     "not_seen_fact_ids": [],
@@ -1000,29 +958,27 @@
               ],
               "diagnosis": {
                 "error_category": "OM",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "explanations": [
-                "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+                "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
               ],
-              "message": "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。",
+              "message": "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。",
               "next": {
-                "step_id": "S25"
+                "step_id": "S24"
               }
             },
-            "frame_id": "1779192063799_000210",
-            "fused_missing_conditions": [
-              "vars.hook_handle_value in [0,0]"
-            ],
-            "fused_step_id": "S25",
+            "frame_id": "1779198740607_000256",
+            "fused_missing_conditions": [],
+            "fused_step_id": "S24",
             "generation_mode": "model",
-            "generation_prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-            "generation_prompt_tokens_est": 5547,
+            "generation_prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+            "generation_prompt_tokens_est": 5549,
             "generation_prompt_trimmed": true,
             "harness_action_plan": {
               "overlay_step_id": "S25",
               "source": "validator_action_hint",
-              "step_id": "S25",
+              "step_id": "S24",
               "targets": [
                 "arresting_hook_handle"
               ],
@@ -1037,9 +993,9 @@
                   ],
                   "role": "candidate_not_authoritative",
                   "source": "deterministic",
-                  "step_id": "S25",
+                  "step_id": "S24",
                   "supporting_evidence_refs": [
-                    "GATES.S25.completion"
+                    "GATES.S24.completion"
                   ]
                 },
                 {
@@ -1049,9 +1005,9 @@
                   ],
                   "role": "candidate",
                   "source": "gate_blocker",
-                  "step_id": "S25",
+                  "step_id": "S24",
                   "supporting_evidence_refs": [
-                    "GATES.S25.completion"
+                    "GATES.S24.completion"
                   ]
                 },
                 {
@@ -1135,9 +1091,9 @@
                 ],
                 "role": "candidate_not_authoritative",
                 "source": "deterministic",
-                "step_id": "S25",
+                "step_id": "S24",
                 "supporting_evidence_refs": [
-                  "GATES.S25.completion"
+                  "GATES.S24.completion"
                 ]
               },
               "evidence_packet_summary": {
@@ -1149,39 +1105,39 @@
                 "telemetry_window_digest": {
                   "changed_var_count": 0,
                   "contradiction_count": 0,
-                  "first_seq": 10625,
+                  "first_seq": 10858,
                   "frame_count": 20,
-                  "latest_seq": 10644
+                  "latest_seq": 10877
                 },
                 "vision_fresh_count": 0,
                 "vision_seen_count": 0,
                 "vision_status": "vision_not_required"
               },
               "evidence_snapshot": {
-                "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-                "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-                "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+                "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+                "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+                "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
                 "schema_version": "evidence_snapshot.v1",
-                "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-                "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-                "source_observation_seq": 10644,
-                "source_observation_t_wall": 1779192063.7441182,
-                "telemetry_window_first_seq": 10625,
+                "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+                "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+                "source_observation_seq": 10877,
+                "source_observation_t_wall": 1779198740.5223603,
+                "telemetry_window_first_seq": 10858,
                 "telemetry_window_frame_count": 20,
-                "telemetry_window_latest_seq": 10644,
-                "telemetry_window_latest_t_wall": 1779192063.7441182,
-                "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+                "telemetry_window_latest_seq": 10877,
+                "telemetry_window_latest_t_wall": 1779198740.5223603,
+                "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
               },
               "evidence_snapshot_consistency": {
                 "deterministic_hint_matches_request": false,
                 "final_action_plan_matches_snapshot": true,
-                "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+                "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
               },
               "final_action_plan": {
-                "evidence_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+                "evidence_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
                 "overlay_step_id": "S25",
                 "source": "validator_action_hint",
-                "step_id": "S25",
+                "step_id": "S24",
                 "targets": [
                   "arresting_hook_handle"
                 ],
@@ -1193,14 +1149,14 @@
               "message_category": "harness_validator_repair",
               "model_decision": {
                 "evidence_refs": [
-                  "GATES.S25.completion"
+                  "GATES.S24.completion"
                 ],
                 "generation_mode": "model",
                 "overlay_targets": [
                   "arresting_hook_handle"
                 ],
                 "status": "ok",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "rejected_candidates": [],
               "repair_result": {
@@ -1214,10 +1170,10 @@
               },
               "schema_version": "v1",
               "snapshot_ids": {
-                "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-                "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-                "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-                "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+                "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+                "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+                "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+                "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
               },
               "validator_result": {
                 "fallback_overlay_reason": "not_needed",
@@ -1232,37 +1188,37 @@
                 "extractor_used": false,
                 "frame_capture_selected": true,
                 "frame_ids": [
-                  "1779192063799_000210"
+                  "1779198740607_000256"
                 ],
                 "ignored_fact_count": 1,
                 "reason": "vision_not_required_for_step",
                 "status": "not_required",
                 "sticky_fact_count": 1,
-                "sync_delta_ms": 86,
+                "sync_delta_ms": 81,
                 "sync_status": "matched_future_fallback",
                 "vision_fact_status": "vision_not_required",
                 "vision_status": "partial"
               }
             },
             "harness_validation_reasons": [],
-            "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+            "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
             "help_response": {
               "diagnosis": {
                 "error_category": "OM",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "explanations": [
-                "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+                "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
               ],
               "next": {
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "overlay": {
                 "evidence": [
                   {
                     "grounding_confidence": 0.95,
                     "quote": "[REDACTED_SOURCE_QUOTE]",
-                    "ref": "GATES.S25.completion",
+                    "ref": "GATES.S24.completion",
                     "target": "arresting_hook_handle",
                     "type": "gate"
                   }
@@ -1275,20 +1231,20 @@
             "help_response_pre_guardrail": {
               "diagnosis": {
                 "error_category": "OM",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "explanations": [
-                "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+                "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
               ],
               "next": {
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "overlay": {
                 "evidence": [
                   {
                     "grounding_confidence": 0.95,
                     "quote": "[REDACTED_SOURCE_QUOTE]",
-                    "ref": "GATES.S25.completion",
+                    "ref": "GATES.S24.completion",
                     "target": "arresting_hook_handle",
                     "type": "gate"
                   }
@@ -1300,35 +1256,35 @@
             },
             "json_repair_reasons": [],
             "json_repaired": false,
-            "latency_ms": 4083,
+            "latency_ms": 4101,
             "layout_id": "fa18c_composite_panel_v2",
             "main_help_multimodal_input_enabled": false,
             "message_category": "harness_validator_repair",
             "model": "simtutor-base",
             "model_raw_diagnosis": {
               "error_category": "OM",
-              "step_id": "S25"
+              "step_id": "S24"
             },
             "model_raw_explanations": [
-              "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+              "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
             ],
             "model_raw_help_response": {
               "diagnosis": {
                 "error_category": "OM",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "explanations": [
-                "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+                "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
               ],
               "next": {
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "overlay": {
                 "evidence": [
                   {
                     "grounding_confidence": 0.95,
                     "quote": "[REDACTED_SOURCE_QUOTE]",
-                    "ref": "GATES.S25.completion",
+                    "ref": "GATES.S24.completion",
                     "target": "arresting_hook_handle",
                     "type": "gate"
                   }
@@ -1339,10 +1295,10 @@
               }
             },
             "model_raw_next": {
-              "step_id": "S25"
+              "step_id": "S24"
             },
             "multimodal_candidate_frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "multimodal_capability_enabled": true,
             "multimodal_failed_frame_ids": [],
@@ -1355,12 +1311,12 @@
             "multimodal_input_present": true,
             "multimodal_path_attempted": false,
             "multimodal_path_success": false,
-            "multimodal_primary_frame_id": "1779192063799_000210",
+            "multimodal_primary_frame_id": "1779198740607_000256",
             "next": {
-              "step_id": "S25"
+              "step_id": "S24"
             },
             "observability_status": "observable",
-            "prompt_budget_used": 5576,
+            "prompt_budget_used": 5602,
             "prompt_build": {
               "allowed_evidence_refs": [
                 "VARS.annunciator_panel_activity",
@@ -1377,20 +1333,20 @@
                 "VARS.comm1_freq_value",
                 "VARS.comm2_channel_numeric",
                 "VARS.comm2_freq_value",
-                "VARS.hook_handle_value",
+                "VARS.engine_crank_left",
                 "GATES.S20.completion",
                 "GATES.S22.completion",
-                "GATES.S25.completion",
-                "GATES.S25.precondition",
+                "GATES.S24.completion",
+                "GATES.S24.precondition",
                 "GATES.S26.completion",
                 "GATES.S28.completion",
                 "GATES.S29.completion",
                 "GATES.S31.completion",
-                "RAG_SNIPPETS.fa18c_scoring_sheet_template_2",
-                "RAG_SNIPPETS.fa18c_nasatlx_vr_0",
-                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_63",
                 "RAG_SNIPPETS.fa18c_coldstart_quiz_1",
-                "RAG_SNIPPETS.fa18c_nasatlx_vr_1"
+                "RAG_SNIPPETS.fa18c_error_coding_guide_10",
+                "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_92",
+                "RAG_SNIPPETS.fa18c_coldstart_quiz_0",
+                "RAG_SNIPPETS.Appendix - Training Task Syllabus_3"
               ],
               "delta_summary_items": 0,
               "delta_summary_top_k": 20,
@@ -1403,16 +1359,16 @@
               "max_prompt_chars": 9000,
               "max_prompt_tokens_est": 2400,
               "preferred_overlay_target": "arresting_hook_handle",
-              "prompt_chars": 22185,
-              "prompt_tokens_est": 5547,
+              "prompt_chars": 22195,
+              "prompt_tokens_est": 5549,
               "prompt_trimmed": true,
               "rag_snippet_count": 5,
               "rag_snippet_ids": [
-                "fa18c_scoring_sheet_template_2",
-                "fa18c_nasatlx_vr_0",
-                "DCS FA-18C Early Access Guide EN_63",
                 "fa18c_coldstart_quiz_1",
-                "fa18c_nasatlx_vr_1"
+                "fa18c_error_coding_guide_10",
+                "DCS FA-18C Early Access Guide EN_92",
+                "fa18c_coldstart_quiz_0",
+                "Appendix - Training Task Syllabus_3"
               ],
               "state_harness_conflicts": [],
               "state_harness_telemetry_status": "nominal",
@@ -1425,8 +1381,8 @@
               "vision_fact_seen_ids": [],
               "vision_fact_status": "vision_not_required"
             },
-            "prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-            "prompt_tokens_est": 5547,
+            "prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+            "prompt_tokens_est": 5549,
             "prompt_trimmed": true,
             "provider": "openai_compat",
             "repair_applied": true,
@@ -1436,18 +1392,18 @@
               "repair_applied": false,
               "repaired_evidence_types": 0
             },
-            "request_prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-            "request_prompt_tokens_est": 5547,
+            "request_prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+            "request_prompt_tokens_est": 5549,
             "request_prompt_trimmed": true,
             "requires_visual_confirmation": false,
             "response_mapping": {
-              "allowed_evidence_ref_count": 118,
+              "allowed_evidence_ref_count": 116,
               "diagnosis": {
                 "error_category": "OM",
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "next": {
-                "step_id": "S25"
+                "step_id": "S24"
               },
               "observability_status": "observable",
               "requires_visual_confirmation": false
@@ -1456,69 +1412,69 @@
             "retry_reason": null,
             "scenario_profile": "airfield",
             "snapshot_ids": {
-              "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-              "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+              "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+              "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
             },
-            "state_key": "d7526d828db0d74c57eb1e07f38fa6d7a4bbb13cb73426b366a5edaa0b4eb16a",
-            "sync_delta_ms": 86,
+            "state_key": "ef74057c09cb312b8d5cbed54c819ecfc1cad65fa6846333d48a2c3804ddeb5a",
+            "sync_delta_ms": 81,
             "validator_rejected": true,
             "vision": {
-              "frame_id": "1779192063799_000210",
+              "frame_id": "1779198740607_000256",
               "frame_ids": [
-                "1779192063799_000210"
+                "1779198740607_000256"
               ],
               "frame_stale": false,
-              "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-              "observation_seq": 10644,
-              "observation_t_wall_ms": 1779192063744,
-              "observation_t_wall_s": 1779192063.7441182,
+              "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+              "observation_seq": 10877,
+              "observation_t_wall_ms": 1779198740522,
+              "observation_t_wall_s": 1779198740.5223603,
               "pre_trigger_frame": null,
               "selected_frames": [
                 {
-                  "capture_wall_ms": 1779192063799,
+                  "capture_wall_ms": 1779198740607,
                   "channel": "composite_panel",
-                  "frame_id": "1779192063799_000210",
-                  "frame_seq": 210,
+                  "frame_id": "1779198740607_000256",
+                  "frame_seq": 256,
                   "frame_stale": false,
                   "height": 1440,
-                  "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779192063799_000210_vlm.png",
+                  "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198740607_000256_vlm.png",
                   "layout_id": "fa18c_composite_panel_v2",
                   "role": "trigger_frame",
-                  "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779192063799_000210.png",
-                  "sync_delta_ms": 86,
+                  "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198740607_000256.png",
+                  "sync_delta_ms": 81,
                   "sync_miss_reason": null,
                   "sync_status": "matched_future_fallback",
                   "width": 3440
                 }
               ],
               "status": "partial",
-              "sync_delta_ms": 86,
+              "sync_delta_ms": 81,
               "sync_miss_reason": "missing_pre_trigger_frame",
               "sync_status": "matched_future_fallback",
               "sync_window_ms": 250,
               "trigger_frame": {
-                "capture_wall_ms": 1779192063799,
+                "capture_wall_ms": 1779198740607,
                 "channel": "composite_panel",
-                "frame_id": "1779192063799_000210",
-                "frame_seq": 210,
+                "frame_id": "1779198740607_000256",
+                "frame_seq": 256,
                 "frame_stale": false,
                 "height": 1440,
-                "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779192063799_000210_vlm.png",
+                "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198740607_000256_vlm.png",
                 "layout_id": "fa18c_composite_panel_v2",
                 "role": "trigger_frame",
-                "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779192063799_000210.png",
-                "sync_delta_ms": 86,
+                "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198740607_000256.png",
+                "sync_delta_ms": 81,
                 "sync_miss_reason": null,
                 "sync_status": "matched_future_fallback",
                 "width": 3440
               },
-              "trigger_wall_ms": 1779192063713,
+              "trigger_wall_ms": 1779198740526,
               "vision_used": true
             },
             "vision_fact_active_step_ids": [
-              "S25"
+              "S24"
             ],
             "vision_fact_cached_count": 1,
             "vision_fact_extractor_used": false,
@@ -1527,7 +1483,7 @@
             "vision_fact_sticky_count": 1,
             "vision_fact_summary": {
               "frame_ids": [
-                "1779192063799_000210"
+                "1779198740607_000256"
               ],
               "fresh_fact_ids": [],
               "not_seen_fact_ids": [],
@@ -1540,47 +1496,35 @@
             "vision_fallback_reason": null,
             "vision_frame_capture_selected": true,
             "vision_frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "vision_status": "partial",
             "vision_used": true,
             "vlm_call_reason": "vision_not_required_for_step",
             "vlm_call_status": "not_required"
           },
-          "response_id": "a792102c-9957-41f4-8311-04028e35bd63",
+          "response_id": "0acf2909-def2-4244-b02f-6dfc2cf7852b",
           "status": "ok",
-          "timestamp": "2026-05-19T12:01:08.335891+00:00",
+          "timestamp": "2026-05-19T13:52:25.150213+00:00",
           "version": "v1"
         },
-        "related_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "related_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "vision_refs": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ]
       }
     ],
     "tutor_request": {
       "actor": "learner",
       "context": {
-        "delta_dropped_count": 0,
-        "four_down_completion_latches": {
-          "s20_latched_complete": true,
-          "s21_latched_complete": true,
-          "s22_latched_complete": true,
-          "s23_latched_complete": true,
-          "s24_latched_complete": true,
-          "s25_latched_complete": false
-        },
-        "refuel_probe_completion_latches": {
-          "s20_latched_complete": true,
-          "s21_latched_complete": true
-        },
+        "delta_dropped_count": 1,
         "deterministic_step_hint": {
           "action_hint": {
             "target": "arresting_hook_handle"
           },
           "gate_blocker_count": 1,
-          "inferred_step_id": "S25",
-          "missing_conditions_count": 1,
+          "inferred_step_id": "S24",
+          "missing_conditions_count": 0,
           "observability": "observable",
           "observability_status": "observable",
           "overlay_step_id": "S25",
@@ -1600,89 +1544,87 @@
           "telemetry_window_digest": {
             "changed_var_count": 0,
             "contradiction_count": 0,
-            "first_seq": 10625,
+            "first_seq": 10858,
             "frame_count": 20,
-            "latest_seq": 10644
+            "latest_seq": 10877
           },
           "vision_fresh_count": 0,
           "vision_seen_count": 0,
           "vision_status": "vision_not_required"
         },
         "evidence_snapshot": {
-          "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+          "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
           "schema_version": "evidence_snapshot.v1",
-          "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-          "source_observation_seq": 10644,
-          "source_observation_t_wall": 1779192063.7441182,
-          "telemetry_window_first_seq": 10625,
+          "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+          "source_observation_seq": 10877,
+          "source_observation_t_wall": 1779198740.5223603,
+          "telemetry_window_first_seq": 10858,
           "telemetry_window_frame_count": 20,
-          "telemetry_window_latest_seq": 10644,
-          "telemetry_window_latest_t_wall": 1779192063.7441182,
-          "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "telemetry_window_latest_seq": 10877,
+          "telemetry_window_latest_t_wall": 1779198740.5223603,
+          "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
         "grounding_missing": false,
         "grounding_query": "[REDACTED_GROUNDING_QUERY]",
         "grounding_reason": null,
         "rag_topk": [
           {
-            "chunk_id": "fa18c_scoring_sheet_template_2",
-            "doc_id": "fa18c_scoring_sheet_template",
-            "page_or_heading": "2. Step-Level Coding",
-            "score": 25.039944761327018,
-            "section": "2. Step-Level Coding",
-            "snippet_id": "fa18c_scoring_sheet_template_2"
-          },
-          {
-            "chunk_id": "fa18c_nasatlx_vr_0",
-            "doc_id": "fa18c_nasatlx_vr",
-            "page_or_heading": "Task: F/A-18C Cold Start in DCS World (VR)",
-            "score": 21.88863349107637,
-            "section": "Task: F/A-18C Cold Start in DCS World (VR)",
-            "snippet_id": "fa18c_nasatlx_vr_0"
-          },
-          {
-            "chunk_id": "DCS FA-18C Early Access Guide EN_63",
-            "doc_id": "DCS FA-18C Early Access Guide EN",
-            "page_or_heading": 64,
-            "score": 20.974642355449337,
-            "snippet_id": "DCS FA-18C Early Access Guide EN_63"
-          },
-          {
             "chunk_id": "fa18c_coldstart_quiz_1",
             "doc_id": "fa18c_coldstart_quiz",
             "page_or_heading": "Q1. Overall Goal",
-            "score": 18.834010694115808,
+            "score": 13.29554266378183,
             "section": "Q1. Overall Goal",
             "snippet_id": "fa18c_coldstart_quiz_1"
           },
           {
-            "chunk_id": "fa18c_nasatlx_vr_1",
-            "doc_id": "fa18c_nasatlx_vr",
-            "page_or_heading": "1. Mental Demand",
-            "score": 17.669751353263905,
-            "section": "1. Mental Demand",
-            "snippet_id": "fa18c_nasatlx_vr_1"
+            "chunk_id": "fa18c_error_coding_guide_10",
+            "doc_id": "fa18c_error_coding_guide",
+            "page_or_heading": "3. Step Criticality",
+            "score": 13.120994677243015,
+            "section": "3. Step Criticality",
+            "snippet_id": "fa18c_error_coding_guide_10"
+          },
+          {
+            "chunk_id": "DCS FA-18C Early Access Guide EN_92",
+            "doc_id": "DCS FA-18C Early Access Guide EN",
+            "page_or_heading": 93,
+            "score": 10.553560644586302,
+            "snippet_id": "DCS FA-18C Early Access Guide EN_92"
+          },
+          {
+            "chunk_id": "fa18c_coldstart_quiz_0",
+            "doc_id": "fa18c_coldstart_quiz",
+            "page_or_heading": "F/A-18C Cold Start – Knowledge Quiz",
+            "score": 10.102965691900046,
+            "section": "F/A-18C Cold Start – Knowledge Quiz",
+            "snippet_id": "fa18c_coldstart_quiz_0"
+          },
+          {
+            "chunk_id": "Appendix - Training Task Syllabus_3",
+            "doc_id": "Appendix - Training Task Syllabus",
+            "page_or_heading": "Phase P1 – Power-Up & Safety (S01–S03)",
+            "score": 9.718372888459161,
+            "section": "Phase P1 – Power-Up & Safety (S01–S03)",
+            "snippet_id": "Appendix - Training Task Syllabus_3"
           }
         ],
         "scenario_profile": "airfield",
         "snapshot_ids": {
-          "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
         "state_harness": {
           "conflicts": [],
           "deterministic_candidate": {
-            "missing_conditions": [
-              "vars.hook_handle_value in [0,0]"
-            ],
+            "missing_conditions": [],
             "overlay_step_id": "S25",
             "role": "candidate_not_authoritative",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "telemetry_evidence": {
             "confidence": "medium",
@@ -1692,7 +1634,7 @@
               "fire_test_b_complete": true,
               "power_available": true
             },
-            "observation_seq": 10644,
+            "observation_seq": 10877,
             "source_status": "nominal",
             "vars_source_missing_count": 4
           },
@@ -1700,52 +1642,52 @@
             "changed_vars": [],
             "contradictions": [],
             "first_frame_only_values": [],
-            "first_seq": 10625,
+            "first_seq": 10858,
             "frame_count": 20,
             "last_seen_true": [
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "battery_on"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "fire_test_a_complete"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "fire_test_b_complete"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "fire_test_complete"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "flap_auto"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "hud_on"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "left_ddi_on"
               },
               {
                 "age_s": 0.0,
-                "seq": 10644,
+                "seq": 10877,
                 "var": "mpcd_on"
               }
             ],
-            "latest_seq": 10644,
-            "latest_t_wall": 1779192063.7441182,
+            "latest_seq": 10877,
+            "latest_t_wall": 1779198740.5223603,
             "stable_false_vars": [
               "fcs_bit_switch_up",
               "pitot_heat_on"
@@ -1768,7 +1710,7 @@
               "ufc_scratchpad_string_1_display",
               "ufc_scratchpad_string_2_display"
             ],
-            "window_duration_s": 1.323
+            "window_duration_s": 1.625
           },
           "vision_evidence": {
             "confidence": "low",
@@ -1781,26 +1723,26 @@
           }
         },
         "vision": {
-          "frame_id": "1779192063799_000210",
+          "frame_id": "1779198740607_000256",
           "frame_ids": [
-            "1779192063799_000210"
+            "1779198740607_000256"
           ],
           "frame_stale": false,
-          "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-          "observation_seq": 10644,
-          "observation_t_wall_ms": 1779192063744,
-          "observation_t_wall_s": 1779192063.7441182,
+          "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+          "observation_seq": 10877,
+          "observation_t_wall_ms": 1779198740522,
+          "observation_t_wall_s": 1779198740.5223603,
           "status": "partial",
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "sync_miss_reason": "missing_pre_trigger_frame",
           "sync_status": "matched_future_fallback",
           "sync_window_ms": 250,
-          "trigger_wall_ms": 1779192063713,
+          "trigger_wall_ms": 1779198740526,
           "vision_used": true
         },
         "vision_fact_summary": {
           "frame_ids": [
-            "1779192063799_000210"
+            "1779198740607_000256"
           ],
           "fresh_fact_ids": [],
           "not_seen_fact_ids": [],
@@ -1823,34 +1765,32 @@
           "telemetry_window_digest": {
             "changed_var_count": 0,
             "contradiction_count": 0,
-            "first_seq": 10625,
+            "first_seq": 10858,
             "frame_count": 20,
-            "latest_seq": 10644
+            "latest_seq": 10877
           },
           "vision_fresh_count": 0,
           "vision_seen_count": 0,
           "vision_status": "vision_not_required"
         },
         "evidence_snapshot": {
-          "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+          "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
           "schema_version": "evidence_snapshot.v1",
-          "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-          "source_observation_seq": 10644,
-          "source_observation_t_wall": 1779192063.7441182,
-          "telemetry_window_first_seq": 10625,
+          "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+          "source_observation_seq": 10877,
+          "source_observation_t_wall": 1779198740.5223603,
+          "telemetry_window_first_seq": 10858,
           "telemetry_window_frame_count": 20,
-          "telemetry_window_latest_seq": 10644,
-          "telemetry_window_latest_t_wall": 1779192063.7441182,
-          "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "telemetry_window_latest_seq": 10877,
+          "telemetry_window_latest_t_wall": 1779198740.5223603,
+          "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
-        "frame_id": "1779192063799_000210",
-        "fused_missing_conditions": [
-          "vars.hook_handle_value in [0,0]"
-        ],
-        "fused_step_id": "S25",
+        "frame_id": "1779198740607_000256",
+        "fused_missing_conditions": [],
+        "fused_step_id": "S24",
         "grounding_cache_hit": false,
         "grounding_error_type": null,
         "grounding_missing": false,
@@ -1861,39 +1801,39 @@
         "grounding_reason": null,
         "grounding_reason_requested": null,
         "grounding_snippet_ids": [
-          "fa18c_scoring_sheet_template_2",
-          "fa18c_nasatlx_vr_0",
-          "DCS FA-18C Early Access Guide EN_63",
           "fa18c_coldstart_quiz_1",
-          "fa18c_nasatlx_vr_1"
+          "fa18c_error_coding_guide_10",
+          "DCS FA-18C Early Access Guide EN_92",
+          "fa18c_coldstart_quiz_0",
+          "Appendix - Training Task Syllabus_3"
         ],
-        "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "layout_id": "fa18c_composite_panel_v2",
-        "prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-        "prompt_tokens_est": 5547,
+        "prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+        "prompt_tokens_est": 5549,
         "prompt_trimmed": true,
         "scenario_profile": "airfield",
         "snapshot_ids": {
-          "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
         "source_chunk_refs": [
-          "fa18c_scoring_sheet_template/fa18c_scoring_sheet_template_2",
-          "fa18c_nasatlx_vr/fa18c_nasatlx_vr_0",
-          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_63",
           "fa18c_coldstart_quiz/fa18c_coldstart_quiz_1",
-          "fa18c_nasatlx_vr/fa18c_nasatlx_vr_1"
+          "fa18c_error_coding_guide/fa18c_error_coding_guide_10",
+          "DCS FA-18C Early Access Guide EN/DCS FA-18C Early Access Guide EN_92",
+          "fa18c_coldstart_quiz/fa18c_coldstart_quiz_0",
+          "Appendix - Training Task Syllabus/Appendix - Training Task Syllabus_3"
         ],
         "state_harness_conflicts": [],
         "state_harness_telemetry_status": "nominal",
-        "sync_delta_ms": 86,
+        "sync_delta_ms": 81,
         "vision_fact_seen_ids": [],
         "vision_fact_status": "vision_not_required",
         "vision_fact_summary": {
           "frame_ids": [
-            "1779192063799_000210"
+            "1779198740607_000256"
           ],
           "fresh_fact_ids": [],
           "not_seen_fact_ids": [],
@@ -1904,14 +1844,14 @@
         },
         "vision_fallback_reason": null,
         "vision_frame_ids": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ],
         "vision_status": "partial",
         "vision_used": true
       },
-      "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-      "request_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
-      "timestamp": "2026-05-19T12:01:04.250942+00:00",
+      "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+      "request_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
+      "timestamp": "2026-05-19T13:52:21.047016+00:00",
       "version": "v1"
     },
     "tutor_response": {
@@ -1919,19 +1859,17 @@
         {
           "element_id": "pnt_293",
           "evidence_refs": [
-            "GATES.S25.completion"
+            "GATES.S24.completion"
           ],
           "evidence_required": true,
           "final_overlay_targets": [
             "arresting_hook_handle"
           ],
-          "frame_id": "1779192063799_000210",
-          "fused_missing_conditions": [
-            "vars.hook_handle_value in [0,0]"
-          ],
-          "fused_step_id": "S25",
+          "frame_id": "1779198740607_000256",
+          "fused_missing_conditions": [],
+          "fused_step_id": "S24",
           "generation_mode": "model",
-          "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+          "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
           "intent": "highlight",
           "layout_id": "fa18c_composite_panel_v2",
           "message_category": "harness_validator_repair",
@@ -1940,7 +1878,7 @@
             "style": "highlight",
             "thickness": 2
           },
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "target": "arresting_hook_handle",
           "type": "overlay",
           "vision_fact_cached_count": 1,
@@ -1949,7 +1887,7 @@
           "vision_fact_sticky_count": 1,
           "vision_fact_summary": {
             "frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "fresh_fact_ids": [],
             "not_seen_fact_ids": [],
@@ -1967,21 +1905,21 @@
       ],
       "actor": "tutor",
       "explanations": [
-        "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+        "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
       ],
-      "in_reply_to": "da08da4a-0909-4acb-a2e6-7027324fa989",
-      "message": "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。",
+      "in_reply_to": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
+      "message": "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。",
       "metadata": {
-        "allowed_evidence_ref_count": 118,
+        "allowed_evidence_ref_count": 116,
         "dcs_tutor_text": {
           "clear_view": false,
-          "cmd_id": "a619baed-eed3-4f0c-b13c-788756b4806b",
+          "cmd_id": "20b050b9-6bcc-4f36-b8d5-9b4a522b5779",
           "display_time_s": 12.0,
           "reason": null,
           "status": "ok",
-          "text": "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+          "text": "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
         },
-        "delta_dropped_count": 0,
+        "delta_dropped_count": 1,
         "deterministic_inference_error": null,
         "deterministic_step_hint": {
           "inferred_step_id": "S08",
@@ -2008,11 +1946,11 @@
             "right_mdi_pb18",
             "right_mdi_pb5"
           ],
-          "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
         "diagnosis": {
           "error_category": "OM",
-          "step_id": "S25"
+          "step_id": "S24"
         },
         "evidence_guardrail_applied": false,
         "evidence_guardrail_reasons": [],
@@ -2021,32 +1959,32 @@
           "repair_applied": false
         },
         "evidence_snapshot": {
-          "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+          "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
           "schema_version": "evidence_snapshot.v1",
-          "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-          "source_observation_seq": 10644,
-          "source_observation_t_wall": 1779192063.7441182,
-          "telemetry_window_first_seq": 10625,
+          "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+          "source_observation_seq": 10877,
+          "source_observation_t_wall": 1779198740.5223603,
+          "telemetry_window_first_seq": 10858,
           "telemetry_window_frame_count": 20,
-          "telemetry_window_latest_seq": 10644,
-          "telemetry_window_latest_t_wall": 1779192063.7441182,
-          "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "telemetry_window_latest_seq": 10877,
+          "telemetry_window_latest_t_wall": 1779198740.5223603,
+          "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
         "evidence_snapshot_consistency": {
           "deterministic_hint_matches_request": false,
           "final_action_plan_matches_snapshot": true,
-          "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
         "fallback_overlay_reason": "not_needed",
         "fallback_overlay_used": false,
         "final_action_plan": {
-          "evidence_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+          "evidence_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
           "overlay_step_id": "S25",
           "source": "validator_action_hint",
-          "step_id": "S25",
+          "step_id": "S24",
           "targets": [
             "arresting_hook_handle"
           ],
@@ -2061,19 +1999,17 @@
             {
               "element_id": "pnt_293",
               "evidence_refs": [
-                "GATES.S25.completion"
+                "GATES.S24.completion"
               ],
               "evidence_required": true,
               "final_overlay_targets": [
                 "arresting_hook_handle"
               ],
-              "frame_id": "1779192063799_000210",
-              "fused_missing_conditions": [
-                "vars.hook_handle_value in [0,0]"
-              ],
-              "fused_step_id": "S25",
+              "frame_id": "1779198740607_000256",
+              "fused_missing_conditions": [],
+              "fused_step_id": "S24",
               "generation_mode": "model",
-              "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+              "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
               "intent": "highlight",
               "layout_id": "fa18c_composite_panel_v2",
               "message_category": "harness_validator_repair",
@@ -2082,7 +2018,7 @@
                 "style": "highlight",
                 "thickness": 2
               },
-              "sync_delta_ms": 86,
+              "sync_delta_ms": 81,
               "target": "arresting_hook_handle",
               "type": "overlay",
               "vision_fact_cached_count": 1,
@@ -2091,7 +2027,7 @@
               "vision_fact_sticky_count": 1,
               "vision_fact_summary": {
                 "frame_ids": [
-                  "1779192063799_000210"
+                  "1779198740607_000256"
                 ],
                 "fresh_fact_ids": [],
                 "not_seen_fact_ids": [],
@@ -2109,29 +2045,27 @@
           ],
           "diagnosis": {
             "error_category": "OM",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "explanations": [
-            "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+            "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
           ],
-          "message": "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。",
+          "message": "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。",
           "next": {
-            "step_id": "S25"
+            "step_id": "S24"
           }
         },
-        "frame_id": "1779192063799_000210",
-        "fused_missing_conditions": [
-          "vars.hook_handle_value in [0,0]"
-        ],
-        "fused_step_id": "S25",
+        "frame_id": "1779198740607_000256",
+        "fused_missing_conditions": [],
+        "fused_step_id": "S24",
         "generation_mode": "model",
-        "generation_prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-        "generation_prompt_tokens_est": 5547,
+        "generation_prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+        "generation_prompt_tokens_est": 5549,
         "generation_prompt_trimmed": true,
         "harness_action_plan": {
           "overlay_step_id": "S25",
           "source": "validator_action_hint",
-          "step_id": "S25",
+          "step_id": "S24",
           "targets": [
             "arresting_hook_handle"
           ],
@@ -2146,9 +2080,9 @@
               ],
               "role": "candidate_not_authoritative",
               "source": "deterministic",
-              "step_id": "S25",
+              "step_id": "S24",
               "supporting_evidence_refs": [
-                "GATES.S25.completion"
+                "GATES.S24.completion"
               ]
             },
             {
@@ -2158,9 +2092,9 @@
               ],
               "role": "candidate",
               "source": "gate_blocker",
-              "step_id": "S25",
+              "step_id": "S24",
               "supporting_evidence_refs": [
-                "GATES.S25.completion"
+                "GATES.S24.completion"
               ]
             },
             {
@@ -2244,9 +2178,9 @@
             ],
             "role": "candidate_not_authoritative",
             "source": "deterministic",
-            "step_id": "S25",
+            "step_id": "S24",
             "supporting_evidence_refs": [
-              "GATES.S25.completion"
+              "GATES.S24.completion"
             ]
           },
           "evidence_packet_summary": {
@@ -2258,39 +2192,39 @@
             "telemetry_window_digest": {
               "changed_var_count": 0,
               "contradiction_count": 0,
-              "first_seq": 10625,
+              "first_seq": 10858,
               "frame_count": 20,
-              "latest_seq": 10644
+              "latest_seq": 10877
             },
             "vision_fresh_count": 0,
             "vision_seen_count": 0,
             "vision_status": "vision_not_required"
           },
           "evidence_snapshot": {
-            "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-            "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-            "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+            "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+            "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+            "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
             "schema_version": "evidence_snapshot.v1",
-            "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-            "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-            "source_observation_seq": 10644,
-            "source_observation_t_wall": 1779192063.7441182,
-            "telemetry_window_first_seq": 10625,
+            "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+            "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+            "source_observation_seq": 10877,
+            "source_observation_t_wall": 1779198740.5223603,
+            "telemetry_window_first_seq": 10858,
             "telemetry_window_frame_count": 20,
-            "telemetry_window_latest_seq": 10644,
-            "telemetry_window_latest_t_wall": 1779192063.7441182,
-            "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+            "telemetry_window_latest_seq": 10877,
+            "telemetry_window_latest_t_wall": 1779198740.5223603,
+            "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
           },
           "evidence_snapshot_consistency": {
             "deterministic_hint_matches_request": false,
             "final_action_plan_matches_snapshot": true,
-            "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+            "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
           },
           "final_action_plan": {
-            "evidence_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+            "evidence_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
             "overlay_step_id": "S25",
             "source": "validator_action_hint",
-            "step_id": "S25",
+            "step_id": "S24",
             "targets": [
               "arresting_hook_handle"
             ],
@@ -2302,14 +2236,14 @@
           "message_category": "harness_validator_repair",
           "model_decision": {
             "evidence_refs": [
-              "GATES.S25.completion"
+              "GATES.S24.completion"
             ],
             "generation_mode": "model",
             "overlay_targets": [
               "arresting_hook_handle"
             ],
             "status": "ok",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "rejected_candidates": [],
           "repair_result": {
@@ -2323,10 +2257,10 @@
           },
           "schema_version": "v1",
           "snapshot_ids": {
-            "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-            "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-            "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-            "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+            "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+            "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+            "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+            "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
           },
           "validator_result": {
             "fallback_overlay_reason": "not_needed",
@@ -2341,37 +2275,37 @@
             "extractor_used": false,
             "frame_capture_selected": true,
             "frame_ids": [
-              "1779192063799_000210"
+              "1779198740607_000256"
             ],
             "ignored_fact_count": 1,
             "reason": "vision_not_required_for_step",
             "status": "not_required",
             "sticky_fact_count": 1,
-            "sync_delta_ms": 86,
+            "sync_delta_ms": 81,
             "sync_status": "matched_future_fallback",
             "vision_fact_status": "vision_not_required",
             "vision_status": "partial"
           }
         },
         "harness_validation_reasons": [],
-        "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+        "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
         "help_response": {
           "diagnosis": {
             "error_category": "OM",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "explanations": [
-            "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+            "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
           ],
           "next": {
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "overlay": {
             "evidence": [
               {
                 "grounding_confidence": 0.95,
                 "quote": "[REDACTED_SOURCE_QUOTE]",
-                "ref": "GATES.S25.completion",
+                "ref": "GATES.S24.completion",
                 "target": "arresting_hook_handle",
                 "type": "gate"
               }
@@ -2384,20 +2318,20 @@
         "help_response_pre_guardrail": {
           "diagnosis": {
             "error_category": "OM",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "explanations": [
-            "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+            "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
           ],
           "next": {
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "overlay": {
             "evidence": [
               {
                 "grounding_confidence": 0.95,
                 "quote": "[REDACTED_SOURCE_QUOTE]",
-                "ref": "GATES.S25.completion",
+                "ref": "GATES.S24.completion",
                 "target": "arresting_hook_handle",
                 "type": "gate"
               }
@@ -2409,35 +2343,35 @@
         },
         "json_repair_reasons": [],
         "json_repaired": false,
-        "latency_ms": 4083,
+        "latency_ms": 4101,
         "layout_id": "fa18c_composite_panel_v2",
         "main_help_multimodal_input_enabled": false,
         "message_category": "harness_validator_repair",
         "model": "simtutor-base",
         "model_raw_diagnosis": {
           "error_category": "OM",
-          "step_id": "S25"
+          "step_id": "S24"
         },
         "model_raw_explanations": [
-          "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+          "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
         ],
         "model_raw_help_response": {
           "diagnosis": {
             "error_category": "OM",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "explanations": [
-            "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+            "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
           ],
           "next": {
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "overlay": {
             "evidence": [
               {
                 "grounding_confidence": 0.95,
                 "quote": "[REDACTED_SOURCE_QUOTE]",
-                "ref": "GATES.S25.completion",
+                "ref": "GATES.S24.completion",
                 "target": "arresting_hook_handle",
                 "type": "gate"
               }
@@ -2448,10 +2382,10 @@
           }
         },
         "model_raw_next": {
-          "step_id": "S25"
+          "step_id": "S24"
         },
         "multimodal_candidate_frame_ids": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ],
         "multimodal_capability_enabled": true,
         "multimodal_failed_frame_ids": [],
@@ -2464,12 +2398,12 @@
         "multimodal_input_present": true,
         "multimodal_path_attempted": false,
         "multimodal_path_success": false,
-        "multimodal_primary_frame_id": "1779192063799_000210",
+        "multimodal_primary_frame_id": "1779198740607_000256",
         "next": {
-          "step_id": "S25"
+          "step_id": "S24"
         },
         "observability_status": "observable",
-        "prompt_budget_used": 5576,
+        "prompt_budget_used": 5602,
         "prompt_build": {
           "allowed_evidence_refs": [
             "VARS.annunciator_panel_activity",
@@ -2486,20 +2420,20 @@
             "VARS.comm1_freq_value",
             "VARS.comm2_channel_numeric",
             "VARS.comm2_freq_value",
-            "VARS.hook_handle_value",
+            "VARS.engine_crank_left",
             "GATES.S20.completion",
             "GATES.S22.completion",
-            "GATES.S25.completion",
-            "GATES.S25.precondition",
+            "GATES.S24.completion",
+            "GATES.S24.precondition",
             "GATES.S26.completion",
             "GATES.S28.completion",
             "GATES.S29.completion",
             "GATES.S31.completion",
-            "RAG_SNIPPETS.fa18c_scoring_sheet_template_2",
-            "RAG_SNIPPETS.fa18c_nasatlx_vr_0",
-            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_63",
             "RAG_SNIPPETS.fa18c_coldstart_quiz_1",
-            "RAG_SNIPPETS.fa18c_nasatlx_vr_1"
+            "RAG_SNIPPETS.fa18c_error_coding_guide_10",
+            "RAG_SNIPPETS.DCS FA-18C Early Access Guide EN_92",
+            "RAG_SNIPPETS.fa18c_coldstart_quiz_0",
+            "RAG_SNIPPETS.Appendix - Training Task Syllabus_3"
           ],
           "delta_summary_items": 0,
           "delta_summary_top_k": 20,
@@ -2512,16 +2446,16 @@
           "max_prompt_chars": 9000,
           "max_prompt_tokens_est": 2400,
           "preferred_overlay_target": "arresting_hook_handle",
-          "prompt_chars": 22185,
-          "prompt_tokens_est": 5547,
+          "prompt_chars": 22195,
+          "prompt_tokens_est": 5549,
           "prompt_trimmed": true,
           "rag_snippet_count": 5,
           "rag_snippet_ids": [
-            "fa18c_scoring_sheet_template_2",
-            "fa18c_nasatlx_vr_0",
-            "DCS FA-18C Early Access Guide EN_63",
             "fa18c_coldstart_quiz_1",
-            "fa18c_nasatlx_vr_1"
+            "fa18c_error_coding_guide_10",
+            "DCS FA-18C Early Access Guide EN_92",
+            "fa18c_coldstart_quiz_0",
+            "Appendix - Training Task Syllabus_3"
           ],
           "state_harness_conflicts": [],
           "state_harness_telemetry_status": "nominal",
@@ -2534,8 +2468,8 @@
           "vision_fact_seen_ids": [],
           "vision_fact_status": "vision_not_required"
         },
-        "prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-        "prompt_tokens_est": 5547,
+        "prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+        "prompt_tokens_est": 5549,
         "prompt_trimmed": true,
         "provider": "openai_compat",
         "repair_applied": true,
@@ -2545,18 +2479,18 @@
           "repair_applied": false,
           "repaired_evidence_types": 0
         },
-        "request_prompt_hash": "e7965c5a4360ec6328a020732a1d1d6826fde7710f9e4501ad3accbf7b137ca6",
-        "request_prompt_tokens_est": 5547,
+        "request_prompt_hash": "9324856ddf713919f5f1b797db70def6edbcf83c63c094f7d4029f0cbbd5ddf0",
+        "request_prompt_tokens_est": 5549,
         "request_prompt_trimmed": true,
         "requires_visual_confirmation": false,
         "response_mapping": {
-          "allowed_evidence_ref_count": 118,
+          "allowed_evidence_ref_count": 116,
           "diagnosis": {
             "error_category": "OM",
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "next": {
-            "step_id": "S25"
+            "step_id": "S24"
           },
           "observability_status": "observable",
           "requires_visual_confirmation": false
@@ -2565,69 +2499,69 @@
         "retry_reason": null,
         "scenario_profile": "airfield",
         "snapshot_ids": {
-          "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-          "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+          "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+          "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
         },
-        "state_key": "d7526d828db0d74c57eb1e07f38fa6d7a4bbb13cb73426b366a5edaa0b4eb16a",
-        "sync_delta_ms": 86,
+        "state_key": "ef74057c09cb312b8d5cbed54c819ecfc1cad65fa6846333d48a2c3804ddeb5a",
+        "sync_delta_ms": 81,
         "validator_rejected": true,
         "vision": {
-          "frame_id": "1779192063799_000210",
+          "frame_id": "1779198740607_000256",
           "frame_ids": [
-            "1779192063799_000210"
+            "1779198740607_000256"
           ],
           "frame_stale": false,
-          "observation_ref": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-          "observation_seq": 10644,
-          "observation_t_wall_ms": 1779192063744,
-          "observation_t_wall_s": 1779192063.7441182,
+          "observation_ref": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+          "observation_seq": 10877,
+          "observation_t_wall_ms": 1779198740522,
+          "observation_t_wall_s": 1779198740.5223603,
           "pre_trigger_frame": null,
           "selected_frames": [
             {
-              "capture_wall_ms": 1779192063799,
+              "capture_wall_ms": 1779198740607,
               "channel": "composite_panel",
-              "frame_id": "1779192063799_000210",
-              "frame_seq": 210,
+              "frame_id": "1779198740607_000256",
+              "frame_seq": 256,
               "frame_stale": false,
               "height": 1440,
-              "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779192063799_000210_vlm.png",
+              "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198740607_000256_vlm.png",
               "layout_id": "fa18c_composite_panel_v2",
               "role": "trigger_frame",
-              "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779192063799_000210.png",
-              "sync_delta_ms": 86,
+              "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198740607_000256.png",
+              "sync_delta_ms": 81,
               "sync_miss_reason": null,
               "sync_status": "matched_future_fallback",
               "width": 3440
             }
           ],
           "status": "partial",
-          "sync_delta_ms": 86,
+          "sync_delta_ms": 81,
           "sync_miss_reason": "missing_pre_trigger_frame",
           "sync_status": "matched_future_fallback",
           "sync_window_ms": 250,
           "trigger_frame": {
-            "capture_wall_ms": 1779192063799,
+            "capture_wall_ms": 1779198740607,
             "channel": "composite_panel",
-            "frame_id": "1779192063799_000210",
-            "frame_seq": 210,
+            "frame_id": "1779198740607_000256",
+            "frame_seq": 256,
             "frame_stale": false,
             "height": 1440,
-            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779192063799_000210_vlm.png",
+            "image_uri": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\artifacts\\1779198740607_000256_vlm.png",
             "layout_id": "fa18c_composite_panel_v2",
             "role": "trigger_frame",
-            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779192063799_000210.png",
-            "sync_delta_ms": 86,
+            "source_image_path": "C:\\Users\\15423\\Saved Games\\DCS\\SimTutor\\frames\\sess-live\\composite_panel\\1779198740607_000256.png",
+            "sync_delta_ms": 81,
             "sync_miss_reason": null,
             "sync_status": "matched_future_fallback",
             "width": 3440
           },
-          "trigger_wall_ms": 1779192063713,
+          "trigger_wall_ms": 1779198740526,
           "vision_used": true
         },
         "vision_fact_active_step_ids": [
-          "S25"
+          "S24"
         ],
         "vision_fact_cached_count": 1,
         "vision_fact_extractor_used": false,
@@ -2636,7 +2570,7 @@
         "vision_fact_sticky_count": 1,
         "vision_fact_summary": {
           "frame_ids": [
-            "1779192063799_000210"
+            "1779198740607_000256"
           ],
           "fresh_fact_ids": [],
           "not_seen_fact_ids": [],
@@ -2649,29 +2583,29 @@
         "vision_fallback_reason": null,
         "vision_frame_capture_selected": true,
         "vision_frame_ids": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ],
         "vision_status": "partial",
         "vision_used": true,
         "vlm_call_reason": "vision_not_required_for_step",
         "vlm_call_status": "not_required"
       },
-      "response_id": "a792102c-9957-41f4-8311-04028e35bd63",
+      "response_id": "0acf2909-def2-4244-b02f-6dfc2cf7852b",
       "status": "ok",
-      "timestamp": "2026-05-19T12:01:08.335891+00:00",
+      "timestamp": "2026-05-19T13:52:25.150213+00:00",
       "version": "v1"
     }
   },
   "expectations": {
-    "expected_final_step_id": "S26",
+    "expected_final_step_id": "S25",
     "expected_overlay_target_ids": [
-      "pitot_heater_switch"
+      "arresting_hook_handle"
     ],
     "final_response_source": "final_evidence_consistency_validator",
     "llm_decision_status": "repaired",
     "vlm_call_status": "not_required"
   },
-  "extraction_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+  "extraction_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
   "harness": {
     "candidate_steps": [
       {
@@ -2681,9 +2615,9 @@
         ],
         "role": "candidate_not_authoritative",
         "source": "deterministic",
-        "step_id": "S25",
+        "step_id": "S24",
         "supporting_evidence_refs": [
-          "GATES.S25.completion"
+          "GATES.S24.completion"
         ]
       },
       {
@@ -2693,9 +2627,9 @@
         ],
         "role": "candidate",
         "source": "gate_blocker",
-        "step_id": "S25",
+        "step_id": "S24",
         "supporting_evidence_refs": [
-          "GATES.S25.completion"
+          "GATES.S24.completion"
         ]
       },
       {
@@ -2773,10 +2707,10 @@
       }
     ],
     "final_action_plan": {
-      "evidence_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+      "evidence_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
       "overlay_step_id": "S25",
       "source": "validator_action_hint",
-      "step_id": "S25",
+      "step_id": "S24",
       "targets": [
         "arresting_hook_handle"
       ],
@@ -2784,14 +2718,14 @@
     },
     "model_decision": {
       "evidence_refs": [
-        "GATES.S25.completion"
+        "GATES.S24.completion"
       ],
       "generation_mode": "model",
       "overlay_targets": [
         "arresting_hook_handle"
       ],
       "status": "ok",
-      "step_id": "S25"
+      "step_id": "S24"
     },
     "repair_result": {
       "applied": true,
@@ -2811,9 +2745,9 @@
           ],
           "role": "candidate_not_authoritative",
           "source": "deterministic",
-          "step_id": "S25",
+          "step_id": "S24",
           "supporting_evidence_refs": [
-            "GATES.S25.completion"
+            "GATES.S24.completion"
           ]
         },
         {
@@ -2823,9 +2757,9 @@
           ],
           "role": "candidate",
           "source": "gate_blocker",
-          "step_id": "S25",
+          "step_id": "S24",
           "supporting_evidence_refs": [
-            "GATES.S25.completion"
+            "GATES.S24.completion"
           ]
         },
         {
@@ -2909,9 +2843,9 @@
         ],
         "role": "candidate_not_authoritative",
         "source": "deterministic",
-        "step_id": "S25",
+        "step_id": "S24",
         "supporting_evidence_refs": [
-          "GATES.S25.completion"
+          "GATES.S24.completion"
         ]
       },
       "evidence_packet_summary": {
@@ -2923,39 +2857,39 @@
         "telemetry_window_digest": {
           "changed_var_count": 0,
           "contradiction_count": 0,
-          "first_seq": 10625,
+          "first_seq": 10858,
           "frame_count": 20,
-          "latest_seq": 10644
+          "latest_seq": 10877
         },
         "vision_fresh_count": 0,
         "vision_seen_count": 0,
         "vision_status": "vision_not_required"
       },
       "evidence_snapshot": {
-        "candidate_generation_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-        "final_decision_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-        "model_request_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+        "candidate_generation_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+        "final_decision_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+        "model_request_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
         "schema_version": "evidence_snapshot.v1",
-        "snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-        "source_observation_id": "246eb226-2051-48b9-b4c5-0a32205a1ab3",
-        "source_observation_seq": 10644,
-        "source_observation_t_wall": 1779192063.7441182,
-        "telemetry_window_first_seq": 10625,
+        "snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+        "source_observation_id": "8f1e65a8-9bed-4491-9d7e-a15229a8a275",
+        "source_observation_seq": 10877,
+        "source_observation_t_wall": 1779198740.5223603,
+        "telemetry_window_first_seq": 10858,
         "telemetry_window_frame_count": 20,
-        "telemetry_window_latest_seq": 10644,
-        "telemetry_window_latest_t_wall": 1779192063.7441182,
-        "validator_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+        "telemetry_window_latest_seq": 10877,
+        "telemetry_window_latest_t_wall": 1779198740.5223603,
+        "validator_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
       },
       "evidence_snapshot_consistency": {
         "deterministic_hint_matches_request": false,
         "final_action_plan_matches_snapshot": true,
-        "superseded_by_snapshot": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+        "superseded_by_snapshot": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
       },
       "final_action_plan": {
-        "evidence_snapshot_id": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
+        "evidence_snapshot_id": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
         "overlay_step_id": "S25",
         "source": "validator_action_hint",
-        "step_id": "S25",
+        "step_id": "S24",
         "targets": [
           "arresting_hook_handle"
         ],
@@ -2967,14 +2901,14 @@
       "message_category": "harness_validator_repair",
       "model_decision": {
         "evidence_refs": [
-          "GATES.S25.completion"
+          "GATES.S24.completion"
         ],
         "generation_mode": "model",
         "overlay_targets": [
           "arresting_hook_handle"
         ],
         "status": "ok",
-        "step_id": "S25"
+        "step_id": "S24"
       },
       "rejected_candidates": [],
       "repair_result": {
@@ -2988,10 +2922,10 @@
       },
       "schema_version": "v1",
       "snapshot_ids": {
-        "candidate_generation": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-        "final_decision": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-        "model_request": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12",
-        "validator": "550c64f6b65686d0c2e6dce02b41053215623e99e2f5e6216d1878fcf7796a12"
+        "candidate_generation": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+        "final_decision": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+        "model_request": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c",
+        "validator": "366086a8e1f9119d5a8930e80130b5ac857d8584dfbff8c34a11c111c8c8551c"
       },
       "validator_result": {
         "fallback_overlay_reason": "not_needed",
@@ -3006,13 +2940,13 @@
         "extractor_used": false,
         "frame_capture_selected": true,
         "frame_ids": [
-          "1779192063799_000210"
+          "1779198740607_000256"
         ],
         "ignored_fact_count": 1,
         "reason": "vision_not_required_for_step",
         "status": "not_required",
         "sticky_fact_count": 1,
-        "sync_delta_ms": 86,
+        "sync_delta_ms": 81,
         "sync_status": "matched_future_fallback",
         "vision_fact_status": "vision_not_required",
         "vision_status": "partial"
@@ -3026,25 +2960,25 @@
       "rejected_model_step_id": null
     }
   },
-  "help_cycle_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+  "help_cycle_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
   "model_io": {
     "help_response": {
       "diagnosis": {
         "error_category": "OM",
-        "step_id": "S25"
+        "step_id": "S24"
       },
       "explanations": [
-        "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+        "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
       ],
       "next": {
-        "step_id": "S25"
+        "step_id": "S24"
       },
       "overlay": {
         "evidence": [
           {
             "grounding_confidence": 0.95,
             "quote": "[REDACTED_SOURCE_QUOTE]",
-            "ref": "GATES.S25.completion",
+            "ref": "GATES.S24.completion",
             "target": "arresting_hook_handle",
             "type": "gate"
           }
@@ -3057,20 +2991,20 @@
     "model_raw_help_response": {
       "diagnosis": {
         "error_category": "OM",
-        "step_id": "S25"
+        "step_id": "S24"
       },
       "explanations": [
-        "当前步骤 S25 未完成，需放下阻钩手柄以伸出阻钩。请左键点击 arresting_hook_handle。"
+        "当前步骤 S24 未完成，需放下拦阻钩手柄。请左键点击 arresting_hook_handle 将其放下。"
       ],
       "next": {
-        "step_id": "S25"
+        "step_id": "S24"
       },
       "overlay": {
         "evidence": [
           {
             "grounding_confidence": 0.95,
             "quote": "[REDACTED_SOURCE_QUOTE]",
-            "ref": "GATES.S25.completion",
+            "ref": "GATES.S24.completion",
             "target": "arresting_hook_handle",
             "type": "gate"
           }
@@ -3083,12 +3017,12 @@
     "raw_llm_text_attempt_count": 0,
     "raw_llm_text_present": false
   },
-  "request_id": "da08da4a-0909-4acb-a2e6-7027324fa989",
+  "request_id": "7ea8bf09-dfe7-4e7b-a23f-6407af510e2a",
   "request_id_missing": false,
   "schema_version": "live_help_replay_fixture.v1",
   "source_log": {
-    "event_count": 12408,
+    "event_count": 14472,
     "malformed_lines": [],
-    "path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/logs/live_help_harness_smoke_20260519_115004.jsonl"
+    "path": "/mnt/l/Documents/files/Yu Zhang TU Clausthal/Thesis/IEFMMQ/logs/live_help_harness_smoke_20260519_134129.jsonl"
   }
 }
