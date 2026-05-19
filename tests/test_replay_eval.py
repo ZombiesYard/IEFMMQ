@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,55 @@ from simtutor.replay_eval import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUITE_PATH = REPO_ROOT / "replay_eval" / "fa18c_startup_v04" / "suite.yaml"
+
+
+LATEST_ISSUE_312_FIXTURES = {
+    "artifacts/live_fixtures/c2a80099-8375-42a1-89eb-b09544b474e2.fixture.json":
+        "final_consistency_no_over_advance",
+    "artifacts/live_fixtures/0758602b-05c0-4ff6-9938-22b7e226f7c0.fixture.json":
+        "completion_based_advancement",
+    "artifacts/live_fixtures/3de0e688-8bc4-4df1-b062-72f3134bc775.fixture.json":
+        "interaction_text_semantics",
+    "artifacts/live_fixtures/e6e6838b-b8ef-4e51-a4a8-1ea3d4771dad.fixture.json":
+        "visual_substate_not_collapsed",
+    "artifacts/live_fixtures/ce8512ef-901a-4f08-a339-af10893b744f.fixture.json":
+        "staged_ufc_comm_selector_first",
+    "artifacts/live_fixtures/20c79783-092e-4128-ad47-5fa7d3774ed7.fixture.json":
+        "four_down_probe_transition_latch",
+    "artifacts/live_fixtures/99b112ae-ea07-4f5f-a561-71e99fdc2581.fixture.json":
+        "four_down_probe_wait_guidance",
+    "artifacts/live_fixtures/7ea8bf09-dfe7-4e7b-a23f-6407af510e2a.fixture.json":
+        "hook_lever_polarity",
+    "artifacts/live_fixtures/5a7d5df7-2f08-4321-9a4a-6858131b4e6e.fixture.json":
+        "wheel_interaction_radar_altimeter",
+    "artifacts/live_fixtures/ffb5e69b-664b-47d8-9150-57d7cd75d233.fixture.json":
+        "wheel_interaction_standby_attitude",
+    "artifacts/live_fixtures/7bea22f8-a4d1-4744-917b-f7ddc957f709.fixture.json":
+        "public_completion_message",
+    "artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json":
+        "raw_wrong_final_repaired",
+}
+
+TEXT_INTENT_REGRESSION_CLASSES = {
+    "interaction_text_semantics",
+    "wheel_interaction_radar_altimeter",
+    "wheel_interaction_standby_attitude",
+    "public_completion_message",
+}
+
+
+def _coverage_sources_by_fixture(matrix: dict[str, object]) -> dict[str, dict[str, object]]:
+    sources: dict[str, dict[str, object]] = {}
+    steps = matrix["steps"]
+    assert isinstance(steps, dict)
+    for row in steps.values():
+        assert isinstance(row, dict)
+        for cell in row.values():
+            assert isinstance(cell, dict)
+            for source in cell.get("sources", []):
+                if isinstance(source, dict) and isinstance(source.get("fixture"), str):
+                    sources[source["fixture"]] = source
+    return sources
 
 
 def test_load_replay_eval_suite_exposes_expected_cases() -> None:
@@ -128,6 +178,89 @@ def test_replay_eval_report_includes_issue_312_fixture_regression_sources(tmp_pa
         source.get("issue") == 306
         for source in matrix["steps"]["S21"]["moving_settling_control"]["sources"]
     )
+
+
+def test_replay_eval_report_records_latest_issue_312_fixture_regression_classes(
+    tmp_path: Path,
+) -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+
+    report = run_replay_eval_suite(suite, output_dir=tmp_path / "issue312-latest")
+    sources_by_fixture = _coverage_sources_by_fixture(report["coverage_matrix"])
+
+    assert set(sources_by_fixture) >= set(LATEST_ISSUE_312_FIXTURES)
+    for fixture, regression_class in LATEST_ISSUE_312_FIXTURES.items():
+        assert (REPO_ROOT / fixture).exists(), fixture
+        source = sources_by_fixture[fixture]
+        assert source["issue"] == 312
+        assert source["source"] == "live_fixture_regression"
+        assert source["regression_class"] == regression_class
+        assert isinstance(source.get("fixture_assertions"), dict), fixture
+        assert "error" not in source["fixture_assertions"]
+        if regression_class in TEXT_INTENT_REGRESSION_CLASSES:
+            assert isinstance(source.get("text_intent"), str), fixture
+
+    s075 = sources_by_fixture[
+        "artifacts/live_fixtures/0758602b-05c0-4ff6-9938-22b7e226f7c0.fixture.json"
+    ]["fixture_assertions"]
+    assert s075["raw_model_step_id"] == "S11"
+    assert s075["raw_model_targets"] == []
+    assert s075["validator_rejected"] is True
+    assert s075["repair_applied"] is True
+    assert s075["final_action_plan_source"] == "final_evidence_consistency_validator"
+    assert s075["message_category"] == "harness_validator_repair"
+    assert s075["final_step_id"] == "S12"
+    assert s075["final_targets"] == ["ins_mode_knob"]
+    assert s075["vlm_call_status"] == "not_required"
+    assert s075["vision_fact_extractor_used"] is False
+    assert s075["frame_capture_selected"] is True
+    assert s075["frame_capture_only"] is True
+
+    s8d30 = sources_by_fixture[
+        "artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json"
+    ]["fixture_assertions"]
+    assert s8d30["raw_model_step_id"] == "S28"
+    assert s8d30["raw_model_targets"] == ["parking_brake_handle"]
+    assert s8d30["final_step_id"] == "S29"
+    assert s8d30["final_targets"] == ["ifei_up_button"]
+    assert s8d30["validator_rejected"] is True
+    assert s8d30["repair_applied"] is True
+    assert s8d30["final_action_plan_source"] == "final_evidence_consistency_validator"
+    assert s8d30["message_category"] == "harness_validator_repair"
+
+    s99b = sources_by_fixture[
+        "artifacts/live_fixtures/99b112ae-ea07-4f5f-a561-71e99fdc2581.fixture.json"
+    ]["fixture_assertions"]
+    assert s99b["vlm_call_status"] == "called"
+    assert s99b["vision_fact_extractor_used"] is True
+    assert s99b["frame_capture_selected"] is True
+    assert s99b["frame_capture_only"] is False
+
+    s3de = sources_by_fixture[
+        "artifacts/live_fixtures/3de0e688-8bc4-4df1-b062-72f3134bc775.fixture.json"
+    ]
+    assert s3de["text_intent"] == "left_engine_left_click_not_right_click"
+
+    s5a = sources_by_fixture[
+        "artifacts/live_fixtures/5a7d5df7-2f08-4321-9a4a-6858131b4e6e.fixture.json"
+    ]
+    assert s5a["text_intent"] == "mouse_wheel_radar_altimeter_bug"
+
+    s7bea = sources_by_fixture[
+        "artifacts/live_fixtures/7bea22f8-a4d1-4744-917b-f7ddc957f709.fixture.json"
+    ]
+    assert s7bea["text_intent"] == "public_completion_no_internal_evidence"
+
+
+def test_harness_coverage_matrix_keeps_suite_regressions_without_pack_specs(tmp_path: Path) -> None:
+    suite = load_replay_eval_suite(SUITE_PATH)
+    suite_without_pack = replace(suite, pack_path=tmp_path / "missing-pack.yaml")
+
+    matrix = build_harness_coverage_matrix(suite_without_pack)
+    sources_by_fixture = _coverage_sources_by_fixture(matrix)
+
+    assert matrix["steps"]["S25"]["moving_settling_control"]["status"] == "regression_reference"
+    assert set(sources_by_fixture) >= set(LATEST_ISSUE_312_FIXTURES)
 
 
 def test_run_replay_eval_suite_is_stable_across_repeated_runs(tmp_path: Path) -> None:

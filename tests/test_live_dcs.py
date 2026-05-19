@@ -11066,7 +11066,35 @@ def _validate_compact_live_help_response(
     request: TutorRequest,
     response: TutorResponse,
     vision_status: str = "vision_not_required",
+    vision_selection: HelpCycleVisionSelection | None = None,
+    vision_fact_context: dict[str, Any] | None = None,
 ) -> TutorResponse:
+    if vision_selection is None:
+        vision_selection = HelpCycleVisionSelection(
+            status=vision_status,
+            observation_ref=None,
+            observation_seq=None,
+            observation_t_wall_s=None,
+            observation_t_wall_ms=None,
+            trigger_wall_ms=None,
+            sync_window_ms=None,
+            vision_used=False,
+            frame_id=None,
+            sync_status=None,
+            sync_delta_ms=None,
+            frame_stale=False,
+            frame_ids=[],
+            selected_frames=[],
+            pre_trigger_frame=None,
+            trigger_frame=None,
+            sync_miss_reason=None,
+        )
+    if vision_fact_context is None:
+        vision_fact_context = {
+            "status": vision_status,
+            "vision_fact_summary": {"status": vision_status},
+            "vision_facts": [],
+        }
     loop = LiveDcsTutorLoop(
         source=_DelayedObservationSource(Observation()),
         model=RecordingModel(),
@@ -11082,30 +11110,8 @@ def _validate_compact_live_help_response(
             prompt_meta={},
             state_key=f"state-{request.request_id}",
             help_cycle_id=request.request_id,
-            vision_selection=HelpCycleVisionSelection(
-                status=vision_status,
-                observation_ref=None,
-                observation_seq=None,
-                observation_t_wall_s=None,
-                observation_t_wall_ms=None,
-                trigger_wall_ms=None,
-                sync_window_ms=None,
-                vision_used=False,
-                frame_id=None,
-                sync_status=None,
-                sync_delta_ms=None,
-                frame_stale=False,
-                frame_ids=[],
-                selected_frames=[],
-                pre_trigger_frame=None,
-                trigger_frame=None,
-                sync_miss_reason=None,
-            ),
-            vision_fact_context={
-                "status": vision_status,
-                "vision_fact_summary": {"status": vision_status},
-                "vision_facts": [],
-            },
+            vision_selection=vision_selection,
+            vision_fact_context=vision_fact_context,
             vision_fact_active_step_ids=[],
             terminal_state_short_circuited=False,
         )
@@ -11116,6 +11122,53 @@ def _validate_compact_live_help_response(
 
 def _load_live_help_fixture(path: str) -> dict[str, Any]:
     return json.loads((Path(__file__).resolve().parents[1] / path).read_text(encoding="utf-8"))
+
+
+def _fixture_vision_selection(fixture: dict[str, Any]) -> HelpCycleVisionSelection:
+    metadata = fixture["cycle"]["tutor_response"].get("metadata", {})
+    vision = metadata.get("vision", {})
+    return HelpCycleVisionSelection(
+        status=vision.get("status"),
+        observation_ref=vision.get("observation_ref"),
+        observation_seq=vision.get("observation_seq"),
+        observation_t_wall_s=vision.get("observation_t_wall_s"),
+        observation_t_wall_ms=vision.get("observation_t_wall_ms"),
+        trigger_wall_ms=vision.get("trigger_wall_ms"),
+        sync_window_ms=vision.get("sync_window_ms"),
+        vision_used=bool(vision.get("vision_used")),
+        frame_id=vision.get("frame_id"),
+        sync_status=vision.get("sync_status"),
+        sync_delta_ms=vision.get("sync_delta_ms"),
+        frame_stale=vision.get("frame_stale"),
+        frame_ids=[item for item in vision.get("frame_ids", []) if isinstance(item, str)],
+        selected_frames=[
+            dict(item) for item in vision.get("selected_frames", []) if isinstance(item, dict)
+        ],
+        pre_trigger_frame=(
+            dict(vision["pre_trigger_frame"]) if isinstance(vision.get("pre_trigger_frame"), dict) else None
+        ),
+        trigger_frame=(
+            dict(vision["trigger_frame"]) if isinstance(vision.get("trigger_frame"), dict) else None
+        ),
+        sync_miss_reason=vision.get("sync_miss_reason"),
+    )
+
+
+def _fixture_vision_fact_context(fixture: dict[str, Any]) -> dict[str, Any]:
+    metadata = fixture["cycle"]["tutor_response"].get("metadata", {})
+    vlm_call = fixture.get("harness", {}).get("trace", {}).get("vlm_call", {})
+    status = vlm_call.get("vision_fact_status") or metadata.get("vision_fact_status") or "vision_not_required"
+    return {
+        "status": status,
+        "vision_fact_summary": metadata.get("vision_fact_summary") or {"status": status},
+        "vision_facts": metadata.get("vision_facts") or [],
+        "metadata": {
+            "extractor_used": bool(vlm_call.get("extractor_used")),
+            "cached_fact_count": vlm_call.get("cached_fact_count", 0),
+            "sticky_fact_count": vlm_call.get("sticky_fact_count", 0),
+            "ignored_fact_count": vlm_call.get("ignored_fact_count", 0),
+        },
+    }
 
 
 def _fixture_request_and_model_response(fixture: dict[str, Any]) -> tuple[TutorRequest, TutorResponse]:
@@ -11276,6 +11329,41 @@ def test_live_help_fixture_311_keeps_s12_when_only_precondition_is_satisfied() -
         "harness_validation_reasons",
         [],
     )
+
+
+def test_live_help_fixture_312_s11_completion_advances_to_s12() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/0758602b-05c0-4ff6-9938-22b7e226f7c0.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+    vars_map = request.context["vars"]
+    assert vars_map["rpm_l"] == 27
+    assert vars_map["rpm_l_gte_25"] is True
+
+    repaired = _validate_compact_live_help_response(
+        request=request,
+        response=response,
+        vision_selection=_fixture_vision_selection(fixture),
+        vision_fact_context=_fixture_vision_fact_context(fixture),
+    )
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S12"
+    assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["validator_rejected"] is True
+    assert repaired.metadata["repair_applied"] is True
+    assert repaired.metadata["final_action_plan"]["source"] == "final_evidence_consistency_validator"
+    assert repaired.metadata["final_overlay_targets"] == ["ins_mode_knob"]
+    assert repaired.metadata["harness_trace"]["model_decision"]["step_id"] == "S11"
+    assert repaired.metadata["harness_trace"]["model_decision"]["overlay_targets"] == []
+    assert repaired.metadata["harness_trace"]["final_action_plan"]["step_id"] == "S12"
+    assert repaired.metadata["vision_frame_capture_selected"] is True
+    assert repaired.metadata["vision_fact_extractor_used"] is False
+    assert repaired.metadata["harness_trace"]["vlm_call"]["frame_capture_selected"] is True
+    assert repaired.metadata["harness_trace"]["vlm_call"]["extractor_used"] is False
+    public_text = _public_response_text(repaired)
+    assert "ins_mode_knob" in public_text
+    assert "RPM >= 25" not in public_text
 
 
 def test_final_evidence_split_uses_current_step_completion_predicates_only() -> None:

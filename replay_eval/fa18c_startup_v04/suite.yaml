@@ -48,6 +48,106 @@ coverage:
     fixture: artifacts/live_fixtures/c3c775ce-7a4d-4e7f-a841-3a022528138e.fixture.json
     test_id: tests/test_live_dcs.py::test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture
     reason: Latest telemetry with engine_crank_left_complete=true must advance past S10.
+  - step_id: S12
+    state_category: completion_already_true
+    source: live_fixture_regression
+    issue: 312
+    regression_class: final_consistency_no_over_advance
+    fixture: artifacts/live_fixtures/c2a80099-8375-42a1-89eb-b09544b474e2.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_311_keeps_s12_when_only_precondition_is_satisfied
+    reason: S12 must not advance to S13 when only the S12 precondition/previous engine gate is satisfied.
+  - step_id: S11
+    state_category: completion_already_true
+    source: live_fixture_regression
+    issue: 312
+    regression_class: completion_based_advancement
+    fixture: artifacts/live_fixtures/0758602b-05c0-4ff6-9938-22b7e226f7c0.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_312_s11_completion_advances_to_s12
+    reason: S11 RPM completion should be repaired forward to S12 / ins_mode_knob.
+  - step_id: S10
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 312
+    regression_class: interaction_text_semantics
+    text_intent: left_engine_left_click_not_right_click
+    fixture: artifacts/live_fixtures/3de0e688-8bc4-4df1-b062-72f3134bc775.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_s10_left_engine_uses_left_click_guidance
+    reason: S10 left-engine guidance must say LEFT / left-click, not R / right-click.
+  - step_id: S08
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 312
+    regression_class: visual_substate_not_collapsed
+    fixture: artifacts/live_fixtures/e6e6838b-b8ef-4e51-a4a8-1ea3d4771dad.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_keeps_s08_supt_bit_root_visual_recovery
+    reason: S08 SUPT/BIT-root sub-state must remain at PB15 instead of collapsing into display-power completion.
+  - step_id: S09
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 312
+    regression_class: staged_ufc_comm_selector_first
+    fixture: artifacts/live_fixtures/ce8512ef-901a-4f08-a339-af10893b744f.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_s09_requires_comm1_pull_before_numeric_sequence
+    reason: S09 staged UFC entry must target COMM1 selector before numeric keys.
+  - step_id: S21
+    state_category: moving_settling_control
+    source: live_fixture_regression
+    issue: 312
+    regression_class: four_down_probe_transition_latch
+    fixture: artifacts/live_fixtures/20c79783-092e-4128-ad47-5fa7d3774ed7.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_306_20c_retracted_probe_latch_advances_to_s22
+    reason: Probe transition/latch evidence must advance to the next four-down step when the retraction is complete.
+  - step_id: S21
+    state_category: moving_settling_control
+    source: live_fixture_regression
+    issue: 312
+    regression_class: four_down_probe_wait_guidance
+    fixture: artifacts/live_fixtures/99b112ae-ea07-4f5f-a561-71e99fdc2581.fixture.json
+    test_id: tests/test_live_dcs.py::test_procedural_guidance_waits_without_highlight_for_s21_probe_retracting
+    reason: Moving/settling probe evidence must produce wait guidance instead of repeated wrong-target prompts.
+  - step_id: S25
+    state_category: moving_settling_control
+    source: live_fixture_regression
+    issue: 312
+    regression_class: hook_lever_polarity
+    fixture: artifacts/live_fixtures/7ea8bf09-dfe7-4e7b-a23f-6407af510e2a.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_306_7ea8_hook_down_advances_to_s25_without_trace_mismatch
+    reason: HOOK_LEVER polarity must distinguish hook-down completion from hook-up retraction guidance.
+  - step_id: S31
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 312
+    regression_class: wheel_interaction_radar_altimeter
+    text_intent: mouse_wheel_radar_altimeter_bug
+    fixture: artifacts/live_fixtures/5a7d5df7-2f08-4321-9a4a-6858131b4e6e.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_s31_radar_altimeter_uses_mouse_wheel_guidance
+    reason: S31 radar altitude bug guidance must preserve wheel interaction semantics.
+  - step_id: S32
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 312
+    regression_class: wheel_interaction_standby_attitude
+    text_intent: mouse_wheel_standby_attitude_cage
+    fixture: artifacts/live_fixtures/ffb5e69b-664b-47d8-9150-57d7cd75d233.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_s32_standby_attitude_uses_mouse_wheel_guidance
+    reason: S32 standby attitude cage guidance must preserve wheel interaction semantics.
+  - step_id: S33
+    state_category: completion_already_true
+    source: live_fixture_regression
+    issue: 312
+    regression_class: public_completion_message
+    text_intent: public_completion_no_internal_evidence
+    fixture: artifacts/live_fixtures/7bea22f8-a4d1-4744-917b-f7ddc957f709.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_314_s33_default_satisfied_uses_public_completion_message
+    reason: S33 already-satisfied repair must show user-facing completion guidance rather than internal validator wording.
+  - step_id: S29
+    state_category: wrong_target_prevention
+    source: live_fixture_regression
+    issue: 312
+    regression_class: raw_wrong_final_repaired
+    fixture: artifacts/live_fixtures/8d30d919-108d-4068-8b58-a9467aecdb21.fixture.json
+    test_id: tests/test_live_dcs.py::test_live_help_fixture_315_s28_raw_model_repair_advances_to_s29_guidance
+    reason: Matrix must expose raw S28 / parking-brake decision separately from final repaired S29 / IFEI action.
 cases:
   - case_id: noop_2min
     input: cases/noop_2min/dcs_bios_raw.jsonl
