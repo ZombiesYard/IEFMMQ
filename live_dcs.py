@@ -2670,8 +2670,12 @@ def _s08_visual_recovery_needed(context: Mapping[str, Any]) -> bool:
         item for item in summary.get("not_seen_fact_ids", [])
         if isinstance(item, str) and item
     } if isinstance(summary.get("not_seen_fact_ids"), (list, tuple, set)) else set()
-    return (
+    left_page_recovery_visible = (
         "tac_page_visible" in seen_or_fresh
+        or "supt_page_visible" in seen_or_fresh
+    )
+    return (
+        left_page_recovery_visible
         and "bit_root_page_visible" in seen_or_fresh
         and "fcs_page_visible" in not_seen
     )
@@ -6181,16 +6185,7 @@ class LiveDcsTutorLoop:
                     "AMPCD, and HUD controls; DDI warm-up can lag briefly, so wait for the displays before navigating."
                 )
             )
-        if "s09_numeric_sequence_targets_selector_maybe_needed" in plan.reasons:
-            plan_guidance = (
-                "如需要，请先拉出 UFC 的 COMM1 selector；然后输入 COMM1 频率 134.000：按 1-3-4-0-0-0，再按 ENT。"
-                if self.lang == "zh"
-                else (
-                    "Pull the UFC COMM1 selector if needed, then enter COMM1 frequency 134.000: "
-                    "press 1-3-4-0-0-0, then ENT."
-                )
-            )
-        elif "s09_numeric_sequence_targets" in plan.reasons:
+        if "s09_numeric_sequence_targets" in plan.reasons:
             plan_guidance = (
                 "请在 UFC 输入 COMM1 频率 134.000：按 1-3-4-0-0-0，然后按 ENT。"
                 if self.lang == "zh"
@@ -6763,12 +6758,24 @@ class LiveDcsTutorLoop:
             if advanced is not None and isinstance(advanced.inferred_step_id, str)
             else self._next_step_id_after(rejected_step_id)
         )
+        s08_visual_hint = _s08_visual_hint_from_vision_summary(context) if s08_visual_recovery else None
+        s08_visual_target = s08_visual_hint[0] if s08_visual_hint is not None else "left_mdi_pb18"
+        s08_visual_evidence_ref = (
+            s08_visual_hint[2]
+            if s08_visual_hint is not None
+            else _visual_fact_ref_from_context(context, "tac_page_visible")
+        )
+
         if s08_visual_recovery:
             next_step_id = "S08"
         if not isinstance(next_step_id, str) or not next_step_id:
             next_step_id = rejected_step_id
 
-        if s08_visual_recovery and self.lang == "zh":
+        if s08_visual_recovery and s08_visual_target == "left_mdi_pb15" and self.lang == "zh":
+            rewritten = "当前仍在 S08：左 DDI 已到 SUPT 页面，但 FCS 页面尚未出现。请按左 DDI PB15 进入 FCS。"
+        elif s08_visual_recovery and s08_visual_target == "left_mdi_pb15":
+            rewritten = "You are still on S08: the left DDI is on SUPT, but the FCS page is not visible. Press Left DDI PB15 to enter FCS."
+        elif s08_visual_recovery and self.lang == "zh":
             rewritten = "当前仍在 S08：左 DDI 还在 TAC 页面，FCS 页面尚未出现。请先按左 DDI PB18 进入 SUPT，再进入 FCS。"
         elif s08_visual_recovery:
             rewritten = "You are still on S08: the left DDI is on TAC and the FCS page is not visible. Press Left DDI PB18 to reach SUPT, then enter FCS."
@@ -6801,24 +6808,18 @@ class LiveDcsTutorLoop:
         ]
 
         if s08_visual_recovery:
-            visual_hint = _s08_visual_hint_from_vision_summary(context)
-            target = visual_hint[0] if visual_hint is not None else "left_mdi_pb18"
-            evidence_ref = visual_hint[2] if visual_hint is not None else _visual_fact_ref_from_context(
-                context,
-                "tac_page_visible",
-            )
             fallback_help_obj = {
                 "diagnosis": {"step_id": "S08", "error_category": "OM"},
                 "next": {"step_id": "S08"},
-                "overlay": {"targets": [target], "evidence": []},
+                "overlay": {"targets": [s08_visual_target], "evidence": []},
                 "explanations": [rewritten],
             }
-            if isinstance(evidence_ref, str) and evidence_ref:
+            if isinstance(s08_visual_evidence_ref, str) and s08_visual_evidence_ref:
                 fallback_help_obj["overlay"]["evidence"] = [
                     {
-                        "target": target,
+                        "target": s08_visual_target,
                         "type": "visual",
-                        "ref": evidence_ref,
+                        "ref": s08_visual_evidence_ref,
                         "quote": "VLM confirms S08 page recovery is still required.",
                         "grounding_confidence": 0.95,
                     }
@@ -7124,16 +7125,35 @@ class LiveDcsTutorLoop:
             }
         elif inferred_step_id == "S09" and "vars.comm1_freq_134_000==true" in missing_set:
             reason = "s09_comm1_frequency_guidance"
+            recent_actions = context.get("recent_actions")
+            recent_buttons = (
+                [
+                    item for item in recent_actions.get("recent_buttons", [])
+                    if isinstance(item, str) and item
+                ]
+                if isinstance(recent_actions, Mapping)
+                else []
+            )
+            scratchpad_text = _normalize_ufc_scratchpad_text(vars_map)
+            compact_scratchpad = scratchpad_text.replace(" ", "")
+            s09_entry_mode_confirmed = (
+                vars_map.get("ufc_comm1_pull_pressed") is True
+                or "ufc_comm1_channel_selector_pull" in set(recent_buttons)
+                or compact_scratchpad.startswith("1--")
+            )
             if self.lang == "zh":
-                rewritten = (
-                    "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz：先拉出 UFC 的 COMM1 "
-                    "频道选择钮，输入 1-3-4-0-0-0，然后按 ENT 确认。"
-                )
+                if s09_entry_mode_confirmed:
+                    rewritten = (
+                        "当前处于 S09。请把 COMM1 预置 1 设置为 134.000 MHz："
+                        "输入 1-3-4-0-0-0，然后按 ENT 确认。"
+                    )
+                else:
+                    rewritten = "当前处于 S09。请先拉出 UFC 的 COMM1 频道选择钮，打开预置 1 输入模式；目标频率是 134.000 MHz。"
             else:
-                rewritten = (
-                    "You are on S09. Set COMM1 preset 1 to 134.000 MHz: pull the UFC COMM1 "
-                    "channel selector, enter 1-3-4-0-0-0, then press ENT."
-                )
+                if s09_entry_mode_confirmed:
+                    rewritten = "You are on S09. Set COMM1 preset 1 to 134.000 MHz: enter 1-3-4-0-0-0, then press ENT."
+                else:
+                    rewritten = "You are on S09. First pull the UFC COMM1 channel selector to open preset 1 entry mode; the target frequency is 134.000 MHz."
         elif inferred_step_id == "S10" and _left_engine_start_complete(vars_map):
             reason = "s10_left_engine_start_complete"
             recent_actions = context.get("recent_actions")

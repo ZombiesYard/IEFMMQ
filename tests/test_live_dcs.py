@@ -5378,7 +5378,8 @@ def test_procedural_guidance_rewrite_mentions_s09_frequency_134(tmp_path: Path) 
         assert rewritten is True
         assert reason == "s09_comm1_frequency_guidance"
         assert "134.000" in response.message
-        assert "1-3-4-0-0-0" in response.message
+        assert "COMM1" in response.message
+        assert "1-3-4-0-0-0" not in response.message
     finally:
         loop.close()
 
@@ -5997,7 +5998,8 @@ def test_procedural_guidance_rewrite_mentions_s09_frequency_134(tmp_path: Path) 
         assert rewritten is True
         assert reason == "s09_comm1_frequency_guidance"
         assert "134.000" in response.message
-        assert "1-3-4-0-0-0" in response.message
+        assert "COMM1" in response.message
+        assert "1-3-4-0-0-0" not in response.message
     finally:
         loop.close()
 
@@ -6493,22 +6495,12 @@ def test_harness_validation_action_plan_s09_empty_scratchpad_mentions_selector_i
 
         assert used is True
         assert reason == "state_action_planner"
-        assert [action["target"] for action in response.actions] == [
-            "ufc_key_1",
-            "ufc_key_3",
-            "ufc_key_4",
-            "ufc_key_0",
-        ]
-        assert "COMM1 selector" in response.message
+        assert [action["target"] for action in response.actions] == ["ufc_comm1_channel_selector_pull"]
+        assert "COMM1" in response.message
         assert "134.000" in response.message
-        assert "1-3-4-0-0-0" in response.message
+        assert "1-3-4-0-0-0" not in response.message
         _annotate_test_final_metadata(loop, response, request)
-        assert response.metadata["final_overlay_targets"] == [
-            "ufc_key_1",
-            "ufc_key_3",
-            "ufc_key_4",
-            "ufc_key_0",
-        ]
+        assert response.metadata["final_overlay_targets"] == ["ufc_comm1_channel_selector_pull"]
         assert response.metadata["final_public_response"]["message"] == response.message
     finally:
         loop.close()
@@ -11061,6 +11053,41 @@ def test_live_help_fixture_314_keeps_s08_tac_bit_root_visual_recovery() -> None:
     public_text = _public_response_text(repaired)
     assert "S09" not in public_text
     assert "COMM1" not in public_text
+
+
+def test_live_help_fixture_314_keeps_s08_supt_bit_root_visual_recovery() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/e6e6838b-b8ef-4e51-a4a8-1ea3d4771dad.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response, vision_status="available")
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S08"
+    assert repaired.metadata["next"]["step_id"] == "S08"
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "left_mdi_pb15"
+    assert repaired.metadata["final_overlay_targets"] == ["left_mdi_pb15"]
+    public_text = _public_response_text(repaired)
+    assert "S09" not in public_text
+    assert "COMM1" not in public_text
+    assert "PB15" in public_text or "left_mdi_pb15" in public_text
+
+
+def test_live_help_fixture_314_s09_requires_comm1_pull_before_numeric_sequence() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/ce8512ef-901a-4f08-a339-af10893b744f.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["final_overlay_targets"] == ["ufc_comm1_channel_selector_pull"]
+    assert repaired.metadata["final_public_response"]["actions"][0]["target"] == "ufc_comm1_channel_selector_pull"
+    assert "134.000" in _public_response_text(repaired)
+    assert "1-3-4-0-0-0" not in _public_response_text(repaired)
+    assert not {"ufc_key_1", "ufc_key_3", "ufc_key_4", "ufc_key_0"} & set(
+        repaired.metadata["final_overlay_targets"]
+    )
 
 
 def test_live_help_fixture_314_s18_pb5_repair_rewrites_public_message() -> None:
