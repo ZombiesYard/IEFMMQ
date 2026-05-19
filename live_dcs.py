@@ -7072,6 +7072,7 @@ class LiveDcsTutorLoop:
         else:
             rewritten = f"The latest evidence satisfies {rejected_step_id}. Continue to {next_step_id}."
 
+        public_guidance = rewritten
         original_actions = copy.deepcopy([dict(action) for action in response.actions if isinstance(action, Mapping)])
         if original_actions:
             response.metadata["final_evidence_consistency_original_actions"] = original_actions
@@ -7085,8 +7086,6 @@ class LiveDcsTutorLoop:
                 response.metadata["rejected_model_target"] = response.metadata["rejected_model_targets"][0]
 
         response.actions = []
-        response.message = rewritten
-        response.explanations = [rewritten]
         response.metadata["diagnosis"] = {"step_id": next_step_id, "error_category": "OM"}
         response.metadata["next"] = {"step_id": next_step_id}
         response.metadata["final_action_plan_source"] = "final_evidence_consistency_validator"
@@ -7123,9 +7122,14 @@ class LiveDcsTutorLoop:
         fallback_used = False
         if isinstance(fallback_help_obj, Mapping):
             planned_help_obj = copy.deepcopy(dict(fallback_help_obj))
+            fallback_explanations = planned_help_obj.get("explanations")
+            if isinstance(fallback_explanations, list):
+                fallback_guidance = next((item for item in fallback_explanations if isinstance(item, str) and item), None)
+                if isinstance(fallback_guidance, str) and fallback_guidance:
+                    public_guidance = fallback_guidance
             planned_help_obj["diagnosis"] = {"step_id": next_step_id, "error_category": "OM"}
             planned_help_obj["next"] = {"step_id": next_step_id}
-            planned_help_obj["explanations"] = [rewritten]
+            planned_help_obj["explanations"] = [public_guidance]
             mapped = map_help_response_to_tutor_response(
                 planned_help_obj,
                 request=request,
@@ -7147,27 +7151,32 @@ class LiveDcsTutorLoop:
                     "diagnosis": {"step_id": next_step_id, "error_category": "OM"},
                     "next": {"step_id": next_step_id},
                     "overlay": {"targets": [], "evidence": []},
-                    "explanations": [rewritten],
+                    "explanations": [public_guidance],
                 }
         else:
             response.metadata["help_response"] = {
                 "diagnosis": {"step_id": next_step_id, "error_category": "OM"},
                 "next": {"step_id": next_step_id},
                 "overlay": {"targets": [], "evidence": []},
-                "explanations": [rewritten],
+                "explanations": [public_guidance],
             }
 
+        response.message = public_guidance
+        response.explanations = [public_guidance]
         final_targets = _overlay_targets_from_actions(response.actions)
-        response.metadata["harness_action_plan"] = {
+        final_action_plan = {
             "step_id": next_step_id,
             "overlay_step_id": next_step_id,
             "targets": list(final_targets),
             "text_only": not bool(final_targets),
             "source": "final_evidence_consistency_validator",
         }
+        response.metadata["harness_action_plan"] = dict(final_action_plan)
+        response.metadata["final_action_plan"] = dict(final_action_plan)
         response.metadata["final_evidence_consistency_repair_applied"] = True
         response.metadata["final_evidence_consistency_overlay_applied"] = fallback_used
         response.metadata["final_evidence_consistency_overlay_reason"] = fallback_reason
+        self._annotate_response_audit_metadata(response)
         return True, "final_evidence_consistency_validator"
 
     def _final_response_step_id(self, response: TutorResponse) -> str | None:
@@ -8133,6 +8142,22 @@ class LiveDcsTutorLoop:
                 "S23": "Retract the launch bar after confirming extension.",
                 "S24": "Lower the arresting hook handle and confirm the hook is down.",
                 "S25": "Raise the arresting hook handle and confirm the hook is up.",
+            }[overlay_step_id]
+        elif self.lang == "zh" and overlay_step_id in {"S28", "S29", "S30", "S31", "S32"}:
+            fallback_guidance = {
+                "S28": "现在进入 S28。请释放停车刹车手柄，准备滑行。",
+                "S29": "现在进入 S29。请用 IFEI UP/DOWN 按钮设置 BINGO fuel。",
+                "S30": "现在进入 S30。请调整备用气压高度表到当前机场标高/QNH。",
+                "S31": "现在进入 S31。请设置雷达高度表告警高度：机场 200 ft，航母 40 ft。",
+                "S32": "现在进入 S32。请解锁备用姿态仪，让姿态指示器自由工作。",
+            }[overlay_step_id]
+        elif overlay_step_id in {"S28", "S29", "S30", "S31", "S32"}:
+            fallback_guidance = {
+                "S28": "Continue to S28. Release the parking brake handle when ready to taxi.",
+                "S29": "Continue to S29. Use the IFEI UP/DOWN buttons to set the BINGO fuel.",
+                "S30": "Continue to S30. Adjust the standby pressure altimeter to the local field elevation or QNH.",
+                "S31": "Continue to S31. Set the radar altimeter bug to 200 ft for airfield or 40 ft for carrier.",
+                "S32": "Continue to S32. Uncage the standby attitude indicator.",
             }[overlay_step_id]
 
         fallback_help_obj = {
