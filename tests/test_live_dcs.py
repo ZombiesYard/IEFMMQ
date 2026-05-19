@@ -6185,6 +6185,42 @@ def test_harness_validation_action_plan_records_s26_repair_metadata() -> None:
         loop.close()
 
 
+def _annotate_test_final_metadata(
+    loop: LiveDcsTutorLoop,
+    response: TutorResponse,
+    request: TutorRequest,
+) -> None:
+    loop._annotate_response_audit_metadata(response)
+    _build_harness_trace_metadata(
+        request=request,
+        response=response,
+        vision_selection=HelpCycleVisionSelection(
+            status="vision_not_required",
+            observation_ref=None,
+            observation_seq=None,
+            observation_t_wall_s=None,
+            observation_t_wall_ms=None,
+            trigger_wall_ms=None,
+            sync_window_ms=None,
+            vision_used=False,
+            frame_id=None,
+            sync_status=None,
+            sync_delta_ms=None,
+            frame_stale=False,
+            frame_ids=[],
+            selected_frames=[],
+            pre_trigger_frame=None,
+            trigger_frame=None,
+            sync_miss_reason=None,
+        ),
+        vision_fact_context={
+            "status": "vision_not_required",
+            "vision_fact_summary": {"status": "vision_not_required"},
+            "vision_facts": [],
+        },
+    )
+
+
 def test_harness_validation_action_plan_uses_s08_all_displays_off_targets() -> None:
     response = TutorResponse(
         message="Turn on the left DDI.",
@@ -6273,6 +6309,14 @@ def test_harness_validation_action_plan_uses_s08_all_displays_off_targets() -> N
         assert "DDI" in response.message
         assert "页面" not in response.message
         assert response.metadata["final_action_plan_source"] == "state_action_planner"
+        _annotate_test_final_metadata(loop, response, request)
+        assert response.metadata["final_overlay_targets"] == [
+            "left_mdi_brightness_selector",
+            "right_mdi_brightness_selector",
+            "ampcd_off_brightness_knob",
+            "hud_symbology_brightness_knob",
+        ]
+        assert response.metadata["final_public_response"]["actions"][0]["target"] == "left_mdi_brightness_selector"
     finally:
         loop.close()
 
@@ -6367,6 +6411,105 @@ def test_harness_validation_action_plan_uses_s09_initial_numeric_sequence_target
             "ufc_key_4",
             "ufc_key_0",
         ]
+        _annotate_test_final_metadata(loop, response, request)
+        assert response.metadata["final_overlay_targets"] == [
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+        ]
+        assert response.metadata["final_public_response"]["message"] == response.message
+        assert response.metadata["final_public_response"]["actions"][0]["target"] == "ufc_key_1"
+    finally:
+        loop.close()
+
+
+def test_harness_validation_action_plan_s09_empty_scratchpad_mentions_selector_if_needed() -> None:
+    response = TutorResponse(
+        message="Pull COMM1.",
+        explanations=["Pull COMM1."],
+        actions=[
+            {
+                "type": "overlay",
+                "intent": "highlight",
+                "target": "ufc_comm1_channel_selector_pull",
+                "element_id": "pnt_301",
+            }
+        ],
+        metadata={
+            "next": {"step_id": "S09"},
+            "diagnosis": {"step_id": "S09", "error_category": "OM"},
+            "help_response": {
+                "diagnosis": {"step_id": "S09", "error_category": "OM"},
+                "next": {"step_id": "S09"},
+                "overlay": {
+                    "targets": ["ufc_comm1_channel_selector_pull"],
+                    "evidence": [
+                        {
+                            "target": "ufc_comm1_channel_selector_pull",
+                            "type": "gate",
+                            "ref": "GATES.S09.completion",
+                            "quote": "blocked",
+                        }
+                    ],
+                },
+                "explanations": ["Pull COMM1."],
+            },
+        },
+    )
+    request = TutorRequest(
+        actor="learner",
+        intent="help",
+        message="help",
+        context={
+            "overlay_target_allowlist": [],
+            "gates": [
+                {"gate_id": "S09.completion", "status": "blocked", "reason": "COMM1 frequency is not 134.000."},
+                {"gate_id": "S09.precondition", "status": "allowed"},
+            ],
+            "vars": {"comm1_freq_134_000": False},
+            "deterministic_step_hint": {
+                "inferred_step_id": "S09",
+                "overlay_step_id": "S09",
+                "missing_conditions": ["vars.comm1_freq_134_000==true"],
+                "step_evidence_requirements": ["var", "gate"],
+            },
+            "rag_topk": [],
+        },
+    )
+
+    loop = LiveDcsTutorLoop(
+        source=ReplayBiosReceiver(Path("/dev/null")),
+        model=FailingModel(),
+        action_executor=RecordingExecutor(),
+        cooldown_s=5.0,
+        lang="zh",
+        max_overlay_targets=4,
+    )
+    try:
+        request.context["overlay_target_allowlist"] = list(loop.overlay_allowlist)
+
+        used, reason = loop._apply_harness_validation_action_plan(response, request)
+
+        assert used is True
+        assert reason == "state_action_planner"
+        assert [action["target"] for action in response.actions] == [
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+        ]
+        assert "COMM1 selector" in response.message
+        assert "134.000" in response.message
+        assert "1-3-4-0-0-0" in response.message
+        _annotate_test_final_metadata(loop, response, request)
+        assert response.metadata["final_overlay_targets"] == [
+            "ufc_key_1",
+            "ufc_key_3",
+            "ufc_key_4",
+            "ufc_key_0",
+        ]
+        assert response.metadata["final_public_response"]["message"] == response.message
     finally:
         loop.close()
 

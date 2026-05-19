@@ -423,10 +423,22 @@ def _s08_state_action_plan(
     allowed = set(spec.allowed_overlay_targets) if spec is not None else set()
     if not allowed:
         return None
-    if max_overlay_targets < len(_S08_DISPLAY_POWER_TARGETS):
-        return None
     if not all(vars_map.get(var_name) is False for var_name in _S08_DISPLAY_POWER_VARS):
         return None
+    if max_overlay_targets < len(_S08_DISPLAY_POWER_TARGETS):
+        target = next((item for item in _S08_DISPLAY_POWER_TARGETS if item in allowed), None)
+        if target is None:
+            return None
+        return _StateActionPlan(
+            targets=(target,),
+            guidance=(
+                "All displays are still off. Start by powering the display brightness controls; "
+                "DDI warm-up can lag, so wait for the displays before page navigation."
+            ),
+            text_only=False,
+            source="state_action_planner",
+            reasons=("s08_all_displays_off_single_power_target",),
+        )
     if not all(target in allowed for target in _S08_DISPLAY_POWER_TARGETS):
         return _StateActionPlan(
             targets=_S08_DISPLAY_POWER_TARGETS,
@@ -497,7 +509,7 @@ def _s09_state_action_plan(
             reasons=(f"s09_state_target:{name}",),
         )
 
-    def _numeric_sequence(guidance: str) -> _StateActionPlan | None:
+    def _numeric_sequence(guidance: str, reason: str = "s09_numeric_sequence_targets") -> _StateActionPlan | None:
         missing = tuple(target for target in _S09_NUMERIC_SEQUENCE_TARGETS if target not in allowed)
         if missing:
             return _StateActionPlan(
@@ -512,7 +524,7 @@ def _s09_state_action_plan(
             guidance=guidance,
             text_only=False,
             source="state_action_planner",
-            reasons=("s09_numeric_sequence_targets",),
+            reasons=(reason,),
         )
 
     if payload.endswith("134.000"):
@@ -537,7 +549,8 @@ def _s09_state_action_plan(
     if max_overlay_targets < len(_S09_NUMERIC_SEQUENCE_TARGETS):
         return _target("ufc_comm1_channel_selector_pull", "Pull the UFC COMM1 channel selector before entering 134.000.")
     return _numeric_sequence(
-        "Pull the UFC COMM1 channel selector if needed, then enter frequency 134.000 with keys 1-3-4-0-0-0 and press ENT."
+        "Pull the UFC COMM1 channel selector if needed, then enter frequency 134.000 with keys 1-3-4-0-0-0 and press ENT.",
+        reason="s09_numeric_sequence_targets_selector_maybe_needed",
     )
 
 

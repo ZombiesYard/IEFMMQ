@@ -635,6 +635,42 @@ def test_plan_harness_action_uses_s08_all_displays_off_power_targets() -> None:
     assert "warm" in (plan.guidance or "").lower()
 
 
+def test_plan_harness_action_keeps_s08_all_displays_off_single_target_when_max_below_four() -> None:
+    specs = {
+        "S08": _spec(
+            "S08",
+            (
+                "left_mdi_brightness_selector",
+                "right_mdi_brightness_selector",
+                "ampcd_off_brightness_knob",
+                "hud_symbology_brightness_knob",
+            ),
+        )
+    }
+    allowed_targets = list(specs["S08"].allowed_overlay_targets)
+
+    plan = plan_harness_action(
+        step_specs=specs,
+        inferred_step_id="S08",
+        model_step_id="S08",
+        proposed_overlay_targets=["left_mdi_brightness_selector", "right_mdi_brightness_selector"],
+        candidate_step_ids=["S08"],
+        runtime_overlay_targets=allowed_targets,
+        request_overlay_targets=allowed_targets,
+        max_overlay_targets=2,
+        latest_vars={
+            "left_ddi_on": False,
+            "right_ddi_on": False,
+            "mpcd_on": False,
+            "hud_on": False,
+        },
+    )
+
+    assert plan.targets == ("left_mdi_brightness_selector",)
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "state_action_target_mismatch:right_mdi_brightness_selector" in plan.reasons
+
+
 def test_plan_harness_action_uses_s09_scratchpad_state_without_live_hint() -> None:
     specs = {
         "S09": _spec(

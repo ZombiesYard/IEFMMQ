@@ -6060,7 +6060,16 @@ class LiveDcsTutorLoop:
                     "AMPCD, and HUD controls; DDI warm-up can lag briefly, so wait for the displays before navigating."
                 )
             )
-        if "s09_numeric_sequence_targets" in plan.reasons:
+        if "s09_numeric_sequence_targets_selector_maybe_needed" in plan.reasons:
+            plan_guidance = (
+                "如需要，请先拉出 UFC 的 COMM1 selector；然后输入 COMM1 频率 134.000：按 1-3-4-0-0-0，再按 ENT。"
+                if self.lang == "zh"
+                else (
+                    "Pull the UFC COMM1 selector if needed, then enter COMM1 frequency 134.000: "
+                    "press 1-3-4-0-0-0, then ENT."
+                )
+            )
+        elif "s09_numeric_sequence_targets" in plan.reasons:
             plan_guidance = (
                 "请在 UFC 输入 COMM1 频率 134.000：按 1-3-4-0-0-0，然后按 ENT。"
                 if self.lang == "zh"
