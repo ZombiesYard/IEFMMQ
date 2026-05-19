@@ -561,9 +561,37 @@ def test_plan_harness_action_keeps_s18_recovery_pb18_when_bit_root_not_visible()
     )
 
     assert plan.targets == ("right_mdi_pb18",)
-    assert plan.repair_applied is False
-    assert plan.validator_rejected is False
-    assert plan.final_action_plan_source == "model"
+    assert plan.repair_applied is True
+    assert plan.validator_rejected is True
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "s18_unknown_page_to_pb18" in plan.reasons
+
+
+def test_plan_harness_action_uses_s18_safe_navigation_when_visual_state_unknown() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S18": _spec(
+                "S18",
+                ("right_mdi_pb18", "right_mdi_pb5"),
+                recovery_kind="visual_confirmation",
+            )
+        },
+        inferred_step_id="S18",
+        model_step_id="S18",
+        proposed_overlay_targets=[],
+        candidate_step_ids=["S18"],
+        runtime_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        request_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        allowed_evidence_refs=["GATES.S18.completion"],
+        evidence_refs=["GATES.S18.completion"],
+        max_overlay_targets=1,
+    )
+
+    assert plan.targets == ("right_mdi_pb18",)
+    assert plan.text_only is False
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "PB18" in (plan.guidance or "")
+    assert "s18_unknown_page_to_pb18" in plan.reasons
 
 
 def test_plan_harness_action_uses_s18_visual_state_without_live_hint() -> None:
@@ -588,6 +616,31 @@ def test_plan_harness_action_uses_s18_visual_state_without_live_hint() -> None:
 
     assert plan.targets == ("right_mdi_pb5",)
     assert plan.final_action_plan_source == "state_action_planner"
+    assert "state_action_target_mismatch:right_mdi_pb18" in plan.reasons
+
+
+def test_plan_harness_action_uses_s18_pb5_when_bit_root_seen_without_fcsmc_not_seen() -> None:
+    plan = plan_harness_action(
+        step_specs={
+            "S18": _spec(
+                "S18",
+                ("right_mdi_pb18", "right_mdi_pb5"),
+                recovery_kind="visual_confirmation",
+            )
+        },
+        inferred_step_id="S18",
+        model_step_id="S18",
+        proposed_overlay_targets=["right_mdi_pb18"],
+        candidate_step_ids=["S18"],
+        runtime_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        request_overlay_targets=["right_mdi_pb18", "right_mdi_pb5"],
+        max_overlay_targets=1,
+        vision_seen_fact_ids=["bit_root_page_visible"],
+    )
+
+    assert plan.targets == ("right_mdi_pb5",)
+    assert plan.final_action_plan_source == "state_action_planner"
+    assert "s18_bit_root_to_pb5" in plan.reasons
     assert "state_action_target_mismatch:right_mdi_pb18" in plan.reasons
 
 

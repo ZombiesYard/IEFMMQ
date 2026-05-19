@@ -677,7 +677,7 @@ def _state_action_plan(
 
     seen_or_fresh = set(_strings(vision_seen_fact_ids)) | set(_strings(vision_fresh_fact_ids))
     not_seen = set(_strings(vision_not_seen_fact_ids))
-    if step_id == "S18" and "bit_root_page_visible" in seen_or_fresh and "fcsmc_page_visible" in not_seen:
+    if step_id == "S18" and "bit_root_page_visible" in seen_or_fresh:
         if "right_mdi_pb5" in allowed:
             return _StateActionPlan(
                 targets=("right_mdi_pb5",),
@@ -686,6 +686,14 @@ def _state_action_plan(
                 source="state_action_planner",
                 reasons=("s18_bit_root_to_pb5",),
             )
+    if step_id == "S18" and "right_mdi_pb18" in allowed:
+        return _StateActionPlan(
+            targets=("right_mdi_pb18",),
+            guidance="Right DDI BIT page state is not confirmed; press Right DDI PB18/MENU to recover the BIT page first.",
+            text_only=False,
+            source="state_action_planner",
+            reasons=("s18_unknown_page_to_pb18",),
+        )
     if step_id == "S19":
         if "fcsmc_in_test_visible" in seen_or_fresh:
             return _StateActionPlan(
