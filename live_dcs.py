@@ -56,7 +56,7 @@ from adapters.step_harness_specs import (
     step_fallback_profiles_from_specs,
     step_signal_profiles_from_specs,
 )
-from adapters.step_inference import StepInferenceResult, infer_step_id, load_pack_steps
+from adapters.step_inference import StepInferenceResult, format_gate_rule_condition, infer_step_id, load_pack_steps
 from adapters.telemetry_pipeline import enrich_bios_observation
 from adapters.vision_capture_trigger import (
     DEFAULT_VISION_CAPTURE_TRIGGER_HOST,
@@ -6793,6 +6793,102 @@ class LiveDcsTutorLoop:
             response.metadata["manual_throttle_guidance_original_explanations"] = original_explanations
         return True, "manual_throttle_keyboard_guidance"
 
+    @staticmethod
+    def _normalize_missing_condition_key(condition: str) -> str:
+        return re.sub(r"\s+", "", condition)
+
+    def _gate_missing_condition_keys_for_step(self, step_id: str | None, gate_type: str) -> set[str]:
+        if not isinstance(step_id, str) or not step_id:
+            return set()
+        if gate_type == "precondition":
+            gate_map = self.precondition_gates
+        elif gate_type == "completion":
+            gate_map = self.completion_gates
+        else:
+            return set()
+        rules = gate_map.get(step_id)
+        if not isinstance(rules, (list, tuple)):
+            return set()
+        out: set[str] = set()
+        for rule in rules:
+            if not isinstance(rule, Mapping):
+                continue
+            condition = format_gate_rule_condition(rule)
+            if condition:
+                out.add(self._normalize_missing_condition_key(condition))
+        return out
+
+    def _split_completion_missing_conditions(
+        self,
+        step_id: str | None,
+        missing_conditions: Sequence[str],
+    ) -> tuple[list[str], list[str]]:
+        precondition_keys = self._gate_missing_condition_keys_for_step(step_id, "precondition")
+        completion_keys = self._gate_missing_condition_keys_for_step(step_id, "completion")
+        completion_only: list[str] = []
+        precondition_only: list[str] = []
+        for condition in missing_conditions:
+            if not isinstance(condition, str) or not condition:
+                continue
+            key = self._normalize_missing_condition_key(condition)
+            if key in completion_keys:
+                completion_only.append(condition)
+            elif key in precondition_keys:
+                precondition_only.append(condition)
+        return completion_only, precondition_only
+
+    def _record_final_evidence_precondition_metadata(
+        self,
+        response: TutorResponse,
+        *,
+        precondition_missing_conditions: Sequence[str],
+        latest_vars: Mapping[str, Any],
+        evidence_packet: Any,
+    ) -> None:
+        if not precondition_missing_conditions:
+            return
+        precondition_result = validate_final_evidence_consistency(
+            accepted_step_id=None,
+            accepted_overlay_targets=[],
+            accepted_missing_conditions=precondition_missing_conditions,
+            latest_vars=latest_vars,
+            evidence_packet=evidence_packet,
+        )
+        satisfied = [
+            item for item in precondition_result.rejected_missing_conditions
+            if isinstance(item, str) and item
+        ]
+        if not satisfied:
+            return
+        response.metadata["final_evidence_consistency_precondition_satisfied"] = True
+        existing_conditions = response.metadata.get("precondition_satisfied_conditions")
+        merged_conditions = (
+            [item for item in existing_conditions if isinstance(item, str) and item]
+            if isinstance(existing_conditions, list)
+            else []
+        )
+        merged_conditions.extend(satisfied)
+        response.metadata["precondition_satisfied_conditions"] = _dedupe_strings(merged_conditions)
+        precondition_reasons = [f"precondition_satisfied:{condition}" for condition in satisfied]
+        existing_precondition_reasons = response.metadata.get("final_evidence_consistency_precondition_reasons")
+        merged_precondition_reasons = (
+            [item for item in existing_precondition_reasons if isinstance(item, str) and item]
+            if isinstance(existing_precondition_reasons, list)
+            else []
+        )
+        merged_precondition_reasons.extend(precondition_reasons)
+        response.metadata["final_evidence_consistency_precondition_reasons"] = _dedupe_strings(
+            merged_precondition_reasons
+        )
+        existing_reasons = response.metadata.get("harness_validation_reasons")
+        merged_reasons = (
+            [item for item in existing_reasons if isinstance(item, str) and item]
+            if isinstance(existing_reasons, list)
+            else []
+        )
+        merged_reasons.extend(precondition_reasons)
+        response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
+
     def _apply_final_evidence_consistency_metadata(
         self,
         response: TutorResponse,
@@ -6841,10 +6937,19 @@ class LiveDcsTutorLoop:
             merged_reasons.append(latched_reason)
             response.metadata["harness_validation_reasons"] = _dedupe_strings(merged_reasons)
             return True
+        completion_missing_conditions, precondition_missing_conditions = (
+            self._split_completion_missing_conditions(accepted_step_id, accepted_missing_conditions)
+        )
+        self._record_final_evidence_precondition_metadata(
+            response,
+            precondition_missing_conditions=precondition_missing_conditions,
+            latest_vars=vars_map,
+            evidence_packet=evidence_packet,
+        )
         result = validate_final_evidence_consistency(
             accepted_step_id=accepted_step_id,
             accepted_overlay_targets=targets,
-            accepted_missing_conditions=accepted_missing_conditions,
+            accepted_missing_conditions=completion_missing_conditions,
             latest_vars=vars_map,
             evidence_packet=evidence_packet,
         )
@@ -6887,7 +6992,8 @@ class LiveDcsTutorLoop:
         latched_reason = self._four_down_latched_completion_conflict(context, step_id)
         if latched_reason is not None:
             return f"evidence_conflict:{latched_reason}"
-        if not missing_conditions and not include_completion_gate:
+        completion_missing_conditions, _ = self._split_completion_missing_conditions(step_id, missing_conditions)
+        if not completion_missing_conditions and not include_completion_gate:
             return None
         evidence_context = self._context_with_full_pack_gates(context)
         try:
@@ -6897,7 +7003,7 @@ class LiveDcsTutorLoop:
         result = validate_final_evidence_consistency(
             accepted_step_id=step_id,
             accepted_overlay_targets=[],
-            accepted_missing_conditions=missing_conditions,
+            accepted_missing_conditions=completion_missing_conditions,
             latest_vars=vars_map,
             evidence_packet=evidence_packet,
         )

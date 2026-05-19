@@ -1,0 +1,152 @@
+{
+  "context": {
+    "observation_ref": "77fb3314-a2eb-451e-b53d-b33a2df0c041",
+    "observations": [
+      {
+        "observation_id": "77fb3314-a2eb-451e-b53d-b33a2df0c041",
+        "payload": {
+          "seq": 6726,
+          "t_wall": 1779198474.829246,
+          "recent_ui_targets": [],
+          "vars": {
+            "battery_on": true,
+            "power_available": true,
+            "hud_on": true,
+            "left_ddi_on": true,
+            "right_ddi_on": true,
+            "mpcd_on": true,
+            "comm1_freq_134_000": true,
+            "right_engine_nominal_start_params": true,
+            "engine_crank_left_complete": true,
+            "rpm_l": 64,
+            "rpm_l_gte_60": true,
+            "throttle_l_not_off": true,
+            "ins_mode": 0,
+            "ins_mode_set": false,
+            "ins_mode_cv_or_gnd": false,
+            "ins_fast_align_complete": false,
+            "radar_mode_opr": false
+          }
+        }
+      }
+    ]
+  },
+  "cycle": {
+    "tutor_request": {
+      "request_id": "c2a80099-8375-42a1-89eb-b09544b474e2",
+      "message": "help",
+      "observation_ref": "77fb3314-a2eb-451e-b53d-b33a2df0c041",
+      "context": {
+        "scenario_profile": "airfield",
+        "deterministic_step_hint": {
+          "inferred_step_id": "S12",
+          "overlay_step_id": "S12",
+          "observability": "observable",
+          "observability_status": "observable",
+          "requires_visual_confirmation": false,
+          "missing_conditions_count": 1,
+          "step_ui_targets": [
+            "ins_mode_knob",
+            "ampcd_pb19"
+          ],
+          "action_hint": {
+            "target": "ins_mode_knob"
+          }
+        },
+        "state_harness": {
+          "conflicts": [],
+          "telemetry_evidence": {
+            "source_status": "nominal",
+            "confidence": "medium",
+            "observation_seq": 6726
+          },
+          "vision_evidence": {
+            "source_status": "vision_not_required",
+            "confidence": "low",
+            "seen_fact_ids": [],
+            "fresh_fact_ids": []
+          },
+          "deterministic_candidate": {
+            "step_id": "S12",
+            "overlay_step_id": "S12",
+            "missing_conditions": [
+              "vars.rpm_l_gte_60==true"
+            ],
+            "role": "candidate_not_authoritative"
+          },
+          "telemetry_window_digest": {
+            "frame_count": 20,
+            "first_seq": 6707,
+            "latest_seq": 6726,
+            "stable_true_vars": [
+              "battery_on",
+              "hud_on",
+              "left_ddi_on",
+              "mpcd_on",
+              "power_available",
+              "right_ddi_on"
+            ],
+            "stable_false_vars": [],
+            "contradictions": [],
+            "changed_vars": []
+          }
+        },
+        "evidence_packet_summary": {
+          "telemetry_status": "nominal",
+          "vision_status": "vision_not_required",
+          "blocked_gate_count": 7,
+          "recent_action_count": 0,
+          "conflicts": []
+        },
+        "vision_fact_summary": {
+          "status": "vision_not_required",
+          "seen_fact_ids": [],
+          "fresh_fact_ids": []
+        },
+        "vision_facts": [],
+        "overlay_target_allowlist": [
+          "ins_mode_knob",
+          "ampcd_pb19",
+          "radar_mode_knob"
+        ],
+        "rag_topk": []
+      },
+      "metadata": {}
+    }
+  },
+  "model_io": {
+    "help_response": {
+      "diagnosis": {
+        "step_id": "S12",
+        "error_category": "OM"
+      },
+      "next": {
+        "step_id": "S12"
+      },
+      "overlay": {
+        "targets": [
+          "ins_mode_knob"
+        ],
+        "evidence": [
+          {
+            "target": "ins_mode_knob",
+            "type": "gate",
+            "ref": "GATES.S12.completion",
+            "quote": "[REDACTED_SOURCE_QUOTE]",
+            "grounding_confidence": 0.95
+          }
+        ]
+      },
+      "explanations": [
+        "当前步骤 S12 未完成，INS 模式未设置为 GND。请操作 ins_mode_knob。"
+      ]
+    }
+  },
+  "expectations": {
+    "expected_final_step_id": "S12",
+    "expected_overlay_target_ids": [
+      "ins_mode_knob"
+    ],
+    "final_response_source": "model"
+  }
+}

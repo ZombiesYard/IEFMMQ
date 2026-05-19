@@ -11229,6 +11229,65 @@ def test_live_help_fixture_311_replays_real_s10_left_engine_complete_fixture() -
     assert "vars.engine_crank_left_complete==true" not in _public_response_text(repaired)
 
 
+def test_live_help_fixture_311_keeps_s12_when_only_precondition_is_satisfied() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/c2a80099-8375-42a1-89eb-b09544b474e2.fixture.json"
+    )
+    request, response = _fixture_request_and_model_response(fixture)
+    vars_map = request.context["vars"]
+    assert vars_map["rpm_l_gte_60"] is True
+    assert vars_map["ins_mode"] == 0
+    assert vars_map["ins_mode_set"] is False
+    assert vars_map["ins_mode_cv_or_gnd"] is False
+    assert vars_map["ins_fast_align_complete"] is False
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    assert repaired.metadata["diagnosis"]["step_id"] == "S12"
+    assert repaired.metadata["next"]["step_id"] == "S12"
+    assert repaired.metadata["final_public_response"]["next"]["step_id"] == "S12"
+    assert repaired.metadata["final_overlay_targets"] == ["ins_mode_knob"]
+    assert [action["target"] for action in repaired.actions] == ["ins_mode_knob"]
+    assert repaired.metadata.get("final_evidence_consistency_repair_applied") is not True
+    assert repaired.metadata.get("rejected_missing_conditions", []) == []
+    assert repaired.metadata["final_evidence_consistency_precondition_satisfied"] is True
+    assert repaired.metadata["precondition_satisfied_conditions"] == ["vars.rpm_l_gte_60==true"]
+    assert "radar_mode_knob" not in repaired.metadata["final_overlay_targets"]
+    assert "completion_gate_already_satisfied:S12" not in repaired.metadata.get(
+        "harness_validation_reasons",
+        [],
+    )
+
+
+def test_final_evidence_split_uses_current_step_completion_predicates_only() -> None:
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(Observation()),
+        model=RecordingModel(),
+        action_executor=RecordingExecutor(),
+        session_id="sess-issue-311-completion-split",
+        rag_top_k=0,
+        lang="zh",
+    )
+    try:
+        completion, precondition = loop._split_completion_missing_conditions(
+            "S12",
+            [
+                "vars.rpm_l_gte_60==true",
+                "vars.ins_mode in [2,2]",
+                "vars.ins_fast_align_complete==true",
+                "vars.some_prior_step_gate==true",
+            ],
+        )
+    finally:
+        loop.close()
+
+    assert completion == [
+        "vars.ins_mode in [2,2]",
+        "vars.ins_fast_align_complete==true",
+    ]
+    assert precondition == ["vars.rpm_l_gte_60==true"]
+
+
 def test_live_help_fixture_315_repairs_unconfirmed_s08_tac_public_response() -> None:
     fixture = _load_live_help_fixture(
         "artifacts/live_fixtures/c2ddd0ad-eb91-416e-a3a8-be16816a9d49.fixture.json"
