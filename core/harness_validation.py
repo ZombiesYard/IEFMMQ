@@ -626,6 +626,15 @@ def _state_action_plan(
                 source="state_action_planner",
                 reasons=("s10_left_engine_left_click_guidance",),
             )
+    if step_id == "S13" and vars_map.get("radar_mode_opr") is not True:
+        if "radar_mode_knob" in allowed:
+            return _StateActionPlan(
+                targets=("radar_mode_knob",),
+                guidance="Set the radar knob to OPR with a right-click to the next detent.",
+                text_only=False,
+                source="state_action_planner",
+                reasons=("s13_radar_opr_right_click_guidance",),
+            )
     if step_id == "S31" and vars_map.get("radar_altimeter_bug_set") is not True:
         if "radar_altimeter_bug_knob" in allowed:
             return _StateActionPlan(
