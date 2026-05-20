@@ -11,8 +11,10 @@ from pathlib import Path
 
 import simtutor.__main__ as simtutor_cli
 from core.experiment_export import (
+    ACTION_TIMELINE_CSV_FIELDS,
     HELP_CYCLES_CSV_FIELDS,
     SessionMeta,
+    ActionTimelineRecord,
     HelpCycleRecord,
     STEP_CODING_CSV_FIELDS,
     TRIAL_SUMMARY_CSV_FIELDS,
@@ -53,7 +55,15 @@ def _make_events_with_help_cycles() -> list[dict]:
         # --- observation 1 ---
         {
             "kind": "observation",
-            "payload": {"seq": 1, "t_wall": 0.5, "source": "telemetry"},
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 0.5,
+                "source": "dcs_bios",
+                "bios": {"BATTERY_SW": 2},
+                "delta": {"BATTERY_SW": 2},
+            },
+            "metadata": {"seq": 1, "delta_count": 1},
             "t_wall": 0.5,
             "session_id": session_id,
             "timestamp": t0.isoformat(),
@@ -258,6 +268,105 @@ def _make_events_with_help_cycles() -> list[dict]:
     ]
 
 
+def _make_events_with_action_timeline() -> list[dict]:
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    t1 = datetime(2026, 5, 9, 10, 0, 2, tzinfo=timezone.utc)
+    t2 = datetime(2026, 5, 9, 10, 0, 4, tzinfo=timezone.utc)
+    t3 = datetime(2026, 5, 9, 10, 0, 9, tzinfo=timezone.utc)
+    t4 = datetime(2026, 5, 9, 10, 0, 12, tzinfo=timezone.utc)
+    t5 = datetime(2026, 5, 9, 10, 0, 14, tzinfo=timezone.utc)
+    t6 = datetime(2026, 5, 9, 10, 0, 20, tzinfo=timezone.utc)
+    t7 = datetime(2026, 5, 9, 10, 0, 24, tzinfo=timezone.utc)
+
+    return [
+        {
+            "kind": "step_activated",
+            "payload": {"step_id": "S01"},
+            "t_wall": 0.0,
+            "timestamp": t0.isoformat(),
+        },
+        {
+            "kind": "observation",
+            "payload": {
+                "observation_id": "obs-action-001",
+                "timestamp": t1.isoformat(),
+                "source": "dcs_bios",
+                "payload": {
+                    "seq": 1,
+                    "t_wall": 2.0,
+                    "delta_summary": {
+                        "recent_key_changes_topk": [
+                            {"key": "BATTERY_SW", "value": 2, "ui_targets": ["battery_switch"]},
+                        ],
+                    },
+                    "recent_ui_targets": ["battery_switch"],
+                },
+                "metadata": {"seq": 1, "delta_count": 1},
+            },
+            "metadata": {"seq": 1, "delta_count": 1},
+            "t_wall": 2.0,
+            "timestamp": t1.isoformat(),
+        },
+        {
+            "kind": "step_completed",
+            "payload": {"step_id": "S01"},
+            "t_wall": 4.0,
+            "timestamp": t2.isoformat(),
+        },
+        {
+            "kind": "step_activated",
+            "payload": {"step_id": "S02"},
+            "t_wall": 9.0,
+            "timestamp": t3.isoformat(),
+        },
+        {
+            "kind": "tutor_request",
+            "payload": {
+                "intent": "ask_help",
+                "metadata": {"help_cycle_id": "cycle-s02", "fused_step_id": "S02"},
+            },
+            "metadata": {"help_cycle_id": "cycle-s02", "fused_step_id": "S02"},
+            "related_id": "cycle-s02",
+            "t_wall": 12.0,
+            "timestamp": t4.isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 2,
+                "t_wall": 14.0,
+                "source": "dcs_bios",
+                "bios": {"BATTERY_SW": 2, "APU_CONTROL_SW": 1},
+                "delta": {"APU_CONTROL_SW": 1},
+            },
+            "metadata": {"seq": 2, "delta_count": 1},
+            "t_wall": 14.0,
+            "timestamp": t5.isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 3,
+                "t_wall": 20.0,
+                "source": "dcs_bios",
+                "bios": {"BATTERY_SW": 2, "APU_CONTROL_SW": 1, "EXPERIMENTAL_RAW_KEY": 7},
+                "delta": {"EXPERIMENTAL_RAW_KEY": 7},
+            },
+            "metadata": {"seq": 3, "delta_count": 1},
+            "t_wall": 20.0,
+            "timestamp": t6.isoformat(),
+        },
+        {
+            "kind": "step_completed",
+            "payload": {"step_id": "S03"},
+            "t_wall": 24.0,
+            "timestamp": t7.isoformat(),
+        },
+    ]
+
+
 # ── tests ───────────────────────────────────────────────────────────────
 
 def test_session_meta_roundtrip():
@@ -397,6 +506,7 @@ def test_build_export_with_help_cycles():
     assert "meta" in d
     assert "summary" in d
     assert "help_cycles" in d
+    assert "action_timeline" in d
     assert "step_coding" in d
     assert "trial_summary" in d
     assert "scoring" in d
@@ -467,6 +577,13 @@ def test_build_export_includes_study_ready_tables():
 
 
 def test_study_ready_csv_contract_fields_are_frozen():
+    assert ACTION_TIMELINE_CSV_FIELDS == [
+        "ParticipantID", "Condition", "TrialID", "EventIndex", "Timestamp", "TWall", "Source",
+        "RawKey", "RawValueBefore", "RawValueAfter", "Delta", "MappedTarget",
+        "CandidateStepID", "ActiveStepID", "FusedStepID", "ExpectedForStep",
+        "BeforeHelpCycleID", "AfterHelpCycleID", "NearestHelpCycleID", "SecondsSinceLastHelp",
+        "StepCompletedByThisEvent", "GateViolationCandidate", "AutoCodingHint",
+    ]
     assert HELP_CYCLES_CSV_FIELDS == [
         "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
         "vision_used", "vision_status", "vision_fact_status", "vision_fallback_reason", "sync_delta_ms",
@@ -489,6 +606,91 @@ def test_study_ready_csv_contract_fields_are_frozen():
         "LLMTriggers", "VLMCalls", "OverlayExecuted", "OverlayRejected", "FallbackCount",
         "CriticalStepsCompleted", "TotalStepsCompleted", "StepCompletionAccuracy",
     ]
+
+
+def test_action_timeline_links_dcs_deltas_to_steps_and_help_cycles():
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_events_with_action_timeline(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    assert [row.RawKey for row in export.action_timeline] == [
+        "BATTERY_SW",
+        "APU_CONTROL_SW",
+        "EXPERIMENTAL_RAW_KEY",
+    ]
+
+    expected = export.action_timeline[0]
+    assert expected.ParticipantID == "P01"
+    assert expected.Condition == "with_tutor"
+    assert expected.TrialID == "T01"
+    assert expected.EventIndex == 1
+    assert expected.Source == "dcs_bios"
+    assert expected.RawValueAfter == "2"
+    assert expected.MappedTarget == "battery_switch"
+    assert expected.CandidateStepID == "S01"
+    assert expected.ActiveStepID == "S01"
+    assert expected.ExpectedForStep == "yes"
+    assert expected.BeforeHelpCycleID == "cycle-s02"
+    assert expected.AfterHelpCycleID == ""
+    assert expected.NearestHelpCycleID == "cycle-s02"
+    assert expected.SecondsSinceLastHelp is None
+    assert expected.StepCompletedByThisEvent == "yes"
+    assert expected.GateViolationCandidate == "no"
+
+    unrelated = export.action_timeline[1]
+    assert unrelated.MappedTarget == "apu_switch"
+    assert unrelated.CandidateStepID == "S03"
+    assert unrelated.ActiveStepID == "S02"
+    assert unrelated.ExpectedForStep == "no"
+    assert unrelated.AfterHelpCycleID == "cycle-s02"
+    assert unrelated.NearestHelpCycleID == "cycle-s02"
+    assert unrelated.SecondsSinceLastHelp == 2.0
+    assert unrelated.StepCompletedByThisEvent == "no"
+    assert unrelated.GateViolationCandidate == "yes"
+    assert "unexpected_for_active_step" in set(unrelated.AutoCodingHint.split(";"))
+
+    unmapped = export.action_timeline[2]
+    assert unmapped.RawKey == "EXPERIMENTAL_RAW_KEY"
+    assert unmapped.RawValueAfter == "7"
+    assert unmapped.MappedTarget == ""
+    assert unmapped.CandidateStepID == ""
+    assert "unmapped_raw_key" in set(unmapped.AutoCodingHint.split(";"))
+
+
+def test_action_timeline_rejects_bios_mapping_with_unknown_ui_target():
+    root = _repo_root()
+    export_events = _make_events_with_action_timeline()
+
+    try:
+        build_experiment_export(
+            export_events,
+            pack_path=root / "packs/fa18c_startup/pack.yaml",
+            bios_to_ui_path=root / "tests/adapters/fixtures/bios_to_ui_bad_target.yaml",
+            ui_map_path=root / "tests/adapters/fixtures/ui_map_only_target.yaml",
+        )
+    except ValueError as exc:
+        assert "unknown ui target" in str(exc)
+    else:
+        raise AssertionError("expected invalid bios_to_ui mapping to fail")
+
+
+def test_action_timeline_record_serialization():
+    rec = ActionTimelineRecord(
+        ParticipantID="P01",
+        Condition="with_tutor",
+        TrialID="T01",
+        EventIndex=3,
+        RawKey="BATTERY_SW",
+        RawValueAfter="2",
+    )
+
+    assert rec.to_dict()["ParticipantID"] == "P01"
+    assert rec.to_dict()["RawKey"] == "BATTERY_SW"
 
 
 def test_step_coding_uses_fused_step_as_help_cycle_owner():
@@ -843,6 +1045,10 @@ def test_experiment_export_cli_freezes_metadata_and_copies_raw_log(tmp_path: Pat
     assert session["quality_gate"]["passed"] is True
     assert (trial_dir / "step_coding.csv").exists()
     assert (trial_dir / "trial_summary.csv").exists()
+    assert (trial_dir / "action_timeline.csv").exists()
+    with (trial_dir / "action_timeline.csv").open("r", newline="", encoding="utf-8") as f:
+        action_rows = list(csv.DictReader(f))
+    assert list(action_rows[0].keys()) == ACTION_TIMELINE_CSV_FIELDS
     with (trial_dir / "step_coding.csv").open("r", newline="", encoding="utf-8") as f:
         step_rows = list(csv.DictReader(f))
     assert len(step_rows) == 33
@@ -872,6 +1078,63 @@ def test_experiment_export_cli_freezes_metadata_and_copies_raw_log(tmp_path: Pat
     assert _run_experiment_export(args) == 1
     args.overwrite = True
     assert _run_experiment_export(args) == 0
+
+
+def test_experiment_export_cli_writes_action_timeline_rows(tmp_path: Path):
+    raw_log = tmp_path / "events.jsonl"
+    _write_jsonl(raw_log, _make_events_with_action_timeline())
+    output_dir = tmp_path / "exports"
+    root = _repo_root()
+
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P01",
+        trial_id="T01",
+        study_id="study-alpha",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id=None,
+        questionnaire=None,
+        recording_ref=None,
+        notes=None,
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider=None,
+        model_name=None,
+        vision_model_name=None,
+        prompt_version=None,
+        prompt_hash=None,
+        scenario_profile=None,
+        dcs_mission=None,
+        dcs_aircraft=None,
+        vr_setup=None,
+        monitor_setup=None,
+        git_commit="abc123",
+        git_dirty=False,
+        strict=False,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P01" / "T01"
+    with (trial_dir / "action_timeline.csv").open("r", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    assert [row["RawKey"] for row in rows] == ["BATTERY_SW", "APU_CONTROL_SW", "EXPERIMENTAL_RAW_KEY"]
+    assert rows[0]["MappedTarget"] == "battery_switch"
+    assert rows[0]["CandidateStepID"] == "S01"
+    assert rows[1]["SecondsSinceLastHelp"] == "2.0"
+    assert rows[1]["GateViolationCandidate"] == "yes"
+    assert "unexpected_for_active_step" in set(rows[1]["AutoCodingHint"].split(";"))
+    assert rows[2]["RawValueAfter"] == "7"
+    assert rows[2]["MappedTarget"] == ""
+    assert "unmapped_raw_key" in set(rows[2]["AutoCodingHint"].split(";"))
 
 
 def test_experiment_export_cli_overwrite_replaces_stale_managed_outputs(tmp_path: Path):

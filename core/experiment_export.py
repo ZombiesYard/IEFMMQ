@@ -69,6 +69,32 @@ HELP_CYCLES_CSV_FIELDS = [
     "scenario_profile",
 ]
 
+ACTION_TIMELINE_CSV_FIELDS = [
+    "ParticipantID",
+    "Condition",
+    "TrialID",
+    "EventIndex",
+    "Timestamp",
+    "TWall",
+    "Source",
+    "RawKey",
+    "RawValueBefore",
+    "RawValueAfter",
+    "Delta",
+    "MappedTarget",
+    "CandidateStepID",
+    "ActiveStepID",
+    "FusedStepID",
+    "ExpectedForStep",
+    "BeforeHelpCycleID",
+    "AfterHelpCycleID",
+    "NearestHelpCycleID",
+    "SecondsSinceLastHelp",
+    "StepCompletedByThisEvent",
+    "GateViolationCandidate",
+    "AutoCodingHint",
+]
+
 STEP_CODING_CSV_FIELDS = [
     "ParticipantID",
     "Condition",
@@ -509,6 +535,36 @@ class StepCodingRecord:
 
 
 @dataclass
+class ActionTimelineRecord:
+    ParticipantID: str = ""
+    Condition: str = ""
+    TrialID: str = ""
+    EventIndex: int = 0
+    Timestamp: str = ""
+    TWall: float | None = None
+    Source: str = ""
+    RawKey: str = ""
+    RawValueBefore: str = ""
+    RawValueAfter: str = ""
+    Delta: str = ""
+    MappedTarget: str = ""
+    CandidateStepID: str = ""
+    ActiveStepID: str = ""
+    FusedStepID: str = ""
+    ExpectedForStep: str = ""
+    BeforeHelpCycleID: str = ""
+    AfterHelpCycleID: str = ""
+    NearestHelpCycleID: str = ""
+    SecondsSinceLastHelp: float | None = None
+    StepCompletedByThisEvent: str = ""
+    GateViolationCandidate: str = ""
+    AutoCodingHint: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class TrialSummaryRecord:
     ParticipantID: str = ""
     Condition: str = ""
@@ -553,6 +609,7 @@ class ExperimentExport:
     meta: SessionMeta = field(default_factory=SessionMeta)
     summary: InteractionMetrics = field(default_factory=InteractionMetrics)
     help_cycles: list[HelpCycleRecord] = field(default_factory=list)
+    action_timeline: list[ActionTimelineRecord] = field(default_factory=list)
     step_coding: list[StepCodingRecord] = field(default_factory=list)
     trial_summary: list[TrialSummaryRecord] = field(default_factory=list)
     scoring: dict[str, Any] | None = None
@@ -564,6 +621,7 @@ class ExperimentExport:
             "meta": self.meta.to_dict(),
             "summary": self.summary.to_dict(),
             "help_cycles": [c.to_dict() for c in self.help_cycles],
+            "action_timeline": [a.to_dict() for a in self.action_timeline],
             "step_coding": [c.to_dict() for c in self.step_coding],
             "trial_summary": [s.to_dict() for s in self.trial_summary],
             "scoring": self.scoring,
@@ -838,6 +896,75 @@ def _load_pack_steps_for_export(pack_path: str | Path | None) -> list[Mapping[st
     return [step for step in steps if isinstance(step, Mapping)]
 
 
+def _load_bios_to_ui_rules_for_export(
+    bios_to_ui_path: str | Path | None,
+    ui_map_path: str | Path | None,
+) -> dict[str, tuple[str, ...]]:
+    if bios_to_ui_path is None:
+        return {}
+    allowed_targets: set[str] | None = None
+    if ui_map_path is not None:
+        ui_map = _load_yaml_mapping(ui_map_path)
+        cockpit_elements = ui_map.get("cockpit_elements")
+        if not isinstance(cockpit_elements, Mapping):
+            raise ValueError("ui_map.yaml missing cockpit_elements mapping")
+        allowed_targets = {
+            key for key in cockpit_elements.keys() if isinstance(key, str) and key
+        }
+
+    bios_to_ui = _load_yaml_mapping(bios_to_ui_path)
+    mappings = bios_to_ui.get("mappings")
+    if not isinstance(mappings, Mapping):
+        raise ValueError("bios_to_ui.yaml missing mappings")
+
+    rules: dict[str, tuple[str, ...]] = {}
+    for raw_key, raw_value in mappings.items():
+        if not isinstance(raw_key, str) or not raw_key:
+            continue
+        targets: list[str] = []
+        if isinstance(raw_value, str):
+            targets = [raw_value]
+        elif isinstance(raw_value, list):
+            targets = [item for item in raw_value if isinstance(item, str) and item]
+        elif isinstance(raw_value, Mapping):
+            raw_targets = raw_value.get("targets")
+            if isinstance(raw_targets, list):
+                targets = [item for item in raw_targets if isinstance(item, str) and item]
+        if not targets:
+            continue
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for target in targets:
+            if target in seen:
+                continue
+            if allowed_targets is not None and target not in allowed_targets:
+                raise ValueError(
+                    f"bios_to_ui key {raw_key!r} references unknown ui target {target!r}"
+                )
+            seen.add(target)
+            ordered.append(target)
+        rules[raw_key] = tuple(ordered)
+    return rules
+
+
+def _build_step_targets_index(pack_steps: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
+    by_target: dict[str, list[str]] = {}
+    for step in pack_steps:
+        step_id = _opt_str(step.get("id"))
+        if not step_id:
+            continue
+        targets = step.get("ui_targets")
+        if not isinstance(targets, list):
+            continue
+        for target in targets:
+            if not isinstance(target, str) or not target:
+                continue
+            by_target.setdefault(target, [])
+            if step_id not in by_target[target]:
+                by_target[target].append(step_id)
+    return by_target
+
+
 def _step_title(step: Mapping[str, Any]) -> str:
     for key in ("title", "name", "short_title", "label"):
         value = _opt_str(step.get(key))
@@ -881,6 +1008,21 @@ def _event_wall_time(ev: Mapping[str, Any]) -> float | None:
 
 def _join_csv_values(values: Sequence[str]) -> str:
     return ";".join(value for value in values if value)
+
+
+def _stringify_csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    try:
+        return yaml.safe_dump(value, default_flow_style=True, sort_keys=True).strip()
+    except Exception:
+        return str(value)
 
 
 def _record_text(value: str | None) -> str:
@@ -967,6 +1109,272 @@ def _build_step_coding(
                 AutoCodingNotes=_join_csv_values(auto_notes),
             )
         )
+    return rows
+
+
+def _event_source(ev: Mapping[str, Any]) -> str:
+    source = _opt_str(ev.get("source"))
+    if source:
+        return source
+    for payload in _event_payload_layers(ev):
+        source = _opt_str(payload.get("source"))
+        if source:
+            return source
+    metadata = ev.get("metadata")
+    if isinstance(metadata, Mapping):
+        source = _opt_str(metadata.get("source")) or _opt_str(metadata.get("observation_kind"))
+        if source:
+            return source
+    return ""
+
+
+def _event_payload_layers(ev: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    payload = ev.get("payload")
+    if not isinstance(payload, Mapping):
+        return []
+    layers: list[Mapping[str, Any]] = [payload]
+    nested = payload.get("payload")
+    if isinstance(nested, Mapping):
+        layers.append(nested)
+    return layers
+
+
+def _extract_event_delta_items(ev: Mapping[str, Any]) -> list[tuple[str, Any]]:
+    for payload in reversed(_event_payload_layers(ev)):
+        delta = payload.get("delta")
+        if isinstance(delta, Mapping):
+            return [(key, value) for key, value in delta.items() if isinstance(key, str) and key]
+
+        delta_summary = payload.get("delta_summary")
+        if not isinstance(delta_summary, Mapping):
+            continue
+        recent = delta_summary.get("recent_key_changes_topk")
+        if not isinstance(recent, list):
+            continue
+
+        items: list[tuple[str, Any]] = []
+        for row in recent:
+            if not isinstance(row, Mapping):
+                continue
+            key = row.get("key")
+            if isinstance(key, str) and key:
+                items.append((key, row.get("value")))
+        if items:
+            return items
+    return []
+
+
+def _event_bios_map(ev: Mapping[str, Any]) -> Mapping[str, Any]:
+    for payload in reversed(_event_payload_layers(ev)):
+        bios = payload.get("bios")
+        if isinstance(bios, Mapping):
+            return bios
+    return {}
+
+
+def _candidate_steps_for_targets(
+    targets: Sequence[str],
+    step_ids_by_target: Mapping[str, Sequence[str]],
+) -> list[str]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for target in targets:
+        for step_id in step_ids_by_target.get(target, ()):
+            if step_id in seen:
+                continue
+            seen.add(step_id)
+            candidates.append(step_id)
+    return candidates
+
+
+def _help_cycle_links(
+    t_wall: float | None,
+    help_cycles: Sequence[HelpCycleRecord],
+) -> tuple[str, str, str, float | None, str]:
+    if t_wall is None:
+        return "", "", "", None, ""
+
+    timed_cycles = [
+        cycle
+        for cycle in help_cycles
+        if cycle.trigger_wall_s is not None and cycle.help_cycle_id
+    ]
+    if not timed_cycles:
+        return "", "", "", None, ""
+
+    before_candidates = [cycle for cycle in timed_cycles if cycle.trigger_wall_s is not None and cycle.trigger_wall_s > t_wall]
+    after_candidates = [cycle for cycle in timed_cycles if cycle.trigger_wall_s is not None and cycle.trigger_wall_s <= t_wall]
+
+    before = min(before_candidates, key=lambda cycle: float(cycle.trigger_wall_s)) if before_candidates else None
+    after = max(after_candidates, key=lambda cycle: float(cycle.trigger_wall_s)) if after_candidates else None
+    nearest = min(timed_cycles, key=lambda cycle: abs(float(cycle.trigger_wall_s) - t_wall))
+    seconds_since = None if after is None else round(t_wall - float(after.trigger_wall_s), 6)
+    fused_step_id = nearest.fused_step_id or nearest.model_next_step_id or ""
+
+    return (
+        before.help_cycle_id if before is not None else "",
+        after.help_cycle_id if after is not None else "",
+        nearest.help_cycle_id,
+        seconds_since,
+        fused_step_id,
+    )
+
+
+def _completed_by_action_event(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    event_index: int,
+    event_wall: float | None,
+    candidate_step_ids: Sequence[str],
+) -> bool:
+    if not candidate_step_ids:
+        return False
+    candidate_set = set(candidate_step_ids)
+
+    current_step = _event_step_id(events[event_index])
+    current_kind = events[event_index].get("kind") or events[event_index].get("type") or ""
+    if current_kind == "step_completed" and current_step in candidate_set:
+        return True
+
+    for next_ev in events[event_index + 1:event_index + 4]:
+        kind = next_ev.get("kind") or next_ev.get("type") or ""
+        if kind not in ("step_completed", "step_blocked", "step_activated", "observation"):
+            continue
+        if kind == "observation":
+            break
+        next_step = _event_step_id(next_ev)
+        if kind == "step_completed" and next_step in candidate_set:
+            next_wall = _event_wall_time(next_ev)
+            if event_wall is None or next_wall is None or 0 <= next_wall - event_wall <= 3.0:
+                return True
+            return False
+        if kind in ("step_blocked", "step_activated"):
+            break
+    return False
+
+
+def _build_action_timeline(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    meta: SessionMeta,
+    help_cycles: Sequence[HelpCycleRecord],
+    pack_steps: Sequence[Mapping[str, Any]],
+    bios_to_ui_path: str | Path | None,
+    ui_map_path: str | Path | None,
+) -> list[ActionTimelineRecord]:
+    bios_to_ui = _load_bios_to_ui_rules_for_export(bios_to_ui_path, ui_map_path)
+    step_ids_by_target = _build_step_targets_index(pack_steps)
+    rows: list[ActionTimelineRecord] = []
+    active_step_id = ""
+    last_values: dict[str, Any] = {}
+
+    for event_index, ev in enumerate(events):
+        kind = ev.get("kind") or ev.get("type") or ""
+
+        if kind == "step_activated":
+            active_step_id = _event_step_id(ev) or active_step_id
+        elif kind in ("step_completed", "step_blocked"):
+            sid = _event_step_id(ev)
+            if sid and active_step_id == sid:
+                active_step_id = ""
+
+        delta_items = _extract_event_delta_items(ev)
+        if not delta_items:
+            for key, value in _event_bios_map(ev).items():
+                if isinstance(key, str) and key:
+                    last_values[key] = value
+            continue
+
+        t_wall = _event_wall_time(ev)
+        before_help, after_help, nearest_help, seconds_since_help, fused_step_id = _help_cycle_links(
+            t_wall,
+            help_cycles,
+        )
+        source = _event_source(ev)
+        timestamp = _opt_str(ev.get("timestamp")) or ""
+
+        bios_map = _event_bios_map(ev)
+
+        for raw_key, raw_after in delta_items:
+            raw_before = last_values.get(raw_key)
+            if raw_after is None and raw_key in bios_map:
+                raw_after = bios_map.get(raw_key)
+
+            mapped_targets = list(bios_to_ui.get(raw_key, ()))
+            candidate_step_ids = _candidate_steps_for_targets(mapped_targets, step_ids_by_target)
+            expected_for_step = ""
+            if active_step_id and candidate_step_ids:
+                expected_for_step = _yes_no(active_step_id in candidate_step_ids)
+            elif active_step_id and not candidate_step_ids:
+                expected_for_step = "no"
+
+            gate_violation = bool(
+                active_step_id
+                and mapped_targets
+                and candidate_step_ids
+                and active_step_id not in candidate_step_ids
+            )
+            completed_by_event = _completed_by_action_event(
+                events,
+                event_index=event_index,
+                event_wall=t_wall,
+                candidate_step_ids=candidate_step_ids,
+            )
+
+            hints: list[str] = []
+            if not mapped_targets:
+                hints.append("unmapped_raw_key")
+            if mapped_targets and not candidate_step_ids:
+                hints.append("mapped_target_without_candidate_step")
+            if active_step_id and candidate_step_ids and active_step_id not in candidate_step_ids:
+                hints.append("unexpected_for_active_step")
+            if active_step_id and candidate_step_ids and active_step_id in candidate_step_ids:
+                hints.append("expected_for_active_step")
+            if seconds_since_help is not None:
+                hints.append("after_help")
+            if completed_by_event:
+                hints.append("completed_step")
+
+            delta_text = ""
+            if raw_before is not None and isinstance(raw_before, (int, float)) and isinstance(raw_after, (int, float)):
+                delta_text = _stringify_csv_value(raw_after - raw_before)
+            elif raw_after is not None:
+                delta_text = _stringify_csv_value(raw_after)
+
+            rows.append(
+                ActionTimelineRecord(
+                    ParticipantID=meta.participant_id,
+                    Condition=meta.condition,
+                    TrialID=meta.trial_id,
+                    EventIndex=event_index,
+                    Timestamp=timestamp,
+                    TWall=t_wall,
+                    Source=source,
+                    RawKey=raw_key,
+                    RawValueBefore=_stringify_csv_value(raw_before),
+                    RawValueAfter=_stringify_csv_value(raw_after),
+                    Delta=delta_text,
+                    MappedTarget=_join_csv_values(mapped_targets),
+                    CandidateStepID=_join_csv_values(candidate_step_ids),
+                    ActiveStepID=active_step_id,
+                    FusedStepID=fused_step_id,
+                    ExpectedForStep=expected_for_step,
+                    BeforeHelpCycleID=before_help,
+                    AfterHelpCycleID=after_help,
+                    NearestHelpCycleID=nearest_help,
+                    SecondsSinceLastHelp=seconds_since_help,
+                    StepCompletedByThisEvent=_yes_no(completed_by_event),
+                    GateViolationCandidate=_yes_no(gate_violation),
+                    AutoCodingHint=_join_csv_values(hints),
+                )
+            )
+
+        for key, value in delta_items:
+            last_values[key] = value
+        for key, value in bios_map.items():
+            if isinstance(key, str) and key:
+                last_values[key] = value
+
     return rows
 
 
@@ -1086,6 +1494,8 @@ def build_experiment_export(
     meta_overrides: Mapping[str, Any] | None = None,
     scoring: Mapping[str, Any] | None = None,
     pack_path: str | Path | None = None,
+    bios_to_ui_path: str | Path | None = None,
+    ui_map_path: str | Path | None = None,
 ) -> ExperimentExport:
     """Build a complete experiment export from a list of event dicts."""
 
@@ -1132,6 +1542,14 @@ def build_experiment_export(
 
     summary = compute_interaction_metrics(events)
     pack_steps = _load_pack_steps_for_export(pack_path)
+    action_timeline = _build_action_timeline(
+        events,
+        meta=meta,
+        help_cycles=help_cycles,
+        pack_steps=pack_steps,
+        bios_to_ui_path=bios_to_ui_path,
+        ui_map_path=ui_map_path,
+    )
     step_coding = _build_step_coding(
         events,
         meta=meta,
@@ -1163,6 +1581,7 @@ def build_experiment_export(
         meta=meta,
         summary=summary,
         help_cycles=help_cycles,
+        action_timeline=action_timeline,
         step_coding=step_coding,
         trial_summary=trial_summary,
         scoring=dict(scoring) if isinstance(scoring, Mapping) else None,
@@ -1174,11 +1593,13 @@ __all__ = [
     "SessionMeta",
     "ExportQualityReport",
     "HelpCycleRecord",
+    "ActionTimelineRecord",
     "StepCodingRecord",
     "TrialSummaryRecord",
     "TimelineSnapshot",
     "ExperimentExport",
     "HELP_CYCLES_CSV_FIELDS",
+    "ACTION_TIMELINE_CSV_FIELDS",
     "STEP_CODING_CSV_FIELDS",
     "TRIAL_SUMMARY_CSV_FIELDS",
     "build_export_quality_report",
