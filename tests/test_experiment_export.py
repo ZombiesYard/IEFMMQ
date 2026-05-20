@@ -670,7 +670,8 @@ def test_study_ready_csv_contract_fields_are_frozen():
     ]
     assert HELP_CYCLES_CSV_FIELDS == [
         "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-        "vision_used", "vision_status", "vision_fact_status", "vision_fallback_reason", "sync_delta_ms",
+        "vision_used", "vision_status", "vision_fact_status", "vlm_call_status",
+        "vision_fallback_reason", "sync_delta_ms",
         "frame_ids", "layout_id", "fused_step_id", "fused_missing_conditions", "model_next_step_id",
         "overlay_targets", "overlay_executed", "overlay_rejected",
         "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
@@ -1096,6 +1097,7 @@ def test_trial_summary_counts_vlm_calls_once_per_help_cycle():
     )
 
     assert export.trial_summary[0].VLMCalls == 1
+    assert export.help_cycles[1].vlm_call_status == "called"
 
 
 def test_trial_summary_honors_explicit_non_called_vlm_status():
@@ -1110,6 +1112,7 @@ def test_trial_summary_honors_explicit_non_called_vlm_status():
     )
 
     assert export.trial_summary[0].VLMCalls == 0
+    assert export.help_cycles[0].vlm_call_status == "not_required"
 
 
 def test_build_export_no_help_cycles():
@@ -1410,6 +1413,7 @@ def test_experiment_export_cli_freezes_metadata_and_copies_raw_log(tmp_path: Pat
     with (trial_dir / "help_cycles.csv").open("r", newline="", encoding="utf-8") as f:
         help_rows = list(csv.DictReader(f))
     assert "vision_fact_status" in help_rows[0]
+    assert "vlm_call_status" in help_rows[0]
     assert "fallback_overlay_reason" in help_rows[0]
     assert "response_mapping_failure_codes" in help_rows[0]
     assert "frame_ids" in help_rows[0]
