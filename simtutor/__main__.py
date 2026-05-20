@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import time
 from typing import Any, Iterable, Tuple
@@ -376,23 +378,151 @@ def _run_extract_live_fixture(args: argparse.Namespace) -> int:
 
 def _sanitize_participant_slug(raw: str) -> str:
     """Return a safe directory name from a participant identifier."""
+    return _sanitize_export_slug(raw, field_name="participant_id")
+
+
+def _sanitize_export_slug(raw: str, *, field_name: str) -> str:
+    """Return a safe directory name from an experiment identifier."""
     # Discard any path component; only use the terminal name.
     slug = Path(raw).name.strip()
     if not slug or slug in (".", ".."):
-        raise ValueError(f"participant_id resolves to unsafe or empty path component: {raw!r}")
+        raise ValueError(f"{field_name} resolves to unsafe or empty path component: {raw!r}")
     # Restrict to alphanumeric + underscore + hyphen for filesystem safety.
     if not slug.replace("_", "").replace("-", "").isalnum():
         raise ValueError(
-            f"participant_id must contain only letters, digits, underscores, and hyphens: {slug!r}"
+            f"{field_name} must contain only letters, digits, underscores, and hyphens: {slug!r}"
         )
     return slug
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _git_text(args: list[str]) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=_repo_root(),
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return None
+    return result.stdout.strip()
+
+
+def _current_git_commit() -> str | None:
+    return _git_text(["rev-parse", "HEAD"])
+
+
+def _current_git_dirty() -> bool | None:
+    status = _git_text(["status", "--short"])
+    if status is None:
+        return None
+    return bool(status)
+
+
+def _coerce_optional_bool(raw: Any) -> bool | None:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        normalized = raw.strip().lower()
+        if normalized in ("1", "true", "yes", "y"):
+            return True
+        if normalized in ("0", "false", "no", "n"):
+            return False
+    return None
+
+
+def _optional_file_sha256(path: str | None) -> str | None:
+    if not path:
+        return None
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        from core.experiment_export import build_file_sha256
+
+        return build_file_sha256(p)
+    except OSError:
+        return None
+
+
+def _print_quality_report(report: Any) -> None:
+    for warning in getattr(report, "warnings", []):
+        print(f"[EXPERIMENT_EXPORT] warning: {warning}")
+    for error in getattr(report, "errors", []):
+        print(f"[EXPERIMENT_EXPORT] error: {error}")
+
+
+def _read_csv_header_and_row_count(path: Path) -> tuple[list[str] | None, int | None]:
+    import csv
+
+    if not path.exists():
+        return None, None
+    with path.open("r", newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            return [], 0
+        return header, sum(1 for _ in reader)
+
+
+def _new_export_staging_dir(out_dir: Path) -> Path:
+    return out_dir.parent / f".{out_dir.name}.tmp-{os.getpid()}-{time.time_ns()}"
+
+
+def _publish_managed_outputs(staging_dir: Path, out_dir: Path, names: list[str]) -> None:
+    backup_dir = out_dir.parent / f".{out_dir.name}.bak-{os.getpid()}-{time.time_ns()}"
+    backed_up = False
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            dest = out_dir / name
+            if dest.exists():
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                os.replace(dest, backup_dir / name)
+                backed_up = True
+
+        for name in names:
+            src = staging_dir / name
+            if src.exists():
+                os.replace(src, out_dir / name)
+
+        if backed_up:
+            shutil.rmtree(backup_dir, ignore_errors=True)
+    except OSError:
+        if backed_up:
+            for name in names:
+                backup = backup_dir / name
+                dest = out_dir / name
+                if backup.exists():
+                    try:
+                        if dest.exists():
+                            dest.unlink()
+                        os.replace(backup, dest)
+                    except OSError:
+                        pass
+        raise
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def _run_experiment_export(args: argparse.Namespace) -> int:
     import csv
 
     from core.event_store import JsonlEventStore
-    from core.experiment_export import build_experiment_export
+    from core.experiment_export import (
+        HELP_CYCLES_CSV_FIELDS,
+        build_export_quality_report,
+        build_experiment_export,
+        build_file_sha256,
+    )
 
     input_path = Path(args.file)
     if not input_path.exists():
@@ -416,11 +546,53 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
         else:
             print(f"[EXPERIMENT_EXPORT] warning: --scoring path not found: {scoring_path}")
 
+    pack_path = getattr(args, "pack", None)
+    taxonomy_path = getattr(args, "taxonomy", None)
+    ui_map_path = getattr(args, "ui_map", None)
+    bios_to_ui_path = getattr(args, "bios_to_ui", None)
+    copy_raw_log = bool(getattr(args, "copy_raw_log", True))
+    raw_log_ref = "raw_events.jsonl" if copy_raw_log else str(input_path.resolve())
+
+    git_commit = getattr(args, "git_commit", None) or _current_git_commit()
+    git_dirty = _coerce_optional_bool(getattr(args, "git_dirty", None))
+    if git_dirty is None:
+        git_dirty = _current_git_dirty()
+
+    try:
+        raw_log_hash = build_file_sha256(input_path)
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to hash raw event log: {exc}")
+        return 1
+
     meta_overrides = {
+        "trial_id": getattr(args, "trial_id", None),
+        "study_id": getattr(args, "study_id", None),
         "participant_id": args.participant_id,
         "condition": args.condition,
         "group": args.group,
+        "experimenter_id": getattr(args, "experimenter_id", None),
         "questionnaire_ref": args.questionnaire,
+        "recording_ref": getattr(args, "recording_ref", None),
+        "git_commit": git_commit,
+        "git_dirty": git_dirty,
+        "pack_path": pack_path,
+        "pack_hash": _optional_file_sha256(pack_path),
+        "taxonomy_path": taxonomy_path,
+        "taxonomy_hash": _optional_file_sha256(taxonomy_path),
+        "ui_map_hash": _optional_file_sha256(ui_map_path),
+        "bios_to_ui_hash": _optional_file_sha256(bios_to_ui_path),
+        "model_provider": getattr(args, "model_provider", None),
+        "model_name": getattr(args, "model_name", None),
+        "vision_model_name": getattr(args, "vision_model_name", None),
+        "prompt_version": getattr(args, "prompt_version", None),
+        "prompt_hash": getattr(args, "prompt_hash", None),
+        "scenario_profile": getattr(args, "scenario_profile", None),
+        "dcs_mission": getattr(args, "dcs_mission", None),
+        "dcs_aircraft": getattr(args, "dcs_aircraft", None),
+        "vr_setup": getattr(args, "vr_setup", None),
+        "monitor_setup": getattr(args, "monitor_setup", None),
+        "raw_log_ref": raw_log_ref,
+        "raw_log_sha256": raw_log_hash,
         "experimenter_notes": args.notes,
     }
 
@@ -433,38 +605,56 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
             print(f"[EXPERIMENT_EXPORT] invalid participant_id: {exc}")
             return 1
         out_dir = out_dir / safe_id
-    try:
-        out_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        print(f"[EXPERIMENT_EXPORT] failed to create output directory: {exc}")
+    if getattr(args, "trial_id", None):
+        try:
+            safe_trial_id = _sanitize_export_slug(args.trial_id, field_name="trial_id")
+        except ValueError as exc:
+            print(f"[EXPERIMENT_EXPORT] invalid trial_id: {exc}")
+            return 1
+        out_dir = out_dir / safe_trial_id
+
+    managed_output_names = [
+        "session.json",
+        "summary.json",
+        "help_cycles.csv",
+        "raw_events.jsonl",
+        "quality_gate.json",
+    ]
+    managed_outputs = [out_dir / name for name in managed_output_names]
+    existing_outputs = [p for p in managed_outputs if p.exists()]
+    if existing_outputs and not bool(getattr(args, "overwrite", False)):
+        existing = ", ".join(str(p) for p in existing_outputs)
+        print(f"[EXPERIMENT_EXPORT] output already exists; pass --overwrite to replace: {existing}")
         return 1
 
-    # session.json
-    session_path = out_dir / "session.json"
-    try:
-        session_path.write_text(
-            json.dumps(export.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-    except OSError as exc:
-        print(f"[EXPERIMENT_EXPORT] failed to write session.json: {exc}")
+    preflight_report = build_export_quality_report(
+        export.meta,
+        events=events,
+        strict=bool(getattr(args, "strict", False)),
+        pack_path=pack_path,
+        taxonomy_path=taxonomy_path,
+        ui_map_path=ui_map_path,
+        bios_to_ui_path=bios_to_ui_path,
+        raw_log_copied=copy_raw_log,
+        expected_help_cycle_rows=None,
+        actual_help_cycle_rows=None,
+        help_cycle_csv_headers=None,
+    )
+    _print_quality_report(preflight_report)
+    if preflight_report.errors:
         return 1
-    print(f"[EXPERIMENT_EXPORT] wrote {session_path}")
 
-    # help_cycles.csv
-    if export.help_cycles:
-        csv_path = out_dir / "help_cycles.csv"
-        cycle_fields = [
-            "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
-            "fused_step_id", "fused_missing_conditions", "model_next_step_id",
-            "overlay_targets", "overlay_executed", "overlay_rejected",
-            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
-            "observability_status", "requires_visual_confirmation",
-            "scenario_profile",
-        ]
+    staging_dir = _new_export_staging_dir(out_dir)
+    try:
+        staging_dir.mkdir(parents=True, exist_ok=False)
+
+        if copy_raw_log:
+            shutil.copy2(input_path, staging_dir / "raw_events.jsonl")
+
+        # help_cycles.csv
+        csv_path = staging_dir / "help_cycles.csv"
         with csv_path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=cycle_fields, extrasaction="ignore")
+            writer = csv.DictWriter(f, fieldnames=HELP_CYCLES_CSV_FIELDS, extrasaction="ignore")
             writer.writeheader()
             for c in export.help_cycles:
                 row = c.to_dict()
@@ -472,19 +662,63 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
                 row["fused_missing_conditions"] = ";".join(c.fused_missing_conditions)
                 row["overlay_targets"] = ";".join(c.overlay_targets)
                 writer.writerow(row)
-        print(f"[EXPERIMENT_EXPORT] wrote {csv_path} ({len(export.help_cycles)} cycles)")
 
-    # summary.json
-    summary_path = out_dir / "summary.json"
-    try:
+        # summary.json
+        summary_path = staging_dir / "summary.json"
         summary_path.write_text(
             json.dumps(export.summary.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+
+        csv_headers, csv_rows = _read_csv_header_and_row_count(staging_dir / "help_cycles.csv")
+        final_report = build_export_quality_report(
+            export.meta,
+            events=events,
+            strict=bool(getattr(args, "strict", False)),
+            pack_path=pack_path,
+            taxonomy_path=taxonomy_path,
+            ui_map_path=ui_map_path,
+            bios_to_ui_path=bios_to_ui_path,
+            raw_log_copied=(staging_dir / "raw_events.jsonl").exists() if copy_raw_log else False,
+            expected_help_cycle_rows=len(export.help_cycles),
+            actual_help_cycle_rows=csv_rows,
+            help_cycle_csv_headers=csv_headers,
+        )
+        _print_quality_report(final_report)
+        if final_report.errors:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            return 1
+
+        export.quality_gate = final_report
+        quality_path = staging_dir / "quality_gate.json"
+        quality_path.write_text(
+            json.dumps(final_report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        # session.json
+        session_path = staging_dir / "session.json"
+        session_path.write_text(
+            json.dumps(export.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     except OSError as exc:
-        print(f"[EXPERIMENT_EXPORT] failed to write summary.json: {exc}")
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        print(f"[EXPERIMENT_EXPORT] failed to write staged export artifacts: {exc}")
         return 1
-    print(f"[EXPERIMENT_EXPORT] wrote {summary_path}")
+
+    try:
+        _publish_managed_outputs(staging_dir, out_dir, managed_output_names)
+    except OSError as exc:
+        print(f"[EXPERIMENT_EXPORT] failed to publish export artifacts: {exc}")
+        return 1
+
+    if copy_raw_log:
+        print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'raw_events.jsonl'}")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'help_cycles.csv'} ({len(export.help_cycles)} cycles)")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'summary.json'}")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'quality_gate.json'}")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'session.json'}")
 
     return 0
 
@@ -528,13 +762,47 @@ def main() -> int:
         help="Export runtime event log as study-ready experiment artifacts",
     )
     exp_export.add_argument("file", help="Event log JSONL")
+    exp_export.add_argument("--trial-id", default=None, help="Trial identifier")
+    exp_export.add_argument("--study-id", default=None, help="Study identifier")
     exp_export.add_argument("--participant-id", default=None, help="Participant identifier")
     exp_export.add_argument("--condition", default=None, help="Experimental condition (e.g. with_tutor, without_tutor)")
     exp_export.add_argument("--group", default=None, help="Participant group (e.g. novice, expert)")
+    exp_export.add_argument("--experimenter-id", default=None, help="Experimenter identifier")
     exp_export.add_argument("--questionnaire", default=None, help="Path to linked questionnaire YAML/JSON")
+    exp_export.add_argument("--recording-ref", default=None, help="Immutable recording reference for the trial")
     exp_export.add_argument("--notes", default=None, help="Free-text experimenter notes")
     exp_export.add_argument("--output-dir", default="artifacts/experiments", help="Output directory")
     exp_export.add_argument("--scoring", default=None, help="Optional scoring JSON to embed (from simtutor score)")
+    exp_export.add_argument("--pack", default="packs/fa18c_startup/pack.yaml", help="pack.yaml path")
+    exp_export.add_argument("--taxonomy", default="packs/fa18c_startup/taxonomy.yaml", help="taxonomy.yaml path")
+    exp_export.add_argument("--ui-map", default="packs/fa18c_startup/ui_map.yaml", help="ui_map.yaml path")
+    exp_export.add_argument("--bios-to-ui", default="packs/fa18c_startup/bios_to_ui.yaml", help="bios_to_ui.yaml path")
+    exp_export.add_argument("--model-provider", default=None, help="Model provider used for the trial")
+    exp_export.add_argument("--model-name", default=None, help="Text/help model name used for the trial")
+    exp_export.add_argument("--vision-model-name", default=None, help="Vision model name used for the trial")
+    exp_export.add_argument("--prompt-version", default=None, help="Prompt version label used for the trial")
+    exp_export.add_argument("--prompt-hash", default=None, help="Prompt hash used for the trial, when available")
+    exp_export.add_argument("--scenario-profile", default=None, help="Scenario profile used for the trial")
+    exp_export.add_argument("--dcs-mission", default=None, help="DCS mission file or immutable mission reference")
+    exp_export.add_argument("--dcs-aircraft", default=None, help="DCS aircraft/module used for the trial")
+    exp_export.add_argument("--vr-setup", default=None, help="VR setup description/reference")
+    exp_export.add_argument("--monitor-setup", default=None, help="Monitor/export setup description/reference")
+    exp_export.add_argument("--git-commit", default=None, help="Override detected git commit")
+    exp_export.add_argument(
+        "--git-dirty",
+        choices=["true", "false", "1", "0", "yes", "no"],
+        default=None,
+        help="Override detected git dirty flag",
+    )
+    exp_export.add_argument("--strict", action="store_true", help="Fail when critical export metadata/gates are missing")
+    exp_export.add_argument("--overwrite", action="store_true", help="Allow replacing an existing participant/trial export")
+    exp_export.add_argument(
+        "--no-copy-raw-log",
+        dest="copy_raw_log",
+        action="store_false",
+        help="Record the raw log reference without copying it into the export directory",
+    )
+    exp_export.set_defaults(copy_raw_log=True)
 
     sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
 

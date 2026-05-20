@@ -2,14 +2,22 @@
 End-to-end tests for experiment export pipeline.
 """
 
+import argparse
+import csv
+import hashlib
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
+import simtutor.__main__ as simtutor_cli
 from core.experiment_export import (
     SessionMeta,
     HelpCycleRecord,
+    build_export_quality_report,
     build_experiment_export,
+    build_file_sha256,
 )
+from simtutor.__main__ import _run_experiment_export
 
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -251,24 +259,58 @@ def _make_events_with_help_cycles() -> list[dict]:
 
 def test_session_meta_roundtrip():
     meta = SessionMeta(
+        trial_id="T01",
+        study_id="study-alpha",
         participant_id="P01",
         session_id="sess-1",
         condition="with_tutor",
         group="novice",
+        experimenter_id="E01",
         questionnaire_ref="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        git_commit="abc123",
+        git_dirty=False,
+        pack_path="packs/fa18c_startup/pack.yaml",
+        pack_hash="pack-sha",
+        taxonomy_path="packs/fa18c_startup/taxonomy.yaml",
+        taxonomy_hash="taxonomy-sha",
+        ui_map_hash="ui-map-sha",
+        bios_to_ui_hash="bios-ui-sha",
+        model_provider="stub",
+        model_name="ModelStub",
+        vision_model_name="VisionStub",
+        prompt_version="prompt-v1",
+        prompt_hash="prompt-sha",
+        scenario_profile="airfield",
+        dcs_mission="cold-start.miz",
+        dcs_aircraft="FA-18C",
+        vr_setup="Quest 3",
+        monitor_setup="native-viewports",
+        raw_log_ref="raw_events.jsonl",
+        raw_log_sha256="raw-sha",
         experimenter_notes="no issues",
         started_at="2026-05-09T10:00:00+00:00",
         ended_at="2026-05-09T10:30:00+00:00",
     )
     d = meta.to_dict()
+    assert d["trial_id"] == "T01"
+    assert d["study_id"] == "study-alpha"
     assert d["participant_id"] == "P01"
     assert d["condition"] == "with_tutor"
     assert d["questionnaire_ref"] == "questionnaires/P01_pre.yml"
+    assert d["recording_ref"] == "recordings/P01_T01.mp4"
+    assert d["git_dirty"] is False
+    assert d["pack_hash"] == "pack-sha"
+    assert d["raw_log_sha256"] == "raw-sha"
 
     reloaded = SessionMeta.from_dict(d)
+    assert reloaded.trial_id == "T01"
     assert reloaded.participant_id == "P01"
     assert reloaded.condition == "with_tutor"
     assert reloaded.questionnaire_ref == "questionnaires/P01_pre.yml"
+    assert reloaded.recording_ref == "recordings/P01_T01.mp4"
+    assert reloaded.git_dirty is False
+    assert reloaded.raw_log_ref == "raw_events.jsonl"
 
 
 def test_session_meta_from_partial():
@@ -435,3 +477,385 @@ def test_timeline_snapshot_fields():
         assert isinstance(snap.blocked_step_ids, list)
         # active_step_id may be None or str
         assert snap.active_step_id is None or isinstance(snap.active_step_id, str)
+
+
+def test_build_file_sha256(tmp_path: Path):
+    payload = b"experiment provenance\n"
+    path = tmp_path / "raw.jsonl"
+    path.write_bytes(payload)
+
+    assert build_file_sha256(path) == hashlib.sha256(payload).hexdigest()
+
+
+def test_quality_gate_strict_reports_missing_critical_metadata():
+    report = build_export_quality_report(
+        SessionMeta(participant_id="P01"),
+        events=[],
+        strict=True,
+        pack_path=None,
+        taxonomy_path=None,
+        raw_log_copied=False,
+        expected_help_cycle_rows=0,
+        actual_help_cycle_rows=None,
+        help_cycle_csv_headers=None,
+    )
+
+    assert report.passed is False
+    assert any("trial_id" in error for error in report.errors)
+    assert any("study_id" in error for error in report.errors)
+    assert any("raw_log" in error for error in report.errors)
+
+
+def test_quality_gate_strict_requires_model_prompt_and_dcs_metadata(tmp_path: Path):
+    root = _repo_root()
+    raw_log = tmp_path / "raw.jsonl"
+    raw_log.write_text("{}\n", encoding="utf-8")
+    meta = SessionMeta(
+        trial_id="T01",
+        study_id="study-alpha",
+        participant_id="P01",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id="E01",
+        questionnaire_ref="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        git_commit="abc123",
+        git_dirty=False,
+        pack_path=str(root / "packs/fa18c_startup/pack.yaml"),
+        pack_hash=build_file_sha256(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy_path=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        taxonomy_hash=build_file_sha256(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map_hash=build_file_sha256(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui_hash=build_file_sha256(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        raw_log_ref="raw_events.jsonl",
+        raw_log_sha256=build_file_sha256(raw_log),
+    )
+
+    report = build_export_quality_report(
+        meta,
+        events=[],
+        strict=True,
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        taxonomy_path=root / "packs/fa18c_startup/taxonomy.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        raw_log_copied=True,
+        expected_help_cycle_rows=0,
+        actual_help_cycle_rows=0,
+        help_cycle_csv_headers=[
+            "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
+            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
+            "fused_step_id", "fused_missing_conditions", "model_next_step_id",
+            "overlay_targets", "overlay_executed", "overlay_rejected",
+            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
+            "observability_status", "requires_visual_confirmation",
+            "scenario_profile",
+        ],
+    )
+
+    assert report.passed is False
+    assert any("model_provider" in error for error in report.errors)
+    assert any("prompt_version or prompt_hash" in error for error in report.errors)
+    assert any("dcs_mission" in error for error in report.errors)
+    assert any("vr_setup or monitor_setup" in error for error in report.errors)
+
+
+def test_quality_gate_rejects_hash_mismatch():
+    root = _repo_root()
+    meta = SessionMeta(
+        trial_id="T01",
+        study_id="study-alpha",
+        participant_id="P01",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id="E01",
+        questionnaire_ref="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        git_commit="abc123",
+        git_dirty=False,
+        pack_path=str(root / "packs/fa18c_startup/pack.yaml"),
+        pack_hash="wrong-pack-hash",
+        taxonomy_path=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        taxonomy_hash=build_file_sha256(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map_hash=build_file_sha256(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui_hash=build_file_sha256(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider="stub",
+        model_name="ModelStub",
+        vision_model_name="VisionStub",
+        prompt_version="prompt-v1",
+        scenario_profile="airfield",
+        dcs_mission="cold-start.miz",
+        dcs_aircraft="FA-18C",
+        vr_setup="Quest 3",
+        monitor_setup="native-viewports",
+        raw_log_ref="raw_events.jsonl",
+        raw_log_sha256="raw-sha",
+    )
+
+    report = build_export_quality_report(
+        meta,
+        events=[],
+        strict=True,
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        taxonomy_path=root / "packs/fa18c_startup/taxonomy.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        raw_log_copied=True,
+        expected_help_cycle_rows=0,
+        actual_help_cycle_rows=0,
+        help_cycle_csv_headers=[
+            "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
+            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
+            "fused_step_id", "fused_missing_conditions", "model_next_step_id",
+            "overlay_targets", "overlay_executed", "overlay_rejected",
+            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
+            "observability_status", "requires_visual_confirmation",
+            "scenario_profile",
+        ],
+    )
+
+    assert report.passed is False
+    assert any("pack_hash" in error and "does not match" in error for error in report.errors)
+
+
+def _write_jsonl(path: Path, events: list[dict]) -> None:
+    path.write_text(
+        "".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events),
+        encoding="utf-8",
+    )
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def test_experiment_export_cli_freezes_metadata_and_copies_raw_log(tmp_path: Path):
+    raw_log = tmp_path / "events.jsonl"
+    _write_jsonl(raw_log, _make_events_with_help_cycles())
+    output_dir = tmp_path / "exports"
+    root = _repo_root()
+
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P01",
+        trial_id="T01",
+        study_id="study-alpha",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id="E01",
+        questionnaire="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        notes="no issues",
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider="stub",
+        model_name="ModelStub",
+        vision_model_name="VisionStub",
+        prompt_version="prompt-v1",
+        prompt_hash=None,
+        scenario_profile="airfield",
+        dcs_mission="cold-start.miz",
+        dcs_aircraft="FA-18C",
+        vr_setup="Quest 3",
+        monitor_setup="native-viewports",
+        git_commit="abc123",
+        git_dirty=False,
+        strict=True,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P01" / "T01"
+    session = json.loads((trial_dir / "session.json").read_text(encoding="utf-8"))
+    meta = session["meta"]
+    assert meta["trial_id"] == "T01"
+    assert meta["study_id"] == "study-alpha"
+    assert meta["git_commit"] == "abc123"
+    assert meta["git_dirty"] is False
+    assert meta["pack_hash"] == build_file_sha256(root / "packs/fa18c_startup/pack.yaml")
+    assert meta["taxonomy_hash"] == build_file_sha256(root / "packs/fa18c_startup/taxonomy.yaml")
+    assert meta["ui_map_hash"] == build_file_sha256(root / "packs/fa18c_startup/ui_map.yaml")
+    assert meta["bios_to_ui_hash"] == build_file_sha256(root / "packs/fa18c_startup/bios_to_ui.yaml")
+    assert meta["raw_log_ref"] == "raw_events.jsonl"
+    assert meta["raw_log_sha256"] == build_file_sha256(raw_log)
+    assert build_file_sha256(trial_dir / "raw_events.jsonl") == build_file_sha256(raw_log)
+    assert session["quality_gate"]["passed"] is True
+
+    # A second export to the same participant/trial directory must not
+    # silently replace study data unless explicitly allowed.
+    assert _run_experiment_export(args) == 1
+    args.overwrite = True
+    assert _run_experiment_export(args) == 0
+
+
+def test_experiment_export_cli_overwrite_replaces_stale_managed_outputs(tmp_path: Path):
+    raw_log = tmp_path / "events.jsonl"
+    _write_jsonl(raw_log, _make_events_with_help_cycles())
+    output_dir = tmp_path / "exports"
+    root = _repo_root()
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P01",
+        trial_id="T01",
+        study_id="study-alpha",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id="E01",
+        questionnaire="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        notes="no issues",
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider="stub",
+        model_name="ModelStub",
+        vision_model_name="VisionStub",
+        prompt_version="prompt-v1",
+        prompt_hash=None,
+        scenario_profile="airfield",
+        dcs_mission="cold-start.miz",
+        dcs_aircraft="FA-18C",
+        vr_setup="Quest 3",
+        monitor_setup="native-viewports",
+        git_commit="abc123",
+        git_dirty=False,
+        strict=True,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+    assert _run_experiment_export(args) == 0
+
+    _write_jsonl(raw_log, [
+        {
+            "kind": "step_activated",
+            "payload": {"step_id": "S01"},
+            "t_wall": 0.0,
+            "session_id": "sess-no-help",
+        }
+    ])
+    args.overwrite = True
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P01" / "T01"
+    with (trial_dir / "help_cycles.csv").open("r", newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+    assert len(rows) == 1
+    assert build_file_sha256(trial_dir / "raw_events.jsonl") == build_file_sha256(raw_log)
+
+
+def test_experiment_export_cli_overwrite_preserves_old_export_when_preflight_fails(tmp_path: Path):
+    raw_log = tmp_path / "events.jsonl"
+    _write_jsonl(raw_log, _make_events_with_help_cycles())
+    output_dir = tmp_path / "exports"
+    root = _repo_root()
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P01",
+        trial_id="T01",
+        study_id="study-alpha",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id="E01",
+        questionnaire="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        notes="no issues",
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider="stub",
+        model_name="ModelStub",
+        vision_model_name="VisionStub",
+        prompt_version="prompt-v1",
+        prompt_hash=None,
+        scenario_profile="airfield",
+        dcs_mission="cold-start.miz",
+        dcs_aircraft="FA-18C",
+        vr_setup="Quest 3",
+        monitor_setup="native-viewports",
+        git_commit="abc123",
+        git_dirty=False,
+        strict=True,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P01" / "T01"
+    old_session = json.loads((trial_dir / "session.json").read_text(encoding="utf-8"))
+    args.overwrite = True
+    args.study_id = None
+    assert _run_experiment_export(args) == 1
+
+    preserved_session = json.loads((trial_dir / "session.json").read_text(encoding="utf-8"))
+    assert preserved_session["meta"]["study_id"] == old_session["meta"]["study_id"]
+    assert (trial_dir / "raw_events.jsonl").exists()
+
+
+def test_experiment_export_cli_overwrite_preserves_old_export_when_staging_write_fails(
+    tmp_path: Path,
+    monkeypatch,
+):
+    raw_log = tmp_path / "events.jsonl"
+    _write_jsonl(raw_log, _make_events_with_help_cycles())
+    output_dir = tmp_path / "exports"
+    root = _repo_root()
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P01",
+        trial_id="T01",
+        study_id="study-alpha",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id="E01",
+        questionnaire="questionnaires/P01_pre.yml",
+        recording_ref="recordings/P01_T01.mp4",
+        notes="no issues",
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider="stub",
+        model_name="ModelStub",
+        vision_model_name="VisionStub",
+        prompt_version="prompt-v1",
+        prompt_hash=None,
+        scenario_profile="airfield",
+        dcs_mission="cold-start.miz",
+        dcs_aircraft="FA-18C",
+        vr_setup="Quest 3",
+        monitor_setup="native-viewports",
+        git_commit="abc123",
+        git_dirty=False,
+        strict=True,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P01" / "T01"
+    old_session_text = (trial_dir / "session.json").read_text(encoding="utf-8")
+    old_raw_hash = build_file_sha256(trial_dir / "raw_events.jsonl")
+
+    def _fail_copy(*_args, **_kwargs):
+        raise OSError("simulated copy failure")
+
+    args.overwrite = True
+    monkeypatch.setattr(simtutor_cli.shutil, "copy2", _fail_copy)
+
+    assert _run_experiment_export(args) == 1
+    assert (trial_dir / "session.json").read_text(encoding="utf-8") == old_session_text
+    assert build_file_sha256(trial_dir / "raw_events.jsonl") == old_raw_hash
