@@ -287,13 +287,21 @@ def _make_events_with_action_timeline() -> list[dict]:
         },
         {
             "kind": "observation",
-            "source": "dcs_bios",
             "payload": {
-                "seq": 1,
-                "t_wall": 2.0,
+                "observation_id": "obs-action-001",
+                "timestamp": t1.isoformat(),
                 "source": "dcs_bios",
-                "bios": {"BATTERY_SW": 2},
-                "delta": {"BATTERY_SW": 2},
+                "payload": {
+                    "seq": 1,
+                    "t_wall": 2.0,
+                    "delta_summary": {
+                        "recent_key_changes_topk": [
+                            {"key": "BATTERY_SW", "value": 2, "ui_targets": ["battery_switch"]},
+                        ],
+                    },
+                    "recent_ui_targets": ["battery_switch"],
+                },
+                "metadata": {"seq": 1, "delta_count": 1},
             },
             "metadata": {"seq": 1, "delta_count": 1},
             "t_wall": 2.0,
@@ -644,14 +652,31 @@ def test_action_timeline_links_dcs_deltas_to_steps_and_help_cycles():
     assert unrelated.SecondsSinceLastHelp == 2.0
     assert unrelated.StepCompletedByThisEvent == "no"
     assert unrelated.GateViolationCandidate == "yes"
-    assert "unexpected_for_active_step" in unrelated.AutoCodingHint
+    assert "unexpected_for_active_step" in set(unrelated.AutoCodingHint.split(";"))
 
     unmapped = export.action_timeline[2]
     assert unmapped.RawKey == "EXPERIMENTAL_RAW_KEY"
     assert unmapped.RawValueAfter == "7"
     assert unmapped.MappedTarget == ""
     assert unmapped.CandidateStepID == ""
-    assert "unmapped_raw_key" in unmapped.AutoCodingHint
+    assert "unmapped_raw_key" in set(unmapped.AutoCodingHint.split(";"))
+
+
+def test_action_timeline_rejects_bios_mapping_with_unknown_ui_target():
+    root = _repo_root()
+    export_events = _make_events_with_action_timeline()
+
+    try:
+        build_experiment_export(
+            export_events,
+            pack_path=root / "packs/fa18c_startup/pack.yaml",
+            bios_to_ui_path=root / "tests/adapters/fixtures/bios_to_ui_bad_target.yaml",
+            ui_map_path=root / "tests/adapters/fixtures/ui_map_only_target.yaml",
+        )
+    except ValueError as exc:
+        assert "unknown ui target" in str(exc)
+    else:
+        raise AssertionError("expected invalid bios_to_ui mapping to fail")
 
 
 def test_action_timeline_record_serialization():
@@ -1053,6 +1078,63 @@ def test_experiment_export_cli_freezes_metadata_and_copies_raw_log(tmp_path: Pat
     assert _run_experiment_export(args) == 1
     args.overwrite = True
     assert _run_experiment_export(args) == 0
+
+
+def test_experiment_export_cli_writes_action_timeline_rows(tmp_path: Path):
+    raw_log = tmp_path / "events.jsonl"
+    _write_jsonl(raw_log, _make_events_with_action_timeline())
+    output_dir = tmp_path / "exports"
+    root = _repo_root()
+
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P01",
+        trial_id="T01",
+        study_id="study-alpha",
+        condition="with_tutor",
+        group="novice",
+        experimenter_id=None,
+        questionnaire=None,
+        recording_ref=None,
+        notes=None,
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider=None,
+        model_name=None,
+        vision_model_name=None,
+        prompt_version=None,
+        prompt_hash=None,
+        scenario_profile=None,
+        dcs_mission=None,
+        dcs_aircraft=None,
+        vr_setup=None,
+        monitor_setup=None,
+        git_commit="abc123",
+        git_dirty=False,
+        strict=False,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P01" / "T01"
+    with (trial_dir / "action_timeline.csv").open("r", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    assert [row["RawKey"] for row in rows] == ["BATTERY_SW", "APU_CONTROL_SW", "EXPERIMENTAL_RAW_KEY"]
+    assert rows[0]["MappedTarget"] == "battery_switch"
+    assert rows[0]["CandidateStepID"] == "S01"
+    assert rows[1]["SecondsSinceLastHelp"] == "2.0"
+    assert rows[1]["GateViolationCandidate"] == "yes"
+    assert "unexpected_for_active_step" in set(rows[1]["AutoCodingHint"].split(";"))
+    assert rows[2]["RawValueAfter"] == "7"
+    assert rows[2]["MappedTarget"] == ""
+    assert "unmapped_raw_key" in set(rows[2]["AutoCodingHint"].split(";"))
 
 
 def test_experiment_export_cli_overwrite_replaces_stale_managed_outputs(tmp_path: Path):

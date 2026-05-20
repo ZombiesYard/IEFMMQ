@@ -898,16 +898,24 @@ def _load_pack_steps_for_export(pack_path: str | Path | None) -> list[Mapping[st
 
 def _load_bios_to_ui_rules_for_export(
     bios_to_ui_path: str | Path | None,
+    ui_map_path: str | Path | None,
 ) -> dict[str, tuple[str, ...]]:
     if bios_to_ui_path is None:
         return {}
-    try:
-        bios_to_ui = _load_yaml_mapping(bios_to_ui_path)
-    except Exception:
-        return {}
+    allowed_targets: set[str] | None = None
+    if ui_map_path is not None:
+        ui_map = _load_yaml_mapping(ui_map_path)
+        cockpit_elements = ui_map.get("cockpit_elements")
+        if not isinstance(cockpit_elements, Mapping):
+            raise ValueError("ui_map.yaml missing cockpit_elements mapping")
+        allowed_targets = {
+            key for key in cockpit_elements.keys() if isinstance(key, str) and key
+        }
+
+    bios_to_ui = _load_yaml_mapping(bios_to_ui_path)
     mappings = bios_to_ui.get("mappings")
     if not isinstance(mappings, Mapping):
-        return {}
+        raise ValueError("bios_to_ui.yaml missing mappings")
 
     rules: dict[str, tuple[str, ...]] = {}
     for raw_key, raw_value in mappings.items():
@@ -929,6 +937,10 @@ def _load_bios_to_ui_rules_for_export(
         for target in targets:
             if target in seen:
                 continue
+            if allowed_targets is not None and target not in allowed_targets:
+                raise ValueError(
+                    f"bios_to_ui key {raw_key!r} references unknown ui target {target!r}"
+                )
             seen.add(target)
             ordered.append(target)
         rules[raw_key] = tuple(ordered)
@@ -1104,8 +1116,7 @@ def _event_source(ev: Mapping[str, Any]) -> str:
     source = _opt_str(ev.get("source"))
     if source:
         return source
-    payload = ev.get("payload")
-    if isinstance(payload, Mapping):
+    for payload in _event_payload_layers(ev):
         source = _opt_str(payload.get("source"))
         if source:
             return source
@@ -1117,30 +1128,48 @@ def _event_source(ev: Mapping[str, Any]) -> str:
     return ""
 
 
-def _extract_event_delta_items(ev: Mapping[str, Any]) -> list[tuple[str, Any]]:
+def _event_payload_layers(ev: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     payload = ev.get("payload")
     if not isinstance(payload, Mapping):
         return []
+    layers: list[Mapping[str, Any]] = [payload]
+    nested = payload.get("payload")
+    if isinstance(nested, Mapping):
+        layers.append(nested)
+    return layers
 
-    delta = payload.get("delta")
-    if isinstance(delta, Mapping):
-        return [(key, value) for key, value in delta.items() if isinstance(key, str) and key]
 
-    delta_summary = payload.get("delta_summary")
-    if not isinstance(delta_summary, Mapping):
-        return []
-    recent = delta_summary.get("recent_key_changes_topk")
-    if not isinstance(recent, list):
-        return []
+def _extract_event_delta_items(ev: Mapping[str, Any]) -> list[tuple[str, Any]]:
+    for payload in reversed(_event_payload_layers(ev)):
+        delta = payload.get("delta")
+        if isinstance(delta, Mapping):
+            return [(key, value) for key, value in delta.items() if isinstance(key, str) and key]
 
-    items: list[tuple[str, Any]] = []
-    for row in recent:
-        if not isinstance(row, Mapping):
+        delta_summary = payload.get("delta_summary")
+        if not isinstance(delta_summary, Mapping):
             continue
-        key = row.get("key")
-        if isinstance(key, str) and key:
-            items.append((key, row.get("value")))
-    return items
+        recent = delta_summary.get("recent_key_changes_topk")
+        if not isinstance(recent, list):
+            continue
+
+        items: list[tuple[str, Any]] = []
+        for row in recent:
+            if not isinstance(row, Mapping):
+                continue
+            key = row.get("key")
+            if isinstance(key, str) and key:
+                items.append((key, row.get("value")))
+        if items:
+            return items
+    return []
+
+
+def _event_bios_map(ev: Mapping[str, Any]) -> Mapping[str, Any]:
+    for payload in reversed(_event_payload_layers(ev)):
+        bios = payload.get("bios")
+        if isinstance(bios, Mapping):
+            return bios
+    return {}
 
 
 def _candidate_steps_for_targets(
@@ -1231,8 +1260,9 @@ def _build_action_timeline(
     help_cycles: Sequence[HelpCycleRecord],
     pack_steps: Sequence[Mapping[str, Any]],
     bios_to_ui_path: str | Path | None,
+    ui_map_path: str | Path | None,
 ) -> list[ActionTimelineRecord]:
-    bios_to_ui = _load_bios_to_ui_rules_for_export(bios_to_ui_path)
+    bios_to_ui = _load_bios_to_ui_rules_for_export(bios_to_ui_path, ui_map_path)
     step_ids_by_target = _build_step_targets_index(pack_steps)
     rows: list[ActionTimelineRecord] = []
     active_step_id = ""
@@ -1240,8 +1270,6 @@ def _build_action_timeline(
 
     for event_index, ev in enumerate(events):
         kind = ev.get("kind") or ev.get("type") or ""
-        payload = ev.get("payload")
-        payload_map = payload if isinstance(payload, Mapping) else {}
 
         if kind == "step_activated":
             active_step_id = _event_step_id(ev) or active_step_id
@@ -1252,11 +1280,9 @@ def _build_action_timeline(
 
         delta_items = _extract_event_delta_items(ev)
         if not delta_items:
-            bios = payload_map.get("bios")
-            if isinstance(bios, Mapping):
-                for key, value in bios.items():
-                    if isinstance(key, str) and key:
-                        last_values[key] = value
+            for key, value in _event_bios_map(ev).items():
+                if isinstance(key, str) and key:
+                    last_values[key] = value
             continue
 
         t_wall = _event_wall_time(ev)
@@ -1267,8 +1293,7 @@ def _build_action_timeline(
         source = _event_source(ev)
         timestamp = _opt_str(ev.get("timestamp")) or ""
 
-        bios = payload_map.get("bios")
-        bios_map = bios if isinstance(bios, Mapping) else {}
+        bios_map = _event_bios_map(ev)
 
         for raw_key, raw_after in delta_items:
             raw_before = last_values.get(raw_key)
@@ -1523,6 +1548,7 @@ def build_experiment_export(
         help_cycles=help_cycles,
         pack_steps=pack_steps,
         bios_to_ui_path=bios_to_ui_path,
+        ui_map_path=ui_map_path,
     )
     step_coding = _build_step_coding(
         events,
