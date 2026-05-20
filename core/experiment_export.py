@@ -60,12 +60,56 @@ EXPECTED_PACK_STEP_IDS = [f"S{i:02d}" for i in range(1, 34)]
 
 HELP_CYCLES_CSV_FIELDS = [
     "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-    "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
-    "fused_step_id", "fused_missing_conditions", "model_next_step_id",
+    "vision_used", "vision_status", "vision_fact_status", "vision_fallback_reason", "sync_delta_ms",
+    "frame_ids", "layout_id", "fused_step_id", "fused_missing_conditions", "model_next_step_id",
     "overlay_targets", "overlay_executed", "overlay_rejected",
     "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
+    "fallback_overlay_reason", "response_mapping_failure_codes",
     "observability_status", "requires_visual_confirmation",
     "scenario_profile",
+]
+
+STEP_CODING_CSV_FIELDS = [
+    "ParticipantID",
+    "Condition",
+    "TrialID",
+    "StepID",
+    "StepTitle",
+    "Phase",
+    "Critical",
+    "Performed",
+    "Completed",
+    "FirstHelpTime_sec",
+    "HelpCount",
+    "FirstOverlayTargets",
+    "LastOverlayTargets",
+    "FirstFusedStepID",
+    "LastFusedStepID",
+    "EvidenceRefs",
+    "Error_OM",
+    "Error_CO",
+    "Error_OR",
+    "Error_PA",
+    "Error_SV",
+    "CoderNotes",
+    "AutoCodingNotes",
+]
+
+TRIAL_SUMMARY_CSV_FIELDS = [
+    "ParticipantID",
+    "Condition",
+    "TrialID",
+    "Completed",
+    "TaskTime_sec",
+    "HelpRequests",
+    "LLMTriggers",
+    "VLMCalls",
+    "OverlayExecuted",
+    "OverlayRejected",
+    "FallbackCount",
+    "CriticalStepsCompleted",
+    "TotalStepsCompleted",
+    "StepCompletionAccuracy",
 ]
 
 CRITICAL_EXPORT_META_FIELDS = [
@@ -434,6 +478,57 @@ class HelpCycleRecord:
         return asdict(self)
 
 
+@dataclass
+class StepCodingRecord:
+    ParticipantID: str = ""
+    Condition: str = ""
+    TrialID: str = ""
+    StepID: str = ""
+    StepTitle: str = ""
+    Phase: str = ""
+    Critical: str = ""
+    Performed: str = ""
+    Completed: str = ""
+    FirstHelpTime_sec: float | None = None
+    HelpCount: int = 0
+    FirstOverlayTargets: str = ""
+    LastOverlayTargets: str = ""
+    FirstFusedStepID: str = ""
+    LastFusedStepID: str = ""
+    EvidenceRefs: str = ""
+    Error_OM: str = ""
+    Error_CO: str = ""
+    Error_OR: str = ""
+    Error_PA: str = ""
+    Error_SV: str = ""
+    CoderNotes: str = ""
+    AutoCodingNotes: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class TrialSummaryRecord:
+    ParticipantID: str = ""
+    Condition: str = ""
+    TrialID: str = ""
+    Completed: str = ""
+    TaskTime_sec: float | None = None
+    HelpRequests: int = 0
+    LLMTriggers: int = 0
+    VLMCalls: int = 0
+    OverlayExecuted: int = 0
+    OverlayRejected: int = 0
+    FallbackCount: int = 0
+    CriticalStepsCompleted: int = 0
+    TotalStepsCompleted: int = 0
+    StepCompletionAccuracy: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 # ── session timeline snapshot ──────────────────────────────────────────
 
 
@@ -458,6 +553,8 @@ class ExperimentExport:
     meta: SessionMeta = field(default_factory=SessionMeta)
     summary: InteractionMetrics = field(default_factory=InteractionMetrics)
     help_cycles: list[HelpCycleRecord] = field(default_factory=list)
+    step_coding: list[StepCodingRecord] = field(default_factory=list)
+    trial_summary: list[TrialSummaryRecord] = field(default_factory=list)
     scoring: dict[str, Any] | None = None
     timeline: list[TimelineSnapshot] = field(default_factory=list)
     quality_gate: ExportQualityReport | None = None
@@ -467,6 +564,8 @@ class ExperimentExport:
             "meta": self.meta.to_dict(),
             "summary": self.summary.to_dict(),
             "help_cycles": [c.to_dict() for c in self.help_cycles],
+            "step_coding": [c.to_dict() for c in self.step_coding],
+            "trial_summary": [s.to_dict() for s in self.trial_summary],
             "scoring": self.scoring,
             "timeline": [t.to_dict() for t in self.timeline],
             "quality_gate": self.quality_gate.to_dict() if self.quality_gate is not None else None,
@@ -726,6 +825,258 @@ def _build_timeline(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]
     return snapshots
 
 
+def _load_pack_steps_for_export(pack_path: str | Path | None) -> list[Mapping[str, Any]]:
+    if pack_path is None:
+        return []
+    try:
+        pack = _load_yaml_mapping(pack_path)
+    except Exception:
+        return []
+    steps = pack.get("steps")
+    if not isinstance(steps, list):
+        return []
+    return [step for step in steps if isinstance(step, Mapping)]
+
+
+def _step_title(step: Mapping[str, Any]) -> str:
+    for key in ("title", "name", "short_title", "label"):
+        value = _opt_str(step.get(key))
+        if value:
+            return value
+    conditions = step.get("completion_conditions")
+    if isinstance(conditions, list):
+        titles = [item.strip() for item in conditions if isinstance(item, str) and item.strip()]
+        if titles:
+            return " ".join(titles)
+    prompts = step.get("tutor_prompts")
+    if isinstance(prompts, list):
+        for prompt in prompts:
+            value = _opt_str(prompt)
+            if value:
+                return value
+    return _opt_str(step.get("id")) or ""
+
+
+def _yes_no(value: bool) -> str:
+    return "yes" if value else "no"
+
+
+def _event_step_id(ev: Mapping[str, Any]) -> str | None:
+    payload = ev.get("payload")
+    if isinstance(payload, Mapping):
+        step_id = _opt_str(payload.get("step_id"))
+        if step_id:
+            return step_id
+    return _opt_str(ev.get("step_id"))
+
+
+def _event_wall_time(ev: Mapping[str, Any]) -> float | None:
+    payload = ev.get("payload")
+    if isinstance(payload, Mapping):
+        t_wall = _opt_float(payload.get("t_wall"))
+        if t_wall is not None:
+            return t_wall
+    return _opt_float(ev.get("t_wall"))
+
+
+def _join_csv_values(values: Sequence[str]) -> str:
+    return ";".join(value for value in values if value)
+
+
+def _record_text(value: str | None) -> str:
+    return value or ""
+
+
+def _help_cycle_matches_step(cycle: HelpCycleRecord, step_id: str) -> bool:
+    cycle_step_id = cycle.fused_step_id or cycle.model_next_step_id
+    return cycle_step_id == step_id
+
+
+def _build_step_coding(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    meta: SessionMeta,
+    help_cycles: Sequence[HelpCycleRecord],
+    pack_steps: Sequence[Mapping[str, Any]],
+) -> list[StepCodingRecord]:
+    completed_steps: set[str] = set()
+    activated_steps: set[str] = set()
+    completed_event_seen: set[str] = set()
+    activated_event_seen: set[str] = set()
+
+    for ev in events:
+        kind = ev.get("kind") or ev.get("type") or ""
+        sid = _event_step_id(ev)
+        if not sid:
+            continue
+        if kind == "step_activated":
+            activated_steps.add(sid)
+            activated_event_seen.add(sid)
+        elif kind == "step_completed":
+            completed_steps.add(sid)
+            completed_event_seen.add(sid)
+
+    rows: list[StepCodingRecord] = []
+    for step in pack_steps:
+        step_id = _opt_str(step.get("id"))
+        if not step_id:
+            continue
+        cycles = [cycle for cycle in help_cycles if _help_cycle_matches_step(cycle, step_id)]
+        completed = step_id in completed_steps
+        performed = completed or step_id in activated_steps or bool(cycles)
+
+        evidence_refs: list[str] = []
+        if step_id in activated_event_seen:
+            evidence_refs.append("step_activated")
+        if step_id in completed_event_seen:
+            evidence_refs.append("step_completed")
+        for cycle in cycles:
+            evidence_refs.append(f"help_cycle:{cycle.help_cycle_id}")
+            if cycle.frame_ids:
+                evidence_refs.append("frames:" + _join_csv_values(cycle.frame_ids))
+
+        auto_notes: list[str] = ["human_error_columns_blank"]
+        if completed:
+            auto_notes.append("completed_from_step_completed")
+        elif performed:
+            auto_notes.append("performed_inferred_from_step_or_help_evidence")
+        else:
+            auto_notes.append("no_step_evidence_found")
+
+        first_cycle = cycles[0] if cycles else None
+        last_cycle = cycles[-1] if cycles else None
+
+        rows.append(
+            StepCodingRecord(
+                ParticipantID=meta.participant_id,
+                Condition=meta.condition,
+                TrialID=meta.trial_id,
+                StepID=step_id,
+                StepTitle=_step_title(step),
+                Phase=_opt_str(step.get("phase")) or "",
+                Critical=_yes_no(_opt_bool(step.get("critical")) is True),
+                Performed=_yes_no(performed),
+                Completed=_yes_no(completed),
+                FirstHelpTime_sec=first_cycle.trigger_wall_s if first_cycle is not None else None,
+                HelpCount=len(cycles),
+                FirstOverlayTargets=_join_csv_values(first_cycle.overlay_targets) if first_cycle is not None else "",
+                LastOverlayTargets=_join_csv_values(last_cycle.overlay_targets) if last_cycle is not None else "",
+                FirstFusedStepID=_record_text(first_cycle.fused_step_id) if first_cycle is not None else "",
+                LastFusedStepID=_record_text(last_cycle.fused_step_id) if last_cycle is not None else "",
+                EvidenceRefs=_join_csv_values(evidence_refs),
+                AutoCodingNotes=_join_csv_values(auto_notes),
+            )
+        )
+    return rows
+
+
+def _task_time_seconds(events: Sequence[Mapping[str, Any]]) -> float | None:
+    times = [t for ev in events if (t := _event_wall_time(ev)) is not None]
+    if not times:
+        return None
+    return max(times) - min(times)
+
+
+def _merged_event_metadata(ev: Mapping[str, Any]) -> dict[str, Any]:
+    metadata = ev.get("metadata") if isinstance(ev.get("metadata"), Mapping) else {}
+    payload = ev.get("payload")
+    payload_metadata = (
+        payload.get("metadata")
+        if isinstance(payload, Mapping) and isinstance(payload.get("metadata"), Mapping)
+        else {}
+    )
+    return {**metadata, **payload_metadata}
+
+
+def _event_help_cycle_id(ev: Mapping[str, Any], metadata: Mapping[str, Any]) -> str | None:
+    help_cycle_id = _opt_str(metadata.get("help_cycle_id"))
+    if help_cycle_id:
+        return help_cycle_id
+    payload = ev.get("payload")
+    if isinstance(payload, Mapping):
+        help_cycle_id = _opt_str(payload.get("help_cycle_id"))
+        if help_cycle_id:
+            return help_cycle_id
+    return _opt_str(ev.get("related_id"))
+
+
+def _count_vlm_calls(
+    events: Sequence[Mapping[str, Any]],
+    help_cycles: Sequence[HelpCycleRecord],
+) -> int:
+    saw_vlm_status = False
+    called_cycle_ids: set[str] = set()
+    called_without_cycle_id = 0
+    for ev in events:
+        metadata = _merged_event_metadata(ev)
+        status = metadata.get("vlm_call_status")
+        if not isinstance(status, str):
+            continue
+        saw_vlm_status = True
+        if status != "called":
+            continue
+        help_cycle_id = _event_help_cycle_id(ev, metadata)
+        if help_cycle_id:
+            called_cycle_ids.add(help_cycle_id)
+        else:
+            called_without_cycle_id += 1
+
+    if saw_vlm_status:
+        return len(called_cycle_ids) + called_without_cycle_id
+
+    vision_fact_observations = sum(
+        1
+        for ev in events
+        if _merged_event_metadata(ev).get("observation_kind") == "vision_fact"
+    )
+    if vision_fact_observations:
+        return vision_fact_observations
+
+    return sum(1 for cycle in help_cycles if cycle.vision_used is True)
+
+
+def _build_trial_summary(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    meta: SessionMeta,
+    summary: InteractionMetrics,
+    help_cycles: Sequence[HelpCycleRecord],
+    step_coding: Sequence[StepCodingRecord],
+) -> list[TrialSummaryRecord]:
+    if not step_coding:
+        return []
+
+    total_steps_completed = sum(1 for row in step_coding if row.Completed == "yes")
+    critical_steps_completed = sum(
+        1 for row in step_coding if row.Critical == "yes" and row.Completed == "yes"
+    )
+    all_completed = total_steps_completed == len(step_coding)
+    fallback_count = sum(
+        1
+        for cycle in help_cycles
+        if cycle.fallback_overlay_used is True or cycle.generation_mode == "fallback"
+    )
+
+    return [
+        TrialSummaryRecord(
+            ParticipantID=meta.participant_id,
+            Condition=meta.condition,
+            TrialID=meta.trial_id,
+            Completed=_yes_no(all_completed),
+            TaskTime_sec=_task_time_seconds(events),
+            HelpRequests=summary.help_requests,
+            LLMTriggers=summary.llm_triggers,
+            VLMCalls=_count_vlm_calls(events, help_cycles),
+            OverlayExecuted=sum(cycle.overlay_executed for cycle in help_cycles),
+            OverlayRejected=sum(cycle.overlay_rejected for cycle in help_cycles),
+            FallbackCount=fallback_count,
+            CriticalStepsCompleted=critical_steps_completed,
+            TotalStepsCompleted=total_steps_completed,
+            StepCompletionAccuracy=round(total_steps_completed / len(step_coding), 6),
+        )
+    ]
+
+
 # ── main entry point ───────────────────────────────────────────────────
 
 
@@ -734,6 +1085,7 @@ def build_experiment_export(
     *,
     meta_overrides: Mapping[str, Any] | None = None,
     scoring: Mapping[str, Any] | None = None,
+    pack_path: str | Path | None = None,
 ) -> ExperimentExport:
     """Build a complete experiment export from a list of event dicts."""
 
@@ -779,6 +1131,20 @@ def build_experiment_export(
     ]
 
     summary = compute_interaction_metrics(events)
+    pack_steps = _load_pack_steps_for_export(pack_path)
+    step_coding = _build_step_coding(
+        events,
+        meta=meta,
+        help_cycles=help_cycles,
+        pack_steps=pack_steps,
+    )
+    trial_summary = _build_trial_summary(
+        events,
+        meta=meta,
+        summary=summary,
+        help_cycles=help_cycles,
+        step_coding=step_coding,
+    )
 
     raw_timeline = _build_timeline(events)
     timeline = [
@@ -797,6 +1163,8 @@ def build_experiment_export(
         meta=meta,
         summary=summary,
         help_cycles=help_cycles,
+        step_coding=step_coding,
+        trial_summary=trial_summary,
         scoring=dict(scoring) if isinstance(scoring, Mapping) else None,
         timeline=timeline,
     )
@@ -806,9 +1174,13 @@ __all__ = [
     "SessionMeta",
     "ExportQualityReport",
     "HelpCycleRecord",
+    "StepCodingRecord",
+    "TrialSummaryRecord",
     "TimelineSnapshot",
     "ExperimentExport",
     "HELP_CYCLES_CSV_FIELDS",
+    "STEP_CODING_CSV_FIELDS",
+    "TRIAL_SUMMARY_CSV_FIELDS",
     "build_export_quality_report",
     "build_experiment_export",
     "build_file_sha256",

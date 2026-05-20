@@ -519,6 +519,8 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     from core.event_store import JsonlEventStore
     from core.experiment_export import (
         HELP_CYCLES_CSV_FIELDS,
+        STEP_CODING_CSV_FIELDS,
+        TRIAL_SUMMARY_CSV_FIELDS,
         build_export_quality_report,
         build_experiment_export,
         build_file_sha256,
@@ -596,7 +598,12 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
         "experimenter_notes": args.notes,
     }
 
-    export = build_experiment_export(events, meta_overrides=meta_overrides, scoring=scoring)
+    export = build_experiment_export(
+        events,
+        meta_overrides=meta_overrides,
+        scoring=scoring,
+        pack_path=pack_path,
+    )
     out_dir = Path(args.output_dir)
     if args.participant_id:
         try:
@@ -617,6 +624,8 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
         "session.json",
         "summary.json",
         "help_cycles.csv",
+        "step_coding.csv",
+        "trial_summary.csv",
         "raw_events.jsonl",
         "quality_gate.json",
     ]
@@ -659,9 +668,27 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
             for c in export.help_cycles:
                 row = c.to_dict()
                 # flatten list fields for CSV
+                row["frame_ids"] = ";".join(c.frame_ids)
                 row["fused_missing_conditions"] = ";".join(c.fused_missing_conditions)
                 row["overlay_targets"] = ";".join(c.overlay_targets)
+                row["response_mapping_failure_codes"] = ";".join(c.response_mapping_failure_codes)
                 writer.writerow(row)
+
+        # step_coding.csv
+        step_coding_path = staging_dir / "step_coding.csv"
+        with step_coding_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=STEP_CODING_CSV_FIELDS, extrasaction="ignore")
+            writer.writeheader()
+            for row in export.step_coding:
+                writer.writerow(row.to_dict())
+
+        # trial_summary.csv
+        trial_summary_path = staging_dir / "trial_summary.csv"
+        with trial_summary_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=TRIAL_SUMMARY_CSV_FIELDS, extrasaction="ignore")
+            writer.writeheader()
+            for row in export.trial_summary:
+                writer.writerow(row.to_dict())
 
         # summary.json
         summary_path = staging_dir / "summary.json"
@@ -716,6 +743,8 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     if copy_raw_log:
         print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'raw_events.jsonl'}")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'help_cycles.csv'} ({len(export.help_cycles)} cycles)")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'step_coding.csv'} ({len(export.step_coding)} steps)")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'trial_summary.csv'} ({len(export.trial_summary)} trials)")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'summary.json'}")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'quality_gate.json'}")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'session.json'}")

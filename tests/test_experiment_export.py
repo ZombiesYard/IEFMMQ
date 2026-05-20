@@ -11,8 +11,11 @@ from pathlib import Path
 
 import simtutor.__main__ as simtutor_cli
 from core.experiment_export import (
+    HELP_CYCLES_CSV_FIELDS,
     SessionMeta,
     HelpCycleRecord,
+    STEP_CODING_CSV_FIELDS,
+    TRIAL_SUMMARY_CSV_FIELDS,
     build_export_quality_report,
     build_experiment_export,
     build_file_sha256,
@@ -322,13 +325,16 @@ def test_session_meta_from_partial():
 
 def test_build_export_with_help_cycles():
     events = _make_events_with_help_cycles()
+    root = _repo_root()
     export = build_experiment_export(
         events,
         meta_overrides={
+            "trial_id": "T01",
             "participant_id": "P01",
             "condition": "with_tutor",
             "group": "novice",
         },
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
     )
 
     # meta
@@ -391,8 +397,173 @@ def test_build_export_with_help_cycles():
     assert "meta" in d
     assert "summary" in d
     assert "help_cycles" in d
+    assert "step_coding" in d
+    assert "trial_summary" in d
     assert "scoring" in d
     assert "timeline" in d
+
+
+def test_build_export_includes_study_ready_tables():
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_events_with_help_cycles(),
+        meta_overrides={
+            "trial_id": "T01",
+            "participant_id": "P01",
+            "condition": "with_tutor",
+        },
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+    )
+
+    assert len(export.step_coding) == 33
+    assert [row.StepID for row in export.step_coding][:3] == ["S01", "S02", "S03"]
+    assert [row.StepID for row in export.step_coding][-1] == "S33"
+
+    s01 = export.step_coding[0]
+    assert s01.ParticipantID == "P01"
+    assert s01.Condition == "with_tutor"
+    assert s01.TrialID == "T01"
+    assert s01.Phase == "P1"
+    assert s01.Critical == "yes"
+    assert s01.Performed == "yes"
+    assert s01.Completed == "yes"
+    assert s01.FirstHelpTime_sec == 5.0
+    assert s01.HelpCount == 1
+    assert s01.FirstOverlayTargets == "battery_switch"
+    assert s01.LastOverlayTargets == "battery_switch"
+    assert s01.FirstFusedStepID == "S01"
+    assert s01.LastFusedStepID == "S01"
+    assert "help_cycle:cycle-aaa-111" in s01.EvidenceRefs
+    assert s01.Error_OM == ""
+    assert s01.Error_CO == ""
+    assert s01.CoderNotes == ""
+
+    s02 = export.step_coding[1]
+    assert s02.Performed == "yes"
+    assert s02.Completed == "no"
+    assert s02.HelpCount == 1
+    assert s02.FirstHelpTime_sec == 12.0
+    assert s02.FirstOverlayTargets == "left_mdi_brightness_selector"
+
+    s33 = export.step_coding[-1]
+    assert s33.Performed == "no"
+    assert s33.Completed == "no"
+    assert s33.HelpCount == 0
+
+    assert len(export.trial_summary) == 1
+    trial = export.trial_summary[0]
+    assert trial.ParticipantID == "P01"
+    assert trial.Condition == "with_tutor"
+    assert trial.TrialID == "T01"
+    assert trial.Completed == "no"
+    assert trial.TaskTime_sec == 12.5
+    assert trial.HelpRequests == 2
+    assert trial.OverlayExecuted == 1
+    assert trial.OverlayRejected == 1
+    assert trial.FallbackCount == 1
+    assert trial.CriticalStepsCompleted == 1
+    assert trial.TotalStepsCompleted == 1
+    assert trial.StepCompletionAccuracy == 0.030303
+
+
+def test_study_ready_csv_contract_fields_are_frozen():
+    assert HELP_CYCLES_CSV_FIELDS == [
+        "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
+        "vision_used", "vision_status", "vision_fact_status", "vision_fallback_reason", "sync_delta_ms",
+        "frame_ids", "layout_id", "fused_step_id", "fused_missing_conditions", "model_next_step_id",
+        "overlay_targets", "overlay_executed", "overlay_rejected",
+        "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
+        "fallback_overlay_reason", "response_mapping_failure_codes",
+        "observability_status", "requires_visual_confirmation",
+        "scenario_profile",
+    ]
+    assert STEP_CODING_CSV_FIELDS == [
+        "ParticipantID", "Condition", "TrialID", "StepID", "StepTitle", "Phase", "Critical",
+        "Performed", "Completed", "FirstHelpTime_sec", "HelpCount", "FirstOverlayTargets",
+        "LastOverlayTargets", "FirstFusedStepID", "LastFusedStepID", "EvidenceRefs",
+        "Error_OM", "Error_CO", "Error_OR", "Error_PA", "Error_SV", "CoderNotes",
+        "AutoCodingNotes",
+    ]
+    assert TRIAL_SUMMARY_CSV_FIELDS == [
+        "ParticipantID", "Condition", "TrialID", "Completed", "TaskTime_sec", "HelpRequests",
+        "LLMTriggers", "VLMCalls", "OverlayExecuted", "OverlayRejected", "FallbackCount",
+        "CriticalStepsCompleted", "TotalStepsCompleted", "StepCompletionAccuracy",
+    ]
+
+
+def test_step_coding_uses_fused_step_as_help_cycle_owner():
+    events = _make_events_with_help_cycles()
+    first_response = events[4]["payload"]["metadata"]["help_response"]
+    first_response["next"]["step_id"] = "S02"
+    root = _repo_root()
+
+    export = build_experiment_export(
+        events,
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+    )
+
+    s01 = export.step_coding[0]
+    s02 = export.step_coding[1]
+    assert s01.HelpCount == 1
+    assert s01.FirstHelpTime_sec == 5.0
+    assert s02.HelpCount == 1
+    assert s02.FirstHelpTime_sec == 12.0
+
+
+def test_step_coding_accepts_top_level_step_id_events(tmp_path: Path):
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "steps:\n"
+        "  - id: S01\n"
+        "    phase: P1\n"
+        "    critical: \"false\"\n"
+        "    completion_conditions: [Battery on.]\n",
+        encoding="utf-8",
+    )
+    export = build_experiment_export(
+        [
+            {"type": "step_activated", "step_id": "S01", "t_wall": 0.0},
+            {"type": "step_completed", "step_id": "S01", "t_wall": 4.0},
+        ],
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "with_tutor"},
+        pack_path=pack,
+    )
+
+    assert len(export.step_coding) == 1
+    assert export.step_coding[0].Performed == "yes"
+    assert export.step_coding[0].Completed == "yes"
+    assert export.step_coding[0].Critical == "no"
+    assert export.trial_summary[0].Completed == "yes"
+
+
+def test_trial_summary_counts_vlm_calls_once_per_help_cycle():
+    events = _make_events_with_help_cycles()
+    events[9]["metadata"]["vlm_call_status"] = "called"
+    events[10]["payload"]["metadata"]["vlm_call_status"] = "called"
+    root = _repo_root()
+
+    export = build_experiment_export(
+        events,
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+    )
+
+    assert export.trial_summary[0].VLMCalls == 1
+
+
+def test_trial_summary_honors_explicit_non_called_vlm_status():
+    events = _make_events_with_help_cycles()
+    events[4]["payload"]["metadata"]["vlm_call_status"] = "not_required"
+    root = _repo_root()
+
+    export = build_experiment_export(
+        events,
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+    )
+
+    assert export.trial_summary[0].VLMCalls == 0
 
 
 def test_build_export_no_help_cycles():
@@ -542,15 +713,7 @@ def test_quality_gate_strict_requires_model_prompt_and_dcs_metadata(tmp_path: Pa
         raw_log_copied=True,
         expected_help_cycle_rows=0,
         actual_help_cycle_rows=0,
-        help_cycle_csv_headers=[
-            "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
-            "fused_step_id", "fused_missing_conditions", "model_next_step_id",
-            "overlay_targets", "overlay_executed", "overlay_rejected",
-            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
-            "observability_status", "requires_visual_confirmation",
-            "scenario_profile",
-        ],
+        help_cycle_csv_headers=HELP_CYCLES_CSV_FIELDS,
     )
 
     assert report.passed is False
@@ -603,15 +766,7 @@ def test_quality_gate_rejects_hash_mismatch():
         raw_log_copied=True,
         expected_help_cycle_rows=0,
         actual_help_cycle_rows=0,
-        help_cycle_csv_headers=[
-            "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-            "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
-            "fused_step_id", "fused_missing_conditions", "model_next_step_id",
-            "overlay_targets", "overlay_executed", "overlay_rejected",
-            "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
-            "observability_status", "requires_visual_confirmation",
-            "scenario_profile",
-        ],
+        help_cycle_csv_headers=HELP_CYCLES_CSV_FIELDS,
     )
 
     assert report.passed is False
@@ -686,6 +841,31 @@ def test_experiment_export_cli_freezes_metadata_and_copies_raw_log(tmp_path: Pat
     assert meta["raw_log_sha256"] == build_file_sha256(raw_log)
     assert build_file_sha256(trial_dir / "raw_events.jsonl") == build_file_sha256(raw_log)
     assert session["quality_gate"]["passed"] is True
+    assert (trial_dir / "step_coding.csv").exists()
+    assert (trial_dir / "trial_summary.csv").exists()
+    with (trial_dir / "step_coding.csv").open("r", newline="", encoding="utf-8") as f:
+        step_rows = list(csv.DictReader(f))
+    assert len(step_rows) == 33
+    assert list(step_rows[0].keys()) == STEP_CODING_CSV_FIELDS
+    assert step_rows[0]["StepID"] == "S01"
+    assert step_rows[0]["Completed"] == "yes"
+    assert step_rows[1]["StepID"] == "S02"
+    assert step_rows[1]["HelpCount"] == "1"
+    with (trial_dir / "trial_summary.csv").open("r", newline="", encoding="utf-8") as f:
+        trial_rows = list(csv.DictReader(f))
+    assert len(trial_rows) == 1
+    assert list(trial_rows[0].keys()) == TRIAL_SUMMARY_CSV_FIELDS
+    assert trial_rows[0]["ParticipantID"] == "P01"
+    assert trial_rows[0]["TotalStepsCompleted"] == "1"
+    with (trial_dir / "help_cycles.csv").open("r", newline="", encoding="utf-8") as f:
+        help_rows = list(csv.DictReader(f))
+    assert "vision_fact_status" in help_rows[0]
+    assert "fallback_overlay_reason" in help_rows[0]
+    assert "response_mapping_failure_codes" in help_rows[0]
+    assert "frame_ids" in help_rows[0]
+    assert "layout_id" in help_rows[0]
+    assert help_rows[0]["frame_ids"] == "frame_001.png"
+    assert help_rows[1]["response_mapping_failure_codes"] == "vision_sync_miss"
 
     # A second export to the same participant/trial directory must not
     # silently replace study data unless explicitly allowed.
