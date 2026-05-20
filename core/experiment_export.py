@@ -14,6 +14,7 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
+from core.gating import GatingEngine
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
 
@@ -112,11 +113,20 @@ STEP_CODING_CSV_FIELDS = [
     "FirstFusedStepID",
     "LastFusedStepID",
     "EvidenceRefs",
+    "Auto_Error_OM",
+    "Auto_Error_CO",
+    "Auto_Error_OR",
+    "Auto_Error_PA",
+    "Auto_Error_SV",
+    "AutoConfidence",
+    "AutoEvidenceRefs",
+    "NeedsHumanReview",
     "Error_OM",
     "Error_CO",
     "Error_OR",
     "Error_PA",
     "Error_SV",
+    "CoderID",
     "CoderNotes",
     "AutoCodingNotes",
 ]
@@ -522,11 +532,20 @@ class StepCodingRecord:
     FirstFusedStepID: str = ""
     LastFusedStepID: str = ""
     EvidenceRefs: str = ""
+    Auto_Error_OM: str = "0"
+    Auto_Error_CO: str = "0"
+    Auto_Error_OR: str = "0"
+    Auto_Error_PA: str = "0"
+    Auto_Error_SV: str = "0"
+    AutoConfidence: str = ""
+    AutoEvidenceRefs: str = ""
+    NeedsHumanReview: str = "no"
     Error_OM: str = ""
     Error_CO: str = ""
     Error_OR: str = ""
     Error_PA: str = ""
     Error_SV: str = ""
+    CoderID: str = ""
     CoderNotes: str = ""
     AutoCodingNotes: str = ""
 
@@ -1378,6 +1397,468 @@ def _build_action_timeline(
     return rows
 
 
+_AUTO_CONFIDENCE_RANK = {"": 0, "low": 1, "medium": 2, "high": 3}
+
+
+def _split_csv_values(value: str) -> list[str]:
+    return [item for item in value.split(";") if item]
+
+
+def _append_unique_ref(existing: str, ref: str) -> str:
+    refs = _split_csv_values(existing)
+    if ref not in refs:
+        refs.append(ref)
+    return _join_csv_values(refs)
+
+
+def _set_auto_candidate(
+    row: StepCodingRecord,
+    category: str,
+    evidence_ref: str,
+    *,
+    confidence: str = "medium",
+) -> None:
+    field_name = f"Auto_Error_{category}"
+    if not hasattr(row, field_name):
+        return
+    setattr(row, field_name, "1")
+    row.NeedsHumanReview = "yes"
+    row.AutoEvidenceRefs = _append_unique_ref(row.AutoEvidenceRefs, evidence_ref)
+    if _AUTO_CONFIDENCE_RANK.get(confidence, 0) > _AUTO_CONFIDENCE_RANK.get(row.AutoConfidence, 0):
+        row.AutoConfidence = confidence
+
+
+def _completion_event_indices(events: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    completed: dict[str, int] = {}
+    for event_index, ev in enumerate(events):
+        kind = ev.get("kind") or ev.get("type") or ""
+        if kind != "step_completed":
+            continue
+        step_id = _event_step_id(ev)
+        if step_id and step_id not in completed:
+            completed[step_id] = event_index
+    return completed
+
+
+def _load_gate_config_for_export(
+    pack_path: str | Path | None,
+    *,
+    scenario_profile: str | None,
+) -> dict[str, Mapping[str, Any]]:
+    if pack_path is None:
+        return {"precondition_gates": {}, "completion_gates": {}}
+    try:
+        pack = _load_yaml_mapping(pack_path)
+    except Exception:
+        return {"precondition_gates": {}, "completion_gates": {}}
+
+    config: dict[str, dict[str, Any]] = {"precondition_gates": {}, "completion_gates": {}}
+    for field_name in config:
+        raw = pack.get(field_name)
+        if isinstance(raw, Mapping):
+            config[field_name] = {
+                step_id: list(rules) if isinstance(rules, list) else rules
+                for step_id, rules in raw.items()
+                if isinstance(step_id, str)
+            }
+
+    profile = scenario_profile if isinstance(scenario_profile, str) and scenario_profile else "airfield"
+    overrides_root = pack.get("profile_overrides")
+    if isinstance(overrides_root, Mapping):
+        overrides = overrides_root.get(profile)
+        if isinstance(overrides, Mapping):
+            for field_name in config:
+                raw_overrides = overrides.get(field_name)
+                if not isinstance(raw_overrides, Mapping):
+                    continue
+                for step_id, rules in raw_overrides.items():
+                    if isinstance(step_id, str) and isinstance(rules, list):
+                        config[field_name][step_id] = list(rules)
+
+    return config
+
+
+def _mark_om_candidates(rows: Sequence[StepCodingRecord]) -> None:
+    for row in rows:
+        if row.Completed == "yes":
+            continue
+        evidence = "om:not_completed"
+        _set_auto_candidate(row, "OM", evidence, confidence="high")
+        if row.Performed == "yes":
+            row.AutoEvidenceRefs = _append_unique_ref(row.AutoEvidenceRefs, "om:partial_or_unfinished")
+
+
+def _event_vars(ev: Mapping[str, Any]) -> Mapping[str, Any]:
+    for payload in reversed(_event_payload_layers(ev)):
+        vars_payload = payload.get("vars")
+        if isinstance(vars_payload, Mapping):
+            return vars_payload
+    vars_top = ev.get("vars")
+    return vars_top if isinstance(vars_top, Mapping) else {}
+
+
+def _vars_history_by_event(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    current_vars: dict[str, Any] = {}
+    history: list[dict[str, Any]] = []
+    for ev in events:
+        for key, value in _event_vars(ev).items():
+            if isinstance(key, str) and key:
+                current_vars[key] = value
+        snapshot = dict(current_vars)
+        history.append({"vars": snapshot, "payload": {"vars": snapshot}})
+    return history
+
+
+def _gate_failure_has_evidence(reason: str | None) -> bool:
+    if not reason:
+        return False
+    lowered = reason.lower()
+    return "missing" not in lowered and "unknown" not in lowered
+
+
+def _precondition_failure(
+    *,
+    step_id: str,
+    event_index: int,
+    precondition_gates: Mapping[str, Any],
+    vars_history: Sequence[dict[str, Any]],
+) -> tuple[str, str | None, str] | None:
+    raw_rules = precondition_gates.get(step_id)
+    if not isinstance(raw_rules, list) or not raw_rules:
+        return None
+    if event_index < 0 or event_index >= len(vars_history):
+        return None
+    rules = [dict(rule) for rule in raw_rules if isinstance(rule, Mapping)]
+    result, failure_index = GatingEngine(rules).evaluate_with_failure_index(
+        [vars_history[event_index]]
+    )
+    if result.allowed or not _gate_failure_has_evidence(result.reason):
+        return None
+    failed_rule = rules[failure_index] if failure_index is not None and failure_index < len(rules) else {}
+    failed_var = _opt_str(failed_rule.get("var"))
+    reason_code = _opt_str(failed_rule.get("reason_code")) or failed_var or "precondition_unsatisfied"
+    return result.reason or "precondition_unsatisfied", failed_var, reason_code
+
+
+def _dependency_step_for_failed_var(
+    *,
+    step_id: str,
+    event_index: int,
+    failed_var: str | None,
+    step_order: Mapping[str, int],
+    completion_indices: Mapping[str, int],
+    completion_gates: Mapping[str, Any],
+) -> str | None:
+    if not failed_var:
+        return None
+    candidate_order = step_order.get(step_id)
+    if candidate_order is None:
+        return None
+    ordered_prior = sorted(
+        (
+            (prior_order, prior_step)
+            for prior_step, prior_order in step_order.items()
+            if prior_order < candidate_order
+        )
+    )
+    for _, prior_step in ordered_prior:
+        raw_rules = completion_gates.get(prior_step)
+        if not isinstance(raw_rules, list):
+            continue
+        if not any(isinstance(rule, Mapping) and rule.get("var") == failed_var for rule in raw_rules):
+            continue
+        completed_at = completion_indices.get(prior_step)
+        if completed_at is None or completed_at > event_index:
+            return prior_step
+    return None
+
+
+def _mark_action_candidates(
+    *,
+    rows_by_step: Mapping[str, StepCodingRecord],
+    step_order: Mapping[str, int],
+    action_timeline: Sequence[ActionTimelineRecord],
+    completion_indices: Mapping[str, int],
+    precondition_gates: Mapping[str, Any],
+    completion_gates: Mapping[str, Any],
+    vars_history: Sequence[dict[str, Any]],
+) -> None:
+    for action in action_timeline:
+        candidate_steps = _split_csv_values(action.CandidateStepID)
+        active_step = action.ActiveStepID or action.FusedStepID
+        blocked_candidate_seen = False
+
+        for step_id in candidate_steps:
+            row = rows_by_step.get(step_id)
+            if row is None:
+                continue
+            failure_reason = _precondition_failure(
+                step_id=step_id,
+                event_index=action.EventIndex,
+                precondition_gates=precondition_gates,
+                vars_history=vars_history,
+            )
+            if failure_reason is None:
+                continue
+            _failure_text, failed_var, reason_code = failure_reason
+            blocked_candidate_seen = True
+            _set_auto_candidate(
+                row,
+                "SV",
+                f"action:{action.EventIndex}:precondition_gate:{reason_code}",
+                confidence="medium",
+            )
+            missing_prior = _dependency_step_for_failed_var(
+                step_id=step_id,
+                event_index=action.EventIndex,
+                failed_var=failed_var,
+                step_order=step_order,
+                completion_indices=completion_indices,
+                completion_gates=completion_gates,
+            )
+            if missing_prior is not None:
+                _set_auto_candidate(
+                    row,
+                    "OR",
+                    f"action:{action.EventIndex}:out_of_order_before:{missing_prior}",
+                    confidence="medium",
+                )
+
+        hints = set(_split_csv_values(action.AutoCodingHint))
+        if "unmapped_raw_key" in hints and active_step:
+            row = rows_by_step.get(active_step)
+            if row is not None:
+                _set_auto_candidate(
+                    row,
+                    "CO",
+                    f"action:{action.EventIndex}:unmapped_raw_key",
+                    confidence="low",
+                )
+        if (
+            "unexpected_for_active_step" in hints
+            or "mapped_target_without_candidate_step" in hints
+        ) and active_step and not blocked_candidate_seen:
+            row = rows_by_step.get(active_step)
+            if row is not None:
+                _set_auto_candidate(
+                    row,
+                    "CO",
+                    f"action:{action.EventIndex}:unexpected_for_active_step",
+                    confidence="medium",
+                )
+
+
+def _payload_tags(ev: Mapping[str, Any]) -> list[str]:
+    for payload in _event_payload_layers(ev):
+        tags = payload.get("tags")
+        if isinstance(tags, list):
+            return [tag for tag in tags if isinstance(tag, str) and tag]
+    tags = ev.get("tags")
+    if isinstance(tags, list):
+        return [tag for tag in tags if isinstance(tag, str) and tag]
+    return []
+
+
+def _payload_procedure_hint(ev: Mapping[str, Any]) -> str | None:
+    for payload in _event_payload_layers(ev):
+        hint = _opt_str(payload.get("procedure_hint"))
+        if hint:
+            return hint
+    return _opt_str(ev.get("procedure_hint"))
+
+
+def _mark_explicit_sv_candidates(
+    *,
+    events: Sequence[Mapping[str, Any]],
+    rows_by_step: Mapping[str, StepCodingRecord],
+) -> None:
+    active_step = ""
+    for event_index, ev in enumerate(events):
+        kind = ev.get("kind") or ev.get("type") or ""
+        step_id = _event_step_id(ev)
+        if kind == "step_activated" and step_id:
+            active_step = step_id
+        elif kind in ("step_completed", "step_blocked") and step_id == active_step:
+            active_step = ""
+
+        if kind != "observation" or "state_violation" not in _payload_tags(ev):
+            continue
+        target_step = _payload_procedure_hint(ev) or active_step or step_id
+        row = rows_by_step.get(target_step or "")
+        if row is not None:
+            _set_auto_candidate(
+                row,
+                "SV",
+                f"observation:{event_index}:state_violation",
+                confidence="medium",
+            )
+
+
+def _vars_by_event(events: Sequence[Mapping[str, Any]]) -> dict[int, dict[str, Any]]:
+    by_event: dict[int, dict[str, Any]] = {}
+    for event_index, ev in enumerate(events):
+        event_vars: dict[str, Any] = {}
+        for key, value in _event_vars(ev).items():
+            if isinstance(key, str) and key:
+                event_vars[key] = value
+                event_vars[f"vars.{key}"] = value
+        if event_vars:
+            by_event[event_index] = event_vars
+    return by_event
+
+
+def _is_numeric(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _mark_pa_candidates(
+    *,
+    rows_by_step: Mapping[str, StepCodingRecord],
+    completion_gates: Mapping[str, Any],
+    action_timeline: Sequence[ActionTimelineRecord],
+    completion_indices: Mapping[str, int],
+    step_order: Mapping[str, int],
+    vars_by_event: Mapping[int, Mapping[str, Any]],
+) -> None:
+    candidate_actions_by_step: dict[str, list[int]] = {}
+    for action in action_timeline:
+        for step_id in _split_csv_values(action.CandidateStepID):
+            candidate_actions_by_step.setdefault(step_id, []).append(action.EventIndex)
+
+    for step_id, raw_rules in completion_gates.items():
+        if not isinstance(step_id, str) or not isinstance(raw_rules, list):
+            continue
+        row = rows_by_step.get(step_id)
+        if row is None:
+            continue
+        for rule in raw_rules:
+            if not isinstance(rule, Mapping) or rule.get("op") != "arg_in_range":
+                continue
+            var_path = _opt_str(rule.get("var"))
+            min_value = rule.get("min")
+            max_value = rule.get("max")
+            if not var_path or not _is_numeric(min_value) or not _is_numeric(max_value):
+                continue
+            values: list[Any] = []
+            relevant_indices = _pa_relevant_event_indices(
+                step_id=step_id,
+                var_path=var_path,
+                candidate_actions_by_step=candidate_actions_by_step,
+                completion_indices=completion_indices,
+                step_order=step_order,
+                vars_by_event=vars_by_event,
+            )
+            for event_index in relevant_indices:
+                event_vars = vars_by_event.get(event_index, {})
+                value = event_vars.get(var_path)
+                if value is None and var_path.startswith("vars."):
+                    value = event_vars.get(var_path[len("vars.") :])
+                if _is_numeric(value):
+                    values.append(value)
+            if not values:
+                continue
+            if any(min_value <= value <= max_value for value in values):
+                continue
+            final_value = values[-1]
+            _set_auto_candidate(
+                row,
+                "PA",
+                f"pa:{var_path}={final_value} not_in:[{min_value},{max_value}]",
+                confidence="high",
+            )
+
+
+def _pa_relevant_event_indices(
+    *,
+    step_id: str,
+    var_path: str,
+    candidate_actions_by_step: Mapping[str, Sequence[int]],
+    completion_indices: Mapping[str, int],
+    step_order: Mapping[str, int],
+    vars_by_event: Mapping[int, Mapping[str, Any]],
+) -> list[int]:
+    action_indices = sorted(set(candidate_actions_by_step.get(step_id, ())))
+    completed_at = completion_indices.get(step_id)
+    previous_completed_at: int | None = None
+    current_order = step_order.get(step_id)
+    if current_order is not None:
+        prior_completion_indices = [
+            completed
+            for prior_step, prior_order in step_order.items()
+            if prior_order < current_order
+            if (completed := completion_indices.get(prior_step)) is not None
+        ]
+        if prior_completion_indices:
+            previous_completed_at = max(prior_completion_indices)
+
+    start_at = previous_completed_at if previous_completed_at is not None else -1
+    end_at = completed_at
+    if end_at is None and action_indices:
+        end_at = max(max(vars_by_event.keys(), default=action_indices[-1]), action_indices[-1])
+
+    relevant = []
+    for event_index in action_indices:
+        if event_index <= start_at:
+            continue
+        if completed_at is not None and event_index > completed_at:
+            continue
+        relevant.append(event_index)
+    for event_index, event_vars in vars_by_event.items():
+        if event_index <= start_at:
+            continue
+        if end_at is not None and event_index > end_at:
+            continue
+        has_var = var_path in event_vars or (
+            var_path.startswith("vars.") and var_path[len("vars.") :] in event_vars
+        )
+        if has_var:
+            relevant.append(event_index)
+    if completed_at is not None:
+        relevant.append(completed_at)
+    return sorted(set(relevant))
+
+
+def _apply_pre_scoring_candidates(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    step_coding: Sequence[StepCodingRecord],
+    action_timeline: Sequence[ActionTimelineRecord],
+    pack_steps: Sequence[Mapping[str, Any]],
+    pack_path: str | Path | None,
+    scenario_profile: str | None,
+) -> None:
+    rows_by_step = {row.StepID: row for row in step_coding if row.StepID}
+    step_order = {
+        step_id: idx
+        for idx, step in enumerate(pack_steps)
+        if (step_id := _opt_str(step.get("id"))) is not None
+    }
+    completion_indices = _completion_event_indices(events)
+    gate_config = _load_gate_config_for_export(pack_path, scenario_profile=scenario_profile)
+    vars_history = _vars_history_by_event(events)
+    vars_by_event = _vars_by_event(events)
+
+    _mark_om_candidates(step_coding)
+    _mark_action_candidates(
+        rows_by_step=rows_by_step,
+        step_order=step_order,
+        action_timeline=action_timeline,
+        completion_indices=completion_indices,
+        precondition_gates=gate_config["precondition_gates"],
+        completion_gates=gate_config["completion_gates"],
+        vars_history=vars_history,
+    )
+    _mark_explicit_sv_candidates(events=events, rows_by_step=rows_by_step)
+    _mark_pa_candidates(
+        rows_by_step=rows_by_step,
+        completion_gates=gate_config["completion_gates"],
+        action_timeline=action_timeline,
+        completion_indices=completion_indices,
+        step_order=step_order,
+        vars_by_event=vars_by_event,
+    )
+
+
 def _task_time_seconds(events: Sequence[Mapping[str, Any]]) -> float | None:
     times = [t for ev in events if (t := _event_wall_time(ev)) is not None]
     if not times:
@@ -1555,6 +2036,14 @@ def build_experiment_export(
         meta=meta,
         help_cycles=help_cycles,
         pack_steps=pack_steps,
+    )
+    _apply_pre_scoring_candidates(
+        events,
+        step_coding=step_coding,
+        action_timeline=action_timeline,
+        pack_steps=pack_steps,
+        pack_path=pack_path,
+        scenario_profile=meta.scenario_profile,
     )
     trial_summary = _build_trial_summary(
         events,

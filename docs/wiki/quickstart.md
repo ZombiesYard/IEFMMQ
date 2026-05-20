@@ -41,6 +41,13 @@ python -m simtutor score logs/run_demo.jsonl \
   --taxonomy packs/fa18c_startup/taxonomy.yaml
 ```
 
+`simtutor score` is a legacy OM/SV-only smoke scorer. For experiment work, run
+`experiment-export` and use `step_coding.csv`: the `Auto_Error_*`,
+`AutoConfidence`, `AutoEvidenceRefs`, and `NeedsHumanReview` columns are
+candidate prefill for raters, while `Error_*`, `CoderID`, and `CoderNotes` are
+the editable final coding fields. Final five-category scores require human
+rater confirmation.
+
 ## Replay DCS-BIOS Offline
 
 Offline replay is the safest way to iterate because overlay commands can remain dry-run.
