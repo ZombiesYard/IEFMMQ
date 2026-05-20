@@ -6,8 +6,10 @@ import argparse
 import csv
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import pytest
 
 import simtutor.__main__ as simtutor_cli
 from core.experiment_export import (
@@ -364,6 +366,140 @@ def _make_events_with_action_timeline() -> list[dict]:
             "t_wall": 24.0,
             "timestamp": t7.isoformat(),
         },
+    ]
+
+
+def _make_live_help_only_completion_events() -> list[dict]:
+    t0 = datetime(2026, 5, 20, 14, 56, 0, tzinfo=timezone.utc)
+
+    def ts(offset: int) -> str:
+        return (t0 + timedelta(seconds=offset)).isoformat()
+
+    def request(cycle_id: str, step_id: str, t_wall: float, missing: list[str]) -> dict:
+        return {
+            "kind": "tutor_request",
+            "payload": {
+                "intent": "help",
+                "metadata": {
+                    "help_cycle_id": cycle_id,
+                    "fused_step_id": step_id,
+                    "fused_missing_conditions": missing,
+                },
+            },
+            "metadata": {
+                "help_cycle_id": cycle_id,
+                "fused_step_id": step_id,
+                "fused_missing_conditions": missing,
+            },
+            "related_id": cycle_id,
+            "t_wall": t_wall,
+            "timestamp": ts(int(t_wall - 100.0)),
+        }
+
+    def response(
+        cycle_id: str,
+        fused_step_id: str,
+        t_wall: float,
+        *,
+        message: str,
+        category: str = "actionable",
+        validation_reasons: list[str] | None = None,
+    ) -> dict:
+        return {
+            "kind": "tutor_response",
+            "payload": {
+                "status": "ok",
+                "message": message,
+                "actions": [],
+                "metadata": {
+                    "help_cycle_id": cycle_id,
+                    "generation_mode": "model",
+                    "fused_step_id": fused_step_id,
+                    "fused_missing_conditions": [],
+                    "help_response": {
+                        "diagnosis": {"step_id": fused_step_id, "error_category": "OM"},
+                        "next": {"step_id": fused_step_id},
+                        "overlay": {"targets": [], "evidence": []},
+                    },
+                    "final_public_instruction_category": category,
+                    "harness_validation_reasons": validation_reasons or [],
+                },
+            },
+            "metadata": {
+                "help_cycle_id": cycle_id,
+                "generation_mode": "model",
+                "fused_step_id": fused_step_id,
+                "fused_missing_conditions": [],
+            },
+            "related_id": cycle_id,
+            "t_wall": t_wall,
+            "timestamp": ts(int(t_wall - 100.0)),
+        }
+
+    return [
+        {
+            "kind": "observation",
+            "source": "vision_frame_manifest",
+            "payload": {
+                "source": "vision_frame_manifest",
+                "payload": {"source": "vision_frame_manifest"},
+            },
+            "t_wall": 10.0,
+            "timestamp": ts(0),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios_raw",
+            "payload": {
+                "seq": 1,
+                "t_wall": 100.0,
+                "source": "dcs_bios_raw",
+                "bios": {
+                    "BATTERY_SW": 2,
+                    "HOOK_LEVER": 1,
+                    "HYD_IND_BRAKE": 42000,
+                    "EXT_HOOK": 1000,
+                },
+                "delta": {
+                    "BATTERY_SW": 2,
+                    "HOOK_LEVER": 1,
+                    "HYD_IND_BRAKE": 42000,
+                    "EXT_HOOK": 1000,
+                },
+                "vars": {"battery_on": True},
+            },
+            "t_wall": 100.0,
+            "timestamp": ts(0),
+        },
+        request("cycle-s01", "S01", 101.0, ["vars.battery_on==true"]),
+        response("cycle-s01", "S01", 104.0, message="BATT 到 ON。"),
+        request("cycle-s02", "S02", 120.0, ["vars.fire_test_a_complete==true"]),
+        response("cycle-s02", "S02", 124.0, message="当前处于 S02。"),
+        {
+            "kind": "observation",
+            "source": "dcs_bios_raw",
+            "payload": {
+                "seq": 2,
+                "t_wall": 140.0,
+                "source": "dcs_bios_raw",
+                "bios": {"HYD_IND_BRAKE": 42001, "EXT_HOOK": 2000},
+                "delta": {"HYD_IND_BRAKE": 42001, "EXT_HOOK": 2000},
+            },
+            "t_wall": 140.0,
+            "timestamp": ts(40),
+        },
+        request("cycle-s33", "S32", 180.0, ["vars.standby_attitude_uncaged==true"]),
+        response(
+            "cycle-s33",
+            "S33",
+            184.0,
+            message="姿态源选择器已经在 AUTO，S33 检查已满足；冷启动流程已完成，无需继续操作。",
+            category="completed",
+            validation_reasons=[
+                "completion_gate_already_satisfied:S32",
+                "completion_gate_already_satisfied:S33",
+            ],
+        ),
     ]
 
 
@@ -1007,6 +1143,104 @@ def test_action_timeline_links_dcs_deltas_to_steps_and_help_cycles():
     assert "unmapped_raw_key" in set(unmapped.AutoCodingHint.split(";"))
 
 
+def test_live_help_only_terminal_s33_infers_completion_and_task_time():
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_live_help_only_completion_events(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert export.trial_summary[0].Completed == "yes"
+    assert export.trial_summary[0].TotalStepsCompleted == 33
+    assert export.trial_summary[0].StepCompletionAccuracy == 1.0
+    assert export.trial_summary[0].TaskTime_sec == 84.0
+
+    assert by_step["S01"].Completed == "yes"
+    assert "completed_inferred_from_progression" in by_step["S01"].AutoCodingNotes
+    assert "progression_to:S02" in by_step["S01"].EvidenceRefs
+
+    assert by_step["S33"].Completed == "yes"
+    assert "completed_inferred_from_terminal_s33" in by_step["S33"].AutoCodingNotes
+    assert "terminal_s33:cycle-s33" in by_step["S33"].EvidenceRefs
+
+
+def test_task_time_does_not_stop_at_intermediate_completed_response():
+    root = _repo_root()
+    events = [
+        {
+            "kind": "observation",
+            "source": "dcs_bios_raw",
+            "payload": {
+                "seq": 1,
+                "t_wall": 0.0,
+                "source": "dcs_bios_raw",
+                "bios": {"BATTERY_SW": 2},
+                "delta": {"BATTERY_SW": 2},
+            },
+            "t_wall": 0.0,
+        },
+        {
+            "kind": "tutor_response",
+            "payload": {
+                "status": "ok",
+                "message": "S08 already satisfied.",
+                "metadata": {
+                    "help_cycle_id": "cycle-s08",
+                    "fused_step_id": "S08",
+                    "help_response": {"next": {"step_id": "S08"}},
+                    "final_public_instruction_category": "completed",
+                },
+            },
+            "metadata": {"help_cycle_id": "cycle-s08", "fused_step_id": "S08"},
+            "t_wall": 5.0,
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios_raw",
+            "payload": {
+                "seq": 2,
+                "t_wall": 20.0,
+                "source": "dcs_bios_raw",
+                "bios": {"APU_CONTROL_SW": 1},
+                "delta": {"APU_CONTROL_SW": 1},
+            },
+            "t_wall": 20.0,
+        },
+    ]
+
+    export = build_experiment_export(
+        events,
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    assert export.trial_summary[0].TaskTime_sec == 20.0
+
+
+def test_action_timeline_filters_passive_live_telemetry_but_keeps_mapped_actions():
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_live_help_only_completion_events(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    raw_keys = [row.RawKey for row in export.action_timeline]
+    assert raw_keys == ["BATTERY_SW", "HOOK_LEVER"]
+    assert export.action_timeline[0].MappedTarget == "battery_switch"
+    assert export.action_timeline[0].CandidateStepID == "S01"
+    assert export.action_timeline[1].MappedTarget == "arresting_hook_handle"
+    assert export.action_timeline[1].CandidateStepID == "S24;S25"
+
+
 def test_action_timeline_rejects_bios_mapping_with_unknown_ui_target():
     root = _repo_root()
     export_events = _make_events_with_action_timeline()
@@ -1483,6 +1717,92 @@ def test_experiment_export_cli_writes_action_timeline_rows(tmp_path: Path):
     assert rows[2]["RawValueAfter"] == "7"
     assert rows[2]["MappedTarget"] == ""
     assert "unmapped_raw_key" in set(rows[2]["AutoCodingHint"].split(";"))
+
+
+def test_real_smoke_live_help_log_export_and_analysis_regression(tmp_path: Path):
+    root = _repo_root()
+    raw_log = root / "logs/live_help_harness_smoke_20260520_145436.jsonl"
+    if not raw_log.exists():
+        pytest.skip(f"smoke regression log not available: {raw_log}")
+
+    output_dir = tmp_path / "exports"
+    args = argparse.Namespace(
+        file=str(raw_log),
+        participant_id="P_SMOKE_20260520",
+        trial_id="T01",
+        study_id="smoke_validation_20260520",
+        condition="tutor",
+        group="internal_smoke",
+        experimenter_id="yz",
+        questionnaire="questionnaires/smoke_placeholder.json",
+        recording_ref=str(raw_log),
+        notes=None,
+        output_dir=str(output_dir),
+        scoring=None,
+        pack=str(root / "packs/fa18c_startup/pack.yaml"),
+        taxonomy=str(root / "packs/fa18c_startup/taxonomy.yaml"),
+        ui_map=str(root / "packs/fa18c_startup/ui_map.yaml"),
+        bios_to_ui=str(root / "packs/fa18c_startup/bios_to_ui.yaml"),
+        model_provider="openai_compat",
+        model_name="qwen36_27b",
+        vision_model_name="simtutor-vision",
+        prompt_version="harness_v04",
+        prompt_hash=None,
+        scenario_profile="airfield",
+        dcs_mission="live_smoke",
+        dcs_aircraft="FA-18C_hornet",
+        vr_setup="live_dcs_vr_or_composite",
+        monitor_setup="fa18c_composite_panel_v2",
+        git_commit="abc123",
+        git_dirty=False,
+        strict=True,
+        overwrite=False,
+        copy_raw_log=True,
+    )
+
+    assert _run_experiment_export(args) == 0
+
+    trial_dir = output_dir / "P_SMOKE_20260520" / "T01"
+    quality_gate = json.loads((trial_dir / "quality_gate.json").read_text(encoding="utf-8"))
+    assert quality_gate["passed"] is True
+
+    with (trial_dir / "trial_summary.csv").open("r", newline="", encoding="utf-8") as f:
+        trial = list(csv.DictReader(f))[0]
+    assert trial["Completed"] == "yes"
+    assert int(trial["TotalStepsCompleted"]) >= 30
+    assert float(trial["StepCompletionAccuracy"]) >= 0.9
+    assert 0 < float(trial["TaskTime_sec"]) < 3600
+
+    with (trial_dir / "step_coding.csv").open("r", newline="", encoding="utf-8") as f:
+        steps = {row["StepID"]: row for row in csv.DictReader(f)}
+    assert steps["S20"]["Completed"] == "yes"
+    assert "completed_inferred_from_progression" in steps["S20"]["AutoCodingNotes"]
+    assert steps["S33"]["Completed"] == "yes"
+    assert "completed_inferred_from_terminal_s33" in steps["S33"]["AutoCodingNotes"]
+
+    with (trial_dir / "action_timeline.csv").open("r", newline="", encoding="utf-8") as f:
+        action_rows = list(csv.DictReader(f))
+    action_keys = {row["RawKey"] for row in action_rows}
+    assert len(action_rows) < 1000
+    assert "BATTERY_SW" in action_keys
+    assert "HYD_IND_BRAKE" not in action_keys
+    assert "HYD_IND_LEFT" not in action_keys
+    assert "EXT_REFUEL_PROBE" not in action_keys
+    assert "EXT_HOOK" not in action_keys
+    assert "IFEI_TEMP_R" not in action_keys
+
+    analysis_dir = tmp_path / "analysis"
+    analyze_args = argparse.Namespace(
+        input_dir=str(output_dir),
+        output_dir=str(analysis_dir),
+        no_figures=True,
+    )
+    assert simtutor_cli._run_experiment_analyze(analyze_args) == 0
+    with (analysis_dir / "condition_summary.csv").open("r", newline="", encoding="utf-8") as f:
+        condition = list(csv.DictReader(f))[0]
+    assert condition["CompletionRate"] == "1.0"
+    assert float(condition["MeanStepCompletionAccuracy"]) >= 0.9
+    assert 0 < float(condition["MeanTaskTime_sec"]) < 3600
 
 
 def test_experiment_export_cli_overwrite_replaces_stale_managed_outputs(tmp_path: Path):
