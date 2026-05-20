@@ -134,3 +134,57 @@ live request_id -> extract fixture -> inspect expectations/harness trace -> writ
 ```
 
 Malformed JSONL lines do not stop extraction; they are recorded under `source_log.malformed_lines`. If the id is not found, the command exits with an `[EXTRACT_LIVE_FIXTURE] error:` message.
+
+## Experiment Export and Analysis
+
+From a raw live/replay JSONL log, first freeze one participant trial into study-ready CSV artifacts:
+
+```bash
+python -m simtutor experiment-export logs/live_dcs.jsonl \
+  --study-id fa18c-thesis-pilot \
+  --participant-id P01 \
+  --condition with_tutor \
+  --trial-id T01 \
+  --group novice \
+  --experimenter-id E01 \
+  --questionnaire questionnaires/P01_pre.yml \
+  --recording-ref recordings/P01_T01.mp4 \
+  --model-provider openai_compat \
+  --model-name Qwen3-8B-Instruct \
+  --vision-model-name Qwen3.5-VL-9B \
+  --prompt-version v0.4 \
+  --scenario-profile airfield \
+  --dcs-mission cold-start.miz \
+  --dcs-aircraft FA-18C \
+  --monitor-setup native-viewports \
+  --output-dir artifacts/experiments \
+  --strict
+```
+
+Repeat `experiment-export` for each participant/trial. Then combine all exported participant/trial folders into thesis-ready summary tables and optional figures:
+
+```bash
+python -m simtutor experiment-analyze artifacts/experiments \
+  --output-dir artifacts/analysis/fa18c-thesis-pilot
+```
+
+This writes:
+
+```text
+artifacts/analysis/fa18c-thesis-pilot/study_summary.csv
+artifacts/analysis/fa18c-thesis-pilot/condition_summary.csv
+artifacts/analysis/fa18c-thesis-pilot/step_accuracy_by_condition.csv
+artifacts/analysis/fa18c-thesis-pilot/help_quality_summary.csv
+artifacts/analysis/fa18c-thesis-pilot/fig_completion_rate.png
+artifacts/analysis/fa18c-thesis-pilot/fig_task_time.png
+artifacts/analysis/fa18c-thesis-pilot/fig_step_accuracy.png
+artifacts/analysis/fa18c-thesis-pilot/fig_help_requests.png
+```
+
+If `matplotlib` is not installed, the CSV files are still written and the command reports that figures were skipped. Use `--no-figures` when only tables are needed:
+
+```bash
+python -m simtutor experiment-analyze artifacts/experiments \
+  --output-dir artifacts/analysis/fa18c-thesis-pilot \
+  --no-figures
+```

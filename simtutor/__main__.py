@@ -765,6 +765,29 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_experiment_analyze(args: argparse.Namespace) -> int:
+    from core.experiment_analysis import build_experiment_analysis, write_experiment_analysis
+
+    try:
+        analysis = build_experiment_analysis(args.input_dir)
+        result = write_experiment_analysis(
+            analysis,
+            args.output_dir,
+            make_figures=not bool(getattr(args, "no_figures", False)),
+        )
+    except (OSError, ValueError) as exc:
+        print(f"[EXPERIMENT_ANALYZE] error: {exc}")
+        return 1
+
+    for path in result.csv_paths:
+        print(f"[EXPERIMENT_ANALYZE] wrote {path}")
+    for path in result.figure_paths:
+        print(f"[EXPERIMENT_ANALYZE] wrote {path}")
+    for warning in result.warnings:
+        print(f"[EXPERIMENT_ANALYZE] warning: {warning}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="simtutor", description="SimTutor CLI utilities")
     sub = parser.add_subparsers(dest="command")
@@ -845,6 +868,14 @@ def main() -> int:
         help="Record the raw log reference without copying it into the export directory",
     )
     exp_export.set_defaults(copy_raw_log=True)
+
+    exp_analyze = sub.add_parser(
+        "experiment-analyze",
+        help="Analyze experiment-export folders into thesis-ready tables and optional figures",
+    )
+    exp_analyze.add_argument("input_dir", help="Directory containing experiment-export participant/trial folders")
+    exp_analyze.add_argument("--output-dir", required=True, help="Directory for analysis CSVs and optional figures")
+    exp_analyze.add_argument("--no-figures", action="store_true", help="Only write CSV summaries")
 
     sub.add_parser("model-config", help="Validate model provider env and print non-sensitive startup info")
 
@@ -1091,6 +1122,8 @@ def main() -> int:
         return 0
     if args.command == "experiment-export":
         return _run_experiment_export(args)
+    if args.command == "experiment-analyze":
+        return _run_experiment_analyze(args)
     if args.command == "model-config":
         from simtutor.config import ModelConfigError, load_model_access_config
 

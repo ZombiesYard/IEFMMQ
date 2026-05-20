@@ -61,7 +61,8 @@ EXPECTED_PACK_STEP_IDS = [f"S{i:02d}" for i in range(1, 34)]
 
 HELP_CYCLES_CSV_FIELDS = [
     "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
-    "vision_used", "vision_status", "vision_fact_status", "vision_fallback_reason", "sync_delta_ms",
+    "vision_used", "vision_status", "vision_fact_status", "vlm_call_status",
+    "vision_fallback_reason", "sync_delta_ms",
     "frame_ids", "layout_id", "fused_step_id", "fused_missing_conditions", "model_next_step_id",
     "overlay_targets", "overlay_executed", "overlay_rejected",
     "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
@@ -509,6 +510,7 @@ class HelpCycleRecord:
     requires_visual_confirmation: bool | None = None
     scenario_profile: str | None = None
     vision_fact_status: str | None = None
+    vlm_call_status: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -809,6 +811,7 @@ def _extract_help_cycles(events: Sequence[Mapping[str, Any]]) -> list[dict[str, 
             "requires_visual_confirmation": _opt_bool(response_meta.get("requires_visual_confirmation")),
             "scenario_profile": response_meta.get("scenario_profile"),
             "vision_fact_status": request_meta.get("vision_fact_status"),
+            "vlm_call_status": audit.get("vlm_call_status"),
         }
         records.append(record)
 
@@ -2017,6 +2020,7 @@ def build_experiment_export(
             requires_visual_confirmation=rc["requires_visual_confirmation"],
             scenario_profile=rc["scenario_profile"],
             vision_fact_status=rc["vision_fact_status"],
+            vlm_call_status=rc["vlm_call_status"],
         )
         for rc in raw_cycles
     ]
