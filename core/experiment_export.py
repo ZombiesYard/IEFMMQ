@@ -1056,6 +1056,137 @@ def _help_cycle_matches_step(cycle: HelpCycleRecord, step_id: str) -> bool:
     return cycle_step_id == step_id
 
 
+def _step_order_index(pack_steps: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    order: dict[str, int] = {}
+    for idx, step in enumerate(pack_steps):
+        step_id = _opt_str(step.get("id"))
+        if step_id:
+            order[step_id] = idx
+    return order
+
+
+def _help_cycle_step_id(cycle: HelpCycleRecord) -> str | None:
+    return cycle.fused_step_id or cycle.model_next_step_id
+
+
+def _metadata_step_id(metadata: Mapping[str, Any]) -> str | None:
+    step_id = _opt_str(metadata.get("fused_step_id")) or _opt_str(metadata.get("model_next_step_id"))
+    if step_id:
+        return step_id
+    help_response = metadata.get("help_response")
+    if isinstance(help_response, Mapping):
+        next_payload = help_response.get("next")
+        if isinstance(next_payload, Mapping):
+            step_id = _opt_str(next_payload.get("step_id"))
+            if step_id:
+                return step_id
+        diagnosis = help_response.get("diagnosis")
+        if isinstance(diagnosis, Mapping):
+            step_id = _opt_str(diagnosis.get("step_id"))
+            if step_id:
+                return step_id
+    final_public = metadata.get("final_public_response")
+    if isinstance(final_public, Mapping):
+        next_payload = final_public.get("next")
+        if isinstance(next_payload, Mapping):
+            step_id = _opt_str(next_payload.get("step_id"))
+            if step_id:
+                return step_id
+    return None
+
+
+def _terminal_completion_event(
+    ev: Mapping[str, Any],
+    *,
+    terminal_step_id: str | None = None,
+) -> tuple[str, str] | None:
+    kind = ev.get("kind") or ev.get("type") or ""
+    if kind != "tutor_response":
+        return None
+    metadata = _merged_event_metadata(ev)
+    step_id = _metadata_step_id(metadata)
+    if step_id is None or (terminal_step_id is not None and step_id != terminal_step_id):
+        return None
+
+    payload = ev.get("payload") if isinstance(ev.get("payload"), Mapping) else {}
+    category = _opt_str(metadata.get("final_public_instruction_category"))
+    final_public = metadata.get("final_public_response")
+    if isinstance(final_public, Mapping):
+        category = category or _opt_str(final_public.get("instruction_category"))
+    reasons = _str_list(metadata.get("harness_validation_reasons"))
+
+    completed = (
+        category == "completed"
+        or f"completion_gate_already_satisfied:{step_id}" in reasons
+    )
+    if not completed:
+        return None
+
+    help_cycle_id = _event_help_cycle_id(ev, metadata) or ""
+    return step_id, help_cycle_id
+
+
+def _inferred_step_completion_notes(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    help_cycles: Sequence[HelpCycleRecord],
+    pack_steps: Sequence[Mapping[str, Any]],
+    explicit_completed: set[str],
+) -> dict[str, tuple[str, str]]:
+    order = _step_order_index(pack_steps)
+    ordered_steps = [
+        _opt_str(step.get("id"))
+        for step in pack_steps
+        if _opt_str(step.get("id")) in order
+    ]
+    inferred: dict[str, tuple[str, str]] = {}
+
+    previous_idx: int | None = None
+    for cycle in help_cycles:
+        step_id = _help_cycle_step_id(cycle)
+        current_idx = order.get(step_id or "")
+        if current_idx is None:
+            continue
+        if previous_idx is None:
+            previous_idx = current_idx
+            continue
+        progression_gap = current_idx - previous_idx
+        if not 0 < progression_gap <= 3:
+            previous_idx = current_idx
+            continue
+        for prior_step in ordered_steps[previous_idx:current_idx]:
+            if prior_step is None or prior_step in explicit_completed or prior_step in inferred:
+                continue
+            inferred[prior_step] = (
+                f"progression_to:{step_id}",
+                "completed_inferred_from_progression",
+            )
+        previous_idx = current_idx
+
+    terminal_step_id = next((step_id for step_id in reversed(ordered_steps) if step_id), None)
+    terminal = None
+    for ev in events:
+        terminal = _terminal_completion_event(ev, terminal_step_id=terminal_step_id) or terminal
+    if terminal is None:
+        return inferred
+
+    terminal_step_id, terminal_help_cycle_id = terminal
+    terminal_idx = order.get(terminal_step_id)
+    if terminal_idx is None:
+        return inferred
+    terminal_ref = (
+        f"terminal_s33:{terminal_help_cycle_id}"
+        if terminal_help_cycle_id
+        else "terminal_s33"
+    )
+    for step_id in ordered_steps[: terminal_idx + 1]:
+        if step_id is None or step_id in explicit_completed or step_id in inferred:
+            continue
+        inferred[step_id] = (terminal_ref, "completed_inferred_from_terminal_s33")
+
+    return inferred
+
+
 def _build_step_coding(
     events: Sequence[Mapping[str, Any]],
     *,
@@ -1080,6 +1211,13 @@ def _build_step_coding(
             completed_steps.add(sid)
             completed_event_seen.add(sid)
 
+    inferred_completion_notes = _inferred_step_completion_notes(
+        events,
+        help_cycles=help_cycles,
+        pack_steps=pack_steps,
+        explicit_completed=completed_event_seen,
+    )
+
     rows: list[StepCodingRecord] = []
     for step in pack_steps:
         step_id = _opt_str(step.get("id"))
@@ -1087,6 +1225,9 @@ def _build_step_coding(
             continue
         cycles = [cycle for cycle in help_cycles if _help_cycle_matches_step(cycle, step_id)]
         completed = step_id in completed_steps
+        inferred_completion = inferred_completion_notes.get(step_id)
+        if not completed and inferred_completion is not None:
+            completed = True
         performed = completed or step_id in activated_steps or bool(cycles)
 
         evidence_refs: list[str] = []
@@ -1098,10 +1239,14 @@ def _build_step_coding(
             evidence_refs.append(f"help_cycle:{cycle.help_cycle_id}")
             if cycle.frame_ids:
                 evidence_refs.append("frames:" + _join_csv_values(cycle.frame_ids))
+        if inferred_completion is not None:
+            evidence_refs.append(inferred_completion[0])
 
         auto_notes: list[str] = ["human_error_columns_blank"]
-        if completed:
+        if step_id in completed_event_seen:
             auto_notes.append("completed_from_step_completed")
+        elif inferred_completion is not None:
+            auto_notes.append(inferred_completion[1])
         elif performed:
             auto_notes.append("performed_inferred_from_step_or_help_evidence")
         else:
@@ -1192,6 +1337,67 @@ def _event_bios_map(ev: Mapping[str, Any]) -> Mapping[str, Any]:
         if isinstance(bios, Mapping):
             return bios
     return {}
+
+
+_PASSIVE_TIMELINE_KEYS = {
+    "COMM1",
+    "COMM2",
+    "EXT_HOOK",
+    "EXT_REFUEL_PROBE",
+    "EXT_NOZZLE_POS_L",
+    "EXT_NOZZLE_POS_R",
+    "HMD_OFF_BRT",
+    "HUD_BLACK_LVL",
+    "HUD_LTDR",
+    "HYD_IND_BRAKE",
+    "HYD_IND_LEFT",
+    "HYD_IND_RIGHT",
+    "IFEI_BINGO",
+    "IFEI_TIME_SET_MODE",
+    "LANDING_GEAR_HANDLE_LT",
+    "LOW_ALT_WARN_LT",
+    "MASTER_CAUTION_LT",
+    "RADALT_ALT_PTR",
+    "RADALT_HEIGHT",
+    "RADALT_OFF_FLAG",
+    "SAI_BANK",
+    "SAI_MAN_PITCH_ADJ",
+    "SAI_POINTER_HOR",
+    "SAI_POINTER_VER",
+    "SAI_SET",
+    "SAI_SLIP_BALL",
+}
+
+_PASSIVE_TIMELINE_PREFIXES = (
+    "AOA_INDEXER",
+    "CLIP_",
+    "EMERG_INSTR_",
+    "ENG_INSTR_",
+    "FIRE_",
+    "FLP_LG_",
+    "IFEI_DD_",
+    "IFEI_DISP_",
+    "IFEI_TEMP_",
+    "IFEI_RPM_",
+    "IFEI_FF_",
+    "IFEI_FUEL_",
+    "IFEI_OIL_PRESS_",
+    "LH_ADV_",
+    "LS_",
+    "SAI_ATT_",
+    "UFC_OPTION_CUEING_",
+    "VOLT_",
+)
+
+
+def _is_passive_timeline_key(raw_key: str) -> bool:
+    if raw_key in _PASSIVE_TIMELINE_KEYS:
+        return True
+    if raw_key.endswith("_LT"):
+        return True
+    if raw_key.endswith("_DISPLAY") or "_DISPLAY_" in raw_key:
+        return True
+    return any(raw_key.startswith(prefix) for prefix in _PASSIVE_TIMELINE_PREFIXES)
 
 
 def _candidate_steps_for_targets(
@@ -1324,6 +1530,8 @@ def _build_action_timeline(
 
             mapped_targets = list(bios_to_ui.get(raw_key, ()))
             candidate_step_ids = _candidate_steps_for_targets(mapped_targets, step_ids_by_target)
+            if _is_passive_timeline_key(raw_key):
+                continue
             expected_for_step = ""
             if active_step_id and candidate_step_ids:
                 expected_for_step = _yes_no(active_step_id in candidate_step_ids)
@@ -1862,11 +2070,61 @@ def _apply_pre_scoring_candidates(
     )
 
 
-def _task_time_seconds(events: Sequence[Mapping[str, Any]]) -> float | None:
-    times = [t for ev in events if (t := _event_wall_time(ev)) is not None]
+def _is_task_time_event(ev: Mapping[str, Any]) -> bool:
+    kind = ev.get("kind") or ev.get("type") or ""
+    if kind in (
+        "step_activated",
+        "step_completed",
+        "step_blocked",
+        "tutor_request",
+        "tutor_response",
+        "overlay_requested",
+        "overlay_dry_run",
+        "overlay_rejected",
+    ):
+        return True
+    if kind != "observation":
+        return False
+
+    source = _event_source(ev)
+    if source == "vision_frame_manifest":
+        return False
+    return bool(_event_bios_map(ev) or _event_vars(ev) or _extract_event_delta_items(ev))
+
+
+def _terminal_task_end_time(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    terminal_step_id: str | None,
+) -> float | None:
+    end_time = None
+    for ev in events:
+        if _terminal_completion_event(ev, terminal_step_id=terminal_step_id) is None:
+            continue
+        end_time = _event_wall_time(ev) or end_time
+    return end_time
+
+
+def _task_time_seconds(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    terminal_step_id: str | None = None,
+) -> float | None:
+    times = [
+        t
+        for ev in events
+        if _is_task_time_event(ev)
+        if (t := _event_wall_time(ev)) is not None
+    ]
     if not times:
         return None
-    return max(times) - min(times)
+    start_time = min(times)
+    end_time = _terminal_task_end_time(events, terminal_step_id=terminal_step_id)
+    if end_time is None:
+        end_time = max(times)
+    if end_time < start_time:
+        return None
+    return end_time - start_time
 
 
 def _merged_event_metadata(ev: Mapping[str, Any]) -> dict[str, Any]:
@@ -1955,7 +2213,7 @@ def _build_trial_summary(
             Condition=meta.condition,
             TrialID=meta.trial_id,
             Completed=_yes_no(all_completed),
-            TaskTime_sec=_task_time_seconds(events),
+            TaskTime_sec=_task_time_seconds(events, terminal_step_id=step_coding[-1].StepID),
             HelpRequests=summary.help_requests,
             LLMTriggers=summary.llm_triggers,
             VLMCalls=_count_vlm_calls(events, help_cycles),
