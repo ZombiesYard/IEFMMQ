@@ -518,6 +518,7 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
 
     from core.event_store import JsonlEventStore
     from core.experiment_export import (
+        ACTION_TIMELINE_CSV_FIELDS,
         HELP_CYCLES_CSV_FIELDS,
         STEP_CODING_CSV_FIELDS,
         TRIAL_SUMMARY_CSV_FIELDS,
@@ -603,6 +604,8 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
         meta_overrides=meta_overrides,
         scoring=scoring,
         pack_path=pack_path,
+        bios_to_ui_path=bios_to_ui_path,
+        ui_map_path=ui_map_path,
     )
     out_dir = Path(args.output_dir)
     if args.participant_id:
@@ -624,6 +627,7 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
         "session.json",
         "summary.json",
         "help_cycles.csv",
+        "action_timeline.csv",
         "step_coding.csv",
         "trial_summary.csv",
         "raw_events.jsonl",
@@ -673,6 +677,14 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
                 row["overlay_targets"] = ";".join(c.overlay_targets)
                 row["response_mapping_failure_codes"] = ";".join(c.response_mapping_failure_codes)
                 writer.writerow(row)
+
+        # action_timeline.csv
+        action_timeline_path = staging_dir / "action_timeline.csv"
+        with action_timeline_path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=ACTION_TIMELINE_CSV_FIELDS, extrasaction="ignore")
+            writer.writeheader()
+            for row in export.action_timeline:
+                writer.writerow(row.to_dict())
 
         # step_coding.csv
         step_coding_path = staging_dir / "step_coding.csv"
@@ -743,6 +755,7 @@ def _run_experiment_export(args: argparse.Namespace) -> int:
     if copy_raw_log:
         print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'raw_events.jsonl'}")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'help_cycles.csv'} ({len(export.help_cycles)} cycles)")
+    print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'action_timeline.csv'} ({len(export.action_timeline)} actions)")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'step_coding.csv'} ({len(export.step_coding)} steps)")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'trial_summary.csv'} ({len(export.trial_summary)} trials)")
     print(f"[EXPERIMENT_EXPORT] wrote {out_dir / 'summary.json'}")
