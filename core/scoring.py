@@ -1,10 +1,10 @@
 """
-Simple scoring engine v1.
+Legacy scoring engine v1.
 
 Rules:
 - Omission (OM): any canonical step up to the max observed step not completed.
 - State Violation (SV): observation tags containing 'state_violation'.
-- Other categories default to 0 in this version.
+- CO/OR/PA are not automatically detected by this legacy scorer.
 - Critical multiplier applied to omissions when step critical=True.
 """
 
@@ -95,6 +95,13 @@ def score_log(log_events: List[dict], pack_path: str, taxonomy_path: str) -> dic
         "Error_PA": errors["PA"],
         "Error_SV": errors["SV"],
         "TotalErrorScore": total,
+        "ScoringMode": "legacy_om_sv_only",
+        "FinalScoreRequiresHumanCoding": True,
+        "UndetectedErrorCategories": ["CO", "OR", "PA"],
+        "ScoringNotes": [
+            "CO/OR/PA zeros mean not detected by the legacy scorer, not verified absence.",
+            "Use experiment-export step_coding auto candidate columns as prefill for human raters.",
+        ],
         "completed_steps": sorted(list(completed)),
         "max_observed_step_index": max_seen_idx,
     }

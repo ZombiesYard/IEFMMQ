@@ -172,6 +172,12 @@ python -m simtutor score logs/run_demo.jsonl \
   --taxonomy packs/fa18c_startup/taxonomy.yaml
 ```
 
+`simtutor score` is a legacy OM/SV-only smoke scorer. For experiment scoring,
+use `experiment-export`: `step_coding.csv` contains automatic candidate/prefill
+columns (`Auto_Error_*`, confidence, evidence refs) plus blank final rater
+columns (`Error_*`, `CoderID`, `CoderNotes`). Final five-category scores require
+human rater confirmation.
+
 ## Documentation
 
 Detailed commands are intentionally kept out of the front page:

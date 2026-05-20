@@ -367,6 +367,90 @@ def _make_events_with_action_timeline() -> list[dict]:
     ]
 
 
+def _make_events_for_prescoring_candidates() -> list[dict]:
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+
+    def ts(offset: int) -> str:
+        return t0.replace(second=offset).isoformat()
+
+    return [
+        {
+            "kind": "step_activated",
+            "payload": {"step_id": "S01"},
+            "t_wall": 0.0,
+            "timestamp": ts(0),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 1.0,
+                "source": "dcs_bios",
+                "bios": {"APU_CONTROL_SW": 1},
+                "delta": {"APU_CONTROL_SW": 1},
+                "vars": {"power_available": False},
+            },
+            "t_wall": 1.0,
+            "timestamp": ts(1),
+        },
+        {
+            "kind": "step_completed",
+            "payload": {"step_id": "S01"},
+            "t_wall": 2.0,
+            "timestamp": ts(2),
+        },
+        {
+            "kind": "step_activated",
+            "payload": {"step_id": "S02"},
+            "t_wall": 3.0,
+            "timestamp": ts(3),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 2,
+                "t_wall": 4.0,
+                "source": "dcs_bios",
+                "bios": {"EXPERIMENTAL_RAW_KEY": 7},
+                "delta": {"EXPERIMENTAL_RAW_KEY": 7},
+            },
+            "t_wall": 4.0,
+            "timestamp": ts(4),
+        },
+        {
+            "kind": "step_completed",
+            "payload": {"step_id": "S03"},
+            "t_wall": 5.0,
+            "timestamp": ts(5),
+        },
+        {
+            "kind": "observation",
+            "payload": {
+                "procedure_hint": "S05",
+                "tags": ["state_violation"],
+            },
+            "t_wall": 6.0,
+            "timestamp": ts(6),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 3,
+                "t_wall": 7.0,
+                "source": "dcs_bios",
+                "bios": {"RADALT_MIN_HEIGHT_PTR": 50000},
+                "delta": {"RADALT_MIN_HEIGHT_PTR": 50000},
+                "vars": {"radar_altimeter_bug_value": 500},
+            },
+            "t_wall": 7.0,
+            "timestamp": ts(7),
+        },
+    ]
+
+
 # ── tests ───────────────────────────────────────────────────────────────
 
 def test_session_meta_roundtrip():
@@ -598,14 +682,274 @@ def test_study_ready_csv_contract_fields_are_frozen():
         "ParticipantID", "Condition", "TrialID", "StepID", "StepTitle", "Phase", "Critical",
         "Performed", "Completed", "FirstHelpTime_sec", "HelpCount", "FirstOverlayTargets",
         "LastOverlayTargets", "FirstFusedStepID", "LastFusedStepID", "EvidenceRefs",
-        "Error_OM", "Error_CO", "Error_OR", "Error_PA", "Error_SV", "CoderNotes",
-        "AutoCodingNotes",
+        "Auto_Error_OM", "Auto_Error_CO", "Auto_Error_OR", "Auto_Error_PA", "Auto_Error_SV",
+        "AutoConfidence", "AutoEvidenceRefs", "NeedsHumanReview",
+        "Error_OM", "Error_CO", "Error_OR", "Error_PA", "Error_SV", "CoderID",
+        "CoderNotes", "AutoCodingNotes",
     ]
     assert TRIAL_SUMMARY_CSV_FIELDS == [
         "ParticipantID", "Condition", "TrialID", "Completed", "TaskTime_sec", "HelpRequests",
         "LLMTriggers", "VLMCalls", "OverlayExecuted", "OverlayRejected", "FallbackCount",
         "CriticalStepsCompleted", "TotalStepsCompleted", "StepCompletionAccuracy",
     ]
+
+
+def test_step_coding_prefills_error_candidates_for_human_review():
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_events_for_prescoring_candidates(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P01", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert by_step["S02"].Auto_Error_OM == "1"
+    assert by_step["S02"].Auto_Error_CO == "1"
+    assert by_step["S02"].NeedsHumanReview == "yes"
+    assert "om:not_completed" in by_step["S02"].AutoEvidenceRefs
+    assert "action:4:unmapped_raw_key" in by_step["S02"].AutoEvidenceRefs
+
+    assert by_step["S03"].Completed == "yes"
+    assert by_step["S03"].Auto_Error_OR == "0"
+    assert by_step["S03"].Auto_Error_SV == "1"
+    assert "action:1:precondition_gate:s03_requires_power_available" in by_step["S03"].AutoEvidenceRefs
+
+    assert by_step["S05"].Auto_Error_SV == "1"
+    assert "observation:6:state_violation" in by_step["S05"].AutoEvidenceRefs
+
+    assert by_step["S31"].Auto_Error_PA == "1"
+    assert "vars.radar_altimeter_bug_value=500" in by_step["S31"].AutoEvidenceRefs
+
+    assert by_step["S01"].Auto_Error_OM == "0"
+    assert by_step["S01"].NeedsHumanReview == "no"
+    assert by_step["S01"].Error_OM == ""
+    assert by_step["S01"].CoderID == ""
+
+
+def test_order_prefill_requires_failed_gate_dependency(tmp_path: Path):
+    pack = tmp_path / "pack.yaml"
+    pack.write_text(
+        "steps:\n"
+        "  - id: S01\n"
+        "    phase: P1\n"
+        "    critical: false\n"
+        "    completion_conditions: [Ready set.]\n"
+        "    ui_targets: [ready_switch]\n"
+        "  - id: S02\n"
+        "    phase: P1\n"
+        "    critical: false\n"
+        "    completion_conditions: [Next set.]\n"
+        "    ui_targets: [next_switch]\n"
+        "precondition_gates:\n"
+        "  S01: []\n"
+        "  S02:\n"
+        "    - op: flag_true\n"
+        "      var: vars.ready\n"
+        "      reason_code: s02_requires_ready\n"
+        "completion_gates:\n"
+        "  S01:\n"
+        "    - op: flag_true\n"
+        "      var: vars.ready\n"
+        "      reason_code: s01_requires_ready\n"
+        "  S02: []\n",
+        encoding="utf-8",
+    )
+    ui_map = tmp_path / "ui_map.yaml"
+    ui_map.write_text(
+        "cockpit_elements:\n"
+        "  ready_switch: {}\n"
+        "  next_switch: {}\n",
+        encoding="utf-8",
+    )
+    bios_to_ui = tmp_path / "bios_to_ui.yaml"
+    bios_to_ui.write_text(
+        "mappings:\n"
+        "  NEXT_SW:\n"
+        "    - next_switch\n",
+        encoding="utf-8",
+    )
+
+    export = build_experiment_export(
+        [
+            {"kind": "step_activated", "payload": {"step_id": "S01"}, "t_wall": 0.0},
+            {
+                "kind": "observation",
+                "source": "dcs_bios",
+                "payload": {
+                    "source": "dcs_bios",
+                    "bios": {"NEXT_SW": 1},
+                    "delta": {"NEXT_SW": 1},
+                    "vars": {"ready": False},
+                },
+                "t_wall": 1.0,
+            },
+        ],
+        pack_path=pack,
+        bios_to_ui_path=bios_to_ui,
+        ui_map_path=ui_map,
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert by_step["S02"].Auto_Error_SV == "1"
+    assert by_step["S02"].Auto_Error_OR == "1"
+    assert "action:1:out_of_order_before:S01" in by_step["S02"].AutoEvidenceRefs
+
+
+def test_active_step_mismatch_without_blocked_gate_is_not_sv_or_order():
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    events = [
+        {"kind": "step_completed", "payload": {"step_id": "S01"}, "t_wall": 0.0, "timestamp": t0.isoformat()},
+        {"kind": "step_activated", "payload": {"step_id": "S02"}, "t_wall": 1.0, "timestamp": t0.isoformat()},
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 2.0,
+                "source": "dcs_bios",
+                "bios": {"APU_CONTROL_SW": 1},
+                "delta": {"APU_CONTROL_SW": 1},
+                "vars": {"power_available": True},
+            },
+            "t_wall": 2.0,
+            "timestamp": t0.isoformat(),
+        },
+    ]
+    root = _repo_root()
+    export = build_experiment_export(
+        events,
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert by_step["S03"].Auto_Error_SV == "0"
+    assert by_step["S03"].Auto_Error_OR == "0"
+    assert by_step["S02"].Auto_Error_CO == "1"
+
+
+def test_parameter_prefill_uses_step_scoped_values_for_reversible_controls():
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    events = [
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 1.0,
+                "source": "dcs_bios",
+                "bios": {"PROBE_SW": 0},
+                "delta": {"PROBE_SW": 0},
+                "vars": {"ext_refuel_probe_value": 65000},
+            },
+            "t_wall": 1.0,
+            "timestamp": t0.isoformat(),
+        },
+        {"kind": "step_completed", "payload": {"step_id": "S20"}, "t_wall": 2.0, "timestamp": t0.isoformat()},
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 2,
+                "t_wall": 3.0,
+                "source": "dcs_bios",
+                "bios": {"PROBE_SW": 1},
+                "delta": {"PROBE_SW": 1},
+                "vars": {"ext_refuel_probe_value": 0},
+            },
+            "t_wall": 3.0,
+            "timestamp": t0.isoformat(),
+        },
+        {"kind": "step_completed", "payload": {"step_id": "S21"}, "t_wall": 4.0, "timestamp": t0.isoformat()},
+    ]
+    root = _repo_root()
+    export = build_experiment_export(
+        events,
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert by_step["S20"].Auto_Error_PA == "0"
+    assert by_step["S21"].Auto_Error_PA == "0"
+
+
+def test_parameter_prefill_reads_vars_only_telemetry_inside_step_window():
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    events = [
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 1.0,
+                "source": "dcs_bios",
+                "bios": {"RADALT_MIN_HEIGHT_PTR": 50000},
+                "delta": {"RADALT_MIN_HEIGHT_PTR": 50000},
+            },
+            "t_wall": 1.0,
+            "timestamp": t0.isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 2,
+                "t_wall": 2.0,
+                "source": "dcs_bios",
+                "vars": {"radar_altimeter_bug_value": 500},
+            },
+            "t_wall": 2.0,
+            "timestamp": t0.isoformat(),
+        },
+        {"kind": "step_completed", "payload": {"step_id": "S31"}, "t_wall": 3.0, "timestamp": t0.isoformat()},
+    ]
+    root = _repo_root()
+    export = build_experiment_export(
+        events,
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert by_step["S31"].Auto_Error_PA == "1"
+    assert "vars.radar_altimeter_bug_value=500" in by_step["S31"].AutoEvidenceRefs
+
+
+def test_parameter_prefill_honors_carrier_profile_overrides():
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    events = [
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 1.0,
+                "source": "dcs_bios",
+                "bios": {"RADALT_MIN_HEIGHT_PTR": 4000},
+                "delta": {"RADALT_MIN_HEIGHT_PTR": 4000},
+                "vars": {"radar_altimeter_bug_value": 40},
+            },
+            "t_wall": 1.0,
+            "timestamp": t0.isoformat(),
+        },
+    ]
+    root = _repo_root()
+    export = build_experiment_export(
+        events,
+        meta_overrides={"scenario_profile": "carrier"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    by_step = {row.StepID: row for row in export.step_coding}
+
+    assert by_step["S31"].Auto_Error_PA == "0"
 
 
 def test_action_timeline_links_dcs_deltas_to_steps_and_help_cycles():

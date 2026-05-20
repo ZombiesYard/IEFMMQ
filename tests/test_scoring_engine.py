@@ -47,6 +47,9 @@ def test_scoring_distinguishes_scenarios():
         assert score_prem["TotalErrorScore"] > score_good["TotalErrorScore"]
         assert score_prem["Count_SV"] > 0
         assert score_missing["Count_OM"] > score_good["Count_OM"]
+        assert score_good["ScoringMode"] == "legacy_om_sv_only"
+        assert score_good["FinalScoreRequiresHumanCoding"] is True
+        assert score_good["UndetectedErrorCategories"] == ["CO", "OR", "PA"]
     finally:
         cleanup_path(Path(log_good))
         cleanup_path(Path(log_missing))
