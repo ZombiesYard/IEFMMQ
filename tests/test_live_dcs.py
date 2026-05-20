@@ -55,7 +55,12 @@ from live_dcs import (
 )
 from simtutor.schemas import validate_instance
 from tools.index_docs import build_index
-from tests._fakes import FakeClient
+from tests._fakes import (
+    FakeClient,
+    FakeResponse,
+    _extract_prompt_constraints_json,
+    _openai_chat_payload_from_help_obj,
+)
 from tests.adapters.socket_stubs import DummySocket
 
 
@@ -11844,6 +11849,156 @@ def test_live_help_fixture_315_s18_advancement_uses_pb5_when_bit_root_seen() -> 
     public_text = _public_response_text(repaired)
     assert "PB5" in public_text
     assert "PB18" not in public_text
+
+
+def test_live_help_fixture_315_f04_final_repair_uses_s18_default_pb5() -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/f04ab6b4-b567-4449-8d23-e14f00cf0fea.fixture.json"
+    )
+    request, response = _fixture_request_and_raw_model_response(fixture)
+
+    repaired = _validate_compact_live_help_response(request=request, response=response)
+
+    _assert_live_fixture_expectations(fixture, repaired)
+    assert repaired.metadata["diagnosis"]["step_id"] == "S18"
+    assert repaired.metadata["final_action_plan"]["targets"] == ["right_mdi_pb5"]
+    assert repaired.metadata["final_evidence_consistency_overlay_reason"] == "s18_default_bit_root_to_pb5"
+    assert [action["target"] for action in repaired.actions] == ["right_mdi_pb5"]
+    public_text = _public_response_text(repaired)
+    assert "PB5" in public_text
+    assert "PB18" not in public_text
+    assert "takeoff_trim_button" not in public_text
+
+
+def test_live_help_fixture_315_f04_stale_s17_candidate_advances_before_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _load_live_help_fixture(
+        "artifacts/live_fixtures/f04ab6b4-b567-4449-8d23-e14f00cf0fea.fixture.json"
+    )
+    observation_payload = fixture["context"]["observations"][0]
+    payload = dict(observation_payload["payload"])
+    vars_map = dict(payload["vars"])
+    payload["vars"] = vars_map
+    obs = Observation(
+        observation_id=observation_payload["observation_id"],
+        timestamp=observation_payload["timestamp"],
+        source=observation_payload["source"],
+        payload=payload,
+        version=observation_payload.get("version", "v1"),
+        procedure_hint=observation_payload.get("procedure_hint"),
+        tags=list(observation_payload.get("tags", [])),
+        attachments=list(observation_payload.get("attachments", [])),
+        metadata=dict(observation_payload.get("metadata", {})),
+    )
+    model = RecordingModel()
+    loop = LiveDcsTutorLoop(
+        source=_DelayedObservationSource(obs),
+        model=model,
+        action_executor=RecordingExecutor(),
+        rag_top_k=0,
+        lang="zh",
+    )
+
+    def _step_id(step: Any) -> str | None:
+        if isinstance(step, dict):
+            raw = step.get("id") or step.get("step_id")
+        else:
+            raw = getattr(step, "id", None) or getattr(step, "step_id", None)
+        return raw if isinstance(raw, str) else None
+
+    def fake_infer_step_id(pack_steps, *_args, **_kwargs) -> StepInferenceResult:
+        step_ids = [_step_id(step) for step in pack_steps]
+        if step_ids and step_ids[0] == "S18":
+            return StepInferenceResult(
+                inferred_step_id="S18",
+                missing_conditions=("vision_facts.fcsmc_page_visible==seen",),
+            )
+        return StepInferenceResult(
+            inferred_step_id="S17",
+            missing_conditions=("vars.takeoff_trim_set==true",),
+        )
+
+    monkeypatch.setattr("live_dcs.infer_step_id", fake_infer_step_id)
+    try:
+        loop._latest_enriched_obs = obs
+        loop._accumulated_vars.update(vars_map)
+        loop.telemetry_window_ring.add_delta(
+            vars_map,
+            t_wall=float(payload["t_wall"]),
+            seq=int(payload["seq"]),
+        )
+        loop._sticky_inference_step_id = "S17"
+        loop._sticky_inference_missing_conditions = ("vars.takeoff_trim_set==true",)
+        response, _report = loop.run_help_cycle(trigger_t_wall=float(payload["t_wall"]))
+    finally:
+        loop.close()
+
+    assert response is not None
+    assert model.calls
+    request = model.calls[0]["request"]
+    assert request is not None
+    hint = request.context["deterministic_step_hint"]
+    assert hint["inferred_step_id"] == "S18"
+    assert hint["overlay_step_id"] == "S18"
+    assert "vars.takeoff_trim_set==true" not in hint.get("missing_conditions", [])
+    assert hint["action_hint"]["target"] == "right_mdi_pb5"
+    assert hint["candidate_generation_rejected_step_id"] == "S17"
+    assert hint["candidate_generation_stale_missing_conditions"] == ["vars.takeoff_trim_set==true"]
+    assert "candidate_generation_stale_missing_condition:vars.takeoff_trim_set==true" in hint[
+        "candidate_generation_reasons"
+    ]
+
+    state_harness = request.context["state_harness"]
+    deterministic_candidate = state_harness["deterministic_candidate"]
+    assert deterministic_candidate["step_id"] == "S18"
+    assert deterministic_candidate["missing_conditions"] == ["vision_facts.fcsmc_page_visible==seen"]
+    assert request.context["vars"]["takeoff_trim_set"] is True
+    assert "vars.takeoff_trim_set==true" not in json.dumps(state_harness)
+    assert request.context["candidate_generation_rejected_step_id"] == "S17"
+    assert request.context["candidate_generation_stale_missing_conditions"] == [
+        "vars.takeoff_trim_set==true"
+    ]
+
+    trace = response.metadata["harness_trace"]
+    assert trace["candidate_generation"]["rejected_step_id"] == "S17"
+    assert trace["candidate_generation"]["stale_missing_conditions"] == [
+        "vars.takeoff_trim_set==true"
+    ]
+
+    help_obj = {
+        "diagnosis": {"step_id": "S18", "error_category": "OM"},
+        "next": {"step_id": "S18"},
+        "overlay": {
+            "targets": ["right_mdi_pb5"],
+            "evidence": [
+                {
+                    "target": "right_mdi_pb5",
+                    "type": "var",
+                    "ref": "VARS.takeoff_trim_set",
+                    "quote": "Takeoff trim is already set, so continue to the FCS-MC page.",
+                    "grounding_confidence": 0.9,
+                }
+            ],
+        },
+        "explanations": ["S17 is complete. Press right DDI PB5 to enter FCS-MC BIT."],
+    }
+    fake_client = FakeClient(
+        responses=[FakeResponse(_openai_chat_payload_from_help_obj(help_obj), status_code=200)]
+    )
+    provider = OpenAICompatModel(client=fake_client, lang="zh")
+    provider.explain_error(obs, request)
+
+    prompt_payload = _extract_prompt_constraints_json(
+        fake_client.calls[0]["json"]["messages"][1]["content"]
+    )
+    prompt_hint = prompt_payload["deterministic_step_hint"]
+    prompt_candidate = prompt_payload["state_harness"]["deterministic_candidate"]
+    assert prompt_hint["inferred_step_id"] == "S18"
+    assert prompt_hint["action_hint"]["target"] == "right_mdi_pb5"
+    assert prompt_candidate["step_id"] == "S18"
+    assert prompt_candidate["missing_conditions"] == ["vision_facts.fcsmc_page_visible==seen"]
+    assert "vars.takeoff_trim_set==true" not in json.dumps(prompt_payload)
 
 
 def test_live_help_visual_skip_trace_does_not_mark_s14_to_s15() -> None:

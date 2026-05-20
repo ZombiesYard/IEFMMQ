@@ -705,6 +705,19 @@ def _sanitize_deterministic_hint_for_event(raw: Any) -> dict[str, Any]:
         sanitized["step_ui_targets"] = [
             item for item in step_ui_targets if isinstance(item, str) and item
         ][:8]
+    candidate_generation_reasons = raw.get("candidate_generation_reasons")
+    if isinstance(candidate_generation_reasons, list):
+        sanitized["candidate_generation_reasons"] = [
+            item for item in candidate_generation_reasons if isinstance(item, str) and item
+        ][:8]
+    stale_missing = raw.get("candidate_generation_stale_missing_conditions")
+    if isinstance(stale_missing, list):
+        sanitized["candidate_generation_stale_missing_conditions"] = [
+            item for item in stale_missing if isinstance(item, str) and item
+        ][:8]
+    rejected_step_id = raw.get("candidate_generation_rejected_step_id")
+    if isinstance(rejected_step_id, str) and rejected_step_id:
+        sanitized["candidate_generation_rejected_step_id"] = rejected_step_id
     visual_action_hint = raw.get("visual_action_hint")
     if isinstance(visual_action_hint, Mapping):
         target = visual_action_hint.get("target")
@@ -2291,6 +2304,26 @@ def _build_harness_trace_metadata(
         "message_category": message_category,
         "vlm_call": vlm_call,
     }
+    candidate_generation_reasons = _coerce_string_list(context.get("candidate_generation_reasons"))
+    candidate_generation_stale_missing_conditions = _coerce_string_list(
+        context.get("candidate_generation_stale_missing_conditions")
+    )
+    candidate_generation_rejected_step_id = context.get("candidate_generation_rejected_step_id")
+    if (
+        candidate_generation_reasons
+        or candidate_generation_stale_missing_conditions
+        or isinstance(candidate_generation_rejected_step_id, str)
+    ):
+        trace["candidate_generation"] = {
+            "status": "corrected",
+            "reasons": candidate_generation_reasons,
+            "stale_missing_conditions": candidate_generation_stale_missing_conditions,
+            "rejected_step_id": (
+                candidate_generation_rejected_step_id
+                if isinstance(candidate_generation_rejected_step_id, str)
+                else None
+            ),
+        }
     vlm_skipped_preliminary_step = response_metadata.get("vlm_skipped_preliminary_step")
     if isinstance(vlm_skipped_preliminary_step, str) and vlm_skipped_preliminary_step:
         trace["vlm_skipped_preliminary_step"] = vlm_skipped_preliminary_step
@@ -2736,23 +2769,43 @@ def _missing_conditions_satisfied_by_vars(
 ) -> bool:
     checked = False
     for condition in missing_conditions:
-        if not isinstance(condition, str) or not condition:
-            continue
-        matched = _MISSING_CONDITION_VAR_RE.search(condition)
-        if matched is None:
+        satisfied = _missing_condition_satisfied_by_vars(condition, vars_selected)
+        if satisfied is None:
             return False
-        var_name = matched.group(1)
-        if "==true" in condition:
-            checked = True
-            if var_name == "comm1_freq_134_000" and _s09_comm1_frequency_complete(vars_selected):
-                continue
-            if var_name == "engine_crank_left_complete" and _left_engine_start_complete(vars_selected):
-                continue
-            if vars_selected.get(var_name) is not True:
-                return False
-        else:
+        checked = True
+        if not satisfied:
             return False
     return checked
+
+
+def _missing_condition_satisfied_by_vars(
+    condition: str,
+    vars_selected: Mapping[str, Any],
+) -> bool | None:
+    if not isinstance(condition, str) or not condition:
+        return None
+    matched = _MISSING_CONDITION_VAR_RE.search(condition)
+    if matched is None or "==true" not in condition:
+        return None
+    var_name = matched.group(1)
+    if var_name == "comm1_freq_134_000" and _s09_comm1_frequency_complete(vars_selected):
+        return True
+    if var_name == "engine_crank_left_complete" and _left_engine_start_complete(vars_selected):
+        return True
+    return vars_selected.get(var_name) is True
+
+
+def _satisfied_missing_conditions_by_vars(
+    missing_conditions: Sequence[str],
+    vars_selected: Mapping[str, Any],
+) -> list[str]:
+    out: list[str] = []
+    for condition in missing_conditions:
+        if not isinstance(condition, str) or not condition:
+            continue
+        if _missing_condition_satisfied_by_vars(condition, vars_selected) is True:
+            out.append(condition)
+    return out
 
 
 def _s19_final_go_hold_satisfied_by_facts(
@@ -4043,6 +4096,9 @@ class LiveDcsTutorLoop:
         }
         self._sticky_inference_step_id: str | None = None
         self._sticky_inference_missing_conditions: tuple[str, ...] = ()
+        self._candidate_generation_rejected_step_id: str | None = None
+        self._candidate_generation_stale_missing_conditions: tuple[str, ...] = ()
+        self._candidate_generation_reasons: tuple[str, ...] = ()
         self._refuel_probe_s20_latched_complete = False
         self._refuel_probe_s21_latched_complete = False
         self._launch_bar_s22_latched_complete = False
@@ -4080,6 +4136,9 @@ class LiveDcsTutorLoop:
         self._last_inferred_step_id = None
         self._sticky_inference_step_id = None
         self._sticky_inference_missing_conditions = ()
+        self._candidate_generation_rejected_step_id = None
+        self._candidate_generation_stale_missing_conditions = ()
+        self._candidate_generation_reasons = ()
         self._refuel_probe_s20_latched_complete = False
         self._refuel_probe_s21_latched_complete = False
         self._launch_bar_s22_latched_complete = False
@@ -4667,6 +4726,19 @@ class LiveDcsTutorLoop:
             "scenario_profile": self.scenario_profile,
             "vision_fact_status": vision_fact_context.get("status"),
         }
+        candidate_generation_reasons = list(self._candidate_generation_reasons)
+        candidate_generation_stale_missing_conditions = list(
+            self._candidate_generation_stale_missing_conditions
+        )
+        candidate_generation_rejected_step_id = self._candidate_generation_rejected_step_id
+        if candidate_generation_reasons:
+            deterministic_hint["candidate_generation_reasons"] = candidate_generation_reasons
+        if candidate_generation_stale_missing_conditions:
+            deterministic_hint["candidate_generation_stale_missing_conditions"] = (
+                candidate_generation_stale_missing_conditions
+            )
+        if isinstance(candidate_generation_rejected_step_id, str) and candidate_generation_rejected_step_id:
+            deterministic_hint["candidate_generation_rejected_step_id"] = candidate_generation_rejected_step_id
         if isinstance(inference.inferred_step_id, str) and inference.inferred_step_id:
             step_harness_spec = self.step_harness_specs.get(inference.inferred_step_id)
             if step_harness_spec is not None:
@@ -4800,6 +4872,14 @@ class LiveDcsTutorLoop:
             "vision_facts": list(vision_fact_context.get("vision_facts", [])),
             "vision_fact_summary": dict(vision_fact_context.get("vision_fact_summary", {})),
         }
+        if candidate_generation_reasons:
+            context["candidate_generation_reasons"] = list(candidate_generation_reasons)
+        if candidate_generation_stale_missing_conditions:
+            context["candidate_generation_stale_missing_conditions"] = list(
+                candidate_generation_stale_missing_conditions
+            )
+        if isinstance(candidate_generation_rejected_step_id, str) and candidate_generation_rejected_step_id:
+            context["candidate_generation_rejected_step_id"] = candidate_generation_rejected_step_id
 
         prompt_result = build_help_prompt_result(
             context,
@@ -4912,6 +4992,21 @@ class LiveDcsTutorLoop:
         if isinstance(power_available, bool) and not power_available:
             return True
         return False
+
+    def _record_candidate_generation_stale_missing(
+        self,
+        *,
+        rejected_step_id: str,
+        missing_conditions: Sequence[str],
+        vars_selected: Mapping[str, Any],
+    ) -> None:
+        stale = _satisfied_missing_conditions_by_vars(missing_conditions, vars_selected)
+        self._candidate_generation_rejected_step_id = rejected_step_id
+        self._candidate_generation_stale_missing_conditions = tuple(stale)
+        self._candidate_generation_reasons = tuple(
+            f"candidate_generation_stale_missing_condition:{condition}"
+            for condition in stale
+        )
 
     def _stabilize_live_inference(
         self,
@@ -5045,7 +5140,7 @@ class LiveDcsTutorLoop:
                 self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
                 return advanced
         if (
-            current_step_id in {"S09", "S10"}
+            current_step_id in {"S09", "S10", "S17"}
             and _missing_conditions_satisfied_by_vars(inference.missing_conditions, vars_selected)
         ):
             advanced = self._infer_after_completed_step(
@@ -5055,6 +5150,11 @@ class LiveDcsTutorLoop:
                 vision_facts=None,
             )
             if advanced is not None:
+                self._record_candidate_generation_stale_missing(
+                    rejected_step_id=current_step_id,
+                    missing_conditions=inference.missing_conditions,
+                    vars_selected=vars_selected,
+                )
                 self._sticky_inference_step_id = advanced.inferred_step_id
                 self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
                 return advanced
@@ -5064,7 +5164,7 @@ class LiveDcsTutorLoop:
             return inference
         if (
             isinstance(sticky_step_id, str)
-            and sticky_step_id in {"S09", "S10"}
+            and sticky_step_id in {"S09", "S10", "S17"}
             and _missing_conditions_satisfied_by_vars(self._sticky_inference_missing_conditions, vars_selected)
         ):
             advanced = self._infer_after_completed_step(
@@ -5074,6 +5174,11 @@ class LiveDcsTutorLoop:
                 vision_facts=None,
             )
             if advanced is not None:
+                self._record_candidate_generation_stale_missing(
+                    rejected_step_id=sticky_step_id,
+                    missing_conditions=self._sticky_inference_missing_conditions,
+                    vars_selected=vars_selected,
+                )
                 self._sticky_inference_step_id = advanced.inferred_step_id
                 self._sticky_inference_missing_conditions = tuple(advanced.missing_conditions)
                 return advanced
@@ -9458,6 +9563,9 @@ class LiveDcsTutorLoop:
         obs = self._latest_enriched_obs
         if obs is None:
             return None, None
+        self._candidate_generation_rejected_step_id = None
+        self._candidate_generation_stale_missing_conditions = ()
+        self._candidate_generation_reasons = ()
 
         resolved_trigger_t_wall = _coerce_finite_float(trigger_t_wall)
         if resolved_trigger_t_wall is None:

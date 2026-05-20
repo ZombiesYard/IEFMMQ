@@ -313,6 +313,23 @@ class BaseHelpModel(ModelPort):
             recent_ui_targets,
             inference_vars,
         )
+        request_hint = self._request_deterministic_hint(request)
+        if request_hint is not None:
+            request_hint.setdefault("recent_ui_targets", list(recent_ui_targets))
+            deterministic_hint = request_hint
+            hinted_step_id = request_hint.get("inferred_step_id")
+            if isinstance(hinted_step_id, str) and hinted_step_id:
+                raw_missing_conditions = request_hint.get("missing_conditions")
+                if not isinstance(raw_missing_conditions, (list, tuple)):
+                    raw_missing_conditions = []
+                deterministic_inference = StepInferenceResult(
+                    inferred_step_id=hinted_step_id,
+                    missing_conditions=tuple(
+                        item
+                        for item in raw_missing_conditions
+                        if isinstance(item, str) and item
+                    ),
+                )
         prompt_meta: dict[str, Any] = {}
         delta_dropped_count = self._extract_delta_dropped_count(request)
         prompt_budget_used = 0
@@ -520,6 +537,11 @@ class BaseHelpModel(ModelPort):
         inferred_step_id = None
         if inference is not None:
             inferred_step_id = inference.inferred_step_id
+        request_hint = self._request_deterministic_hint(request)
+        if request_hint is not None:
+            hinted_step_id = request_hint.get("inferred_step_id")
+            if isinstance(hinted_step_id, str) and hinted_step_id:
+                inferred_step_id = hinted_step_id
         state_harness = context.get("state_harness")
         harness_conflicts = (
             state_harness.get("conflicts")
@@ -545,11 +567,12 @@ class BaseHelpModel(ModelPort):
         if not isinstance(scenario_profile, str) or not scenario_profile:
             scenario_profile = None
         normalized_recent_ui_targets = list(recent_ui_targets or [])
-        hint_payload = (
-            dict(deterministic_hint)
-            if isinstance(deterministic_hint, Mapping)
-            else self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
-        )
+        if request_hint is not None:
+            hint_payload = dict(request_hint)
+        elif isinstance(deterministic_hint, Mapping):
+            hint_payload = dict(deterministic_hint)
+        else:
+            hint_payload = self._serialize_deterministic_hint(inference, normalized_recent_ui_targets)
         step_ui_targets = hint_payload.get("step_ui_targets")
         missing_conditions = hint_payload.get("missing_conditions")
         gate_blockers = hint_payload.get("gate_blockers")
@@ -584,6 +607,10 @@ class BaseHelpModel(ModelPort):
             "vision": context.get("vision"),
             "vision_facts": context.get("vision_facts"),
             "vision_fact_summary": context.get("vision_fact_summary"),
+            "state_harness": state_harness,
+            "evidence_packet_summary": context.get("evidence_packet_summary"),
+            "evidence_snapshot": context.get("evidence_snapshot"),
+            "snapshot_ids": context.get("snapshot_ids"),
             "observation": {
                 "procedure_hint": observation.procedure_hint,
                 "source": observation.source,
@@ -605,6 +632,15 @@ class BaseHelpModel(ModelPort):
             ],
             prompt_meta,
         )
+
+    @staticmethod
+    def _request_deterministic_hint(request: TutorRequest | None) -> dict[str, Any] | None:
+        if request is None or not isinstance(request.context, dict):
+            return None
+        raw = request.context.get("deterministic_step_hint")
+        if not isinstance(raw, Mapping):
+            return None
+        return dict(raw)
 
     def _print_model_io_block(
         self,
