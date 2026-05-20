@@ -7,8 +7,12 @@ behavior traces, system response metadata, and experiment-layer annotations.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field, asdict
+from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+import yaml
 
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
@@ -41,19 +45,95 @@ def _opt_int(raw: Any) -> int | None:
 def _opt_bool(raw: Any) -> bool | None:
     if isinstance(raw, bool):
         return raw
+    if isinstance(raw, str):
+        normalized = raw.strip().lower()
+        if normalized in ("1", "true", "yes", "y"):
+            return True
+        if normalized in ("0", "false", "no", "n"):
+            return False
     return None
 
 
 # ── experiment-layer metadata ──────────────────────────────────────────
 
+EXPECTED_PACK_STEP_IDS = [f"S{i:02d}" for i in range(1, 34)]
+
+HELP_CYCLES_CSV_FIELDS = [
+    "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
+    "vision_used", "vision_status", "vision_fallback_reason", "sync_delta_ms",
+    "fused_step_id", "fused_missing_conditions", "model_next_step_id",
+    "overlay_targets", "overlay_executed", "overlay_rejected",
+    "overlay_dropped", "overlay_dry_run_count", "response_status", "fallback_overlay_used",
+    "observability_status", "requires_visual_confirmation",
+    "scenario_profile",
+]
+
+CRITICAL_EXPORT_META_FIELDS = [
+    "trial_id",
+    "study_id",
+    "participant_id",
+    "condition",
+    "group",
+    "experimenter_id",
+    "questionnaire_ref",
+    "recording_ref",
+    "git_commit",
+    "git_dirty",
+    "pack_path",
+    "pack_hash",
+    "taxonomy_path",
+    "taxonomy_hash",
+    "ui_map_hash",
+    "bios_to_ui_hash",
+    "model_provider",
+    "model_name",
+    "vision_model_name",
+    "scenario_profile",
+    "dcs_mission",
+    "dcs_aircraft",
+    "raw_log_ref",
+    "raw_log_sha256",
+]
+
+RECOMMENDED_EXPORT_META_FIELDS: list[str] = []
+
+CRITICAL_ONE_OF_META_FIELDS = [
+    ("prompt_version or prompt_hash", ("prompt_version", "prompt_hash")),
+    ("vr_setup or monitor_setup", ("vr_setup", "monitor_setup")),
+]
+
 
 @dataclass
 class SessionMeta:
+    trial_id: str = ""
+    study_id: str = ""
     participant_id: str = ""
     session_id: str = ""
     condition: str = ""
     group: str = ""
+    experimenter_id: str | None = None
     questionnaire_ref: str | None = None
+    recording_ref: str | None = None
+    git_commit: str | None = None
+    git_dirty: bool | None = None
+    pack_path: str | None = None
+    pack_hash: str | None = None
+    taxonomy_path: str | None = None
+    taxonomy_hash: str | None = None
+    ui_map_hash: str | None = None
+    bios_to_ui_hash: str | None = None
+    model_provider: str | None = None
+    model_name: str | None = None
+    vision_model_name: str | None = None
+    prompt_version: str | None = None
+    prompt_hash: str | None = None
+    scenario_profile: str | None = None
+    dcs_mission: str | None = None
+    dcs_aircraft: str | None = None
+    vr_setup: str | None = None
+    monitor_setup: str | None = None
+    raw_log_ref: str | None = None
+    raw_log_sha256: str | None = None
     experimenter_notes: str | None = None
     started_at: str | None = None
     ended_at: str | None = None
@@ -64,15 +144,258 @@ class SessionMeta:
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "SessionMeta":
         return cls(
+            trial_id=_opt_str(raw.get("trial_id")) or "",
+            study_id=_opt_str(raw.get("study_id")) or "",
             participant_id=_opt_str(raw.get("participant_id")) or "",
             session_id=_opt_str(raw.get("session_id")) or "",
             condition=_opt_str(raw.get("condition")) or "",
             group=_opt_str(raw.get("group")) or "",
+            experimenter_id=_opt_str(raw.get("experimenter_id")),
             questionnaire_ref=_opt_str(raw.get("questionnaire_ref")),
+            recording_ref=_opt_str(raw.get("recording_ref")),
+            git_commit=_opt_str(raw.get("git_commit")),
+            git_dirty=_opt_bool(raw.get("git_dirty")),
+            pack_path=_opt_str(raw.get("pack_path")),
+            pack_hash=_opt_str(raw.get("pack_hash")),
+            taxonomy_path=_opt_str(raw.get("taxonomy_path")),
+            taxonomy_hash=_opt_str(raw.get("taxonomy_hash")),
+            ui_map_hash=_opt_str(raw.get("ui_map_hash")),
+            bios_to_ui_hash=_opt_str(raw.get("bios_to_ui_hash")),
+            model_provider=_opt_str(raw.get("model_provider")),
+            model_name=_opt_str(raw.get("model_name")),
+            vision_model_name=_opt_str(raw.get("vision_model_name")),
+            prompt_version=_opt_str(raw.get("prompt_version")),
+            prompt_hash=_opt_str(raw.get("prompt_hash")),
+            scenario_profile=_opt_str(raw.get("scenario_profile")),
+            dcs_mission=_opt_str(raw.get("dcs_mission")),
+            dcs_aircraft=_opt_str(raw.get("dcs_aircraft")),
+            vr_setup=_opt_str(raw.get("vr_setup")),
+            monitor_setup=_opt_str(raw.get("monitor_setup")),
+            raw_log_ref=_opt_str(raw.get("raw_log_ref")),
+            raw_log_sha256=_opt_str(raw.get("raw_log_sha256")),
             experimenter_notes=_opt_str(raw.get("experimenter_notes")),
             started_at=_opt_str(raw.get("started_at")),
             ended_at=_opt_str(raw.get("ended_at")),
         )
+
+
+@dataclass
+class ExportQualityReport:
+    strict: bool = False
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    checks: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def passed(self) -> bool:
+        return not self.errors
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "passed": self.passed,
+            "strict": self.strict,
+            "errors": list(self.errors),
+            "warnings": list(self.warnings),
+            "checks": dict(self.checks),
+        }
+
+
+def build_file_sha256(path: str | Path) -> str:
+    hasher = hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _meta_value_present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def _load_yaml_mapping(path: str | Path) -> Mapping[str, Any]:
+    payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError("YAML root must be a mapping")
+    return payload
+
+
+def _append_gate_issue(report: ExportQualityReport, message: str, *, strict: bool) -> None:
+    if strict:
+        report.errors.append(message)
+    else:
+        report.warnings.append(message)
+
+
+def build_export_quality_report(
+    meta: SessionMeta,
+    *,
+    events: Sequence[Mapping[str, Any]],
+    strict: bool = False,
+    pack_path: str | Path | None = None,
+    taxonomy_path: str | Path | None = None,
+    ui_map_path: str | Path | None = None,
+    bios_to_ui_path: str | Path | None = None,
+    raw_log_copied: bool = False,
+    expected_help_cycle_rows: int | None = None,
+    actual_help_cycle_rows: int | None = None,
+    help_cycle_csv_headers: Sequence[str] | None = None,
+) -> ExportQualityReport:
+    report = ExportQualityReport(strict=bool(strict))
+    report.checks["event_count"] = len(events)
+
+    for field_name in CRITICAL_EXPORT_META_FIELDS:
+        if not _meta_value_present(getattr(meta, field_name)):
+            _append_gate_issue(
+                report,
+                f"missing critical metadata field: {field_name}",
+                strict=strict,
+            )
+
+    for group_name, field_names in CRITICAL_ONE_OF_META_FIELDS:
+        if not any(_meta_value_present(getattr(meta, field_name)) for field_name in field_names):
+            _append_gate_issue(
+                report,
+                f"missing critical metadata field: {group_name}",
+                strict=strict,
+            )
+
+    missing_recommended = [
+        field_name
+        for field_name in RECOMMENDED_EXPORT_META_FIELDS
+        if not _meta_value_present(getattr(meta, field_name))
+    ]
+    report.checks["missing_recommended_metadata_fields"] = missing_recommended
+    for field_name in missing_recommended:
+        report.warnings.append(f"missing recommended metadata field: {field_name}")
+
+    if not raw_log_copied:
+        _append_gate_issue(
+            report,
+            "raw_log was not copied into the export directory",
+            strict=strict,
+        )
+    report.checks["raw_log_copied"] = bool(raw_log_copied)
+
+    def _validate_hash(path: str | Path | None, meta_hash_field: str) -> None:
+        if path is None:
+            return
+        try:
+            actual_hash = build_file_sha256(path)
+        except Exception as exc:
+            _append_gate_issue(
+                report,
+                f"failed to hash {Path(path).name}: {exc}",
+                strict=strict,
+            )
+            return
+        recorded_hash = getattr(meta, meta_hash_field)
+        report.checks[f"actual_{meta_hash_field}"] = actual_hash
+        if _meta_value_present(recorded_hash) and recorded_hash != actual_hash:
+            _append_gate_issue(
+                report,
+                f"{meta_hash_field} does not match file content",
+                strict=strict,
+            )
+
+    if pack_path is None:
+        _append_gate_issue(report, "pack_path is required for S01-S33 quality gate", strict=strict)
+    else:
+        _validate_hash(pack_path, "pack_hash")
+        try:
+            pack = _load_yaml_mapping(pack_path)
+            steps = pack.get("steps")
+            if not isinstance(steps, list):
+                raise ValueError("pack.yaml missing top-level steps list")
+            step_ids = [
+                item.get("id")
+                for item in steps
+                if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+            ]
+            report.checks["pack_step_ids"] = step_ids
+            if step_ids != EXPECTED_PACK_STEP_IDS:
+                _append_gate_issue(
+                    report,
+                    "pack steps must be exactly S01-S33 in order",
+                    strict=strict,
+                )
+        except Exception as exc:
+            _append_gate_issue(report, f"failed to validate pack steps: {exc}", strict=strict)
+
+    if taxonomy_path is None:
+        _append_gate_issue(report, "taxonomy_path is required for scoring quality gate", strict=strict)
+    else:
+        _validate_hash(taxonomy_path, "taxonomy_hash")
+        try:
+            taxonomy = _load_yaml_mapping(taxonomy_path)
+            scoring = taxonomy.get("scoring")
+            taxonomy_root = taxonomy.get("taxonomy")
+            categories = taxonomy_root.get("categories") if isinstance(taxonomy_root, Mapping) else None
+            if not isinstance(scoring, Mapping):
+                raise ValueError("taxonomy.yaml missing scoring mapping")
+            if not isinstance(categories, list) or not categories:
+                raise ValueError("taxonomy.yaml missing taxonomy.categories")
+            weights = scoring.get("base_weights")
+            if not isinstance(weights, Mapping):
+                raise ValueError("taxonomy.yaml missing scoring.base_weights")
+            category_codes = [
+                item.get("code")
+                for item in categories
+                if isinstance(item, Mapping) and isinstance(item.get("code"), str)
+            ]
+            report.checks["taxonomy_category_codes"] = category_codes
+            missing_weights = [code for code in category_codes if code not in weights]
+            if missing_weights:
+                _append_gate_issue(
+                    report,
+                    "taxonomy categories missing scoring weights: " + ", ".join(missing_weights),
+                    strict=strict,
+                )
+        except Exception as exc:
+            _append_gate_issue(report, f"failed to validate taxonomy/scoring docs: {exc}", strict=strict)
+
+    _validate_hash(ui_map_path, "ui_map_hash")
+    _validate_hash(bios_to_ui_path, "bios_to_ui_hash")
+
+    if help_cycle_csv_headers is not None:
+        header_list = list(help_cycle_csv_headers)
+        report.checks["help_cycles_csv_headers"] = header_list
+        if header_list != HELP_CYCLES_CSV_FIELDS:
+            _append_gate_issue(
+                report,
+                "help_cycles.csv headers do not match expected export contract",
+                strict=strict,
+            )
+    elif expected_help_cycle_rows is not None:
+        _append_gate_issue(
+            report,
+            "help_cycles.csv was not generated for row/header validation",
+            strict=strict,
+        )
+
+    if actual_help_cycle_rows is not None and expected_help_cycle_rows is not None:
+        report.checks["help_cycle_row_count"] = actual_help_cycle_rows
+        report.checks["expected_help_cycle_row_count"] = expected_help_cycle_rows
+        if actual_help_cycle_rows != expected_help_cycle_rows:
+            _append_gate_issue(
+                report,
+                (
+                    "help_cycles.csv row count mismatch: "
+                    f"expected {expected_help_cycle_rows}, got {actual_help_cycle_rows}"
+                ),
+                strict=strict,
+            )
+    elif expected_help_cycle_rows is not None:
+        _append_gate_issue(
+            report,
+            "help_cycles.csv row count was not available for validation",
+            strict=strict,
+        )
+
+    return report
 
 
 # ── per-cycle behavioural record ───────────────────────────────────────
@@ -137,6 +460,7 @@ class ExperimentExport:
     help_cycles: list[HelpCycleRecord] = field(default_factory=list)
     scoring: dict[str, Any] | None = None
     timeline: list[TimelineSnapshot] = field(default_factory=list)
+    quality_gate: ExportQualityReport | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -145,6 +469,7 @@ class ExperimentExport:
             "help_cycles": [c.to_dict() for c in self.help_cycles],
             "scoring": self.scoring,
             "timeline": [t.to_dict() for t in self.timeline],
+            "quality_gate": self.quality_gate.to_dict() if self.quality_gate is not None else None,
         }
 
 
@@ -479,8 +804,12 @@ def build_experiment_export(
 
 __all__ = [
     "SessionMeta",
+    "ExportQualityReport",
     "HelpCycleRecord",
     "TimelineSnapshot",
     "ExperimentExport",
+    "HELP_CYCLES_CSV_FIELDS",
+    "build_export_quality_report",
     "build_experiment_export",
+    "build_file_sha256",
 ]
