@@ -580,6 +580,83 @@ Schema 规则：
 
 除非另做专门转换或重新训练，否则不要把 9B LoRA 直接挂到 27B 上。
 
+### 当前论文 / 实验框架主线（2026-05-20 更新）
+
+当前 master thesis 的主线已经从“实时完整识别 5 类错误”收敛为：
+
+> 构建并评估一个 grounded multimodal VR/DCS procedural tutor：用遥测、VLM facts、LLM 推理、harness validation、overlay guidance 与 replay/export logs，支持复杂冷启动流程中的可执行中文帮助，并评估其对新手任务完成质量的影响。
+
+重要判断：
+
+- 不要把正式实验目标定义成“系统实时完整支持 OM/CO/OR/PA/SV 五类错误”
+- 五类错误可以保留为**实验评分 / 人工编码 / 后验分析框架**
+- runtime tutor 的当前核心能力是：基于当前状态给出正确下一步、正确高亮、帮助用户从卡住状态恢复
+- 正式实验前最缺的是：**实验级数据导出、step-level coding、trial summary、action timeline、版本冻结和分析表**
+- 在没有用户明确要求的情况下，不要再主动扩展 runtime tutor、不要继续做大规模 live loop 重构、不要追求全自动 CO/OR/PA/SV 检测
+
+当前已创建一组实验框架 issue，供接下来快速开发：
+
+1. **#354 Add experiment metadata freeze and export quality gate**
+   - 优先级最高
+   - 目标：保证每次实验 run 都能追溯 participant / condition / trial / git commit / pack hash / model / prompt / DCS setup
+   - 正式实验前必须避免“这条数据到底是哪版系统跑的”这种不可恢复问题
+
+2. **#353 Export study-ready trial and S01-S33 step coding tables**
+   - 核心 issue
+   - 目标：`experiment-export` 输出正式实验主表：
+     - `step_coding.csv`
+     - `trial_summary.csv`
+     - 扩展后的 `help_cycles.csv`
+     - 保留 `session.json` / `summary.json`
+   - `step_coding.csv` 应是 S01-S33 每步一行，给人工评分和统计直接使用
+
+3. **#355 Add experiment-grade participant action timeline export**
+   - 目标：输出 `action_timeline.csv`
+   - 用 DCS-BIOS delta / mapped UI target / nearby help cycle / candidate step 还原用户动作时间线
+   - 主要服务于 OR / CO / PA / SV 的人工复核，而不是声称自动完美识别
+
+4. **#352 Add semi-automatic pre-scoring and human rater workflow**
+   - 目标：自动生成 OM/SV/OR/PA/CO candidate 和 evidence refs，最终仍由 human rater 确认
+   - 不要把 `core/scoring.py` 里 CO/OR/PA 默认为 0 的 v1 scoring 误当成正式评分器
+   - 论文表述应为 “semi-automatic evidence-assisted coding”
+
+5. **#356 Generate thesis-ready experiment analysis tables and figures**
+   - 最后做
+   - 目标：从 exported CSV 生成 `study_summary.csv`、`condition_summary.csv`、step accuracy / help request / completion / task time 图表
+   - 不做复杂 dashboard，不做过度统计框架
+
+建议开发顺序：
+
+```text
+#354 -> #353 -> #355 -> #352 -> #356
+```
+
+最快开发规则：
+
+- 每个 issue 一个短分支 / 一个 Codex session，不混做
+- 先写 synthetic event log 测试，再用一条真实 live log 做回归
+- 不改 runtime tutor，除非导出字段确实缺失
+- CSV 列名一旦定下尽量不要改，实验表最怕 schema 漂移
+- 全量 pytest 不要每次跑；实验框架 issue 优先跑：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q tests/test_experiment_export.py tests/test_scoring_engine.py
+```
+
+如果遇到本机 pytest capture 问题，使用前文记录的：
+
+```bash
+source ~/venvs/iefmmq-wsl/bin/activate && PYTHONPATH=/usr/lib/python3/dist-packages python -m pytest -q -s --basetemp=.tmp/pytest-full
+```
+
+当前论文 / 博士申请叙事建议：
+
+- 不要说 “I built a DCS startup helper”
+- 应说：
+  “I built and evaluated a grounded multimodal AI tutor for high-fidelity VR procedural training, integrating simulator telemetry, cockpit vision, LLM reasoning, and harness-based validation to improve reliability and auditability.”
+
+也就是说，DCS/F/A-18C 是高保真任务载体；真正贡献是 multimodal grounding、procedural tutoring、harness reliability、replayable evaluation。
+
 ---
 
 ## 12. Task Selection Rule
