@@ -18,6 +18,7 @@ PROFILES_DIR_NAME = "profiles"
 
 SUPPORTED_LANGUAGES = ("zh", "en")
 SUPPORTED_MODEL_PROVIDERS = ("stub", "openai_compat", "ollama")
+SUPPORTED_MODEL_PROFILE_MODES = ("local_stub", "remote_direct", "remote_tunnel")
 
 _SECRET_KEY_FRAGMENTS = ("api_key", "token", "password", "secret")
 
@@ -38,12 +39,21 @@ class LauncherSettings:
     condition: str = ""
     trial_id: str = ""
     model_provider: str = "stub"
+    model_profile_mode: str = "local_stub"
     model_base_url: str = ""
     text_model_name: str = "Qwen3-8B-Instruct"
     vision_model_name: str = "simtutor-vision"
     model_timeout_s: float = 20.0
+    model_enable_multimodal: bool = False
     max_overlay_targets: int = 1
     ssh_tunnel_profile: str = ""
+    ssh_executable_path: str = ""
+    ssh_user: str = ""
+    ssh_host: str = ""
+    ssh_local_port: int = 16324
+    ssh_remote_host: str = "127.0.0.1"
+    ssh_remote_port: int = 6324
+    ssh_identity_file_path: str = ""
     preflight_profile: str = ""
     export_profile: str = ""
 
@@ -58,6 +68,19 @@ class LauncherSettings:
             settings.max_overlay_targets = int(settings.max_overlay_targets)
         except (TypeError, ValueError) as exc:
             raise LauncherSettingsError("model_timeout_s and max_overlay_targets must be numeric") from exc
+        settings.model_enable_multimodal = _parse_bool(settings.model_enable_multimodal, "model_enable_multimodal")
+        settings.ssh_local_port = _parse_profile_port(
+            settings.ssh_local_port,
+            "ssh_local_port",
+            default=16324,
+            required=settings.model_profile_mode == "remote_tunnel",
+        )
+        settings.ssh_remote_port = _parse_profile_port(
+            settings.ssh_remote_port,
+            "ssh_remote_port",
+            default=6324,
+            required=settings.model_profile_mode == "remote_tunnel",
+        )
         if not math.isfinite(settings.model_timeout_s):
             raise LauncherSettingsError("model_timeout_s must be finite")
         return settings
@@ -141,6 +164,7 @@ def validate_settings(settings: LauncherSettings) -> None:
         "condition",
         "trial_id",
         "model_provider",
+        "model_profile_mode",
         "text_model_name",
         "vision_model_name",
     )
@@ -153,10 +177,17 @@ def validate_settings(settings: LauncherSettings) -> None:
         errors.append("language")
     if settings.model_provider not in SUPPORTED_MODEL_PROVIDERS:
         errors.append("model_provider")
-    if settings.model_provider in {"openai_compat", "ollama"} and (
+    if settings.model_profile_mode not in SUPPORTED_MODEL_PROFILE_MODES:
+        errors.append("model_profile_mode")
+    if settings.model_profile_mode == "remote_direct" and (
         not isinstance(settings.model_base_url, str) or not settings.model_base_url.strip()
     ):
         errors.append("model_base_url")
+    if settings.model_profile_mode == "remote_tunnel":
+        for name in ("ssh_user", "ssh_host", "ssh_remote_host"):
+            value = getattr(settings, name)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(name)
     try:
         timeout_s = float(settings.model_timeout_s)
     except (TypeError, ValueError):
@@ -172,6 +203,15 @@ def validate_settings(settings: LauncherSettings) -> None:
         errors.append("model_timeout_s")
     if max_overlay_targets < 0:
         errors.append("max_overlay_targets")
+    if settings.model_profile_mode == "remote_tunnel":
+        for name in ("ssh_local_port", "ssh_remote_port"):
+            try:
+                port = int(getattr(settings, name))
+            except (TypeError, ValueError):
+                errors.append(name)
+                continue
+            if port <= 0 or port > 65535:
+                errors.append(name)
 
     if errors:
         raise LauncherSettingsError("invalid launcher settings: " + ", ".join(sorted(set(errors))))
@@ -206,6 +246,31 @@ def _reject_secret_keys(payload: Mapping[str, Any]) -> None:
 
 def _reject_json_constant(value: str) -> None:
     raise LauncherSettingsError(f"invalid non-finite JSON number: {value}")
+
+
+def _parse_bool(value: Any, name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    raise LauncherSettingsError(f"{name} must be a boolean")
+
+
+def _parse_profile_port(value: Any, name: str, *, default: int, required: bool) -> int:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        if required:
+            raise LauncherSettingsError(f"{name} must be numeric")
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        if required:
+            raise LauncherSettingsError(f"{name} must be numeric") from exc
+        return default
 
 
 __all__ = [

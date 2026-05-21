@@ -19,6 +19,7 @@ else:
     _TK_IMPORT_ERROR = None
 
 from simtutor.launcher_processes import LauncherProcess, ProcessState
+from simtutor.launcher_model_check import validate_launcher_model_profile
 from simtutor.launcher_preflight import run_launcher_install, run_preflight
 from simtutor.launcher_settings import (
     LauncherSettings,
@@ -29,6 +30,7 @@ from simtutor.launcher_settings import (
     save_settings,
     validate_settings,
 )
+from simtutor.launcher_tunnel import LauncherTunnel
 
 
 NORMAL_FIELDS = (
@@ -45,12 +47,21 @@ NORMAL_FIELDS = (
 
 ADVANCED_FIELDS = (
     ("model_provider", "Model provider"),
+    ("model_profile_mode", "Model profile mode"),
     ("model_base_url", "Model base URL"),
     ("text_model_name", "Text model name"),
     ("vision_model_name", "Vision model name"),
     ("model_timeout_s", "Model timeout"),
+    ("model_enable_multimodal", "VLM facts enabled"),
     ("max_overlay_targets", "Max overlay targets"),
     ("ssh_tunnel_profile", "SSH tunnel profile"),
+    ("ssh_executable_path", "SSH executable path"),
+    ("ssh_user", "SSH user"),
+    ("ssh_host", "SSH host"),
+    ("ssh_local_port", "SSH local port"),
+    ("ssh_remote_host", "SSH remote host"),
+    ("ssh_remote_port", "SSH remote port"),
+    ("ssh_identity_file_path", "SSH identity file path"),
     ("preflight_profile", "Preflight profile"),
     ("export_profile", "Export profile"),
 )
@@ -81,6 +92,7 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             for name in ("DCS", "model", "tunnel", "tutor", "vision")
         }
         self.process: LauncherProcess | None = None
+        self.tunnel: LauncherTunnel | None = None
 
         master.title("SimTutor Experiment Launcher")
         master.minsize(860, 620)
@@ -128,7 +140,7 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
     def _build_buttons(self) -> None:
         frame = ttk.Frame(self)
         frame.grid(row=2, column=0, sticky="ew", pady=(10, 0))
-        frame.columnconfigure(9, weight=1)
+        frame.columnconfigure(10, weight=1)
         ttk.Button(frame, text="Load", command=self._load).grid(row=0, column=0, padx=(0, 6))
         ttk.Button(frame, text="Save", command=self._save).grid(row=0, column=1, padx=(0, 6))
         ttk.Button(frame, text="Save Profile", command=self._save_profile).grid(row=0, column=2, padx=(0, 6))
@@ -137,7 +149,8 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         ttk.Button(frame, text="Stop", command=self._stop).grid(row=0, column=5, padx=(0, 18))
         ttk.Button(frame, text="Install", command=self._install).grid(row=0, column=6, padx=(0, 6))
         ttk.Button(frame, text="Preflight", command=self._preflight).grid(row=0, column=7, padx=(0, 6))
-        ttk.Button(frame, text="Export", command=self._placeholder_export).grid(row=0, column=8, padx=(0, 6))
+        ttk.Button(frame, text="Validate Model", command=self._validate_model).grid(row=0, column=8, padx=(0, 6))
+        ttk.Button(frame, text="Export", command=self._placeholder_export).grid(row=0, column=9, padx=(0, 6))
 
     def _build_log_area(self) -> None:
         frame = ttk.LabelFrame(self, text="Process log", padding=10)
@@ -228,6 +241,9 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
     def _stop(self) -> None:
         if self.process is not None:
             self.process.stop()
+        if self.tunnel is not None:
+            self.tunnel.stop()
+            self.status_variables["tunnel"].set("stopped")
         self.status_variables["tutor"].set("stopped")
 
     def _poll_process(self) -> None:
@@ -271,6 +287,28 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             assert messagebox is not None
             messagebox.showwarning("Preflight found issues", "See the process log for details.")
 
+    def _validate_model(self) -> None:
+        try:
+            settings = self._collect_settings()
+            validate_settings(settings)
+            if settings.model_profile_mode == "remote_tunnel":
+                if self.tunnel is None or not self.tunnel.snapshot().running:
+                    self.tunnel = LauncherTunnel(settings)
+                    self.tunnel.start()
+                self.status_variables["tunnel"].set("running")
+            report, text = _run_model_check_action(settings)
+        except Exception as exc:
+            assert messagebox is not None
+            messagebox.showerror("Model validation failed", str(exc))
+            self._append_log(f"model validation failed: {exc}")
+            return
+        self.settings = settings
+        self.status_variables["model"].set(settings.model_profile_mode)
+        self._append_log(text)
+        if not report.ok:
+            assert messagebox is not None
+            messagebox.showwarning("Model validation found issues", "See the process log for details.")
+
     def _placeholder_export(self) -> None:
         self._append_log("export placeholder: experiment export implementation is out of scope for this MVP")
 
@@ -312,6 +350,14 @@ def _run_preflight_action(
 ) -> tuple[Any, str]:
     report = runner(settings)
     return report, "preflight report:\n" + report.to_text()
+
+
+def _run_model_check_action(
+    settings: LauncherSettings,
+    runner: Callable[[LauncherSettings], Any] = validate_launcher_model_profile,
+) -> tuple[Any, str]:
+    report = runner(settings)
+    return report, "model validation report:\n" + report.to_text()
 
 
 def main() -> int:
