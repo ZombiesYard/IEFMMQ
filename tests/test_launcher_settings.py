@@ -35,6 +35,7 @@ def _valid_settings() -> LauncherSettings:
         vision_model_name="simtutor-vision",
         model_timeout_s=30.0,
         max_overlay_targets=2,
+        model_profile_mode="remote_direct",
     )
 
 
@@ -126,6 +127,58 @@ def test_openai_compat_requires_model_base_url() -> None:
 
     with pytest.raises(LauncherSettingsError, match="model_base_url"):
         validate_settings(settings)
+
+
+def test_remote_tunnel_requires_ssh_profile_fields() -> None:
+    settings = _valid_settings()
+    settings.model_profile_mode = "remote_tunnel"
+    settings.model_base_url = ""
+    settings.ssh_user = ""
+    settings.ssh_host = ""
+
+    with pytest.raises(LauncherSettingsError) as exc:
+        validate_settings(settings)
+
+    message = str(exc.value)
+    assert "ssh_user" in message
+    assert "ssh_host" in message
+
+
+def test_local_stub_does_not_require_remote_base_url() -> None:
+    settings = _valid_settings()
+    settings.model_profile_mode = "local_stub"
+    settings.model_provider = "stub"
+    settings.model_base_url = ""
+
+    validate_settings(settings)
+
+
+def test_non_tunnel_profiles_ignore_blank_or_bad_ssh_ports() -> None:
+    local_stub = _valid_settings()
+    local_stub.model_profile_mode = "local_stub"
+    local_stub.model_provider = "stub"
+    local_stub.model_base_url = ""
+    local_stub.ssh_local_port = ""  # type: ignore[assignment]
+    local_stub.ssh_remote_port = "not-a-port"  # type: ignore[assignment]
+
+    loaded = LauncherSettings.from_dict(local_stub.to_dict())
+    validate_settings(loaded)
+
+    remote_direct = _valid_settings()
+    remote_direct.ssh_local_port = "not-a-port"  # type: ignore[assignment]
+    remote_direct.ssh_remote_port = ""  # type: ignore[assignment]
+
+    loaded = LauncherSettings.from_dict(remote_direct.to_dict())
+    validate_settings(loaded)
+
+
+def test_ollama_provider_remains_valid_for_existing_launcher_settings() -> None:
+    settings = _valid_settings()
+    settings.model_provider = "ollama"
+    settings.model_profile_mode = "remote_direct"
+    settings.model_base_url = "http://127.0.0.1:11434"
+
+    validate_settings(settings)
 
 
 def test_openai_compat_rejects_non_string_base_url() -> None:
