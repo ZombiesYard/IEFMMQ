@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Callable
+from typing import Any, Callable
 
 try:
     import tkinter as tk
@@ -19,6 +19,7 @@ else:
     _TK_IMPORT_ERROR = None
 
 from simtutor.launcher_processes import LauncherProcess, ProcessState
+from simtutor.launcher_preflight import run_launcher_install, run_preflight
 from simtutor.launcher_settings import (
     LauncherSettings,
     LauncherSettingsError,
@@ -127,15 +128,16 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
     def _build_buttons(self) -> None:
         frame = ttk.Frame(self)
         frame.grid(row=2, column=0, sticky="ew", pady=(10, 0))
-        frame.columnconfigure(8, weight=1)
+        frame.columnconfigure(9, weight=1)
         ttk.Button(frame, text="Load", command=self._load).grid(row=0, column=0, padx=(0, 6))
         ttk.Button(frame, text="Save", command=self._save).grid(row=0, column=1, padx=(0, 6))
         ttk.Button(frame, text="Save Profile", command=self._save_profile).grid(row=0, column=2, padx=(0, 6))
         ttk.Button(frame, text="Load Profile", command=self._load_profile).grid(row=0, column=3, padx=(0, 18))
         ttk.Button(frame, text="Start", command=self._start).grid(row=0, column=4, padx=(0, 6))
         ttk.Button(frame, text="Stop", command=self._stop).grid(row=0, column=5, padx=(0, 18))
-        ttk.Button(frame, text="Preflight", command=self._placeholder_preflight).grid(row=0, column=6, padx=(0, 6))
-        ttk.Button(frame, text="Export", command=self._placeholder_export).grid(row=0, column=7, padx=(0, 6))
+        ttk.Button(frame, text="Install", command=self._install).grid(row=0, column=6, padx=(0, 6))
+        ttk.Button(frame, text="Preflight", command=self._preflight).grid(row=0, column=7, padx=(0, 6))
+        ttk.Button(frame, text="Export", command=self._placeholder_export).grid(row=0, column=8, padx=(0, 6))
 
     def _build_log_area(self) -> None:
         frame = ttk.LabelFrame(self, text="Process log", padding=10)
@@ -242,8 +244,32 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         self.log_text.insert("end", text + "\n")
         self.log_text.see("end")
 
-    def _placeholder_preflight(self) -> None:
-        self._append_log("preflight placeholder: installer/preflight is out of scope for this MVP")
+    def _install(self) -> None:
+        try:
+            settings = self._collect_settings()
+            summary = _run_install_action(settings)
+        except Exception as exc:
+            assert messagebox is not None
+            messagebox.showerror("Install failed", str(exc))
+            self._append_log(f"install failed: {exc}")
+            return
+        self.settings = settings
+        self._append_log(summary)
+
+    def _preflight(self) -> None:
+        try:
+            settings = self._collect_settings()
+        except LauncherSettingsError as exc:
+            assert messagebox is not None
+            messagebox.showerror("Preflight failed", str(exc))
+            self._append_log(f"preflight failed: {exc}")
+            return
+        self.settings = settings
+        report, text = _run_preflight_action(settings)
+        self._append_log(text)
+        if not report.ok:
+            assert messagebox is not None
+            messagebox.showwarning("Preflight found issues", "See the process log for details.")
 
     def _placeholder_export(self) -> None:
         self._append_log("export placeholder: experiment export implementation is out of scope for this MVP")
@@ -263,6 +289,29 @@ def _fake_process_command(settings: LauncherSettings) -> list[str]:
         "time.sleep(0.2)"
     )
     return [sys.executable, "-u", "-c", script]
+
+
+def _run_install_action(
+    settings: LauncherSettings,
+    installer: Callable[[LauncherSettings], Any] = run_launcher_install,
+) -> str:
+    result = installer(settings)
+    return (
+        "install complete: "
+        f"files_copied={result.files_copied}, "
+        f"export_patched={result.export_patched}, "
+        f"config_written={result.config_written}, "
+        f"monitor_setup_written={result.monitor_setup_written}, "
+        f"vlm_frame_enabled={result.vlm_frame_enabled}"
+    )
+
+
+def _run_preflight_action(
+    settings: LauncherSettings,
+    runner: Callable[[LauncherSettings], Any] = run_preflight,
+) -> tuple[Any, str]:
+    report = runner(settings)
+    return report, "preflight report:\n" + report.to_text()
 
 
 def main() -> int:
