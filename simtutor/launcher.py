@@ -19,6 +19,7 @@ else:
     _TK_IMPORT_ERROR = None
 
 from simtutor.launcher_processes import LauncherProcess, ProcessState
+from simtutor.launcher_session import LauncherExperimentSession, format_dry_run_plan
 from simtutor.launcher_model_check import validate_launcher_model_profile
 from simtutor.launcher_preflight import run_launcher_install, run_preflight
 from simtutor.launcher_settings import (
@@ -40,9 +41,16 @@ NORMAL_FIELDS = (
     ("language", "Language"),
     ("scenario_profile", "Scenario profile"),
     ("output_log_directory", "Output log directory"),
+    ("export_output_directory", "Export output directory"),
+    ("analysis_output_directory", "Analysis output directory"),
     ("participant_id", "Participant id"),
     ("condition", "Condition"),
     ("trial_id", "Trial id"),
+    ("study_id", "Study id"),
+    ("participant_group", "Participant group"),
+    ("experimenter_id", "Experimenter id"),
+    ("questionnaire_ref", "Questionnaire ref"),
+    ("recording_ref", "Recording ref"),
 )
 
 ADVANCED_FIELDS = (
@@ -54,6 +62,29 @@ ADVANCED_FIELDS = (
     ("model_timeout_s", "Model timeout"),
     ("model_enable_multimodal", "VLM facts enabled"),
     ("max_overlay_targets", "Max overlay targets"),
+    ("pack_path", "Pack path"),
+    ("taxonomy_path", "Taxonomy path"),
+    ("ui_map_path", "UI map path"),
+    ("telemetry_map_path", "Telemetry map path"),
+    ("bios_to_ui_path", "BIOS-to-UI path"),
+    ("knowledge_index_path", "Knowledge index path"),
+    ("rag_top_k", "RAG top-k"),
+    ("dcs_bios_source", "DCS-BIOS source"),
+    ("raw_bios_host", "Raw BIOS host"),
+    ("raw_bios_port", "Raw BIOS port"),
+    ("raw_bios_control_dir", "Raw BIOS control dir"),
+    ("dcs_aircraft", "DCS aircraft"),
+    ("dcs_mission", "DCS mission"),
+    ("vr_setup", "VR setup"),
+    ("monitor_setup", "Monitor setup"),
+    ("prompt_version", "Prompt version"),
+    ("prompt_hash", "Prompt hash"),
+    ("global_help_hotkey", "Global help hotkey"),
+    ("global_help_modifiers", "Global help modifiers"),
+    ("global_help_cooldown_ms", "Global help cooldown ms"),
+    ("vision_trigger_wait_ms", "Vision trigger wait ms"),
+    ("vision_capture_trigger_host", "Vision trigger host"),
+    ("vision_capture_trigger_port", "Vision trigger port"),
     ("ssh_tunnel_profile", "SSH tunnel profile"),
     ("ssh_executable_path", "SSH executable path"),
     ("ssh_user", "SSH user"),
@@ -89,10 +120,12 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         self.variables: dict[str, tk.StringVar] = {}
         self.status_variables = {
             name: tk.StringVar(value="stopped")
-            for name in ("DCS", "model", "tunnel", "tutor", "vision")
+            for name in ("DCS", "model", "tunnel", "tutor", "vision", "export", "analysis")
         }
         self.process: LauncherProcess | None = None
         self.tunnel: LauncherTunnel | None = None
+        self.session: LauncherExperimentSession | None = None
+        self.session_log_header: list[str] = []
 
         master.title("SimTutor Experiment Launcher")
         master.minsize(860, 620)
@@ -126,7 +159,7 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             self.variables[name] = var
             entry = ttk.Entry(frame, textvariable=var)
             entry.grid(row=row, column=1, sticky="ew", pady=3)
-            if name in {"saved_games_path", "output_log_directory"}:
+            if name in {"saved_games_path", "output_log_directory", "export_output_directory", "analysis_output_directory"}:
                 button = ttk.Button(frame, text="Browse", command=lambda key=name: self._browse_directory(key))
                 button.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
 
@@ -145,12 +178,13 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         ttk.Button(frame, text="Save", command=self._save).grid(row=0, column=1, padx=(0, 6))
         ttk.Button(frame, text="Save Profile", command=self._save_profile).grid(row=0, column=2, padx=(0, 6))
         ttk.Button(frame, text="Load Profile", command=self._load_profile).grid(row=0, column=3, padx=(0, 18))
-        ttk.Button(frame, text="Start", command=self._start).grid(row=0, column=4, padx=(0, 6))
-        ttk.Button(frame, text="Stop", command=self._stop).grid(row=0, column=5, padx=(0, 18))
-        ttk.Button(frame, text="Install", command=self._install).grid(row=0, column=6, padx=(0, 6))
-        ttk.Button(frame, text="Preflight", command=self._preflight).grid(row=0, column=7, padx=(0, 6))
-        ttk.Button(frame, text="Validate Model", command=self._validate_model).grid(row=0, column=8, padx=(0, 6))
-        ttk.Button(frame, text="Export", command=self._placeholder_export).grid(row=0, column=9, padx=(0, 6))
+        ttk.Button(frame, text="Dry Run", command=self._dry_run).grid(row=0, column=4, padx=(0, 6))
+        ttk.Button(frame, text="Start", command=self._start).grid(row=0, column=5, padx=(0, 6))
+        ttk.Button(frame, text="Stop", command=self._stop).grid(row=0, column=6, padx=(0, 18))
+        ttk.Button(frame, text="Install", command=self._install).grid(row=0, column=7, padx=(0, 6))
+        ttk.Button(frame, text="Preflight", command=self._preflight).grid(row=0, column=8, padx=(0, 6))
+        ttk.Button(frame, text="Validate Model", command=self._validate_model).grid(row=0, column=9, padx=(0, 6))
+        ttk.Button(frame, text="Export", command=self._export).grid(row=0, column=10, padx=(0, 6))
 
     def _build_log_area(self) -> None:
         frame = ttk.LabelFrame(self, text="Process log", padding=10)
@@ -216,6 +250,14 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             messagebox.showerror("Profile load failed", str(exc))
 
     def _start(self) -> None:
+        if self.session is not None and any(
+            snapshot.state == ProcessState.RUNNING
+            for snapshot in self.session.snapshots()
+        ):
+            assert messagebox is not None
+            messagebox.showerror("Start failed", "An experiment session is already running.")
+            self._append_log("start failed: an experiment session is already running")
+            return
         try:
             settings = self._collect_settings()
             save_settings(settings)
@@ -224,30 +266,74 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             messagebox.showerror("Start failed", str(exc))
             return
         self.settings = settings
-        if self.process is None or self.process.snapshot().state != ProcessState.RUNNING:
-            self.process = self.process_factory(name="simtutor-fake-session", command=self.command_builder(settings))
         try:
-            self.process.start()
+            session = LauncherExperimentSession(
+                settings,
+                process_factory=self.process_factory,
+                tunnel_factory=LauncherTunnel,
+                python_executable=sys.executable,
+            )
+            result = session.start()
         except Exception as exc:
             assert messagebox is not None
             messagebox.showerror("Start failed", str(exc))
+            self._append_log(f"start failed: {exc}")
+            self.session = None
             return
+        self.session = session
         self.status_variables["DCS"].set("external")
-        self.status_variables["model"].set(settings.model_provider)
-        self.status_variables["tunnel"].set("placeholder")
+        self.status_variables["model"].set(settings.model_profile_mode)
+        self.status_variables["tunnel"].set("running" if settings.model_profile_mode == "remote_tunnel" else "not required")
         self.status_variables["tutor"].set("running")
-        self.status_variables["vision"].set("placeholder")
+        self.status_variables["vision"].set("running")
+        self.status_variables["export"].set("pending")
+        self.status_variables["analysis"].set("pending")
+        self.session_log_header = [
+            f"session started: {result.session_id}",
+            f"live log: {result.live_log_path}",
+        ]
+        self._append_log("\n".join(self.session_log_header))
 
     def _stop(self) -> None:
-        if self.process is not None:
+        if self.session is not None:
+            try:
+                self.session.stop(run_post_run=True)
+                self.status_variables["export"].set("complete")
+                self.status_variables["analysis"].set("complete")
+                if self.session.plan is not None:
+                    self.session_log_header.extend(
+                        [
+                            f"export output: {self.session.plan.export_output_dir}",
+                            f"analysis output: {self.session.plan.analysis_output_dir}",
+                        ]
+                    )
+                    self._append_log("\n".join(self.session_log_header[-2:]))
+            except Exception as exc:
+                assert messagebox is not None
+                messagebox.showerror("Stop/export failed", str(exc))
+                self._append_log(f"stop/export failed: {exc}")
+        elif self.process is not None:
             self.process.stop()
         if self.tunnel is not None:
             self.tunnel.stop()
-            self.status_variables["tunnel"].set("stopped")
+        self.status_variables["tunnel"].set("stopped")
         self.status_variables["tutor"].set("stopped")
+        self.status_variables["vision"].set("stopped")
 
     def _poll_process(self) -> None:
-        if self.process is not None:
+        if self.session is not None:
+            lines: list[str] = list(self.session_log_header)
+            for snapshot in self.session.snapshots():
+                lines.extend(f"[{snapshot.name}] {line}" for line in snapshot.log_lines)
+                if snapshot.name == "live-dcs" and snapshot.state == ProcessState.EXITED:
+                    self.status_variables["tutor"].set(f"exited ({snapshot.returncode})")
+                if snapshot.name == "vision-sidecar" and snapshot.state == ProcessState.EXITED:
+                    self.status_variables["vision"].set(f"exited ({snapshot.returncode})")
+            if lines:
+                self.log_text.delete("1.0", "end")
+                self.log_text.insert("end", "\n".join(lines))
+                self.log_text.see("end")
+        elif self.process is not None:
             snapshot = self.process.snapshot()
             self.log_text.delete("1.0", "end")
             self.log_text.insert("end", "\n".join(snapshot.log_lines))
@@ -309,8 +395,43 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             assert messagebox is not None
             messagebox.showwarning("Model validation found issues", "See the process log for details.")
 
-    def _placeholder_export(self) -> None:
-        self._append_log("export placeholder: experiment export implementation is out of scope for this MVP")
+    def _dry_run(self) -> None:
+        try:
+            settings = self._collect_settings()
+            session = LauncherExperimentSession(
+                settings,
+                process_factory=self.process_factory,
+                python_executable=sys.executable,
+            )
+            plan = session.start(dry_run=True).plan
+            text = (
+                "workflow:\n"
+                "- validate settings and preflight\n"
+                "- start SSH tunnel when model_profile_mode=remote_tunnel\n"
+                "- validate model endpoint\n"
+                "- launch the commands below\n"
+                + format_dry_run_plan(plan)
+            )
+        except Exception as exc:
+            assert messagebox is not None
+            messagebox.showerror("Dry run failed", str(exc))
+            self._append_log(f"dry run failed: {exc}")
+            return
+        self._append_log("dry run:\n" + text)
+
+    def _export(self) -> None:
+        if self.session is None:
+            self._append_log("export skipped: no completed session is available")
+            return
+        try:
+            self.session.run_post_run()
+        except Exception as exc:
+            assert messagebox is not None
+            messagebox.showerror("Export failed", str(exc))
+            self._append_log(f"export failed: {exc}")
+            return
+        self.status_variables["export"].set("complete")
+        self.status_variables["analysis"].set("complete")
 
 
 def _fake_process_command(settings: LauncherSettings) -> list[str]:
