@@ -121,6 +121,14 @@ def test_validate_settings_reports_non_numeric_numbers() -> None:
     assert "max_overlay_targets" in message
 
 
+def test_validate_settings_rejects_invalid_raw_bios_port() -> None:
+    settings = _valid_settings()
+    settings.raw_bios_port = 70000
+
+    with pytest.raises(LauncherSettingsError, match="raw_bios_port"):
+        validate_settings(settings)
+
+
 def test_openai_compat_requires_model_base_url() -> None:
     settings = _valid_settings()
     settings.model_base_url = ""

@@ -35,17 +35,47 @@ class LauncherSettings:
     language: str = "zh"
     scenario_profile: str = "airfield"
     output_log_directory: str = "logs"
+    export_output_directory: str = "artifacts/experiments"
+    analysis_output_directory: str = "artifacts/experiment_analysis"
     participant_id: str = ""
     condition: str = ""
     trial_id: str = ""
+    study_id: str = ""
+    participant_group: str = ""
+    experimenter_id: str = ""
+    questionnaire_ref: str = ""
+    recording_ref: str = ""
     model_provider: str = "stub"
     model_profile_mode: str = "local_stub"
     model_base_url: str = ""
     text_model_name: str = "Qwen3-8B-Instruct"
     vision_model_name: str = "simtutor-vision"
     model_timeout_s: float = 20.0
-    model_enable_multimodal: bool = False
-    max_overlay_targets: int = 1
+    model_enable_multimodal: bool = True
+    max_overlay_targets: int = 4
+    pack_path: str = "packs/fa18c_startup/pack.yaml"
+    taxonomy_path: str = "packs/fa18c_startup/taxonomy.yaml"
+    ui_map_path: str = "packs/fa18c_startup/ui_map.yaml"
+    telemetry_map_path: str = "packs/fa18c_startup/telemetry_map.yaml"
+    bios_to_ui_path: str = "packs/fa18c_startup/bios_to_ui.yaml"
+    knowledge_index_path: str = "Doc/Evaluation/index.json"
+    rag_top_k: int = 5
+    dcs_bios_source: str = "raw"
+    raw_bios_host: str = "239.255.50.10"
+    raw_bios_port: int = 5010
+    raw_bios_control_dir: str = "DCS/Scripts/DCS-BIOS/doc/json"
+    dcs_aircraft: str = "FA-18C_hornet"
+    dcs_mission: str = ""
+    vr_setup: str = ""
+    monitor_setup: str = ""
+    prompt_version: str = "launcher-v0.4"
+    prompt_hash: str = ""
+    global_help_hotkey: str = "X1"
+    global_help_modifiers: str = ""
+    global_help_cooldown_ms: int = 800
+    vision_trigger_wait_ms: int = 4000
+    vision_capture_trigger_host: str = "127.0.0.1"
+    vision_capture_trigger_port: int = 7795
     ssh_tunnel_profile: str = ""
     ssh_executable_path: str = ""
     ssh_user: str = ""
@@ -66,8 +96,17 @@ class LauncherSettings:
         try:
             settings.model_timeout_s = float(settings.model_timeout_s)
             settings.max_overlay_targets = int(settings.max_overlay_targets)
+            settings.rag_top_k = int(settings.rag_top_k)
+            settings.raw_bios_port = int(settings.raw_bios_port)
+            settings.global_help_cooldown_ms = int(settings.global_help_cooldown_ms)
+            settings.vision_trigger_wait_ms = int(settings.vision_trigger_wait_ms)
+            settings.vision_capture_trigger_port = int(settings.vision_capture_trigger_port)
         except (TypeError, ValueError) as exc:
-            raise LauncherSettingsError("model_timeout_s and max_overlay_targets must be numeric") from exc
+            raise LauncherSettingsError(
+                "model_timeout_s, max_overlay_targets, rag_top_k, raw_bios_port, "
+                "global_help_cooldown_ms, vision_trigger_wait_ms, and "
+                "vision_capture_trigger_port must be numeric"
+            ) from exc
         settings.model_enable_multimodal = _parse_bool(settings.model_enable_multimodal, "model_enable_multimodal")
         settings.ssh_local_port = _parse_profile_port(
             settings.ssh_local_port,
@@ -203,6 +242,34 @@ def validate_settings(settings: LauncherSettings) -> None:
         errors.append("model_timeout_s")
     if max_overlay_targets < 0:
         errors.append("max_overlay_targets")
+    for name in ("rag_top_k", "global_help_cooldown_ms", "vision_trigger_wait_ms"):
+        try:
+            value = int(getattr(settings, name))
+        except (TypeError, ValueError):
+            errors.append(name)
+            continue
+        if value < 0:
+            errors.append(name)
+    try:
+        raw_bios_port = int(settings.raw_bios_port)
+    except (TypeError, ValueError):
+        errors.append("raw_bios_port")
+    else:
+        if raw_bios_port <= 0 or raw_bios_port > 65535:
+            errors.append("raw_bios_port")
+    try:
+        vision_capture_trigger_port = int(settings.vision_capture_trigger_port)
+    except (TypeError, ValueError):
+        errors.append("vision_capture_trigger_port")
+    else:
+        if vision_capture_trigger_port < 0 or vision_capture_trigger_port > 65535:
+            errors.append("vision_capture_trigger_port")
+    if settings.dcs_bios_source not in {"decoded", "raw"}:
+        errors.append("dcs_bios_source")
+    if settings.dcs_bios_source == "raw" and (
+        not isinstance(settings.dcs_aircraft, str) or not settings.dcs_aircraft.strip()
+    ):
+        errors.append("dcs_aircraft")
     if settings.model_profile_mode == "remote_tunnel":
         for name in ("ssh_local_port", "ssh_remote_port"):
             try:
