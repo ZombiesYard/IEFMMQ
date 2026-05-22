@@ -8,6 +8,8 @@
 
 Quest 3 是固定实验平台，不作为被比较的自变量。正式比较的是 `without_tutor` 与 `with_tutor`。
 
+实验用表格见 [Experiment forms](experiment-forms.md)，包括 condition assignment、trial sheet、NASA Raw TLX、usability/trust questionnaire 和 export quality checklist。
+
 ## 1. 实验角色
 
 每次实验至少需要一名实验执行者。
@@ -708,4 +710,3 @@ recordings/
 - 实验助手能按本手册独立跑完 trial
 - 已确定正式 condition label 和 participant ID 规则
 - 已确定 baseline 是否使用人工录像编码
-

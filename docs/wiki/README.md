@@ -7,6 +7,7 @@ This wiki collects operational notes that are too detailed for the front page.
 - [Quickstart](quickstart.md): local setup, tests, mock runs, replay.
 - [DCS live operation](dcs-live-operation.md): simulator hook installation, monitor setup, live loop, sidecar capture.
 - [Experiment operation manual](experiment-operation-manual.md): Quest 3 user-study runbook, participant flow, launcher/CLI operation, export, quality checks, and anomaly handling.
+- [Experiment forms](experiment-forms.md): condition assignment, trial sheet, NASA Raw TLX, usability/trust questionnaire, and export quality checklist.
 - [VLM dataset pipeline](vlm-dataset-pipeline.md): screenshot capture, pre-labeling, Label Studio review, SFT export.
 - [Qwen3.5 VLM fine-tuning](fine-tuning-qwen35-vlm.md): Unsloth + PEFT LoRA + TRL `SFTTrainer` training workflow.
 - [Benchmarking](benchmarking.md): base-vs-LoRA evaluation and metric interpretation.
