@@ -8,6 +8,7 @@ import pytest
 from simtutor.launcher_settings import (
     LauncherSettings,
     LauncherSettingsError,
+    default_saved_games_path,
     load_profile,
     load_settings,
     profiles_dir,
@@ -46,6 +47,32 @@ def test_settings_path_uses_windows_localappdata() -> None:
     assert profiles_dir(env=env, platform="win32") == Path("C:/Users/test/AppData/Local") / "SimTutor" / "profiles"
 
 
+def test_default_saved_games_path_uses_stable_dcs_directory() -> None:
+    env = {"USERPROFILE": "C:/Users/test"}
+
+    assert default_saved_games_path(env=env) == str(Path("C:/Users/test") / "Saved Games" / "DCS")
+
+
+def test_launcher_defaults_match_dev_tunnel_vllm_profile() -> None:
+    settings = LauncherSettings()
+
+    assert settings.model_provider == "openai_compat"
+    assert settings.model_profile_mode == "remote_tunnel"
+    assert settings.model_base_url == "http://localhost:16324"
+    assert settings.text_model_name == "simtutor-base"
+    assert settings.vision_model_name == "simtutor-vision"
+    assert settings.model_timeout_s == 60.0
+    assert settings.log_raw_llm_text is True
+    assert settings.print_model_io is True
+    assert settings.max_overlay_targets == 2
+    assert settings.ssh_tunnel_profile == "cloud-247-vllm"
+    assert settings.ssh_user == "yz50"
+    assert settings.ssh_host == "cloud-247.rz.tu-clausthal.de"
+    assert settings.ssh_local_port == 16324
+    assert settings.ssh_remote_host == "127.0.0.1"
+    assert settings.ssh_remote_port == 6324
+
+
 def test_settings_round_trip_json(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     settings = _valid_settings()
@@ -69,6 +96,7 @@ def test_load_settings_returns_defaults_when_missing(tmp_path: Path) -> None:
 
 def test_validate_settings_reports_required_fields() -> None:
     settings = LauncherSettings()
+    settings.saved_games_path = ""
 
     with pytest.raises(LauncherSettingsError) as exc:
         validate_settings(settings)

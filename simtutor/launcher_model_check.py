@@ -69,7 +69,10 @@ def endpoint_config_from_settings(settings: LauncherSettings) -> ModelEndpointCo
 
 def check_model_endpoint(config: ModelEndpointConfig, *, client: Any | None = None) -> ModelCheckReport:
     owns_client = client is None
-    http_client = client or _make_http_client()
+    try:
+        http_client = client or _make_http_client()
+    except RuntimeError as exc:
+        return ModelCheckReport((ModelCheckEntry("error", "http_client_missing", str(exc)),))
     entries: list[ModelCheckEntry] = []
     base_url = _normalize_base_url(config.base_url)
 
@@ -142,7 +145,10 @@ def _make_http_client() -> Any:
     try:
         import httpx
     except ModuleNotFoundError as exc:
-        raise RuntimeError("httpx is required when no client is injected") from exc
+        raise RuntimeError(
+            "Missing Python dependency: httpx. Install dependencies in the environment that starts the GUI "
+            "with `python -m pip install httpx` or run `poetry install`."
+        ) from exc
     return httpx.Client()
 
 

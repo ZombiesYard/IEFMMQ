@@ -25,6 +25,7 @@ from simtutor.launcher_preflight import run_launcher_install, run_preflight
 from simtutor.launcher_settings import (
     LauncherSettings,
     LauncherSettingsError,
+    default_saved_games_path,
     load_profile,
     load_settings,
     save_profile,
@@ -35,22 +36,21 @@ from simtutor.launcher_tunnel import LauncherTunnel
 
 
 NORMAL_FIELDS = (
-    ("saved_games_path", "Saved Games path"),
-    ("dcs_variant", "DCS variant"),
     ("monitor_mode", "Monitor mode"),
     ("language", "Language"),
     ("scenario_profile", "Scenario profile"),
-    ("output_log_directory", "Output log directory"),
-    ("export_output_directory", "Export output directory"),
+    ("output_log_directory", "Runtime log output directory"),
+    ("export_output_directory", "Experiment output directory"),
     ("analysis_output_directory", "Analysis output directory"),
-    ("participant_id", "Participant id"),
+    ("__metadata", "Experiment metadata"),
+    ("participant_id", "Participant ID"),
     ("condition", "Condition"),
-    ("trial_id", "Trial id"),
-    ("study_id", "Study id"),
+    ("trial_id", "Trial ID"),
+    ("study_id", "Study ID"),
     ("participant_group", "Participant group"),
-    ("experimenter_id", "Experimenter id"),
-    ("questionnaire_ref", "Questionnaire ref"),
-    ("recording_ref", "Recording ref"),
+    ("experimenter_id", "Experimenter ID"),
+    ("questionnaire_ref", "Questionnaire reference"),
+    ("recording_ref", "Recording reference"),
 )
 
 ADVANCED_FIELDS = (
@@ -61,6 +61,8 @@ ADVANCED_FIELDS = (
     ("vision_model_name", "Vision model name"),
     ("model_timeout_s", "Model timeout"),
     ("model_enable_multimodal", "VLM facts enabled"),
+    ("log_raw_llm_text", "Log raw LLM text"),
+    ("print_model_io", "Print model IO"),
     ("max_overlay_targets", "Max overlay targets"),
     ("pack_path", "Pack path"),
     ("taxonomy_path", "Taxonomy path"),
@@ -97,6 +99,75 @@ ADVANCED_FIELDS = (
     ("export_profile", "Export profile"),
 )
 
+DIRECTORY_FIELDS = {
+    "output_log_directory",
+    "export_output_directory",
+    "analysis_output_directory",
+    "raw_bios_control_dir",
+}
+
+FILE_FIELDS = {
+    "pack_path",
+    "taxonomy_path",
+    "ui_map_path",
+    "telemetry_map_path",
+    "bios_to_ui_path",
+    "knowledge_index_path",
+    "ssh_executable_path",
+    "ssh_identity_file_path",
+}
+
+FIELD_CHOICES = {
+    "monitor_mode": ("single-monitor", "extended-right", "ultrawide-left-stack", "fa18c_composite_panel_v2"),
+    "language": ("zh", "en"),
+    "scenario_profile": ("airfield", "carrier"),
+    "condition": ("with_tutor", "without_tutor", "baseline", "treatment"),
+    "participant_group": ("", "novice", "experienced", "pilot", "student"),
+    "model_provider": ("openai_compat", "stub", "ollama"),
+    "model_profile_mode": ("remote_tunnel", "remote_direct", "local_stub"),
+    "model_timeout_s": ("60.0", "20.0", "30.0", "120.0"),
+    "model_enable_multimodal": ("true", "false"),
+    "log_raw_llm_text": ("true", "false"),
+    "print_model_io": ("true", "false"),
+    "max_overlay_targets": ("2", "4", "3", "1", "0"),
+    "rag_top_k": ("5", "8", "10", "3", "1"),
+    "dcs_bios_source": ("raw", "decoded"),
+    "raw_bios_host": ("239.255.50.10", "127.0.0.1", "0.0.0.0"),
+    "raw_bios_port": ("5010",),
+    "dcs_aircraft": ("FA-18C_hornet",),
+    "dcs_mission": ("", "cold_start", "freeflight", "training"),
+    "vr_setup": ("", "none", "Quest 3", "VR headset"),
+    "monitor_setup": ("", "single-monitor", "extended-right", "ultrawide-left-stack", "fa18c_composite_panel_v2"),
+    "prompt_version": ("launcher-v0.4",),
+    "prompt_hash": ("",),
+    "global_help_hotkey": ("X1", "X2", "F10", "F12", ""),
+    "global_help_modifiers": ("", "ctrl", "alt", "shift", "ctrl+shift"),
+    "global_help_cooldown_ms": ("800", "1000", "1500", "2000", "0"),
+    "vision_trigger_wait_ms": ("4000", "3000", "5000", "8000", "0"),
+    "vision_capture_trigger_host": ("127.0.0.1", "localhost", "0.0.0.0"),
+    "vision_capture_trigger_port": ("7795",),
+    "ssh_tunnel_profile": ("cloud-247-vllm", "", "default", "tu-clausthal", "local"),
+    "ssh_user": ("yz50", ""),
+    "ssh_host": ("cloud-247.rz.tu-clausthal.de", ""),
+    "ssh_local_port": ("16324",),
+    "ssh_remote_host": ("127.0.0.1", "localhost"),
+    "ssh_remote_port": ("6324",),
+    "preflight_profile": ("", "default", "quick", "strict"),
+    "export_profile": ("", "default", "experiment", "analysis"),
+}
+
+READONLY_CHOICE_FIELDS = {
+    "monitor_mode",
+    "language",
+    "scenario_profile",
+    "model_provider",
+    "model_profile_mode",
+    "model_enable_multimodal",
+    "log_raw_llm_text",
+    "print_model_io",
+    "dcs_bios_source",
+}
+
 
 ProcessFactory = Callable[..., LauncherProcess]
 CommandBuilder = Callable[[LauncherSettings], list[str]]
@@ -128,7 +199,7 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         self.session_log_header: list[str] = []
 
         master.title("SimTutor Experiment Launcher")
-        master.minsize(860, 620)
+        master.minsize(900, 680)
         self.grid(row=0, column=0, sticky="nsew")
         master.columnconfigure(0, weight=1)
         master.rowconfigure(0, weight=1)
@@ -150,18 +221,67 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         self._add_settings_tab(notebook, "Advanced", ADVANCED_FIELDS)
 
     def _add_settings_tab(self, notebook: ttk.Notebook, title: str, field_defs: tuple[tuple[str, str], ...]) -> None:
-        frame = ttk.Frame(notebook, padding=10)
-        notebook.add(frame, text=title)
+        outer = ttk.Frame(notebook)
+        notebook.add(outer, text=title)
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(0, weight=1)
+
+        canvas = tk.Canvas(outer, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        frame = ttk.Frame(canvas, padding=10)
+        window_id = canvas.create_window((0, 0), window=frame, anchor="nw")
+
+        def update_scroll_region(_event: tk.Event) -> None:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def update_inner_width(event: tk.Event) -> None:
+            canvas.itemconfigure(window_id, width=event.width)
+
+        def on_mousewheel(event: tk.Event) -> None:
+            canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+
+        def on_linux_scroll_up(_event: tk.Event) -> None:
+            canvas.yview_scroll(-3, "units")
+
+        def on_linux_scroll_down(_event: tk.Event) -> None:
+            canvas.yview_scroll(3, "units")
+
+        frame.bind("<Configure>", update_scroll_region)
+        canvas.bind("<Configure>", update_inner_width)
+        canvas.bind("<Enter>", lambda _event: canvas.bind_all("<MouseWheel>", on_mousewheel))
+        canvas.bind("<Leave>", lambda _event: canvas.unbind_all("<MouseWheel>"))
+        canvas.bind("<Enter>", lambda _event: canvas.bind_all("<Button-4>", on_linux_scroll_up), add="+")
+        canvas.bind("<Leave>", lambda _event: canvas.unbind_all("<Button-4>"), add="+")
+        canvas.bind("<Enter>", lambda _event: canvas.bind_all("<Button-5>", on_linux_scroll_down), add="+")
+        canvas.bind("<Leave>", lambda _event: canvas.unbind_all("<Button-5>"), add="+")
+
         frame.columnconfigure(1, weight=1)
-        for row, (name, label) in enumerate(field_defs):
+        row = 0
+        for name, label in field_defs:
+            if name.startswith("__"):
+                ttk.Separator(frame).grid(row=row, column=0, columnspan=3, sticky="ew", pady=(10, 6))
+                row += 1
+                ttk.Label(frame, text=label).grid(row=row, column=0, columnspan=3, sticky="w", pady=(0, 3))
+                row += 1
+                continue
             ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=3)
-            var = tk.StringVar(value=str(getattr(self.settings, name)))
+            var = tk.StringVar(value=_format_setting_value(getattr(self.settings, name)))
             self.variables[name] = var
-            entry = ttk.Entry(frame, textvariable=var)
-            entry.grid(row=row, column=1, sticky="ew", pady=3)
-            if name in {"saved_games_path", "output_log_directory", "export_output_directory", "analysis_output_directory"}:
-                button = ttk.Button(frame, text="Browse", command=lambda key=name: self._browse_directory(key))
+            choices = FIELD_CHOICES.get(name)
+            if choices is None:
+                field = ttk.Entry(frame, textvariable=var)
+            else:
+                state = "readonly" if name in READONLY_CHOICE_FIELDS else "normal"
+                field = ttk.Combobox(frame, textvariable=var, values=choices, state=state)
+            field.grid(row=row, column=1, sticky="ew", pady=3)
+            if name in DIRECTORY_FIELDS or name in FILE_FIELDS:
+                button = ttk.Button(frame, text="Browse", command=lambda key=name: self._browse_path(key))
                 button.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
+            row += 1
 
     def _build_status_area(self) -> None:
         frame = ttk.LabelFrame(self, text="Status", padding=10)
@@ -198,20 +318,22 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.log_text.configure(yscrollcommand=scrollbar.set)
 
-    def _browse_directory(self, key: str) -> None:
+    def _browse_path(self, key: str) -> None:
         assert filedialog is not None
-        selected = filedialog.askdirectory()
+        selected = filedialog.askopenfilename() if key in FILE_FIELDS else filedialog.askdirectory()
         if selected:
             self.variables[key].set(selected)
 
     def _collect_settings(self) -> LauncherSettings:
         values = {name: var.get() for name, var in self.variables.items()}
+        values["saved_games_path"] = default_saved_games_path()
+        values["dcs_variant"] = "DCS"
         return LauncherSettings.from_dict(values)
 
     def _apply_settings(self, settings: LauncherSettings) -> None:
         self.settings = settings
         for name, var in self.variables.items():
-            var.set(str(getattr(settings, name)))
+            var.set(_format_setting_value(getattr(settings, name)))
 
     def _load(self) -> None:
         try:
@@ -432,6 +554,12 @@ class LauncherApp(ttk.Frame if ttk is not None else object):
             return
         self.status_variables["export"].set("complete")
         self.status_variables["analysis"].set("complete")
+
+
+def _format_setting_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 def _fake_process_command(settings: LauncherSettings) -> list[str]:

@@ -45,6 +45,8 @@ REQUIRED_PORTS = (
     RequiredPort("vision_capture_trigger", "127.0.0.1", DEFAULT_VISION_CAPTURE_TRIGGER_PORT),
 )
 
+DCS_LISTENER_PORT_NAMES = {"overlay_command", "tutor_text", "dcs_handshake"}
+
 
 @dataclass(frozen=True)
 class PreflightEntry:
@@ -275,9 +277,26 @@ def _check_ports(entries: list[PreflightEntry], required_ports: Iterable[Require
             entries.append(_warn(code, f"could not verify {required.protocol.upper()} port {required.port}: {exc}"))
             continue
         if available:
-            entries.append(_pass(code, f"{required.protocol.upper()} port {required.port} is available"))
+            if required.name in DCS_LISTENER_PORT_NAMES:
+                entries.append(
+                    _pass(
+                        code,
+                        f"{required.protocol.upper()} port {required.port} is available; "
+                        "DCS hook is not currently listening",
+                    )
+                )
+            else:
+                entries.append(_pass(code, f"{required.protocol.upper()} port {required.port} is available"))
         else:
-            entries.append(_error(code, f"{required.protocol.upper()} port {required.port} is already occupied"))
+            if required.name in DCS_LISTENER_PORT_NAMES:
+                entries.append(
+                    _pass(
+                        code,
+                        f"{required.protocol.upper()} port {required.port} is occupied; DCS hook appears to be listening",
+                    )
+                )
+            else:
+                entries.append(_error(code, f"{required.protocol.upper()} port {required.port} is already occupied"))
 
 
 def _check_metadata(entries: list[PreflightEntry], settings: LauncherSettings) -> None:

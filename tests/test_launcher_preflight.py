@@ -129,7 +129,7 @@ def test_preflight_reports_missing_highlight_slots(tmp_path: Path) -> None:
     assert "4" in entry.message
 
 
-def test_preflight_reports_port_conflict(tmp_path: Path) -> None:
+def test_preflight_allows_overlay_command_port_when_dcs_is_running(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     saved_games_dir = Path(settings.saved_games_path)
     _write_installed_tree(saved_games_dir)
@@ -141,6 +141,46 @@ def test_preflight_reports_port_conflict(tmp_path: Path) -> None:
     report = run_preflight(settings, port_checker=fake_port_checker)
 
     entry = _entry_by_code(report, "port_overlay_command_available")
+    assert report.ok is True
+    assert entry.status == "pass"
+    assert "DCS hook appears to be listening" in entry.message
+
+
+def test_preflight_allows_dcs_listener_ports_when_dcs_is_running(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    saved_games_dir = Path(settings.saved_games_path)
+    _write_installed_tree(saved_games_dir)
+    dcs_ports = {port for port in REQUIRED_PORTS if port.name in {"overlay_command", "tutor_text", "dcs_handshake"}}
+
+    def fake_port_checker(port) -> bool:
+        return port not in dcs_ports
+
+    report = run_preflight(settings, port_checker=fake_port_checker)
+
+    overlay_entry = _entry_by_code(report, "port_overlay_command_available")
+    tutor_entry = _entry_by_code(report, "port_tutor_text_available")
+    handshake_entry = _entry_by_code(report, "port_dcs_handshake_available")
+    assert report.ok is True
+    assert overlay_entry.status == "pass"
+    assert tutor_entry.status == "pass"
+    assert handshake_entry.status == "pass"
+    assert "DCS hook appears to be listening" in overlay_entry.message
+    assert "DCS hook appears to be listening" in tutor_entry.message
+    assert "DCS hook appears to be listening" in handshake_entry.message
+
+
+def test_preflight_reports_simtutor_owned_port_conflict(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    saved_games_dir = Path(settings.saved_games_path)
+    _write_installed_tree(saved_games_dir)
+    conflicted = next(port for port in REQUIRED_PORTS if port.name == "overlay_ack")
+
+    def fake_port_checker(port) -> bool:
+        return port != conflicted
+
+    report = run_preflight(settings, port_checker=fake_port_checker)
+
+    entry = _entry_by_code(report, "port_overlay_ack_available")
     assert report.ok is False
     assert entry.status == "error"
     assert str(conflicted.port) in entry.message

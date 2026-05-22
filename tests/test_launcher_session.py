@@ -14,6 +14,7 @@ from simtutor.launcher_session import (
     resolve_unique_live_log_path,
 )
 from simtutor.launcher_settings import LauncherSettings
+from simtutor.launcher_tunnel import LauncherTunnelError
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,12 @@ class FakeTunnel:
         return type("TunnelSnapshot", (), {"running": True, "returncode": None, "command": ("ssh",)})()
 
 
+class OccupiedPortTunnel(FakeTunnel):
+    def start(self) -> None:
+        self.events.append("start:tunnel")
+        raise LauncherTunnelError("local TCP port 16324 is already occupied")
+
+
 def _settings(tmp_path: Path, *, model_profile_mode: str = "remote_direct") -> LauncherSettings:
     saved_games = tmp_path / "Saved Games" / "DCS"
     logs = tmp_path / "logs"
@@ -157,6 +164,10 @@ def test_build_launcher_session_plan_uses_production_live_dcs_flags(tmp_path: Pa
     assert "--max-overlay-targets" in plan.live_dcs_command
     assert "4" in plan.live_dcs_command
     assert "--model-enable-multimodal" in plan.live_dcs_command
+    assert "--log-raw-llm-text" in plan.live_dcs_command
+    assert "--print-model-io" in plan.live_dcs_command
+    assert "--help-udp-port" in plan.live_dcs_command
+    assert "7792" in plan.live_dcs_command
     assert "--no-cold-start-production" in plan.live_dcs_command
     assert plan.export_command[:4] == ("python", "-m", "simtutor", "experiment-export")
     assert "--strict" in plan.export_command
@@ -212,6 +223,38 @@ def test_session_starts_preflight_tunnel_model_sidecar_then_live_and_stops_in_re
         "stop:live-dcs",
         "stop:vision-sidecar",
         "stop:tunnel",
+    ]
+
+
+def test_session_reuses_existing_tunnel_when_local_forward_port_is_occupied(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, model_profile_mode="remote_tunnel")
+    settings.ssh_user = "yz"
+    settings.ssh_host = "example.invalid"
+    events: list[str] = []
+
+    def process_factory(*, name: str, command: list[str], **kwargs: object) -> FakeProcess:
+        return FakeProcess(name=name, command=command, events=events, **kwargs)
+
+    session = LauncherExperimentSession(
+        settings,
+        process_factory=process_factory,
+        tunnel_factory=lambda received: OccupiedPortTunnel(received, events),
+        preflight_runner=lambda received: events.append("preflight") or FakeReport(ok=True),
+        model_validator=lambda received: events.append("model") or FakeReport(ok=True),
+        timestamp=lambda: "20260521_153000",
+    )
+
+    session.start()
+    session.stop(run_post_run=False)
+
+    assert events == [
+        "preflight",
+        "start:tunnel",
+        "model",
+        "start:vision-sidecar",
+        "start:live-dcs",
+        "stop:live-dcs",
+        "stop:vision-sidecar",
     ]
 
 

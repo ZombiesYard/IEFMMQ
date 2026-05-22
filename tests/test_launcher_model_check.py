@@ -133,6 +133,26 @@ def test_remote_tunnel_endpoint_failure_includes_key_auth_hint() -> None:
     assert "password prompts are disabled" in report.to_text()
 
 
+def test_check_model_endpoint_reports_missing_http_client(monkeypatch: Any) -> None:
+    def fail_client() -> Any:
+        raise RuntimeError("Missing Python dependency: httpx. Install dependencies.")
+
+    monkeypatch.setattr("simtutor.launcher_model_check._make_http_client", fail_client)
+    config = ModelEndpointConfig(
+        base_url="http://localhost:16324",
+        text_model_name="simtutor-base",
+        vision_model_name="simtutor-vision",
+        require_vision_model=True,
+        timeout_s=3.0,
+    )
+
+    report = check_model_endpoint(config)
+
+    assert report.ok is False
+    assert "http_client_missing" in report.to_text()
+    assert "httpx" in report.to_text()
+
+
 def test_remote_tunnel_missing_model_does_not_include_key_auth_hint() -> None:
     settings = LauncherSettings(
         model_provider="openai_compat",

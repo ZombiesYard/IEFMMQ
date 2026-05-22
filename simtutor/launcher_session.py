@@ -14,7 +14,10 @@ from simtutor.launcher_model_check import validate_launcher_model_profile
 from simtutor.launcher_preflight import run_preflight
 from simtutor.launcher_processes import LauncherProcess, ProcessSnapshot, ProcessState
 from simtutor.launcher_settings import LauncherSettings, validate_settings
-from simtutor.launcher_tunnel import LauncherTunnel
+from simtutor.launcher_tunnel import LauncherTunnel, LauncherTunnelError
+
+HELP_TRIGGER_HOST = "127.0.0.1"
+HELP_TRIGGER_PORT = 7792
 
 
 class LauncherSessionError(RuntimeError):
@@ -137,6 +140,10 @@ def build_launcher_session_plan(
         settings.global_help_hotkey,
         "--global-help-cooldown-ms",
         str(settings.global_help_cooldown_ms),
+        "--help-udp-host",
+        HELP_TRIGGER_HOST,
+        "--help-udp-port",
+        str(HELP_TRIGGER_PORT),
         "--model-provider",
         settings.model_provider,
         "--model-base-url",
@@ -159,6 +166,14 @@ def build_launcher_session_plan(
         live_dcs_command.append("--model-enable-multimodal")
     else:
         live_dcs_command.append("--no-model-enable-multimodal")
+    if settings.log_raw_llm_text:
+        live_dcs_command.append("--log-raw-llm-text")
+    else:
+        live_dcs_command.append("--no-log-raw-llm-text")
+    if settings.print_model_io:
+        live_dcs_command.append("--print-model-io")
+    else:
+        live_dcs_command.append("--no-print-model-io")
 
     export_command = [
         executable,
@@ -294,7 +309,12 @@ class LauncherExperimentSession:
         try:
             if self.settings.model_profile_mode == "remote_tunnel":
                 self.tunnel = self.tunnel_factory(self.settings)
-                self.tunnel.start()
+                try:
+                    self.tunnel.start()
+                except LauncherTunnelError as exc:
+                    if "local TCP port" not in str(exc) or "already occupied" not in str(exc):
+                        raise
+                    self.tunnel = None
 
             model_report = self.model_validator(self.settings)
             if not getattr(model_report, "ok", False):

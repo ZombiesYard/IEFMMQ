@@ -47,7 +47,8 @@ contractV04.md
 .vscode/
 .claude
 CLAUDE.md
-
+logs/GUIStableLogs
+logs/experiments
 # Dev tunnel scripts (sensitive: expose server topology)
 tools/dev_tunnel_vllm.ps1
 tools/dev_tunnel_vllm.sh

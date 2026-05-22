@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 import json
 import math
 import os
@@ -27,9 +27,20 @@ class LauncherSettingsError(ValueError):
     """Raised when launcher settings cannot be loaded, saved, or validated."""
 
 
+def default_saved_games_path(
+    *,
+    env: Mapping[str, str] | None = None,
+    home: Path | None = None,
+) -> str:
+    source = os.environ if env is None else env
+    user_profile = source.get("USERPROFILE", "").strip()
+    root = Path(user_profile) if user_profile else (home or Path.home())
+    return str(root / "Saved Games" / "DCS")
+
+
 @dataclass
 class LauncherSettings:
-    saved_games_path: str = ""
+    saved_games_path: str = field(default_factory=default_saved_games_path)
     dcs_variant: str = "DCS"
     monitor_mode: str = "single-monitor"
     language: str = "zh"
@@ -45,14 +56,16 @@ class LauncherSettings:
     experimenter_id: str = ""
     questionnaire_ref: str = ""
     recording_ref: str = ""
-    model_provider: str = "stub"
-    model_profile_mode: str = "local_stub"
-    model_base_url: str = ""
-    text_model_name: str = "Qwen3-8B-Instruct"
+    model_provider: str = "openai_compat"
+    model_profile_mode: str = "remote_tunnel"
+    model_base_url: str = "http://localhost:16324"
+    text_model_name: str = "simtutor-base"
     vision_model_name: str = "simtutor-vision"
-    model_timeout_s: float = 20.0
+    model_timeout_s: float = 60.0
     model_enable_multimodal: bool = True
-    max_overlay_targets: int = 4
+    log_raw_llm_text: bool = True
+    print_model_io: bool = True
+    max_overlay_targets: int = 2
     pack_path: str = "packs/fa18c_startup/pack.yaml"
     taxonomy_path: str = "packs/fa18c_startup/taxonomy.yaml"
     ui_map_path: str = "packs/fa18c_startup/ui_map.yaml"
@@ -76,10 +89,10 @@ class LauncherSettings:
     vision_trigger_wait_ms: int = 4000
     vision_capture_trigger_host: str = "127.0.0.1"
     vision_capture_trigger_port: int = 7795
-    ssh_tunnel_profile: str = ""
+    ssh_tunnel_profile: str = "cloud-247-vllm"
     ssh_executable_path: str = ""
-    ssh_user: str = ""
-    ssh_host: str = ""
+    ssh_user: str = "yz50"
+    ssh_host: str = "cloud-247.rz.tu-clausthal.de"
     ssh_local_port: int = 16324
     ssh_remote_host: str = "127.0.0.1"
     ssh_remote_port: int = 6324
@@ -108,6 +121,8 @@ class LauncherSettings:
                 "vision_capture_trigger_port must be numeric"
             ) from exc
         settings.model_enable_multimodal = _parse_bool(settings.model_enable_multimodal, "model_enable_multimodal")
+        settings.log_raw_llm_text = _parse_bool(settings.log_raw_llm_text, "log_raw_llm_text")
+        settings.print_model_io = _parse_bool(settings.print_model_io, "print_model_io")
         settings.ssh_local_port = _parse_profile_port(
             settings.ssh_local_port,
             "ssh_local_port",
@@ -346,6 +361,7 @@ __all__ = [
     "LauncherSettingsError",
     "PROFILES_DIR_NAME",
     "SETTINGS_FILENAME",
+    "default_saved_games_path",
     "load_profile",
     "load_settings",
     "profiles_dir",
