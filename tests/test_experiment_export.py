@@ -1318,6 +1318,245 @@ def test_step_coding_accepts_top_level_step_id_events(tmp_path: Path):
     assert export.trial_summary[0].Completed == "yes"
 
 
+def _make_observation_only_baseline_events() -> list[dict]:
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    return [
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 1.0,
+                "source": "dcs_bios",
+                "bios": {"BATTERY_SW": 2, "L_GEN_SW": 1, "R_GEN_SW": 1},
+                "delta": {"BATTERY_SW": 2},
+            },
+            "metadata": {"seq": 1, "delta_count": 1},
+            "t_wall": 1.0,
+            "timestamp": t0.isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 2,
+                "t_wall": 3.0,
+                "source": "dcs_bios",
+                "bios": {
+                    "BATTERY_SW": 2,
+                    "L_GEN_SW": 1,
+                    "R_GEN_SW": 1,
+                    "APU_CONTROL_SW": 1,
+                    "APU_READY_LT": 1,
+                },
+                "delta": {"APU_CONTROL_SW": 1},
+            },
+            "metadata": {"seq": 2, "delta_count": 1},
+            "t_wall": 3.0,
+            "timestamp": (t0 + timedelta(seconds=2)).isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 3,
+                "t_wall": 5.0,
+                "source": "dcs_bios",
+                "bios": {"PROBE_SW": 1, "EXT_REFUEL_PROBE": 0},
+                "delta": {"PROBE_SW": 1, "EXT_REFUEL_PROBE": 0},
+            },
+            "metadata": {"seq": 3, "delta_count": 2},
+            "t_wall": 5.0,
+            "timestamp": (t0 + timedelta(seconds=4)).isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 4,
+                "t_wall": 8.0,
+                "source": "dcs_bios",
+                "bios": {"PROBE_SW": 1, "EXT_REFUEL_PROBE": 65535},
+                "delta": {"EXT_REFUEL_PROBE": 65535},
+            },
+            "metadata": {"seq": 4, "delta_count": 1},
+            "t_wall": 8.0,
+            "timestamp": (t0 + timedelta(seconds=7)).isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 5,
+                "t_wall": 11.0,
+                "source": "dcs_bios",
+                "bios": {"PROBE_SW": 1, "EXT_REFUEL_PROBE": 0},
+                "delta": {"EXT_REFUEL_PROBE": 0},
+            },
+            "metadata": {"seq": 5, "delta_count": 1},
+            "t_wall": 11.0,
+            "timestamp": (t0 + timedelta(seconds=10)).isoformat(),
+        },
+    ]
+
+
+def test_without_tutor_export_marks_passive_telemetry_gate_completions() -> None:
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_observation_only_baseline_events(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S01"].Completed == "yes"
+    assert rows["S03"].Completed == "yes"
+    assert rows["S20"].Completed == "yes"
+    assert rows["S21"].Completed == "yes"
+    assert "completed_from_passive_gate" in rows["S01"].AutoCodingNotes
+    assert "passive_gate:S01:s01_requires_battery_on" in rows["S01"].EvidenceRefs
+    assert "action:BATTERY_SW" in rows["S01"].EvidenceRefs
+    assert "telemetry_var:vars.ext_refuel_probe_value" in rows["S20"].EvidenceRefs
+
+    trial = export.trial_summary[0]
+    assert trial.HelpRequests == 0
+    assert trial.LLMTriggers == 0
+    assert trial.VLMCalls == 0
+    assert trial.OverlayExecuted == 0
+    assert trial.TotalStepsCompleted >= 4
+    assert trial.StepCompletionAccuracy > 0
+
+
+def test_passive_export_does_not_complete_mapped_action_when_gate_is_unsatisfied() -> None:
+    root = _repo_root()
+    event = _make_observation_only_baseline_events()[0]
+    event["payload"]["bios"] = {"BATTERY_SW": 2}
+    export = build_experiment_export(
+        [event],
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S01"].Completed == "no"
+    assert export.trial_summary[0].TotalStepsCompleted == 0
+
+
+def test_passive_export_does_not_complete_retraction_from_initial_latch_state() -> None:
+    root = _repo_root()
+    event = _make_observation_only_baseline_events()[2]
+    export = build_experiment_export(
+        [event],
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S20"].Completed == "no"
+    assert rows["S21"].Completed == "no"
+
+
+def test_passive_export_assigns_shared_action_to_earliest_uncompleted_candidate() -> None:
+    root = _repo_root()
+    event = {
+        "kind": "observation",
+        "source": "dcs_bios",
+        "payload": {
+            "seq": 1,
+            "t_wall": 1.0,
+            "source": "dcs_bios",
+            "bios": {"FLAP_SW": 2},
+            "delta": {"FLAP_SW": 2},
+        },
+        "metadata": {"seq": 1, "delta_count": 1},
+        "t_wall": 1.0,
+        "timestamp": datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc).isoformat(),
+    }
+
+    export = build_experiment_export(
+        [event],
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S16"].Completed == "yes"
+    assert rows["S27"].Completed == "no"
+
+
+def test_passive_export_respects_completion_gate_profile_overrides() -> None:
+    root = _repo_root()
+    event = {
+        "kind": "observation",
+        "source": "dcs_bios",
+        "payload": {
+            "seq": 1,
+            "t_wall": 1.0,
+            "source": "dcs_bios",
+            "bios": {"RADALT_MIN_HEIGHT_PTR": 4000},
+            "delta": {"RADALT_MIN_HEIGHT_PTR": 4000},
+        },
+        "metadata": {"seq": 1, "delta_count": 1},
+        "t_wall": 1.0,
+        "timestamp": datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc).isoformat(),
+    }
+
+    airfield = build_experiment_export(
+        [event],
+        meta_overrides={
+            "trial_id": "T01",
+            "participant_id": "P_BASE",
+            "condition": "without_tutor",
+            "scenario_profile": "airfield",
+        },
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    carrier = build_experiment_export(
+        [event],
+        meta_overrides={
+            "trial_id": "T01",
+            "participant_id": "P_BASE",
+            "condition": "without_tutor",
+            "scenario_profile": "carrier",
+        },
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    airfield_rows = {row.StepID: row for row in airfield.step_coding}
+    carrier_rows = {row.StepID: row for row in carrier.step_coding}
+    assert airfield_rows["S31"].Completed == "no"
+    assert carrier_rows["S31"].Completed == "yes"
+    assert "passive_gate:S31:s31_requires_radalt_bug_carrier_40" in carrier_rows["S31"].EvidenceRefs
+
+
+def test_with_tutor_export_does_not_use_passive_baseline_inference() -> None:
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_observation_only_baseline_events(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P_HELP", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S01"].Completed == "no"
+    assert rows["S03"].Completed == "no"
+    assert export.trial_summary[0].TotalStepsCompleted == 0
+
+
 def test_trial_summary_counts_vlm_calls_once_per_help_cycle():
     events = _make_events_with_help_cycles()
     events[9]["metadata"]["vlm_call_status"] = "called"

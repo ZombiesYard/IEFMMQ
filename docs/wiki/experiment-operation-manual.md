@@ -222,7 +222,11 @@ python .\tools\simtutor_launcher.py
 
 - 不向参与者提供 X1 help 操作。
 - 如果需要 passive logging，可仍启动 launcher，但必须记录“participant did not use tutor help”。
-- 若 baseline log 不能自动推断完整步骤，使用录像和 `step_coding.csv` 人工修正作为主数据。
+- baseline export 会把 DCS-BIOS observation、derived telemetry vars 和 pack completion gates 作为隐藏 passive evidence，用于自动填充可审计的 step completion。
+- passive logging 不会调用 LLM/VLM，不显示 overlay，也不向参与者暴露 step hint。
+- `step_coding.csv` 中 `Completed`、`EvidenceRefs`、`AutoCodingNotes` 可包含自动 gate evidence，例如 `completed_from_passive_gate`、`passive_gate:S01:s01_requires_battery_on`、`telemetry_var:vars.battery_on`。
+- `HelpRequests`、`LLMTriggers`、`VLMCalls`、`OverlayExecuted` 在未请求帮助的 baseline trial 中应保持 0。
+- 人工/录像编码仍用于审计和修正，尤其是不可观测动作、视频可见但 telemetry 不足的步骤，以及 `Error_*` 人工错误类型列。
 
 ### 6.2 Launcher 操作顺序
 
@@ -595,14 +599,14 @@ python -m simtutor extract-live-fixture `
 3. 询问是否继续。
 4. 如果停止，记录 `participant_stop_vr_discomfort`。
 
-### 11.5 Baseline 无法自动导出完整步骤
+### 11.5 Baseline passive export 需要复核
 
-baseline 条件可能没有 help cycles，因此自动 `step_coding.csv` 可能不完整。处理方式：
+baseline 条件通常没有 help cycles，但 `experiment-export` 会优先使用 passive telemetry、derived vars 和 pack completion gates 自动填充 `step_coding.csv`。处理方式：
 
-1. 保留 raw log 和录像。
-2. 用录像人工编码 S01-S33。
-3. 在 `experimenter_notes` 中写明 baseline 使用 video/manual coding。
-4. 分析时把 automatic coding 和 human coding 区分开。
+1. 保留 raw log 和录像，确保自动编码可追溯。
+2. 先检查 `EvidenceRefs` 和 `AutoCodingNotes`；自动完成通常会标记 `completed_from_passive_gate`、`passive_gate:*` 和 `telemetry_var:*`。
+3. 对 telemetry 不足、不可观测动作、实验异常或自动编码明显不符合录像的步骤，再用录像进行人工复核和修正。
+4. 分析时区分自动字段（如 `Completed`、`EvidenceRefs`、`AutoCodingNotes`）和人工字段（如 `Error_*`、`CoderID`、`CoderNotes`）。
 
 ## 12. 实验当天一页清单
 
