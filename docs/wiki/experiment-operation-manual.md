@@ -599,14 +599,14 @@ python -m simtutor extract-live-fixture `
 3. 询问是否继续。
 4. 如果停止，记录 `participant_stop_vr_discomfort`。
 
-### 11.5 Baseline 无法自动导出完整步骤
+### 11.5 Baseline passive export 需要复核
 
-baseline 条件可能没有 help cycles，因此自动 `step_coding.csv` 可能不完整。处理方式：
+baseline 条件通常没有 help cycles，但 `experiment-export` 会优先使用 passive telemetry、derived vars 和 pack completion gates 自动填充 `step_coding.csv`。处理方式：
 
-1. 保留 raw log 和录像。
-2. 用录像人工编码 S01-S33。
-3. 在 `experimenter_notes` 中写明 baseline 使用 video/manual coding。
-4. 分析时把 automatic coding 和 human coding 区分开。
+1. 保留 raw log 和录像，确保自动编码可追溯。
+2. 先检查 `EvidenceRefs` 和 `AutoCodingNotes`；自动完成通常会标记 `completed_from_passive_gate`、`passive_gate:*` 和 `telemetry_var:*`。
+3. 对 telemetry 不足、不可观测动作、实验异常或自动编码明显不符合录像的步骤，再用录像进行人工复核和修正。
+4. 分析时区分自动字段（如 `Completed`、`EvidenceRefs`、`AutoCodingNotes`）和人工字段（如 `Error_*`、`CoderID`、`CoderNotes`）。
 
 ## 12. 实验当天一页清单
 

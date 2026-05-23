@@ -1695,31 +1695,15 @@ def _passive_vars_history_by_event(
     return history
 
 
-def _actions_by_event_and_step(
+def _actions_by_event(
     action_timeline: Sequence[ActionTimelineRecord],
-) -> dict[int, dict[str, list[str]]]:
-    by_event: dict[int, dict[str, list[str]]] = {}
+) -> dict[int, list[ActionTimelineRecord]]:
+    by_event: dict[int, list[ActionTimelineRecord]] = {}
     for action in action_timeline:
-        raw_key = action.RawKey
-        if not raw_key:
+        if not action.RawKey:
             continue
-        for step_id in _split_csv_values(action.CandidateStepID):
-            by_event.setdefault(action.EventIndex, {}).setdefault(step_id, [])
-            if raw_key not in by_event[action.EventIndex][step_id]:
-                by_event[action.EventIndex][step_id].append(raw_key)
+        by_event.setdefault(action.EventIndex, []).append(action)
     return by_event
-
-
-def _passive_completion_requires_transition(step_id: str) -> bool:
-    return step_id in {"S21", "S23", "S25"}
-
-
-def _passive_completion_prerequisite(step_id: str) -> str | None:
-    return {
-        "S21": "S20",
-        "S23": "S22",
-        "S25": "S24",
-    }.get(step_id)
 
 
 def _gate_rules(raw_rules: Any) -> list[dict[str, Any]]:
@@ -1760,28 +1744,55 @@ def _passive_completion_notes(
         for step in pack_steps
         if (step_id := _opt_str(step.get("id"))) is not None
     ]
+    step_order = {step_id: idx for idx, step_id in enumerate(step_ids)}
+    rules_by_step = {
+        step_id: rules
+        for step_id in step_ids
+        if (rules := _gate_rules(completion_gates.get(step_id)))
+    }
     vars_history = _passive_vars_history_by_event(events, pack_path=pack_path)
-    action_refs_by_event = _actions_by_event_and_step(action_timeline)
+    actions_by_event = _actions_by_event(action_timeline)
     last_allowed: dict[str, bool] = {}
     notes: dict[str, tuple[Sequence[str], str]] = {}
 
     for event_index, vars_snapshot in enumerate(vars_history):
-        action_refs_for_event = action_refs_by_event.get(event_index, {})
+        allowed_by_step = {
+            step_id: GatingEngine(rules).evaluate([vars_snapshot]).allowed
+            for step_id, rules in rules_by_step.items()
+        }
+        action_candidates_for_event: set[str] = set()
+        action_refs_for_step: dict[str, list[str]] = {}
+        for action in actions_by_event.get(event_index, []):
+            candidates = sorted(
+                _split_csv_values(action.CandidateStepID),
+                key=lambda step_id: step_order.get(step_id, len(step_order)),
+            )
+            action_candidates_for_event.update(candidates)
+            for candidate in candidates:
+                if candidate in notes:
+                    continue
+                if allowed_by_step.get(candidate) is not True:
+                    break
+                action_refs_for_step.setdefault(candidate, [])
+                if action.RawKey not in action_refs_for_step[candidate]:
+                    action_refs_for_step[candidate].append(action.RawKey)
+                break
+
         for step_id in step_ids:
             if step_id in notes:
                 continue
-            rules = _gate_rules(completion_gates.get(step_id))
-            if not rules:
+            rules = rules_by_step.get(step_id)
+            if rules is None:
                 continue
-            allowed = GatingEngine(rules).evaluate([vars_snapshot]).allowed
+            allowed = allowed_by_step[step_id]
             previous_allowed = last_allowed.get(step_id)
-            action_refs = action_refs_for_event.get(step_id, [])
-            gate_transition = previous_allowed is False and allowed
-            action_supported = bool(action_refs) and not _passive_completion_requires_transition(step_id)
-            prerequisite = _passive_completion_prerequisite(step_id)
-            if prerequisite is not None and prerequisite not in notes:
-                last_allowed[step_id] = allowed
-                continue
+            action_refs = action_refs_for_step.get(step_id, [])
+            gate_transition = (
+                previous_allowed is False
+                and allowed
+                and step_id not in action_candidates_for_event
+            )
+            action_supported = bool(action_refs)
 
             if allowed and (gate_transition or action_supported):
                 refs = _passive_gate_refs(step_id, rules)

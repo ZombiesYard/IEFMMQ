@@ -1462,6 +1462,85 @@ def test_passive_export_does_not_complete_retraction_from_initial_latch_state() 
     assert rows["S21"].Completed == "no"
 
 
+def test_passive_export_assigns_shared_action_to_earliest_uncompleted_candidate() -> None:
+    root = _repo_root()
+    event = {
+        "kind": "observation",
+        "source": "dcs_bios",
+        "payload": {
+            "seq": 1,
+            "t_wall": 1.0,
+            "source": "dcs_bios",
+            "bios": {"FLAP_SW": 2},
+            "delta": {"FLAP_SW": 2},
+        },
+        "metadata": {"seq": 1, "delta_count": 1},
+        "t_wall": 1.0,
+        "timestamp": datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc).isoformat(),
+    }
+
+    export = build_experiment_export(
+        [event],
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S16"].Completed == "yes"
+    assert rows["S27"].Completed == "no"
+
+
+def test_passive_export_respects_completion_gate_profile_overrides() -> None:
+    root = _repo_root()
+    event = {
+        "kind": "observation",
+        "source": "dcs_bios",
+        "payload": {
+            "seq": 1,
+            "t_wall": 1.0,
+            "source": "dcs_bios",
+            "bios": {"RADALT_MIN_HEIGHT_PTR": 4000},
+            "delta": {"RADALT_MIN_HEIGHT_PTR": 4000},
+        },
+        "metadata": {"seq": 1, "delta_count": 1},
+        "t_wall": 1.0,
+        "timestamp": datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc).isoformat(),
+    }
+
+    airfield = build_experiment_export(
+        [event],
+        meta_overrides={
+            "trial_id": "T01",
+            "participant_id": "P_BASE",
+            "condition": "without_tutor",
+            "scenario_profile": "airfield",
+        },
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+    carrier = build_experiment_export(
+        [event],
+        meta_overrides={
+            "trial_id": "T01",
+            "participant_id": "P_BASE",
+            "condition": "without_tutor",
+            "scenario_profile": "carrier",
+        },
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    airfield_rows = {row.StepID: row for row in airfield.step_coding}
+    carrier_rows = {row.StepID: row for row in carrier.step_coding}
+    assert airfield_rows["S31"].Completed == "no"
+    assert carrier_rows["S31"].Completed == "yes"
+    assert "passive_gate:S31:s31_requires_radalt_bug_carrier_40" in carrier_rows["S31"].EvidenceRefs
+
+
 def test_with_tutor_export_does_not_use_passive_baseline_inference() -> None:
     root = _repo_root()
     export = build_experiment_export(
