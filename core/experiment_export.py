@@ -17,6 +17,7 @@ import yaml
 from core.gating import GatingEngine
 from core.help_cycle_audit import normalize_help_cycle_audit_fields
 from core.interaction_metrics import InteractionMetrics, compute_interaction_metrics
+from core.vars import VarResolver, VarResolverError
 
 
 def _str_list(raw: Any) -> list[str]:
@@ -1187,12 +1188,16 @@ def _inferred_step_completion_notes(
     return inferred
 
 
+PassiveCompletionNotes = Mapping[str, tuple[Sequence[str], str]]
+
+
 def _build_step_coding(
     events: Sequence[Mapping[str, Any]],
     *,
     meta: SessionMeta,
     help_cycles: Sequence[HelpCycleRecord],
     pack_steps: Sequence[Mapping[str, Any]],
+    passive_completion_notes: PassiveCompletionNotes | None = None,
 ) -> list[StepCodingRecord]:
     completed_steps: set[str] = set()
     activated_steps: set[str] = set()
@@ -1226,7 +1231,14 @@ def _build_step_coding(
         cycles = [cycle for cycle in help_cycles if _help_cycle_matches_step(cycle, step_id)]
         completed = step_id in completed_steps
         inferred_completion = inferred_completion_notes.get(step_id)
+        passive_completion = (
+            passive_completion_notes.get(step_id)
+            if passive_completion_notes is not None
+            else None
+        )
         if not completed and inferred_completion is not None:
+            completed = True
+        if not completed and passive_completion is not None:
             completed = True
         performed = completed or step_id in activated_steps or bool(cycles)
 
@@ -1241,10 +1253,14 @@ def _build_step_coding(
                 evidence_refs.append("frames:" + _join_csv_values(cycle.frame_ids))
         if inferred_completion is not None:
             evidence_refs.append(inferred_completion[0])
+        if passive_completion is not None:
+            evidence_refs.extend(passive_completion[0])
 
         auto_notes: list[str] = ["human_error_columns_blank"]
         if step_id in completed_event_seen:
             auto_notes.append("completed_from_step_completed")
+        elif passive_completion is not None:
+            auto_notes.append(passive_completion[1])
         elif inferred_completion is not None:
             auto_notes.append(inferred_completion[1])
         elif performed:
@@ -1606,6 +1622,175 @@ def _build_action_timeline(
                 last_values[key] = value
 
     return rows
+
+
+def _passive_completion_enabled(
+    *,
+    meta: SessionMeta,
+    scoring: Mapping[str, Any] | None,
+) -> bool:
+    condition = meta.condition.strip().lower()
+    if condition in {"without_tutor", "baseline", "no_tutor"}:
+        return True
+    if isinstance(scoring, Mapping):
+        return _opt_bool(scoring.get("passive_step_inference")) is True
+    return False
+
+
+def _pack_telemetry_map_path(pack_path: str | Path | None) -> Path | None:
+    if pack_path is None:
+        return None
+    candidate = Path(pack_path).parent / "telemetry_map.yaml"
+    return candidate if candidate.exists() else None
+
+
+def _load_var_resolver_for_export(pack_path: str | Path | None) -> VarResolver | None:
+    telemetry_map_path = _pack_telemetry_map_path(pack_path)
+    if telemetry_map_path is None:
+        return None
+    try:
+        return VarResolver.from_yaml(telemetry_map_path)
+    except (OSError, VarResolverError, yaml.YAMLError):
+        return None
+
+
+def _passive_vars_history_by_event(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    pack_path: str | Path | None,
+) -> list[dict[str, Any]]:
+    resolver = _load_var_resolver_for_export(pack_path)
+    current_bios: dict[str, Any] = {}
+    current_vars: dict[str, Any] = {}
+    history: list[dict[str, Any]] = []
+
+    for ev in events:
+        for key, value in _event_bios_map(ev).items():
+            if isinstance(key, str) and key:
+                current_bios[key] = value
+        for key, value in _extract_event_delta_items(ev):
+            current_bios[key] = value
+        for key, value in _event_vars(ev).items():
+            if isinstance(key, str) and key:
+                current_vars[key] = value
+
+        if resolver is not None:
+            try:
+                current_vars.update(
+                    resolver.resolve({"bios": current_bios, "vars": current_vars})
+                )
+            except VarResolverError:
+                pass
+
+        vars_snapshot = dict(current_vars)
+        bios_snapshot = dict(current_bios)
+        history.append(
+            {
+                "vars": vars_snapshot,
+                "bios": bios_snapshot,
+                "payload": {"vars": vars_snapshot, "bios": bios_snapshot},
+            }
+        )
+
+    return history
+
+
+def _actions_by_event_and_step(
+    action_timeline: Sequence[ActionTimelineRecord],
+) -> dict[int, dict[str, list[str]]]:
+    by_event: dict[int, dict[str, list[str]]] = {}
+    for action in action_timeline:
+        raw_key = action.RawKey
+        if not raw_key:
+            continue
+        for step_id in _split_csv_values(action.CandidateStepID):
+            by_event.setdefault(action.EventIndex, {}).setdefault(step_id, [])
+            if raw_key not in by_event[action.EventIndex][step_id]:
+                by_event[action.EventIndex][step_id].append(raw_key)
+    return by_event
+
+
+def _passive_completion_requires_transition(step_id: str) -> bool:
+    return step_id in {"S21", "S23", "S25"}
+
+
+def _passive_completion_prerequisite(step_id: str) -> str | None:
+    return {
+        "S21": "S20",
+        "S23": "S22",
+        "S25": "S24",
+    }.get(step_id)
+
+
+def _gate_rules(raw_rules: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw_rules, list) or not raw_rules:
+        return []
+    return [dict(rule) for rule in raw_rules if isinstance(rule, Mapping)]
+
+
+def _passive_gate_refs(step_id: str, rules: Sequence[Mapping[str, Any]]) -> list[str]:
+    refs: list[str] = []
+    for rule in rules:
+        reason_code = _opt_str(rule.get("reason_code"))
+        var_path = _opt_str(rule.get("var"))
+        if reason_code:
+            refs.append(f"passive_gate:{step_id}:{reason_code}")
+        elif var_path:
+            refs.append(f"passive_gate:{step_id}:{var_path}")
+        if var_path:
+            refs.append(f"telemetry_var:{var_path}")
+    return refs
+
+
+def _passive_completion_notes(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    action_timeline: Sequence[ActionTimelineRecord],
+    pack_steps: Sequence[Mapping[str, Any]],
+    pack_path: str | Path | None,
+    scenario_profile: str | None,
+) -> dict[str, tuple[Sequence[str], str]]:
+    gate_config = _load_gate_config_for_export(pack_path, scenario_profile=scenario_profile)
+    completion_gates = gate_config["completion_gates"]
+    if not completion_gates:
+        return {}
+
+    step_ids = [
+        step_id
+        for step in pack_steps
+        if (step_id := _opt_str(step.get("id"))) is not None
+    ]
+    vars_history = _passive_vars_history_by_event(events, pack_path=pack_path)
+    action_refs_by_event = _actions_by_event_and_step(action_timeline)
+    last_allowed: dict[str, bool] = {}
+    notes: dict[str, tuple[Sequence[str], str]] = {}
+
+    for event_index, vars_snapshot in enumerate(vars_history):
+        action_refs_for_event = action_refs_by_event.get(event_index, {})
+        for step_id in step_ids:
+            if step_id in notes:
+                continue
+            rules = _gate_rules(completion_gates.get(step_id))
+            if not rules:
+                continue
+            allowed = GatingEngine(rules).evaluate([vars_snapshot]).allowed
+            previous_allowed = last_allowed.get(step_id)
+            action_refs = action_refs_for_event.get(step_id, [])
+            gate_transition = previous_allowed is False and allowed
+            action_supported = bool(action_refs) and not _passive_completion_requires_transition(step_id)
+            prerequisite = _passive_completion_prerequisite(step_id)
+            if prerequisite is not None and prerequisite not in notes:
+                last_allowed[step_id] = allowed
+                continue
+
+            if allowed and (gate_transition or action_supported):
+                refs = _passive_gate_refs(step_id, rules)
+                refs.extend(f"action:{raw_key}" for raw_key in action_refs)
+                notes[step_id] = (refs, "completed_from_passive_gate")
+
+            last_allowed[step_id] = allowed
+
+    return notes
 
 
 _AUTO_CONFIDENCE_RANK = {"": 0, "low": 1, "medium": 2, "high": 3}
@@ -2293,11 +2478,23 @@ def build_experiment_export(
         bios_to_ui_path=bios_to_ui_path,
         ui_map_path=ui_map_path,
     )
+    passive_completion_notes = (
+        _passive_completion_notes(
+            events,
+            action_timeline=action_timeline,
+            pack_steps=pack_steps,
+            pack_path=pack_path,
+            scenario_profile=meta.scenario_profile,
+        )
+        if _passive_completion_enabled(meta=meta, scoring=scoring)
+        else None
+    )
     step_coding = _build_step_coding(
         events,
         meta=meta,
         help_cycles=help_cycles,
         pack_steps=pack_steps,
+        passive_completion_notes=passive_completion_notes,
     )
     _apply_pre_scoring_candidates(
         events,

@@ -222,7 +222,11 @@ python .\tools\simtutor_launcher.py
 
 - 不向参与者提供 X1 help 操作。
 - 如果需要 passive logging，可仍启动 launcher，但必须记录“participant did not use tutor help”。
-- 若 baseline log 不能自动推断完整步骤，使用录像和 `step_coding.csv` 人工修正作为主数据。
+- baseline export 会把 DCS-BIOS observation、derived telemetry vars 和 pack completion gates 作为隐藏 passive evidence，用于自动填充可审计的 step completion。
+- passive logging 不会调用 LLM/VLM，不显示 overlay，也不向参与者暴露 step hint。
+- `step_coding.csv` 中 `Completed`、`EvidenceRefs`、`AutoCodingNotes` 可包含自动 gate evidence，例如 `completed_from_passive_gate`、`passive_gate:S01:s01_requires_battery_on`、`telemetry_var:vars.battery_on`。
+- `HelpRequests`、`LLMTriggers`、`VLMCalls`、`OverlayExecuted` 在未请求帮助的 baseline trial 中应保持 0。
+- 人工/录像编码仍用于审计和修正，尤其是不可观测动作、视频可见但 telemetry 不足的步骤，以及 `Error_*` 人工错误类型列。
 
 ### 6.2 Launcher 操作顺序
 
