@@ -59,6 +59,9 @@ def _opt_bool(raw: Any) -> bool | None:
 # ── experiment-layer metadata ──────────────────────────────────────────
 
 EXPECTED_PACK_STEP_IDS = [f"S{i:02d}" for i in range(1, 34)]
+NO_HELP_BASELINE_CONDITIONS = frozenset({"without_tutor", "baseline", "no_tutor"})
+VISUAL_STEP_MANUAL_REVIEW_NOTE = "visual_step_requires_manual_review"
+VISUAL_STEP_MANUAL_REVIEW_REF = "manual_review:visual_step_without_passive_evidence"
 
 HELP_CYCLES_CSV_FIELDS = [
     "cycle_index", "help_cycle_id", "trigger_wall_s", "generation_mode",
@@ -1630,7 +1633,7 @@ def _passive_completion_enabled(
     scoring: Mapping[str, Any] | None,
 ) -> bool:
     condition = meta.condition.strip().lower()
-    if condition in {"without_tutor", "baseline", "no_tutor"}:
+    if condition in NO_HELP_BASELINE_CONDITIONS:
         return True
     if isinstance(scoring, Mapping):
         return _opt_bool(scoring.get("passive_step_inference")) is True
@@ -1906,9 +1909,61 @@ def _load_gate_config_for_export(
     return config
 
 
-def _mark_om_candidates(rows: Sequence[StepCodingRecord]) -> None:
+def _baseline_visual_manual_review_step_ids(
+    *,
+    pack_steps: Sequence[Mapping[str, Any]],
+    completion_gates: Mapping[str, Any],
+) -> set[str]:
+    step_ids: set[str] = set()
+    for step in pack_steps:
+        step_id = _opt_str(step.get("id"))
+        if not step_id:
+            continue
+        evidence_requirements = set(_str_list(step.get("evidence_requirements")))
+        requires_visual = (
+            _opt_bool(step.get("requires_visual_confirmation")) is True
+            or "visual" in evidence_requirements
+        )
+        if not requires_visual:
+            continue
+        if _gate_rules(completion_gates.get(step_id)):
+            continue
+        step_ids.add(step_id)
+    return step_ids
+
+
+def _mark_baseline_visual_manual_review(
+    *,
+    rows_by_step: Mapping[str, StepCodingRecord],
+    step_ids: set[str],
+) -> None:
+    for step_id in step_ids:
+        row = rows_by_step.get(step_id)
+        if row is None or row.Completed == "yes":
+            continue
+        if row.Condition.strip().lower() not in NO_HELP_BASELINE_CONDITIONS:
+            continue
+        row.NeedsHumanReview = "yes"
+        row.AutoEvidenceRefs = _append_unique_ref(
+            row.AutoEvidenceRefs,
+            VISUAL_STEP_MANUAL_REVIEW_REF,
+        )
+        row.AutoCodingNotes = _append_unique_ref(
+            row.AutoCodingNotes,
+            VISUAL_STEP_MANUAL_REVIEW_NOTE,
+        )
+
+
+def _mark_om_candidates(
+    rows: Sequence[StepCodingRecord],
+    *,
+    skip_step_ids: set[str] | None = None,
+) -> None:
+    skipped = skip_step_ids or set()
     for row in rows:
         if row.Completed == "yes":
+            continue
+        if row.StepID in skipped and row.Condition.strip().lower() in NO_HELP_BASELINE_CONDITIONS:
             continue
         evidence = "om:not_completed"
         _set_auto_candidate(row, "OM", evidence, confidence="high")
@@ -2265,8 +2320,16 @@ def _apply_pre_scoring_candidates(
     gate_config = _load_gate_config_for_export(pack_path, scenario_profile=scenario_profile)
     vars_history = _vars_history_by_event(events)
     vars_by_event = _vars_by_event(events)
+    manual_review_step_ids = _baseline_visual_manual_review_step_ids(
+        pack_steps=pack_steps,
+        completion_gates=gate_config["completion_gates"],
+    )
 
-    _mark_om_candidates(step_coding)
+    _mark_baseline_visual_manual_review(
+        rows_by_step=rows_by_step,
+        step_ids=manual_review_step_ids,
+    )
+    _mark_om_candidates(step_coding, skip_step_ids=manual_review_step_ids)
     _mark_action_candidates(
         rows_by_step=rows_by_step,
         step_order=step_order,

@@ -286,9 +286,12 @@ For `without_tutor`:
 | Participant could access checklist without removing Quest 3 | yes / no |
 | Participant used checklist | yes / no / partially |
 | Manual coding required | yes / no |
+| S18/S19 visual review completed | yes / no / N/A |
+| S18/S19 review source | video / offline VLM / both / N/A |
 | Notes |  |
 
 为了避免弱证据，正式 baseline 推荐使用 VR 内可访问 checklist，而不是要求参与者摘下头显查看外部 PDF。
+S18/S19 依赖右 DDI FCS-MC 页面和 final GO 视觉确认；如果 `step_coding.csv` 标记 `visual_step_requires_manual_review`，需要用录像或 trial 后离线 VLM 复核，不能把缺少 passive visual evidence 直接视为确认遗漏。
 
 ## 11. Tutor-Specific Notes
 

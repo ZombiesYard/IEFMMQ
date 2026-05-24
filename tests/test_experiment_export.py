@@ -1429,6 +1429,38 @@ def test_without_tutor_export_marks_passive_telemetry_gate_completions() -> None
     assert trial.StepCompletionAccuracy > 0
 
 
+def test_without_tutor_visual_only_steps_require_manual_review_not_auto_om() -> None:
+    root = _repo_root()
+    export = build_experiment_export(
+        _make_observation_only_baseline_events(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    for step_id in ("S18", "S19"):
+        assert rows[step_id].Completed == "no"
+        assert rows[step_id].NeedsHumanReview == "yes"
+        assert rows[step_id].Auto_Error_OM == "0"
+        assert rows[step_id].AutoConfidence != "high"
+        assert "visual_step_requires_manual_review" in rows[step_id].AutoCodingNotes
+        assert "manual_review:visual_step_without_passive_evidence" in rows[step_id].AutoEvidenceRefs
+
+    with_tutor = build_experiment_export(
+        _make_observation_only_baseline_events(),
+        meta_overrides={"trial_id": "T01", "participant_id": "P_HELP", "condition": "with_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    with_tutor_rows = {row.StepID: row for row in with_tutor.step_coding}
+    assert with_tutor_rows["S18"].Auto_Error_OM == "1"
+    assert "visual_step_requires_manual_review" not in with_tutor_rows["S18"].AutoCodingNotes
+
+
 def test_without_tutor_export_preserves_logged_latch_vars_over_resolver_recompute() -> None:
     root = _repo_root()
     t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
