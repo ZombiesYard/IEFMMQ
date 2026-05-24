@@ -282,6 +282,43 @@
       font-size: 13px;
     }
 
+    .command-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin: 8px 0 12px;
+    }
+
+    .command-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .command-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfe;
+    }
+
+    .command-card h3 {
+      margin-top: 0;
+    }
+
+    .command-card textarea {
+      min-height: 260px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: pre;
+      overflow: auto;
+    }
+
+    .command-card .toolbar {
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
     .status {
       color: var(--muted);
       font-size: 13px;
@@ -327,7 +364,8 @@
 
       .grid,
       .grid.two,
-      .grid.three {
+      .grid.three,
+      .command-grid {
         grid-template-columns: 1fr;
       }
 
@@ -395,6 +433,7 @@
       <a href="#post">实验后</a>
       <a href="#quality">导出质检</a>
       <a href="#condition">条件分配</a>
+      <a href="#generated-commands">Generated commands</a>
     </nav>
 
     <form id="experimentForm">
@@ -606,6 +645,45 @@
               <option value="mixed">mixed</option>
             </select>
           </label>
+        </div>
+      </section>
+
+      <section id="generated-commands">
+        <h2>Generated commands</h2>
+        <p class="section-note">根据实验前字段自动生成 PowerShell 命令；复制前确认 participant、trial、condition 和路径一致。</p>
+        <div class="notice" id="generatedCommandWarning" hidden></div>
+        <div class="command-actions">
+          <button type="button" id="copyAllCommands">复制全部命令</button>
+        </div>
+        <div class="command-grid">
+          <article class="command-card">
+            <div class="toolbar">
+              <h3>with_tutor live run</h3>
+              <button type="button" data-copy-target="commandWithTutor">复制</button>
+            </div>
+            <textarea id="commandWithTutor" readonly></textarea>
+          </article>
+          <article class="command-card">
+            <div class="toolbar">
+              <h3>without_tutor passive live run</h3>
+              <button type="button" data-copy-target="commandWithoutTutor">复制</button>
+            </div>
+            <textarea id="commandWithoutTutor" readonly></textarea>
+          </article>
+          <article class="command-card">
+            <div class="toolbar">
+              <h3>experiment-export</h3>
+              <button type="button" data-copy-target="commandExport">复制</button>
+            </div>
+            <textarea id="commandExport" readonly></textarea>
+          </article>
+          <article class="command-card">
+            <div class="toolbar">
+              <h3>experiment-analyze</h3>
+              <button type="button" data-copy-target="commandAnalyze">复制</button>
+            </div>
+            <textarea id="commandAnalyze" readonly></textarea>
+          </article>
         </div>
       </section>
 
@@ -896,6 +974,13 @@
     const assignmentRows = document.getElementById("assignmentRows");
     const form = document.getElementById("experimentForm");
     const status = document.getElementById("status");
+    const generatedCommandWarning = document.getElementById("generatedCommandWarning");
+    const generatedCommandIds = [
+      "commandWithTutor",
+      "commandWithoutTutor",
+      "commandExport",
+      "commandAnalyze"
+    ];
 
     const usabilityItems = [
       ["U1", "I understood what I was expected to do during the task."],
@@ -1057,6 +1142,7 @@
       }
       syncAllTlxFromNumbers();
       updateRawTlx();
+      updateGeneratedCommands();
       markStatus("已加载");
     }
 
@@ -1156,6 +1242,7 @@
       localStorage.removeItem(STORAGE_KEY);
       syncAllTlxFromNumbers();
       updateRawTlx();
+      updateGeneratedCommands();
       markStatus("已清空");
     }
 
@@ -1196,6 +1283,238 @@
       document.getElementById("tlxRawHidden").value = text;
     }
 
+    function fieldValue(name, fallback = "") {
+      const el = form.elements.namedItem(name);
+      if (!el || typeof el.value !== "string") {
+        return fallback;
+      }
+      const value = el.value.trim();
+      return value || fallback;
+    }
+
+    function psQuote(value) {
+      return `"${String(value).replace(/"/g, '`"')}"`;
+    }
+
+    function psCommand(lines) {
+      return lines.map((line, idx) => (idx === lines.length - 1 ? line : `${line} \``)).join("\n");
+    }
+
+    function derivedCommandData() {
+      const study = fieldValue("study_id", "fa18c_quest3_simitutor_2026");
+      const participant = fieldValue("participant_id", "ParticipantID");
+      const trial = fieldValue("trial_id", "TrialID");
+      const condition = fieldValue("condition", "condition");
+      const sessionId = `sess-${participant}-${trial}`;
+      const rawLogPath = fieldValue("raw_log_path") || `logs\\${participant}_${trial}_${condition}.jsonl`;
+      const questionnairePath = fieldValue("questionnaire_path") || `questionnaires\\${participant}_${trial}.json`;
+      const recordingPath = fieldValue("recording_path") || `recordings\\${participant}_${trial}.mp4`;
+      const exportOutputDir = `artifacts\\experiments\\${study}`;
+      const analysisOutputDir = `artifacts\\analysis\\${study}`;
+
+      return {
+        study,
+        participant,
+        trial,
+        condition,
+        sessionId,
+        rawLogPath,
+        questionnairePath,
+        recordingPath,
+        exportOutputDir,
+        analysisOutputDir,
+        group: fieldValue("participant_group", "novice"),
+        experimenter: fieldValue("experimenter_id", "ExperimenterID"),
+        modelEndpoint: fieldValue("model_endpoint", "http://127.0.0.1:16324"),
+        textModel: fieldValue("text_model", "simtutor-base"),
+        visionModel: fieldValue("vision_model", "simtutor-vision"),
+        dcsMission: fieldValue("dcs_mission", "fa18c_cold_start_fixed.miz"),
+        dcsAircraft: fieldValue("dcs_aircraft", "FA-18C_hornet"),
+        vrSetup: fieldValue("vr_setup", "Quest 3 Link"),
+        monitorSetup: fieldValue("monitor_setup", "fa18c_composite_panel_v2"),
+        helpHotkey: fieldValue("help_hotkey"),
+        language: fieldValue("tutor_language", "zh")
+      };
+    }
+
+    function buildWithTutorCommand(data) {
+      const hotkeyLines = data.helpHotkey
+        ? [`  --global-help-hotkey ${psQuote(data.helpHotkey)}`]
+        : [];
+      return [
+        "# PowerShell window 1: vision sidecar",
+        psCommand([
+          "python .\\tools\\capture_vision_sidecar.py",
+          "  --saved-games-dir \"C:\\Users\\<USER>\\Saved Games\\DCS\"",
+          `  --session-id ${psQuote(data.sessionId)}`,
+          "  --capture-fps 0",
+          "  --trigger-host \"127.0.0.1\"",
+          "  --trigger-port 7795"
+        ]),
+        "",
+        "# PowerShell window 2: with_tutor live run",
+        psCommand([
+          "python -m simtutor live-dcs",
+          "  --bios-source raw",
+          "  --raw-bios-host 239.255.50.10",
+          "  --raw-bios-port 5010",
+          `  --raw-bios-aircraft ${data.dcsAircraft}`,
+          "  --raw-bios-control-dir \"DCS\\Scripts\\DCS-BIOS\\doc\\json\"",
+          "  --timeout 0.5",
+          `  --session-id ${psQuote(data.sessionId)}`,
+          "  --vision-saved-games-dir \"C:\\Users\\<USER>\\Saved Games\\DCS\"",
+          `  --vision-session-id ${psQuote(data.sessionId)}`,
+          "  --vision-trigger-wait-ms 4000",
+          "  --vision-capture-trigger-host \"127.0.0.1\"",
+          "  --vision-capture-trigger-port 7795",
+          ...hotkeyLines,
+          "  --global-help-cooldown-ms 800",
+          "  --model-provider openai_compat",
+          `  --model-base-url ${psQuote(data.modelEndpoint)}`,
+          `  --model-name ${psQuote(data.textModel)}`,
+          `  --vision-model-name ${psQuote(data.visionModel)}`,
+          "  --model-timeout-s 60",
+          "  --max-overlay-targets 4",
+          "  --knowledge-index \"Doc\\Evaluation\\index.json\"",
+          "  --rag-top-k 5",
+          "  --model-enable-multimodal",
+          "  --no-cold-start-production",
+          `  --lang ${data.language}`,
+          "  --scenario-profile airfield",
+          "  --log-raw-llm-text",
+          "  --print-model-io",
+          `  --output ${psQuote(data.rawLogPath)}`
+        ])
+      ].join("\n");
+    }
+
+    function buildWithoutTutorCommand(data) {
+      return [
+        "# without_tutor passive baseline: No LLM/VLM/overlay/help is expected.",
+        psCommand([
+          "python -m simtutor live-dcs",
+          "  --bios-source raw",
+          "  --raw-bios-host 239.255.50.10",
+          "  --raw-bios-port 5010",
+          `  --raw-bios-aircraft ${data.dcsAircraft}`,
+          "  --raw-bios-control-dir \"DCS\\Scripts\\DCS-BIOS\\doc\\json\"",
+          "  --timeout 0.5",
+          `  --session-id ${psQuote(data.sessionId)}`,
+          "  --help-udp-port 0",
+          "  --model-provider stub",
+          "  --stub-mode correct",
+          "  --no-model-enable-multimodal",
+          `  --lang ${data.language}`,
+          "  --scenario-profile airfield",
+          `  --output ${psQuote(data.rawLogPath)}`
+        ])
+      ].join("\n");
+    }
+
+    function buildExportCommand(data) {
+      const isWithoutTutor = data.condition === "without_tutor";
+      const provider = isWithoutTutor ? "stub" : "openai_compat";
+      const textModel = isWithoutTutor ? "not_used" : data.textModel;
+      const visionModel = isWithoutTutor ? "not_used" : data.visionModel;
+      return psCommand([
+        `python -m simtutor experiment-export ${psQuote(data.rawLogPath)}`,
+        `  --study-id ${psQuote(data.study)}`,
+        `  --participant-id ${psQuote(data.participant)}`,
+        `  --condition ${psQuote(data.condition)}`,
+        `  --group ${psQuote(data.group)}`,
+        `  --trial-id ${psQuote(data.trial)}`,
+        `  --experimenter-id ${psQuote(data.experimenter)}`,
+        `  --questionnaire ${psQuote(data.questionnairePath)}`,
+        `  --recording-ref ${psQuote(data.recordingPath)}`,
+        `  --output-dir ${psQuote(data.exportOutputDir)}`,
+        "  --pack \"packs\\fa18c_startup\\pack.yaml\"",
+        "  --taxonomy \"packs\\fa18c_startup\\taxonomy.yaml\"",
+        "  --ui-map \"packs\\fa18c_startup\\ui_map.yaml\"",
+        "  --bios-to-ui \"packs\\fa18c_startup\\bios_to_ui.yaml\"",
+        `  --model-provider ${provider}`,
+        `  --model-name ${textModel}`,
+        `  --vision-model-name ${visionModel}`,
+        "  --prompt-version form-v0.1",
+        "  --scenario-profile airfield",
+        `  --dcs-mission ${psQuote(data.dcsMission)}`,
+        `  --dcs-aircraft ${data.dcsAircraft}`,
+        `  --vr-setup ${psQuote(data.vrSetup)}`,
+        `  --monitor-setup ${data.monitorSetup}`,
+        "  --strict"
+      ]);
+    }
+
+    function buildAnalyzeCommand(data) {
+      return psCommand([
+        `python -m simtutor experiment-analyze ${psQuote(data.exportOutputDir)}`,
+        `  --output-dir ${psQuote(data.analysisOutputDir)}`
+      ]);
+    }
+
+    function updateGeneratedWarning(data) {
+      const missing = [];
+      if (!fieldValue("study_id")) missing.push("StudyID");
+      if (!fieldValue("participant_id")) missing.push("ParticipantID");
+      if (!fieldValue("trial_id")) missing.push("TrialID");
+      if (!fieldValue("condition")) missing.push("Condition");
+      if (data.condition === "with_tutor" && !fieldValue("model_endpoint")) {
+        missing.push("Model endpoint");
+      }
+      generatedCommandWarning.hidden = missing.length === 0;
+      generatedCommandWarning.textContent = missing.length
+        ? `缺少必填字段，命令中已使用占位或默认值：${missing.join(", ")}`
+        : "";
+    }
+
+    function updateGeneratedCommands() {
+      const data = derivedCommandData();
+      document.getElementById("commandWithTutor").value = buildWithTutorCommand(data);
+      document.getElementById("commandWithoutTutor").value = buildWithoutTutorCommand(data);
+      document.getElementById("commandExport").value = buildExportCommand(data);
+      document.getElementById("commandAnalyze").value = buildAnalyzeCommand(data);
+      updateGeneratedWarning(data);
+    }
+
+    async function copyCommandText(targetId) {
+      const textarea = document.getElementById(targetId);
+      if (!textarea) {
+        return;
+      }
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          throw new Error("Clipboard API unavailable");
+        }
+        await navigator.clipboard.writeText(textarea.value);
+        markStatus("命令已复制");
+      } catch {
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        markStatus("命令已选中，可手动复制");
+      }
+    }
+
+    async function copyAllGeneratedCommands() {
+      const text = generatedCommandIds
+        .map((id) => document.getElementById(id).value)
+        .join("\n\n");
+      const fallback = document.getElementById("commandWithTutor");
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          throw new Error("Clipboard API unavailable");
+        }
+        await navigator.clipboard.writeText(text);
+        markStatus("全部命令已复制");
+      } catch {
+        fallback.value = text;
+        fallback.focus();
+        fallback.select();
+        document.execCommand("copy");
+        updateGeneratedCommands();
+        markStatus("全部命令已选中，可手动复制");
+      }
+    }
+
     buildRows();
 
     document.querySelectorAll("[data-tlx]").forEach((range) => {
@@ -1210,8 +1529,14 @@
     document.getElementById("loadJson").addEventListener("change", (ev) => loadJsonFile(ev.target.files[0]));
     document.getElementById("printForm").addEventListener("click", () => window.print());
     document.getElementById("clearForm").addEventListener("click", clearForm);
+    document.getElementById("copyAllCommands").addEventListener("click", copyAllGeneratedCommands);
+    document.querySelectorAll("[data-copy-target]").forEach((button) => {
+      button.addEventListener("click", () => copyCommandText(button.dataset.copyTarget));
+    });
 
     let saveTimer = null;
+    form.addEventListener("input", updateGeneratedCommands);
+    form.addEventListener("change", updateGeneratedCommands);
     form.addEventListener("input", () => {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveLocal, 300);
@@ -1229,6 +1554,7 @@
 
     loadLocal();
     updateRawTlx();
+    updateGeneratedCommands();
   </script>
 </body>
 </html>
