@@ -2,6 +2,8 @@
 
 本页提供正式实验可直接复制、打印或转成问卷系统的 Markdown 表格。默认研究设计为 Quest 3 固定平台下的 `with_tutor` vs `without_tutor`。
 
+可填写并导出 JSON/CSV 的 HTML 版本见：[Experiment forms HTML](experiment-forms.html)。
+
 ## 1. 条件顺序建议
 
 ### 推荐主设计：between-subject
@@ -302,4 +304,3 @@ For `with_tutor`:
 | Any wrong help observed | yes / no |
 | Any wrong highlight observed | yes / no |
 | Notable request IDs |  |
-

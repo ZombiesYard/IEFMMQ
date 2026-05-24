@@ -8,7 +8,7 @@
 
 Quest 3 是固定实验平台，不作为被比较的自变量。正式比较的是 `without_tutor` 与 `with_tutor`。
 
-实验用表格见 [Experiment forms](experiment-forms.md)，包括 condition assignment、trial sheet、NASA Raw TLX、usability/trust questionnaire 和 export quality checklist。
+实验用表格见 [Experiment forms](experiment-forms.md)，可填写并导出 JSON/CSV 的本地 HTML 版本见 [Experiment forms HTML](experiment-forms.html)。表格包括 condition assignment、trial sheet、NASA Raw TLX、usability/trust questionnaire 和 export quality checklist。
 
 ## 1. 实验角色
 

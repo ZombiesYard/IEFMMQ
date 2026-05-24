@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SimTutor Experiment Forms</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #1c2430;
+      --muted: #5e6a7a;
+      --line: #d9dee7;
+      --line-strong: #b8c0ce;
+      --accent: #1769aa;
+      --accent-ink: #ffffff;
+      --warn: #8a5b00;
+      --warn-bg: #fff7df;
+      --ok: #17663a;
+      --ok-bg: #eaf7ef;
+      --danger: #9b1c31;
+      --danger-bg: #fdecef;
+      --shadow: 0 1px 2px rgba(20, 30, 45, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, "Microsoft YaHei", sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: rgba(246, 247, 249, 0.96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+
+    .topbar {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    button,
+    .file-label {
+      border: 1px solid var(--line-strong);
+      background: var(--panel);
+      color: var(--ink);
+      min-height: 34px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+    }
+
+    button.danger {
+      color: var(--danger);
+      border-color: #efb2bd;
+      background: #fff;
+    }
+
+    button:hover,
+    .file-label:hover {
+      filter: brightness(0.97);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    nav a {
+      color: var(--accent);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 10px;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      margin: 14px 0;
+      padding: 16px;
+    }
+
+    h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .section-note {
+      color: var(--muted);
+      margin: 0 0 14px;
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    label.field {
+      display: grid;
+      gap: 5px;
+      align-content: start;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 8px 9px;
+      min-height: 36px;
+      color: var(--ink);
+      background: #fff;
+      font: inherit;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 82px;
+      resize: vertical;
+    }
+
+    .span-2 {
+      grid-column: span 2;
+    }
+
+    .span-3 {
+      grid-column: span 3;
+    }
+
+    .span-4 {
+      grid-column: 1 / -1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 7px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f4f8;
+      color: #2a3340;
+      font-weight: 650;
+    }
+
+    td input,
+    td select,
+    td textarea {
+      min-height: 32px;
+      padding: 6px 7px;
+      font-size: 13px;
+    }
+
+    td textarea {
+      min-height: 44px;
+    }
+
+    .compact td,
+    .compact th {
+      padding: 5px;
+    }
+
+    .scale {
+      display: grid;
+      grid-template-columns: 1fr 74px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      min-height: 26px;
+    }
+
+    .tlx-total {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      background: var(--ok-bg);
+      color: var(--ok);
+      font-weight: 650;
+    }
+
+    .notice {
+      border: 1px solid #f0d38a;
+      background: var(--warn-bg);
+      color: var(--warn);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+      min-height: 20px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #edf2f8;
+      color: #435268;
+      font-size: 12px;
+      margin-right: 5px;
+    }
+
+    .checkbox-line {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .checkbox-line input {
+      width: auto;
+      min-height: 0;
+    }
+
+    .footer-space {
+      height: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+      }
+
+      .grid,
+      .grid.two,
+      .grid.three {
+        grid-template-columns: 1fr;
+      }
+
+      .span-2,
+      .span-3,
+      .span-4 {
+        grid-column: 1 / -1;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+
+    @media print {
+      header,
+      nav,
+      .toolbar,
+      .no-print {
+        display: none !important;
+      }
+
+      body {
+        background: #fff;
+      }
+
+      main {
+        max-width: none;
+        padding: 0;
+      }
+
+      section {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1>SimTutor 实验表单</h1>
+        <div class="subtitle">Quest 3 / F/A-18C cold-start study，数据只保存在本地浏览器或下载文件中。</div>
+      </div>
+      <div class="toolbar">
+        <button type="button" class="primary" id="saveJson">保存 JSON</button>
+        <label class="file-label" for="loadJson">加载 JSON</label>
+        <input id="loadJson" type="file" accept="application/json,.json">
+        <button type="button" id="exportCsv">导出 CSV</button>
+        <button type="button" id="printForm">打印</button>
+        <button type="button" class="danger" id="clearForm">清空</button>
+      </div>
+      <div></div>
+      <div class="status" id="status">未保存</div>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="Form sections">
+      <a href="#pre">实验前</a>
+      <a href="#during">实验中</a>
+      <a href="#post">实验后</a>
+      <a href="#quality">导出质检</a>
+      <a href="#condition">条件分配</a>
+    </nav>
+
+    <form id="experimentForm">
+      <section id="pre">
+        <h2>实验前填写</h2>
+        <p class="section-note">在 participant 进入正式 trial 前完成。正式主实验推荐每名参与者只做一个条件：<span class="pill">with_tutor</span><span class="pill">without_tutor</span></p>
+
+        <h3>Trial metadata</h3>
+        <div class="grid">
+          <label class="field">StudyID
+            <input name="study_id" value="fa18c_quest3_simitutor_2026">
+          </label>
+          <label class="field">ParticipantID
+            <input name="participant_id" placeholder="P01">
+          </label>
+          <label class="field">TrialID
+            <input name="trial_id" value="T01">
+          </label>
+          <label class="field">Condition
+            <select name="condition">
+              <option value=""></option>
+              <option value="with_tutor">with_tutor</option>
+              <option value="without_tutor">without_tutor</option>
+            </select>
+          </label>
+          <label class="field">Group
+            <select name="participant_group">
+              <option value="novice">novice</option>
+              <option value="intermediate">intermediate</option>
+              <option value="expert">expert</option>
+            </select>
+          </label>
+          <label class="field">ExperimenterID
+            <input name="experimenter_id" placeholder="E01">
+          </label>
+          <label class="field">Date
+            <input name="date" type="date">
+          </label>
+          <label class="field">Randomization method
+            <input name="randomization_method" placeholder="balanced assignment">
+          </label>
+          <label class="field">DCS mission
+            <input name="dcs_mission" placeholder="fa18c_cold_start_fixed.miz">
+          </label>
+          <label class="field">DCS aircraft
+            <input name="dcs_aircraft" value="FA-18C_hornet">
+          </label>
+          <label class="field">VR setup
+            <input name="vr_setup" value="Quest 3 Link">
+          </label>
+          <label class="field">Monitor setup
+            <input name="monitor_setup" value="fa18c_composite_panel_v2">
+          </label>
+          <label class="field">Model endpoint
+            <input name="model_endpoint" placeholder="http://127.0.0.1:16324">
+          </label>
+          <label class="field">Text model
+            <input name="text_model" value="simtutor-base">
+          </label>
+          <label class="field">Vision model
+            <input name="vision_model" value="simtutor-vision">
+          </label>
+          <label class="field">Git commit
+            <input name="git_commit">
+          </label>
+          <label class="field">Git dirty
+            <select name="git_dirty">
+              <option value=""></option>
+              <option value="no">no</option>
+              <option value="yes">yes</option>
+            </select>
+          </label>
+          <label class="field">Questionnaire path
+            <input name="questionnaire_path" placeholder="questionnaires/P01_T01.json">
+          </label>
+          <label class="field">Recording path
+            <input name="recording_path" placeholder="recordings/P01_T01.mp4">
+          </label>
+          <label class="field">Raw log path
+            <input name="raw_log_path" placeholder="logs/P01_T01_with_tutor.jsonl">
+          </label>
+        </div>
+
+        <h3>Participant background</h3>
+        <div class="grid">
+          <label class="field">Age range
+            <select name="age_range">
+              <option value=""></option>
+              <option>18-24</option>
+              <option>25-34</option>
+              <option>35-44</option>
+              <option>45+</option>
+              <option>prefer not to say</option>
+            </select>
+          </label>
+          <label class="field">Dominant hand
+            <select name="dominant_hand">
+              <option value=""></option>
+              <option>left</option>
+              <option>right</option>
+              <option>both</option>
+              <option>prefer not to say</option>
+            </select>
+          </label>
+          <label class="field">DCS experience
+            <select name="dcs_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>very little</option>
+              <option>occasional</option>
+              <option>frequent</option>
+            </select>
+          </label>
+          <label class="field">Flight simulator experience
+            <select name="flight_sim_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>very little</option>
+              <option>occasional</option>
+              <option>frequent</option>
+            </select>
+          </label>
+          <label class="field">VR experience
+            <select name="vr_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>very little</option>
+              <option>occasional</option>
+              <option>frequent</option>
+            </select>
+          </label>
+          <label class="field">Quest 3 experience
+            <select name="quest3_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>very little</option>
+              <option>occasional</option>
+              <option>frequent</option>
+            </select>
+          </label>
+          <label class="field">HOTAS/cockpit control experience
+            <select name="hotas_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>very little</option>
+              <option>occasional</option>
+              <option>frequent</option>
+            </select>
+          </label>
+          <label class="field">F/A-18C experience
+            <select name="fa18c_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>watched videos</option>
+              <option>tried before</option>
+              <option>experienced</option>
+            </select>
+          </label>
+          <label class="field">F/A-18C cold-start experience
+            <select name="cold_start_experience">
+              <option value=""></option>
+              <option>none</option>
+              <option>watched videos</option>
+              <option>tried before</option>
+              <option>can complete</option>
+            </select>
+          </label>
+          <label class="field">Aviation English familiarity 1-7
+            <input name="aviation_english_familiarity" type="number" min="1" max="7">
+          </label>
+          <label class="field">Confidence before task 1-7
+            <input name="confidence_before" type="number" min="1" max="7">
+          </label>
+          <label class="field">VR discomfort history
+            <select name="vr_discomfort_history">
+              <option value=""></option>
+              <option>no</option>
+              <option>mild</option>
+              <option>moderate</option>
+              <option>severe</option>
+            </select>
+          </label>
+          <label class="field span-4">Pre-trial notes
+            <textarea name="pre_trial_notes"></textarea>
+          </label>
+        </div>
+
+        <h3>Baseline / tutor setup</h3>
+        <div class="grid two">
+          <label class="field">Baseline checklist format
+            <select name="baseline_checklist_format">
+              <option value=""></option>
+              <option>VR kneeboard</option>
+              <option>in-VR static page</option>
+              <option>paper</option>
+              <option>other</option>
+            </select>
+          </label>
+          <label class="field">Checklist pages
+            <input name="checklist_pages" placeholder="DCS FA-18C CN p093-p098">
+          </label>
+          <label class="field">Help hotkey
+            <input name="help_hotkey" value="X1">
+          </label>
+          <label class="field">Tutor message language
+            <select name="tutor_language">
+              <option value="zh">zh</option>
+              <option value="en">en</option>
+              <option value="mixed">mixed</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section id="during">
+        <h2>实验中填写</h2>
+        <p class="section-note">只记录事实，不给步骤提示。`without_tutor` 条件不要告诉参与者 X1 help。</p>
+
+        <div class="grid">
+          <label class="field">StartTime
+            <input name="start_time" type="time" step="1">
+          </label>
+          <label class="field">EndTime
+            <input name="end_time" type="time" step="1">
+          </label>
+          <label class="field">Launcher used
+            <select name="launcher_used">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+            </select>
+          </label>
+          <label class="field">Participant understood task
+            <select name="participant_understood_task">
+              <option value=""></option>
+              <option>yes</option>
+              <option>partially</option>
+              <option>no</option>
+            </select>
+          </label>
+        </div>
+
+        <h3>Trial observation notes</h3>
+        <table class="compact" aria-label="Trial observation notes">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>RequestID</th>
+              <th>Step/Phase</th>
+              <th>Observation</th>
+              <th>Participant behavior</th>
+              <th>System behavior</th>
+              <th>Severity</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="observationRows"></tbody>
+        </table>
+      </section>
+
+      <section id="post">
+        <h2>实验后填写</h2>
+        <p class="section-note">trial 结束后立即填写。NASA Raw TLX 已整合在本区。</p>
+
+        <h3>Trial outcome</h3>
+        <div class="grid">
+          <label class="field">Completed
+            <select name="completed">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+            </select>
+          </label>
+          <label class="field">End reason
+            <select name="end_reason">
+              <option value=""></option>
+              <option>completed</option>
+              <option>timeout</option>
+              <option>participant_stop</option>
+              <option>vr_discomfort</option>
+              <option>technical_failure</option>
+              <option>experimenter_stop</option>
+            </select>
+          </label>
+          <label class="field">Technical issue occurred
+            <select name="technical_issue_occurred">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+            </select>
+          </label>
+          <label class="field">Experimenter intervention
+            <select name="experimenter_intervention">
+              <option value=""></option>
+              <option>none</option>
+              <option>technical only</option>
+              <option>procedural hint given</option>
+            </select>
+          </label>
+          <label class="field span-4">Trial outcome notes
+            <textarea name="trial_outcome_notes"></textarea>
+          </label>
+        </div>
+
+        <h3>NASA Raw TLX</h3>
+        <div class="notice">请根据刚才这一次任务打分。0 表示左侧描述，100 表示右侧描述。RawTLX 自动按 6 项平均值计算。</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Dimension</th>
+              <th>中文说明</th>
+              <th>0</th>
+              <th>100</th>
+              <th>Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Mental Demand</td>
+              <td>心理需求：任务需要多少思考、记忆、判断、搜索和注意力？</td>
+              <td>非常低</td>
+              <td>非常高</td>
+              <td><div class="scale"><input type="range" min="0" max="100" value="0" data-tlx="mental_demand"><input name="tlx_mental_demand" type="number" min="0" max="100" value="0" data-tlx-number="mental_demand"></div></td>
+            </tr>
+            <tr>
+              <td>Physical Demand</td>
+              <td>身体需求：任务需要多少身体操作、转头、点击、移动或姿态控制？</td>
+              <td>非常低</td>
+              <td>非常高</td>
+              <td><div class="scale"><input type="range" min="0" max="100" value="0" data-tlx="physical_demand"><input name="tlx_physical_demand" type="number" min="0" max="100" value="0" data-tlx-number="physical_demand"></div></td>
+            </tr>
+            <tr>
+              <td>Temporal Demand</td>
+              <td>时间压力：你是否觉得任务节奏紧、需要赶时间？</td>
+              <td>非常低</td>
+              <td>非常高</td>
+              <td><div class="scale"><input type="range" min="0" max="100" value="0" data-tlx="temporal_demand"><input name="tlx_temporal_demand" type="number" min="0" max="100" value="0" data-tlx-number="temporal_demand"></div></td>
+            </tr>
+            <tr>
+              <td>Performance</td>
+              <td>表现负担：你对自己的任务表现有多不满意？</td>
+              <td>非常满意/成功</td>
+              <td>非常不满意/失败</td>
+              <td><div class="scale"><input type="range" min="0" max="100" value="0" data-tlx="performance"><input name="tlx_performance" type="number" min="0" max="100" value="0" data-tlx-number="performance"></div></td>
+            </tr>
+            <tr>
+              <td>Effort</td>
+              <td>努力程度：你为了完成任务付出了多少努力？</td>
+              <td>非常低</td>
+              <td>非常高</td>
+              <td><div class="scale"><input type="range" min="0" max="100" value="0" data-tlx="effort"><input name="tlx_effort" type="number" min="0" max="100" value="0" data-tlx-number="effort"></div></td>
+            </tr>
+            <tr>
+              <td>Frustration</td>
+              <td>挫败感：你感到多烦躁、沮丧、紧张或受挫？</td>
+              <td>非常低</td>
+              <td>非常高</td>
+              <td><div class="scale"><input type="range" min="0" max="100" value="0" data-tlx="frustration"><input name="tlx_frustration" type="number" min="0" max="100" value="0" data-tlx-number="frustration"></div></td>
+            </tr>
+          </tbody>
+        </table>
+        <p><span class="tlx-total">RawTLX: <output id="rawTlx" name="tlx_raw">0.00</output></span></p>
+        <input type="hidden" name="tlx_raw" id="tlxRawHidden" value="0.00">
+
+        <h3>Usability and trust</h3>
+        <table class="compact">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Statement</th>
+              <th>Score 1-7</th>
+              <th>N/A</th>
+            </tr>
+          </thead>
+          <tbody id="usabilityRows"></tbody>
+        </table>
+
+        <h3>Open questions</h3>
+        <div class="grid two">
+          <label class="field">What was the most difficult part of the task?
+            <textarea name="open_difficult_part"></textarea>
+          </label>
+          <label class="field">What helped you the most?
+            <textarea name="open_most_helpful"></textarea>
+          </label>
+          <label class="field">What confused you the most?
+            <textarea name="open_most_confusing"></textarea>
+          </label>
+          <label class="field">Did the VR setup make the task easier or harder? Why?
+            <textarea name="open_vr_effect"></textarea>
+          </label>
+          <label class="field">If you used SimTutor, did any help message feel wrong or unclear?
+            <textarea name="open_tutor_wrong_unclear"></textarea>
+          </label>
+          <label class="field">If you used a checklist, was it easy to access in VR?
+            <textarea name="open_checklist_access"></textarea>
+          </label>
+          <label class="field span-2">Any other comments?
+            <textarea name="open_other_comments"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section id="quality">
+        <h2>导出质检填写</h2>
+        <p class="section-note">`experiment-export --strict` 后填写。质检不是 participant 问卷。</p>
+        <table class="compact">
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Pass/Fail</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="qualityRows"></tbody>
+        </table>
+
+        <h3>Condition-specific notes</h3>
+        <div class="grid two">
+          <label class="field">Participant could access checklist without removing Quest 3
+            <select name="baseline_checklist_no_hmd_removal">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+              <option>not applicable</option>
+            </select>
+          </label>
+          <label class="field">Participant used checklist
+            <select name="baseline_checklist_used">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+              <option>partially</option>
+              <option>not applicable</option>
+            </select>
+          </label>
+          <label class="field">Manual coding required
+            <select name="manual_coding_required">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+              <option>partially</option>
+            </select>
+          </label>
+          <label class="field">Overlay visible in VR
+            <select name="overlay_visible_vr">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+              <option>partially</option>
+              <option>not applicable</option>
+            </select>
+          </label>
+          <label class="field">Multi-target overlay visible
+            <select name="multi_target_overlay_visible">
+              <option value=""></option>
+              <option>yes</option>
+              <option>no</option>
+              <option>partially</option>
+              <option>not applicable</option>
+            </select>
+          </label>
+          <label class="field">Notable request IDs
+            <input name="notable_request_ids">
+          </label>
+          <label class="field span-2">Condition-specific notes
+            <textarea name="condition_specific_notes"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section id="condition">
+        <h2>条件分配参考</h2>
+        <p class="section-note">正式主实验推荐 between-subject：每名参与者只做一次正式 trial。以下分配表可复制到项目记录中。</p>
+        <table class="compact">
+          <thead>
+            <tr>
+              <th>ParticipantID</th>
+              <th>SuggestedCondition</th>
+              <th>AssignedCondition</th>
+              <th>TrialID</th>
+              <th>ExperimenterID</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="assignmentRows"></tbody>
+        </table>
+      </section>
+    </form>
+    <div class="footer-space"></div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "simtutor_experiment_form_v1";
+
+    const observationRows = document.getElementById("observationRows");
+    const usabilityRows = document.getElementById("usabilityRows");
+    const qualityRows = document.getElementById("qualityRows");
+    const assignmentRows = document.getElementById("assignmentRows");
+    const form = document.getElementById("experimentForm");
+    const status = document.getElementById("status");
+
+    const usabilityItems = [
+      ["U1", "I understood what I was expected to do during the task."],
+      ["U2", "The cockpit procedure felt difficult to follow."],
+      ["U3", "I felt confident about my next action."],
+      ["U4", "I could find the relevant cockpit controls."],
+      ["U5", "The Quest 3 setup was comfortable enough for this task."],
+      ["T1", "The tutor's instruction was easy to understand."],
+      ["T2", "The highlighted control matched the written instruction."],
+      ["T3", "The tutor helped me recover when I was unsure."],
+      ["T4", "I trusted the tutor's guidance."],
+      ["T5", "The tutor interrupted the task flow."],
+      ["T6", "I would prefer using this tutor over a static checklist in VR."]
+    ];
+
+    const qualityItems = [
+      "Raw log exists",
+      "Recording exists",
+      "Questionnaire exists",
+      "experiment-export --strict passed",
+      "quality_gate.json has passed=true",
+      "trial_summary.csv condition is correct",
+      "trial_summary.csv participant/trial IDs are correct",
+      "step_coding.csv contains S01-S33",
+      "help_cycles.csv looks plausible",
+      "action_timeline.csv exists",
+      "VLMNotRequiredLeakageCount acceptable",
+      "Technical issues recorded",
+      "Export directory backed up"
+    ];
+
+    const suggestedAssignments = [
+      ["P01", "with_tutor"],
+      ["P02", "without_tutor"],
+      ["P03", "without_tutor"],
+      ["P04", "with_tutor"],
+      ["P05", "with_tutor"],
+      ["P06", "without_tutor"],
+      ["P07", "without_tutor"],
+      ["P08", "with_tutor"],
+      ["P09", "with_tutor"],
+      ["P10", "without_tutor"],
+      ["P11", "without_tutor"],
+      ["P12", "with_tutor"]
+    ];
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[ch]));
+    }
+
+    function buildRows() {
+      for (let i = 1; i <= 8; i += 1) {
+        observationRows.insertAdjacentHTML("beforeend", `
+          <tr>
+            <td><input name="obs_${i}_time"></td>
+            <td><input name="obs_${i}_request_id"></td>
+            <td><input name="obs_${i}_step_phase"></td>
+            <td><textarea name="obs_${i}_observation"></textarea></td>
+            <td><textarea name="obs_${i}_participant_behavior"></textarea></td>
+            <td><textarea name="obs_${i}_system_behavior"></textarea></td>
+            <td>
+              <select name="obs_${i}_severity">
+                <option value=""></option>
+                <option>low</option>
+                <option>medium</option>
+                <option>high</option>
+              </select>
+            </td>
+            <td><textarea name="obs_${i}_notes"></textarea></td>
+          </tr>
+        `);
+      }
+
+      for (const [code, statement] of usabilityItems) {
+        usabilityRows.insertAdjacentHTML("beforeend", `
+          <tr>
+            <td>${escapeHtml(code)}</td>
+            <td>${escapeHtml(statement)}</td>
+            <td><input name="usability_${code.toLowerCase()}_score" type="number" min="1" max="7"></td>
+            <td class="checkbox-line"><input name="usability_${code.toLowerCase()}_na" type="checkbox"></td>
+          </tr>
+        `);
+      }
+
+      qualityItems.forEach((item, idx) => {
+        const n = idx + 1;
+        qualityRows.insertAdjacentHTML("beforeend", `
+          <tr>
+            <td>${escapeHtml(item)}</td>
+            <td>
+              <select name="quality_${n}_status">
+                <option value=""></option>
+                <option>pass</option>
+                <option>fail</option>
+                <option>n/a</option>
+              </select>
+            </td>
+            <td><input name="quality_${n}_notes"></td>
+          </tr>
+        `);
+      });
+
+      for (const [participant, suggested] of suggestedAssignments) {
+        assignmentRows.insertAdjacentHTML("beforeend", `
+          <tr>
+            <td>${participant}<input type="hidden" name="assignment_${participant}_participant" value="${participant}"></td>
+            <td>${suggested}<input type="hidden" name="assignment_${participant}_suggested" value="${suggested}"></td>
+            <td>
+              <select name="assignment_${participant}_assigned">
+                <option value=""></option>
+                <option>with_tutor</option>
+                <option>without_tutor</option>
+              </select>
+            </td>
+            <td><input name="assignment_${participant}_trial" value="T01"></td>
+            <td><input name="assignment_${participant}_experimenter"></td>
+            <td><input name="assignment_${participant}_notes"></td>
+          </tr>
+        `);
+      }
+    }
+
+    function formControls() {
+      return Array.from(form.querySelectorAll("input[name], select[name], textarea[name]"));
+    }
+
+    function collectData() {
+      const data = {};
+      for (const el of formControls()) {
+        if (el.type === "checkbox") {
+          data[el.name] = el.checked;
+        } else {
+          data[el.name] = el.value;
+        }
+      }
+      data.tlx_raw = document.getElementById("tlxRawHidden").value;
+      return data;
+    }
+
+    function applyData(data) {
+      if (!data || typeof data !== "object") {
+        return;
+      }
+      for (const el of formControls()) {
+        if (!(el.name in data)) {
+          continue;
+        }
+        if (el.type === "checkbox") {
+          el.checked = Boolean(data[el.name]);
+        } else {
+          el.value = data[el.name] ?? "";
+        }
+      }
+      syncAllTlxFromNumbers();
+      updateRawTlx();
+      markStatus("已加载");
+    }
+
+    function baseFilename(extension) {
+      const data = collectData();
+      const participant = data.participant_id || "participant";
+      const trial = data.trial_id || "trial";
+      const condition = data.condition || "condition";
+      const date = data.date || new Date().toISOString().slice(0, 10);
+      return `${participant}_${trial}_${condition}_${date}.${extension}`;
+    }
+
+    function downloadText(filename, text, mime) {
+      const blob = new Blob([text], {type: mime});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function saveJson() {
+      const payload = {
+        schema_version: "simtutor_experiment_form.v1",
+        exported_at: new Date().toISOString(),
+        data: collectData()
+      };
+      downloadText(baseFilename("json"), JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
+      markStatus("JSON 已下载");
+    }
+
+    function csvEscape(value) {
+      const text = value == null ? "" : String(value);
+      if (/[",\n\r]/.test(text)) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    }
+
+    function exportCsv() {
+      const data = collectData();
+      const rows = [["field", "value"]];
+      Object.keys(data).sort().forEach((key) => rows.push([key, data[key]]));
+      const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n") + "\n";
+      downloadText(baseFilename("csv"), csv, "text/csv;charset=utf-8");
+      markStatus("CSV 已下载");
+    }
+
+    function loadJsonFile(file) {
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result));
+          applyData(parsed.data || parsed);
+          saveLocal();
+        } catch (err) {
+          alert(`无法读取 JSON: ${err}`);
+        }
+      };
+      reader.readAsText(file, "utf-8");
+    }
+
+    function saveLocal() {
+      const payload = {
+        saved_at: new Date().toISOString(),
+        data: collectData()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      markStatus(`本地草稿已保存 ${new Date().toLocaleTimeString()}`);
+    }
+
+    function loadLocal() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        applyData(parsed.data || parsed);
+        markStatus(`已恢复本地草稿 ${parsed.saved_at || ""}`.trim());
+      } catch {
+        markStatus("本地草稿读取失败");
+      }
+    }
+
+    function clearForm() {
+      if (!confirm("清空当前表单和本地草稿？")) {
+        return;
+      }
+      form.reset();
+      localStorage.removeItem(STORAGE_KEY);
+      syncAllTlxFromNumbers();
+      updateRawTlx();
+      markStatus("已清空");
+    }
+
+    function markStatus(text) {
+      status.textContent = text;
+    }
+
+    function clampScore(value, min, max) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        return min;
+      }
+      return Math.min(max, Math.max(min, Math.round(n)));
+    }
+
+    function syncTlx(source, key) {
+      const range = document.querySelector(`[data-tlx="${key}"]`);
+      const number = document.querySelector(`[data-tlx-number="${key}"]`);
+      const value = clampScore(source.value, 0, 100);
+      range.value = value;
+      number.value = value;
+      updateRawTlx();
+    }
+
+    function syncAllTlxFromNumbers() {
+      document.querySelectorAll("[data-tlx-number]").forEach((number) => {
+        syncTlx(number, number.dataset.tlxNumber);
+      });
+    }
+
+    function updateRawTlx() {
+      const values = Array.from(document.querySelectorAll("[data-tlx-number]"))
+        .map((el) => clampScore(el.value, 0, 100));
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      const text = avg.toFixed(2);
+      document.getElementById("rawTlx").value = text;
+      document.getElementById("rawTlx").textContent = text;
+      document.getElementById("tlxRawHidden").value = text;
+    }
+
+    buildRows();
+
+    document.querySelectorAll("[data-tlx]").forEach((range) => {
+      range.addEventListener("input", () => syncTlx(range, range.dataset.tlx));
+    });
+    document.querySelectorAll("[data-tlx-number]").forEach((number) => {
+      number.addEventListener("input", () => syncTlx(number, number.dataset.tlxNumber));
+    });
+
+    document.getElementById("saveJson").addEventListener("click", saveJson);
+    document.getElementById("exportCsv").addEventListener("click", exportCsv);
+    document.getElementById("loadJson").addEventListener("change", (ev) => loadJsonFile(ev.target.files[0]));
+    document.getElementById("printForm").addEventListener("click", () => window.print());
+    document.getElementById("clearForm").addEventListener("click", clearForm);
+
+    let saveTimer = null;
+    form.addEventListener("input", () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveLocal, 300);
+    });
+    form.addEventListener("change", () => {
+      clearTimeout(saveTimer);
+      saveLocal();
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const dateInput = form.querySelector('[name="date"]');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = today;
+    }
+
+    loadLocal();
+    updateRawTlx();
+  </script>
+</body>
+</html>
