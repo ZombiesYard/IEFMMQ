@@ -1429,6 +1429,99 @@ def test_without_tutor_export_marks_passive_telemetry_gate_completions() -> None
     assert trial.StepCompletionAccuracy > 0
 
 
+def test_without_tutor_export_preserves_logged_latch_vars_over_resolver_recompute() -> None:
+    root = _repo_root()
+    t0 = datetime(2026, 5, 9, 10, 0, 0, tzinfo=timezone.utc)
+    base_vars = {
+        "fire_test_a_complete": False,
+        "fire_test_b_complete": False,
+        "obogs_ready": False,
+        "standby_altimeter_set": False,
+        "vars_source_missing": [
+            "fire_test_a_complete",
+            "fire_test_b_complete",
+            "obogs_ready",
+            "standby_altimeter_set",
+        ],
+    }
+    complete_vars = {
+        "fire_test_a_complete": True,
+        "fire_test_b_complete": True,
+        "obogs_ready": True,
+        "standby_altimeter_set": True,
+        "vars_source_missing": [
+            "fire_test_a_complete",
+            "fire_test_b_complete",
+            "obogs_ready",
+            "standby_altimeter_set",
+        ],
+    }
+    bios_that_cannot_rederive_logged_completions = {
+        "FIRE_TEST_SW": 1,
+        "OBOGS_SW": 0,
+        "OXY_FLOW": 0,
+        "STBY_PRESS_SET_0": 0,
+        "STBY_PRESS_SET_1": 0,
+        "STBY_PRESS_SET_2": 0,
+    }
+    events = [
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 1,
+                "t_wall": 1.0,
+                "source": "dcs_bios",
+                "bios": bios_that_cannot_rederive_logged_completions,
+                "vars": base_vars,
+            },
+            "metadata": {"seq": 1, "delta_count": 0},
+            "t_wall": 1.0,
+            "timestamp": t0.isoformat(),
+        },
+        {
+            "kind": "observation",
+            "source": "dcs_bios",
+            "payload": {
+                "seq": 2,
+                "t_wall": 2.0,
+                "source": "dcs_bios",
+                "bios": bios_that_cannot_rederive_logged_completions,
+                "vars": complete_vars,
+            },
+            "metadata": {"seq": 2, "delta_count": 0},
+            "t_wall": 2.0,
+            "timestamp": (t0 + timedelta(seconds=1)).isoformat(),
+        },
+    ]
+
+    export = build_experiment_export(
+        events,
+        meta_overrides={"trial_id": "T01", "participant_id": "P_BASE", "condition": "without_tutor"},
+        pack_path=root / "packs/fa18c_startup/pack.yaml",
+        bios_to_ui_path=root / "packs/fa18c_startup/bios_to_ui.yaml",
+        ui_map_path=root / "packs/fa18c_startup/ui_map.yaml",
+    )
+
+    rows = {row.StepID: row for row in export.step_coding}
+    assert rows["S02"].Completed == "yes"
+    assert "passive_gate:S02:s02_requires_fire_test_a" in rows["S02"].EvidenceRefs
+    assert "telemetry_var:vars.fire_test_a_complete" in rows["S02"].EvidenceRefs
+    assert "telemetry_var:vars.fire_test_b_complete" in rows["S02"].EvidenceRefs
+    assert rows["S14"].Completed == "yes"
+    assert "telemetry_var:vars.obogs_ready" in rows["S14"].EvidenceRefs
+    assert rows["S30"].Completed == "yes"
+    assert "telemetry_var:vars.standby_altimeter_set" in rows["S30"].EvidenceRefs
+
+    trial = export.trial_summary[0]
+    assert trial.HelpRequests == 0
+    assert trial.LLMTriggers == 0
+    assert trial.VLMCalls == 0
+    assert trial.OverlayExecuted == 0
+    assert trial.OverlayRejected == 0
+    assert trial.FallbackCount == 0
+
+
 def test_passive_export_does_not_complete_mapped_action_when_gate_is_unsatisfied() -> None:
     root = _repo_root()
     event = _make_observation_only_baseline_events()[0]

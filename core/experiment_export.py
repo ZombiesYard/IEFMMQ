@@ -1654,6 +1654,14 @@ def _load_var_resolver_for_export(pack_path: str | Path | None) -> VarResolver |
         return None
 
 
+def _is_missing_logged_var_value(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in {"unknown", "unk", "missing", "n/a", "na"}
+    return False
+
+
 def _passive_vars_history_by_event(
     events: Sequence[Mapping[str, Any]],
     *,
@@ -1661,7 +1669,7 @@ def _passive_vars_history_by_event(
 ) -> list[dict[str, Any]]:
     resolver = _load_var_resolver_for_export(pack_path)
     current_bios: dict[str, Any] = {}
-    current_vars: dict[str, Any] = {}
+    logged_vars: dict[str, Any] = {}
     history: list[dict[str, Any]] = []
 
     for ev in events:
@@ -1672,15 +1680,28 @@ def _passive_vars_history_by_event(
             current_bios[key] = value
         for key, value in _event_vars(ev).items():
             if isinstance(key, str) and key:
-                current_vars[key] = value
+                logged_vars[key] = value
 
         if resolver is not None:
             try:
-                current_vars.update(
-                    resolver.resolve({"bios": current_bios, "vars": current_vars})
-                )
+                current_vars = resolver.resolve({"bios": current_bios, "vars": logged_vars})
             except VarResolverError:
-                pass
+                current_vars = dict(logged_vars)
+            logged_overrides = {
+                key: value
+                for key, value in logged_vars.items()
+                if key != "vars_source_missing" and not _is_missing_logged_var_value(value)
+            }
+            current_vars.update(logged_overrides)
+            source_missing = current_vars.get("vars_source_missing")
+            if isinstance(source_missing, list):
+                current_vars["vars_source_missing"] = sorted(
+                    key
+                    for key in source_missing
+                    if isinstance(key, str) and key not in logged_overrides
+                )
+        else:
+            current_vars = dict(logged_vars)
 
         vars_snapshot = dict(current_vars)
         bios_snapshot = dict(current_bios)
