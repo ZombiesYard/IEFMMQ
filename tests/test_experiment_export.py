@@ -1457,8 +1457,14 @@ def test_without_tutor_visual_only_steps_require_manual_review_not_auto_om() -> 
     )
 
     with_tutor_rows = {row.StepID: row for row in with_tutor.step_coding}
-    assert with_tutor_rows["S18"].Auto_Error_OM == "1"
-    assert "visual_step_requires_manual_review" not in with_tutor_rows["S18"].AutoCodingNotes
+    for step_id in ("S18", "S19"):
+        assert with_tutor_rows[step_id].Auto_Error_OM == "1"
+        assert with_tutor_rows[step_id].NeedsHumanReview == "yes"
+        assert "visual_step_requires_manual_review" not in with_tutor_rows[step_id].AutoCodingNotes
+        assert (
+            "manual_review:visual_step_without_passive_evidence"
+            not in with_tutor_rows[step_id].AutoEvidenceRefs
+        )
 
 
 def test_without_tutor_export_preserves_logged_latch_vars_over_resolver_recompute() -> None:
