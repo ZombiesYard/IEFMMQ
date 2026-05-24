@@ -604,9 +604,12 @@ python -m simtutor extract-live-fixture `
 baseline 条件通常没有 help cycles，但 `experiment-export` 会优先使用 passive telemetry、derived vars 和 pack completion gates 自动填充 `step_coding.csv`。处理方式：
 
 1. 保留 raw log 和录像，确保自动编码可追溯。
-2. 先检查 `EvidenceRefs` 和 `AutoCodingNotes`；自动完成通常会标记 `completed_from_passive_gate`、`passive_gate:*` 和 `telemetry_var:*`。
-3. 对 telemetry 不足、不可观测动作、实验异常或自动编码明显不符合录像的步骤，再用录像进行人工复核和修正。
-4. 分析时区分自动字段（如 `Completed`、`EvidenceRefs`、`AutoCodingNotes`）和人工字段（如 `Error_*`、`CoderID`、`CoderNotes`）。
+2. 先检查 `EvidenceRefs`、`AutoEvidenceRefs` 和 `AutoCodingNotes`；自动完成通常会标记 `completed_from_passive_gate`、`passive_gate:*` 和 `telemetry_var:*`。
+3. 对 S18/S19 这类依赖 DDI 页面状态或 final GO 视觉确认、且 baseline passive log 没有视觉证据的步骤，`step_coding.csv` 会保留 `Completed=no`，同时标记 `NeedsHumanReview=yes`、`manual_review:visual_step_without_passive_evidence` 和 `visual_step_requires_manual_review`。这表示“需要复核”，不是自动确认参与者遗漏。
+4. 人工复核 S18 时，从录像确认右 DDI 是否从 BIT root/FCS-MC 入口进入 FCS-MC BIT 页面；人工复核 S19 时，从录像确认 FCS-MC BIT final GO 是否出现并被参与者查看。
+5. 如果使用离线/passive VLM 辅助复核，只能在 trial 结束后运行，并在 `CoderNotes` 或外部审计记录中注明来源；不要把它记作 live tutor 的 VLM/help evidence。
+6. 对 telemetry 不足、不可观测动作、实验异常或自动编码明显不符合录像的步骤，再用录像进行人工复核和修正。
+7. 分析时区分自动字段（如 `Completed`、`EvidenceRefs`、`AutoCodingNotes`）和人工字段（如 `Error_*`、`CoderID`、`CoderNotes`）。
 
 ## 12. 实验当天一页清单
 
