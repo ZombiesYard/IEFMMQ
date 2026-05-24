@@ -4,6 +4,10 @@
 
 可填写并导出 JSON/CSV 的 HTML 版本见：[Experiment forms HTML](experiment-forms.html)。
 
+## Generated commands
+
+HTML 表单会根据 StudyID、ParticipantID、TrialID、Condition、模型 endpoint 和实验路径自动生成可复制的 PowerShell 命令，包括 `live-dcs`（`with_tutor` 和 `without_tutor` passive baseline）、`experiment-export` 与 `experiment-analyze`。实验执行前应优先从 HTML 表单复制这些命令，避免手工改错 participant、condition、session 或 log/questionnaire/recording 路径。
+
 ## 1. 条件顺序建议
 
 ### 推荐主设计：between-subject
