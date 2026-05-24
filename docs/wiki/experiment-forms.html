@@ -319,6 +319,13 @@
       margin-bottom: 8px;
     }
 
+    .copy-all-fallback {
+      margin-top: 12px;
+      min-height: 180px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+    }
+
     .status {
       color: var(--muted);
       font-size: 13px;
@@ -685,6 +692,7 @@
             <textarea id="commandAnalyze" readonly></textarea>
           </article>
         </div>
+        <textarea id="commandAllFallback" class="copy-all-fallback" readonly hidden aria-label="All generated commands"></textarea>
       </section>
 
       <section id="during">
@@ -1305,6 +1313,8 @@
       const participant = fieldValue("participant_id", "ParticipantID");
       const trial = fieldValue("trial_id", "TrialID");
       const condition = fieldValue("condition", "condition");
+      const formLanguage = fieldValue("tutor_language", "zh");
+      const commandLanguage = formLanguage === "en" ? "en" : "zh";
       const sessionId = `sess-${participant}-${trial}`;
       const rawLogPath = fieldValue("raw_log_path") || `logs\\${participant}_${trial}_${condition}.jsonl`;
       const questionnairePath = fieldValue("questionnaire_path") || `questionnaires\\${participant}_${trial}.json`;
@@ -1333,7 +1343,8 @@
         vrSetup: fieldValue("vr_setup", "Quest 3 Link"),
         monitorSetup: fieldValue("monitor_setup", "fa18c_composite_panel_v2"),
         helpHotkey: fieldValue("help_hotkey"),
-        language: fieldValue("tutor_language", "zh")
+        formLanguage,
+        commandLanguage
       };
     }
 
@@ -1379,7 +1390,7 @@
           "  --rag-top-k 5",
           "  --model-enable-multimodal",
           "  --no-cold-start-production",
-          `  --lang ${data.language}`,
+          `  --lang ${data.commandLanguage}`,
           "  --scenario-profile airfield",
           "  --log-raw-llm-text",
           "  --print-model-io",
@@ -1404,7 +1415,7 @@
           "  --model-provider stub",
           "  --stub-mode correct",
           "  --no-model-enable-multimodal",
-          `  --lang ${data.language}`,
+          `  --lang ${data.commandLanguage}`,
           "  --scenario-profile airfield",
           `  --output ${psQuote(data.rawLogPath)}`
         ])
@@ -1460,6 +1471,9 @@
       if (data.condition === "with_tutor" && !fieldValue("model_endpoint")) {
         missing.push("Model endpoint");
       }
+      if (data.formLanguage === "mixed") {
+        missing.push("Tutor message language=mixed maps to --lang zh");
+      }
       generatedCommandWarning.hidden = missing.length === 0;
       generatedCommandWarning.textContent = missing.length
         ? `缺少必填字段，命令中已使用占位或默认值：${missing.join(", ")}`
@@ -1472,6 +1486,7 @@
       document.getElementById("commandWithoutTutor").value = buildWithoutTutorCommand(data);
       document.getElementById("commandExport").value = buildExportCommand(data);
       document.getElementById("commandAnalyze").value = buildAnalyzeCommand(data);
+      document.getElementById("commandAllFallback").hidden = true;
       updateGeneratedWarning(data);
     }
 
@@ -1498,7 +1513,7 @@
       const text = generatedCommandIds
         .map((id) => document.getElementById(id).value)
         .join("\n\n");
-      const fallback = document.getElementById("commandWithTutor");
+      const fallback = document.getElementById("commandAllFallback");
       try {
         if (!navigator.clipboard || !navigator.clipboard.writeText) {
           throw new Error("Clipboard API unavailable");
@@ -1506,11 +1521,11 @@
         await navigator.clipboard.writeText(text);
         markStatus("全部命令已复制");
       } catch {
+        fallback.hidden = false;
         fallback.value = text;
         fallback.focus();
         fallback.select();
         document.execCommand("copy");
-        updateGeneratedCommands();
         markStatus("全部命令已选中，可手动复制");
       }
     }

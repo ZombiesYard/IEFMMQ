@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +60,34 @@ def test_experiment_form_copy_buttons_have_clipboard_fallback() -> None:
     assert ".select()" in html
     assert "document.execCommand(\"copy\")" in html
     assert "copyCommandText" in html
+    assert 'id="commandAllFallback"' in html
+
+
+def test_experiment_form_keeps_passive_command_free_of_tutor_setup() -> None:
+    html = _html()
+    match = re.search(
+        r"function buildWithoutTutorCommand\(data\) \{(?P<body>.*?)function buildExportCommand",
+        html,
+        re.S,
+    )
+    assert match is not None
+    body = match.group("body")
+
+    assert "--help-udp-port 0" in body
+    assert "--model-provider stub" in body
+    assert "--stub-mode correct" in body
+    assert "--no-model-enable-multimodal" in body
+    assert "--global-help-hotkey" not in body
+    assert "--model-base-url" not in body
+    assert "vision-saved-games-dir" not in body
+
+
+def test_experiment_form_maps_mixed_language_to_cli_supported_zh() -> None:
+    html = _html()
+
+    assert 'const commandLanguage = formLanguage === "en" ? "en" : "zh";' in html
+    assert "Tutor message language=mixed maps to --lang zh" in html
+    assert "--lang ${data.commandLanguage}" in html
 
 
 def test_experiment_form_load_regenerates_commands() -> None:
