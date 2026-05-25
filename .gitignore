@@ -19,6 +19,7 @@ simtutor/schemas/v1/__pycache__/
 simtutor/__pycache__/
 logs/*.jsonl
 /artifacts/
+/models/
 DCS/Scripts/Hooks/scratchpad-hook.lua
 DCS/Scripts/Hooks/TheWay.lua
 DCS/Scripts/Scratchpad
