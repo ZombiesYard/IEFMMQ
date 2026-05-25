@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimTutor Architecture Map — Thesis Reference</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a2e; --muted: #4a4a5a; --border: #c8c8d0;
+    --accent: #2563eb; --accent2: #7c3aed; --accent3: #059669;
+    --warn: #d97706; --danger: #dc2626;
+    --surface: #f4f4f6; --surface2: #e8e8ec;
+    --tag-bg: #dbeafe; --tag-fg: #1e40af;
+  }
+  @media print { body { font-size: 10pt; } section { break-inside: avoid; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg); background: var(--bg);
+    line-height: 1.5; max-width: 1100px; margin: 0 auto; padding: 20px;
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  h2 { font-size: 1.25rem; margin: 0 0 10px; }
+  .subtitle { color: var(--muted); font-size: .85rem; margin-bottom: 20px; }
+  .info-banner {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 14px; margin-bottom: 16px;
+    font-size: .85rem; display: flex; align-items: center; gap: 8px;
+  }
+  section {
+    border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 18px; padding: 16px;
+  }
+  section summary {
+    cursor: pointer; user-select: none; font-weight: 600;
+    font-size: 1.05rem; color: var(--accent);
+  }
+  section summary:hover { color: var(--accent2); }
+  .diagram {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px; background: var(--surface); position: relative;
+    overflow: auto; margin-top: 10px;
+  }
+  .legend {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; margin-bottom: 16px; background: var(--surface);
+  }
+  .legend summary { font-weight: 600; cursor: pointer; }
+  .legend-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px; margin-top: 8px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: .82rem; }
+  .legend-dot {
+    width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+    border: 1px solid var(--border);
+  }
+  .legend .box-core { background: #e0f2fe; }
+  .legend .box-adapter { background: #fce7f3; }
+  .legend .box-port { background: #ede9fe; }
+  .legend .box-data { background: #fef3c7; }
+  .legend .box-ext { background: #fff; }
+  .legend .box-hw { background: #e5e7eb; }
+  .legend .box-vlm { background: #dcfce7; }
+  .legend .box-llm { background: #dbeafe; }
+  .code { font-family: "JetBrains Mono", "Fira Code", monospace; font-size: .78rem; background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+  .path { color: var(--accent2); }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: 8px 0; }
+  th, td { padding: 5px 8px; border: 1px solid var(--border); text-align: left; }
+  th { background: var(--surface2); font-weight: 600; }
+  footer { font-size: .75rem; color: var(--muted); text-align: center; margin-top: 20px; }
+  @media (max-width: 700px) { body { padding: 10px; } .diagram { padding: 4px; } }
+</style>
+</head>
+<body>
+
+<h1>SimTutor Architecture Map</h1>
+<p class="subtitle">
+  Interactive reference for thesis presentation. Describes the system as implemented on the <code>experiment-distribution</code> branch (May 2026).
+  All file paths are relative to the repository root.
+</p>
+
+<div class="info-banner">
+  <span>&#9432;</span>
+  <span><strong>Usage:</strong> Click sections to expand/collapse. Press <kbd>Ctrl+P</kbd> to print. All diagrams are inline SVG — no external resources.</span>
+</div>
+
+<details class="legend" open>
+  <summary>Colour Legend</summary>
+  <div class="legend-grid">
+    <div class="legend-item"><span class="legend-dot box-core"></span> <strong>Core</strong> — domain logic (no I/O)</div>
+    <div class="legend-item"><span class="legend-dot box-adapter"></span> <strong>Adapter</strong> — I/O, model, transport</div>
+    <div class="legend-item"><span class="legend-dot box-port"></span> <strong>Port</strong> — Protocol / interface</div>
+    <div class="legend-item"><span class="legend-dot box-data"></span> <strong>Data</strong> — dataclasses, config</div>
+    <div class="legend-item"><span class="legend-dot box-ext"></span> <strong>External</strong> — third-party</div>
+    <div class="legend-item"><span class="legend-dot box-hw"></span> <strong>Hardware / Sim</strong> — DCS, Quest&nbsp;3</div>
+    <div class="legend-item"><span class="legend-dot box-vlm"></span> <strong>VLM</strong> — vision fact extractor</div>
+    <div class="legend-item"><span class="legend-dot box-llm"></span> <strong>LLM</strong> — text help model</div>
+  </div>
+</details>
+
+<!-- ================================================================ -->
+<!-- 1. SYSTEM OVERVIEW -->
+<!-- ================================================================ -->
+<section>
+  <details open><summary>1. System Overview</summary></details>
+  <p style="margin:6px 0;font-size:.85rem;">
+    SimTutor sits between the DCS F/A-18C simulator (rendered through a Quest&nbsp;3 HMD) and a remote model server.
+    DCS-BIOS exports real-time cockpit telemetry. The Vision Sidecar captures composite-panel screenshots.
+    On each <kbd>X1</kbd> help request, the Live Help Loop assembles evidence, calls the text LLM, optionally calls the VLM for visual-priority steps, and sends overlay highlights + Chinese text guidance back to the cockpit.
+  </p>
+  <div class="diagram" id="d1"></div>
+  <table style="margin-top:8px;">
+    <tr><th style="width:180px">File / Module</th><th>Role</th></tr>
+    <tr><td class="path">live_dcs.py</td><td>Main live tutor loop: DCS-BIOS ingest, help trigger, orchestration, overlay dispatch</td></tr>
+    <tr><td class="path">adapters/dcs_bios/receiver.py</td><td>Raw UDP DCS-BIOS telemetry receiver</td></tr>
+    <tr><td class="path">adapters/vision_fact_extractor.py</td><td><span class="code">VisionFactExtractor</span> — VLM-backed structured visual fact extraction</td></tr>
+    <tr><td class="path">adapters/openai_compat_model.py</td><td><span class="code">OpenAICompatModel</span> — text-only help LLM via OpenAI-compatible API</td></tr>
+    <tr><td class="path">adapters/action_executor.py</td><td>Overlay highlighter: writes SimTutorConfig.lua and signals DCS hook</td></tr>
+    <tr><td class="path">packs/fa18c_startup/pack.yaml</td><td>Procedure steps S01–S33, gates, UI targets, telemetry mappings</td></tr>
+    <tr><td class="path">packs/fa18c_startup/vision_facts.yaml</td><td>13 structured vision facts, expiry rules, stickiness flags</td></tr>
+    <tr><td class="path">tools/capture_vision_sidecar.py</td><td>Vision sidecar: composite screenshot capture, frame saving</td></tr>
+    <tr><td class="path">tools/simtutor_launcher.py</td><td>GUI launcher: preflight, tunnel, experiment session management</td></tr>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 2. LIVE HELP CYCLE -->
+<!-- ================================================================ -->
+<section>
+  <details open><summary>2. Live Help Cycle</summary></details>
+  <p style="margin:6px 0;font-size:.85rem;">
+    When the participant presses <kbd>X1</kbd> (handled by <span class="code path">adapters/windows_global_help_trigger.py</span>),
+    the orchestrator in <span class="path">live_dcs.py</span> runs one full help cycle — about 15 sequential stages —
+    from telemetry snapshot through LLM call and overlay dispatch. Every stage is event-logged to JSONL.
+  </p>
+  <div class="diagram" id="d2"></div>
+  <table>
+    <tr><th>Stage</th><th>Key Class / Function</th><th>File</th></tr>
+    <tr><td>1. Trigger &amp; cooldown</td><td class="code">WindowsGlobalHelpTrigger</td><td class="path">adapters/windows_global_help_trigger.py</td></tr>
+    <tr><td>2. Telemetry snapshot</td><td class="code">DcsBiosReceiver</td><td class="path">adapters/dcs_bios/receiver.py</td></tr>
+    <tr><td>3. Enrich telemetry</td><td class="code">enrich_bios_observation()</td><td class="path">adapters/telemetry_pipeline.py</td></tr>
+    <tr><td>4. Vision trigger</td><td class="code">build_capture_request_payload()</td><td class="path">adapters/vision_capture_trigger.py</td></tr>
+    <tr><td>5. Deterministic inference</td><td class="code">infer_step_id()</td><td class="path">adapters/step_inference.py</td></tr>
+    <tr><td>6. Gate evaluation</td><td class="code">evaluate_pack_gates()</td><td class="path">adapters/pack_gates.py</td></tr>
+    <tr><td>7. Evidence packet</td><td class="code">build_evidence_packet()</td><td class="path">core/evidence_packet.py</td></tr>
+    <tr><td>8. VLM extraction (conditional)</td><td class="code">VisionFactExtractor.extract()</td><td class="path">adapters/vision_fact_extractor.py</td></tr>
+    <tr><td>9. RAG retrieval</td><td class="code">LocalKnowledgeAdapter</td><td class="path">adapters/knowledge_local.py</td></tr>
+    <tr><td>10. Prompt build</td><td class="code">build_help_prompt_result()</td><td class="path">adapters/prompting.py</td></tr>
+    <tr><td>11. LLM call</td><td class="code">OpenAICompatModel</td><td class="path">adapters/openai_compat_model.py</td></tr>
+    <tr><td>12. Response mapping</td><td class="code">map_help_response_to_tutor_response()</td><td class="path">adapters/response_mapping.py</td></tr>
+    <tr><td>13. Harness: validate &amp; plan</td><td class="code">plan_harness_action()</td><td class="path">core/harness_validation.py</td></tr>
+    <tr><td>14. Overlay dispatch</td><td class="code">OverlayActionExecutor</td><td class="path">adapters/action_executor.py</td></tr>
+    <tr><td>15. Log event</td><td class="code">JsonlEventStore</td><td class="path">core/event_store.py</td></tr>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 3. VLM / LLM SEPARATION -->
+<!-- ================================================================ -->
+<section>
+  <details open><summary>3. VLM / LLM Separation</summary></details>
+  <p style="margin:6px 0;font-size:.85rem;">
+    <strong>Critical architectural decision:</strong> The VLM is only a structured visual fact extractor.
+    It never generates teaching text, overlays, or step decisions.
+    The main help LLM is text-only (<span class="path">adapters/openai_compat_model.py</span>).
+    VLM is only called for <em>visual-priority</em> steps (S08, S15, S18, S19) where DDI page state must be confirmed.
+    For all other steps the VLM is skipped entirely — the system checks <span class="code">requires_visual_confirmation</span> from the pack.
+  </p>
+  <div class="diagram" id="d3"></div>
+  <table>
+    <tr><th style="width:160px">Aspect</th><th>VLM (Vision)</th><th>LLM (Text Help)</th></tr>
+    <tr><td><strong>Model</strong></td><td>Qwen3.5-27B-Instruct + LoRA</td><td>Qwen3-8B-Instruct (simtutor-base)</td></tr>
+    <tr><td><strong>Input</strong></td><td>Composite cockpit panel images (2 frames max)</td><td>Evidence packet JSON + RAG snippets + step specs</td></tr>
+    <tr><td><strong>Output</strong></td><td>13 structured VisionFact objects (seen/not_seen/uncertain)</td><td>HelpResponse (step diagnosis, next action, overlay targets)</td></tr>
+    <tr><td><strong>Schema</strong></td><td>VisionFactResponse (JSON Schema)</td><td>HelpResponse via <span class="path">core/llm_schema.py</span></td></tr>
+    <tr><td><strong>When called</strong></td><td>Only visual-priority steps (S08, S15, S18, S19)</td><td>Every help request</td></tr>
+    <tr><td><strong>Failure behaviour</strong></td><td>Fallback to text-only inference</td><td>Retry with transport backoff; stub fallback</td></tr>
+    <tr><td><strong>Prompt builder</strong></td><td class="path">adapters/vision_fact_prompting.py</td><td class="path">adapters/prompting.py</td></tr>
+    <tr><td><strong>Fact config</strong></td><td class="path">packs/fa18c_startup/vision_facts.yaml</td><td>n/a (text prompt from pack step context)</td></tr>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 4. HARNESS ENGINEERING OBJECTS -->
+<!-- ================================================================ -->
+<section>
+  <details open><summary>4. Harness Engineering Objects</summary></details>
+  <p style="margin:6px 0;font-size:.85rem;">
+    The <strong>harness</strong> is the safety layer between the LLM's raw output and the public cockpit response.
+    It verifies that the chosen step is a valid candidate, repairs missing or invalid overlay targets,
+    detects evidence contradictions, and can force text-only fallback when the model's proposal is unsafe.
+    All harness objects live in <span class="path">core/</span> — they are pure domain logic with no I/O.
+  </p>
+  <div class="diagram" id="d4"></div>
+  <table>
+    <tr><th>Object</th><th>File</th><th>Purpose</th></tr>
+    <tr><td class="code">EvidencePacket</td><td class="path">core/evidence_packet.py</td><td>Aggregates: TelemetryEvidence, TelemetryWindowDigest, VisionEvidence, GateEvidence, RecentActionEvidence, DeterministicCandidateEvidence, and conflicts list (4 conflict types)</td></tr>
+    <tr><td class="code">StepCandidate</td><td class="path">core/evidence_packet.py</td><td>One candidate step with source (deterministic, visual_anchor, gate_blocker, telemetry_window, recent_action, procedure_order), supporting/refuting evidence refs, confidence score</td></tr>
+    <tr><td class="code">build_evidence_packet()</td><td class="path">core/evidence_packet.py</td><td>Builds the full evidence packet from context dict; detects 4 conflict types</td></tr>
+    <tr><td class="code">build_step_candidates()</td><td class="path">core/evidence_packet.py</td><td>Generates up to 8 ordered adjudication candidates from all evidence sources</td></tr>
+    <tr><td class="code">StepHarnessSpec</td><td class="path">core/step_harness.py</td><td>Per-step contract: allowed overlay targets, required observables, latch semantics, recovery policy</td></tr>
+    <tr><td class="code">HarnessActionPlan</td><td class="path">core/harness_validation.py</td><td>Final action plan: step_id, overlay targets, evidence refs, guidance, text_only flag, validator_rejected/repair_applied flags</td></tr>
+    <tr><td class="code">plan_harness_action()</td><td class="path">core/harness_validation.py</td><td>Main harness entry: validates model output against candidates, applies state-action planner, filters targets, enforces evidence refs</td></tr>
+    <tr><td class="code">validate_final_evidence_consistency()</td><td class="path">core/harness_validation.py</td><td>Post-hoc check: rejects decision if missing conditions are already satisfied by latest telemetry</td></tr>
+    <tr><td class="code">HarnessDecision</td><td class="path">core/harness_decision.py</td><td>LLM reasoning contract (JSON Schema): chosen_step_id, diagnosis_category, rejected_candidates, conflict_resolution, etc.</td></tr>
+    <tr><td class="code">get_harness_decision_schema()</td><td class="path">core/harness_decision.py</td><td>Builds the dynamic JSON Schema for the harness decision</td></tr>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 5. EXPERIMENT EXPORT AND ANALYSIS -->
+<!-- ================================================================ -->
+<section>
+  <details open><summary>5. Experiment Export and Analysis Pipeline</summary></details>
+  <p style="margin:6px 0;font-size:.85rem;">
+    After each trial, the raw JSONL event log is frozen into study-ready CSV artifacts.
+    These are then aggregated across participants for thesis analysis.
+    The pipeline is implemented across <span class="path">core/experiment_export.py</span> and the CLI commands
+    <span class="code">experiment-export</span> / <span class="code">experiment-analyze</span> in <span class="path">simtutor/__main__.py</span>.
+  </p>
+  <div class="diagram" id="d5"></div>
+  <table>
+    <tr><th>Output File</th><th>Content</th></tr>
+    <tr><td class="code">trial_summary.csv</td><td>One row per trial: ParticipantID, Condition, Completed, TaskTime_s, HelpRequests, LLMTriggers, VLMCalls, OverlayRejectionRate, FallbackRate, VLMNotRequiredLeakageCount</td></tr>
+    <tr><td class="code">step_coding.csv</td><td>One row per step (S01–S33): Completed, EvidenceRefs, AutoCodingNotes, visual_step_requires_manual_review flag</td></tr>
+    <tr><td class="code">help_cycles.csv</td><td>One row per help request: trigger_wall_s, vision_used, vlm_call_status, fused_step_id, overlay_targets, overlay_executed, response_status</td></tr>
+    <tr><td class="code">action_timeline.csv</td><td>Chronological participant actions with wall-clock timestamps</td></tr>
+    <tr><td class="code">quality_gate.json</td><td>Export health check: schema version, event counts, passed/failed</td></tr>
+    <tr><td class="code">session.json</td><td>Trial metadata (participant, condition, model config, DCS mission)</td></tr>
+    <tr><td class="code">raw_events.jsonl</td><td>Copy of the original event log (for archival traceability)</td></tr>
+    <tr><td colspan="2" style="background:var(--surface2)"><strong>After aggregation (experiment-analyze):</strong></td></tr>
+    <tr><td class="code">study_summary.csv</td><td>All trials combined</td></tr>
+    <tr><td class="code">condition_summary.csv</td><td>Group-level means, SDs per condition</td></tr>
+    <tr><td class="code">step_accuracy_by_condition.csv</td><td>Per-step completion rates by condition</td></tr>
+    <tr><td class="code">help_quality_summary.csv</td><td>Help effectiveness metrics by condition</td></tr>
+    <tr><td class="code">fig_*.png</td><td>Matplotlib figures (completion rate, task time, step accuracy, help requests)</td></tr>
+  </table>
+</section>
+
+<!-- ================================================================ -->
+<!-- 6. DEPLOYMENT TOPOLOGY -->
+<!-- ================================================================ -->
+<section>
+  <details open><summary>6. Deployment Topology</summary></details>
+  <p style="margin:6px 0;font-size:.85rem;">
+    The production deployment spans two physical machines connected by SSH tunnel.
+    Quest&nbsp;3 is the <strong>fixed</strong> user-study platform (not an experimental variable).
+  </p>
+  <div class="diagram" id="d6"></div>
+  <table>
+    <tr><th>Component</th><th>Machine</th><th>Details</th></tr>
+    <tr><td>DCS World + F/A-18C</td><td>Windows Sim Host</td><td>GPU-accelerated; VR mirror via Oculus Link</td></tr>
+    <tr><td>DCS-BIOS</td><td>Windows Sim Host</td><td>UDP multicast on 239.255.50.10:5010; exports ~150 telemetry variables</td></tr>
+    <tr><td>Quest 3 HMD</td><td>Windows Sim Host (tethered)</td><td>Fixed platform for all conditions; Oculus Link over USB-C</td></tr>
+    <tr><td>SimTutor live-dcs</td><td>Windows Sim Host</td><td>Python process: telemetry ingest, help orchestration, overlay dispatch</td></tr>
+    <tr><td>Vision Sidecar</td><td>Windows Sim Host</td><td>tools/capture_vision_sidecar.py: captures composite panel screenshots on trigger</td></tr>
+    <tr><td>GUI Launcher</td><td>Windows Sim Host</td><td>tools/simtutor_launcher.py: preflight, tunnel management, session control</td></tr>
+    <tr><td>SSH Tunnel</td><td>Both</td><td>Windows → cloud-247.rz.tu-clausthal.de → localhost:8000</td></tr>
+    <tr><td>vLLM Server</td><td>Remote GPU Server</td><td>Serves two models: simtutor-base (text LLM) and simtutor-vision (VLM + LoRA)</td></tr>
+    <tr><td>Experiment Export</td><td>Windows or WSL</td><td>Post-trial: JSONL → CSV artifacts via experiment-export</td></tr>
+    <tr><td>Analysis</td><td>Windows or WSL</td><td>Aggregated CSV + figures via experiment-analyze</td></tr>
+  </table>
+  <h3 style="margin-top:12px;">Network paths</h3>
+  <table>
+    <tr><th>Path</th><th>Protocol</th><th>Port</th></tr>
+    <tr><td>DCS → DCS-BIOS → live-dcs (telemetry)</td><td>UDP multicast</td><td>5010</td></tr>
+    <tr><td>live-dcs → Vision Sidecar (capture trigger)</td><td>TCP</td><td>7795</td></tr>
+    <tr><td>live-dcs → vLLM (text LLM API)</td><td>HTTP (SSH tunnel)</td><td>8000 (mapped)</td></tr>
+    <tr><td>VisionFactExtractor → vLLM (VLM API)</td><td>HTTP (SSH tunnel)</td><td>8000 (mapped)</td></tr>
+    <tr><td>live-dcs → DCS (overlay config write)</td><td>File I/O</td><td>n/a (local fs)</td></tr>
+  </table>
+</section>
+
+<footer>
+  SimTutor Architecture Map &middot; Generated from <code>experiment-distribution</code> branch &middot; May 2026 &middot;
+  Self-contained HTML — no CDN, no external resources
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var SVG = "http://www.w3.org/2000/svg";
+
+  // ── colour palettes by layer ──
+  var C = {
+    core:    { fill: "#e0f2fe", stroke: "#7dd3fc" },
+    adapter: { fill: "#fce7f3", stroke: "#f9a8d4" },
+    data:    { fill: "#fef3c7", stroke: "#fcd34d" },
+    ext:     { fill: "#ffffff", stroke: "#999999", dash: "6 3" },
+    hw:      { fill: "#e5e7eb", stroke: "#9ca3af" },
+    vlm:     { fill: "#dcfce7", stroke: "#86efac" },
+    llm:     { fill: "#dbeafe", stroke: "#93c5fd" },
+    port:    { fill: "#ede9fe", stroke: "#c4b5fd" }
+  };
+
+  function ce(tag, attrs, text) {
+    var e = document.createElementNS(SVG, tag);
+    for (var k in attrs) { if (attrs.hasOwnProperty(k)) e.setAttribute(k, String(attrs[k])); }
+    if (text !== undefined && text !== null) e.textContent = String(text);
+    return e;
+  }
+
+  // ── shared defs (shadow filter, arrowheads) ──
+  function makeDefs() {
+    var d = "", id = 0;
+    var defs = ce("defs", {});
+    defs.innerHTML =
+      '<filter id="sh" x="-10%" y="-10%" width="130%" height="130%">'+
+        '<feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-opacity="0.12"/>'+
+      '</filter>'+
+      '<marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">'+
+        '<polygon points="0 0, 8 3, 0 6" fill="#6b7280"/>'+
+      '</marker>'+
+      '<marker id="ahb" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">'+
+        '<polygon points="0 0, 8 3, 0 6" fill="#2563eb"/>'+
+      '</marker>';
+    return defs;
+  }
+
+  // ── box helper — returns {x,y,w,h,cx,cy,right,bottom} ──
+  function B(x, y, w, h, kind) {
+    return { x:x, y:y, w:w, h:h, kind:kind||"core",
+      cx: x+w/2, cy: y+h/2, right: x+w, bottom: y+h };
+  }
+
+  function place(g, b, lines, opts) {
+    var c = C[b.kind] || C.core;
+    opts = opts || {};
+    var rect = ce("rect", {
+      x:b.x, y:b.y, width:b.w, height:b.h, rx:5,
+      fill:c.fill, stroke:c.stroke, "stroke-width":1.2,
+      "stroke-dasharray": c.dash||"none", filter:"url(#sh)" });
+    g.appendChild(rect);
+    var fs = opts.small ? 9 : 10;
+    var lh = fs + 4;
+    var th = lines.length * lh;
+    var sy = b.y + (b.h - th) / 2 + fs - 1;
+    for (var i = 0; i < lines.length; i++) {
+      g.appendChild(ce("text", {
+        x:b.cx, y:sy + i*lh, "text-anchor":"middle",
+        "font-size":fs, fill:"#1a1a2e",
+        "font-weight": opts.bold ? "600" : "400" }, lines[i]));
+    }
+    if (opts.sub) {
+      g.appendChild(ce("text", {
+        x:b.cx, y:b.bottom - 4, "text-anchor":"middle",
+        "font-size":7, fill:"#6b7280" }, opts.sub));
+    }
+  }
+
+  // ── arrow: from centre-right of b1 to centre-left of b2 ──
+  function ah(g, b1, b2, label) {
+    var x1 = b1.right, y1 = b1.cy;
+    var x2 = b2.x,     y2 = b2.cy;
+    g.appendChild(ce("path", {
+      d:"M"+x1+","+y1+" L"+(x2-0)+","+y2,
+      stroke:"#6b7280","stroke-width":1.2,fill:"none","marker-end":"url(#ah)"}));
+    if (label) {
+      var mx = (x1+x2)/2, my = (y1+y2)/2 - 6;
+      g.appendChild(ce("text", {x:mx, y:my, "text-anchor":"middle","font-size":8, fill:"#6b7280"}, label));
+    }
+  }
+
+  // ── vertical down arrow ──
+  function av(g, x, y1, y2, label) {
+    g.appendChild(ce("path", {
+      d:"M"+x+","+y1+" L"+x+","+y2,
+      stroke:"#2563eb","stroke-width":1.2,fill:"none","marker-end":"url(#ahb)"}));
+    if (label) {
+      g.appendChild(ce("text", {x:x+10, y:(y1+y2)/2+3, "font-size":8, fill:"#2563eb"}, label));
+    }
+  }
+
+  // ── path with mid-label ──
+  function ap(g, pts, label) {
+    var d = "M"+pts[0]+","+pts[1];
+    for (var i = 2; i < pts.length; i += 2) d += " L"+pts[i]+","+pts[i+1];
+    g.appendChild(ce("path", {
+      d:d, stroke:"#6b7280","stroke-width":1.2,fill:"none","marker-end":"url(#ah)"}));
+    if (label) {
+      var mx = 0, my = 0, n = pts.length/2;
+      for (var j = 0; j < pts.length; j += 2) { mx += pts[j]; my += pts[j+1]; }
+      mx /= n; my = my/n - 6;
+      g.appendChild(ce("text", {x:mx,y:my,"text-anchor":"middle","font-size":8,fill:"#6b7280"}, label));
+    }
+  }
+
+  // ===================== 1. SYSTEM OVERVIEW =====================
+  (function () {
+    var svg = ce("svg", { viewBox: "0 0 1020 380", width:"100%", height:380 });
+    svg.appendChild(makeDefs());
+    var g = ce("g", {}); svg.appendChild(g);
+
+    // large zones
+    g.appendChild(ce("rect", {x:8,y:8,width:185,height:280,rx:6,fill:"#f8fafc",stroke:"#d1d5db","stroke-width":1,"stroke-dasharray":"4 3"}));
+    g.appendChild(ce("text", {x:16,y:24,"font-size":9,fill:"#6b7280","font-weight":"600"},"Hardware / Sim"));
+
+    g.appendChild(ce("rect", {x:210,y:8,width:380,height:280,rx:6,fill:"#faf5ff",stroke:"#d8b4fe","stroke-width":1,"stroke-dasharray":"4 3"}));
+    g.appendChild(ce("text", {x:218,y:24,"font-size":9,fill:"#7c3aed","font-weight":"600"},"SimTutor Process (live_dcs.py)"));
+
+    g.appendChild(ce("rect", {x:610,y:8,width:390,height:280,rx:6,fill:"#eff6ff",stroke:"#93c5fd","stroke-width":1,"stroke-dasharray":"4 3"}));
+    g.appendChild(ce("text", {x:618,y:24,"font-size":9,fill:"#2563eb","font-weight":"600"},"Remote & Output"));
+
+    // --- hardware column ---
+    var q3  = B(22, 40, 155, 38, "hw");   place(g, q3,  ["Quest 3 HMD", "(fixed platform)"],{small:true});
+    var dcs = B(22, 92, 155, 38, "hw");   place(g, dcs, ["DCS F/A-18C", "cold-start mission"],{small:true});
+    var bios= B(22, 144,155, 38, "hw");   place(g, bios,["DCS-BIOS", "UDP 239.255.50.10:5010"],{small:true});
+    var pack= B(22, 200,155, 38, "data");  place(g, pack,["Pack Config", "packs/fa18c_startup/"],{small:true});
+    var vfc = B(22, 248,155, 38, "data");  place(g, vfc, ["Vision Facts", "13 facts, sticky"],{small:true});
+
+    // --- simtutor column ---
+    var l1  = B(230, 40, 175, 34, "adapter"); place(g, l1,  ["LiveDcsTutorLoop", "live_dcs.py"],{small:true});
+    var l2  = B(230, 84, 175, 34, "adapter"); place(g, l2,  ["build_help_prompt_result()", "adapters/prompting.py"],{small:true});
+    var l3  = B(230, 128,175, 34, "core");    place(g, l3,  ["EvidencePacket", "core/evidence_packet.py"],{small:true});
+    var l4  = B(230, 172,175, 34, "core");    place(g, l4,  ["plan_harness_action()", "core/harness_validation.py"],{small:true});
+    var l5  = B(230, 216,175, 34, "adapter"); place(g, l5,  ["OverlayActionExecutor", "adapters/action_executor.py"],{small:true});
+    var l6  = B(230, 256,175, 34, "core");    place(g, l6,  ["experiment-export", "core/experiment_export.py"],{small:true});
+
+    // --- remote / output column ---
+    var r1  = B(625, 40, 180, 38, "llm");  place(g, r1,  ["OpenAICompatModel", "Qwen3-8B — text LLM"],{small:true});
+    var r2  = B(625, 92, 180, 38, "vlm");  place(g, r2,  ["VisionFactExtractor", "Qwen3.5-27B — VLM"],{small:true});
+    var r3  = B(825, 40, 160, 44, "ext");  place(g, r3,  ["vLLM Server", "Remote GPU"],{small:true});
+    var r4  = B(825, 98, 160, 44, "ext");  place(g, r4,  ["simtutor-base", "simtutor-vision (LoRA)"],{small:true});
+    var r5  = B(825, 160,160, 38, "data"); place(g, r5,  ["JSONL Event Log", "logs/*.jsonl"],{small:true});
+    var r6  = B(825, 212,160, 38, "data"); place(g, r6,  ["CSV Artifacts", "trial_summary, step_coding..."],{small:true});
+    var r7  = B(825, 260,160, 38, "data"); place(g, r7,  ["Analysis Output", "study_summary, figures"],{small:true});
+
+    // Overlay config
+    var ovc = B(445, 256, 155, 34, "hw"); place(g, ovc, ["SimTutorConfig.lua", "DCS overlay config"],{small:true});
+
+    // --- arrows ---
+    // Hardware chain
+    av(g, q3.cx, q3.bottom, dcs.y,   "");
+    av(g, dcs.cx, dcs.bottom,bios.y, "");
+    ah(g, bios, l1, "telemetry");
+    ah(g, dcs, l1,  "VR mirror");
+    // simtutor pipeline
+    av(g, l1.cx, l1.bottom, l2.y,  "");
+    av(g, l2.cx, l2.bottom, l3.y,  "");
+    av(g, l3.cx, l3.bottom, l4.y,  "");
+    // branches from middle
+    ap(g, [l3.right,l3.cy, l3.right+20,l3.cy, r1.x-10,r1.cy+6],  "evidence for prompt");
+    ap(g, [l3.right+20,l3.cy, l3.right+20,r2.cy, r2.x-10,r2.cy], "VLM facts");
+    ah(g, l4, l5, "");
+    ah(g, l5, ovc, "write config");
+    // model calls
+    ah(g, r1, r3, "SSH tunnel");
+    ah(g, r2, r4, "SSH tunnel");
+    // export chain
+    av(g, l5.cx+30, l5.bottom, l6.y+4, "");
+    ah(g, l6, r5, "freeze trial");
+    av(g, r5.cx, r5.bottom, r6.y, "");
+    av(g, r6.cx, r6.bottom, r7.y, "");
+    // Pack feeds
+    ah(g, pack, l3, "steps/gates");
+
+    document.getElementById("d1").appendChild(svg);
+  })();
+
+  // ===================== 2. LIVE HELP CYCLE =====================
+  (function () {
+    var svg = ce("svg", { viewBox: "0 0 620 640", width:"100%", height:640 });
+    svg.appendChild(makeDefs());
+    var g = ce("g", {}); svg.appendChild(g);
+
+    var steps = [
+      { t:"1. Participant presses X1",          f:"adapters/windows_global_help_trigger.py", k:"adapter" },
+      { t:"2. Telemetry snapshot",              f:"adapters/dcs_bios/receiver.py",         k:"adapter" },
+      { t:"3. Enrich derived vars",             f:"adapters/telemetry_pipeline.py",         k:"adapter" },
+      { t:"4. Trigger vision capture",          f:"adapters/vision_capture_trigger.py",     k:"adapter" },
+      { t:"5. Deterministic inference",         f:"adapters/step_inference.py",             k:"adapter" },
+      { t:"6. Evaluate pack gates",             f:"adapters/pack_gates.py",                 k:"adapter" },
+      { t:"7. Build EvidencePacket",            f:"core/evidence_packet.py",                k:"core" },
+      { t:"8. VLM extraction (if visual step)", f:"adapters/vision_fact_extractor.py",      k:"vlm" },
+      { t:"9. RAG knowledge retrieval",         f:"adapters/knowledge_local.py",            k:"adapter" },
+      { t:"10. Build LLM prompt",               f:"adapters/prompting.py",                  k:"adapter" },
+      { t:"11. Call text LLM",                  f:"adapters/openai_compat_model.py",         k:"llm" },
+      { t:"12. Map response",                   f:"adapters/response_mapping.py",            k:"adapter" },
+      { t:"13. Harness validate & plan",        f:"core/harness_validation.py",             k:"core" },
+      { t:"14. Dispatch overlay",               f:"adapters/action_executor.py",             k:"adapter" },
+      { t:"15. Log to JSONL",                   f:"core/event_store.py",                    k:"core" },
+    ];
+
+    var boxW = 400, boxX = 100, boxH = 34, gap = 38;
+    var tagX = 30, tagW = 55;
+
+    for (var i = 0; i < steps.length; i++) {
+      var y = 30 + i * gap;
+      var s = steps[i];
+      var c = C[s.k] || C.core;
+      var b = B(boxX, y, boxW, boxH, s.k);
+      // main box
+      g.appendChild(ce("rect", {
+        x:b.x, y:b.y, width:b.w, height:b.h, rx:4,
+        fill:c.fill, stroke:c.stroke, "stroke-width":1, filter:"url(#sh)" }));
+      g.appendChild(ce("text", {
+        x:b.cx, y:b.y+14, "text-anchor":"middle","font-size":10, fill:"#1a1a2e","font-weight":"500"}, s.t));
+      g.appendChild(ce("text", {
+        x:b.cx, y:b.y+27, "text-anchor":"middle","font-size":8, fill:"#6b7280"}, s.f));
+      // layer badge
+      var layer = {core:"CORE",adapter:"ADAPT",vlm:"VLM",llm:"LLM"}[s.k]||s.k.toUpperCase();
+      g.appendChild(ce("rect", {x:tagX, y:y+6, width:tagW, height:14, rx:3, fill:c.fill, stroke:c.stroke, "stroke-width":0.8}));
+      g.appendChild(ce("text", {x:tagX+tagW/2, y:y+16, "text-anchor":"middle","font-size":7,fill:"#4a4a5a","font-weight":"600"}, layer));
+      // down arrow
+      if (i < steps.length - 1) {
+        g.appendChild(ce("path", {
+          d:"M"+(boxX+boxW/2)+","+(y+boxH)+" L"+(boxX+boxW/2)+","+(y+gap),
+          stroke:"#2563eb","stroke-width":1.2,fill:"none","marker-end":"url(#ahb)"}));
+      }
+    }
+    document.getElementById("d2").appendChild(svg);
+  })();
+
+  // ===================== 3. VLM / LLM SEPARATION =====================
+  (function () {
+    var svg = ce("svg", { viewBox: "0 0 820 340", width:"100%", height:340 });
+    svg.appendChild(makeDefs());
+    var g = ce("g", {}); svg.appendChild(g);
+
+    // Help request at top
+    var req = B(310, 8, 200, 30, "core"); place(g, req, ["Help Request Received (X1)"], {bold:true,small:true});
+
+    // VLM path (left side)
+    var ve  = B(20, 60, 230, 34, "vlm");  place(g, ve,  ["VisionFactExtractor", "adapters/vision_fact_extractor.py"],{small:true});
+    var vf  = B(20, 108,230, 42, "data"); place(g, vf,  ["Composite Panel Screenshots", "pre_trigger_frame + trigger_frame"],{small:true});
+    var vo  = B(20, 164,230, 42, "data"); place(g, vo,  ["13 VisionFact Objects", "seen / not_seen / uncertain"],{small:true});
+    var vs  = B(20, 220,230, 34, "data"); place(g, vs,  ["Vision Fact Summary", "→ EvidencePacket.vision_evidence"],{small:true});
+
+    // LLM path (right side)
+    var le  = B(500, 60, 240, 34, "llm");  place(g, le,  ["OpenAICompatModel", "adapters/openai_compat_model.py"],{small:true});
+    var lp  = B(500, 108,240, 42, "data"); place(g, lp,  ["Text Prompt", "Evidence + Candidates + RAG + Specs"],{small:true});
+    var lo  = B(500, 164,240, 42, "data"); place(g, lo,  ["HarnessDecision JSON Schema", "step, diagnosis, targets, evidence_refs"],{small:true});
+    var lr  = B(500, 220,240, 34, "data"); place(g, lr,  ["TutorResponse", "→ overlay + text guidance to cockpit"],{small:true});
+
+    // Decision gate (middle)
+    var gate = B(270, 100, 200, 38, "core"); place(g, gate, ["requires_visual_confirmation?", "from pack step config"],{small:true});
+
+    // Model endpoints (bottom)
+    var vm = B(80, 280, 200, 32, "ext");  place(g, vm,  ["simtutor-vision (LoRA)", "Qwen3.5-27B on remote GPU"],{small:true});
+    var lm = B(530, 280,200, 32, "ext");  place(g, lm,  ["simtutor-base (text)", "Qwen3-8B on remote GPU"],{small:true});
+
+    // Callout box
+    var call = B(310, 220, 200, 46, "vlm"); place(g, call, ["Visual-Priority Steps Only:", "S08, S15, S18, S19"],{small:true,bold:true});
+
+    // --- arrows ---
+    ap(g, [req.x+req.w/2, req.bottom, req.x+req.w/2, gate.y-6, gate.x+gate.w/2, gate.y], "check step config");
+
+    // VLM branch (left from gate)
+    ap(g, [gate.x, gate.cy+6, ve.right+10, ve.cy+6], "Yes (visual step)");
+    av(g, ve.cx, ve.bottom, vf.y, "");
+    av(g, vf.cx, vf.bottom, vo.y, "");
+    av(g, vo.cx, vo.bottom, vs.y, "");
+    ap(g, [ve.x, ve.cy, 8, ve.cy, 8, vm.cy, vm.x, vm.cy], "HTTP/SSH tunnel");
+
+    // LLM branch (right from gate)
+    ap(g, [gate.right, gate.cy-4, le.x-10, le.cy-4], "No, or after VLM →");
+    av(g, le.cx, le.bottom, lp.y, "");
+    av(g, lp.cx, lp.bottom, lo.y, "");
+    av(g, lo.cx, lo.bottom, lr.y, "");
+    ap(g, [le.right, le.cy, 790, le.cy, 790, lm.cy, lm.right, lm.cy], "HTTP/SSH tunnel");
+
+    // Facts go into evidence for LLM prompt
+    ap(g, [vs.right, vs.cy, le.x+30, le.cy-17], "facts injected into evidence");
+
+    // VLM not needed path
+    ap(g, [gate.cx, gate.bottom, gate.cx, le.y-12, le.cx, le.y-12, le.cx, le.y], "text only");
+
+    // Step callout
+    ap(g, [call.x, call.cy, vs.right+10, call.cy], "");
+
+    document.getElementById("d3").appendChild(svg);
+  })();
+
+  // ===================== 4. HARNESS ENGINEERING OBJECTS =====================
+  (function () {
+    var svg = ce("svg", { viewBox: "0 0 960 420", width:"100%", height:420 });
+    svg.appendChild(makeDefs());
+    var g = ce("g", {}); svg.appendChild(g);
+
+    // --- row 1: five evidence sources ---
+    var ev1 = B(8,  10, 170, 34, "data"); place(g, ev1, ["TelemetryEvidence", "source_status, confidence"],{small:true});
+    var ev2 = B(190,10, 170, 34, "data"); place(g, ev2, ["TelemetryWindowDigest", "windowed var analysis"],{small:true});
+    var ev3 = B(372,10, 170, 34, "data"); place(g, ev3, ["VisionEvidence", "13 facts, anchors"],{small:true});
+    var ev4 = B(554,10, 170, 34, "data"); place(g, ev4, ["GateEvidence", "blocked/satisfied gates"],{small:true});
+    var ev5 = B(736,10, 170, 34, "data"); place(g, ev5, ["RecentActionEvidence", "target_ids, deltas"],{small:true});
+
+    // --- row 2: deterministic + build fns ---
+    var inf = B(8,  65, 170, 30, "adapter"); place(g, inf, ["infer_step_id()", "adapters/step_inference.py"],{small:true});
+    var det = B(195,65, 160, 30, "data");    place(g, det, ["DeterministicCandidate", "step_id, missing_conditions"],{small:true});
+    var bep = B(480,65, 200, 30, "core");    place(g, bep, ["build_evidence_packet()", "core/evidence_packet.py"],{bold:true,small:true});
+
+    // --- row 3: EvidencePacket ---
+    var ep  = B(340,115, 210, 34, "data"); place(g, ep, ["EvidencePacket", "+ conflicts tuple (4 types)"],{small:true});
+
+    // --- row 4: build_step_candidates + StepCandidate[] ---
+    var bsc = B(280,170, 200, 30, "core"); place(g, bsc, ["build_step_candidates()", "max 8, ordered by confidence"],{bold:true,small:true});
+    var sc  = B(530,170, 180, 30, "data"); place(g, sc, ["StepCandidate[]", "source, confidence, evidence_refs"],{small:true});
+
+    // --- row 5: specs + LLM + harness decision ---
+    var shs = B(20, 230, 180, 30, "core"); place(g, shs, ["StepHarnessSpec[]", "core/step_harness.py"],{small:true});
+    var ldc = B(280,230, 200, 30, "llm");  place(g, ldc, ["HarnessDecision (LLM output)", "JSON Schema contract"],{small:true});
+
+    // --- row 6: plan_harness_action + state planner ---
+    var sap = B(20, 290, 180, 30, "core"); place(g, sap, ["State-Action Planner", "S08/S09/S12/S18/S19 rules"],{small:true});
+    var pha = B(310,290, 200, 30, "core"); place(g, pha, ["plan_harness_action()", "core/harness_validation.py"],{bold:true,small:true});
+
+    // --- row 7: validator + action plan ---
+    var vld = B(560,285, 200, 30, "core"); place(g, vld, ["validate_final_evidence_", "consistency()"],{bold:true,small:true});
+    var hap = B(340,345, 210, 30, "data"); place(g, hap, ["HarnessActionPlan", "targets, guidance, text_only, repaired"],{small:true});
+    var ecr = B(580,345, 180, 30, "data"); place(g, ecr, ["EvidenceConsistencyResult", "accepted, rejected, repair"],{small:true});
+
+    // --- final output ---
+    var out = B(380,390, 170, 22, "data"); place(g, out, ["→ Public TutorResponse", "safe for cockpit display"],{small:true,sub:""});
+
+    // --- arrows ---
+    // evidence → build_evidence_packet
+    ap(g, [ev1.right, ev1.cy, ev1.right+8, ev1.cy, ev1.right+8, bep.cy-12, bep.x, bep.cy-12]);
+    ap(g, [ev2.right, ev2.cy, ev2.right+8, ev2.cy, ev2.right+8, bep.cy-4, bep.x, bep.cy-4]);
+    ap(g, [ev3.right, ev3.cy, ev3.right+4, ev3.cy, ev3.right+4, bep.cy+4, bep.x, bep.cy+4]);
+    ap(g, [ev4.cx, ev4.bottom, ev4.cx, bep.y-8, bep.right-55, bep.y-8, bep.right-55, bep.y]);
+    ap(g, [ev5.cx, ev5.bottom, ev5.cx, bep.y-14, bep.right-15, bep.y-14, bep.right-15, bep.y]);
+    av(g, bep.cx, bep.bottom, ep.y, "");
+
+    // deterministic chain
+    av(g, inf.cx, inf.bottom, det.y, "");
+    ah(g, det, ep, "");
+
+    // evidence packet → candidates
+    av(g, ep.cx, ep.bottom-2, bsc.y, "");
+    ah(g, bsc, sc, "");
+
+    // LLM decision
+    ap(g, [ep.right, ep.cy, ep.right+20, ep.cy, ep.right+20, ldc.y+15, ldc.x, ldc.y+15], "evidence feeds prompt");
+    ah(g, sc, ldc, "candidates");
+    ah(g, shs, ldc, "specs");
+
+    // LLM output → plan_harness_action
+    av(g, ldc.cx, ldc.bottom, pha.y, "");
+    ah(g, sap, pha, "");
+
+    // plan_harness_action → HarnessActionPlan
+    av(g, pha.cx, pha.bottom, hap.y, "");
+
+    // branch to validator
+    ap(g, [pha.right, pha.cy, vld.x-10, vld.cy-4], "");
+    av(g, vld.cx, vld.bottom, ecr.y, "");
+
+    // → final output
+    ap(g, [hap.cx, hap.bottom, out.cx, out.y], "");
+    ap(g, [ecr.x, ecr.cy, out.right+2, ecr.cy, out.right+2, out.cy], "");
+
+    document.getElementById("d4").appendChild(svg);
+  })();
+
+  // ===================== 5. EXPERIMENT EXPORT AND ANALYSIS =====================
+  (function () {
+    var svg = ce("svg", { viewBox: "0 0 880 330", width:"100%", height:330 });
+    svg.appendChild(makeDefs());
+    var g = ce("g", {}); svg.appendChild(g);
+
+    // Input
+    var jlog = B(15, 15, 165, 38, "data"); place(g, jlog, ["Raw JSONL Event Log", "one .jsonl per trial"],{small:true});
+
+    // CLI metadata
+    var cli  = B(15, 72, 165, 42, "data"); place(g, cli,  ["CLI Metadata", "--participant-id --condition", "--study-id --model-name..."],{small:true});
+
+    // experiment-export
+    var exp  = B(230, 40, 200, 36, "core"); place(g, exp,  ["experiment-export", "core/experiment_export.py"],{bold:true,small:true});
+    var exp2 = B(230, 112,200, 30, "core"); place(g, exp2, ["Repeat per participant/trial"],{small:true});
+
+    // experiment-analyze
+    var ana  = B(230, 170,200, 36, "core"); place(g, ana,  ["experiment-analyze", "All trials combined"],{bold:true,small:true});
+
+    // Pack input
+    var pki  = B(15, 132,165, 42, "data"); place(g, pki,  ["Pack & Taxonomy", "pack.yaml, taxonomy.yaml", "ui_map.yaml, bios_to_ui.yaml"],{small:true});
+
+    // Quality gate
+    var qg   = B(15, 200,165, 34, "core"); place(g, qg,   ["quality_gate.passed?", "must be true"],{small:true});
+
+    // Per-trial outputs column
+    var oy = 8, oh = 26, og = 2;
+    var oColX = 500, oColW = 170;
+    function op(yy, label) { return B(oColX, yy, oColW, oh, "data"); }
+    var o1 = op(oy,           "trial_summary.csv");          place(g, o1, ["trial_summary.csv"],{small:true});
+    var o2 = op(oy+1*(oh+og), "step_coding.csv");            place(g, o2, ["step_coding.csv"],{small:true});
+    var o3 = op(oy+2*(oh+og), "help_cycles.csv");            place(g, o3, ["help_cycles.csv"],{small:true});
+    var o4 = op(oy+3*(oh+og), "action_timeline.csv");        place(g, o4, ["action_timeline.csv"],{small:true});
+    var o5 = op(oy+4*(oh+og), "quality_gate.json");          place(g, o5, ["quality_gate.json"],{small:true});
+    var o6 = op(oy+5*(oh+og), "session.json");               place(g, o6, ["session.json"],{small:true});
+    var o7 = op(oy+6*(oh+og), "raw_events.jsonl (copy)");    place(g, o7, ["raw_events.jsonl (copy)"],{small:true});
+
+    // Aggregate outputs column
+    var ay = 170, aColX = 690, aColW = 175;
+    function ap2(yy, label) { return B(aColX, yy, aColW, oh, "data"); }
+    var a1 = ap2(ay,             "study_summary.csv");         place(g, a1, ["study_summary.csv"],{small:true});
+    var a2 = ap2(ay+1*(oh+og),   "condition_summary.csv");     place(g, a2, ["condition_summary.csv"],{small:true});
+    var a3 = ap2(ay+2*(oh+og),   "step_accuracy_by_");         place(g, a3, ["step_accuracy_by_condition.csv"],{small:true});
+    var a4 = ap2(ay+3*(oh+og),   "help_quality_summary.csv");  place(g, a4, ["help_quality_summary.csv"],{small:true});
+    var a5 = ap2(ay+4*(oh+og),   "fig_*.png (optional)");      place(g, a5, ["fig_*.png (optional)"],{small:true});
+
+    // --- arrows ---
+    ah(g, jlog, exp, "");
+    ap(g, [cli.right, cli.cy, cli.right+12, cli.cy, cli.right+12, exp.y+10, exp.x, exp.y+10], "");
+    ap(g, [pki.right, pki.cy, pki.right+12, pki.cy, pki.right+12, exp.y+26, exp.x, exp.y+26], "step coding rules");
+
+    // From export to per-trial outputs
+    for (var i = 0; i < 7; i++) {
+      var ob = [o1,o2,o3,o4,o5,o6,o7][i];
+      ap(g, [exp.right, exp.cy-10+i*2, exp.right+18, exp.cy-10+i*2, exp.right+18, ob.cy, ob.x, ob.cy], "");
+    }
+
+    // export → repeat → analyze
+    av(g, exp.cx, exp.bottom, exp2.y, "");
+    av(g, exp2.cx, exp2.bottom, ana.y, "");
+
+    // quality gate
+    ap(g, [qg.right, qg.cy, exp2.x, qg.cy], "yes →");
+
+    // From analyze to aggregate outputs
+    for (var j = 0; j < 5; j++) {
+      var ab = [a1,a2,a3,a4,a5][j];
+      ap(g, [ana.right, ana.cy-8+j*2, ana.right+18, ana.cy-8+j*2, ana.right+18, ab.cy, ab.x, ab.cy], "");
+    }
+
+    document.getElementById("d5").appendChild(svg);
+  })();
+
+  // ===================== 6. DEPLOYMENT TOPOLOGY =====================
+  (function () {
+    var svg = ce("svg", { viewBox: "0 0 820 370", width:"100%", height:370 });
+    svg.appendChild(makeDefs());
+    var g = ce("g", {}); svg.appendChild(g);
+
+    // Windows host zone
+    g.appendChild(ce("rect", {x:8, y:8, width:370, height:335, rx:8, fill:"#f0f9ff", stroke:"#bae6fd","stroke-width":1.5,"stroke-dasharray":"6 3"}));
+    g.appendChild(ce("text", {x:18, y:26, "font-size":11, fill:"#0369a1","font-weight":"600"}, "Windows Simulator Host"));
+
+    // Remote server zone
+    g.appendChild(ce("rect", {x:450, y:8, width:352, height:240, rx:8, fill:"#f5f3ff", stroke:"#c4b5fd","stroke-width":1.5,"stroke-dasharray":"6 3"}));
+    g.appendChild(ce("text", {x:460, y:26, "font-size":11, fill:"#7c3aed","font-weight":"600"}, "Remote GPU Server (cloud-247)"));
+
+    // Windows boxes
+    var dcs  = B(22, 42, 155, 32, "hw");      place(g, dcs,  ["DCS World F/A-18C"],{small:true});
+    var bios = B(22, 88, 155, 32, "hw");      place(g, bios, ["DCS-BIOS (UDP:5010)"],{small:true});
+    var q3   = B(22, 134,155, 32, "hw");      place(g, q3,   ["Quest 3 (Oculus Link)"],{small:true});
+    var vs   = B(200, 42, 160, 32, "vlm");    place(g, vs,   ["Vision Sidecar", "capture_vision_sidecar.py"],{small:true});
+    var ld   = B(200, 88, 160, 32, "adapter"); place(g, ld,  ["SimTutor live-dcs"],{small:true});
+    var gui  = B(200, 134,160, 32, "adapter"); place(g, gui,  ["GUI Launcher", "simtutor_launcher.py"],{small:true});
+    var sg   = B(22, 188, 200, 32, "hw");     place(g, sg,   ["Saved Games\\DCS\\", "SimTutorConfig.lua"],{small:true});
+    var logf = B(22, 238, 200, 32, "data");   place(g, logf, ["logs/*.jsonl", "Runtime event log"],{small:true});
+    var art  = B(22, 288, 200, 32, "data");   place(g, art,  ["artifacts/experiments/", "CSV per-trial exports"],{small:true});
+    var ex2  = B(250, 188,110, 32, "core");   place(g, ex2,  ["Experiment Export"],{small:true});
+
+    // Remote boxes
+    var vllm = B(470, 42, 310, 32, "ext");    place(g, vllm, ["vLLM Server (localhost:8000)"],{small:true});
+    var sbase= B(470, 88, 310, 32, "llm");    place(g, sbase,["simtutor-base — Qwen3-8B (text LLM)"],{small:true});
+    var svis = B(470, 134,310, 32, "vlm");    place(g, svis, ["simtutor-vision — Qwen3.5-27B + LoRA"],{small:true});
+    var ssh  = B(470, 180,310, 32, "ext");    place(g, ssh,  ["SSH Tunnel Endpoint"],{small:true});
+
+    // Local arrows
+    av(g, dcs.cx,  dcs.bottom,  bios.y, "");
+    ap(g, [dcs.x+18, dcs.bottom, dcs.x+18, q3.y-8, q3.cx, q3.y-8, q3.cx, q3.y], "VR headset");
+    ah(g, dcs, vs, "VR mirror");
+    ah(g, bios,ld, "telemetry");
+    ah(g, vs, ld, "frame trigger");
+
+    // Config write
+    ap(g, [ld.right, ld.cy-4, ld.right+10, ld.cy-4, ld.right+10, sg.cy, sg.x, sg.cy], "write config");
+    av(g, sg.cx, sg.bottom, logf.y, "");
+    av(g, logf.cx, logf.bottom, art.y, "");
+
+    // Export
+    ah(g, logf, ex2, "");
+
+    // SSH tunnel
+    g.appendChild(ce("path", {
+      d:"M370,120 L450,120",
+      stroke:"#7c3aed","stroke-width":2.5,fill:"none","stroke-dasharray":"8 4"}));
+    g.appendChild(ce("rect", {x:380,y:108,width:60,height:22,rx:4,fill:"#f5f3ff",stroke:"#c4b5fd","stroke-width":1}));
+    g.appendChild(ce("text", {x:410,y:123,"text-anchor":"middle","font-size":9,fill:"#7c3aed","font-weight":"600"}, "SSH"));
+
+    // Model calls through tunnel
+    ap(g, [ld.right, ld.cy+4, ld.right+20, ld.cy+4, sbase.x-5, sbase.cy-8], "text LLM call");
+    ap(g, [ld.right, ld.cy+10, ld.right+28, ld.cy+10, svis.x-5, svis.cy+4], "VLM call");
+
+    g.appendChild(ce("text", {x:12, y:355, "font-size":8, fill:"#6b7280"},
+      "All model API calls go through SSH tunnel (localhost:16324 → cloud-247:8000).  Overlay config is written to DCS Saved Games directory."));
+
+    document.getElementById("d6").appendChild(svg);
+  })();
+
+})();
+</script>
+
+</body>
+</html>
