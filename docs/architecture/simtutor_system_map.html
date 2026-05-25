@@ -551,14 +551,14 @@
     av(g, ve.cx, ve.bottom, vf.y, "");
     av(g, vf.cx, vf.bottom, vo.y, "");
     av(g, vo.cx, vo.bottom, vs.y, "");
-    av(g, vs.cx, vs.bottom, vm.y, "HTTP/SSH tunnel");
+    ap(g, [ve.x, ve.cy, 8, ve.cy, 8, vm.cy, vm.x, vm.cy], "HTTP/SSH tunnel");
 
     // LLM branch (right from gate)
     ap(g, [gate.right, gate.cy-4, le.x-10, le.cy-4], "No, or after VLM →");
     av(g, le.cx, le.bottom, lp.y, "");
     av(g, lp.cx, lp.bottom, lo.y, "");
     av(g, lo.cx, lo.bottom, lr.y, "");
-    av(g, lr.cx, lr.bottom, lm.y, "HTTP/SSH tunnel");
+    ap(g, [le.right, le.cy, 790, le.cy, 790, lm.cy, lm.right, lm.cy], "HTTP/SSH tunnel");
 
     // Facts go into evidence for LLM prompt
     ap(g, [vs.right, vs.cy, le.x+30, le.cy-17], "facts injected into evidence");
@@ -618,8 +618,8 @@
     ap(g, [ev1.right, ev1.cy, ev1.right+8, ev1.cy, ev1.right+8, bep.cy-12, bep.x, bep.cy-12]);
     ap(g, [ev2.right, ev2.cy, ev2.right+8, ev2.cy, ev2.right+8, bep.cy-4, bep.x, bep.cy-4]);
     ap(g, [ev3.right, ev3.cy, ev3.right+4, ev3.cy, ev3.right+4, bep.cy+4, bep.x, bep.cy+4]);
-    ap(g, [ev4.x, bep.cy+12, ev4.x-10, bep.cy+12]);
-    ap(g, [ev5.x, bep.cy+20, ev5.x-10, bep.cy+20]);
+    ap(g, [ev4.cx, ev4.bottom, ev4.cx, bep.y-8, bep.right-55, bep.y-8, bep.right-55, bep.y]);
+    ap(g, [ev5.cx, ev5.bottom, ev5.cx, bep.y-14, bep.right-15, bep.y-14, bep.right-15, bep.y]);
     av(g, bep.cx, bep.bottom, ep.y, "");
 
     // deterministic chain
@@ -782,7 +782,7 @@
 
     // Model calls through tunnel
     ap(g, [ld.right, ld.cy+4, ld.right+20, ld.cy+4, sbase.x-5, sbase.cy-8], "text LLM call");
-    ap(g, [vs.right, vs.cy+4, vs.right+30, vs.cy+4, svis.x-5, svis.cy+4], "VLM call");
+    ap(g, [ld.right, ld.cy+10, ld.right+28, ld.cy+10, svis.x-5, svis.cy+4], "VLM call");
 
     g.appendChild(ce("text", {x:12, y:355, "font-size":8, fill:"#6b7280"},
       "All model API calls go through SSH tunnel (localhost:16324 → cloud-247:8000).  Overlay config is written to DCS Saved Games directory."));
