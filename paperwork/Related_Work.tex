@@ -1,0 +1,25 @@
+\chapter{Related Work}
+Here you present the related literature that falls into the scope of this thesis.
+
+\begin{table}[!h]
+	\renewcommand{\arraystretch}{1.25} %Changing line height, because space to upper line is to small
+	\vspace{.5em}
+	\caption{First table}
+	\label{tab:First}
+	\centering
+	\footnotesize
+	\begin{threeparttable}[b]
+		\begin{tabular}{llll}
+			\toprule
+			Number  & Value & Data & Description \\
+			\midrule
+			1 & Answer & 42 & Asked the question\tnote{1}\\
+			2 & None & --\tnote{2} & Help!\\
+			\bottomrule
+		\end{tabular}
+		\begin{tablenotes}
+			\item [1] What was the question?
+			\item [2] No data available. Sorry\dots
+		\end{tablenotes}
+	\end{threeparttable}
+\end{table}
