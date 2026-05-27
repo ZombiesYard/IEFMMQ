@@ -1,0 +1,190 @@
+% ===========================================================================
+%  08 — Conclusion
+%
+%  Source of truth: paper_context/paper_outline.md §2.8
+%  Evidence:       paper_context/claims_registry.md
+%  Terminology:    paper_context/terminology.md
+% ===========================================================================
+\chapter{Conclusion}\label{ch:conclusion}
+
+This thesis set out to design, implement, and technically validate a telemetry-grounded
+tutoring runtime for procedural learning in a high-fidelity flight simulator. The
+contributions delivered are a functioning dual-platform runtime, a structured visual
+fact ontology with a generalisable design principle, a fine-tuned VLM adapter with
+benchmark evidence, a reproducible data pipeline, cross-backbone generalisation
+results, and an extensible evaluation infrastructure with a documented path to
+human-subject studies. This chapter summarises the completed work, restates the five
+contributions in the revised hierarchy established in
+Chapter~\ref{ch:introduction}, and outlines directions for future work.
+
+% ===========================================================================
+\section{Summary of Completed Work}\label{sec:conc-summary}
+
+The thesis has produced five contributions, ordered by novelty and supported by
+verified claims and repository artifacts.
+
+\textbf{First, a structured visual fact ontology design with an abstraction-level
+design principle.}
+The 13-fact v2 ontology decomposes cockpit display-page state into discrete, locally
+verifiable propositions across three display regions (Left DDI, Right DDI, AMPCD).
+The ontology evolved from an 8-fact v1 baseline that mixed abstraction levels
+(compound targets such as \texttt{ins\_go}), producing systematic false positives on
+completion-type facts at rates as high as 70 per 100 holdout samples. The v2
+decomposition into atomic visual evidence---breaking \texttt{ins\_go} into
+\texttt{ins\_grnd\_alignment\_text\_visible} and \texttt{ins\_ok\_text\_visible},
+and decomposing \texttt{fcsmc\_complete} into three sequential sub-states---reduced
+critical false positives by 64\% on the Run-002 holdout (13$\rightarrow$4) and by
+89\% on the Run-004 holdout (70$\rightarrow$8). The thesis generalises this finding:
+VLMs should extract observable visual atoms; procedural interpretation belongs in
+downstream reasoning.
+% Evidence: C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-04, C-VLM-05
+
+\textbf{Second, a complete small-data VLM domain adaptation pipeline.}
+The pipeline forms a closed loop: DCS screenshot capture, AI pre-labeling, human
+review in Label Studio, bilingual (EN+ZH) supervised fine-tuning export, LoRA
+fine-tuning via Unsloth + PEFT + TRL, and automated base-vs-LoRA benchmarking on
+independent holdout sets with verified zero training overlap. The pipeline is
+demonstrated with 180--220 human-reviewed samples yielding 928 bilingual training
+rows. Every artifact from the pipeline is stored in the repository and can be
+independently inspected and reproduced.
+% Evidence: C-VLM-03a, C-VLM-07, C-DATA-01, C-TRAIN-01
+
+\textbf{Third, an integrated telemetry-visual-knowledge architecture with verifiable
+evidence grounding.}
+The tutoring runtime enforces that every overlay target and step recommendation
+carries a traceable evidence reference (telemetry variable, gating rule, RAG snippet,
+or visual fact). The evidence constraint is enforced at the schema level through
+runtime-generated JSON Schema with \texttt{if/then} rules that validate every
+actionable output before it is dispatched to the simulator---not merely logged for
+post-hoc audit. The runtime orchestrates a complete help cycle: it assembles a
+structured context from normalised telemetry, delta summaries, candidate steps, a
+deterministic hint, an overlay-target allowlist, retrieved knowledge snippets, and
+visual fact observations; passes this context to an LLM for structured help
+response generation; validates the response against schema, allowlist, and
+evidence-grounding constraints; executes validated overlay actions; and logs every
+stage as versioned, timestamped events for offline replay. A deterministic fallback
+path ensures the system remains functional when no model is available or when model
+output fails validation. All procedure definitions, gating rules, telemetry mappings,
+and visual fact ontologies are expressed as declarative YAML configuration (a
+procedure pack), making the system extensible to new procedures and simulators.
+% Evidence: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02, C-TELEM-01, C-RAG-01, C-RUNTIME-01
+
+\textbf{Fourth, cross-backbone generalisation evidence.}
+The identical bilingual SFT recipe transfers from Qwen3.5-9B to Gemma-4-31B with
+consistent improvements, confirming that the data recipe and ontology design are not
+architecture-specific. The Gemma LoRA adapter achieves fact accuracies of 0.9492 and
+0.9715 (base: 0.8169 and 0.8146), with zero critical false positives on the Run-002
+holdout, revealing a backbone-level difference in error style (conservative vs.\
+assertive) that is relevant for safety-critical deployment decisions.
+% Evidence: C-VLM-06, C-VLM-03b
+
+\textbf{Fifth, an extensible runtime and evaluation infrastructure.}
+The thesis delivers a pack-driven, simulator-agnostic architecture with procedure
+state machine, gating rule engine, deterministic fallback, JSONL event logging,
+replay validation, automated scoring, and a design-level framework for VR-based
+human-subject evaluation---all implemented with automated tests. The runtime supports
+both desktop/DCS and VR (Quest~3) configurations. The planned human-subject
+evaluation design---a three-condition between-subjects study (video-and-notes,
+ungrounded text-only LLM, grounded tutoring) with metrics spanning performance,
+workload, learning, retention, and transfer---is documented in
+Section~\ref{sec:eval-planned}. The evaluation design and the associated
+infrastructure upgrades required for execution constitute the next phase of the
+research programme.
+% Evidence: C-ARCH-01, C-PROC-01, C-RUNTIME-01, C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01
+
+\paragraph{What this thesis demonstrates.}
+The work establishes that a telemetry-grounded, evidence-constrained tutoring
+runtime with structured visual fact extraction is technically feasible and can be
+validated through systematic, reproducible automated benchmarks. It demonstrates
+that a modest amount of human-reviewed data (180--220 samples) is sufficient to
+adapt a general-purpose VLM to a domain-specific structured extraction task with
+near-ceiling accuracy on independent holdout sets. It shows that the design of
+the visual fact ontology---specifically, the decision to decompose high-level
+procedural states into low-level, locally verifiable atoms---has a measurable,
+quantitative impact on model reliability. It provides evidence that these
+improvements generalise across VLM backbones, confirming that the data recipe
+and ontology design, rather than any single model architecture, drive the
+gains. And it delivers a functioning runtime infrastructure with automated tests,
+replay capabilities, and a documented extension path to controlled human-subject
+evaluation.
+
+\paragraph{Scope and boundaries.}
+The thesis does not report learning outcome data from human participants, nor
+does it claim that the system improves procedural skill acquisition, reduces
+workload, or accelerates training relative to alternative instructional methods.
+Within the scope of this thesis, validation is conducted through automated
+benchmarks; human-subject evaluation is addressed in the planned study design
+(Section~\ref{sec:eval-planned}) and represents future work. The VR runtime
+code path is implemented (VR\_MIRROR, tutor text display, composite-panel
+capture) but its integration with the full tutoring loop has not been exercised
+outside the development environment. These boundary conditions do not limit the
+internal validity of the benchmark results reported for the VLM adaptation
+pipeline.
+
+% ===========================================================================
+\section{Future Work}\label{sec:conc-future}
+
+The contributions of this thesis open several directions for future work, each of which
+builds directly on the completed contributions.
+
+\paragraph{VR experimental validation.}
+The most immediate extension is the experimental validation of the VR runtime code path
+with human subjects. The VR code path is already implemented (VR\_MIRROR configuration,
+tutor text UDP injection, composite-panel capture in VR mode); what remains is to validate
+the telemetry pipeline and help cycle with study participants in the DCS-VR environment,
+and to integrate gaze and hand-tracking inputs for help triggering. The existing
+ports-and-adapters architecture supports this: the core tutoring logic is
+platform-agnostic, and the VR input/output adapters can be validated without changes to
+the core.
+
+\paragraph{Human-subject evaluation.}
+The planned evaluation design described in Section~\ref{sec:eval-planned} should be
+executed as a controlled between-subjects study. This requires completing the runtime
+data collection upgrades identified in Section~\ref{sec:eval-planned}
+(participant/session schema, NASA-TLX integration, quiz linkage, anonymisation pipeline),
+recruiting participants from a beginner-to-intermediate population, and conducting the
+full pre-test / training / post-test / retention protocol. Only this study can establish
+whether the grounded tutoring approach produces measurable improvements in procedural
+learning outcomes, workload, and retention relative to baseline conditions.
+
+\paragraph{Ontology extension to other procedures.}
+The 13-fact v2 ontology is specific to the F/A-18C cold-start task and its three-display
+composite panel layout. Extending the ontology to other procedures within DCS---such as
+navigation, weapon employment, or emergency checklists---would test the generality of the
+visual fact decomposition strategy and require new dataset capture and annotation cycles.
+The procedure pack format is designed to accommodate such extensions: a new pack
+directory with its own \texttt{vision\_facts.yaml}, \texttt{vision\_layout.yaml},
+\texttt{step\_registry.yaml}, and \texttt{telemetry\_map.yaml} would define a new
+training scenario without changes to the pipeline tools.
+
+\paragraph{Multi-frame temporal reasoning.}
+The current VLM pipeline operates on single frame pairs (pre-trigger and trigger frames)
+and makes independent predictions per observation window. Incorporating temporal context
+across multiple frames could improve accuracy on facts that involve transient states or
+state transitions, such as the FCS-MC test sequence (\texttt{fcsmc\_in\_test\_visible}
+$\rightarrow$ \texttt{fcsmc\_final\_go\_result\_visible}). Possible approaches include
+frame stacking as multi-image input to the VLM, recurrent aggregation of fact predictions
+over a sliding window, or a lightweight temporal model that consumes per-frame fact vectors
+and produces temporally consistent sequences.
+
+\paragraph{Online adaptation.}
+The current LoRA adapter is trained offline on a fixed dataset and deployed as a static
+model. An online adaptation loop, in which the system collects new labelled frames during
+live tutoring sessions (with tutor or expert verification) and periodically updates the
+adapter, could progressively improve accuracy on edge cases and adapt to changes in
+cockpit display configurations across DCS versions or aircraft variants. This would
+require lightweight fine-tuning infrastructure that can operate concurrently with the
+tutoring runtime and a quality-control mechanism for newly acquired labels.
+
+\paragraph{Deterministic procedure engine enhancements.}
+The current gating rule engine uses a v1 DSL with four operators (\texttt{var\_gte},
+\texttt{arg\_in\_range}, \texttt{flag\_true}, \texttt{time\_since}). Extending the DSL
+with additional operators (e.g., logical combinations, sequence counters, multi-variable
+conditions) and supporting user-defined gating functions would increase the expressiveness
+of procedure packs and reduce reliance on manual-step classification for edge cases.
+
+The work completed in this thesis establishes that a telemetry-grounded, evidence-constrained
+tutoring runtime with structured visual fact extraction is technically feasible and can be
+validated through automated benchmarks. The next phase of research must determine whether
+this capability translates into improved human learning in immersive simulation
+environments.

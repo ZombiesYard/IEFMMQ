@@ -60,6 +60,4 @@ docs/dev_notes/dev_tunnel_vllm.md
 .label_studio/
 
 # Thesis content lives only on the private paper branch/repo.
-paper/
-paper_zh/
-paperwork/
+

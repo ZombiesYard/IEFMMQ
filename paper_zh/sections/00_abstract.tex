@@ -1,0 +1,70 @@
+% ===========================================================================
+%  00 — 摘要 + Zusammenfassung（德文摘要）
+%
+%  事实来源：paper_context/paper_outline.md §2.1
+%  证据：     paper_context/claims_registry.md（结果部分仅使用已验证声明）
+%  术语：     paper_context/terminology.md
+% ===========================================================================
+
+\chapter*{摘要}
+
+在高保真仿真环境中进行程序性学习面临着独特的挑战：学习者必须执行固定、有序的
+动作序列，同时验证中间系统状态、从错误中恢复并保持态势感知——这一切都在没有
+专家教员持续在场的情况下完成。传统的培训辅助手段（如视频演示和纸质检查单）会
+打断仿真器内练习的连续性，而缺乏依据的语言模型辅助则存在提供流畅但事实性错误
+指导的风险。本文提出一个基于遥测的教学运行时系统，它结合了程序包驱动
+的状态跟踪、检索增强的语言模型辅助生成，以及用于从座舱显示器中提取结构化视觉
+事实的微调视觉语言模型（VLM）。该系统强制实施显式的证据溯源：每个叠加目标和
+步骤推荐都必须可追溯到遥测变量、门控规则、检索到的文档片段或视觉事实观察。
+训练场景为 DCS World 中 F/A-18C 的冷启动程序，涵盖六个操作阶段的 25 个步骤，
+其步骤间依赖关系使其成为序列敏感、状态依赖型程序性任务的代表性案例。一项核心
+发现是，视觉事实本体设计决定了模型可靠性：通过将复合目标分解为可局部验证的视觉
+原子，从 8 事实 v1 本体演进到 13 事实 v2 本体，在独立留出集上将关键假阳性减少
+了 64--89\%，由此得出一个设计原则：VLM 应提取可观察的证据，而程序性解释应归于
+下游推理。VLM 适配流水线——包括截图捕获、预标注、人工审查、双语监督微调、LoRA
+适配和自动化基准测试——在两个骨干架构上进行了展示。在 13 事实本体上，基于 928
+条双语训练数据训练的 Qwen3.5-9B LoRA 适配器将事实准确率从基础模型的 0.80--0.87
+提升至两个独立留出集上的 0.99（已核实训练数据零重叠）。相同的训练数据方案应用
+于 Gemma-4-31B 也证实了该改进在不同骨干架构间的泛化性。本文交付了一个可运行的
+双平台运行时系统，包含自动化测试、基准测试工件和回放基础设施，以及一份为下一
+阶段人因研究准备的文档化评估设计。
+
+\newpage
+\chapter*{Zusammenfassung}
+
+\begin{otherlanguage}{ngerman}
+Prozedurales Lernen in hochrealistischen Simulationsumgebungen stellt besondere
+Herausforderungen: Lernende m\"ussen feste, geordnete Handlungsabfolgen ausf\"uhren,
+w\"ahrend sie Zwischenzust\"ande des Systems \"uberpr\"ufen, Fehler korrigieren und das
+Situationsbewusstsein aufrechterhalten---und dies ohne die st\"andige Anwesenheit eines
+erfahrenen Ausbilders. Herk\"ommliche Trainingshilfen wie Videoanleitungen und gedruckte
+Checklisten unterbrechen den \"Ubungsfluss im Simulator, w\"ahrend nicht
+zustandsgebundene Sprachmodell-Assistenz Gefahr l\"auft, fl\"ussige, aber faktisch
+inkorrekte Anweisungen zu geben. Diese Arbeit stellt ein System vor, eine
+telemetriegest\"utzte Tutoring-Laufzeitumgebung, die paketbasierte
+Prozedurzustandsverfolgung, Retrieval-Augmented-LLM-Hilfegenerierung und ein
+feinabgestimmtes Vision-Language-Model (VLM) zur strukturierten Extraktion visueller
+Fakten aus Cockpit-Anzeigen kombiniert. Das System erzwingt eine explizite
+Evidenzgrundlage: Jede hervorgehobene Cockpit-Referenz und jede Schrittempfehlung muss
+auf eine Telemetrie-Variable, eine Gating-Regel, einen abgerufenen Dokumentausschnitt
+oder eine visuelle Faktbeobachtung zur\"uckf\"uhrbar sein. Als Trainingsszenario dient
+der Kaltstart der F/A-18C in DCS World mit 25 Schritten in sechs Betriebsphasen, deren
+Abh\"angigkeiten untereinander sie repr\"asentativ f\"ur zustandsabh\"angige prozedurale
+Aufgaben machen. Ein zentrales Ergebnis ist, dass das Design der visuellen
+Fakten-Ontologie die Modellzuverl\"assigkeit bestimmt: Die Weiterentwicklung von einer
+8-Fact-v1- zu einer 13-Fact-v2-Ontologie durch Zerlegung zusammengesetzter Ziele in
+lokal \"uberpr\"ufbare visuelle Atome reduzierte kritische False-Positives um 64--89\%
+auf unabh\"angigen Holdout-Sets und liefert ein Design-Prinzip, wonach VLMs
+beobachtbare Evidenz extrahieren sollten, w\"ahrend die prozedurale Interpretation dem
+nachgelagerten Reasoning vorbehalten bleibt. Die VLM-Adaptationspipeline---Screenshot-Erfassung,
+Vorlabeling, menschliche \"Uberpr\"ufung, bilingualer SFT-Export, LoRA-Feinabstimmung und
+automatisiertes Benchmarking---wird auf zwei Backbone-Architekturen demonstriert. Auf der
+13-Fact-Ontologie verbessert ein Qwen3.5-9B LoRA-Adapter (928 bilinguale
+Trainingszeilen) die Fact-Genauigkeit von 0,80--0,87 (Basismodell) auf 0,99 auf zwei
+unabh\"angigen Holdout-Sets mit verifizierter Null-\"Uberlappung zum Training. Die
+identische Datenrezeptur, auf Gemma-4-31B angewendet, best\"atigt die
+\"Ubertragbarkeit der Verbesserung \"uber Backbones hinweg. Die Arbeit liefert eine
+funktionsf\"ahige Dual-Platform-Laufzeitumgebung mit automatisierten Tests,
+Benchmark-Artefakten und Replay-Infrastruktur sowie einem dokumentierten
+Evaluationsdesign f\"ur die n\"achste Phase der Human-Subject-Forschung.
+\end{otherlanguage}

@@ -1,0 +1,140 @@
+% ===========================================================================
+%  SimTutor — 硕士学位论文（中文版）
+%  TU Clausthal, Institute for Software and Systems Engineering (ISSE)
+%
+%  由 paper/main.tex 翻译而来。
+%  使用 tectonic（基于 XeTeX）编译，原生支持中文。
+% ===========================================================================
+\documentclass[12pt,a4paper,bibtotoc,numbers=noenddot]{scrreprt}
+
+% ---------------------------------------------------------------------------
+%  Language — babel for German Zusammenfassung, ctex for Chinese
+% ---------------------------------------------------------------------------
+\usepackage[main=english,ngerman]{babel}
+\usepackage[UTF8,heading]{ctex}
+
+% ---------------------------------------------------------------------------
+%  Spacing
+% ---------------------------------------------------------------------------
+\usepackage[onehalfspacing]{setspace}
+
+% ---------------------------------------------------------------------------
+%  Encoding (XeTeX native UTF-8)
+% ---------------------------------------------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+
+% ---------------------------------------------------------------------------
+%  Tables, figures, maths
+% ---------------------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array,longtable,tabularx,multirow}
+\usepackage{amsmath,amssymb,mathtools}
+
+% ---------------------------------------------------------------------------
+%  Units
+% ---------------------------------------------------------------------------
+\usepackage{siunitx}
+
+% ---------------------------------------------------------------------------
+%  Captions
+% ---------------------------------------------------------------------------
+\usepackage[
+  format=plain,
+  justification=centering,
+  margin=10pt,
+  font=small,
+  labelfont=bf
+]{caption}
+\usepackage{subcaption}
+
+% ---------------------------------------------------------------------------
+%  Page style
+% ---------------------------------------------------------------------------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\leftmark}
+\fancyfoot[R]{\thepage}
+\setlength{\headheight}{14.5pt}
+
+% ---------------------------------------------------------------------------
+%  Hyperlinks (load late)
+% ---------------------------------------------------------------------------
+\usepackage[bookmarksnumbered=true,colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+% ---------------------------------------------------------------------------
+%  Date formatting (British style)
+% ---------------------------------------------------------------------------
+\usepackage{datetime}
+\newdateformat{britishdate}{\ordinal{DAY} \monthname[\THEMONTH] \THEYEAR}
+\newdate{hand-in}{\day}{\month}{\year}
+
+% ---------------------------------------------------------------------------
+%  Misc
+% ---------------------------------------------------------------------------
+\usepackage{csquotes}
+\usepackage[table]{xcolor}
+\usepackage{colortbl}
+\usepackage{threeparttable}
+\usepackage[numbers,sort&compress]{natbib}
+
+% ---------------------------------------------------------------------------
+%  Code listings
+% ---------------------------------------------------------------------------
+\usepackage{listings}
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numbersep=5pt,
+  xleftmargin=10pt,
+}
+
+% ---------------------------------------------------------------------------
+%  Metadata (TODO: finalise title before submission)
+% ---------------------------------------------------------------------------
+\author{Yu Zhang}
+\title{SimTutor: A Telemetry-Grounded Tutoring Runtime with \\
+       Structured Visual Fact Extraction for Procedural Learning}
+\date{\today}
+
+% ===========================================================================
+\begin{document}
+
+% --- Front matter (Roman page numbers) ---
+\pagenumbering{Roman}
+
+\include{Preamble}
+\include{sections/00_abstract}
+\include{sections/00_acknowledgements}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+% --- Main content (Arabic page numbers) ---
+\cleardoublepage
+\pagenumbering{arabic}
+
+\include{sections/01_introduction}
+\include{sections/02_background_related_work}
+\include{sections/03_system_design}
+\include{sections/04_methodology}
+\include{sections/05_implementation}
+\include{sections/06_evaluation}
+\include{sections/07_discussion}
+\include{sections/08_conclusion}
+
+% --- Bibliography ---
+\cleardoublepage
+\renewcommand{\bibname}{参考文献}
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+% --- Appendix ---
+\include{sections/09_appendix}
+
+\end{document}

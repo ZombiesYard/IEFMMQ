@@ -1,0 +1,636 @@
+% ===========================================================================
+%  04 — Methodology
+%
+%  Source of truth: paper_context/repo_inventory.md §2--8
+%  Claims: C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-03a,
+%          C-VLM-03b, C-VLM-07, C-DATA-01, C-TRAIN-01, C-PROC-01, C-PROC-02
+% ===========================================================================
+\chapter{Methodology}\label{ch:methodology}
+
+This chapter describes the methodological framework underlying the implemented system.
+Section~\ref{sec:method-telemetry} covers the telemetry processing pipeline that transforms raw DCS-BIOS data into normalised runtime state.
+Section~\ref{sec:method-knowledge} describes the knowledge grounding subsystem, including BM25 retrieval and source policy enforcement.
+Section~\ref{sec:method-vlm-pipeline} presents the seven-stage visual fact data pipeline from screenshot capture through LoRA fine-tuning to benchmark evaluation.
+Section~\ref{sec:method-datasets} details the six curated datasets, the ontology evolution from 8-fact v1 to 13-fact v2, and the training-recipe construction.
+Section~\ref{sec:method-lora-config} specifies the LoRA fine-tuning configuration, including exact hyperparameters for both backbone models.
+Section~\ref{sec:method-benchmark} defines the benchmark protocol, metrics, and holdout strategy.
+The chapter provides the methodological foundation for the system design presented in Chapter~\ref{ch:system-design} and the technical results reported in Chapter~\ref{ch:evaluation}.
+
+% ===========================================================================
+\section{Procedure Runtime and Telemetry Grounding}\label{sec:method-telemetry}
+
+% Evidence: adapters/telemetry_pipeline.py, core/gating.py, core/vars.py
+% Claims: C-TELEM-01, C-PROC-01, C-PROC-02
+
+The procedure runtime is the central mechanism by which the proposed system tracks learner progress through the F/A-18C cold-start procedure and produces grounded, state-aware tutoring output.
+It ingests raw simulator telemetry, normalises it into stable state variables, evaluates gating rules to determine step eligibility, and provides the resulting state representation to the help-cycle context assembler.
+This section describes each stage of the telemetry processing chain and the gating rule evaluation framework.
+
+\subsection{DCS-BIOS Raw Frame Ingestion}
+
+% Evidence: adapters/dcs_bios/receiver.py, simtutor/schemas/v2/dcs_bios_frame.json
+
+The telemetry subsystem begins with raw DCS-BIOS data ingestion.
+The DCS-BIOS receiver listens on a UDP socket for binary DCS-BIOS export frames transmitted by the simulator.
+Each frame is decoded into a structured JSON object with wall-clock timestamps and monotonically increasing sequence numbers.
+The decoded frames are written to a JSONL file for archival and replay purposes and forwarded into the telemetry enrichment pipeline.
+% Evidence: adapters/dcs_bios/receiver.py, simtutor/schemas/v2/telemetry_frame.json
+
+The DCS-BIOS protocol covers a wide range of cockpit controls and indicators---switch positions, knob states, warning lights, and display-related state flags---but the raw frames are noisy.
+Switch bounce, sensor drift, rapidly fluctuating gauge values, and out-of-order UDP delivery introduce spurious variations that, if passed directly to the tutoring runtime, would produce false state-change events and trigger unnecessary help cycles.
+The subsequent pipeline stages address these issues systematically.
+
+\subsection{Variable Resolution and Source-Missing Tracking}
+
+% Evidence: core/vars.py, packs/fa18c_startup/telemetry_map.yaml
+
+A telemetry map (specified in the procedure pack's \texttt{telemetry\_map.yaml}) defines how raw DCS-BIOS fields are projected onto normalised state variables.
+The variable resolver consumes an enriched telemetry observation and produces a flat dictionary of key--value pairs, where each key corresponds to a named variable in the procedure pack (e.g., \texttt{apu\_ready}, \texttt{battery\_switch\_on}).
+% Evidence: core/vars.py, packs/fa18c_startup/telemetry_map.yaml
+
+Crucially, the resolver tracks unavailable or unknown sources, enabling downstream components to distinguish ``the value is zero'' from ``the value is unknown,'' which is essential for correct gating rule behaviour.
+A missing variable never silently evaluates to a successful condition.
+% Evidence: core/vars.py (vars_source_missing tracking)
+
+\subsection{Gating Rule Evaluation}
+
+% Evidence: core/gating.py, packs/fa18c_startup/pack.yaml
+
+The procedure engine evaluates two types of gates for each step: precondition gates, which must be satisfied before a step becomes active, and completion gates, which must be satisfied before the step is marked done.
+The gating rule DSL supports four operators:
+
+\begin{description}
+\item[\texttt{var\_gte}] --- a named variable must be greater than or equal to a threshold.
+\item[\texttt{arg\_in\_range}] --- a named variable must fall within a specified range.
+\item[\texttt{flag\_true}] --- a boolean flag must be true.
+\item[\texttt{time\_since}] --- a minimum time must have elapsed since a specified event.
+\end{description}
+
+% Evidence: core/gating.py (evaluate_gate, evaluate_rule)
+
+The evaluator includes explicit unknown-value handling: missing, source-missing, or sentinel-value variables cause rule failure with a diagnostic reason rather than silent treatment as false.
+Rules short-circuit on first failure, and the failure index and reason are propagated to downstream components, including the deterministic step hint and the help-cycle context.
+% Evidence: core/gating.py, core/step_hint.py
+
+Gating rules are specified declaratively in the procedure pack's configuration.
+Each step in the F/A-18C cold-start procedure has been assigned precondition and completion gates based on the procedure's operational requirements.
+Steps classified as BIOS-priority (S01, S03--S07, S09--S13, S21) rely primarily on telemetry-grounded gating rules for completion detection.
+Steps classified as vision-priority (S08, S15, S18) supplement gate evaluation with visual fact evidence, since their completion conditions involve cockpit-display states not reflected in telemetry.
+% Evidence: packs/fa18c_startup/pack.yaml (bios_priority_steps, vision_priority_steps)
+% Claims: C-PROC-01, C-PROC-02
+
+\subsection{Delta Sanitisation and Aggregation}
+
+% Evidence: adapters/delta_sanitizer.py, adapters/delta_aggregator.py, packs/fa18c_startup/delta_policy.yaml
+
+Raw telemetry variables change at high frequency due to simulator physics, even when no learner action has been performed.
+To produce a stable state representation suitable for prompt context, the pipeline applies two successive processing stages.
+
+\textbf{Delta sanitisation.}
+A configurable policy (specified in the procedure pack's \texttt{delta\_policy.yaml}) defines per-variable thresholds, debounce windows, and filtering rules.
+Spurious changes caused by switch bounce, sensor noise, and UDP out-of-order delivery are suppressed.
+Only changes that exceed the configured thresholds and persist beyond the debounce window are promoted to the sanitised delta stream.
+% Evidence: adapters/delta_sanitizer.py, packs/fa18c_startup/delta_policy.yaml
+% Claims: C-TELEM-01
+
+\textbf{Delta aggregation.}
+Sanitised deltas are accumulated over a configurable time window and compressed into a compact, human-readable summary.
+This summary is included in the help-cycle context, providing the language model with a concise representation of recent learner actions and state transitions without exposing raw high-frequency telemetry.
+% Evidence: adapters/delta_aggregator.py
+
+\subsection{Deterministic Fallback}
+
+% Evidence: core/step_hint.py, adapters/step_inference.py
+
+When no language model is available or when model output fails validation, the procedure runtime falls back to deterministic step inference.
+The fallback mechanism examines the currently active step, its unsatisfied gating rules, and recent UI targets to produce a text hint restricted to the currently active step.
+By default, no overlay highlights are sent in fallback mode unless a local rule can prove a unique, valid target given the current telemetry state.
+This ensures that the system remains operational and safe even without a model.
+% Evidence: core/step_hint.py, help_flow_en.md §5
+
+\subsection{Runtime Efficiency Caching}
+
+% Evidence: core/llm_schema.py (lru_cache on build_help_response_schema), core/vision_facts.py (lru_cache on load_vision_facts_config)
+
+Several performance-critical paths in the procedure runtime employ LRU caching to avoid repeated computation over long-running tutoring sessions. The HelpResponse JSON Schema, which validates every model-generated overlay and explanation against the current pack configuration, is cached keyed on the filesystem modification times of its source configuration files; schema regeneration is skipped when the configuration has not changed, eliminating redundant YAML parsing and JSON Schema construction on each help cycle. The vision facts configuration loader applies the same caching strategy, avoiding repeated parsing and normalisation of the 13-fact ontology on every visual observation merge. These caching points are applied selectively to paths that would otherwise repeat identical I/O and validation work, reflecting attention to runtime efficiency without introducing cache-invalidation complexity.
+
+% ===========================================================================
+\section{Knowledge Grounding and Source Policy}\label{sec:method-knowledge}
+
+% Evidence: adapters/knowledge_local.py, core/knowledge.py, knowledge_source_policy.yaml
+% Claims: C-RAG-01
+
+The knowledge grounding subsystem provides the tutoring runtime with retrieval-augmented procedural documentation.
+It retrieves relevant text snippets from an indexed document collection and enforces a source policy that restricts which documents may be surfaced to the model.
+Knowledge grounding is a core architectural feature of the tutoring runtime: every help cycle assembles a grounding query from the current procedure state, retrieves relevant documentation snippets, and includes them as evidence context in the model prompt.
+
+\subsection{BM25 Retrieval}
+
+% Evidence: core/knowledge.py (BM25Retriever), adapters/knowledge_local.py
+
+Knowledge retrieval uses BM25, a bag-of-words ranking function from the probabilistic information retrieval family.
+Documents are indexed at the sentence level: the F/A-18C NATOPS flight manual and supplemental cold-start documentation are preprocessed into a local JSON index.
+% Evidence: tools/index_docs.py
+
+At retrieval time, a grounding query is constructed from the current procedure state: the active step identifier, its description from the step registry, and the most recent telemetry observation.
+The query is tokenised and scored against the indexed sentences using the standard BM25 weighting function with default parameters ($k_1 = 1.2$, $b = 0.75$).
+The top-$k$ scoring snippets (default $k = 5$) are returned and included as evidence context in the help-cycle prompt.
+% Evidence: adapters/knowledge_local.py (build_grounding_query)
+
+\subsection{Source Policy}
+
+% Evidence: adapters/knowledge_source_policy.py, knowledge_source_policy.yaml
+
+Not all knowledge sources are appropriate for every tutoring context.
+A declarative source policy (specified in \texttt{knowledge\_source\_policy.yaml}) defines an allowlist of permitted document sources.
+Each indexed sentence carries a source identifier, and the policy enforces that only snippets from allowed sources are included in the retrieval results.
+% Evidence: adapters/knowledge_source_policy.py, knowledge_source_policy.yaml
+
+The source policy serves two purposes.
+First, it prevents the model from being exposed to procedure variants that contradict the current procedure pack---for example, carrier-based procedures when the current profile is airfield.
+Second, it bounds the retrieval scope to curated, verified documentation, reducing the risk of hallucination from outdated or irrelevant sources.
+% Evidence: tests/test_knowledge_source_policy.py
+
+% ===========================================================================
+\section{Visual Fact Data Pipeline}\label{sec:method-vlm-pipeline}
+
+% Evidence: tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
+%           tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py,
+%           tools/benchmark_qwen35_vlm_facts.py
+% Claims: C-VLM-01, C-VLM-03, C-VLM-07
+
+The visual fact data pipeline transforms raw DCS cockpit screenshots into structured visual fact extraction models.
+It comprises seven stages, spanning data capture, human annotation, supervised fine-tuning dataset generation, model training, and benchmark evaluation.
+Each stage produces versioned, inspectable artifacts, enabling full traceability from raw image to benchmark metric.
+Figure~\ref{fig:vlm-pipeline} provides an overview.
+
+\begin{figure}[htbp]
+  \centering
+  % TODO: Insert VLM pipeline diagram.
+  % \includegraphics[width=\textwidth]{figures/vlm_pipeline.pdf}
+  \caption{Seven-stage visual fact data pipeline. Capture and prelabeling feed human review; reviewed labels drive bilingual SFT export; exported data trains a LoRA adapter; base and LoRA models are benchmarked on independent holdout sets.}
+  \label{fig:vlm-pipeline}
+\end{figure}
+
+\subsection{Stage 1: DCS Screenshot Capture}
+
+% Evidence: tools/capture_vlm_dataset.py
+
+The first stage captures cockpit screenshots from DCS World.
+DCS renders the three primary multifunction displays---left DDI, AMPCD, and right DDI---into a single composite-panel image.
+The capture process triggers screenshots at configurable intervals, associates each capture with a session identifier and wall-clock timestamp, and stores the raw images alongside a sidecar manifest.
+% Evidence: tools/capture_vlm_dataset.py, DCS/Scripts/SimTutor/SimTutor.lua
+
+The composite-panel format is chosen to keep training, pre-labeling, evaluation, and runtime usage on the same input distribution, avoiding a train--evaluation mismatch where the model is exposed to three separate region crops during training but receives a single composite image at inference time.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §2
+
+\subsection{Stage 2: Initial VLM Pre-Labeling}
+
+% Evidence: tools/generate_vlm_prelabels.py
+
+Each captured composite-panel image is pre-labeled by a large VLM (a Qwen 397B-class model accessed via an OpenAI-compatible API) using the target visual fact ontology as the prompt contract.
+The pre-labeling script sends each image alongside a structured prompt that enumerates all facts in the ontology, their definitions, and the three admissible states (\texttt{seen}, \texttt{not\_seen}, \texttt{uncertain}).
+The VLM returns a JSON object containing per-fact labels and evidence notes.
+% Evidence: tools/generate_vlm_prelabels.py, tools/generate_vlm_prelabels_en.py, tools/generate_vlm_prelabels_zh.py
+
+Pre-labeling serves as a seeding step: it produces initial annotations at scale, which are then refined by human review.
+The pre-labeling VLM is large and general-purpose; it is not fine-tuned on the cockpit domain and frequently makes errors on ambiguous or rare visual states.
+Human review in the next stage corrects these errors.
+
+\subsection{Stage 3: Label Studio Human Review}
+
+% Evidence: tools/generate_vlm_prelabels.py (Label Studio export path)
+
+The pre-labeled samples are imported into Label Studio, an open-source data annotation platform.
+Each task presents the reviewer with the composite-panel image, the VLM's predicted labels for all facts, and a free-text summary field.
+The reviewer inspects the image, corrects any mislabeled facts, and provides an evidence note justifying each correction.
+The review interface enforces that every fact receives one of the three admissible states and that the summary field is populated.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §3
+
+Human review is the quality-control bottleneck: each capture session contains between 50 and 220 images, and review time per image depends on the number of visible facts and the reviewer's familiarity with cockpit displays.
+All reviewed samples carry an audit trail linking back to the raw image, the original VLM pre-label, and the reviewer's corrections.
+
+\subsection{Stage 4: Reviewed JSONL Export}
+
+After human review, Label Studio exports the corrected labels as a JSONL file.
+Each line contains a task identifier, the original image path, the reviewed facts with per-fact state and evidence note, and the reviewed summary.
+This reviewed JSONL is the authoritative ground-truth artifact for all downstream stages (SFT export, training, and benchmark).
+
+\subsection{Stage 5: Bilingual SFT JSONL Generation}
+
+% Evidence: tools/export_vision_sft_dataset.py
+
+The reviewed JSONL is transformed into an OpenAI-compatible multimodal chat SFT format.
+Each reviewed sample produces two training rows---one in English and one in Chinese---sharing the same composite-panel image and the same fact labels but differing in the system and user instruction texts.
+% Evidence: tools/export_vision_sft_dataset.py, Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4
+
+Each SFT row is a three-message conversation: a system message instructing the model to output JSON only, a user message containing the base64-encoded image and the textual instruction (which enumerates all facts, their definitions, and decision boundaries), and an assistant message containing the ground-truth JSON object with the \texttt{facts} array and a \texttt{summary} string.
+Each fact entry in the assistant output contains exactly three fields: \texttt{fact\_id}, \texttt{state}, and \texttt{evidence\_note}.
+External metadata fields such as \texttt{frame\_id}, \texttt{session\_id}, \texttt{confidence}, and image paths are excluded from the training target, since they are dataset-management fields, not visually inferable properties.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4.1--4.2
+
+Bilingual SFT increases instruction diversity rather than visual diversity: English and Chinese examples share identical images and fact labels.
+The purpose is to improve JSON-format robustness under both languages and to support eventual bilingual runtime deployment.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4
+
+\subsection{Stage 6: LoRA Fine-Tuning}
+
+% Evidence: tools/train_qwen35_vlm_unsloth.py, models/*/train_summary.json
+
+The exported SFT JSONL files are used to fine-tune a base VLM via Low-Rank Adaptation (LoRA).
+The training stack combines three components: Unsloth for 4-bit VLM loading, LoRA injection, and vision batch collation; PEFT (Parameter-Efficient Fine-Tuning) for LoRA adapter definition; and TRL \texttt{SFTTrainer} for the supervised fine-tuning loop.
+% Evidence: tools/train_qwen35_vlm_unsloth.py (FastVisionModel, get_peft_model, SFTTrainer)
+
+The training script loads the base model in 4-bit precision via Unsloth's \texttt{FastVisionModel.from\_pretrained}, applies LoRA adapters to both vision and language layers (Qwen) or language-only linear layers (Gemma), and trains on the bilingual SFT data.
+The adapter weights are saved separately from the base model, enabling efficient storage and inference-time loading.
+Full training configuration details are provided in Section~\ref{sec:method-lora-config}.
+% Evidence: models/qwen35_vlm_lora/README.md, models/gemma4_vlm_lora/.../train_summary.json
+
+\subsection{Stage 7: Base-vs-LoRA Benchmark}
+
+% Evidence: tools/benchmark_qwen35_vlm_facts.py
+
+The final stage evaluates the fine-tuned LoRA adapter against the unadapted base model on held-out datasets.
+The benchmark script loads each model (base and base-plus-LoRA) in 4-bit inference mode, sends each held-out sample through the same prompt used during training, parses and validates the model output against the expected JSON schema, and computes a suite of metrics comparing model predictions to human-reviewed ground-truth labels.
+The benchmark protocol is detailed in Section~\ref{sec:method-benchmark}.
+% Evidence: tools/benchmark_qwen35_vlm_facts.py
+
+\subsection{End-to-End Traceability}
+
+% Claims: C-VLM-03
+
+A defining methodological property of this pipeline is end-to-end traceability.
+Every benchmark prediction can be traced back through the training data, the human-reviewed labels, the VLM pre-labels, and the original DCS screenshot.
+The pipeline produces versioned artifacts at each stage: capture manifests, pre-label JSONL files, Label Studio export files, SFT JSONL files, LoRA adapter weights, \texttt{train\_summary.json} files, benchmark predictions, and benchmark metric summaries.
+This chain of custody enables rigorous audit of any observed model behaviour, from a single fact misclassification up to aggregate benchmark metrics.
+% Evidence: benchmarks/qwen35_vlm_finetune/*/predictions_*.jsonl,
+%           benchmarks/qwen35_vlm_finetune/*/errors_*.jsonl,
+%           benchmarks/qwen35_vlm_finetune/*/benchmark_summary.json
+
+% ===========================================================================
+\section{Dataset Curation}\label{sec:method-datasets}
+
+% Evidence: datasets/*/stats.json
+% Claims: C-DATA-01, C-VLM-07
+
+\subsection{Dataset Overview}
+
+The visual fact data pipeline produced six datasets over successive capture and review cycles.
+Table~\ref{tab:datasets} summarises each dataset's role, sample count, fact ontology version, review status, and export languages.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Dataset inventory. All sample counts are from the corresponding \texttt{stats.json} files.}
+  \label{tab:datasets}
+  \small
+  \begin{tabular}{@{}lcccccc@{}}
+  \toprule
+  \textbf{Dataset} & \textbf{Role} & \textbf{Samples} & \textbf{Ontology} & \textbf{Reviewed} & \textbf{Languages} \\
+  \midrule
+  Run-001 (\texttt{vision\_sft}) & Training source (8-fact v1) & 180 & 8-fact v1 & 180 & en, zh \\
+  \addlinespace
+  Run-002 (\texttt{vision\_sft\_holdout\_run002}) & Holdout (8-fact v1) & 50 & 8-fact v1 & 50 & en \\
+  \addlinespace
+  Run-002 newfacts (\texttt{vision\_sft\_holdout\_run002\_newfacts}) & Holdout (13-fact v2) & 50 & 13-fact v2 & 50 & en \\
+  \addlinespace
+  Run-003 (\texttt{vision\_sft\_run003}) & Training source (13-fact v2) & 220 & 13-fact v2 & 220 & en, zh \\
+  \addlinespace
+  Run-004 (\texttt{vision\_sft\_holdout\_run004\_random}) & Holdout (13-fact v2) & 100 & 13-fact v2 & 100 & en \\
+  \addlinespace
+  Run-005 (\texttt{vision\_sft\_run005\_composition\_rebalance}) & Training supplement (13-fact v2) & 122 & 13-fact v2 & 122 & en, zh \\
+  \bottomrule
+  \end{tabular}
+\end{table}
+
+% Evidence: datasets/vision_sft/stats.json (180 samples)
+% Evidence: datasets/vision_sft_holdout_run002/stats.json (50 samples)
+% Evidence: datasets/vision_sft_holdout_run002_newfacts/stats.json (50 samples)
+% Evidence: datasets/vision_sft_run003/stats.json (220 samples, missing_summary_count=82)
+% Evidence: datasets/vision_sft_holdout_run004_random/stats.json (100 samples)
+% Evidence: datasets/vision_sft_run005_composition_rebalance/stats.json (122 samples, missing_summary_count=25)
+
+Each dataset is fully human-reviewed: every sample has been inspected and corrected in Label Studio.
+Run-003 and Run-005 contain samples where the human reviewer left the summary field blank (82 and 25 samples, respectively, as recorded in the \texttt{missing\_summary\_count} field).
+These samples remain valid for training and evaluation because the facts array---the primary supervised target---is fully annotated for every fact in every sample.
+% Evidence: datasets/vision_sft_run003/stats.json (missing_summary_count=82),
+%           datasets/vision_sft_run005_composition_rebalance/stats.json (missing_summary_count=25)
+
+\subsection{Ontology Evolution: 8-Fact v1 to 13-Fact v2}
+
+% Evidence: packs/fa18c_startup/vision_facts.yaml, datasets/vision_sft/stats.json,
+%           datasets/vision_sft_run003/stats.json
+% Claims: C-VLM-07
+
+The initial 8-fact v1 ontology (used in Run-001 and Run-002) defined eight facts:
+\texttt{fcs\_page\_visible},
+\texttt{bit\_root\_page\_visible},
+\texttt{bit\_page\_failure\_visible},
+\texttt{right\_ddi\_fcsmc\_page\_visible},
+\texttt{right\_ddi\_in\_test\_visible},
+\texttt{fcs\_bit\_result\_visible},
+\texttt{ins\_alignment\_page\_visible},
+and \texttt{ins\_go}.
+% Evidence: datasets/vision_sft/stats.json (fact_state_counts keys)
+
+The v1 ontology exhibited two structural weaknesses identified during the initial benchmark analysis.
+First, it mixed abstraction levels: some facts described low-level visual observations (e.g., \texttt{fcs\_page\_visible}), while others encoded higher-level procedural judgments (e.g., \texttt{ins\_go}, which represented a completion signal for the INS alignment process rather than a directly observable visual feature).
+Second, several facts shared overlapping semantics: \texttt{bit\_root\_page\_visible} and \texttt{bit\_page\_failure\_visible} could overlap in certain cockpit states, and \texttt{right\_ddi\_fcsmc\_page\_visible} conflated the region identifier with the fact semantics.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8.2
+
+The 13-fact v2 ontology (used in Run-003, Run-004, Run-005, and the current runtime) redesigned and expanded the fact set.
+The v2 facts are:
+\texttt{tac\_page\_visible},
+\texttt{supt\_page\_visible},
+\texttt{fcs\_page\_visible},
+\texttt{fcs\_page\_x\_marks\_visible},
+\texttt{bit\_root\_page\_visible},
+\texttt{fcsmc\_page\_visible},
+\texttt{fcsmc\_intermediate\_result\_visible},
+\texttt{fcsmc\_in\_test\_visible},
+\texttt{fcsmc\_final\_go\_result\_visible},
+\texttt{hsi\_page\_visible},
+\texttt{hsi\_map\_layer\_visible},
+\texttt{ins\_grnd\_alignment\_text\_visible},
+and \texttt{ins\_ok\_text\_visible}.
+% Evidence: packs/fa18c_startup/vision_facts.yaml, tools/benchmark_qwen35_vlm_facts.py (CORE_FACT_IDS)
+
+The v2 redesign addressed the v1 weaknesses through three strategies.
+First, the ambiguous \texttt{ins\_go} fact was decomposed into two lower-level, directly observable facts: \texttt{ins\_grnd\_alignment\_text\_visible} (requiring literal GRND alignment block text) and \texttt{ins\_ok\_text\_visible} (requiring clearly readable OK text near the alignment block).
+Second, region identifiers were removed from fact names (\texttt{right\_ddi\_fcsmc\_page\_visible} became \texttt{fcsmc\_page\_visible}), and page-visibility facts were added for the TAC and SUPT menus to cover the left DDI.
+Third, the FCS-MC state sequence was decomposed into a finer-grained four-state chain (\texttt{page}, \texttt{intermediate\_result}, \texttt{in\_test}, \texttt{final\_go\_result}), replacing the single \texttt{fcs\_bit\_result\_visible} fact.
+Fourth, HSI-related facts were split into \texttt{hsi\_page\_visible} and \texttt{hsi\_map\_layer\_visible}, and the FCS X-marks fact was separated from the FCS page visibility.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §9,
+%           Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+
+\subsection{Training Recipe: Run-003 + Run-005x2}
+
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+
+The primary training recipe for the 13-fact v2 models combines Run-003 (220 reviewed samples, bilingual export producing 220 English and 220 Chinese rows) with Run-005 composition rebalance data included twice (122 reviewed samples, bilingual export producing $122 \times 2 = 244$ English and $122 \times 2 = 244$ Chinese rows).
+The resulting training set contains 928 rows.
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json (train_rows=928)
+
+Run-005 was captured specifically as a composition rebalance dataset.
+Analysis of Run-003's fact-state distribution revealed severe class imbalance: several critical facts (e.g., \texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible}, \texttt{fcsmc\_final\_go\_result\_visible}, \texttt{ins\_ok\_text\_visible}) had very few \texttt{seen} examples in the training data.
+Run-005 was designed with targeted cockpit-state transitions to oversample these underrepresented visual states.
+% Evidence: datasets/vision_sft_run003/stats.json (fact_state_counts showing seen counts as low as 12 for ins_ok_text_visible),
+%           datasets/vision_sft_run005_composition_rebalance/stats.json (fact_state_counts showing improved balance)
+
+The double-counting of Run-005 (Run-005x2) further amplifies the representation of these rare states in the training distribution.
+The input files for the training run are: \texttt{sft\_en.jsonl} and \texttt{sft\_zh.jsonl} from Run-003, plus two copies each of \texttt{sft\_en.jsonl} and \texttt{sft\_zh.jsonl} from Run-005, for a total of six input files.
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json (input_files array)
+
+No internal evaluation split was used: the training configuration sets \texttt{eval\_rows = 0}.
+All evaluation is performed on independent holdout datasets.
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json (eval_rows=0)
+
+\subsection{Holdout Independence Verification}
+
+% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+% Claims: C-VLM-03a
+
+Holdout independence is a critical methodological requirement: the benchmark must measure cross-session generalisation, not in-distribution memorisation.
+Two holdout sets were constructed:
+
+\begin{itemize}
+\item \textbf{Run-002} (and its 13-fact re-annotation \texttt{run002\_newfacts}): a new DCS capture session distinct from all training sessions. Contains 50 reviewed samples.
+\item \textbf{Run-004 random}: a further independent capture session with uniform random sampling of cockpit states. Contains 100 reviewed samples.
+\end{itemize}
+
+% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+
+Exact overlap between each holdout set and the training data was verified to be zero (0).
+The overlap check compared image artifact paths and sample identifiers across training and holdout splits.
+No holdout sample appears in any training input file.
+% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md (exact overlap = 0)
+
+In contrast, the Run-001 benchmark used in early 8-fact v1 experiments is a \textbf{contaminated development set}: the same data pool from which training examples were derived was used for evaluation.
+Run-001 results are reported for regression analysis only and are explicitly distinguished from independent holdout results.
+% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_current180_v1/benchmark_summary.json (benchmark_kind=contaminated_dev_set)
+
+% ===========================================================================
+\section{LoRA Fine-Tuning Configuration}\label{sec:method-lora-config}
+
+% Evidence: models/*/train_summary.json, tools/train_qwen35_vlm_unsloth.py,
+%           tools/train_gemma4_vlm_unsloth.py
+% Claims: C-TRAIN-01
+
+\subsection{Base Models}
+
+Two base VLM architectures were fine-tuned under the same data recipe to enable backbone comparison:
+
+\begin{description}
+\item[Qwen/Qwen3.5-9B-Base] --- a 9-billion-parameter vision-language model supporting multimodal input (image + text) and text generation.
+This is the primary experimental backbone.
+% Evidence: tools/train_qwen35_vlm_unsloth.py (model_name default)
+
+\item[google/gemma-4-31B] --- a 31-billion-parameter vision-language model from Google DeepMind.
+This is the supplementary comparison backbone, tested to verify whether the same data recipe generalises across model families.
+% Evidence: models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+\end{description}
+
+Both models were loaded in 4-bit precision via Unsloth's \texttt{FastVisionModel.from\_pretrained}.
+For Qwen, LoRA adapters were applied to both vision and language layers (\texttt{finetune\_vision\_layers=True}, \texttt{finetune\_language\_layers=True}).
+For Gemma, LoRA was restricted to all linear modules (\texttt{lora\_target\_modules=all-linear}) and vision layers were not fine-tuned (\texttt{finetune\_vision\_layers=False}).
+% Evidence: tools/train_qwen35_vlm_unsloth.py (get_peft_model call),
+%           models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+
+\subsection{Training Stack}
+
+% Evidence: tools/train_qwen35_vlm_unsloth.py
+
+The training stack comprises three integrated components:
+
+\begin{enumerate}
+\item \textbf{Unsloth} --- handles 4-bit model loading, LoRA injection, vision batch collation via \texttt{UnslothVisionDataCollator}, and FP16/BF16 automatic precision selection.
+\item \textbf{PEFT (Parameter-Efficient Fine-Tuning)} --- defines the LoRA adapter format, including rank, alpha, dropout, and target module selection.
+\item \textbf{TRL SFTTrainer} --- runs the supervised fine-tuning loop with configurable batch size, gradient accumulation, epochs, learning rate, warmup, and weight decay.
+\end{enumerate}
+
+% Evidence: tools/train_qwen35_vlm_unsloth.py (imports and trainer_args)
+
+\subsection{Hyperparameter Configuration}
+
+Table~\ref{tab:lora-hyperparams} lists the exact hyperparameters used for the primary training run (Run-003 + Run-005x2), matched across both backbones.
+All values are drawn from the \texttt{train\_summary.json} artifacts.
+
+\begin{table}[htbp]
+  \centering
+  \caption{LoRA fine-tuning hyperparameters, matched across Qwen3.5-9B and Gemma-4-31B.}
+  \label{tab:lora-hyperparams}
+  \small
+  \begin{tabular}{@{}lll@{}}
+  \toprule
+  \textbf{Parameter} & \textbf{Qwen3.5-9B} & \textbf{Gemma-4-31B} \\
+  \midrule
+  \texttt{max\_seq\_length} & 4096 & 4096 \\
+  \texttt{num\_train\_epochs} & 4.0 & 4.0 \\
+  \texttt{learning\_rate} & 2$\times 10^{-4}$ & 2$\times 10^{-4}$ \\
+  \texttt{per\_device\_train\_batch\_size} & 1 & 1 \\
+  \texttt{gradient\_accumulation\_steps} & 4 & 4 \\
+  \texttt{lora\_r} & 16 & 16 \\
+  \texttt{lora\_alpha} & 16 & 16 \\
+  \texttt{lora\_dropout} & 0.0 & 0.0 \\
+  \texttt{seed} & 3407 & 3407 \\
+  \texttt{load\_in\_4bit} & True & True \\
+  \texttt{warmup\_ratio} & 0.1 & 0.1 \\
+  \texttt{weight\_decay} & 0.01 & 0.01 \\
+  \texttt{train\_rows} & 928 & 928 \\
+  \texttt{eval\_rows} & 0 & 0 \\
+  \midrule
+  \textbf{Backbone-specific} & & \\
+  \midrule
+  Vision LoRA & enabled & disabled \\
+  LoRA target modules & vision + language + attention + MLP & all-linear \\
+  Chat template & Qwen default & gemma-4 \\
+  GPU memory utilisation & 0.6 & 0.95 \\
+  \midrule
+  \textbf{Training outcomes} & & \\
+  \midrule
+  Train runtime (s) & 6419.16 & 8049.65 \\
+  Train loss (final) & 0.2156 & 0.0474 \\
+  \bottomrule
+  \end{tabular}
+\end{table}
+
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+% Evidence: models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+
+The final training loss values (0.2156 for Qwen, 0.0474 for Gemma) should not be compared directly across backbones, because tokenizer behaviour, chat-template structure, target-sequence distribution, and model parameterisation differ.
+The epoch count of 4 was selected as a compromise for small-data domain adaptation: with only 928 training examples, fewer epochs may not reliably teach the model the fixed JSON schema and cockpit fact boundaries, while more epochs risk overfitting to the training sessions.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §5
+
+The LoRA rank $r = 16$ and alpha $\alpha = 16$ provide moderate adaptation capacity: sufficient to learn cockpit layout patterns and JSON formatting, but not as large as a high-capacity adapter ($r \geq 64$) that might overfit the small dataset more aggressively.
+Dropout was set to zero for the primary run, prioritising learnability over regularisation in this first adaptation experiment.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §5
+
+\subsection{Bilingual SFT Strategy}
+
+% Evidence: tools/export_vision_sft_dataset.py
+
+The bilingual SFT strategy produces two training rows per reviewed sample: one with English system and user instructions, and one with Chinese instructions.
+Both rows share the same image (base64-encoded) and the same assistant target (ground-truth facts JSON).
+The English assistant target is reused for the Chinese rows; the model's task is to extract visual facts from the image, not to generate language-specific natural-language descriptions.
+% Evidence: tools/export_vision_sft_dataset.py, Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4
+
+This approach increases instruction-following robustness across languages without requiring additional human annotation effort.
+It does not, however, substitute for additional cockpit-state screenshots or hard-negative visual data.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8.3
+
+\subsection{Composition Rebalance Strategy}
+
+% Evidence: datasets/vision_sft_run005_composition_rebalance/stats.json
+
+The composition rebalance strategy (Run-005) addresses the class imbalance observed in the primary training source (Run-003).
+In Run-003, several facts had extremely low positive (\texttt{seen}) counts: \texttt{ins\_ok\_text\_visible} had only 12 \texttt{seen} examples out of 220 samples (5.5\%); \texttt{fcs\_page\_x\_marks\_visible} had 16 (7.3\%); \texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible}, and \texttt{fcsmc\_final\_go\_result\_visible} each had 18 (8.2\%).
+% Evidence: datasets/vision_sft_run003/stats.json (fact_state_counts)
+
+Run-005 captured 122 additional samples targeting cockpit states in which these rare facts are \texttt{seen}.
+After Run-005 augmentation, the combined training set provides improved coverage of previously underrepresented facts:
+\texttt{supt\_page\_visible} (from 20 to 54 combined seen), \texttt{fcsmc\_page\_visible} (from 55 to 111), \texttt{hsi\_page\_visible} (from 106 to 215), and \texttt{ins\_grnd\_alignment\_text\_visible} (from 58 to 130).
+% Evidence: datasets/vision_sft_run003/stats.json, datasets/vision_sft_run005_composition_rebalance/stats.json
+
+The Run-005 data is included twice in the training recipe (Run-005x2), further amplifying the signal for these underrepresented visual states.
+% Evidence: models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+
+% ===========================================================================
+\section{Benchmark Protocol}\label{sec:method-benchmark}
+
+% Evidence: tools/benchmark_qwen35_vlm_facts.py
+% Claims: C-VLM-04, C-VLM-05, C-VLM-06
+
+\subsection{Metrics}
+
+The benchmark compares model predictions against human-reviewed ground-truth labels using the following metrics:
+
+\begin{description}
+\item[\texttt{json\_valid\_rate}] --- the proportion of samples for which the model output is parseable as a JSON object.
+A failure here indicates that the model produced non-JSON text (e.g., markdown, natural-language commentary, or malformed braces).
+\item[\texttt{schema\_valid\_rate}] --- the proportion of samples for which the parsed JSON conforms to the expected schema: a top-level object containing only \texttt{summary} and \texttt{facts} keys, a \texttt{facts} array where each entry contains exactly \texttt{fact\_id}, \texttt{state}, and \texttt{evidence\_note}, all 13 fact IDs present exactly once, and all states in \texttt{\{seen, not\_seen, uncertain\}}.
+\item[\texttt{fact\_accuracy}] --- three-class accuracy over all facts in all samples, computed as the proportion of individual fact predictions that match the ground-truth label.
+\item[\texttt{macro\_f1}] --- macro-averaged F1 score across the three states (\texttt{seen}, \texttt{not\_seen}, \texttt{uncertain}), computed per fact and then averaged across all 13 facts.
+\item[\texttt{seen\_f1}] --- F1 score for the positive \texttt{seen} class, computed per fact and then averaged across all 13 facts.
+This is a particularly important metric because missing a \texttt{seen} state (false negative) or hallucinating a \texttt{seen} state (false positive) directly affects downstream procedure-state reasoning.
+\item[\texttt{sample\_exact\_match}] --- the proportion of samples for which all 13 facts match the ground-truth labels exactly.
+A single fact misclassification counts as a sample-level failure.
+\item[\texttt{critical\_false\_positive\_count}] --- the count of errors in which a fact classified as \emph{critical} (a subset of 6 facts: \texttt{fcs\_page\_x\_marks\_visible}, \texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible}, \texttt{fcsmc\_final\_go\_result\_visible}, \texttt{ins\_grnd\_alignment\_text\_visible}, \texttt{ins\_ok\_text\_visible}) is predicted as \texttt{seen} when the ground truth is \texttt{not\_seen} or \texttt{uncertain}.
+\end{description}
+
+% Evidence: tools/benchmark_qwen35_vlm_facts.py (compute_metrics, CRITICAL_FACT_IDS)
+
+Critical false positives are tracked separately because they represent the most consequential error type in the tutoring context: incorrectly reporting a completion-critical state as observed when it is not.
+A tutor that erroneously believes the INS alignment is complete (based on a \texttt{ins\_ok\_text\_visible} false positive, for example) may skip essential guidance, potentially leading to procedural errors.
+% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §6
+
+The benchmark also computes per-fact confusion matrices and per-fact precision, recall, and F1 scores, which are stored in \texttt{fact\_scores.csv} alongside automatically generated charts (overall accuracy, per-fact macro F1, per-fact seen F1, critical false positives, and per-fact confusion matrices).
+% Evidence: tools/benchmark_qwen35_vlm_facts.py (_make_charts, _write_fact_scores_csv)
+
+\subsection{Base vs. LoRA Comparison Methodology}
+
+% Evidence: tools/benchmark_qwen35_vlm_facts.py
+
+The benchmark protocol compares two model configurations against the same ground-truth labels:
+
+\begin{enumerate}
+\item \textbf{Base model}: the unadapted base VLM loaded in 4-bit inference mode without any LoRA adapter.
+\item \textbf{LoRA model}: the same base VLM loaded in 4-bit inference mode with the LoRA adapter weights loaded via PEFT's \texttt{PeftModel.from\_pretrained}.
+\end{enumerate}
+
+Both configurations receive the identical prompt, the identical images, and the identical generation parameters: temperature = 0.0 (greedy decoding), \texttt{max\_new\_tokens} = 1024, and seed = 3407.
+The benchmark runs each sample independently, serialises predictions to JSONL, and computes metrics without any post-hoc filtering or exclusion.
+% Evidence: tools/benchmark_qwen35_vlm_facts.py (_run_predictions, temperature=0.0)
+
+The comparison script (\texttt{comparison.json}) computes delta metrics (LoRA minus Base) and an automated recommendation flag (\texttt{recommend\_simtutor\_chain\_validation}) that activates when the LoRA adapter simultaneously improves JSON validity, fact accuracy, seen F1, and does not increase critical false positives.
+% Evidence: tools/benchmark_qwen35_vlm_facts.py (_compare_metrics)
+
+\subsection{Holdout Definitions and Benchmark Categories}
+
+% Evidence: benchmarks/qwen35_vlm_finetune/*/benchmark_summary.json
+
+Each benchmark run is assigned a \texttt{benchmark\_kind} that determines how its results should be interpreted:
+
+\begin{description}
+\item[\texttt{contaminated\_dev\_set}] --- the evaluation set is drawn from the same data pool as the training set.
+Results indicate whether the model learned the schema and in-distribution visual boundaries but cannot support generalisation claims.
+Used for Run-001 benchmarks.
+% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_current180_v1/benchmark_summary.json
+
+\item[\texttt{heldout\_new\_session}] --- the evaluation set is a completely independent capture session with zero overlap with any training data.
+Results support cross-session generalisation claims.
+This is the primary evaluation category.
+Run-002 newfacts and Run-004 random benchmarks fall into this category.
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/benchmark_summary.json (benchmark_kind=holdout_run002_newfacts)
+\end{description}
+
+The distinction between contaminated and heldout benchmarks is maintained rigorously throughout the benchmark infrastructure and is reflected in the results chapter (Chapter~\ref{ch:evaluation}).
+% Evidence: paper_outline.md §4
+
+\subsection{Benchmark Artifacts}
+
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/
+
+Each benchmark run produces a standardised directory of artifacts:
+
+\begin{itemize}
+\item \texttt{benchmark\_summary.json} --- top-level summary with comparison deltas and chart paths.
+\item \texttt{metrics\_base.json} / \texttt{metrics\_lora.json} --- full metric dictionaries, including per-fact scores and confusion matrices.
+\item \texttt{predictions\_base.jsonl} / \texttt{predictions\_lora.jsonl} --- per-sample model outputs, one JSON object per line.
+\item \texttt{errors\_base.jsonl} / \texttt{errors\_lora.jsonl} --- individual prediction errors with gold labels, predicted labels, and raw model text.
+\item \texttt{comparison.json} --- delta metrics and recommendation flag.
+\item \texttt{fact\_scores.csv} --- CSV table of per-fact, per-model metrics.
+\item \texttt{report.md} --- human-readable markdown summary.
+\item \texttt{charts/} --- automatically generated charts: overall accuracy, sample exact match, per-fact macro F1, per-fact seen F1, critical false positives, and per-fact confusion matrices for base and LoRA models.
+\end{itemize}
+
+% Evidence: benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/benchmark_summary.json
+
+These artifacts constitute the full evidence chain for the technical results reported in Chapter~\ref{ch:evaluation}.
+Every metric, chart, and error record is reproducible by re-running the benchmark script with the same reviewed JSONL and LoRA adapter weights.
+
+% ===========================================================================
+\section{Summary}\label{sec:method-summary}
+
+This chapter has described the four methodological pillars of the proposed system: telemetry-grounded procedure runtime, knowledge grounding with BM25 retrieval and source policy, the seven-stage visual fact data pipeline from screenshot capture to benchmark, and the LoRA fine-tuning protocol with matched hyperparameters across two backbone architectures.
+The methodology is characterised by end-to-end traceability---every benchmark metric can be traced through training data, human-reviewed labels, and original screenshots---and by a strict separation between contaminated development benchmarks and independent holdout benchmarks.
+These methodological choices directly support the claims and results presented in Chapters~\ref{ch:evaluation} and~\ref{ch:discussion}.

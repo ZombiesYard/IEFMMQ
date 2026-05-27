@@ -1,0 +1,270 @@
+% ===========================================================================
+%  06 — 评估
+%  已验证声明：C-VLM-04, C-VLM-05, C-VLM-06, C-VLM-03b, C-VLM-07,
+%              C-DATA-01, C-VLM-03a, C-TRAIN-01
+%  Likely 声明：  C-VLM-03b, C-RUNTIME-01
+%  TODO 声明：    C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01,
+%                C-PROPOSAL-02
+% ===========================================================================
+\chapter{评估}\label{ch:evaluation}
+
+本章呈现在视觉事实提取子系统及其支撑运行时基础设施开发过程中收集的经验证据。本章分为两个明确区分的部分。A 部分（第\ref{sec:eval-tech}节）报告由当前代码仓库中存在的基准测试数据、数据集统计和训练工件支撑的技术验证结果。B 部分（第\ref{sec:eval-planned}节）描述构成本论文原始研究愿景的计划中人因评估，但尚未实施；此处包含该部分是为了记录评估设计，以便未来工作可据此进行衡量。
+
+% ===========================================================================
+% --- A 部分：当前技术结果（仅已验证/likely 声明）---
+% ===========================================================================
+\section{当前技术结果}\label{sec:eval-tech}
+
+技术评估针对一个核心问题：经过 LoRA 微调的视觉语言模型（VLM）能否可靠地从 F/A-18C 座舱截图中提取结构化视觉事实，并且所得到的适配器是否持续优于未微调的基础模型？该问题通过在模型训练期间从未见过的数据（经核实零重叠的留出集）上进行一系列基准测试对比来评估。下文报告的度量由第\ref{sec:method-benchmark}节描述的自动化基准测试框架计算得出，并直接取自代码仓库中存储的基准测试工件。
+
+% ---------------------------------------------------------------------------
+\subsection{数据集与训练摘要}\label{sec:eval-data}
+
+% 证据：datasets/*/stats.json; paper_context/experiment_inventory.md §1
+% 声明：C-DATA-01, C-VLM-07
+
+视觉事实提取任务经历了两代事实本体的演进。第一代（v1）定义了 8 个视觉事实，用于建立初始的训练和评估流水线。第二代（v2）将本体扩展到 13 个视觉事实，使其与 \texttt{packs/fa18c\_startup/vision\_facts.yaml} 中定义的运行时视觉契约对齐。这 13 个事实涵盖面板级页面可见性（如 \texttt{tac\_page\_visible}、\texttt{supt\_page\_visible}、\texttt{fcs\_page\_visible}）、面板内细粒度状态指示器（\texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible}、\texttt{fcsmc\_final\_go\_result\_visible}）以及小文本识别目标（\texttt{ins\_grnd\_alignment\_text\_visible}、\texttt{ins\_ok\_text\_visible}）。
+
+表\ref{tab:dataset-summary}总结了代码仓库中存在的六个标注数据集，每个均具有经人工审查的真实标注标签。
+% 证据：datasets/vision_sft/stats.json
+% 证据：datasets/vision_sft_holdout_run002/stats.json
+% 证据：datasets/vision_sft_holdout_run002_newfacts/stats.json
+% 证据：datasets/vision_sft_holdout_run004_random/stats.json
+% 证据：datasets/vision_sft_run003/stats.json
+% 证据：datasets/vision_sft_run005_composition_rebalance/stats.json
+
+\begin{table}[htbp]
+\centering
+\caption{标注视觉事实数据集摘要。双语导出从相同的经审查任务生成独立的英文和中文样本。留出集仅英文。}\label{tab:dataset-summary}
+\begin{tabular}{l c c c c c}
+\toprule
+\textbf{数据集} & \textbf{Run} & \textbf{事实数} & \textbf{任务数} & \textbf{双语} & \textbf{角色} \\
+\midrule
+\texttt{vision\_sft}                     & Run-001 & 8  & 180 & 是 & v1 训练 \\
+\texttt{vision\_sft\_holdout\_run002}    & Run-002 & 8  & 50  & 否  & v1 留出 \\
+\texttt{vision\_sft\_holdout\_run002\_newfacts} & Run-002 & 13 & 50  & 否  & v2 留出 \\
+\texttt{vision\_sft\_run003}             & Run-003 & 13 & 220 & 是 & v2 训练源 \\
+\texttt{vision\_sft\_run005\_composition\_rebalance} & Run-005 & 13 & 122 & 是 & v2 再平衡 \\
+\texttt{vision\_sft\_holdout\_run004\_random} & Run-004 & 13 & 100 & 否  & v2 留出 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+v2 训练方案将 Run-003（220 个经审查任务）与 Run-005（122 个经审查任务，专门为再平衡代表性不足的事实状态而采集）相结合，并应用 Run-005 两次（以下记为 Run-005$\times$2）作为适度的过采样策略。
+% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+Run-003（220$\times$2 = 440 行）和 Run-005$\times$2（122$\times$4 = 488 行）的双语导出（中文+英文）产生组合训练集共 \textbf{928 行}。v2 留出集——Run-002 newfacts（50 样本）和 Run-004 random（100 样本）——仅英文，并已核实与训练数据\textbf{零完全重叠}。
+% 证据：Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+% 声明：C-VLM-03a
+
+% ---------------------------------------------------------------------------
+\subsection{Qwen3.5 8-Fact V1 基线}\label{sec:eval-qwen-8fact}
+
+% 证据：benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/benchmark_summary.json
+% 证据：benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/metrics_base.json
+% 证据：benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/metrics_lora.json
+% TODO:VERIFY — 将 8-fact v1 保留在论文正文还是移至附录？
+% 声明：C-VLM-07
+
+最早的完整基准测试线使用在 Run-001 数据集（180 个任务）上训练并在 Run-002 留出集（50 样本）上评估的 8-fact LoRA 适配器。该线早于 13-fact 本体，主要作为历史参考点；此处将其纳入以建立性能轨迹，但可能更适合放置在附录中。
+
+\begin{table}[htbp]
+\centering
+\caption{8-fact v1 基准测试：Qwen3.5-9B 基础模型 vs.\ LoRA-v1 在 Run-002 留出集上（50 样本，英文）。}\label{tab:qwen-8fact}
+\begin{tabular}{l c c c c c}
+\toprule
+\textbf{度量} & \textbf{基础模型} & \textbf{LoRA-v1} & \textbf{$\Delta$} \\
+\midrule
+JSON 有效率       & 1.0    & 1.0    & --- \\
+模式有效率     & 1.0    & 1.0    & --- \\
+事实准确率         & 0.7600 & 0.9150 & +0.1550 \\
+宏 $F_1$           & 0.4241 & 0.5847 & +0.1605 \\
+Seen $F_1$         & 0.4714 & 0.8380 & +0.3666 \\
+样本完全匹配    & 0.06   & 0.36   & +0.30 \\
+关键假阳性 & 13  & 15     & +2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+表\ref{tab:qwen-8fact}显示事实级度量的显著改进：事实准确率从 0.7600 升至 0.9150，seen $F_1$ 从 0.4714 几乎翻倍至 0.8380。然而，关键假阳性计数从 13 增加到 15，表明 8-fact v1 适配器没有抑制对高风险事实（其假阳性断言可能误导教学系统跳过必要步骤的事实）的幻觉。LoRA 适配器的样本完全匹配率为 0.36，表明在单个截图中完全正确提取所有八个事实仍然具有挑战性。
+
+% ---------------------------------------------------------------------------
+\subsection{Qwen3.5 13-Fact V2 结果}\label{sec:eval-qwen-13fact}
+
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/benchmark_summary.json
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/metrics_base.json
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/metrics_lora.json
+% 声明：C-VLM-04
+
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/benchmark_summary.json
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/metrics_base.json
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/metrics_lora.json
+% 声明：C-VLM-05
+
+本工作的主要技术结果是在 13-fact v2 本体下使用 Run-003 + Run-005$\times$2 方案训练的 Qwen3.5-9B LoRA 适配器的性能。
+% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+该适配器训练了 4 个轮数，学习率为 $2 \times 10^{-4}$，LoRA 秩 $r=16$，$\alpha=16$，dropout $=0.0$，有效批次大小为 4，最大序列长度为 4096。训练在 6419 秒内收敛，最终训练损失为 0.2156。
+
+表\ref{tab:qwen-13fact}报告了两个留出评估集上的结果：Run-002 newfacts 留出集（50 样本）和 Run-004 random 留出集（100 样本）。两个留出集均仅英文，且与训练数据零完全重叠。
+
+\begin{table}[htbp]
+\centering
+\caption{13-fact v2 基准测试：Qwen3.5-9B 基础模型 vs.\ LoRA（Run-003 + Run-005$\times$2）在两个留出集上。}\label{tab:qwen-13fact}
+\begin{tabular}{l c c c c c c}
+\toprule
+& \multicolumn{3}{c}{\textbf{Run-002 newfacts (50)}} & \multicolumn{3}{c}{\textbf{Run-004 random (100)}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+\textbf{度量} & \textbf{基础模型} & \textbf{LoRA} & \textbf{$\Delta$} & \textbf{基础模型} & \textbf{LoRA} & \textbf{$\Delta$} \\
+\midrule
+JSON 有效       & 1.0    & 1.0    & ---  & 0.96   & 1.0    & +0.04 \\
+模式有效     & 1.0    & 1.0    & ---  & 0.96   & 1.0    & +0.04 \\
+事实准确率    & 0.8677 & \textbf{0.9908} & +0.1231 & 0.8038 & \textbf{0.9931} & +0.1892 \\
+宏 $F_1$      & 0.4513 & \textbf{0.6515} & +0.2002 & 0.4393 & \textbf{0.6100} & +0.1707 \\
+Seen $F_1$    & 0.5022 & \textbf{0.9648} & +0.4626 & 0.5659 & \textbf{0.9159} & +0.3500 \\
+完全匹配      & 0.10   & \textbf{0.88}   & +0.78  & 0.03   & \textbf{0.92}   & +0.89 \\
+关键 FP       & 11     & \textbf{4}      & $-$7   & 70     & \textbf{8}      & $-$62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Run-002 newfacts 留出集。}
+LoRA 适配器实现事实准确率 0.9908，seen $F_1$ 0.9648，样本完全匹配率 0.88。这意味着在 50 个样本中的 44 个中，所有 13 个事实被正确分类。相比之下，基础模型实现事实准确率 0.8677，完全匹配率仅为 0.10。关键假阳性计数从 11（基础模型）降至 4（LoRA），减少了 7。LoRA 适配器中剩余的三个错误源为：\texttt{tac\_page\_visible} 的两个假阴性（适配器在 TAC 页面存在时遗漏它），\texttt{fcsmc\_final\_go\_result\_visible} 的一个假阳性，\texttt{ins\_grnd\_alignment\_text\_visible} 的一个假阳性，以及 \texttt{ins\_ok\_text\_visible} 的两个假阳性。
+% 证据：metrics_lora.json → fact_scores → ins_ok_text_visible seen false_positives=2
+
+\textbf{Run-004 random 留出集。}
+模式一致，但基础模型在这个更大、更多样化的留出集上退化更加严重。基础模型产生 4 个无效 JSON/模式响应（有效率为 0.96），70 个关键假阳性（几乎全部集中在 \texttt{fcsmc\_intermediate\_result\_visible} 上，达 60 个），样本完全匹配率仅为 0.03。LoRA 适配器恢复完美的 JSON 和模式有效性（1.0），事实准确率升至 0.9931，并实现样本完全匹配率 0.92（100 个样本中 92 个完全正确）。关键假阳性计数从 70 降至 8，全部在 \texttt{fcsmc\_final\_go\_result\_visible} 上。
+% 证据：Run-004 random 的 metrics_lora.json → critical_false_positives_by_fact: fcsmc_final_go_result_visible=8
+
+跨两个留出集，LoRA 适配器展示了三个关键特性。第一，它恢复了输出格式的可靠性：基础模型在 Run-004 留出集上偶尔产生格式错误的 JSON 或模式无效的响应，而 LoRA 适配器则不会。第二，它大幅提高了逐事实召回率，体现为 seen $F_1$ 从基础模型的 0.50--0.57 范围升至 LoRA 的 0.92--0.96。第三，它将关键假阳性减少了 64\%（Run-002）和 89\%（Run-004），尽管完成类事实（\texttt{fcsmc\_final\_go\_result\_visible}、\texttt{ins\_ok\_text\_visible}）上仍存在残余假阳性集。
+
+\textbf{与 8-fact v1 的比较。}
+% 证据：experiment_inventory.md §4.1 vs §4.2
+从 8-fact v1 本体迁移到 13-fact v2 本体后，LoRA 适配器在 Run-002 系列留出集上的事实准确率从 0.9150 升至 0.9908，样本完全匹配率从 0.36 升至 0.88。关键的是，v2 适配器减少了关键假阳性（在 Run-002 系列上从 15 降至 4），而不是像 v1 适配器相对于其基础模型那样增加它们。这表明扩展的事实本体、Run-003 + Run-005$\times$2 数据方案以及组合再平衡策略的组合解决了 v1 线中存在的假阳性脆弱性。
+% TODO:VERIFY — 是否将 8-fact→13-fact 比较作为论文内发现呈现，还是将 8-fact 仅保留在附录中。
+
+% ---------------------------------------------------------------------------
+\subsection{Gemma-4 13-Fact V2 对比}\label{sec:eval-gemma}
+
+% 证据：benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/benchmark_summary.json
+% 证据：benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/metrics_base.json
+% 证据：benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run002_newfacts_v2/metrics_lora.json
+% 声明：C-VLM-06
+
+% 证据：benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/benchmark_summary.json
+% 证据：benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/metrics_base.json
+% 证据：benchmarks/qwen35_vlm_finetune/gemma4_31b_run003_plus_run005x2_vs_base_holdout_run004_random_v2/metrics_lora.json
+
+为评估训练方案是否能泛化到单个骨干架构之外，相同的训练数据方案（Run-003 + Run-005$\times$2，928 行，双语，13-fact 本体）被应用于第二个 VLM 骨干：\texttt{google/gemma-4-31B}。
+% 证据：models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+训练超参数在可能的情况下进行了匹配：4 个轮数，学习率 $2 \times 10^{-4}$，LoRA $r=16$，$\alpha=16$，dropout $=0.0$，有效批次大小 4，最大序列长度 4096。差异包括使用 \texttt{all-linear} LoRA 目标模块（对比 Qwen 的 vision+language 附加）、4 位量化（\texttt{load\_in\_4bit=true}）、GPU 内存利用率 0.95，以及 \texttt{gemma-4} 对话模板。训练在 8050 秒内收敛，最终训练损失为 0.0474。注意，训练损失值不可在骨干间直接比较，因为分词器行为、模板结构和参数化各不相同。
+
+\begin{table}[htbp]
+\centering
+\caption{13-fact v2 基准测试：Gemma-4-31B 基础模型 vs.\ LoRA（Run-003 + Run-005$\times$2）在两个留出集上。}\label{tab:gemma-13fact}
+\begin{tabular}{l c c c c c c}
+\toprule
+& \multicolumn{3}{c}{\textbf{Run-002 newfacts (50)}} & \multicolumn{3}{c}{\textbf{Run-004 random (100)}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+\textbf{度量} & \textbf{基础模型} & \textbf{LoRA} & \textbf{$\Delta$} & \textbf{基础模型} & \textbf{LoRA} & \textbf{$\Delta$} \\
+\midrule
+JSON 有效       & 1.0    & 1.0    & ---  & 0.99   & 1.0    & +0.01 \\
+模式有效     & 1.0    & 1.0    & ---  & 0.99   & 1.0    & +0.01 \\
+事实准确率    & 0.8169 & 0.9492 & +0.1323 & 0.8146 & 0.9715 & +0.1569 \\
+宏 $F_1$      & 0.4432 & 0.5857 & +0.1425 & 0.4400 & 0.5630 & +0.1229 \\
+Seen $F_1$    & 0.5128 & 0.8123 & +0.2995 & 0.6332 & 0.7959 & +0.1627 \\
+完全匹配      & 0.04   & 0.44   & +0.40  & 0.12   & 0.74   & +0.62 \\
+关键 FP       & 16     & \textbf{0} & $-$16  & 47     & 13     & $-$34 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+表\ref{tab:gemma-13fact}证实 Run-003 + Run-005$\times$2 数据方案同样为 Gemma 骨干带来有意义的改进。
+% 声明：C-VLM-03b
+在两个留出集上，事实准确率从基础模型的 0.81--0.82 范围升至 LoRA 适配器的 0.95--0.97。最具特色的结果在 Run-002 newfacts 留出集上，Gemma LoRA 适配器实现了\textbf{零关键假阳性}（从 Gemma 基础模型的 16 降至 0）。这与 Qwen LoRA 适配器在同一留出集上保留 4 个关键假阳性形成对比。
+
+然而，Gemma 的保守行为在召回率和完全匹配性能上付出了代价。在 Run-002 上，Gemma LoRA 适配器的样本完全匹配率为 0.44，而 Qwen LoRA 为 0.88。在 Run-004 上，差距为 0.74（Gemma）vs.\ 0.92（Qwen）。Seen $F_1$ 遵循相似模式：在 Run-002 上为 0.81（Gemma）vs.\ 0.96（Qwen），在 Run-004 上为 0.80（Gemma）vs.\ 0.92（Qwen）。Gemma 基础模型在 Run-004 上是更强的起点（seen $F_1$ 为 0.6332 vs.\ Qwen 基础模型的 0.5659），但 Qwen LoRA 适配器的改进幅度更大，产生了更高的绝对性能天花板。
+
+与骨干对比报告一致的实践解释是，Qwen3.5-9B 适配器因其更高的总体准确率、更强的 seen $F_1$ 和更高的样本完全匹配率，仍然是下游系统集成的更优选择。
+% 证据：Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+Gemma 在 Run-002 上的零关键 FP 结果值得注意，表明即使在匹配的训练数据下，骨干层面的错误风格差异（保守 vs.\ 自信）也是可观察到的。
+% TODO:VERIFY — 是否将 Gemma 对比呈现在论文正文还是附录/讨论中。
+
+% ---------------------------------------------------------------------------
+\subsection{错误分析}\label{sec:eval-errors}
+
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/fact_scores.csv
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/fact_scores.csv
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/metrics_lora.json
+% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run004_random_v1/metrics_lora.json
+
+为了解剩余错误发生的位置以及哪些模式区分基础模型与 LoRA 适配器，本节提供最强配置（Qwen LoRA 在 13-fact v2 本体上）的逐事实分解。
+
+\subsubsection{按难度分类的事实类别}
+
+13 个视觉事实可分组为三个反映不同提取难度层次的类别。
+
+\textbf{第一组：粗粒度面板存在性（6 个事实）。}
+该组中的事实指示特定座舱面板或显示页面当前是否可见：\texttt{tac\_page\_visible}、\texttt{supt\_page\_visible}、\texttt{fcs\_page\_visible}、\texttt{bit\_root\_page\_visible}、\texttt{fcsmc\_page\_visible} 和 \texttt{hsi\_page\_visible}。这些是依赖识别大型、视觉独特的面板布局的结构性识别任务。
+
+Qwen LoRA 适配器在两个留出集——Run-002 newfacts 和 Run-004 random——上对所有六个事实实现了完美分类，唯一的例外是 Run-002 上的 \texttt{tac\_page\_visible}（50 个样本中有两个假阴性；TAC 页面在 50 个样本的 23 个中可见，因此这些代表遗漏检测而非幻觉）。
+% 证据：Run-002 newfacts metrics_lora.json → tac_page_visible seen: tp=21, fn=2
+相比之下，基础模型在若干这些事实上失败：它在 Run-002 上完全漏掉了所有五次 \texttt{supt\_page\_visible} 的出现（seen $F_1 = 0.0$），在 Run-002 上对 \texttt{bit\_root\_page\_visible} 幻觉出五个假阳性，并在 Run-004 上漏掉了 \texttt{fcs\_page\_visible} 94 次出现中的 18 次（seen recall $=0.81$）。
+
+\textbf{第二组：细粒度状态指示器（5 个事实）。}
+该组中的事实捕获微妙的面板内状态：\texttt{fcs\_page\_x\_marks\_visible}（FCS 页面上的 X 标记）、\texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible}、\texttt{fcsmc\_final\_go\_result\_visible}（FCS-MC 测试序列的三个渐进状态）以及 \texttt{hsi\_map\_layer\_visible}（HSI 上地图叠加层是否激活）。
+
+Qwen LoRA 适配器在两个留出集上对 \texttt{fcs\_page\_x\_marks\_visible}、\texttt{fcsmc\_intermediate\_result\_visible} 和 \texttt{hsi\_map\_layer\_visible} 实现了完美分类。在 Run-004 上 \texttt{fcsmc\_in\_test\_visible} 出现一个假阴性（17 个 seen 样本，正确识别 16 个）。最持久的错误源是 \texttt{fcsmc\_final\_go\_result\_visible}，适配器在 Run-002 上产生 1 个假阳性，在 Run-004 上产生 8 个假阳性（对比 60 个 seen 出现）。
+% 证据：Run-004 random metrics_lora.json → fcsmc_final_go_result_visible seen: tp=60, fp=8
+该事实要求区分 FCS-MC 面板内的特定数字读数，而一致的假阳性模式表明视觉上相似的中间状态偶尔被误分类为最终 GO 结果。
+
+基础模型在该组上的行为有质的不同。在 Run-004 上，基础模型仅在 \texttt{fcsmc\_intermediate\_result\_visible} 上就产生了 60 个关键假阳性（对比仅 7 个真正的 seen 出现），表明在区分此状态上几乎完全失败。基础模型在 \texttt{fcs\_page\_x\_marks\_visible}（两个留出集上 seen $F_1=0.0$）和 \texttt{fcsmc\_in\_test\_visible}（seen recall $\approx 0.33$--0.53）上也表现出较差的召回率。
+
+\textbf{第三组：小文本识别（2 个事实）。}
+事实 \texttt{ins\_grnd\_alignment\_text\_visible} 和 \texttt{ins\_ok\_text\_visible} 要求模型识别 INS 面板上的小型文本指示器。这些是本体中最细粒度的事实，对 9B 参数模型构成近乎 OCR 级别的挑战。
+
+Qwen LoRA 适配器在 \texttt{ins\_grnd\_alignment\_text\_visible} 上表现强劲：在 Run-004 上完美分类（69 seen，31 not seen），在 Run-002 上一个假阳性（42 seen，7 not seen）。
+% 证据：Run-002 newfacts metrics_lora.json → ins_grnd_alignment_text_visible: accuracy=0.98, seen_f1=0.9882
+在 \texttt{ins\_ok\_text\_visible} 上，适配器在 Run-002 上产生 2 个假阳性（对比 4 个 seen 出现；这些是 OK 文本尚不可见但适配器断言其存在的样本）。在 Run-004 上，\texttt{ins\_ok\_text\_visible} 从未出现（100 中的 0），适配器正确产生零假阳性，实现完美准确率。
+
+基础模型对这两个事实实际上是盲目的：在两个留出集上 \texttt{ins\_grnd\_alignment\_text\_visible} 的 seen $F_1 = 0.0$，\texttt{ins\_ok\_text\_visible} 的 seen $F_1 = 0.0$（尽管基础模型在 Run-004 上也从未看到它，因此 $F_1$ 度量根据构造报告为 0.0）。
+
+\subsubsection{错误分类}
+
+跨两个留出集聚合 Qwen LoRA 适配器的观察错误，可分为三种模式：
+
+\begin{enumerate}
+  \item \textbf{完成事实假阳性（主要）。}
+  残余错误的最大份额来自 \texttt{fcsmc\_final\_go\_result\_visible} 和 \texttt{ins\_ok\_text\_visible}，其中适配器偶尔断言一个尚不存在的完成/最终化状态。这些在基准测试中被归类为\textit{关键}假阳性，因为它们携带直接的下游风险：如果教学系统认为某步骤已完成而实际上并未完成，它可能过早推进程序。
+
+  \item \textbf{孤立的假阴性（次要）。}
+  \texttt{tac\_page\_visible} 上的两个假阴性（Run-002）和 \texttt{fcsmc\_in\_test\_visible} 上的一个假阴性（Run-004）代表对实际存在状态的遗漏检测。从教学安全角度来说这些不太严重（遗漏检测触发冗余提示而非跳过步骤），但表明残余的召回差距。
+
+  \item \textbf{小文本幻觉（次要）。}
+  \texttt{ins\_grnd\_alignment\_text\_visible} 上的一个假阳性（Run-002）代表适配器错误地检测到了校准状态文本。考虑到该指示器的小视觉足迹，此错误与预期难度特征一致。
+\end{enumerate}
+
+\subsubsection{混淆模式摘要}
+
+% 证据：基准测试目录包含基础模型和 LoRA 模型的逐事实混淆矩阵图表
+逐事实混淆矩阵（在每个基准测试目录中作为图表可用）揭示了基础模型错误中的系统性模式：基础模型容易对训练分布中出现频率较低的事实产生\textit{单向幻觉}。例如，\texttt{fcsmc\_intermediate\_result\_visible} 在 Run-004 留出集的 100 个样本中仅出现 7 次，但基础模型在另外 60 个不存在的样本中断言其为 \texttt{seen}。LoRA 适配器几乎完全消除了此类错误，表明组合再平衡和过采样策略有效抵消了基础模型过度预测频繁共现事实状态的倾向。
+
+% ---------------------------------------------------------------------------
+\subsection{运行时基础设施就绪度}\label{sec:eval-runtime}
+
+% 证据：replay_eval/fa18c_startup_v04/suite.yaml, cases/*/
+% 证据：logs/test_index/index.json
+% 声明：C-RUNTIME-01
+
+除 VLM 基准测试外，代码仓库包含功能性回放评估基础设施的证据。\texttt{replay\_eval/fa18c\_startup\_v04/} 处的回放评估套件定义了五个测试用例（\texttt{batteryon\_2min}、\texttt{Batteryon\_enginGenoff\_2min}、\texttt{fcs\_reset\_fcs\_bit\_2min}、\texttt{ins\_2min}、\texttt{noop\_2min}），具有 DCS-BIOS 原始捕获（\texttt{dcs\_bios\_raw.jsonl}）和逐帧副文件（\texttt{frames.jsonl}）。此基础设施支持在没有实时 DCS 实例的情况下回放录制的 DCS 会话，用于离线测试遥测流水线、知识检索和程序执行逻辑。
+
+运行时数据采集流水线通过 \texttt{core/event\_store.py} 模块记录结构化事件，并将其索引到 \texttt{logs/test\_index/index.json} 下。目前，该流水线捕获遥测快照、程序步骤转换和 VLM 推理请求。它尚未实现人因研究所需的参与者/会话模式、测验关联或 NASA-TLX 集成；这些是计划中的人因评估升级（第\ref{sec:eval-planned}节）。
+
+% ===========================================================================
+% --- B 部分：计划中人因评估（仅 TODO 声明）---
+% ===========================================================================
+\section{计划中的运行时数据采集与人因评估}\label{sec:eval-planned}
+% TODO: Planned human-subject evaluation design.
+
+% ===========================================================================
+% --- 本章小结 ---
+% ===========================================================================
+总结而言，本章呈现了：(a) 技术验证结果，证实经过 LoRA 微调的 VLM 适配器在 13-fact 视觉本体下跨两个独立留出集持续优于基础模型，其中 Qwen3.5-9B 骨干取得了最强的总体结果；(b) 训练方案泛化到第二个骨干架构（Gemma-4-31B）的证据，尽管具有不同的精确率-召回率权衡；(c) 逐事实错误分析，将完成事实假阳性确定为主要残余失效模式。
