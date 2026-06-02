@@ -389,9 +389,121 @@ base and LoRA models). These artifacts constitute the full evidence chain for
 the technical results reported in Chapter~\ref{ch:evaluation}.
 
 % ===========================================================================
+\section{Human-Subject Pilot Methodology}\label{sec:method-pilot}
+
+A small formative VR pilot study was conducted to gather descriptive evidence
+on how the tutoring system supports learners during the F/A-18C cold-start
+procedure compared with unaided practice. The pilot was designed as a
+preliminary field trial rather than a powered controlled experiment.
+
+\subsection{Participants and Conditions}
+
+Nine participants (P01--P09) were recruited from a convenience sample of DCS
+users with varied experience levels. Each participant completed one trial in a
+between-subjects design with two conditions:
+
+\begin{description}
+\item[With-tutor (n=4).] P04, P05, P08, P09. Participants received the full
+telemetry-grounded tutoring system with overlay highlights, VLM visual fact
+extraction, and structured help text displayed in the DCS in-game text area.
+Help was triggered via hotkey.
+\item[Without-tutor (n=5).] P01, P02, P03, P06, P07. Participants received no
+tutor assistance. Telemetry was recorded passively for later step inference
+and error coding, but no overlays or help text were shown.
+\end{description}
+
+Assignment to conditions was not randomised; participants were assigned based
+on scheduling availability. Prior DCS and VR experience varied across
+participants (see Appendix~\ref{ch:appendix}, Table~\ref{tab:pilot-participants}).
+
+\subsection{Task and Apparatus}
+
+All trials used the F/A-18C cold-start procedure with the full 33-step pack
+(S01--S33) in DCS World on a Meta Quest~3 via Quest Link. The composite-panel
+layout (left DDI, AMPCD, right DDI) was rendered on an external monitor for
+experimenter observation. The tutoring runtime ran on a Windows PC with remote
+model inference via an OpenAI-compatible endpoint. Each trial ended when the
+participant either completed the procedure (confirmed by terminal step
+completion or tutor declaration) or stopped voluntarily after being unable to
+progress.
+
+\subsection{Data Sources and Export Pipeline}
+
+For each trial, the experiment export pipeline produced a standardised set of
+artifacts:
+
+\begin{itemize}
+\item \texttt{trial\_summary.csv}: per-trial aggregate metrics (completion
+status, observed duration, help requests, LLM triggers, VLM calls, overlay
+executed/rejected, fallback count, step completion counts).
+\item \texttt{step\_coding.csv}: per-step coding with auto-coded errors
+(OM/CO/OR/PA/SV), evidence references, auto-confidence, and human review
+fields.
+\item \texttt{help\_cycles.csv}: per-help-cycle detail (generation mode,
+vision status, VLM call status, overlay targets, fallback reason) for
+tutor-condition trials.
+\item \texttt{action\_timeline.csv}: timestamped telemetry actions with fused
+step inference.
+\item \texttt{quality\_gate.json}: configuration hash verification, event
+count, and metadata completeness check.
+\item \texttt{session.json} / \texttt{summary.json}: per-trial session
+metadata and interaction summary.
+\end{itemize}
+
+\subsection{Error Taxonomy and Coding Policy}
+
+All steps were coded under a five-category error taxonomy: \textbf{OM}
+(omission --- step not completed), \textbf{CO} (commission --- step executed
+incorrectly or out of order), \textbf{OR} (order error), \textbf{PA}
+(prompting/assistance error --- step completed only after tutor intervention
+or with incorrect tutor guidance), and \textbf{SV} (state violation).
+
+The automated coding pipeline produced initial error labels (Auto\_Error\_*
+columns), which were then reviewed and corrected by a human coder
+(CodexTelemetryReview) using raw telemetry, help-cycle logs, and action
+timeline evidence. Human-coded columns (Error\_OM through Error\_SV) are the
+authoritative data source for all reported results.
+
+\subsection{Data-Quality Notes}
+
+Two trials require explicit data-quality documentation:
+
+\paragraph{P08 --- auto-summary override.}
+The automated trial summary reported P08 as incomplete (Completed=no,
+TotalStepsCompleted=5/33). However, manual telemetry review confirmed that all
+33 steps reached their required states. The auto-pipeline failed because it
+required explicit step evidence and gate completion signals that the passive
+visual inference path could not reconstruct for several vision-priority steps.
+Following the coding policy, manual coding overrides the auto-summary; P08 is
+reported as completed (33/33 steps) with zero manual errors. The pre-review
+coding file (\texttt{step\_coding.before\_codex\_log\_review.csv}) is preserved
+for audit in the experiment artifacts.
+
+\paragraph{P02 --- questionnaire metadata unresolved.}
+P02's trial directory contains a questionnaire JSON file with internal
+participant\_id = P01, indicating a file mislabelling during export. P02's
+task metrics (steps completed, errors) are derived from
+\texttt{trial\_summary.csv} and \texttt{step\_coding.csv} and are usable. P02
+is excluded from any workload, TLX, or confidence summaries because the
+questionnaire data cannot be confidently attributed.
+
+\subsection{Analysis Approach}
+
+Given the small sample ($n=9$) and non-random assignment, the analysis is
+strictly descriptive. No null-hypothesis significance tests are performed.
+Results are reported as per-participant counts and condition-level summaries.
+Observed trial durations are reported but cannot be interpreted as completion
+time comparisons because without-tutor trials were stopped at different points
+by participants who could not progress further. The analysis focuses on three
+descriptive questions: (1) whether participants completed the procedure,
+(2) what categories of procedural error occurred and how they differed between
+conditions, and (3) how tutor interaction was used (help requests, VLM calls,
+overlay actions, fallback events).
+
+% ===========================================================================
 \section{Summary}\label{sec:method-summary}
 
-The methodology is characterised by three properties. First, \emph{end-to-end
+The methodology is characterised by four properties. First, \emph{end-to-end
 traceability}: every benchmark metric can be traced through training data,
 human-reviewed labels, and original DCS screenshots. Second, \emph{strict
 holdout independence}: contaminated development benchmarks and independent
@@ -400,4 +512,6 @@ Third, \emph{matched comparison design}: the identical data recipe, benchmark
 protocol, and evaluation sets are applied across three backbones
 (Qwen3.5-9B, Qwen3.6-27B, Gemma-4-31B), enabling controlled comparison of
 model scale, version, and family effects while holding data and evaluation
-constant.
+constant. Fourth, \emph{descriptive pilot analysis}: the human-subject pilot
+is analysed descriptively with explicit data-quality documentation and no
+inferential statistical claims.

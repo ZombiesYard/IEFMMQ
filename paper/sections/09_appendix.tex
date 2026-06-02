@@ -198,3 +198,86 @@ Cases with \texttt{vision\_status = available} include per-frame sidecar files
 (\texttt{frames.jsonl}) in the corresponding DCS Saved Games directory,
 enabling replay of vision-dependent procedure steps without a live DCS
 instance.
+
+% ===========================================================================
+\section{VR Pilot Study --- Supplementary Data}\label{sec:appendix-pilot}
+
+Table~\ref{tab:pilot-participants} lists participant experience profiles.
+
+\begin{table}[htbp]
+\centering
+\caption{Pilot participant experience profiles (self-reported).}\label{tab:pilot-participants}
+\small
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+\textbf{P} & \textbf{Condition} & \textbf{DCS exp.} & \textbf{Flight sim.} & \textbf{VR exp.} & \textbf{Quest~3} & \textbf{Group} \\
+\midrule
+P01 & without\_tutor & frequent & frequent & frequent & frequent & intermediate \\
+P02 & without\_tutor & intermediate & intermediate & frequent & frequent & --- \\
+P03 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
+P04 & with\_tutor    & intermediate & intermediate & frequent & frequent & intermediate \\
+P05 & with\_tutor    & intermediate & intermediate & frequent & frequent & --- \\
+P06 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
+P07 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
+P08 & with\_tutor    & novice & novice & frequent & frequent & --- \\
+P09 & with\_tutor    & novice & novice & intermediate & intermediate & beginner \\
+\bottomrule
+\end{tabular}
+
+--- = not recorded.
+\end{table}
+
+Table~\ref{tab:pilot-uncompleted} lists the specific steps not completed by
+each without-tutor participant.
+
+\begin{table}[htbp]
+\centering
+\caption{Steps not completed in the without-tutor condition (manual coding).}\label{tab:pilot-uncompleted}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{P} & \textbf{Steps not completed} \\
+\midrule
+P01 & S09, S12, S18, S19, S20, S22, S24, S27, S29, S31 \\
+P02 & S02, S14, S18, S19, S27, S30 \\
+P03 & S07, S09, S16, S18, S19, S26, S27, S29, S32 \\
+P06 & S07, S18, S19, S27 \\
+P07 & S02, S09, S12, S13, S16, S17, S18, S19, S22, S26, S27, S28, S29, S32 \\
+\bottomrule
+\end{tabular}
+
+S18 (FCS-MC BIT page on right DDI) and S19 (FCS BIT final GO result) are
+missed by all five without-tutor participants. S27 (flap switch to AUTO) is
+missed by all five. These steps are vision-priority and require either VLM
+confirmation or instructor knowledge of the correct display-page sequence.
+\end{table}
+
+Table~\ref{tab:pilot-errors-auto} reports the auto-coded error counts (before
+manual review) alongside the manual error counts, illustrating the magnitude of
+auto-to-manual correction in this pilot.
+
+\begin{table}[htbp]
+\centering
+\caption{Auto-coded vs.\ manual error counts per participant.}\label{tab:pilot-errors-auto}
+\small
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+\textbf{P} & \textbf{Condition} & \textbf{Auto OM} & \textbf{Auto CO} & \textbf{Manual OM} & \textbf{Manual CO} & \textbf{Total manual} \\
+\midrule
+P01 & without\_tutor & 4  & 3  & 8  & 0 & 10 \\
+P02 & without\_tutor & 0  & 3  & 0  & 0 & 1  \\
+P03 & without\_tutor & 0  & 4  & 7  & 0 & 11 \\
+P06 & without\_tutor & 0  & 3  & 2  & 0 & 4  \\
+P07 & without\_tutor & 1  & 9  & 11 & 0 & 11 \\
+P04 & with\_tutor    & 0  & 4  & 0  & 3 & 7  \\
+P05 & with\_tutor    & 0  & 3  & 0  & 3 & 6  \\
+P08 & with\_tutor    & 0  & 3  & 0  & 0 & 0  \\
+P09 & with\_tutor    & 0  & 3  & 0  & 3 & 5  \\
+\bottomrule
+\end{tabular}
+
+Auto-coded errors are from the automated pipeline (Auto\_Error\_* columns in
+\texttt{step\_coding.csv}). Manual errors are from the human-reviewed columns
+(Error\_*). P08's auto errors were all overridden to zero by manual review
+(see data-quality note in Section~\ref{sec:eval-pilot}).
+\end{table}

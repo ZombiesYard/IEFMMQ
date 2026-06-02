@@ -16,9 +16,10 @@ This chapter interprets the results presented in Chapter~\ref{ch:evaluation} and
 situates them within the larger trajectory of the thesis.
 Section~\ref{sec:disc-evolution} explains why the project evolved from the
 original VR-first proposal toward the telemetry- and VLM-heavy implementation
-reported here.
+reported here, and how the formative pilot study fits within this trajectory.
 Section~\ref{sec:disc-interpretation} interprets what the benchmark results do
 and do not demonstrate.
+Section~\ref{sec:disc-pilot} interprets the formative VR pilot findings.
 Section~\ref{sec:disc-ontology} draws design lessons from the two-generation
 evolution of the visual fact ontology.
 Section~\ref{sec:disc-limitations} enumerates the known limitations of the
@@ -28,7 +29,41 @@ from these limitations.
 
 % ===========================================================================
 \section{Evolution from Proposal to Implemented System}\label{sec:disc-evolution}
-% TODO: Discussion of project evolution
+
+The original thesis proposal~\citep{ThesisProposal1128} specified a VR-first
+grounded tutoring system with gaze, hand-tracking, and voice input on the
+Meta Quest~3, supported by a lightweight RAG+LLM backend and evaluated through
+a three-condition human-subject study. The work reported in this thesis differs
+from that vision in two substantive ways.
+
+First, the implementation effort shifted from VR-native interaction to
+telemetry-grounded tutoring on desktop DCS, because the core technical
+challenges---reliable telemetry processing, evidence grounding, VLM-based
+visual fact extraction, and harness-level output validation---required a
+stable development and debugging environment that desktop DCS provides. This
+shift produced the ports-and-adapters architecture, the procedure pack and
+gating engine, the deterministic fallback path, the JSONL logging and replay
+infrastructure, and the VLM adaptation pipeline---none of which were
+anticipated in the original proposal.
+
+Second, the VLM adaptation work grew from an unplanned component into one of
+the thesis's main contributions. The original proposal assumed read-only
+simulator state flags would suffice for procedural state tracking; in
+practice, several critical procedure steps require visual confirmation of
+display-page content not exported by DCS-BIOS. Addressing this gap led to
+the visual fact ontology, the seven-stage data pipeline, the LoRA fine-tuning
+experiments, and the three-backbone benchmark comparison---forming a
+self-contained contribution with verified holdout evidence.
+
+The formative VR pilot study (RQ3) represents a partial convergence back
+toward the original proposal's human-subject evaluation ambition. The pilot
+used the Quest~3 with the full tutoring runtime, produced real participant
+data, and demonstrated that the evidence-grounded infrastructure operates
+correctly in a live VR setting. However, the pilot was small ($n=9$),
+non-randomised, and descriptive rather than inferential. It does not fulfil
+the proposal's three-condition controlled evaluation goal. The gap between the
+formative pilot and a fully powered controlled study remains the central
+unfinished thread of the thesis.
 
 % ===========================================================================
 \section{Interpretation of Technical Results}\label{sec:disc-interpretation}
@@ -38,7 +73,7 @@ from these limitations.
 % Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8
 % Claims: C-VLM-04, C-VLM-05 (verified); C-VLM-03b, C-VLM-06 (likely)
 
-The benchmark results reported in Section~\ref{sec:eval-tech} provide evidence
+The benchmark results reported in Section~\ref{sec:eval-rq2} provide evidence
 about the performance of the VLM visual fact extraction pipeline.
 This section draws interpretive conclusions from those results, distinguishing
 carefully between what the benchmarks demonstrate and what they do not.
@@ -151,6 +186,54 @@ design decision in the ontology evolution, and the benchmark results bear out
 its effectiveness: \texttt{ins\_grnd\_alignment\_text\_visible} achieves a seen
 $F_1$ of 0.99 on Run-002, and \texttt{ins\_ok\_text\_visible} produces only 2
 false positives on Run-002 and zero on Run-004.
+
+% ===========================================================================
+\section{Interpretation of Pilot Findings}\label{sec:disc-pilot}
+
+The formative VR pilot study (Section~\ref{sec:eval-pilot}) provides
+descriptive evidence that must be interpreted within its proper scope.
+
+\textbf{Completion and omission errors.}
+The clearest signal is the completion gap: 4/4 with-tutor participants
+completed all 33 steps, while 0/5 without-tutor participants did. Coupled
+with the error coding---zero OM errors in the tutor condition versus a mean
+of 5.6 OM errors in the without-tutor condition---this suggests the tutor
+helped participants progress through the procedure by reducing missed steps.
+This is consistent with the tutor's design: the help system actively
+identifies the next required step and highlights the relevant cockpit control,
+making it harder for a participant to skip a step unknowingly.
+
+\textbf{Assistance-coupled errors.}
+The tutor condition did not eliminate errors; it changed their composition.
+CO and PA errors appeared in three of four with-tutor trials, with a total
+of 9 CO and 8 PA errors across the condition. These are primarily
+assistance-coupled: cases where the tutor provided guidance that was followed
+but where the resulting action did not fully align with the procedure
+specification. For example, the harness occasionally repaired model-proposed
+overlay targets (PB18 to PB5 for BIT root sub-state), and these repairs,
+while correct, could produce a participant action that was technically the
+right control but in a slightly different context than the strict procedure
+definition. These errors highlight the inherent tension between flexible
+LLM-generated guidance and fixed procedural specifications: the tutor can
+guide correctly in substance while deviating in form.
+
+\textbf{Infrastructure reliability.}
+The zero overlay rejection rate (0/82) across 77 help cycles provides
+evidence that the evidence-grounding, allowlist, and schema validation
+pipeline functions correctly in live VR operation. All 21 fallback events
+were harness repairs (target re-mapping), not rejections. This supports the
+architectural claim that evidence grounding can be enforced at the schema
+level without blocking legitimate tutor output.
+
+\textbf{What the pilot does not show.}
+The pilot provides no evidence about learning (no pre/post knowledge
+measures), retention (no follow-up testing), workload (P02 questionnaire data
+unresolved; other questionnaire data not yet fully coded), or transfer. The
+small sample, non-random assignment, and variable participant experience mean
+that observed differences between conditions cannot be attributed to the
+tutor alone. The pilot's value is formative: it demonstrates that the
+instrumentation pipeline captures the intended data, that the tutor functions
+end-to-end in VR, and that the experimental design is executable.
 
 % ===========================================================================
 \section{Ontology Design Lessons}\label{sec:disc-ontology}
@@ -355,28 +438,61 @@ cockpit types or new simulators).
 
 \subsection{Limitations of the System}
 
-\textbf{VR code path verified functional; human-subject validation pending.}
-The VR runtime code path has been verified functional end-to-end by the author (VR\_MIRROR, tutor text display, composite-panel capture in VR mode) but has not yet been validated through controlled human-subject experiments.
-In-headset interaction, overlay rendering in VR, and latency characteristics under study conditions have not been tested with participants.
+\textbf{VR runtime operational; pilot completed but controlled study pending.}
+The VR runtime has been exercised in a formative pilot study with nine
+participants (Section~\ref{sec:eval-pilot}), confirming that the tutoring
+system functions end-to-end in live VR operation. However, the pilot was small
+($n=9$), non-randomised, and descriptive. In-headset overlay rendering and
+latency characteristics under study conditions have been observed but not
+systematically measured.
 
-\textbf{No human-subject evaluation.}
-This is the most significant limitation of the current work.
-The benchmarks demonstrate that the VLM adapter extracts visual facts accurately
-on held-out data, but they provide no evidence about whether the full tutoring
-system --- with or without visual fact extraction --- improves any
-human-relevant outcome: learning, retention, transfer, workload, or procedural
-error rate.
-A human-subject study is required to establish the pedagogical value of the
-system, and the current work does not include such a study.
+\textbf{No controlled human-subject evaluation.}
+The formative pilot provides descriptive evidence of feasibility but does not
+constitute a controlled evaluation. The pilot provides no evidence about
+whether the tutoring system improves learning, retention, transfer, or
+workload relative to baseline conditions. The causal chain from tutoring
+system use to improved human learning outcomes remains untested. A larger
+controlled study with randomised assignment, pre-registered analysis, and
+adequate statistical power is required to establish pedagogical value.
 
 \textbf{The benchmark measures fact extraction, not tutoring quality.}
-Even within the technical evaluation, the metrics reported are perception
-metrics computed on isolated single-frame fact extraction.
-They do not measure the quality, usefulness, or timeliness of the tutor's help
-responses, the correctness of overlay targets, or the coherence of multi-turn
-help sequences.
-An end-to-end evaluation of the full help cycle --- from simulator observation
-through tutoring output --- has not been conducted.
+The VLM benchmarks reported in Section~\ref{sec:eval-rq2} are perception
+metrics computed on isolated single-frame fact extraction. They do not measure
+the quality, usefulness, or timeliness of the tutor's help responses, the
+correctness of overlay targets, or the coherence of multi-turn help sequences.
+The pilot study addresses some of these gaps at a formative level, but an
+end-to-end evaluation of the full help cycle under controlled conditions has
+not been conducted.
+
+\subsection{Limitations of the Pilot Study}
+
+\textbf{Small sample and non-random assignment.}
+The pilot's nine participants were assigned to conditions based on scheduling
+availability, not randomisation. With four with-tutor and five without-tutor
+participants, condition sizes are small and unbalanced. No inferential
+statistical tests are appropriate.
+
+\textbf{Variable participant experience.}
+Participants ranged from novice to frequent DCS users. Prior experience was
+not balanced across conditions, and the small sample precludes statistical
+control for experience effects.
+
+\textbf{Incomplete workload and questionnaire data.}
+P02's questionnaire file was mislabelled and could not be confidently
+attributed; workload, TLX, and confidence data are therefore incomplete.
+NASA-TLX integration was not yet implemented in the export pipeline for these
+trials.
+
+\textbf{Without-tutor duration not comparable.}
+Without-tutor trials ended at different procedure points (19--29 steps
+completed), so observed durations do not measure completion time and cannot be
+compared with with-tutor durations.
+
+\textbf{Passive visual verification limitation.}
+For without-tutor trials, step completion was inferred from passive telemetry
+gates and action timeline review, without active VLM visual confirmation.
+Steps requiring visual evidence (S08, S18) may be misclassified as completed
+or not completed based on incomplete telemetry evidence alone.
 
 \subsection{Limitations of the VLM Adaptation Results}
 
@@ -409,10 +525,12 @@ conducted.
 \subsection{Scope Summary}
 These limitations bound the claims of this thesis.
 Within these bounds, the thesis demonstrates: (1) a working dual-platform
-tutoring runtime with automated tests; (2) a reproducible VLM adaptation pipeline
-achieving 0.99 fact accuracy on holdout data; (3) cross-backbone evidence that
-the data recipe is not architecture-specific; and (4) a pack-driven architecture
-supporting extension to new procedures and simulators.
+tutoring runtime with automated tests and harness-level evidence validation;
+(2) a reproducible VLM adaptation pipeline achieving 0.99 fact accuracy on
+holdout data with cross-backbone evidence; (3) a pack-driven architecture
+supporting extension to new procedures and simulators; and (4) formative VR
+pilot evidence ($n=9$) that the tutor enables procedural completion and
+reduces omission errors, while not eliminating assistance-coupled errors.
 These contributions do not depend on claims that exceed the stated bounds.
 
 % ===========================================================================
@@ -427,38 +545,20 @@ The limitations enumerated above define a concrete research agenda.
 This section outlines the principal directions for future work, ordered from the
 most immediate technical extensions to the longer-term thesis objectives.
 
-\subsection{VR Runtime Integration}
+\subsection{Controlled Human-Subject Evaluation}
 
-The most direct path toward the original thesis vision is the experimental
-validation of the VR runtime with human subjects.
-The VR code path has been verified functional end-to-end by the author (VR\_MIRROR configuration, tutor text UDP
-injection, composite-panel capture in VR mode); what remains is to validate the
-telemetry pipeline and VLM inference under VR rendering loads with study
-participants, and to adapt the help trigger mechanism from desktop hotkey to VR
-controller or gaze-based interaction.
-The modular architecture described in Chapter~\ref{ch:system-design} is designed
-to support this transition: the core tutoring logic, procedure engine, and VLM
-pipeline are simulator-platform-agnostic, and only the input/output adapters
-require modification.
-
-\subsection{Human-Subject Evaluation}
-
-The planned between-subjects evaluation described in
-Section~\ref{sec:eval-planned} remains the central empirical objective of the
-thesis.
-Conducting this study requires completing the infrastructure upgrades enumerated
-in Section~\ref{sec:eval-planned} --- participant/session schema,
-NASA-TLX integration, quiz linkage, and anonymisation --- and recruiting a
-sufficient participant sample.
-Given the small planned sample size ($n = 5$--$10$ per condition), the study
-should be designed and reported with attention to effect sizes and confidence
-intervals rather than null-hypothesis significance testing, and the analysis plan
-should be pre-registered to strengthen the credibility of the findings.
-
-\textbf{TODO:VERIFY} --- whether the three-condition design (video + notes vs.\
-ungrounded text-only LLM vs.\ grounded tutor) is still feasible given the shift
-to desktop DCS, or whether a two-condition comparison (grounded tutor vs.\
-ungrounded baseline) is more practical for the first study.
+The formative pilot study (Section~\ref{sec:eval-pilot}) demonstrated
+feasibility and instrumentation readiness but did not provide controlled
+evidence about learning, workload, or retention. The next research stage is a
+larger controlled between-subjects evaluation comparing the grounded tutor
+against an appropriate baseline condition (e.g., without-tutor or static
+checklist). This requires completing the participant/session metadata schema,
+NASA-TLX integration, quiz linkage, and anonymisation pipeline; recruiting an
+adequate sample with randomised assignment; and pre-registering the analysis
+plan. Given the pilot's observed effect on completion rates, a two-condition
+design (with-tutor vs.\ without-tutor) with $n \geq 15$ per condition would
+provide a more feasible starting point than the original three-condition
+proposal design.
 
 \subsection{Extending the Visual Fact Ontology to Other Procedures}
 
@@ -521,7 +621,7 @@ vision-priority steps; the rate of deterministic fallback (when model output
 fails validation); and the perceived usefulness of help responses as judged by
 domain experts reviewing replay logs.
 Such an evaluation would bridge the gap between the component-level benchmarks
-(reported here) and the human-subject evaluation (planned), providing evidence
+(reported here) and the pilot study (Section~\ref{sec:eval-pilot}), providing evidence
 about whether the system's components function correctly when integrated.
 
 \subsection{Summary of Future Directions}
@@ -538,13 +638,9 @@ current status.
   \toprule
   \textbf{Direction} & \textbf{Current status} & \textbf{Key challenge} \\
   \midrule
-  VR runtime integration &
-    VR code path implemented and verified functional; human-subject validation pending &
-    Experimental validation with participants, latency under study conditions \\
-
-  Human-subject evaluation &
-    Design specified; infrastructure upgrades pending &
-    Recruitment, statistical power, platform choice \\
+  Controlled human-subject evaluation &
+    Formative pilot completed ($n=9$); controlled study pending &
+    Recruitment, randomisation, statistical power \\
 
   Ontology extension to other procedures &
     13-fact v2 validated for cold-start only &

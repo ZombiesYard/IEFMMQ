@@ -78,16 +78,15 @@ To what extent can a small-data LoRA-adapted VLM reliably extract structured
 cockpit visual facts, and how does visual fact ontology design affect critical
 false positives?
 
-\paragraph{RQ3 --- Human-subject evaluation design.}
-In a VR-based F/A-18C cold-start training task, how would a grounded tutor
-affect task performance, procedural errors, workload, and user experience
-compared with baseline training support?
+\paragraph{RQ3 --- Formative VR pilot evidence.}
+In a VR-based F/A-18C cold-start training task, what formative evidence does a
+small pilot study provide about task completion, procedural errors, and tutor
+interaction in a with-tutor versus without-tutor comparison?
 
 RQ1 and RQ2 are addressed through the design, implementation, and technical
-evaluation presented in this thesis. RQ3 is addressed through a documented
-evaluation design and instrumentation framework; the controlled
-human-subject study itself constitutes the next phase of the research
-programme.
+evaluation presented in this thesis. RQ3 is addressed through a completed
+formative VR pilot study ($n=9$) and a documented evaluation framework;
+larger controlled human-subject evaluation remains future work.
 
 % ===========================================================================
 \section{Thesis Vision and Scope}\label{sec:intro-vision}
@@ -115,8 +114,9 @@ visual fact extraction pipeline with LoRA fine-tuning, an evidence-grounding
 architecture enforced at the JSON Schema level, and a systematic benchmark
 protocol with verified holdout independence. Third, the VR code path has been
 implemented and verified functional (VR\_MIRROR, tutor text display,
-composite-panel capture), but controlled human-subject evaluation in VR has
-not yet been conducted.
+composite-panel capture). A formative pilot study has been conducted in VR
+(Section~\ref{sec:eval-pilot}); larger controlled evaluation remains future
+work.
 
 The scope of this thesis is therefore threefold:
 \begin{enumerate}
@@ -126,9 +126,10 @@ The scope of this thesis is therefore threefold:
 \item The technical validation of the VLM adaptation pipeline through
   systematic benchmark evaluation on independent holdout sets
   (Chapter~\ref{ch:evaluation}, Part~A);
-\item The documentation of a planned VR human-subject evaluation design and
-  the instrumentation infrastructure that makes it feasible
-  (Chapter~\ref{ch:evaluation}, Part~B).
+\item A formative VR pilot study ($n=9$) providing descriptive evidence on
+  task completion, procedural errors, and tutor interaction under with-tutor
+  versus without-tutor conditions, supported by experiment instrumentation
+  and a documented evaluation framework (Chapter~\ref{ch:evaluation}, Part~B).
 \end{enumerate}
 
 % ===========================================================================
@@ -206,21 +207,25 @@ Chapter~\ref{ch:evaluation}, Sections~\ref{sec:eval-qwen-13fact}
 and~\ref{sec:eval-gemma}.
 % Evidence: C-VLM-01 through C-VLM-07, C-DATA-01, C-TRAIN-01
 
-\item \textbf{A VR procedural training evaluation framework.}
-The thesis delivers study-ready instrumentation for a three-condition
-between-subjects evaluation of grounded procedural tutoring in immersive
-simulation: experiment export tooling, a Windows launcher with session
-management, baseline and passive condition configurations, semi-automated
-pre-scoring, error coding guides, NASA-TLX forms, and an experiment operation
-manual. The evaluation design, study materials, and infrastructure are
-documented in Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-planned}, and
-in the accompanying experiment documentation. Controlled human-subject data
-collection constitutes the next phase of the research programme.
-% Evidence: C-HUMAN-01, C-HUMAN-02, C-HUMAN-03, C-DATA-COLLECT-01
-% Status: all four claims are TODO for human-subject OUTCOMES (no
-% participant data exists). This contribution covers only the study
-% DESIGN, instrumentation, and experiment infrastructure --- not any
-% measured learning, workload, or performance results.
+\item \textbf{A VR procedural training evaluation framework and formative
+pilot study.}
+The thesis delivers study-ready instrumentation for evaluating grounded
+procedural tutoring in immersive simulation: experiment export tooling, a
+Windows launcher with session management, baseline and passive condition
+configurations, semi-automated pre-scoring, error coding guides, and an
+experiment operation manual. A formative VR pilot study ($n=9$) was conducted
+with four with-tutor and five without-tutor participants. All four
+tutor-condition participants completed the full 33-step procedure; none of
+the five without-tutor participants did. With-tutor errors were predominantly
+assistance-coupled (CO/PA), while without-tutor errors were predominantly
+omissions. The pilot provides descriptive evidence of feasibility and
+instrumentation readiness; larger controlled evaluation remains future work.
+This contribution is documented in Chapter~\ref{ch:evaluation},
+Section~\ref{sec:eval-pilot}, and Appendix~\ref{ch:appendix}.
+% Evidence: artifacts/experiments/fa18c_quest3_simitutor_2026/
+% Status: pilot completed with real participant data (n=9). Claims are
+% descriptive/formative only --- no inferential statistics, no learning
+% outcome validation, no retention/transfer evidence.
 
 \end{enumerate}
 
@@ -255,7 +260,7 @@ help generation, VLM visual fact extraction, and replay infrastructure.
 
 \textbf{Chapter~\ref{ch:evaluation}} reports current technical results (VLM
 benchmarks, error analysis, runtime infrastructure readiness) in Part~A, and
-documents the planned VR human-subject evaluation design in Part~B.
+reports the formative VR pilot study results in Part~B.
 
 \textbf{Chapter~\ref{ch:discussion}} interprets the results, explains the
 evolution from the original proposal to the current system, draws design
