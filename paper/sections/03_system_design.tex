@@ -1,419 +1,439 @@
 % ===========================================================================
 %  03 — System Design
 %
-%  Source of truth: paper_context/repo_inventory.md §1–11
 %  Claims: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02,
 %          C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-RUNTIME-01
 % ===========================================================================
 \chapter{System Design}\label{ch:system-design}
 
-This chapter describes the design of a telemetry-grounded tutoring runtime for procedural training in the DCS F/A-18C cold-start task.
-It covers the system architecture, component design, and design rationale.
-Detailed methodology---including the VLM adaptation protocol, dataset curation, and benchmark design---is deferred to Chapter~\ref{ch:methodology}; implementation-level details of specific modules appear in Chapter~\ref{ch:implementation}.
-Section~\ref{sec:design-goals} derives the design goals from the thesis problem statement.
-Section~\ref{sec:design-arch} presents the overall architecture and the separation of core tutoring logic from simulator-specific adapters.
-Section~\ref{sec:design-dataflow} describes the runtime data flow through the main help cycle.
-Sections~\ref{sec:design-telemetry} and~\ref{sec:design-procedure} cover the telemetry processing pipeline and the procedure and gating rule engines.
-Section~\ref{sec:design-adapters} details the simulator adapter layer and Lua-side integration.
-Section~\ref{sec:design-replay} describes the event logging, replay, and scoring infrastructure.
-Section~\ref{sec:design-vlm} presents the VLM adaptation component for visual state understanding.
+This chapter presents the architecture of a telemetry-grounded tutoring runtime
+for procedural training. It covers the design rationale, the evidence-grounded
+help cycle, the core components, and the harness engineering that enforces
+correctness. Methodology-level detail---the VLM adaptation protocol, dataset
+curation, and benchmark design---is deferred to Chapter~\ref{ch:methodology};
+implementation-level specifics appear in Chapter~\ref{ch:implementation}.
 
 % ===========================================================================
 \section{Design Goals and Requirements}\label{sec:design-goals}
 
-The thesis addresses the problem of providing grounded, context-aware procedural guidance to a learner operating a complex simulator.
-In the target scenario---the F/A-18C cold-start procedure in DCS World---the learner must execute a fixed sequence of 25 steps (S01--S25) spanning six phases (P1--P6), from battery power-up through engine start, avionics configuration, flight-control checks, and taxi preparation.
-% Evidence: packs/fa18c_startup/pack.yaml (25 steps across phases P1--P6), packs/fa18c_startup/step_registry.yaml
-Each step has specific preconditions that must be satisfied before execution and completion conditions that must be met before advancing.
-Mistakes include omissions, order errors, parameter-setting errors, and state violations---categories formalised in the error taxonomy described in Chapter~\ref{ch:methodology}.
-
-From this problem, we derive the following design goals:
+The thesis addresses the problem of providing grounded, context-aware
+procedural guidance in the F/A-18C cold-start procedure---a fixed sequence of
+25 core steps (S01--S25, extended to S33 in the current pack) across six
+operational phases. Each step has preconditions that must be satisfied before
+execution and completion conditions that must be met before advancing. From
+this problem, six design goals are derived:
 
 \begin{description}
 \item[G1 -- Simulator-based procedural tutoring.]
-The system must observe the learner's actions through simulator state, determine which procedural step the learner is currently attempting, and provide timely, grounded guidance when the learner is stuck or requests help.
-The tutoring output must reference concrete cockpit elements and cite evidence from telemetry, documentation, or visual facts.
-% Evidence: core/procedure.py, core/gating.py, core/step_hint.py, help_flow_en.md
+The system must observe learner actions through simulator state, determine the
+current procedural step, and provide timely, grounded guidance. Tutoring
+output must reference concrete cockpit elements and cite evidence.
+% Evidence: core/procedure.py, core/gating.py
 
 \item[G2 -- State-aware step guidance.]
-The system must track procedure progress through a formal state machine.
-It must evaluate preconditions before allowing a step to become active and verify completion conditions before advancing.
-Guidance must be conditional on the current simulator state, not merely on step order.
-% Evidence: core/procedure.py (state-machine tracking), core/gating.py (state-dependent gating)
+Procedure progress is tracked through a formal state machine. Preconditions
+are evaluated before step activation; completion conditions are verified
+before advancement. Guidance must be conditional on current simulator state,
+not merely step order.
+% Evidence: core/procedure.py, core/gating.py
 
-\item[G3 -- Separation between tutoring logic and simulator-specific integration.]
-The core tutoring logic---procedure tracking, gating, scoring, and help generation---must be independent of any particular simulator, model provider, or knowledge source.
-Simulator-specific code, model-provider code, and knowledge-retrieval code must be isolated behind stable interfaces so that the core can be tested without a running simulator and can be ported to other simulators or training domains.
+\item[G3 -- Separation of tutoring logic from simulator integration.]
+The core tutoring logic---procedure tracking, gating, scoring, help
+generation---must be independent of any particular simulator or model
+provider. Simulator-specific code is isolated behind stable interfaces so the
+core can be tested without a running simulator.
 % Evidence: ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
 
 \item[G4 -- Replayability and inspectability.]
-Every interaction between the learner, the tutoring system, and the simulator must be recorded as structured, timestamped events.
-These event logs must support offline replay for debugging, automated scoring against a procedure pack, and post-hoc analysis of learner behaviour.
-They must also support replay of telemetry captures and benchmark traces for the VLM adaptation pipeline.
-% Evidence: core/event_store.py, simtutor/runner.py
+Every interaction is recorded as structured, timestamped events supporting
+offline replay, automated scoring, and post-hoc analysis.
 
-\item[G5 -- Foundation-model and VLM-based visual fact extraction.]
-The system must be able to operate with or without a large language model.
-When a model is available, it provides richer diagnoses and explanations.
-When unavailable or when its output fails validation, the system must degrade gracefully to deterministic, rule-based fallback behaviour.
-Vision-language model (VLM) based visual fact extraction from cockpit screenshots is a core system component that complements telemetry gating by providing structured visual evidence for display-page states not exported through DCS-BIOS.
-% Evidence: help_flow_en.md §5, model_access.md
+\item[G5 -- Model-optional operation with deterministic fallback.]
+When a language model is available, it provides richer diagnoses; when
+unavailable or when its output fails validation, the system degrades
+gracefully to deterministic, rule-based behaviour. A VLM-based visual fact
+extraction path complements telemetry gating for display-page states not
+exported through DCS-BIOS.
 
-\item[G6 -- Extensibility to different simulators and procedures.]
-The procedure definition, UI target mapping, telemetry mapping, error taxonomy, and knowledge source policy must be expressed as declarative configuration (YAML files) rather than hard-coded in source code.
-Adding a new procedure or adapting the system to a different simulator should require only new configuration artifacts, not changes to the core tutoring logic.
+\item[G6 -- Declarative procedure configuration.]
+Procedure definitions, UI targets, telemetry mappings, error taxonomies, and
+vision fact ontologies are expressed as declarative YAML configuration (a
+\emph{procedure pack}) rather than hard-coded in source code.
 % Evidence: packs/fa18c_startup/*.yaml
 \end{description}
 
-These goals directly inform the architectural decisions described in the following sections.
-
 % ===========================================================================
-\section{Overall Architecture}\label{sec:design-arch}
+\section{Architecture: Ports and Adapters}\label{sec:design-arch}
 
-% Evidence: README.md; pyproject.toml; live_dcs.py
-% Claims: C-ARCH-01
-
-The system follows a ports-and-adapters (hexagonal) architecture.
-The system is organised into three main layers, each with clearly defined responsibilities and dependency directions.
+The system follows a ports-and-adapters (hexagonal) architecture organised
+into three layers with strict dependency direction: \textbf{adapters
+$\rightarrow$ ports $\leftarrow$ core}. The core never references adapter
+code directly.
 
 \begin{description}
-\item[Core layer (\texttt{core/}).]
-The core contains all domain logic that is independent of any particular simulator, model provider, or external service.
-It defines the data contracts for runtime messaging (Section~\ref{sec:design-dataflow}), the procedure state machine and gating rule engine (Section~\ref{sec:design-procedure}), the scoring and interaction-metrics engines, the vision fact ontology and sticky/TTL persistence semantics, the BM25 retrieval implementation, the HelpResponse schema builder, and the security and audit infrastructure.
-By design, the core depends only on standard Python libraries and the abstract interfaces defined in the ports layer.
-% Evidence: core/procedure.py, core/gating.py, core/scoring.py, core/vision_facts.py,
-%           core/types.py, core/types_v2.py, core/knowledge.py, core/llm_schema.py
+\item[Core layer.] Contains all domain logic independent of any simulator,
+model provider, or external service: the procedure state machine, gating rule
+engine, scoring and interaction-metrics engines, vision fact ontology with
+sticky/TTL persistence, BM25 retrieval, dynamic JSON Schema generation for
+help responses, and security infrastructure.
+% Evidence: core/procedure.py, core/gating.py, core/scoring.py, core/vision_facts.py, core/types.py
 
-\item[Ports layer (\texttt{ports/}).]
-The ports layer defines stable, technology-agnostic Python protocols for the four external dependencies the core may need at runtime: model reasoning (\texttt{ModelPort}), knowledge retrieval (\texttt{KnowledgePort}), vision input (\texttt{VisionPort}), and telemetry input (\texttt{TelemetryPort}).
-These interfaces are the only dependency injection points between the core and the outside world.
-% Evidence: ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
+\item[Ports layer.] Defines four stable Python protocols: \texttt{ModelPort}
+(reasoning), \texttt{KnowledgePort} (retrieval), \texttt{VisionPort} (visual
+input), and \texttt{TelemetryPort} (simulator state). These are the only
+dependency injection points between core and the outside world.
 
-\item[Adapters layer (\texttt{adapters/}).]
-The adapters layer contains all simulator-specific, provider-specific, and infrastructure-specific code.
-It includes DCS-BIOS telemetry receivers, the telemetry enrichment and delta-sanitisation pipeline, DCS overlay senders, OpenAI-compatible model clients (with and without multimodal support), Ollama fallback clients, a deterministic model stub for testing, a local BM25 knowledge adapter, the vision fact extraction runtime, and the response-mapping and action-execution components that bridge model output to runtime behaviour.
-Adapters depend on the ports they implement and on the core types they produce and consume; they never introduce reverse dependencies into the core.
-% Evidence: adapters/telemetry_pipeline.py, adapters/dcs_adapter.py,
-%           adapters/openai_compat_model.py, adapters/vision_fact_extractor.py,
-%           adapters/knowledge_local.py, adapters/action_executor.py
+\item[Adapters layer.] Contains all simulator-specific, provider-specific, and
+infrastructure-specific code: DCS-BIOS telemetry receivers, telemetry
+enrichment and delta sanitisation, DCS overlay senders, OpenAI-compatible
+model clients (with and without multimodal support), Ollama fallback, a
+deterministic model stub, local BM25 knowledge adapter, and the vision fact
+extraction runtime.
 \end{description}
 
-The three layers are complemented by two further structural elements:
+Two further structural elements complete the architecture:
 
 \begin{description}
-\item[Procedure packs (\texttt{packs/}).]
-A procedure pack is a directory of declarative YAML configuration files that fully describe one procedural task.
-The pack defines the step list, preconditions and completion conditions (gating rules), UI targets and their simulator-specific element identifiers, telemetry variable mappings, error taxonomy categories and scoring weights, delta-sanitisation policy, vision fact ontology with step bindings, and vision layout description.
-The current repository contains one pack: \texttt{fa18c\_startup}, covering the full F/A-18C cold-start procedure.
-% Evidence: packs/fa18c_startup/pack.yaml, packs/fa18c_startup/step_registry.yaml,
-%           packs/fa18c_startup/taxonomy.yaml, packs/fa18c_startup/ui_map.yaml,
-%           packs/fa18c_startup/vision_facts.yaml
+\item[Procedure packs (\texttt{packs/}).] A directory of declarative YAML files
+describing one procedural task: step list, precondition and completion gates,
+UI targets and element identifiers, telemetry variable mappings, error
+taxonomy, delta sanitisation policy, and vision fact ontology with step
+bindings. The current repository contains the \texttt{fa18c\_startup} pack.
 
-\item[CLI and runtime entrypoints (\texttt{simtutor/}, \texttt{live\_dcs.py}).]
-The \texttt{simtutor} package provides a command-line interface for running mock scenarios, replaying and validating event logs, scoring runs, recording VLM predictions for benchmarking, and replaying DCS-BIOS raw captures.
-The \texttt{live\_dcs.py} module orchestrates the full live runtime loop: it wires together a DCS-BIOS receiver, the telemetry enrichment pipeline, knowledge retrieval, model-based help generation, VLM visual fact extraction, overlay action execution, and event logging into a single long-running process.
-% Evidence: simtutor/__main__.py, live_dcs.py
+\item[Runtime entrypoints.] The \texttt{simtutor} package provides a
+command-line interface for simulation, replay, scoring, VLM recording, and
+validation. The live runtime module orchestrates the full loop: DCS-BIOS
+ingestion, telemetry enrichment, knowledge retrieval, model-based help
+generation, VLM visual fact extraction, overlay execution, and event logging.
 \end{description}
 
-Figure~\ref{fig:architecture} shows the high-level component diagram.
-
-\begin{figure}[htbp]
-  \centering
-  % TODO: Insert architecture diagram.
-  % \includegraphics[width=\textwidth]{figures/architecture.pdf}
-  \caption{The proposed system architecture. The core layer contains simulator-agnostic domain logic. The ports layer defines abstract interfaces. The adapters layer provides concrete implementations for DCS, model providers, knowledge sources, and the vision pipeline. Procedure packs supply declarative configuration.}
-  \label{fig:architecture}
-\end{figure}
+The separation serves four purposes. \textbf{Testability}: core logic can be
+tested with mock adapters without DCS, a GPU, or network access.
+\textbf{Maintainability}: simulator API changes affect only the relevant
+adapter. \textbf{Transferability}: porting to a new simulator requires new
+adapters and packs; the core is reused as-is. \textbf{Independent evolution}:
+the VLM pipeline can be developed, trained, and benchmarked independently of
+the tutoring runtime.
 
 % ===========================================================================
-\section{Separation of Core Tutoring Logic and Simulator Adapters}\label{sec:design-separation}
+\section{The Evidence-Grounded Help Cycle}\label{sec:design-dataflow}
 
-% Evidence: ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
-% Claims: C-ARCH-01
+The central architectural mechanism is the evidence-grounded help cycle: a
+structured pipeline from simulator observation through tutoring output and
+logging, in which every actionable output must carry a traceable evidence
+reference.
 
-The separation between simulator-independent core logic and simulator-specific adapters serves four concrete purposes:
+\subsection{Help Cycle Stages}
 
-\begin{enumerate}
-\item \textbf{Testability.}
-The core logic can be tested with mock adapters and deterministic scenarios without requiring a running DCS instance, a GPU, or network access to a model server.
-The repository includes a \texttt{MockEnvAdapter} that replays pre-recorded observation sequences and a \texttt{ModelStub} that returns deterministic responses, enabling fast, reproducible unit and integration tests.
-% Evidence: adapters/mock_env.py, adapters/model_stub.py
+\textbf{Observation.} The simulator adapter---a DCS-BIOS UDP receiver---produces
+a stream of timestamped observations containing raw simulator state. These are
+enriched through variable resolution and delta processing into normalised
+key--value state variables.
 
-\item \textbf{Maintainability.}
-When a simulator API changes, only the affected adapter needs to be updated; the core remains unchanged.
-When a model provider changes (e.g., from Ollama to an OpenAI-compatible vLLM server), only the model adapter configuration is affected.
-Three providers (\texttt{openai\_compat}, \texttt{ollama}, \texttt{stub}) are supported through a single configuration interface.
-% Evidence: simtutor/config.py, model_access.md
+\textbf{Tutor request.} When the learner triggers help, a tutor request is
+created carrying the current observation and an assembled context: normalised
+state variables, sanitised recent deltas, candidate procedure steps, a
+deterministic step hint, an overlay target allowlist, BM25-retrieved knowledge
+snippets ($k=5$), and, when available, the current vision fact summary.
 
-\item \textbf{Transferability.}
-Porting the system to a new simulator or aircraft requires writing new telemetry and overlay adapters and creating new procedure packs.
-The procedural reasoning, gating, scoring, and help-generation infrastructure can be reused as-is.
-The port interfaces are intentionally minimal: a telemetry port requires \texttt{start}, \texttt{poll}, and \texttt{stop} methods; an overlay port requires only the ability to send highlight, clear, and pulse commands to named cockpit elements.
-% Evidence: ports/telemetry.py (TelemetryPort), adapters/dcs_adapter.py (overlay methods)
+\textbf{Model inference.} The assembled context is formatted into a prompt and
+sent to the language model, which returns a structured JSON object conforming
+to a dynamically generated HelpResponse JSON Schema.
 
-\item \textbf{Independent evolution of the VLM pipeline.}
-The VLM visual fact extraction component communicates with the tutoring runtime through the vision port and the vision fact observation schema, not through direct coupling.
-The VLM pipeline can be developed, trained, and benchmarked independently of the tutoring runtime.
-A runtime deployment can include the VLM component, omit it entirely, or replace it with a different perception backend without affecting the tutoring logic.
-\end{enumerate}
+\textbf{Response validation and mapping.} The raw model output passes through
+four validation stages: JSON extraction with minimal repair (code fence
+removal only), schema validation against the runtime-generated schema,
+allowlist checks on step identifiers and overlay targets, and
+evidence-grounding validation. Validated responses are mapped to overlay
+actions resolved through the UI map. Failed validation triggers deterministic
+fallback.
 
-% ===========================================================================
-\section{Data Flow}\label{sec:design-dataflow}
+\textbf{Action execution.} Overlay actions (highlight, clear, pulse) are
+validated against the UI target allowlist and dispatched to the simulator.
+Auto-click and control-injection are forbidden.
 
-% Evidence: live_dcs.py; repo_inventory.md §11
-% Claims: C-ARCH-02
+\textbf{Event logging.} Every stage is recorded as a versioned, timestamped
+event in a JSONL event log---the authoritative record for all downstream
+analysis, replay, and scoring.
 
-The runtime data flow follows a structured pipeline from simulator observation to tutoring output and logging.
-Figure~\ref{fig:dataflow} provides a visual summary.
+\subsection{Schema-Level Evidence Grounding}
 
-\begin{figure}[htbp]
-  \centering
-  % TODO: Insert data flow diagram.
-  % \includegraphics[width=\textwidth]{figures/dataflow.pdf}
-  \caption{Main runtime data flow through the help cycle.}
-  \label{fig:dataflow}
-\end{figure}
-
-\subsection{Observation}
-The simulator adapter---in the current implementation, a DCS-BIOS UDP receiver---produces a stream of \emph{observations}: versioned, timestamped data objects containing raw simulator state and, after enrichment, a set of normalised state variables.
-% Evidence: core/types.py:Observation, adapters/dcs_bios/receiver.py
-
-\subsection{Tutor Request}
-When the learner triggers help---via a hotkey or a UDP message---a \emph{tutor request} is created.
-The request carries an intent (\texttt{help}), an optional free-text message, a reference to the current observation, and a context dictionary populated by the runtime orchestrator.
-% Evidence: core/types.py:TutorRequest
-
-\subsection{Context Assembly}
-The runtime orchestrator assembles a context for the help cycle by gathering:
-\begin{itemize}
-\item \textbf{State variables} (\texttt{vars}): normalised key--value pairs from the most recent telemetry observation.
-\item \textbf{Recent deltas} (\texttt{recent\_deltas}): a sanitised, aggregated summary of recent state changes.
-\item \textbf{Candidate steps} (\texttt{candidate\_steps}): eligible step identifiers from the procedure pack.
-\item \textbf{Deterministic step hint} (\texttt{deterministic\_step\_hint}): a locally computed fallback suggestion from rule-based inference, used both as prompt guidance and as fallback when model output is unavailable.
-\item \textbf{Overlay target allowlist} (\texttt{overlay\_target\_allowlist}): the set of UI elements the model is permitted to reference.
-\item \textbf{Knowledge snippets} (\texttt{rag\_topk}, optional): top-$k$ BM25 retrieval results, included only when a knowledge index exists.
-\end{itemize}
-% Evidence: adapters/prompting.py, adapters/telemetry_pipeline.py, help_flow_en.md §3
-
-\subsection{Model Inference}
-If a ModelPort implementation is available, the assembled context is formatted into a prompt and sent to the language model.
-The model returns a structured JSON object conforming to the HelpResponse schema, which is generated dynamically at runtime from the procedure pack, UI map, and taxonomy.
-% Evidence: core/llm_schema.py:get_help_response_schema
-
-\subsection{Response Validation and Mapping}
-The raw model output passes through a validation pipeline: (1) JSON extraction with minimal repair, (2) schema validation, (3) allowlist checks on diagnosis step IDs, next step IDs, and overlay targets, (4) evidence-grounding validation.
-If validation succeeds, the help object is mapped to a \texttt{TutorResponse} with overlay actions resolved through the UI map.
-If validation fails, or if no model is available, the system enters deterministic fallback.
-% Evidence: adapters/json_extract.py, adapters/response_mapping.py, help_flow_en.md §4--5
-
-\paragraph{Schema-level evidence grounding.}
 The evidence constraint operates at the schema level, not as a post-hoc check.
-The \texttt{HelpResponse} JSON Schema is generated dynamically from the procedure pack and UI map (Section~\ref{sec:design-arch}).
-For every overlay target in the schema's \texttt{targets} array, an \texttt{if/then} rule requires that the accompanying \texttt{evidence} array contain at least one item whose \texttt{target} field matches that overlay target.
-Each evidence item must further declare a \texttt{type} from five grounding kinds---\texttt{var} (telemetry variable), \texttt{gate} (gating rule), \texttt{rag} (knowledge snippet), \texttt{delta} (recent state change), \texttt{visual} (vision fact)---each with a corresponding \texttt{ref} prefix (\texttt{VARS.}, \texttt{GATES.}, \texttt{RAG\_SNIPPETS.}, \texttt{DELTA\_KEYS.}, \texttt{VISION\_FACTS.}).
-An LLM response that proposes an overlay highlight without a matching, validly-typed evidence item is structurally invalid and will be rejected \emph{before} any action reaches the simulator.
-This creates a unified audit trail: for example, highlighting \texttt{battery\_switch} must be accompanied by an evidence item such as \texttt{\{"target": "battery\_switch", "type": "var", "ref": "VARS.battery\_switch", "quote": "0"\}}, tracing the action back to the telemetry variable that justified it.
-% Evidence: core/llm_schema.py:get_help_response_schema (if/then overlay-target × evidence rules),
-%           adapters/evidence_refs.py (five evidence types with prefix families)
+The HelpResponse JSON Schema is generated dynamically from the procedure pack
+and UI map at runtime. For every overlay target in the schema's
+\texttt{targets} array, a conditional \texttt{if/then} rule requires that the
+accompanying \texttt{evidence} array contain at least one item referencing
+that target. Each evidence item must declare a \texttt{type} from five
+grounding kinds---telemetry variable (\texttt{var}), gating rule
+(\texttt{gate}), knowledge snippet (\texttt{rag}), recent state change
+(\texttt{delta}), or vision fact (\texttt{visual})---each with a corresponding
+\texttt{ref} prefix. An LLM response that proposes an overlay without a
+matching, validly-typed evidence item is structurally invalid and rejected
+before any action reaches the simulator.
 
-\subsection{Action Execution}
-The tutor response may contain overlay actions (highlight, clear, or pulse) targeting specific cockpit elements.
-The action executor validates each action against the UI target allowlist, enforces a limit on concurrent highlights (default: one), and dispatches the command to the simulator via UDP.
-Auto-click and control-injection actions are forbidden by design.
-% Evidence: adapters/action_executor.py, adapters/dcs_adapter.py, help_flow_en.md §7
-
-\subsection{Event Logging}
-Every stage of the help cycle is recorded as a versioned, timestamped \texttt{Event} object and appended to a JSONL event log, which serves as the authoritative record for all downstream analysis, replay, and scoring.
-% Evidence: core/event_store.py, core/types.py:Event
+This mechanism produces a unified audit trail. For example, highlighting the
+\texttt{battery\_switch} must be accompanied by an evidence item such as
+\texttt{\{"target": "battery\_switch", "type": "var", "ref":
+"VARS.battery\_switch", "quote": "0"\}}, tracing the action to the telemetry
+variable that justified it. The five evidence types are validated against the
+keys actually present in the help-cycle context; fabricated references are
+rejected.
 
 % ===========================================================================
 \section{Telemetry Processing}\label{sec:design-telemetry}
 
-% Evidence: adapters/telemetry_pipeline.py, adapters/delta_sanitizer.py,
-%           adapters/delta_aggregator.py, core/vars.py
-% Claims: C-TELEM-01
-
-The telemetry processing subsystem transforms raw simulator data into the normalised state representation through four stages:
+The telemetry processing subsystem transforms raw DCS-BIOS data into stable
+state representation through four stages:
 
 \begin{enumerate}
-\item \textbf{Raw ingestion.}
-The DCS-BIOS receiver listens on a UDP socket for binary DCS-BIOS export frames, decoding each into a structured JSON object with wall-clock timestamps and monotonically increasing sequence numbers.
-% Evidence: adapters/dcs_bios/receiver.py
+\item \textbf{Raw ingestion.} The DCS-BIOS receiver decodes binary UDP export
+frames into structured JSON with wall-clock timestamps and monotonic sequence
+numbers.
 
-\item \textbf{Variable resolution.}
-A telemetry map specifies how raw BIOS fields are projected onto normalised state variables.
-The variable resolver produces a flat dictionary of key--value pairs and tracks unavailable or unknown sources in a \texttt{vars\_source\_missing} set, enabling downstream components to distinguish ``the value is zero'' from ``the value is unknown.''
-% Evidence: core/vars.py, packs/fa18c_startup/telemetry_map.yaml
+\item \textbf{Variable resolution.} A telemetry map (declared in the procedure
+pack) projects raw BIOS fields onto normalised state variables. The resolver
+tracks unavailable sources in a \texttt{vars\_source\_missing} set, enabling
+downstream components to distinguish ``value is zero'' from ``value is
+unknown''---a distinction critical for correct gating behaviour.
 
-\item \textbf{Delta sanitisation.}
-A configurable policy (thresholds, debounce windows, per-variable filtering rules) suppresses spurious changes caused by switch bounce, sensor drift, and UDP out-of-order delivery.
-% Evidence: adapters/delta_sanitizer.py, packs/fa18c_startup/delta_policy.yaml
+\item \textbf{Delta sanitisation.} A configurable policy (per-variable
+thresholds, debounce windows, filtering rules) suppresses spurious changes
+from switch bounce, sensor drift, and UDP out-of-order delivery.
 
-\item \textbf{Delta aggregation.}
-Sanitised deltas are accumulated over a configurable time window and compressed into a compact summary for the prompt context.
-% Evidence: adapters/delta_aggregator.py
+\item \textbf{Delta aggregation.} Sanitised deltas are accumulated over a
+configurable window and compressed into a compact prompt-safe summary.
 \end{enumerate}
 
-The telemetry pipeline runs continuously, independent of the help cycle.
+The telemetry pipeline runs continuously, independent of any help cycle.
 
 % ===========================================================================
-\section{Procedure Engine and Gating Rule Engine}\label{sec:design-procedure}
+\section{Procedure Engine and Gating Rules}\label{sec:design-procedure}
 
-% Evidence: core/procedure.py, core/gating.py, core/step_hint.py
-% Claims: C-PROC-01, C-PROC-02
+\subsection{Procedure State Machine}
 
-\subsection{Procedure Engine}
-The procedure engine maintains a finite-state machine over the ordered sequence of steps.
-Each step is in one of four states: \texttt{pending}, \texttt{active} (at most one), \texttt{done}, or \texttt{blocked}.
-Operations include \texttt{activate\_next}, \texttt{complete\_active}, \texttt{block\_active}, \texttt{rewind}, and \texttt{check\_timeout}.
-All transitions are recorded as internal events and propagated to the event log.
-% Evidence: core/procedure.py:ProcedureEngine
+The procedure engine maintains a finite-state machine over the ordered step
+sequence. Each step is in one of four states: \texttt{pending}, \texttt{active}
+(at most one), \texttt{done}, or \texttt{blocked}. All transitions emit
+internal event records with ISO-8601 timestamps.
 
 \subsection{Gating Rule Engine}
-The gating rule engine evaluates precondition gates and completion gates using a v1 DSL with four operators: \texttt{var\_gte}, \texttt{arg\_in\_range}, \texttt{flag\_true}, and \texttt{time\_since}.
-The evaluator includes explicit unknown-value handling: missing, source-missing, or sentinel-value variables cause rule failure with a diagnostic reason rather than silent treatment as false.
-Rules short-circuit on first failure; the failure index and reason feed into the deterministic step hint.
-% Evidence: core/gating.py
 
-\subsection{Graceful Degradation through Deterministic Fallback}
-When no model is available or model output fails schema validation, the system does not simply return an error.
-Instead, it actively computes a useful step hint through deterministic inference---a design choice that distinguishes the proposed system from LLM-dependent tutoring systems that stop functioning without a model.
-The deterministic fallback analyses three sources of information: (1) the active step and its unsatisfied gating rules from the procedure engine, (2) the learner's recent UI interactions (from delta aggregation), and (3) the observability metadata that classifies each missing evidence source as either a \emph{hard blocker} (the gate explicitly fails---e.g., a switch is in the wrong position) or a \emph{soft blocker} (the telemetry source is absent---e.g., a sensor is not exported by DCS-BIOS, so the true state is unknown rather than false).
-This distinction prevents the tutor from incorrectly claiming a step is unsatisfied when the evidence is simply unavailable.
-The fallback produces a text-only hint restricted to the currently active step; overlay highlights are suppressed unless a local rule can uniquely determine a valid target from the current telemetry state.
-This mechanism enables the tutoring system to remain partially functional when the LLM is unavailable---a deliberate architectural property, not an afterthought.
-% Evidence: core/step_hint.py (soft/hard blocker classification), adapters/step_inference.py (fallback hint generation), help_flow_en.md §5
+Precondition and completion gates are evaluated using a DSL with four
+operators: \texttt{var\_gte} (threshold), \texttt{arg\_in\_range} (interval),
+\texttt{flag\_true} (boolean), and \texttt{time\_since} (elapsed time). The
+evaluator includes explicit unknown-value handling: missing, source-missing, or
+sentinel-value variables cause rule failure with a diagnostic reason.
+Rules short-circuit on first failure; the failure index and reason feed into
+the deterministic step hint.
 
-\subsection{Procedure Pack Structure}
-The procedure pack is the declarative configuration driving the entire tutoring runtime.
-Each step is classified by primary evidence source:
+\subsection{Deterministic Fallback}
+
+When no model is available or model output fails validation, the system
+actively computes a useful step hint through deterministic inference. The
+fallback analyses three information sources: (1) the active step and its
+unsatisfied gating rules, (2) the learner's recent UI interactions, and (3)
+observability metadata that classifies each missing evidence source as a
+\emph{hard blocker} (gate explicitly fails) or \emph{soft blocker} (telemetry
+source absent, true state unknown). This distinction prevents the tutor from
+incorrectly claiming a step is unsatisfied when the evidence is simply
+unavailable. The fallback produces a text-only hint restricted to the active
+step; overlay highlights are suppressed unless a local rule can uniquely
+determine a valid target.
+
+\subsection{Step Classification by Evidence Source}
+
+Each step is classified by its primary evidence source, declared in the
+procedure pack:
 \begin{itemize}
-\item \textbf{BIOS-priority steps} (S01, S03--S07, S09--S13, S21): primarily verified through DCS-BIOS telemetry variables.
-\item \textbf{Vision-priority steps} (S02, S08, S14--S20, S22--S25): verified through VLM visual fact extraction from cockpit displays.
+\item \textbf{BIOS-priority steps} (S01, S03--S07, S09--S13, S21): verified
+primarily through DCS-BIOS telemetry.
+\item \textbf{Vision-priority steps} (S02, S08, S14--S20, S22--S25): verified
+through VLM visual fact extraction from cockpit displays.
+\item \textbf{Manual/out-of-layout steps}: steps requiring manual confirmation
+or involving cockpit areas outside the three-display composite panel.
 \end{itemize}
-All steps are observable through at least one of these two mechanisms.
-The pack also defines per-step gating rules, UI targets, tutor prompts, and profile overrides (airfield vs.\ carrier).
-% Evidence: packs/fa18c_startup/pack.yaml
-% Claims: C-PROC-01, C-PROC-02
+This tripartite classification ensures each step's completion evidence is
+sourced from the most reliable available signal.
+
+% ===========================================================================
+\section{Harness Engineering and Evidence Validation}\label{sec:design-harness}
+
+A distinguishing architectural feature of the system is the \emph{step
+harness}: a validation layer that sits between the help-cycle response
+generation and the overlay action execution, enforcing that every actionable
+output satisfies evidence-grounding, allowlist, and procedural consistency
+constraints before reaching the simulator.
+
+\subsection{Harness Architecture}
+
+The harness operates in four stages applied sequentially to every candidate
+tutor response:
+
+\begin{enumerate}
+\item \textbf{Spec derivation.} For each active procedure step, the harness
+derives a \emph{step harness spec} from the procedure pack: the set of
+permitted overlay targets (from the UI map), the required evidence categories
+(from the step's gating configuration and observability metadata), and the
+banned target categories (e.g., targets belonging to a different procedure
+phase or requiring visual confirmation when the vision path is unavailable).
+
+\item \textbf{Decision adjudication.} The harness evaluates the model's
+proposed diagnosis and next-step recommendations against the current procedure
+state. A \texttt{HarnessDecision} dataclass records whether each proposed
+action is \texttt{accepted}, \texttt{repaired} (modified to align with
+procedure state), or \texttt{rejected} (blocked as unsafe or inconsistent).
+Repairs are traceable: every modification carries a reason code referencing
+the specific harness rule that triggered it.
+
+\item \textbf{Evidence snapshot trace.} Before any overlay action is executed,
+the harness captures an \emph{evidence snapshot}---a frozen record of the
+telemetry variables, gating rule evaluations, knowledge snippet references,
+and vision fact states that jointly justify the current overlay plan. This
+snapshot is embedded in the event log alongside the tutor response, creating a
+verifiable link between the evidence that was available at decision time and
+the action that was taken.
+
+\item \textbf{Coverage matrix.} A regression coverage matrix maps each
+procedure step to a set of harness test scenarios (fixture-based replay
+cases), each exercising a specific harness rule: correct advancement, safe
+rejection of wrong-target proposals, repair of incomplete visual evidence,
+handling of moving/settling controls, and prevention of VLM evidence leakage
+into non-visual steps.
+\end{enumerate}
+
+\subsection{Fixture-Based Regression Testing}
+
+The harness is validated through a suite of \emph{live help fixtures}:
+recorded telemetry snapshots captured at specific procedure states that
+previously exposed harness failures. Each fixture replays a specific state
+through the full help cycle and asserts that the harness produces the expected
+outcome (correct target, correct step, or correct rejection). As of the
+current implementation, the regression suite covers 20 live-fixture regression entries in the coverage matrix spanning
+steps S01 through S33, including:
+
+\begin{itemize}
+\item Correct advancement when completion conditions are satisfied
+(telemetry-based and vision-based);
+\item Safe rejection of overlay targets that violate the UI allowlist or
+belong to a different procedure phase;
+\item Repair of wrong-target proposals (e.g., PB18 repaired to PB5 for BIT
+root sub-state);
+\item Prevention of VLM evidence leakage into non-visual steps (stale S08
+visual facts must not drive S09/S10 help);
+\item Correct handling of moving/settling controls (refuelling probe, arresting
+hook) that require wait guidance rather than repeated prompts;
+\item Consistent interaction semantics (left-click vs. right-click, mouse wheel
+for rotary controls).
+\end{itemize}
+
+The harness coverage matrix and fixture suite serve a dual role: they are both
+a development-time regression safety net and an existence proof that systematic
+evidence-grounding validation can be enforced at the architectural level rather
+than relying on model output trustworthiness.
 
 % ===========================================================================
 \section{Simulator Adapter Layer}\label{sec:design-adapters}
 
-% Evidence: adapters/dcs_adapter.py, adapters/dcs_bios/, DCS/Scripts/
-% Claims: C-ARCH-01, C-ARCH-02
+The simulator adapter layer isolates DCS-specific code behind the port
+interfaces. Three adapters are defined:
 
-\subsection{Telemetry Input Adapter}
-Receives DCS-BIOS state data over UDP. The Python-side \texttt{DcsBiosRawReceiver} parses the binary protocol and emits raw frames as JSONL records, which feed the telemetry enrichment pipeline.
-% Evidence: adapters/dcs_bios/receiver.py
+\textbf{Telemetry input.} Receives DCS-BIOS state data over UDP and feeds the
+telemetry enrichment pipeline.
 
-\subsection{Overlay Output Adapter}
-Sends highlight, clear, and pulse commands to DCS via plain-text UDP messages.
-A Lua script (\texttt{VRHilite.lua}) inside DCS renders graphical overlays on cockpit elements.
-The adapter maps abstract target names to DCS-internal point codes using the procedure pack's UI map.
-% Evidence: adapters/dcs_adapter.py, DCS/Scripts/Hooks/VRHilite.lua
+\textbf{Overlay output.} Sends highlight, clear, and pulse commands to DCS via
+UDP. A Lua script inside DCS renders graphical overlays on cockpit elements.
+The adapter maps abstract target names to DCS-internal point codes using the
+pack's UI map.
 
-\subsection{Vision Input Adapter}
-Triggers screenshot captures in DCS via a UDP-based capture trigger.
-The Lua-side \texttt{SimTutor.lua} renders the three primary cockpit displays into a single composite image.
-The Python-side adapter selects pre-trigger and trigger frames and passes them to the vision fact extractor.
-% Evidence: adapters/vision_capture_trigger.py, DCS/Scripts/SimTutor/SimTutor.lua
+\textbf{Vision input.} Triggers screenshot captures in DCS. The Lua-side
+integration renders the three primary cockpit displays into a single composite
+image; the Python side manages frame selection and passes images to the VLM
+extractor.
 
-\subsection{Lua-Side Integration}
-Three categories of Lua scripts execute inside DCS:
-\begin{itemize}
-\item \textbf{State export} (\texttt{Export.lua}): configures DCS-BIOS export.
-\item \textbf{Overlay rendering} (\texttt{Hooks/VRHilite.lua}, \texttt{Hooks/SimTutorHighlight.lua}): receives and renders highlight commands.
-\item \textbf{SimTutor integration} (\texttt{SimTutor/SimTutor.lua}, \texttt{SimTutor/SimTutor Function.lua}, \texttt{SimTutor/SimTutorDcsBiosHub.lua}): handles capture and composite-panel rendering.
-\end{itemize}
-% Evidence: DCS/Scripts/Export.lua, DCS/Scripts/Hooks/VRHilite.lua,
-%           DCS/Scripts/SimTutor/SimTutor.lua
-
-\subsection{Planned and Partially Implemented Adapters}
-The current repository includes a \texttt{MockEnvAdapter} for deterministic testing without a running simulator.
-% Evidence: adapters/mock_env.py
-The VR runtime code path is implemented, including VR\_MIRROR and
-VR\_allow\_MFD\_out\_of\_HMD configuration for Quest~3 VR mode, tutor text UDP injection
-into the DCS in-game text area, and composite-panel capture compatibility validation in
-VR mode. The VR code path has not yet been validated through controlled human-subject
-experiments (Section~\ref{sec:eval-planned}).
-% Evidence: system_delta_from_proposal.md §4
+The VR code path is implemented (VR\_MIRROR configuration, tutor text UDP
+injection, composite-panel capture compatibility in VR mode) but has not yet
+been validated through controlled human-subject experiments
+(Section~\ref{sec:eval-planned}).
 
 % ===========================================================================
 \section{Event Logging and Replay}\label{sec:design-replay}
 
-% Evidence: core/event_store.py, simtutor/runner.py, core/scoring.py,
-%           core/interaction_metrics.py
-% Claims: C-RUNTIME-01
+All runtime occurrences are represented as versioned, timestamped \texttt{Event}
+objects with a fixed schema and persisted in JSONL format via an append-only
+store with immediate flush after each write, ensuring crash-safe logging.
 
-\subsection{Event Model}
-All runtime occurrences are represented as \texttt{Event} objects with a fixed schema: unique identifier, wall-clock timestamp, session identifier, event kind (\texttt{observation}, \texttt{tutor\_request}, \texttt{tutor\_response}, \texttt{overlay\_requested}, \texttt{overlay\_applied}, \texttt{overlay\_failed}), typed payload, schema version, and extensible metadata.
-% Evidence: core/types.py:Event, help_flow_en.md §6
+A recorded event log can be replayed offline to verify step ordering and state
+machine consistency. The replay evaluation infrastructure supports
+suite-driven regression replay: a YAML suite file specifies a pack path, test
+cases with expected outcomes, and optional vision frame directories. Five
+replay evaluation cases cover distinct scenario types (no-operation,
+battery-on, battery-and-generator-off, FCS reset and BIT, INS alignment),
+each with DCS-BIOS raw captures and per-frame sidecar files.
 
-\subsection{JSONL Event Store}
-Events are persisted in JSONL format via \texttt{JsonlEventStore}, supporting append-only writing and full-file loading.
-% Evidence: core/event_store.py
-
-\subsection{Replay and Validation}
-A recorded event log can be replayed offline to verify step ordering and state machine consistency.
-Telemetry logs are independently validated for monotonic sequence numbers and timestamps.
-The replay infrastructure has been implemented at the code level and exercised with recorded telemetry traces; it has not yet been validated with end-to-end human-in-the-loop sessions.
-% Evidence: simtutor/runner.py
-
-\subsection{Scoring and Interaction Metrics}
-The scoring engine counts omissions and state violations with configurable per-category weights and a critical-step multiplier.
-Interaction metrics characterise learner behaviour: stall time, help requests, LLM triggers, UI click counts, and overlay request/acknowledgement counts.
-% Evidence: core/scoring.py, core/interaction_metrics.py
+The scoring engine counts omissions and state violations with configurable
+per-category weights. Interaction metrics characterise learner behaviour:
+stall time, help requests, LLM triggers, UI click counts, and overlay
+request/acknowledgement counts.
 
 \subsection{Current Limitations}
-The replay infrastructure currently supports synthetic regression replay at the telemetry level, including scenarios with vision frame sidecars (\texttt{replay\_eval/fa18c\_startup\_v04/}).
-End-to-end replay of full multimodal sessions with synchronised vision frames from live human runs has not yet been validated.
+
+The replay infrastructure has been exercised with synthetic regression
+scenarios and fixture-based replay at the telemetry level, including cases
+with vision frame sidecars. End-to-end replay of full multimodal sessions with
+synchronised vision frames from live human-in-the-loop runs has not yet been
+validated.
 
 % ===========================================================================
 \section{VLM Adaptation for Visual State Understanding}\label{sec:design-vlm}
 
-% Evidence: adapters/vision_fact_extractor.py, adapters/vision_fact_prompting.py,
-%           packs/fa18c_startup/vision_facts.yaml, tools/train_qwen35_vlm_unsloth.py
-% Claims: C-VLM-01, C-VLM-02
+The VLM component extracts structured \emph{visual facts} from cockpit
+screenshots---intermediate propositions about visible display content. Visual
+facts are not final tutoring decisions; they provide visual evidence that the
+tutoring runtime combines with telemetry, procedure state, and documentation.
+This layered architecture isolates the VLM's responsibility to structured
+visual evidence extraction, reserving procedure-level decisions for
+deterministic rule-based components.
 
-Visual perception in the proposed system is a core, independently operable subsystem.
+\subsection{Vision Fact Ontology (13-Fact v2)}
 
-\subsection{Role of the VLM Component}
-The VLM component extracts structured \emph{visual facts} from cockpit screenshots---intermediate propositions about visible display content.
-Visual facts are not final tutoring decisions; they provide visual evidence that the tutoring runtime combines with telemetry, procedure state, and documentation.
-This decomposition enables each component to be developed, tested, and evaluated independently.
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §2
+The current ontology defines 13 facts spanning three display regions:
 
-\subsection{Vision Fact Ontology}
-The current ontology (v2) defines 13 facts spanning three display regions:
 \begin{itemize}
-\item \textbf{Left DDI}: \texttt{tac\_page\_visible}, \texttt{supt\_page\_visible}, \texttt{fcs\_page\_visible}, \texttt{fcs\_page\_x\_marks\_visible}.
-\item \textbf{Right DDI}: \texttt{bit\_root\_page\_visible}, \texttt{fcsmc\_page\_visible}, \texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible}, \texttt{fcsmc\_final\_go\_result\_visible}.
-\item \textbf{AMPCD}: \texttt{hsi\_page\_visible}, \texttt{hsi\_map\_layer\_visible}, \texttt{ins\_grnd\_alignment\_text\_visible}, \texttt{ins\_ok\_text\_visible}.
+\item \textbf{Left DDI}: \texttt{tac\_page\_visible},
+\texttt{supt\_page\_visible}, \texttt{fcs\_page\_visible},
+\texttt{fcs\_page\_x\_marks\_visible}.
+\item \textbf{Right DDI}: \texttt{bit\_root\_page\_visible},
+\texttt{fcsmc\_page\_visible}, \texttt{fcsmc\_intermediate\_result\_visible},
+\texttt{fcsmc\_in\_test\_visible}, \texttt{fcsmc\_final\_go\_result\_visible}.
+\item \textbf{AMPCD}: \texttt{hsi\_page\_visible},
+\texttt{hsi\_map\_layer\_visible}, \texttt{ins\_grnd\_alignment\_text\_visible},
+\texttt{ins\_ok\_text\_visible}.
 \end{itemize}
-% Evidence: packs/fa18c_startup/vision_facts.yaml; core/vision_facts.py:VISION_FACT_IDS
 
-Each fact has a three-valued state (\texttt{seen}, \texttt{not\_seen}, \texttt{uncertain}), a time-to-live, an optional \texttt{sticky} flag, and step bindings via \texttt{all\_of} / \texttt{any\_of} conditions.
-% Evidence: packs/fa18c_startup/vision_facts.yaml; core/vision_facts.py
-
-\subsection{VLM Integration in the Help Cycle}
-When a help request arrives and the active step is vision-priority (S08, S15, S18), a capture trigger is sent to DCS.
-Pre-trigger and trigger frames are rendered and sent to the VLM.
-The returned facts are merged into the vision fact snapshot (with sticky and TTL semantics) and included in the help-cycle context.
-If the vision adapter is unavailable or the multimodal request fails, the help cycle proceeds with telemetry and knowledge only.
-% Evidence: adapters/vision_fact_extractor.py:extract, adapters/vision_sync.py
+Each fact has a three-valued state (\texttt{seen}, \texttt{not\_seen},
+\texttt{uncertain}), a time-to-live, an optional \texttt{sticky} flag (once
+\texttt{seen}, not overwritten by subsequent \texttt{not\_seen} within TTL),
+and step bindings via \texttt{all\_of} / \texttt{any\_of} conditions. The
+evolution from the 8-fact v1 ontology to the current 13-fact v2 design is a
+central methodological and evaluation narrative, detailed in
+Chapter~\ref{ch:methodology} and evaluated in Chapter~\ref{ch:evaluation}.
 
 \subsection{VLM Adaptation Pipeline}
-The VLM used at runtime is fine-tuned.
-The adaptation pipeline---detailed in Chapter~\ref{ch:methodology}---comprises screenshot capture, pre-labeling by a large VLM, human review in Label Studio, bilingual SFT export, LoRA fine-tuning (Unsloth + PEFT + TRL), and base-vs-LoRA benchmarking on independent held-out sessions.
-This pipeline forms a self-contained contribution spanning data capture through benchmark evaluation.
-% Evidence: tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
-%           tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py,
-%           tools/benchmark_qwen35_vlm_facts.py
 
-\subsection{Distinction from Rule-Based State Gating}
-Rule-based gating evaluates telemetry variables deterministically; it is deterministic and auditable but limited to telemetry-representable conditions.
-VLM-based visual fact extraction interprets display content that has no telemetry representation.
-The two mechanisms are complementary: the gating engine provides the primary procedure-tracking backbone; visual facts supply supplementary evidence for steps whose completion cannot be inferred from telemetry alone.
-% Evidence: packs/fa18c_startup/pack.yaml (vision_priority_steps, bios_priority_steps)
-% Claims: C-PROC-02
+The VLM used at runtime is fine-tuned through a seven-stage pipeline spanning
+screenshot capture, AI pre-labeling, human review in Label Studio, bilingual
+supervised fine-tuning export, LoRA fine-tuning via Unsloth + PEFT + TRL, and
+automated base-vs-LoRA benchmarking on independent holdout sets with verified
+zero training overlap. Full methodological detail appears in
+Chapter~\ref{ch:methodology}.
 
+\subsection{Runtime Integration}
+
+When a help request arrives and the active step is vision-priority, a capture
+trigger is sent to DCS. Pre-trigger and trigger frames are rendered and sent
+to the VLM. The returned facts are merged into the vision fact snapshot (with
+sticky and TTL semantics) and included in the help-cycle context. If the
+vision adapter is unavailable or the multimodal request fails, the help cycle
+proceeds with telemetry and knowledge only. This graceful degradation is a
+deliberate design property: visual perception is an optional enhancement to the
+telemetry-grounded core, not a dependency.

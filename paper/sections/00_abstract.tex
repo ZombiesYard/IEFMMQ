@@ -1,78 +1,51 @@
 % ===========================================================================
 %  00 — Abstract + Zusammenfassung
 %
-%  Source of truth: paper_context/paper_outline.md §2.1
-%  Evidence:       paper_context/claims_registry.md (verified claims only for results)
-%  Terminology:    paper_context/terminology.md
+%  Evidence: paper_context/claims_registry.md (verified claims only)
+%  Terminology: paper_context/terminology.md
 % ===========================================================================
 
 \chapter*{Abstract}
 
-Procedural learning in high-fidelity simulation environments presents distinct challenges:
-learners must execute fixed, ordered sequences of actions while verifying intermediate
-system states, recovering from errors, and maintaining situational awareness---all without
-the continuous presence of an expert instructor. Traditional training aids such as video
-walkthroughs and printed checklists break the continuity of in-simulator practice, while
-ungrounded language model assistance risks providing fluent but factually incorrect
-guidance. This thesis presents a telemetry-grounded tutoring runtime that
-combines procedure-pack-driven state tracking, retrieval-augmented language model help
-generation, and a fine-tuned vision-language model (VLM) for structured visual fact
-extraction from cockpit displays. The system enforces explicit evidence grounding: every
-overlay target and step recommendation must be traceable to a telemetry variable, a gating
-rule, a retrieved document snippet, or a visual fact observation. The training scenario is
-the F/A-18C cold-start procedure in DCS World, comprising 25 steps across six operational
-phases, with inter-step dependencies that make it representative of sequence-sensitive,
-state-dependent procedural tasks. A central finding is that visual fact ontology design
-determines model reliability: evolving from an 8-fact v1 to a 13-fact v2 ontology by
-decomposing compound targets into locally verifiable visual atoms reduced critical false
-positives by 64--89\% on independent holdout sets, yielding a design principle that VLMs
-should extract observable evidence while procedural interpretation belongs in downstream
-reasoning. The VLM adaptation pipeline---screenshot capture, pre-labeling, human review,
-bilingual supervised fine-tuning, LoRA adaptation, and automated benchmarking---is
-demonstrated on two backbone architectures. On the 13-fact ontology, a Qwen3.5-9B LoRA
-adapter trained on 928 bilingual rows improves fact accuracy from 0.80--0.87 (base model)
-to 0.99 on two independent holdout sets with verified zero training overlap. An identical
-data recipe applied to Gemma-4-31B confirms that the improvement generalises across
-backbones. The thesis delivers a working dual-platform runtime with automated tests,
-benchmark artifacts, and replay infrastructure, together with a documented evaluation
-design for the next phase of human-subject research.
+Procedural learning in high-fidelity simulation requires learners to execute ordered,
+state-dependent sequences while verifying intermediate system states, yet existing
+training aids either break immersion or lack access to live simulator state. This
+thesis addresses the gap by designing a telemetry-grounded tutoring runtime that
+integrates procedure-pack-driven state tracking, retrieval-augmented help generation,
+and a fine-tuned vision-language model (VLM) for structured visual fact extraction
+from cockpit displays. A central finding is that visual fact ontology design governs
+model reliability: evolving from an 8-fact to a 13-fact ontology by decomposing
+compound targets into locally verifiable visual atoms reduced critical false positives
+by 64--89\% on independent holdout sets. A Qwen3.5-9B LoRA adapter trained on 928
+bilingual rows achieves 0.99 fact accuracy on two holdout sets with verified zero
+training overlap; the identical data recipe transfers to Gemma-4-31B with consistent gains,
+suggesting the approach is not tied to a single backbone. Controlled human-subject evaluation in VR
+remains a planned next phase; the current work delivers the technical baseline,
+benchmark artifacts, and evaluation infrastructure to support it.
 
 \newpage
 \chapter*{Zusammenfassung}
 
 \begin{otherlanguage}{ngerman}
-Prozedurales Lernen in hochrealistischen Simulationsumgebungen stellt besondere
-Herausforderungen: Lernende m\"ussen feste, geordnete Handlungsabfolgen ausf\"uhren,
-w\"ahrend sie Zwischenzust\"ande des Systems \"uberpr\"ufen, Fehler korrigieren und das
-Situationsbewusstsein aufrechterhalten---und dies ohne die st\"andige Anwesenheit eines
-erfahrenen Ausbilders. Herk\"ommliche Trainingshilfen wie Videoanleitungen und gedruckte
-Checklisten unterbrechen den \"Ubungsfluss im Simulator, w\"ahrend nicht
-zustandsgebundene Sprachmodell-Assistenz Gefahr l\"auft, fl\"ussige, aber faktisch
-inkorrekte Anweisungen zu geben. Diese Arbeit stellt ein System vor, eine
+Prozedurales Lernen in hochrealistischer Simulation erfordert das Ausf\"uhren
+geordneter, zustandsabh\"angiger Handlungsabfolgen bei gleichzeitiger
+\"Uberpr\"ufung von Systemzust\"anden. Herk\"ommliche Trainingshilfen
+unterbrechen jedoch entweder die Immersion oder haben keinen Zugriff auf den
+Simulatorzustand. Diese Arbeit begegnet dieser L\"ucke durch eine
 telemetriegest\"utzte Tutoring-Laufzeitumgebung, die paketbasierte
-Prozedurzustandsverfolgung, Retrieval-Augmented-LLM-Hilfegenerierung und ein
-feinabgestimmtes Vision-Language-Model (VLM) zur strukturierten Extraktion visueller
-Fakten aus Cockpit-Anzeigen kombiniert. Das System erzwingt eine explizite
-Evidenzgrundlage: Jede hervorgehobene Cockpit-Referenz und jede Schrittempfehlung muss
-auf eine Telemetrie-Variable, eine Gating-Regel, einen abgerufenen Dokumentausschnitt
-oder eine visuelle Faktbeobachtung zur\"uckf\"uhrbar sein. Als Trainingsszenario dient
-der Kaltstart der F/A-18C in DCS World mit 25 Schritten in sechs Betriebsphasen, deren
-Abh\"angigkeiten untereinander sie repr\"asentativ f\"ur zustandsabh\"angige prozedurale
-Aufgaben machen. Ein zentrales Ergebnis ist, dass das Design der visuellen
-Fakten-Ontologie die Modellzuverl\"assigkeit bestimmt: Die Weiterentwicklung von einer
-8-Fact-v1- zu einer 13-Fact-v2-Ontologie durch Zerlegung zusammengesetzter Ziele in
-lokal \"uberpr\"ufbare visuelle Atome reduzierte kritische False-Positives um 64--89\%
-auf unabh\"angigen Holdout-Sets und liefert ein Design-Prinzip, wonach VLMs
-beobachtbare Evidenz extrahieren sollten, w\"ahrend die prozedurale Interpretation dem
-nachgelagerten Reasoning vorbehalten bleibt. Die VLM-Adaptationspipeline---Screenshot-Erfassung,
-Vorlabeling, menschliche \"Uberpr\"ufung, bilingualer SFT-Export, LoRA-Feinabstimmung und
-automatisiertes Benchmarking---wird auf zwei Backbone-Architekturen demonstriert. Auf der
-13-Fact-Ontologie verbessert ein Qwen3.5-9B LoRA-Adapter (928 bilinguale
-Trainingszeilen) die Fact-Genauigkeit von 0,80--0,87 (Basismodell) auf 0,99 auf zwei
-unabh\"angigen Holdout-Sets mit verifizierter Null-\"Uberlappung zum Training. Die
-identische Datenrezeptur, auf Gemma-4-31B angewendet, best\"atigt die
-\"Ubertragbarkeit der Verbesserung \"uber Backbones hinweg. Die Arbeit liefert eine
-funktionsf\"ahige Dual-Platform-Laufzeitumgebung mit automatisierten Tests,
-Benchmark-Artefakten und Replay-Infrastruktur sowie einem dokumentierten
-Evaluationsdesign f\"ur die n\"achste Phase der Human-Subject-Forschung.
+Zustandsverfolgung, Retrieval-Augmented-LLM-Hilfegenerierung und ein
+feinabgestimmtes Vision-Language-Model (VLM) zur strukturierten Extraktion
+visueller Fakten aus Cockpit-Anzeigen kombiniert. Ein zentrales Ergebnis ist,
+dass das Design der visuellen Fakten-Ontologie die Modellzuverl\"assigkeit
+bestimmt: Die Weiterentwicklung von einer 8-Fact- zu einer 13-Fact-Ontologie
+durch Zerlegung zusammengesetzter Ziele in lokal \"uberpr\"ufbare visuelle
+Atome reduzierte kritische False-Positives um 64--89\% auf unabh\"angigen
+Holdout-Sets. Ein Qwen3.5-9B LoRA-Adapter, trainiert mit 928 bilingualen
+Datenzeilen, erreicht eine Fact-Genauigkeit von 0,99 auf zwei Holdout-Sets
+mit verifizierter Null-\"Uberlappung zum Training; dieselbe Datenrezeptur
+\"ubertr\"agt sich mit konsistenten Verbesserungen auf Gemma-4-31B, was
+darauf hindeutet, dass der Ansatz nicht an ein einzelnes Backbone gebunden
+ist. Die kontrollierte Human-Subject-Evaluation in VR
+bleibt eine geplante n\"achste Phase; die vorliegende Arbeit liefert die
+technische Basis, Benchmark-Artefakte und Evaluationsinfrastruktur daf\"ur.
 \end{otherlanguage}
