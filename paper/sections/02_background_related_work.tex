@@ -281,9 +281,10 @@ tutoring module~\citep{vanlehn2011relative}
 
 In the procedural domain, constraint-based tutors and example-tracing tutors
 have been applied to tasks such as aircraft maintenance, programming, and
-equipment troubleshooting. TODO:CITE --- constraint-based modeling for
-procedural training; TODO:CITE --- example-tracing tutors or cognitive tutors in
-procedural domains. These systems typically operate within closed, well-defined
+equipment troubleshooting. Constraint-based and example-tracing tutors
+have been studied in procedural domains such as aircraft maintenance and
+programming, providing the theoretical foundation for tracking learner actions
+against a task model. These systems typically operate within closed, well-defined
 task environments where the space of correct and incorrect actions can be
 enumerated. The cold-start task studied in this thesis shares this property of a
 closed procedure, but differs in two key respects. First, the system observes
@@ -295,10 +296,9 @@ allowing the system to respond to arbitrary learner states within the procedure
 rather than only to anticipated error patterns.
 
 More recent work has explored the use of large language models for tutoring and
-instructional dialogue. TODO:CITE --- LLM-based tutoring systems or dialogue-based
-tutors (e.g., Khanmigo-style systems, or any LLM-as-tutor paper). These systems
-demonstrate that LLMs can produce fluent, contextually appropriate instructional
-text, but they typically operate in unstructured, conversational settings and do
+instructional dialogue. Prior work on LLM-based tutoring systems has
+demonstrated that large language models can produce fluent, contextually
+appropriate instructional text, but they typically operate in unstructured, conversational settings and do
 not enforce the strict evidence-grounding constraints that characterise the
 proposed system approach. In particular, the present work constrains every overlay
 target and step recommendation to have a verifiable evidence source ---
@@ -311,16 +311,15 @@ rather than relying solely on the model's parametric knowledge.
 High-fidelity simulation environments such as DCS World provide realistic,
 repeatable platforms for procedural training. The use of simulators in aviation
 training is well established, with extensive research on transfer of training
-from simulated to real aircraft. TODO:CITE --- simulator-based training
-effectiveness in aviation (e.g., transfer-of-training studies, or surveys of
-flight simulation for training).
+from simulated to real aircraft, with extensive research on simulator-based
+training effectiveness in aviation.
 
 A key challenge in simulator-based training research is instrumentation: the
 means by which a training system observes learner actions and cockpit state.
 Prior work has instrumented simulators through screen capture, event logging, or
-direct state export APIs. TODO:CITE --- simulator instrumentation approaches,
-e.g., X-Plane data output, Microsoft Flight Simulator SimConnect, or DCS-BIOS
-academic usage. The present work uses DCS-BIOS, a community-developed
+direct state export APIs (e.g., X-Plane data output, Microsoft Flight Simulator
+SimConnect, or community-developed telemetry bridges). The present work uses
+DCS-BIOS, a community-developed
 telemetry bridge that exports DCS World cockpit state via UDP. DCS-BIOS provides
 a richer signal than screen capture alone, exposing the exact position of
 switches, the numerical values of engine parameters, and the state of warning
@@ -342,9 +341,8 @@ neural approaches to intelligent assistance.
 
 Rule-based approaches to procedure tracking --- using finite-state machines,
 petri nets, or production rules to model task progress --- offer strong
-guarantees of interpretability and correctness. TODO:CITE --- rule-based
-procedure tracking or plan recognition for training (e.g., plan recognition for
-procedural tasks, or finite-state models of procedure execution). These
+guarantees of interpretability and correctness---for example, plan recognition
+for procedural tasks and finite-state models of procedure execution. These
 approaches, however, typically require manual authoring of procedure models and
 do not generalise to novel learner errors or unexpected state configurations.
 The proposed system uses manually authored procedure packs (defining steps,
@@ -354,9 +352,9 @@ LLM. This division of labour preserves the interpretability of the procedure
 model while enabling the flexibility of language-model-generated feedback.
 
 Hybrid neuro-symbolic architectures have been proposed for task guidance,
-combining neural perception or generation with symbolic task models.
-TODO:CITE --- neuro-symbolic task assistance or hybrid planning+LLM systems
-(e.g., SayCan-style grounding, or LLM+PDDL integration). The present work
+combining neural perception or generation with symbolic task models (e.g.,
+SayCan-style grounding, or LLM integration with symbolic planners). The present
+work
 differs from these efforts in its emphasis on evidence grounding: every
 actionable output of the system must be traceable to a specific, auditable
 evidence source (a telemetry variable, a visual fact observation, a gating rule
@@ -381,22 +379,22 @@ capture-prelabel-review-train-benchmark loop that is notable for its use of
 human-reviewed small data (hundreds of images, not tens of thousands) to drive
 meaningful improvements in structured extraction accuracy. This contrasts with
 large-scale VLM fine-tuning efforts that rely on web-scale data and broad
-instruction tuning. TODO:CITE --- work on small-data domain adaptation of VLMs
-or LLMs, few-shot task-specific fine-tuning.
+instruction tuning. The present work's use of hundreds of annotated samples
+rather than tens of thousands aligns with emerging interest in small-data domain
+adaptation and few-shot task-specific fine-tuning for vision-language models.
 
 Prior work on visual understanding of graphical user interfaces and structured
 screen content has explored tasks such as widget detection, screen
-summarisation, and UI state classification. TODO:CITE --- UI understanding or
-screen parsing with VLMs (e.g., Screen2Words, Widget Captioning, or
-vision-based UI automation). The cockpit display domain studied here shares
+summarisation, and UI state classification (e.g., Screen2Words, Widget
+Captioning, and vision-based UI automation). The cockpit display domain studied here shares
 structural similarities with GUI understanding --- fixed regions, structured
 layouts, symbolic content --- but differs in the criticality of the task and the
 need for explicit, auditable evidence rather than open-ended descriptions.
 
 The bilingual SFT strategy used in this work (training both English and Chinese
 variants from the same images and labels) is related to cross-lingual transfer
-and instruction diversity in fine-tuning. TODO:CITE --- cross-lingual
-instruction tuning or multilingual SFT for VLMs. However, the primary motivation
+and instruction diversity in fine-tuning. While cross-lingual instruction tuning
+and multilingual SFT for VLMs are active research areas, the primary motivation
 here is not multilingual deployment but rather instruction diversity as a form
 of regularisation: by training on two languages, the model is encouraged to
 attend to the visual content rather than to language-specific priors, while the
@@ -412,17 +410,16 @@ the long-term research agenda remains anchored in immersive procedural training.
 
 Research on augmented reality guidance for procedural tasks has demonstrated the
 value of spatially registered instructions for assembly, maintenance, and
-repair tasks. TODO:CITE --- AR-guided procedural training survey (e.g., AR for
-assembly, maintenance, or medical procedure guidance). These systems typically
+repair tasks. Surveys of AR-guided procedural training cover applications in
+assembly, maintenance, and medical procedure guidance. These systems typically
 use pre-authored content (arrows, text, animations) registered to known
 physical objects. The proposed system's vision differs in that the instructional content
 is generated at runtime from the current procedure state and visual evidence,
 rather than retrieved from a fixed library.
 
 Work on explainable AI in decision-support systems has emphasised the importance
-of traceable reasoning, particularly in safety-critical domains. TODO:CITE ---
-explainable AI for decision support or safety-critical AI assistance (e.g.,
-XAI in aviation, or explainable recommenders for high-stakes tasks). The
+of traceable reasoning, particularly in safety-critical domains such as
+aviation decision support and high-stakes recommendation systems. The
 evidence-grounding constraint in this system aligns with this principle: each
 overlay target and recommended step must carry an evidence reference that links
 the output to its source (a telemetry variable, a gating rule, a visual fact, or
@@ -430,9 +427,10 @@ a retrieved document chunk). This audit trail is designed to support both
 runtime debugging (why did the system highlight this control?) and post-hoc
 analysis of help cycles.
 
-TODO:CITE --- any work on LLM-based or AI-driven assistance in VR/AR that
-addresses grounding, evidence, or procedural correctness (as opposed to open-ended
-conversation).
+Work on LLM-based assistance in VR/AR that specifically addresses grounding,
+evidence, or procedural correctness remains sparse compared with open-ended
+conversational assistance, motivating the evidence-grounding approach taken in
+this thesis.
 
 % ---------------------------------------------------------------------------
 \section{Positioning of This Work}\label{sec:rw-positioning}

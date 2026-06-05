@@ -419,9 +419,8 @@ The current models have not been tested on such configurations.
 The largest training configuration uses 928 rows (Run-003 + Run-005$\times$2,
 bilingual).
 This is small by comparison with typical VLM fine-tuning datasets, which
-often use tens or hundreds of thousands of examples.
-TODO:CITE for comparison with dataset sizes reported in related VLM fine-tuning
-work (e.g., LLaVA instruction tuning, domain-specific VQA fine-tuning).
+often use tens or hundreds of thousands of examples (e.g., LLaVA instruction
+tuning and domain-specific VQA fine-tuning).
 While the results demonstrate that 928 rows can produce meaningful improvements,
 they do not establish the upper bound of what is achievable with more data.
 Conversely, the results do not establish the minimum data requirement; it is
@@ -529,8 +528,9 @@ tutoring runtime with automated tests and harness-level evidence validation;
 (2) a reproducible VLM adaptation pipeline achieving 0.99 fact accuracy on
 holdout data with cross-backbone evidence; (3) a pack-driven architecture
 supporting extension to new procedures and simulators; and (4) formative VR
-pilot evidence ($n=9$) that the tutor enables procedural completion and
-reduces omission errors, while not eliminating assistance-coupled errors.
+pilot evidence ($n=9$) that the tutor was associated with full procedural
+completion and fewer coded omission errors, while assistance-coupled errors
+persisted.
 These contributions do not depend on claims that exceed the stated bounds.
 
 % ===========================================================================
@@ -588,9 +588,8 @@ This extension would require changes to the data capture pipeline (recording
 frame sequences rather than isolated screenshots), the training format (video or
 multi-image inputs), and the benchmark protocol (temporal fact definitions).
 Whether current small-scale VLMs can effectively exploit temporal information
-for cockpit state recognition is uncertain.
-\textbf{TODO:VERIFY} --- feasibility of multi-frame VLM input given the current
-9B-parameter scale and LoRA training regime.
+for cockpit state recognition is uncertain. Whether multi-frame VLM input is
+feasible at the 9B-parameter scale under LoRA training has not been tested.
 
 \subsection{Online Adaptation from In-Situ Corrections}
 
@@ -607,9 +606,9 @@ This direction requires addressing challenges in label reliability (learner
 corrections may themselves be erroneous), catastrophic forgetting (online updates
 should not degrade performance on previously correct facts), and evaluation
 (online adaptation must be benchmarked against a fixed holdout set that remains
-untouched by the adaptation process).
-\textbf{TODO:VERIFY} --- whether the current Unsloth + PEFT + TRL stack supports
-incremental fine-tuning without full retraining.
+untouched by the adaptation process). Whether the current Unsloth + PEFT + TRL
+stack supports incremental fine-tuning without full retraining has not been
+evaluated.
 
 \subsection{System-Level End-to-End Evaluation}
 

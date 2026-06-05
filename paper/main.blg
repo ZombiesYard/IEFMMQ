@@ -1,0 +1,33 @@
+This is BibTeX, Version 0.99d
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: main.aux
+A level-1 auxiliary file: Preamble.aux
+A level-1 auxiliary file: sections/00_abstract.aux
+A level-1 auxiliary file: sections/00_acknowledgements.aux
+A level-1 auxiliary file: sections/01_introduction.aux
+A level-1 auxiliary file: sections/02_background_related_work.aux
+A level-1 auxiliary file: sections/03_system_design.aux
+A level-1 auxiliary file: sections/04_methodology.aux
+A level-1 auxiliary file: sections/05_implementation.aux
+A level-1 auxiliary file: sections/06_evaluation.aux
+A level-1 auxiliary file: sections/07_discussion.aux
+A level-1 auxiliary file: sections/08_conclusion.aux
+The style file: plainnat.bst
+A level-1 auxiliary file: sections/09_appendix.aux
+Database file #1: references.bib
+You're missing a field name---line 149 of file references.bib
+ :   
+ :   % TODO:VERIFY — exact initial release year; DCS World platform launched circa 2013
+(Error may have been on previous line)
+I'm skipping whatever remains of this entry
+You're missing a field name---line 169 of file references.bib
+ : 
+ : %    title   = {},
+(Error may have been on previous line)
+I'm skipping whatever remains of this entry
+You're missing a field name---line 180 of file references.bib
+ : 
+ : %    title     = {},
+(Error may have been on previous line)
+I'm skipping whatever remains of this entry
+(There were 3 error messages)
