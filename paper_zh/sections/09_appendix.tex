@@ -3,4 +3,257 @@
 % ===========================================================================
 \chapter{附录}\label{ch:appendix}
 
-% TODO: 根据需要添加附录（完整基准测试表、数据集详情等）。
+% ===========================================================================
+\section{完整 LoRA 超参数配置}\label{sec:appendix-hyperparams}
+
+表~\ref{tab:lora-hyperparams-full} 列出了在匹配的 Run-003 + Run-005$\times$2 数据
+配方下三种骨干模型的完整超参数配置。数值来自可用的训练报告和基准测试工件。
+
+\begin{table}[htbp]
+  \centering
+  \caption{三种骨干的完整 LoRA 微调超参数。}
+  \label{tab:lora-hyperparams-full}
+  \small
+  \begin{tabular}{@{}llll@{}}
+  \toprule
+  \textbf{参数} & \textbf{Qwen3.5-9B} & \textbf{Qwen3.6-27B} & \textbf{Gemma-4-31B} \\
+  \midrule
+  \texttt{max\_seq\_length} & 4096 & 4096 & 4096 \\
+  \texttt{num\_train\_epochs} & 4.0 & 4.0 & 4.0 \\
+  \texttt{learning\_rate} & $2{\times}10^{-4}$ & $2{\times}10^{-4}$ & $2{\times}10^{-4}$ \\
+  \texttt{per\_device\_train\_batch\_size} & 1 & 1 & 1 \\
+  \texttt{gradient\_accumulation\_steps} & 4 & 4 & 4 \\
+  \texttt{lora\_r} & 16 & 16 & 16 \\
+  \texttt{lora\_alpha} & 16 & 16 & 16 \\
+  \texttt{lora\_dropout} & 0.0 & 0.0 & 0.0 \\
+  \texttt{seed} & 3407 & 3407 & 3407 \\
+  \texttt{load\_in\_4bit} & True & True & True \\
+  \texttt{warmup\_ratio} & 0.1 & 0.1 & 0.1 \\
+  \texttt{weight\_decay} & 0.01 & 0.01 & 0.01 \\
+  \texttt{train\_rows} & 928 & 928 & 928 \\
+  \texttt{eval\_rows} & 0 & 0 & 0 \\
+  \midrule
+  \textbf{骨干特定参数} & & & \\
+  \midrule
+  Vision LoRA & enabled & enabled & disabled \\
+  LoRA target modules & vision+lang & vision+lang & all-linear \\
+  Chat template & Qwen default & Qwen default & gemma-4 \\
+  GPU memory util. & 0.6 & 0.6 & 0.95 \\
+  \midrule
+  \textbf{训练结果} & & & \\
+  \midrule
+  Train runtime (s) & 6419 & 12619 & 8050 \\
+  Train loss (final) & 0.2156 & 0.1068 & 0.0474 \\
+  \bottomrule
+  \end{tabular}
+\end{table}
+
+注：训练损失值不可在不同骨干之间直接比较，因为分词器行为、聊天模板结构、目标序列分布和模型参数化存在差异。
+
+% ===========================================================================
+\section{8 事实 V1 基线基准测试}\label{sec:appendix-8fact}
+
+最早的完整基准测试使用在 Run-001（180 个任务）上训练的 8 事实 LoRA 适配器，并在
+Run-002 保留集（50 个样本）上进行评估。该实验线早于 13 事实本体，此处列作历史参考。
+
+\begin{table}[htbp]
+\centering
+\caption{8 事实 v1 基准测试：Qwen3.5-9B Base vs.\ LoRA-v1 在 Run-002 保留集上（50 样本，EN）。}\label{tab:appendix-qwen-8fact}
+\begin{tabular}{l c c c}
+\toprule
+\textbf{指标} & \textbf{Base} & \textbf{LoRA-v1} & \textbf{$\Delta$} \\
+\midrule
+JSON valid rate       & 1.0    & 1.0    & --- \\
+Schema valid rate     & 1.0    & 1.0    & --- \\
+Fact accuracy         & 0.7600 & 0.9150 & +0.1550 \\
+Macro $F_1$           & 0.4241 & 0.5847 & +0.1605 \\
+Seen $F_1$            & 0.4714 & 0.8380 & +0.3666 \\
+Sample exact match    & 0.06   & 0.36   & +0.30 \\
+Critical false positives & 13  & 15     & +2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/
+
+LoRA 适配器在事实级指标上有显著改善，但关键误报从 13 个增加到 15 个，这证实了
+8 事实 v1 本体的结构性弱点：诸如 \texttt{ins\_go} 等复合目标无法从单一帧中进行视觉
+验证，并在完成类事实上产生了系统性的误报错误。
+
+% ===========================================================================
+\section{数据集事实分布}\label{sec:appendix-datasets}
+
+表~\ref{tab:fact-distributions} 报告了两个主要训练来源（Run-003、Run-005）和两个
+13 事实保留集（Run-002 newfacts、Run-004 random）的逐事实 \texttt{seen} 计数。计数
+数据取自对应的 \texttt{stats.json} 文件。
+
+\begin{table}[htbp]
+\centering
+\caption{训练集和保留集中逐事实 \texttt{seen} 计数（13 事实 v2 本体）。}
+\label{tab:fact-distributions}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Fact ID} & \textbf{Run-003 (220)} & \textbf{Run-005 (122)} & \textbf{Run-002 new (50)} & \textbf{Run-004 (100)} \\
+\midrule
+\texttt{tac\_page\_visible}            & 46  & 24  & 23 & 3  \\
+\texttt{supt\_page\_visible}           & 20  & 34  & 5  & 3  \\
+\texttt{fcs\_page\_visible}            & 30  & 40  & 13 & 94 \\
+\texttt{fcs\_page\_x\_marks\_visible}   & 16  & 18  & 1  & 5  \\
+\texttt{bit\_root\_page\_visible}       & 18  & 43  & 9  & 16 \\
+\texttt{fcsmc\_page\_visible}           & 55  & 56  & 9  & 84 \\
+\texttt{fcsmc\_intermediate\_result\_visible} & 18 & 15  & 1  & 7  \\
+\texttt{fcsmc\_in\_test\_visible}        & 18  & 19  & 6  & 17 \\
+\texttt{fcsmc\_final\_go\_result\_visible} & 18 & 22  & 2  & 60 \\
+\texttt{hsi\_page\_visible}              & 106 & 109 & 49 & 100 \\
+\texttt{hsi\_map\_layer\_visible}        & 79  & 37  & 27 & 50 \\
+\texttt{ins\_grnd\_alignment\_text\_visible} & 58 & 72  & 42 & 69 \\
+\texttt{ins\_ok\_text\_visible}          & 12  & 14  & 4  & 0  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Evidence: datasets/vision_sft_run003/stats.json,
+%           datasets/vision_sft_run005_composition_rebalance/stats.json,
+%           datasets/vision_sft_holdout_run002_newfacts/stats.json,
+%           datasets/vision_sft_holdout_run004_random/stats.json
+
+Run-005 的组合再平衡成功改进了代表性不足的事实的覆盖范围：\texttt{supt\_page\_visible}
+从 20 增加到 54 combined seen，\texttt{fcsmc\_page\_visible} 从 55 增加到 111，
+\texttt{ins\_grnd\_alignment\_text\_visible} 从 58 增加到 130。
+
+% ===========================================================================
+\section{CLI 命令参考}\label{sec:appendix-cli}
+
+\texttt{simtutor} 包提供以下 CLI 命令：
+
+\begin{description}
+\item[\texttt{run}.] 使用模拟环境适配器和预录制场景文件执行仿真，写入事件日志。
+\item[\texttt{replay}.] 对照程序包验证现有事件日志，检查步骤排序和状态机一致性。
+\item[\texttt{score}.] 使用评分引擎对事件日志进行评分。
+\item[\texttt{record-vlm}.] 在视觉观察集上运行 VLM 事实提取，记录预测用于基准测试。
+\item[\texttt{replay-bios}.] 通过遥测流水线重放原始 DCS-BIOS 捕获。
+\item[\texttt{validate}.] 对照模式注册表中的命名模式验证 JSONL 文件。
+\end{description}
+
+所有命令接受模型配置覆盖（\texttt{--model-provider}、\texttt{--model-name}、
+\texttt{--model-base-url}、\texttt{--model-timeout-s}）和语言切换（\texttt{--lang}）。
+
+% ===========================================================================
+\section{模型提供者配置}\label{sec:appendix-model-config}
+
+模型访问通过环境变量配置：\texttt{SIMTUTOR\_MODEL\_PROVIDER}（\texttt{openai\_compat}
+$|$ \texttt{ollama} $|$ \texttt{stub}）、\texttt{SIMTUTOR\_MODEL\_BASE\_URL}、
+\texttt{SIMTUTOR\_MODEL\_NAME}、\texttt{SIMTUTOR\_MODEL\_TIMEOUT\_S}、
+\texttt{SIMTUTOR\_MODEL\_API\_KEY}（\texttt{openai\_compat} 必需）、
+\texttt{SIMTUTOR\_MODEL\_ENABLE\_MULTIMODAL}（切换请求中的 base64 图像编码）以及
+\texttt{SIMTUTOR\_LANG}（\texttt{zh} $|$ \texttt{en}）。实时运行时在启动时验证所有
+必需配置，并从所有日志输出中脱敏 API 密钥。
+
+% ===========================================================================
+\section{回放评估套件}\label{sec:appendix-replay}
+
+表~\ref{tab:replay-cases} 列出了 \texttt{fa18c\_startup\_v04} 套件中的五个回放评估用例。
+
+\begin{table}[htbp]
+\centering
+\caption{回放评估用例。}
+\label{tab:replay-cases}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Case ID} & \textbf{预期步骤} & \textbf{视觉} & \textbf{预期目标} \\
+\midrule
+\texttt{noop\_2min} & S01 & unavailable & \texttt{battery\_switch} \\
+\texttt{batteryon\_2min} & S02 & unavailable & \texttt{fire\_test\_switch} \\
+\texttt{Batteryon\_enginGenoff\_2min} & S01 & unavailable & \texttt{generator\_left\_switch} \\
+\texttt{fcs\_reset\_fcs\_bit\_2min} & S18 & available & \texttt{fcs\_bit\_switch} \\
+\texttt{ins\_2min} & S12 & available & \texttt{ins\_mode\_knob} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Evidence: replay_eval/fa18c_startup_v04/suite.yaml
+
+具有 \texttt{vision\_status = available} 的用例在对应的 DCS Saved Games 目录中
+包含逐帧 sidecar 文件（\texttt{frames.jsonl}），支持在无实时 DCS 实例的情况下
+回放视觉依赖的程序步骤。
+
+% ===========================================================================
+\section{VR 试点研究 —— 补充数据}\label{sec:appendix-pilot}
+
+表~\ref{tab:pilot-participants} 列出了参与者的经验概况。
+
+\begin{table}[htbp]
+\centering
+\caption{试点参与者经验概况（自报）。}\label{tab:pilot-participants}
+\small
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+\textbf{P} & \textbf{条件} & \textbf{DCS 经验} & \textbf{飞行仿真} & \textbf{VR 经验} & \textbf{Quest~3} & \textbf{分组} \\
+\midrule
+P01 & without\_tutor & frequent & frequent & frequent & frequent & intermediate \\
+P02 & without\_tutor & intermediate & intermediate & frequent & frequent & --- \\
+P03 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
+P04 & with\_tutor    & intermediate & intermediate & frequent & frequent & intermediate \\
+P05 & with\_tutor    & intermediate & intermediate & frequent & frequent & --- \\
+P06 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
+P07 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
+P08 & with\_tutor    & novice & novice & frequent & frequent & --- \\
+P09 & with\_tutor    & novice & novice & intermediate & intermediate & beginner \\
+\bottomrule
+\end{tabular}
+
+--- = 未记录。
+\end{table}
+
+表~\ref{tab:pilot-uncompleted} 列出了每位无教学辅助参与者未完成的步骤。
+
+\begin{table}[htbp]
+\centering
+\caption{无教学辅助条件中未完成的步骤（人工编码）。}\label{tab:pilot-uncompleted}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{P} & \textbf{未完成的步骤} \\
+\midrule
+P01 & S09, S12, S18, S19, S20, S22, S24, S27, S29, S31 \\
+P02 & S02, S14, S18, S19, S27, S30 \\
+P03 & S07, S09, S16, S18, S19, S26, S27, S29, S32 \\
+P06 & S07, S18, S19, S27 \\
+P07 & S02, S09, S12, S13, S16, S17, S18, S19, S22, S26, S27, S28, S29, S32 \\
+\bottomrule
+\end{tabular}
+
+S18（右 DDI 上的 FCS-MC BIT 页面）和 S19（FCS BIT 最终 GO 结果）被所有五名无教学
+辅助参与者遗漏。S27（襟翼开关至 AUTO）也被所有五人遗漏。这些步骤是视觉优先的，需要
+VLM 确认或教员对正确显示页面序列的了解。
+\end{table}
+
+表~\ref{tab:pilot-errors-auto} 报告了自动编码的错误计数（人工审查前）与人工错误计数
+的对比，说明本试点中自动到人工校正的量级。
+
+\begin{table}[htbp]
+\centering
+\caption{自动编码 vs.\ 人工错误计数（每参与者）。}\label{tab:pilot-errors-auto}
+\small
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+\textbf{P} & \textbf{条件} & \textbf{自动 OM} & \textbf{自动 CO} & \textbf{人工 OM} & \textbf{人工 CO} & \textbf{人工总计} \\
+\midrule
+P01 & without\_tutor & 4  & 3  & 8  & 0 & 10 \\
+P02 & without\_tutor & 0  & 3  & 0  & 0 & 1  \\
+P03 & without\_tutor & 0  & 4  & 7  & 0 & 11 \\
+P06 & without\_tutor & 0  & 3  & 2  & 0 & 4  \\
+P07 & without\_tutor & 1  & 9  & 11 & 0 & 11 \\
+P04 & with\_tutor    & 0  & 4  & 0  & 3 & 7  \\
+P05 & with\_tutor    & 0  & 3  & 0  & 3 & 6  \\
+P08 & with\_tutor    & 0  & 3  & 0  & 0 & 0  \\
+P09 & with\_tutor    & 0  & 3  & 0  & 3 & 5  \\
+\bottomrule
+\end{tabular}
+
+自动编码错误来自自动化流水线（\texttt{step\_coding.csv} 中的 Auto\_Error\_* 列）。
+人工错误来自人工审查列（Error\_*）。P08 的自动错误在人工审查中被全部覆盖为零
+（见第\ref{sec:eval-pilot}节的数据质量注记）。
+\end{table}
