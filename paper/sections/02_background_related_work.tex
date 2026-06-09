@@ -31,15 +31,15 @@ assistance.
 
 The procedural training scenario at the centre of this thesis is the F/A-18C
 cold-start, a standard pre-flight cockpit procedure that brings the aircraft from
-a powered-down state to a taxi-ready configuration. This task is canonical in
-DCS World training curricula and is representative of a broader class of
+a powered-down state to a taxi-ready configuration~\citep{eagledynamics2023hornetguide}.
+This task is canonical in DCS World training curricula and is representative of a broader class of
 fixed-sequence, state-sensitive procedural tasks in which the order of actions,
 the verification of intermediate system states, and the correct interpretation of
 cockpit instrumentation all contribute to successful completion.
 
-\subsection{Procedure Structure: S01--S25 and Phases P1--P6}
+\subsection{Procedure Structure: S01--S33 and Phases P1--P6}
 
-The cold-start procedure is organised into 25 numbered steps (S01--S25), grouped
+The cold-start procedure is organised into 33 numbered steps (S01--S33), grouped
 into six coarse-grained phases (P1--P6) that reflect distinct operational stages:
 
 \begin{description}
@@ -60,11 +60,11 @@ into six coarse-grained phases (P1--P6) that reflect distinct operational stages
     following verification of right-engine parameters in nominal ranges, INS
     alignment mode selection (ground or carrier), radar power-up, and OBOGS
     (On-Board Oxygen Generating System) activation.
-  \item[P5 --- FCS and flight controls (S15--S19):] Flight Control System (FCS)
-    reset and BIT (Built-In Test) execution, flap and trim configuration, and
-    the ``four-down'' pre-flight checks covering the refuelling probe, speed
-    brake, launch bar, and arrestor hook.
-  \item[P6 --- Pre-taxi instruments and final checks (S20--S25):] Parking brake
+  \item[P5 --- FCS and flight controls (S15--S27):] Flight Control System (FCS)
+    reset and BIT (Built-In Test) execution, flap and trim configuration,
+    ``four-down'' pre-flight checks covering the refuelling probe, launch bar,
+    and arrestor hook, and pitot heat configuration.
+  \item[P6 --- Pre-taxi instruments and final checks (S28--S33):] Parking brake
     release, BINGO fuel setting, barometric and radar altimeter configuration,
     standby attitude indicator uncaging, and attitude source selection.
 \end{description}
@@ -111,7 +111,7 @@ for the vision-language model (VLM). This design choice avoids mismatches
 between training and inference (where the model would be trained on per-region
 crops but evaluated on a full composite, or vice versa) and simplifies the
 multi-turn visual pipeline to a single-image extraction step per observation
-window~\citep{vaswani2017attention}.
+window.
 
 \subsection{DCS-BIOS Telemetry}
 
@@ -121,7 +121,7 @@ window~\citep{vaswani2017attention}.
 
 DCS-BIOS provides a real-time UDP-based telemetry stream from DCS World,
 exporting the state of cockpit switches, indicators, warning lights, gauges, and
-other instruments as structured data. The tutoring runtime receives these raw
+other instruments as structured data~\citep{dcsbiosdocs}. The tutoring runtime receives these raw
 BIOS frames and passes them through a telemetry enrichment pipeline that
 normalises the raw values into stable runtime variables (e.g., \texttt{rpm\_r},
 \texttt{apu\_ready}, \texttt{ins\_mode}), applies delta sanitisation to suppress
@@ -256,14 +256,15 @@ confirmed. The current ontology defines two binding types:
 \end{itemize}
 
 % Evidence: packs/fa18c_startup/pack.yaml (vision_priority_steps vs bios_priority_steps)
-Steps that rely on visual confirmation (S08, S15, S18) are registered as
+Steps that rely on visual confirmation (S08, S15, S18, S19) are registered as
 \texttt{vision\_priority\_steps} in the procedure pack, while steps directly
-observable through DCS-BIOS telemetry (S01, S03--S07, S09--S13, S21) are
-registered as \texttt{bios\_priority\_steps}. Steps that require manual
-confirmation or involve cockpit areas outside the three-display layout (S02,
-S14, S16--S20, S22--S25) are marked as \texttt{manual\_or\_out\_of\_layout\_steps}.
-This tripartite classification ensures that each step's completion evidence is
-sourced from the most reliable available signal.
+observable through DCS-BIOS telemetry (including S01, S03--S13, S16, and
+S20--S33) are registered as \texttt{bios\_priority\_steps}. Steps that require
+manual confirmation or involve cockpit areas outside the three-display layout
+(S14 and S17 in the current pack) are marked as
+\texttt{manual\_or\_out\_of\_layout\_steps}. This classification ensures that
+each step's completion evidence is sourced from the most reliable available
+signal.
 
 % ===========================================================================
 %  PART II — RELATED WORK
@@ -284,7 +285,8 @@ have been applied to tasks such as aircraft maintenance, programming, and
 equipment troubleshooting. Constraint-based and example-tracing tutors
 have been studied in procedural domains such as aircraft maintenance and
 programming, providing the theoretical foundation for tracking learner actions
-against a task model. These systems typically operate within closed, well-defined
+against a task model~\citep{mitrovic2012constraint,aleven2009example}. These
+systems typically operate within closed, well-defined
 task environments where the space of correct and incorrect actions can be
 enumerated. The cold-start task studied in this thesis shares this property of a
 closed procedure, but differs in two key respects. First, the system observes
@@ -298,7 +300,8 @@ rather than only to anticipated error patterns.
 More recent work has explored the use of large language models for tutoring and
 instructional dialogue. Prior work on LLM-based tutoring systems has
 demonstrated that large language models can produce fluent, contextually
-appropriate instructional text, but they typically operate in unstructured, conversational settings and do
+appropriate instructional text~\citep{kasneci2023chatgpt}, but they typically
+operate in unstructured, conversational settings and do
 not enforce the strict evidence-grounding constraints that characterise the
 proposed system approach. In particular, the present work constrains every overlay
 target and step recommendation to have a verifiable evidence source ---
@@ -310,9 +313,9 @@ rather than relying solely on the model's parametric knowledge.
 
 High-fidelity simulation environments such as DCS World provide realistic,
 repeatable platforms for procedural training. The use of simulators in aviation
-training is well established, with extensive research on transfer of training
-from simulated to real aircraft, with extensive research on simulator-based
-training effectiveness in aviation.
+training is well established, with research on both transfer of training from
+simulated to real aircraft and simulator-based training effectiveness in
+aviation~\citep{hays1992flight}.
 
 A key challenge in simulator-based training research is instrumentation: the
 means by which a training system observes learner actions and cockpit state.
@@ -320,7 +323,7 @@ Prior work has instrumented simulators through screen capture, event logging, or
 direct state export APIs (e.g., X-Plane data output, Microsoft Flight Simulator
 SimConnect, or community-developed telemetry bridges). The present work uses
 DCS-BIOS, a community-developed
-telemetry bridge that exports DCS World cockpit state via UDP. DCS-BIOS provides
+telemetry bridge that exports DCS World cockpit state via UDP~\citep{dcsbiosdocs}. DCS-BIOS provides
 a richer signal than screen capture alone, exposing the exact position of
 switches, the numerical values of engine parameters, and the state of warning
 lights without requiring computer vision to recover them. This allows the system
@@ -329,7 +332,8 @@ DCS-BIOS) while relying on deterministic telemetry for switch positions and
 gauge readings.
 
 DCS World~\citep{dcsworld} serves as the simulation platform employed in this
-research; DCS-BIOS provides the telemetry interface used throughout the system.
+research; DCS-BIOS~\citep{dcsbiosdocs} provides the telemetry interface used
+throughout the system.
 
 % ---------------------------------------------------------------------------
 \section{Rule-Based and State-Aware Tutoring}\label{sec:rw-state}
@@ -353,7 +357,7 @@ model while enabling the flexibility of language-model-generated feedback.
 
 Hybrid neuro-symbolic architectures have been proposed for task guidance,
 combining neural perception or generation with symbolic task models (e.g.,
-SayCan-style grounding, or LLM integration with symbolic planners). The present
+SayCan-style grounding, or LLM integration with symbolic planners)~\citep{ahn2022saycan}. The present
 work
 differs from these efforts in its emphasis on evidence grounding: every
 actionable output of the system must be traceable to a specific, auditable
@@ -370,9 +374,7 @@ The adaptation of vision-language models (VLMs) to domain-specific structured
 extraction tasks is a rapidly growing area. Parameter-efficient fine-tuning
 methods, particularly Low-Rank Adaptation (LoRA), have made it feasible to adapt
 large pre-trained models to narrow domains with modest computational resources
-and small curated datasets. \citep{hu2021lora};
-\citep{mangrulkar2022peft};
-\citep{bai2023qwen}.
+and small curated datasets~\citep{hu2021lora,mangrulkar2022peft,bai2023qwen,liu2023llava,dai2023instructblip}.
 
 The VLM adaptation pipeline in this thesis (§\ref{sec:methods-vlm}) follows a
 capture-prelabel-review-train-benchmark loop that is notable for its use of
@@ -381,23 +383,23 @@ meaningful improvements in structured extraction accuracy. This contrasts with
 large-scale VLM fine-tuning efforts that rely on web-scale data and broad
 instruction tuning. The present work's use of hundreds of annotated samples
 rather than tens of thousands aligns with emerging interest in small-data domain
-adaptation and few-shot task-specific fine-tuning for vision-language models.
+adaptation and task-specific fine-tuning for vision-language models.
 
 Prior work on visual understanding of graphical user interfaces and structured
 screen content has explored tasks such as widget detection, screen
 summarisation, and UI state classification (e.g., Screen2Words, Widget
-Captioning, and vision-based UI automation). The cockpit display domain studied here shares
+Captioning, and vision-based UI automation)~\citep{wang2021screen2words}. The
+cockpit display domain studied here shares
 structural similarities with GUI understanding --- fixed regions, structured
 layouts, symbolic content --- but differs in the criticality of the task and the
 need for explicit, auditable evidence rather than open-ended descriptions.
 
 The bilingual SFT strategy used in this work (training both English and Chinese
 variants from the same images and labels) is related to cross-lingual transfer
-and instruction diversity in fine-tuning. While cross-lingual instruction tuning
-and multilingual SFT for VLMs are active research areas, the primary motivation
-here is not multilingual deployment but rather instruction diversity as a form
-of regularisation: by training on two languages, the model is encouraged to
-attend to the visual content rather than to language-specific priors, while the
+and instruction diversity in fine-tuning. The primary motivation here is not
+multilingual deployment but rather instruction diversity as a form of
+regularisation: by training on two languages, the model is encouraged to attend
+to the visual content rather than to language-specific priors, while the
 structured JSON output format remains language-independent.
 
 % ---------------------------------------------------------------------------
@@ -411,7 +413,8 @@ the long-term research agenda remains anchored in immersive procedural training.
 Research on augmented reality guidance for procedural tasks has demonstrated the
 value of spatially registered instructions for assembly, maintenance, and
 repair tasks. Surveys of AR-guided procedural training cover applications in
-assembly, maintenance, and medical procedure guidance. These systems typically
+assembly, maintenance, and medical procedure guidance~\citep{palmarini2018ar}.
+These systems typically
 use pre-authored content (arrows, text, animations) registered to known
 physical objects. The proposed system's vision differs in that the instructional content
 is generated at runtime from the current procedure state and visual evidence,
@@ -419,7 +422,7 @@ rather than retrieved from a fixed library.
 
 Work on explainable AI in decision-support systems has emphasised the importance
 of traceable reasoning, particularly in safety-critical domains such as
-aviation decision support and high-stakes recommendation systems. The
+aviation decision support and high-stakes recommendation systems~\citep{gunning2019xai,amershi2019guidelines}. The
 evidence-grounding constraint in this system aligns with this principle: each
 overlay target and recommended step must carry an evidence reference that links
 the output to its source (a telemetry variable, a gating rule, a visual fact, or
@@ -429,8 +432,10 @@ analysis of help cycles.
 
 Work on LLM-based assistance in VR/AR that specifically addresses grounding,
 evidence, or procedural correctness remains sparse compared with open-ended
-conversational assistance, motivating the evidence-grounding approach taken in
-this thesis.
+conversational assistance. Related embodied-AI work grounds language output in
+action affordances~\citep{ahn2022saycan}, but procedural correctness in a live
+flight-simulator cockpit remains a different operational setting. This motivates
+the evidence-grounding approach taken in this thesis.
 
 % ---------------------------------------------------------------------------
 \section{Positioning of This Work}\label{sec:rw-positioning}
@@ -446,11 +451,11 @@ configuration artifact that can be authored, versioned, and replayed
 independently of the model. The concrete contributions arising from this
 positioning are enumerated in Section~\ref{sec:intro-contributions}.
 
-The work presented in this thesis represents a technical baseline rather than a
-completed evaluation. The VLM adaptation results (§\ref{ch:evaluation}) provide
+The work presented in this thesis combines technical validation with a formative
+pilot evaluation. The VLM adaptation results (§\ref{ch:evaluation}) provide
 evidence that structured visual fact extraction can be measurably improved
-through small-data domain fine-tuning, but they do not yet constitute evidence
-of learning gains, workload reduction, or transfer. The human-subject evaluation
-envisioned in the original thesis proposal remains a planned next phase
-(§\ref{sec:eval-planned}), and the current system is best understood as the
-runtime and instrumentation infrastructure that makes that evaluation feasible.
+through small-data domain fine-tuning, but they do not constitute evidence of
+learning gains, workload reduction, or transfer. The formative VR pilot
+(§\ref{sec:eval-pilot}) provides descriptive evidence that the runtime and
+instrumentation can be exercised with real participants; a larger controlled
+human-subject evaluation remains future work.

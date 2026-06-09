@@ -31,8 +31,8 @@ JSON Schema with \texttt{if/then} rules---not merely logged for post-hoc audit.
 The architecture follows a ports-and-adapters pattern with a deterministic
 fallback path, a step harness that validates and repairs model outputs before
 they reach the simulator, and a procedure pack format that expresses all
-procedure logic as declarative YAML configuration. The architecture is validated
-through automated tests, a replay evaluation suite (5 cases), and 20
+procedure logic as declarative YAML configuration. The architecture is supported
+by automated tests, a replay evaluation suite (5 cases), and 20
 live-fixture regression entries covering correct advancement, safe rejection,
 and interaction semantics. In the VR pilot, the architecture processed 77 help
 cycles with zero overlay rejections.
@@ -70,7 +70,7 @@ Larger controlled evaluation remains future work.
 \paragraph{What this thesis demonstrates.}
 The work establishes that a telemetry-grounded, evidence-constrained tutoring
 runtime with structured visual fact extraction is technically feasible and can
-be validated through systematic benchmarks. It demonstrates that 928 rows of
+be assessed through systematic benchmarks. It demonstrates that 928 rows of
 human-reviewed data suffice to adapt a general-purpose VLM to a domain-specific
 extraction task with near-ceiling accuracy on independent holdout sets. It shows
 that visual fact ontology design---specifically, the decomposition of compound
@@ -90,7 +90,7 @@ workload reduction, or retention improvement. Without-tutor observed durations
 are not comparable with with-tutor durations because trials were stopped at
 different procedure points. Questionnaire and workload data remain incomplete
 (P02 questionnaire mislabelled). Within these boundaries, the thesis delivers a
-technically validated tutoring runtime, a reproducible VLM adaptation pipeline
+technically evaluated tutoring runtime, a reproducible VLM adaptation pipeline
 with benchmark evidence, and formative VR pilot results that demonstrate
 feasibility and instrumentation readiness.
 
@@ -148,6 +148,6 @@ of procedure packs and reduce reliance on manual-step classification for edge ca
 
 The work completed in this thesis establishes that a telemetry-grounded, evidence-constrained
 tutoring runtime with structured visual fact extraction is technically feasible and can be
-validated through automated benchmarks. The next phase of research must determine whether
+assessed through automated benchmarks. The next phase of research must determine whether
 this capability translates into improved human learning in immersive simulation
 environments.

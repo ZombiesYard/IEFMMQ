@@ -8,7 +8,7 @@
 %            paper_context/experiment_inventory.md,
 %            paper_context/claims_registry.md
 %  Claims: C-VLM-06 (likely), C-RUNTIME-01 (likely), C-VLM-07 (verified),
-%          C-PROPOSAL-01 (TODO), C-HUMAN-01 (TODO)
+%          C-PROPOSAL-01, C-HUMAN-01 (future-scope)
 % ===========================================================================
 \chapter{Discussion}\label{ch:discussion}
 
@@ -386,7 +386,7 @@ related procedural domains:
 \section{Limitations}\label{sec:disc-limitations}
 
 % Evidence: paper_context/experiment_inventory.md §7
-% Evidence: paper_context/claims_registry.md (TODO claims)
+% Evidence: paper_context/claims_registry.md (future-scope human-subject claims)
 % Evidence: paper_context/system_delta_from_proposal.md §4
 
 The following limitations bound the scope of conclusions that can be drawn from
@@ -420,7 +420,7 @@ The largest training configuration uses 928 rows (Run-003 + Run-005$\times$2,
 bilingual).
 This is small by comparison with typical VLM fine-tuning datasets, which
 often use tens or hundreds of thousands of examples (e.g., LLaVA instruction
-tuning and domain-specific VQA fine-tuning).
+tuning and broader instruction-tuned VLM recipes)~\citep{liu2023llava,dai2023instructblip}.
 While the results demonstrate that 928 rows can produce meaningful improvements,
 they do not establish the upper bound of what is achievable with more data.
 Conversely, the results do not establish the minimum data requirement; it is
@@ -510,8 +510,8 @@ evaluated end-to-end.
 Two backbone models were evaluated (Qwen3.5-9B and Gemma-4-31B), both with
 LoRA fine-tuning using the Unsloth + PEFT + TRL stack.
 The results do not generalise to other model architectures (e.g., LLaVA-style
-models, InternVL), other fine-tuning methods (e.g., full fine-tuning, QLoRA with
-different rank configurations), or other training frameworks.
+models~\citep{liu2023llava}), other fine-tuning methods (e.g., full fine-tuning,
+QLoRA with different rank configurations), or other training frameworks.
 
 \textbf{No ablation of training components.}
 The training recipe combines several design choices --- bilingual SFT,
@@ -539,7 +539,7 @@ These contributions do not depend on claims that exceed the stated bounds.
 % Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §9
 % Evidence: paper_context/paper_outline.md §2.7
 % Evidence: paper_context/system_delta_from_proposal.md §8
-% Claims: C-PROPOSAL-01, C-PROPOSAL-02, C-HUMAN-01, C-HUMAN-02, C-HUMAN-03 (all TODO)
+% Claims: C-PROPOSAL-01, C-PROPOSAL-02, C-HUMAN-01, C-HUMAN-02, C-HUMAN-03 (future-scope)
 
 The limitations enumerated above define a concrete research agenda.
 This section outlines the principal directions for future work, ordered from the
