@@ -7,13 +7,17 @@
 
 \chapter*{Abstract}
 
-Procedural learning in high-fidelity simulation requires learners to execute ordered,
-state-dependent sequences while verifying intermediate system states, yet existing
-training aids either break immersion or lack access to live simulator state. This
-thesis addresses the gap by designing a telemetry-grounded tutoring runtime that
-integrates procedure-pack-driven state tracking, retrieval-augmented help generation,
-and a fine-tuned vision-language model (VLM) for structured visual fact extraction
-from cockpit displays. A central finding is that visual fact ontology design governs
+Many safety- and skill-critical domains, including aviation, industrial
+maintenance, medicine, and emergency operations, require learners to practise
+ordered procedures whose next correct action depends on the current system
+state. As such training moves into high-fidelity and immersive simulation,
+tutoring systems must provide contextual help without relying on
+language-model fluency alone. This thesis studies that problem through the
+F/A-18C cold-start procedure in DCS World and designs an evidence-grounded
+tutoring runtime that integrates procedure-pack-driven state tracking,
+retrieval-augmented help generation, and a fine-tuned vision-language model
+(VLM) for structured visual fact extraction from cockpit displays. A central
+finding is that visual fact ontology design governs
 model reliability: evolving from an 8-fact to a 13-fact ontology by decomposing
 compound targets into locally verifiable visual atoms reduced critical false positives
 by 64--89\% on independent holdout sets. A Qwen3.5-9B LoRA adapter trained on 928

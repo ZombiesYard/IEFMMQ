@@ -1,58 +1,80 @@
 % ===========================================================================
 %  01 — Introduction
 %
-%  Evidence: paper_context/proposal_summary.md
-%            paper_context/system_delta_from_proposal.md
-%            paper_context/claims_registry.md
+%  Evidence: paper_context/claims_registry.md
+%            paper_context/experiment_inventory.md
 %  Terminology: paper_context/terminology.md
 % ===========================================================================
 \chapter{Introduction}\label{ch:introduction}
 
 % ===========================================================================
-\section{Motivation and Problem Statement}\label{sec:intro-motivation}
+\section{Motivation and Problem Context}\label{sec:intro-motivation}
 
-High-fidelity flight simulators are increasingly capable of reproducing the
-instrument density and operational tempo of real cockpit procedures. That
-fidelity is valuable for training, but it also creates a practical tutoring
-problem. A novice learner does not simply need to know the next checklist item.
-They must recognise whether the current aircraft state makes that item valid,
-verify that preconditions have been satisfied, notice when a display has reached
-the intended state, and recover when an earlier action was skipped or only
-partly completed. In this setting, procedural knowledge is not only textual; it
-is distributed across switches, gauges, warning lights, display pages, and the
-sequence history of the task.
+Many safety- and skill-critical domains require people to learn ordered
+procedures whose next correct action depends on the current state of a system.
+Examples include aircraft cockpit procedures, industrial maintenance,
+emergency operations, and medical or technical equipment workflows. In such
+settings, procedural knowledge is not only a list of actions. It also includes
+preconditions, intermediate checks, state-dependent branching, and recovery
+from partially completed or incorrectly completed steps.
 
-Conventional aids such as manuals, videos, and printed checklists remain useful
-for preparation, yet they are poorly matched to moments where the learner is
-already inside the simulator and unsure about the current state. Looking away
-from the cockpit breaks the training flow, and a generic text answer may be
-fluent without being grounded in the aircraft state that caused the learner to
-ask for help. The problem is therefore not whether a language model can describe
-an F/A-18C procedure in general. The harder question is whether a tutoring
-runtime can constrain generated assistance to what is actually evidenced in the
-simulator at the moment of help.
+High-fidelity and immersive simulation make these procedures available for
+practice without exposing learners to the risks and costs of the real
+environment. At the same time, fidelity creates a tutoring problem. A learner
+who is already inside a simulated cockpit, machine, or procedure room may need
+help that is specific to the current state rather than a general explanation of
+the task. If the learner has to leave the simulation to consult a manual, video,
+or checklist, the training flow is interrupted. If the learner instead asks a
+language model for help, the answer may be fluent but disconnected from the
+state that actually exists in the simulation.
 
-This thesis studies that question through the F/A-18C cold-start procedure in
-DCS World. The current procedure pack contains 33 ordered steps (S01--S33)
-grouped into six operational phases, from initial electrical power through
-engine start, avionics configuration, flight-control checks, and final pre-taxi
-configuration (Section~\ref{sec:bg-coldstart}). The benchmark and VLM
-evaluation reported in this thesis focus on the original 25-step core procedure;
-the later extension to S33 adds further pre-taxi checks without changing the
-central evidence problem. Some steps are directly observable through DCS-BIOS
-telemetry, some depend on cockpit display content that must be interpreted from
-images, and a small number remain manual or outside the instrument layout used
-by the vision pipeline. This mixture makes the cold-start a compact but
-representative case for state-dependent procedural tutoring.
+This thesis studies that problem through the F/A-18C cold-start procedure in
+DCS World. The flight-simulation setting is used as a concrete and demanding
+case study, not as a claim that the research problem exists only in aviation.
+The case is useful because it makes the evidence problem visible: procedure
+progress depends on switch states, engine parameters, warning lights, cockpit
+display pages, and the order in which earlier actions were completed. Some of
+these states are directly observable through telemetry; others require visual
+inspection of cockpit displays; and a small number require manual confirmation
+or lie outside the display layout used by the vision pipeline.
 
-The central premise of the thesis is that procedural assistance becomes more
+The current procedure pack contains 33 ordered steps (S01--S33) grouped into
+six operational phases, from initial electrical power through engine start,
+avionics configuration, flight-control checks, and final pre-taxi configuration
+(Section~\ref{sec:bg-coldstart}). The benchmark and VLM evaluation reported in
+this thesis focus on the original 25-step core procedure; the later extension
+to S33 adds further pre-taxi checks without changing the central evidence
+problem. This makes the cold-start a compact but representative case for
+state-dependent procedural tutoring in high-fidelity simulation.
+
+% ===========================================================================
+\section{Research Gap and Problem Statement}\label{sec:intro-problem}
+
+Existing training aids and recent foundation-model systems each address part of
+the problem but leave an important gap. Manuals, videos, and checklists provide
+authoritative procedural knowledge, yet they do not observe the learner's
+current simulator state. Conventional simulator telemetry can expose many
+states, yet it does not by itself explain what the learner should do next or
+interpret display content that is not exported as data. Foundation models can
+generate flexible explanations, but their output is not reliable enough for
+procedural guidance unless it is constrained by explicit evidence.
+
+The central premise of this thesis is that procedural assistance becomes more
 reliable and more auditable when every actionable tutoring output is tied to an
 explicit evidence source. In the system developed here, such evidence may be a
 telemetry variable, a procedure-gate evaluation, a retrieved manual or checklist
 snippet, or a VLM-derived visual fact. The language model is therefore not asked
-to infer procedure state from its parametric knowledge alone. It operates inside
-a runtime that supplies state evidence, checks structured outputs, validates
+to infer procedure state from parametric knowledge alone. It operates inside a
+runtime that supplies state evidence, checks structured outputs, validates
 overlay targets, and records the resulting help cycle for replay and analysis.
+
+This framing changes the role of the foundation model. The model is not the
+tutor by itself; it is one component inside an evidence-grounded procedural
+tutoring runtime. The research question is therefore architectural and
+methodological as much as it is generative: how should simulator telemetry,
+procedure rules, retrieval, and visual fact extraction be connected so that
+generated help remains state-aware, inspectable, and bounded by available
+evidence?
 
 % ===========================================================================
 \section{Research Questions}\label{sec:intro-rq}
@@ -62,7 +84,7 @@ questions:
 
 \paragraph{Main RQ.}
 How can an evidence-grounded multimodal tutoring system support
-state-dependent procedural training in an immersive flight simulator?
+state-dependent procedural training in high-fidelity immersive simulation?
 
 \paragraph{RQ1 --- System architecture and evidence integration.}
 How can simulator telemetry, retrieved procedural knowledge, and visual fact
@@ -87,32 +109,41 @@ is not used to claim controlled learning gains, workload reduction, retention,
 or transfer.
 
 % ===========================================================================
-\section{Thesis Vision and Scope}\label{sec:intro-vision}
+\section{Approach and Scope}\label{sec:intro-vision}\label{sec:intro-scope}
 
-The original research proposal framed the project as a VR-first grounded tutor
-for the Meta Quest~3 and DCS-VR~\citep{ThesisProposal1128}. In that vision, the
-learner would interact with the cockpit through gaze, hand tracking, and voice;
-the tutor would retrieve relevant manual and checklist passages; an LLM would
-generate concise step guidance; and the result would be shown as in-headset
-cards or spatial overlays. The proposal also described a three-condition human
-evaluation comparing a video-and-notes baseline, an ungrounded text-only LLM,
-and a grounded tutor, with outcome measures such as completion rate, procedural
-errors, task time, NASA-TLX workload, knowledge quizzes, retention, and
-transfer.
+The thesis addresses the research questions by building and evaluating an
+evidence-grounded tutoring runtime for the F/A-18C cold-start case. The
+approach combines four evidence channels. First, DCS-BIOS telemetry provides
+the most authoritative signal for many cockpit controls, lights, and numerical
+engine or system values. Raw UDP frames are normalised, sanitised, and
+aggregated into stable runtime variables so that procedure gates can
+distinguish between a false value and a missing source. Second, where telemetry
+is insufficient, a visual fact layer converts cockpit display captures into
+structured facts with states \texttt{seen}, \texttt{not\_seen}, or
+\texttt{uncertain}. Third, retrieved procedural sources provide textual support
+for explanations. Fourth, procedure-pack gates define which evidence is
+required before a step can be considered available or complete.
 
-The completed thesis keeps the same long-term goal but sharpens the research
-focus. Instead of treating VR presentation as the main contribution, it asks
-what technical evidence chain is required before generated help can be trusted
-in a live simulator procedure. This led to three implementation priorities that
-were not fully visible in the proposal: a telemetry pipeline that distinguishes
-known state from missing state, a visual-fact pipeline that adapts VLMs to
-cockpit display evidence, and a structured help cycle that validates model
-outputs against procedure gates, evidence references, and overlay constraints.
-The VR path was implemented and exercised in a completed pilot study, but the
-human evidence remains formative.
+The help cycle is deliberately constrained. The runtime assembles an evidence
+packet containing the current procedure candidates, telemetry state, visual
+observations, and retrieved sources before model generation occurs. The
+LLM/VLM output is then validated against runtime-generated JSON Schema
+constraints and mapped through allowlisted overlay targets. If the model path
+is unavailable or invalid, the system falls back to deterministic, text-only
+guidance. This design makes the help cycle auditable: a later replay can
+inspect which evidence was available, which step was inferred, what the model
+returned, and how the response was validated before display.
 
-The thesis scope is therefore deliberately split into technical validation and
-formative human evidence:
+The scope is intentionally bounded. The thesis validates the architecture and
+visual fact pipeline technically, and it reports a completed formative VR pilot
+study. It does not claim that the system has established controlled learning
+gains, workload reduction, retention, transfer, or generality across all
+procedural domains. The F/A-18C case is used to make the evidence-grounding
+problem concrete and measurable. Extending the approach to other aircraft,
+industrial equipment, medical training tasks, or emergency procedures would
+require new procedure packs, evidence mappings, and domain-specific validation.
+
+Within that boundary, the thesis scope is threefold:
 
 \begin{enumerate}
 \item The design and implementation of an evidence-grounded tutoring runtime
@@ -128,35 +159,6 @@ formative human evidence:
   instrumentation readiness under with-tutor and without-tutor conditions
   (Chapter~\ref{ch:evaluation}, Part~B).
 \end{enumerate}
-
-% ===========================================================================
-\section{Implemented Evidence Chain}\label{sec:intro-scope}
-
-The implemented runtime can be understood as an evidence chain rather than as a
-collection of isolated modules. At the bottom of the chain, DCS-BIOS telemetry
-provides the most authoritative signal for cockpit controls, lights, and
-numerical engine or system values. Raw UDP frames are normalised, sanitised, and
-aggregated into stable runtime variables so that procedure gates can distinguish
-between a false value and a missing source. This distinction matters because a
-tutor should not advance a learner simply because an expected signal was absent.
-
-Where telemetry is insufficient, the runtime uses a visual fact layer. Cockpit
-display pages such as the FCS page, BIT root page, FCS-MC BIT states, and INS
-alignment text are captured as composite-panel images and converted into
-structured facts with states \texttt{seen}, \texttt{not\_seen}, or
-\texttt{uncertain}. The VLM is restricted to this perception task. It does not
-decide that the procedure is complete; downstream gates combine visual facts
-with telemetry and sequence state.
-
-The tutoring response is produced only after the runtime has assembled an
-evidence packet containing the current procedure candidates, relevant telemetry
-and visual observations, and retrieved procedural sources. The LLM/VLM output is
-validated against runtime-generated JSON Schema constraints and mapped through
-allowlisted overlay targets. If the model path is unavailable or invalid, the
-system falls back to deterministic, text-only guidance. This design makes the
-help cycle auditable: a later replay can inspect which evidence was available,
-which step was inferred, what the model returned, and how the response was
-validated before display.
 
 Procedure definitions, gates, telemetry mappings, visual fact bindings, and
 error taxonomies are kept in declarative procedure-pack configuration rather
@@ -257,9 +259,9 @@ experiment tooling.
 technical evidence for RQ1 and RQ2, followed by the formative VR pilot evidence
 for RQ3.
 
-\textbf{Chapter~\ref{ch:discussion}} interprets the results, explains the
-evolution from the original proposal, draws design lessons from the ontology
-revision, and states the limitations and future work.
+\textbf{Chapter~\ref{ch:discussion}} interprets the results, draws design
+lessons from the ontology revision, discusses scope boundaries, and states the
+limitations and future work.
 
 \textbf{Chapter~\ref{ch:conclusion}} summarises the completed work against the
 research questions and restates the claim boundaries of the thesis.
