@@ -153,11 +153,12 @@ Within that boundary, the thesis scope is threefold:
   \ref{ch:methodology}, and~\ref{ch:implementation});
 \item The technical validation of the visual fact adaptation pipeline through
   independent holdout benchmarks and cross-backbone comparisons
-  (Chapter~\ref{ch:evaluation}, Part~A);
+  (Chapter~\ref{ch:evaluation}, Sections~\ref{sec:eval-rq2}
+  and~\ref{sec:eval-backbones});
 \item A completed formative VR pilot study ($n=9$) that provides descriptive
   evidence about task completion, error patterns, tutor interaction, and
   instrumentation readiness under with-tutor and without-tutor conditions
-  (Chapter~\ref{ch:evaluation}, Part~B).
+  (Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-pilot}).
 \end{enumerate}
 
 Procedure definitions, gates, telemetry mappings, visual fact bindings, and
@@ -173,7 +174,7 @@ This thesis makes three contributions.
 
 \begin{enumerate}
 
-\item \textbf{An evidence-grounded procedural tutoring architecture.}
+\item \textbf{Evidence-grounded tutoring architecture.}
 The thesis presents a ports-and-adapters tutoring runtime in which each
 actionable help output must be traceable to telemetry, a procedure-gate
 evaluation, a retrieved source, or a visual fact. The contribution is not merely
@@ -186,7 +187,7 @@ evidence in Chapter~\ref{ch:evaluation}, Section~\ref{sec:eval-rq1}.
 % Evidence: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02,
 %          C-TELEM-01, C-RAG-01, C-RUNTIME-01
 
-\item \textbf{A visual fact ontology and small-data VLM adaptation pipeline.}
+\item \textbf{Visual fact ontology and small-data VLM adaptation.}
 The thesis develops a 13-fact visual ontology for F/A-18C cockpit display state,
 evolved from an 8-fact baseline that exposed the weakness of asking a VLM to
 recognise compound procedural states directly. The revised ontology decomposes
@@ -196,15 +197,16 @@ screenshot capture, AI pre-labelling, human review, bilingual SFT row
 generation, LoRA fine-tuning, and independent holdout benchmarking. On the Qwen
 backbone, a LoRA adapter trained on 928 bilingual rows reaches approximately
 0.99 fact accuracy on two independent holdouts and reduces critical false
-positives by 64--89\%; the same data recipe also improves the Gemma backbone.
+positives by 64--89\% relative to the corresponding base model. Supplementary
+Qwen3.6 and Gemma-4 results show that the recipe can be applied to the
+evaluated backbones, while performance remains backbone-specific.
 This contribution addresses RQ2 and is described in
 Chapters~\ref{ch:system-design} and~\ref{ch:methodology}, with evaluation in
 Chapter~\ref{ch:evaluation}, Sections~\ref{sec:eval-qwen-13fact}
 and~\ref{sec:eval-backbones}.
 % Evidence: C-VLM-01 through C-VLM-07, C-DATA-01, C-TRAIN-01
 
-\item \textbf{A VR procedural training evaluation framework and formative
-pilot study.}
+\item \textbf{VR evaluation framework and formative pilot.}
 The thesis delivers the instrumentation required to study evidence-grounded
 procedural tutoring with real participants: experiment export tooling, baseline
 and tutor-condition configurations, session launch support, replayable logs,
@@ -235,8 +237,8 @@ formative evidence.
 \section{Thesis Structure}\label{sec:intro-structure}
 
 \textbf{Chapter~\ref{ch:background}} explains why the F/A-18C cold-start task
-requires multiple evidence sources, introduces the visual fact ontology, and
-positions the thesis against related work in intelligent tutoring, simulator
+requires multiple evidence sources and introduces the visual fact ontology. It
+then positions the thesis against related work in tutoring, simulator
 instrumentation, state-aware assistance, VLM adaptation, and grounded AR/VR
 systems.
 
@@ -255,9 +257,9 @@ that make the architecture operational, including core domain logic, adapter
 boundaries, structured help generation, overlay mapping, VLM integration, and
 experiment tooling.
 
-\textbf{Chapter~\ref{ch:evaluation}} evaluates the thesis claims in two parts:
-technical evidence for RQ1 and RQ2, followed by the formative VR pilot evidence
-for RQ3.
+\textbf{Chapter~\ref{ch:evaluation}} evaluates the thesis claims through three
+evidence lines: VLM benchmarks for RQ2, replay and harness readiness for RQ1,
+and formative VR pilot evidence for RQ3.
 
 \textbf{Chapter~\ref{ch:discussion}} interprets the results, draws design
 lessons from the ontology revision, discusses scope boundaries, and states the

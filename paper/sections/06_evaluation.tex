@@ -133,10 +133,11 @@ facts are evidence inputs, not procedure decisions.
 \subsection{Gemma-4 and Qwen3.6 Backbone Comparison}\label{sec:eval-backbones}
 
 The same Run-003 + Run-005$\times$2 recipe was also applied to Qwen3.6-27B and
-Gemma-4-31B. This comparison is supplementary: it checks whether the data and
-ontology recipe transfers across backbones, while the Qwen3.5 base-vs-LoRA line
-remains the primary technical result. Table~\ref{tab:backbone-comparison}
-summarises the LoRA-only comparison.
+Gemma-4-31B. This comparison is supplementary: it checks whether the
+data-and-ontology recipe remains usable on the evaluated supplementary
+backbones, while the Qwen3.5 base-versus-LoRA line remains the primary
+technical result.
+Table~\ref{tab:backbone-comparison} summarises the LoRA-only comparison.
 
 \begin{table}[htbp]
 \centering
@@ -167,9 +168,10 @@ false positives, but its seen-state recall and sample exact match are lower
 than Qwen3.5. On Run-004, the Gemma adapter improves substantially over its base
 line but still records more critical false positives than the Qwen3.5 adapter.
 The comparison therefore supports a conservative conclusion: the 13-fact data
-recipe transfers across backbones, but the deployment choice remains
-backbone-specific. Qwen3.5 is the best-performing configuration in these local
-benchmarks; Gemma is more conservative in one holdout but less complete.
+recipe can be applied to the evaluated supplementary backbones, but the
+deployment choice remains backbone-specific. Qwen3.5 is the best-performing
+configuration in these local benchmarks; Gemma is more conservative in one
+holdout but less complete.
 
 % ---------------------------------------------------------------------------
 \subsection{Error Analysis}\label{sec:eval-errors}

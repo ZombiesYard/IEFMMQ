@@ -13,17 +13,20 @@ ordered procedures whose next correct action depends on the current system
 state. As such training moves into high-fidelity and immersive simulation,
 tutoring systems must provide contextual help without relying on
 language-model fluency alone. This thesis studies that problem through the
-F/A-18C cold-start procedure in DCS World and designs an evidence-grounded
-tutoring runtime that integrates procedure-pack-driven state tracking,
-retrieval-augmented help generation, and a fine-tuned vision-language model
-(VLM) for structured visual fact extraction from cockpit displays. A central
-finding is that visual fact ontology design governs
-model reliability: evolving from an 8-fact to a 13-fact ontology by decomposing
-compound targets into locally verifiable visual atoms reduced critical false positives
-by 64--89\% on independent holdout sets. A Qwen3.5-9B LoRA adapter trained on 928
-bilingual rows achieves 0.99 fact accuracy on two holdout sets with verified zero
-training overlap; the identical data recipe transfers to Gemma-4-31B with consistent gains,
-suggesting the approach is not tied to a single backbone. A small formative VR pilot study with nine participants provides descriptive
+F/A-18C cold-start procedure in DCS World. It designs an evidence-grounded
+tutoring runtime that combines procedure-pack state tracking, retrieved
+procedural context, and a fine-tuned vision-language model (VLM) for structured
+visual fact extraction from cockpit displays. Two technical findings support
+the visual evidence layer. First, the 8-fact
+ontology exposed the risk of compound targets that mix perception with
+procedural completion. Second, the runtime-aligned 13-fact ontology, paired
+with small-data LoRA adaptation, reduced critical false positives by
+64--89\% in the primary Qwen3.5 base-versus-LoRA comparison on independent
+holdouts. The Qwen3.5-9B LoRA adapter, trained on 928 bilingual rows, achieves
+0.99 fact accuracy on two holdout sets with verified zero training overlap.
+Supplementary Qwen3.6 and Gemma-4 results show that the recipe can be applied
+to the evaluated backbones, while performance remains backbone-specific. A
+small formative VR pilot study with nine participants provides descriptive
 evidence: all four tutor-condition participants completed the full 33-step
 procedure, whereas none of the five without-tutor participants did; omission
 errors were largely replaced by assistance-coupled errors in the tutor condition.
@@ -41,17 +44,18 @@ Simulatorzustand. Diese Arbeit begegnet dieser L\"ucke durch eine
 telemetriegest\"utzte Tutoring-Laufzeitumgebung, die paketbasierte
 Zustandsverfolgung, Retrieval-Augmented-LLM-Hilfegenerierung und ein
 feinabgestimmtes Vision-Language-Model (VLM) zur strukturierten Extraktion
-visueller Fakten aus Cockpit-Anzeigen kombiniert. Ein zentrales Ergebnis ist,
-dass das Design der visuellen Fakten-Ontologie die Modellzuverl\"assigkeit
-bestimmt: Die Weiterentwicklung von einer 8-Fact- zu einer 13-Fact-Ontologie
-durch Zerlegung zusammengesetzter Ziele in lokal \"uberpr\"ufbare visuelle
-Atome reduzierte kritische False-Positives um 64--89\% auf unabh\"angigen
-Holdout-Sets. Ein Qwen3.5-9B LoRA-Adapter, trainiert mit 928 bilingualen
-Datenzeilen, erreicht eine Fact-Genauigkeit von 0,99 auf zwei Holdout-Sets
-mit verifizierter Null-\"Uberlappung zum Training; dieselbe Datenrezeptur
-\"ubertr\"agt sich mit konsistenten Verbesserungen auf Gemma-4-31B, was
-darauf hindeutet, dass der Ansatz nicht an ein einzelnes Backbone gebunden
-ist. Eine kleine formative VR-Pilotstudie mit neun Teilnehmern liefert deskriptive
+visueller Fakten aus Cockpit-Anzeigen kombiniert. Zwei technische Ergebnisse
+st\"utzen die visuelle Evidenzschicht. Erstens zeigte die 8-Fact-Ontologie das
+Risiko zusammengesetzter Ziele, die Wahrnehmung und prozedurale Fertigstellung
+vermischen. Zweitens reduzierte die runtime-ausgerichtete 13-Fact-Ontologie in
+Verbindung mit kleiner LoRA-Anpassung kritische False-Positives um 64--89\%
+im prim\"aren Qwen3.5-Base-gegen-LoRA-Vergleich auf unabh\"angigen Holdout-Sets.
+Der Qwen3.5-9B LoRA-Adapter, trainiert mit 928 bilingualen Datenzeilen,
+erreicht eine Fact-Genauigkeit von 0,99 auf zwei Holdout-Sets mit verifizierter
+Null-\"Uberlappung zum Training. Erg\"anzende Qwen3.6- und Gemma-4-Ergebnisse
+zeigen, dass die Rezeptur auf die untersuchten Backbones anwendbar ist; die
+Leistung bleibt jedoch backbone-spezifisch. Eine kleine formative
+VR-Pilotstudie mit neun Teilnehmern liefert deskriptive
 Evidenz: Alle vier Teilnehmer mit Tutor absolvierten die vollst\"andige
 33-Schritt-Prozedur, w\"ahrend keiner der f\"unf Teilnehmer ohne Tutor dies
 schaffte; Auslassungsfehler wurden in der Tutor-Bedingung weitgehend durch
