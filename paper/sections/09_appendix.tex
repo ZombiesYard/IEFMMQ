@@ -3,6 +3,11 @@
 % ===========================================================================
 \chapter{Appendix}\label{ch:appendix}
 
+This appendix supports the methodology, implementation, and evaluation
+chapters. It preserves raw configuration, dataset, replay, diagram, and
+pilot-coding material without extending the claim boundaries stated in the
+main chapters.
+
 % ===========================================================================
 \section{Full LoRA Hyperparameter Configuration}\label{sec:appendix-hyperparams}
 
@@ -82,10 +87,10 @@ Critical false positives & 13  & 15     & +2 \\
 % Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/
 
 The LoRA adapter improves fact-level metrics substantially but increases
-critical false positives from 13 to 15, confirming the 8-fact v1 ontology's
-structural weakness: compound targets such as \texttt{ins\_go} were not
-visually verifiable from single frames and produced systematic
-false-positive errors on completion-type facts.
+critical false positives from 13 to 15. This historical result illustrates the
+8-fact v1 ontology's structural weakness: compound targets such as
+\texttt{ins\_go} were not visually verifiable from single frames and produced
+systematic false-positive errors on completion-type facts.
 
 % ===========================================================================
 \section{Dataset Fact Distributions}\label{sec:appendix-datasets}
@@ -93,32 +98,34 @@ false-positive errors on completion-type facts.
 Table~\ref{tab:fact-distributions} reports per-fact \texttt{seen} counts for
 the two main training sources (Run-003, Run-005) and the two 13-fact holdout
 sets (Run-002 newfacts, Run-004 random). Counts are drawn from the
-corresponding \texttt{stats.json} files.
+corresponding \texttt{stats.json} files. The table uses short display labels;
+the authoritative fact identifiers are defined in the visual-fact ontology
+file used by the procedure pack.
 
 \begin{table}[htbp]
 \centering
 \caption{Per-fact \texttt{seen} counts across training and holdout datasets (13-fact v2 ontology).}
 \label{tab:fact-distributions}
 \small
-\begin{tabular}{@{}lrrrr@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xrrrr@{}}
 \toprule
-\textbf{Fact ID} & \textbf{Run-003 (220)} & \textbf{Run-005 (122)} & \textbf{Run-002 new (50)} & \textbf{Run-004 (100)} \\
+\textbf{Fact label} & \textbf{Run-003} & \textbf{Run-005} & \textbf{Run-002} & \textbf{Run-004} \\
 \midrule
-\texttt{tac\_page\_visible}            & 46  & 24  & 23 & 3  \\
-\texttt{supt\_page\_visible}           & 20  & 34  & 5  & 3  \\
-\texttt{fcs\_page\_visible}            & 30  & 40  & 13 & 94 \\
-\texttt{fcs\_page\_x\_marks\_visible}   & 16  & 18  & 1  & 5  \\
-\texttt{bit\_root\_page\_visible}       & 18  & 43  & 9  & 16 \\
-\texttt{fcsmc\_page\_visible}           & 55  & 56  & 9  & 84 \\
-\texttt{fcsmc\_intermediate\_result\_visible} & 18 & 15  & 1  & 7  \\
-\texttt{fcsmc\_in\_test\_visible}        & 18  & 19  & 6  & 17 \\
-\texttt{fcsmc\_final\_go\_result\_visible} & 18 & 22  & 2  & 60 \\
-\texttt{hsi\_page\_visible}              & 106 & 109 & 49 & 100 \\
-\texttt{hsi\_map\_layer\_visible}        & 79  & 37  & 27 & 50 \\
-\texttt{ins\_grnd\_alignment\_text\_visible} & 58 & 72  & 42 & 69 \\
-\texttt{ins\_ok\_text\_visible}          & 12  & 14  & 4  & 0  \\
+TAC page visible            & 46  & 24  & 23 & 3  \\
+SUPT page visible           & 20  & 34  & 5  & 3  \\
+FCS page visible            & 30  & 40  & 13 & 94 \\
+FCS X marks visible         & 16  & 18  & 1  & 5  \\
+BIT root page visible       & 18  & 43  & 9  & 16 \\
+FCS-MC page visible         & 55  & 56  & 9  & 84 \\
+FCS-MC intermediate result  & 18  & 15  & 1  & 7  \\
+FCS-MC in-test state        & 18  & 19  & 6  & 17 \\
+FCS-MC final GO result      & 18  & 22  & 2  & 60 \\
+HSI page visible            & 106 & 109 & 49 & 100 \\
+HSI map layer visible       & 79  & 37  & 27 & 50 \\
+INS GRND alignment text     & 58  & 72  & 42 & 69 \\
+INS OK text                 & 12  & 14  & 4  & 0  \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 % Evidence: datasets/vision_sft_run003/stats.json,
@@ -126,10 +133,11 @@ corresponding \texttt{stats.json} files.
 %           datasets/vision_sft_holdout_run002_newfacts/stats.json,
 %           datasets/vision_sft_holdout_run004_random/stats.json
 
-The Run-005 composition rebalance successfully improved coverage of
-underrepresented facts: \texttt{supt\_page\_visible} from 20 to 54 combined
-seen, \texttt{fcsmc\_page\_visible} from 55 to 111, and
-\texttt{ins\_grnd\_alignment\_text\_visible} from 58 to 130.
+Run-005 increases coverage for several sparse targets when combined with
+Run-003: SUPT page observations rise from 20 to 54, FCS-MC page observations
+from 55 to 111, and INS GRND alignment text observations from 58 to 130. This
+table documents data provenance; Chapter~\ref{ch:evaluation} evaluates whether
+the resulting training recipe improves model behaviour on holdout sets.
 
 % ===========================================================================
 \section{CLI Command Reference}\label{sec:appendix-cli}
@@ -158,46 +166,53 @@ and a language switch (\texttt{--lang}).
 % ===========================================================================
 \section{Model Provider Configuration}\label{sec:appendix-model-config}
 
-Model access is configured through environment variables:
-\texttt{SIMTUTOR\_MODEL\_PROVIDER} (\texttt{openai\_compat} $|$
-\texttt{ollama} $|$ \texttt{stub}), \texttt{SIMTUTOR\_MODEL\_BASE\_URL},
-\texttt{SIMTUTOR\_MODEL\_NAME}, \texttt{SIMTUTOR\_MODEL\_TIMEOUT\_S},
-\texttt{SIMTUTOR\_MODEL\_API\_KEY} (required for \texttt{openai\_compat}),
-\texttt{SIMTUTOR\_MODEL\_ENABLE\_MULTIMODAL} (toggles base64 image encoding in
-requests), and \texttt{SIMTUTOR\_LANG} (\texttt{zh} $|$ \texttt{en}). The live
-runtime validates all required configuration at startup and redacts API keys
-from all log output.
+Model access is configured through environment variables and validated at
+runtime:
+
+\begin{description}
+\item[Provider.] \texttt{SIMTUTOR\_MODEL\_PROVIDER} selects
+\texttt{openai\_compat}, \texttt{ollama}, or \texttt{stub}.
+\item[Base URL.] \texttt{SIMTUTOR\_MODEL\_BASE\_URL} sets the provider
+endpoint.
+\item[Model.] \texttt{SIMTUTOR\_MODEL\_NAME} selects the model name.
+\item[Timeout.] \texttt{SIMTUTOR\_MODEL\_TIMEOUT\_S} sets the request timeout.
+\item[Credentials.] \texttt{SIMTUTOR\_MODEL\_API\_KEY} is required for the
+\texttt{openai\_compat} provider. API keys are redacted from log output.
+\item[Images.] \texttt{SIMTUTOR\_MODEL\_ENABLE\_MULTIMODAL} toggles base64
+image encoding in requests.
+\item[Language.] \texttt{SIMTUTOR\_LANG} selects \texttt{zh} or \texttt{en}.
+\end{description}
 
 % ===========================================================================
 \section{Replay Evaluation Suite}\label{sec:appendix-replay}
 
 Table~\ref{tab:replay-cases} lists the five replay evaluation cases in the
-\texttt{fa18c\_startup\_v04} suite.
+\texttt{fa18c\_startup\_v04} suite. Display labels are shortened here; the
+suite file preserves the exact \texttt{case\_id} strings.
 
 \begin{table}[htbp]
 \centering
 \caption{Replay evaluation cases.}
 \label{tab:replay-cases}
 \small
-\begin{tabular}{@{}llll@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xccl@{}}
 \toprule
-\textbf{Case ID} & \textbf{Expected step} & \textbf{Vision} & \textbf{Expected target} \\
+\textbf{Case} & \textbf{Step} & \textbf{Vision} & \textbf{Target} \\
 \midrule
-\texttt{noop\_2min} & S01 & unavailable & \texttt{battery\_switch} \\
-\texttt{batteryon\_2min} & S02 & unavailable & \texttt{fire\_test\_switch} \\
-\texttt{Batteryon\_enginGenoff\_2min} & S01 & unavailable & \texttt{generator\_left\_switch} \\
-\texttt{fcs\_reset\_fcs\_bit\_2min} & S18 & available & \texttt{fcs\_bit\_switch} \\
-\texttt{ins\_2min} & S12 & available & \texttt{ins\_mode\_knob} \\
+No-op capture & S01 & no & battery switch \\
+Battery on & S02 & no & fire-test switch \\
+Battery on, engine generator off & S01 & no & left generator switch \\
+FCS reset / FCS BIT & S18 & yes & FCS BIT switch \\
+INS mode & S12 & yes & INS mode knob \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 % Evidence: replay_eval/fa18c_startup_v04/suite.yaml
 
-Cases with \texttt{vision\_status = available} include per-frame sidecar files
-(\texttt{frames.jsonl}) in the corresponding DCS Saved Games directory,
-enabling replay of vision-dependent procedure steps without a live DCS
-instance.
+Cases marked as vision available include per-frame sidecar files
+(\texttt{frames.jsonl}) in the corresponding DCS Saved Games capture. These
+files allow vision-dependent replay cases to run without a live DCS instance.
 
 % ===========================================================================
 \section{Supplementary Architecture and Export Diagrams}\label{sec:appendix-figures}
@@ -245,23 +260,23 @@ Table~\ref{tab:pilot-participants} lists participant experience profiles.
 \centering
 \caption{Pilot participant experience profiles (self-reported).}\label{tab:pilot-participants}
 \small
-\begin{tabular}{@{}lllllll@{}}
+\begin{tabularx}{\textwidth}{@{}ll>{\raggedright\arraybackslash}Xl@{}}
 \toprule
-\textbf{P} & \textbf{Condition} & \textbf{DCS exp.} & \textbf{Flight sim.} & \textbf{VR exp.} & \textbf{Quest~3} & \textbf{Group} \\
+\textbf{P} & \textbf{Condition} & \textbf{Self-reported experience} & \textbf{Group} \\
 \midrule
-P01 & without\_tutor & frequent & frequent & frequent & frequent & intermediate \\
-P02 & without\_tutor & intermediate & intermediate & frequent & frequent & --- \\
-P03 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
-P04 & with\_tutor    & intermediate & intermediate & frequent & frequent & intermediate \\
-P05 & with\_tutor    & intermediate & intermediate & frequent & frequent & --- \\
-P06 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
-P07 & without\_tutor & novice & novice & intermediate & frequent & beginner \\
-P08 & with\_tutor    & novice & novice & frequent & frequent & --- \\
-P09 & with\_tutor    & novice & novice & intermediate & intermediate & beginner \\
+P01 & No tutor & DCS frequent; flight simulation frequent; VR frequent; Quest 3 frequent & intermediate \\
+P02 & No tutor & DCS intermediate; flight simulation intermediate; VR frequent; Quest 3 frequent & n/r \\
+P03 & No tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 frequent & beginner \\
+P04 & Tutor & DCS intermediate; flight simulation intermediate; VR frequent; Quest 3 frequent & intermediate \\
+P05 & Tutor & DCS intermediate; flight simulation intermediate; VR frequent; Quest 3 frequent & n/r \\
+P06 & No tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 frequent & beginner \\
+P07 & No tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 frequent & beginner \\
+P08 & Tutor & DCS novice; flight simulation novice; VR frequent; Quest 3 frequent & n/r \\
+P09 & Tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 intermediate & beginner \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 
---- = not recorded.
+n/r = not recorded.
 \end{table}
 
 Table~\ref{tab:pilot-uncompleted} lists the specific steps not completed by
@@ -271,7 +286,7 @@ each without-tutor participant.
 \centering
 \caption{Steps not completed in the without-tutor condition (manual coding).}\label{tab:pilot-uncompleted}
 \small
-\begin{tabular}{@{}ll@{}}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
 \toprule
 \textbf{P} & \textbf{Steps not completed} \\
 \midrule
@@ -281,35 +296,38 @@ P03 & S07, S09, S16, S18, S19, S26, S27, S29, S32 \\
 P06 & S07, S18, S19, S27 \\
 P07 & S02, S09, S12, S13, S16, S17, S18, S19, S22, S26, S27, S28, S29, S32 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 
 S18 (FCS-MC BIT page on right DDI) and S19 (FCS BIT final GO result) are
-missed by all five without-tutor participants. S27 (flap switch to AUTO) is
-missed by all five. These steps are vision-priority and require either VLM
-confirmation or instructor knowledge of the correct display-page sequence.
+missed by all five without-tutor participants and are vision-priority display
+checks. S27 (flap switch to AUTO) is also missed by all five, but the procedure
+pack classifies it as BIOS-priority with variable and gate evidence rather
+than VLM-bound visual evidence. The pattern is therefore descriptive: it shows
+where participants struggled, not that one evidence source explains the
+omissions.
 \end{table}
 
 Table~\ref{tab:pilot-errors-auto} reports the auto-coded error counts (before
-manual review) alongside the manual error counts, illustrating the magnitude of
-auto-to-manual correction in this pilot.
+manual review) alongside the manual error counts, showing how much the
+automated export had to be corrected before pilot interpretation.
 
 \begin{table}[htbp]
 \centering
 \caption{Auto-coded vs.\ manual error counts per participant.}\label{tab:pilot-errors-auto}
 \small
-\begin{tabular}{@{}llccccc@{}}
+\begin{tabular}{@{}llrrrrr@{}}
 \toprule
-\textbf{P} & \textbf{Condition} & \textbf{Auto OM} & \textbf{Auto CO} & \textbf{Manual OM} & \textbf{Manual CO} & \textbf{Total manual} \\
+\textbf{P} & \textbf{Cond.} & \textbf{Auto OM} & \textbf{Auto CO} & \textbf{Man. OM} & \textbf{Man. CO} & \textbf{Man. total} \\
 \midrule
-P01 & without\_tutor & 4  & 3  & 8  & 0 & 10 \\
-P02 & without\_tutor & 0  & 3  & 0  & 0 & 1  \\
-P03 & without\_tutor & 0  & 4  & 7  & 0 & 11 \\
-P06 & without\_tutor & 0  & 3  & 2  & 0 & 4  \\
-P07 & without\_tutor & 1  & 9  & 11 & 0 & 11 \\
-P04 & with\_tutor    & 0  & 4  & 0  & 3 & 7  \\
-P05 & with\_tutor    & 0  & 3  & 0  & 3 & 6  \\
-P08 & with\_tutor    & 0  & 3  & 0  & 0 & 0  \\
-P09 & with\_tutor    & 0  & 3  & 0  & 3 & 5  \\
+P01 & No tutor & 4  & 3  & 8  & 0 & 10 \\
+P02 & No tutor & 0  & 3  & 0  & 0 & 1  \\
+P03 & No tutor & 0  & 4  & 7  & 0 & 11 \\
+P06 & No tutor & 0  & 3  & 2  & 0 & 4  \\
+P07 & No tutor & 1  & 9  & 11 & 0 & 11 \\
+P04 & Tutor    & 0  & 4  & 0  & 3 & 7  \\
+P05 & Tutor    & 0  & 3  & 0  & 3 & 6  \\
+P08 & Tutor    & 0  & 3  & 0  & 0 & 0  \\
+P09 & Tutor    & 0  & 3  & 0  & 3 & 5  \\
 \bottomrule
 \end{tabular}
 
