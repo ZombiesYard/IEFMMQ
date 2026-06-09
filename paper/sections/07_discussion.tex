@@ -1,669 +1,365 @@
 % ===========================================================================
-%  07 — Discussion
+%  07 -- Discussion
 %
-%  Source of truth: paper_context/paper_outline.md §2.7
-%  Evidence: paper_context/system_delta_from_proposal.md,
-%            Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8--9,
-%            Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md,
-%            paper_context/experiment_inventory.md,
-%            paper_context/claims_registry.md
-%  Claims: C-VLM-06 (likely), C-RUNTIME-01 (likely), C-VLM-07 (verified),
-%          C-PROPOSAL-01, C-HUMAN-01 (future-scope)
+%  Source of truth: Chapter 6, paper_context/paper_outline.md section 2.7,
+%                   paper_context/system_delta_from_proposal.md
+%  Evidence: VLM benchmark reports, replay/harness evidence, participant
+%            exports, quality gates, and visual fact ontology evolution
+%  Claim boundary: technical reliability and auditability are supported more
+%                  strongly than pedagogical effectiveness.
 % ===========================================================================
 \chapter{Discussion}\label{ch:discussion}
 
-This chapter interprets the results presented in Chapter~\ref{ch:evaluation} and
-situates them within the larger trajectory of the thesis.
-Section~\ref{sec:disc-evolution} explains why the project evolved from the
-original VR-first proposal toward the telemetry- and VLM-heavy implementation
-reported here, and how the formative pilot study fits within this trajectory.
-Section~\ref{sec:disc-interpretation} interprets what the benchmark results do
-and do not demonstrate.
-Section~\ref{sec:disc-pilot} interprets the formative VR pilot findings.
-Section~\ref{sec:disc-ontology} draws design lessons from the two-generation
-evolution of the visual fact ontology.
-Section~\ref{sec:disc-limitations} enumerates the known limitations of the
-current system and experimental evidence.
-Section~\ref{sec:disc-future} outlines directions for future work that follow
-from these limitations.
+Chapter~\ref{ch:evaluation} reported three evidence lines with different claim
+strengths: visual-fact benchmarks for RQ2, replay and harness readiness evidence
+for RQ1, and a formative VR pilot for RQ3. This chapter interprets those
+evidence lines together. The main claim is not that the tutor has already been
+proven to improve learning. Rather, the thesis shows how a procedural tutor can
+be made technically auditable by placing telemetry, procedural rules, retrieved
+sources, VLM-derived visual facts, and harness validation between the learner and
+the foundation-model response.
+
+Section~\ref{sec:disc-evolution} explains how the implemented work differs from
+the original proposal. Section~\ref{sec:disc-interpretation} interprets the
+technical evidence. Section~\ref{sec:disc-pilot} discusses the pilot findings
+within their formative boundary. Section~\ref{sec:disc-ontology} draws the main
+design lesson from the ontology evolution. Sections~\ref{sec:disc-limitations}
+and~\ref{sec:disc-future} state the limits of the thesis and the most direct
+next research steps.
 
 % ===========================================================================
 \section{Evolution from Proposal to Implemented System}\label{sec:disc-evolution}
 
-The original thesis proposal~\citep{ThesisProposal1128} specified a VR-first
-grounded tutoring system with gaze, hand-tracking, and voice input on the
-Meta Quest~3, supported by a lightweight RAG+LLM backend and evaluated through
-a three-condition human-subject study. The work reported in this thesis differs
-from that vision in two substantive ways.
+The original thesis proposal~\citep{ThesisProposal1128} described a VR-first
+tutoring system for the Meta Quest~3, with gaze, hand tracking, voice input, a
+RAG+LLM backend, and a controlled three-condition human-subject study. The final
+thesis keeps the immersive procedural tutoring motivation, but the center of the
+work moved. The implemented contribution is best understood as an
+evidence-grounded tutoring runtime and visual-fact extraction method, with VR
+used for a formative pilot rather than for a controlled effectiveness claim.
 
-First, the implementation effort shifted from VR-native interaction to
-telemetry-grounded tutoring on desktop DCS, because the core technical
-challenges---reliable telemetry processing, evidence grounding, VLM-based
-visual fact extraction, and harness-level output validation---required a
-stable development and debugging environment that desktop DCS provides. This
-shift produced the ports-and-adapters architecture, the procedure pack and
-gating engine, the deterministic fallback path, the JSONL logging and replay
-infrastructure, and the VLM adaptation pipeline---none of which were
-anticipated in the original proposal.
+This shift was not only an engineering convenience. The cold-start procedure
+made a prior problem visible: before a tutor can give useful procedural help, it
+must know which state it is allowed to trust. Some required evidence is exported
+as telemetry through DCS-BIOS. Some evidence is visible only on cockpit displays.
+Some steps are manual, out of layout, or unsuitable for automatic confirmation.
+The thesis therefore had to build the evidence layer first: procedure packs,
+gate inference, evidence packets, retrieval boundaries, VLM visual facts,
+schema-constrained model output, harness validation, overlay allowlists, and
+replayable logs.
 
-Second, the VLM adaptation work grew from an unplanned component into one of
-the thesis's main contributions. The original proposal assumed read-only
-simulator state flags would suffice for procedural state tracking; in
-practice, several critical procedure steps require visual confirmation of
-display-page content not exported by DCS-BIOS. Addressing this gap led to
-the visual fact ontology, the seven-stage data pipeline, the LoRA fine-tuning
-experiments, and the three-backbone benchmark comparison---forming a
-self-contained contribution with verified holdout evidence.
+The VLM work grew out of the same pressure. The proposal assumed that simulator
+state would be sufficient for procedural tracking. In practice, display-page
+content such as alignment and BIT states had to be observed visually. This led
+to the 13-fact ontology, the reviewed screenshot datasets, the LoRA adaptation
+pipeline, and the independent holdout benchmarks. These became a core
+contribution because they define how a foundation model can be used as a bounded
+perception component rather than as an unconstrained judge of procedure state.
 
-The formative VR pilot study (RQ3) represents a partial convergence back
-toward the original proposal's human-subject evaluation ambition. The pilot
-used the Quest~3 with the full tutoring runtime, produced real participant
-data, and demonstrated that the evidence-grounded infrastructure operates
-correctly in a live VR setting. However, the pilot was small ($n=9$),
-non-randomised, and descriptive rather than inferential. It does not fulfil
-the proposal's three-condition controlled evaluation goal. The gap between the
-formative pilot and a fully powered controlled study remains the central
-unfinished thread of the thesis.
+The completed VR pilot partially returns to the original proposal's
+human-subject ambition. It shows that the evidence-grounded runtime can be
+exercised in headset with real participants and that the export pipeline can
+capture the data needed for later analysis. It does not, however, complete the
+controlled three-condition study proposed at the beginning of the project. With
+$n=9$, non-random assignment, and unresolved questionnaire data for one
+participant, the pilot is formative and descriptive.
 
 % ===========================================================================
-\section{Interpretation of Technical Results}\label{sec:disc-interpretation}
+\section{Interpretation of Technical Evidence}\label{sec:disc-interpretation}
 
-% Evidence: Chapter 6 (Evaluation) benchmark tables
-% Evidence: Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8
-% Claims: C-VLM-04, C-VLM-05 (verified); C-VLM-03b, C-VLM-06 (likely)
+The strongest technical result is the RQ2 visual-fact benchmark. The primary
+Qwen3.5-9B LoRA line reaches approximately 0.99 fact accuracy on both
+independent 13-fact holdouts, while reducing critical false positives sharply
+relative to the base model. Supplementary Qwen3.6-27B and Gemma-4-31B results
+show that the same data-and-ontology recipe is not tied to a single backbone,
+although the thesis does not claim broad model-family generality. The important
+interpretation is narrower and more useful: a small, reviewed, ontology-aligned
+dataset can make a VLM substantially more reliable for cockpit visual-fact
+extraction than the corresponding base model on local holdout data.
 
-The benchmark results reported in Section~\ref{sec:eval-rq2} provide evidence
-about the performance of the VLM visual fact extraction pipeline.
-This section draws interpretive conclusions from those results, distinguishing
-carefully between what the benchmarks demonstrate and what they do not.
+That result matters because the tutoring runtime treats VLM output as evidence,
+not as authority. A visual fact such as a visible page, label, or status text is
+one input to downstream step inference. The procedure engine still combines
+visual facts with telemetry, procedure order, temporal context, and pack-defined
+gates. This separation is what prevents the benchmark from becoming an
+unsupported pedagogical claim. The VLM result supports the perception layer of
+the tutoring system; it does not by itself prove that the tutor teaches better.
 
-\subsection{What the Benchmark Results Demonstrate}
+The RQ1 replay and harness evidence supports a different part of the thesis.
+The replay cases, live-fixture coverage, pack-derived schemas, response mapping,
+and overlay allowlists show that the implemented runtime can constrain model
+output before it reaches the learner. This is a technical readiness and
+auditability claim. It means that help cycles can be replayed, inspected, and
+checked against explicit evidence contracts. It does not mean that every future
+model response will be pedagogically optimal, nor that the runtime has been
+validated across simulators or procedures.
 
-\textbf{Small-data LoRA adaptation greatly improves domain-specific VLM
-extraction.}
-Under the 13-fact v2 ontology, the Qwen3.5-9B LoRA adapter trained on 928 rows
-(Run-003 + Run-005$\times$2) achieves a fact accuracy of 0.9908 on the Run-002
-newfacts holdout and 0.9931 on the Run-004 random holdout, compared to 0.8677
-and 0.8038 for the base model, respectively.
-The seen $F_1$ rises from 0.50--0.57 (base) to 0.92--0.96 (LoRA).
-These are large effect sizes by any standard, and they are observed on holdout
-sets with verified zero training overlap, ruling out memorisation as an
-explanation.
+Taken together, the technical evidence supports the architecture's central
+premise: foundation models can be useful in procedural tutoring when their role
+is bounded by explicit evidence production and validation. The thesis does not
+ask the LLM to be the source of truth. It asks the LLM to generate a response
+inside a runtime where the observable state, procedural pack, retrieved sources,
+and harness define what the response may safely claim or highlight.
 
-\textbf{The data recipe transfers across model backbones.}
-The identical training recipe (Run-003 + Run-005$\times$2, bilingual, 13-fact
-ontology) applied to the Gemma-4-31B backbone produces a similar pattern of
-consistent improvement: fact accuracy rises from 0.82 to 0.95 on Run-002 and
-from 0.81 to 0.97 on Run-004.
-This cross-backbone transfer provides evidence that the improvement is driven by
-the data and ontology design rather than by idiosyncratic properties of a single
-model architecture.
+\subsection{What the Technical Evidence Does Not Prove}
 
-\textbf{JSON and schema validity become near-perfect after training.}
-On the Run-004 random holdout, the base model produces 4 schema-invalid or
-JSON-invalid responses out of 100; the LoRA adapter produces none.
-This is not a trivial property: in a runtime system that must parse model output
-to extract overlay targets and step recommendations, format reliability is a
-hard requirement.
-The fine-tuning process reliably teaches the model to conform to the expected
-output schema.
+The technical evidence does not show learning gains, retention, transfer,
+reduced workload, or superior training outcomes. The VLM benchmarks measure
+single-frame visual-fact extraction. The replay and harness tests measure
+whether evidence contracts and output constraints behave as expected. Both are
+necessary for a reliable tutor, but neither is sufficient for a human learning
+claim. A learner could receive accurate, grounded help and still fail to form a
+durable procedural understanding. Conversely, a learner might learn from a less
+instrumented system if it happens to fit their prior knowledge and strategy.
 
-\textbf{The error profile shifts from indiscriminate hallucination to targeted
-false positives on completion-type facts.}
-The base model's dominant failure mode is unidirectional hallucination: it
-asserts \texttt{seen} for many facts that are not present, particularly on rare
-states such as \texttt{fcsmc\_intermediate\_result\_visible} (60 false positives
-on Run-004 out of only 7 true occurrences).
-The LoRA adapter eliminates this class of error almost entirely, concentrating
-its residual errors on a specific subset of facts: \texttt{fcsmc\_final\_go\_result\_visible}
-(8 false positives on Run-004) and, to a lesser extent, \texttt{ins\_ok\_text\_visible}
-(2 false positives on Run-002).
-This shift from diffuse hallucination to focused, interpretable error patterns
-is a qualitative improvement that is not fully captured by aggregate accuracy
-metrics.
-
-\textbf{The benchmark protocol itself constitutes a contribution.}
-The use of holdout sets with verified zero overlap, per-fact confusion analysis,
-critical false positive tracking, and automated chart generation provides a
-reproducible evaluation framework that can be reused for future iterations of
-the ontology, for different backbone models, and for other procedures.
-
-\subsection{What the Benchmark Results Do NOT Demonstrate}
-
-\textbf{They do not demonstrate that the tutoring system improves learning.}
-The benchmarks measure the accuracy of visual fact extraction from cockpit
-screenshots.
-Accurate fact extraction is a necessary condition for a grounded tutoring system
-to function correctly, but it is not a sufficient condition for improving human
-learning outcomes.
-A learner could receive perfectly accurate visual facts and still fail to learn
-the procedure, or could learn effectively from a system with imperfect fact
-extraction.
-The causal chain from perception accuracy to learning outcomes has not been
-tested.
-
-\textbf{They do not demonstrate that visual fact extraction leads to better
-tutoring.}
-The benchmarks evaluate the VLM component in isolation, not the end-to-end
-tutoring system.
-Whether the availability of visual facts improves the quality, timeliness, or
-acceptability of the tutor's help responses relative to a telemetry-only
-baseline is an open question that requires a system-level evaluation.
-
-\textbf{They measure a perception subtask, not pedagogical effectiveness.}
-The metrics reported --- fact accuracy, seen $F_1$, sample exact match, critical
-false positives --- are perception metrics.
-They answer the question ``does the VLM see the cockpit correctly?'' rather than
-``does the tutoring system help the learner?''.
-Conflating the two would be a category error.
-
-\subsection{The \texttt{ins\_go} to \texttt{ins\_ok\_text} Decomposition as a Design Lesson}
-
-The 8-fact v1 ontology included a single fact, \texttt{ins\_go}, which asked the
-VLM to recognise whether the INS alignment had reached a visible GO state.
-This fact proved to be the dominant source of false positives in the v1
-adapter: 13 of 50 Run-002 samples were incorrectly predicted as \texttt{seen}.
-The issue was not that the VLM failed to learn from the training data, but that
-the target itself was poorly specified.
-\texttt{ins\_go} was not a visual fact in the same sense as ``the FCS page is
-visible on the left DDI''; it was a procedural completion judgement that required
-integrating the presence of specific text (``OK''), the absence of other text
-(alignment countdown), and the procedural context (which phase of the alignment
-the system is in).
-Asking a single-frame VLM to make this judgement conflated perception with
-reasoning.
-
-The 13-fact v2 ontology decomposes this compound target into lower-level,
-visually observable facts: \texttt{ins\_grnd\_alignment\_text\_visible} and
-\texttt{ins\_ok\_text\_visible} each describe a specific piece of text on the
-AMPCD.
-The procedural interpretation --- whether the combination of these facts
-indicates that alignment is complete --- is deferred to the downstream procedure
-engine, which has access to telemetry, procedure phase, and timing information.
-This decomposition was not a cosmetic change; it was the single most important
-design decision in the ontology evolution, and the benchmark results bear out
-its effectiveness: \texttt{ins\_grnd\_alignment\_text\_visible} achieves a seen
-$F_1$ of 0.99 on Run-002, and \texttt{ins\_ok\_text\_visible} produces only 2
-false positives on Run-002 and zero on Run-004.
+The evidence also does not yet isolate the value of each component. This thesis
+does not contain an ablation comparing telemetry-only tutoring, vision-augmented
+tutoring, different retrieval policies, or different harness strictness levels.
+The evaluation therefore supports an integrated artifact claim: the implemented
+system shows a technically auditable way to combine these elements. It does not
+rank every design choice against alternatives.
 
 % ===========================================================================
 \section{Interpretation of Pilot Findings}\label{sec:disc-pilot}
 
-The formative VR pilot study (Section~\ref{sec:eval-pilot}) provides
-descriptive evidence that must be interpreted within its proper scope.
+The formative VR pilot provides descriptive evidence about live use of the
+system. In the reviewed data, all four with-tutor participants completed the
+33-step procedure, while none of the five without-tutor participants completed
+it. Manual coding also shows zero omission errors in the tutor condition and a
+mean of 5.6 omission errors in the without-tutor condition. These observations
+are consistent with the intended function of the tutor: it keeps the current
+procedure step visible, retrieves relevant procedural context, and can point the
+learner toward cockpit controls.
 
-\textbf{Completion and omission errors.}
-The clearest signal is the completion gap: 4/4 with-tutor participants
-completed all 33 steps, while 0/5 without-tutor participants did. Coupled
-with the error coding---zero OM errors in the tutor condition versus a mean
-of 5.6 OM errors in the without-tutor condition---this suggests the tutor
-helped participants progress through the procedure by reducing missed steps.
-This is consistent with the tutor's design: the help system actively
-identifies the next required step and highlights the relevant cockpit control,
-making it harder for a participant to skip a step unknowingly.
+The same data also show that assistance does not eliminate procedural error.
+Commission and prompt-assistance errors remained in the tutor condition. This is
+an important finding because it points to a more precise design problem than
+"does the tutor help?" The remaining problem is how flexible model-generated
+guidance, deterministic harness repair, visual-state uncertainty, and human
+action timing align with a strict procedure specification. The tutor can reduce
+missed-step patterns while still leaving room for wrong timing, incomplete
+execution, or over-trust in assistance.
 
-\textbf{Assistance-coupled errors.}
-The tutor condition did not eliminate errors; it changed their composition.
-CO and PA errors appeared in three of four with-tutor trials, with a total
-of 9 CO and 8 PA errors across the condition. These are primarily
-assistance-coupled: cases where the tutor provided guidance that was followed
-but where the resulting action did not fully align with the procedure
-specification. For example, the harness occasionally repaired model-proposed
-overlay targets (PB18 to PB5 for BIT root sub-state), and these repairs,
-while correct, could produce a participant action that was technically the
-right control but in a slightly different context than the strict procedure
-definition. These errors highlight the inherent tension between flexible
-LLM-generated guidance and fixed procedural specifications: the tutor can
-guide correctly in substance while deviating in form.
+The live help-cycle logs support the infrastructure claim. Across the four
+with-tutor trials, the system recorded 77 help cycles, 23 VLM calls, 82 overlay
+executions, zero overlay rejections, and 21 fallback or repair events. The zero
+overlay rejection count should not be read as "nothing went wrong." Rather, it
+means that proposed overlay actions stayed within the configured allowlist after
+schema validation and harness processing. The repair events are evidence that
+the constraint layer was active, not evidence that model output was always
+directly correct.
 
-\textbf{Infrastructure reliability.}
-The zero overlay rejection rate (0/82) across 77 help cycles provides
-evidence that the evidence-grounding, allowlist, and schema validation
-pipeline functions correctly in live VR operation. All 21 fallback events
-were harness repairs (target re-mapping), not rejections. This supports the
-architectural claim that evidence grounding can be enforced at the schema
-level without blocking legitimate tutor output.
-
-\textbf{What the pilot does not show.}
-The pilot provides no evidence about learning (no pre/post knowledge
-measures), retention (no follow-up testing), workload (P02 questionnaire data
-unresolved; other questionnaire data not yet fully coded), or transfer. The
-small sample, non-random assignment, and variable participant experience mean
-that observed differences between conditions cannot be attributed to the
-tutor alone. The pilot's value is formative: it demonstrates that the
-instrumentation pipeline captures the intended data, that the tutor functions
-end-to-end in VR, and that the experimental design is executable.
+The pilot therefore has two roles in the thesis. First, it shows that the
+instrumented tutoring runtime can be used in a live VR setting and produce
+analysable logs. Second, it reveals the kind of human-system interaction data
+that a later controlled study should measure more carefully. It does not support
+causal claims about learning, workload, retention, transfer, or task speed.
 
 % ===========================================================================
 \section{Ontology Design Lessons}\label{sec:disc-ontology}
 
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8
-% Evidence: packs/fa18c_startup/vision_facts.yaml
-% Evidence: Chapter 6 (Evaluation) error analysis
-% Claims: C-VLM-07
+The ontology evolution is the clearest design lesson in the thesis. The first
+visual-fact ontology mixed observable facts with procedural conclusions. For
+example, \texttt{ins\_go} asked the VLM to decide whether an alignment state had
+effectively been reached. That target was not simply visual. It depended on
+particular display text, the absence of other display states, and the procedure
+phase. The failure pattern in the first benchmark made the boundary problem
+visible: a single-frame VLM was being asked to perform both perception and
+procedure reasoning.
 
-The two-generation evolution from 8-fact v1 to 13-fact v2 provides concrete
-design lessons that may inform future visual ontology construction for
-procedural training systems.
+The 13-fact ontology corrected that boundary. It decomposed compound targets
+into lower-level visual observations, such as whether the ground-alignment text
+or OK text is visible, and decomposed FCS-MC states into visually distinguishable
+stages. The downstream runtime then interprets those observations together with
+telemetry and procedural context. The design principle is therefore:
 
-\subsection{Abstraction-Level Discipline}
-
-The central lesson is that a VLM-based visual fact extractor should be asked to
-report \emph{observable visual evidence}, not \emph{procedural conclusions}.
-The 8-fact v1 ontology mixed these two levels of abstraction within a single
-fact set: facts such as \texttt{fcs\_page\_visible} and
-\texttt{bit\_root\_page\_visible} described visually localisable display-page
-states, while facts such as \texttt{ins\_go} and \texttt{fcs\_bit\_result\_visible}
-encoded higher-level procedural judgements.
-The mixed-abstraction ontology produced the predictable consequence:
-straightforward page-visibility facts achieved strong performance, while the
-compound procedural facts accounted for the majority of critical false positives.
-
-The 13-fact v2 ontology enforces a design discipline in which every fact is a
-locally verifiable piece of visual evidence.
-This discipline has three practical consequences.
-First, it makes the per-fact annotation task clearer for human reviewers:
-deciding whether ``OK'' text is visible on the AMPCD is a well-defined visual
-judgement; deciding whether ``INS alignment is complete'' is not.
-Second, it produces cleaner training signals, because the mapping from image
-content to fact label is more direct and less dependent on implicit procedural
-context.
-Third, it localises errors: when a fact is misclassified, the source of the
-error can be inspected in the image region that the fact describes, without
-needing to reason about the model's implicit understanding of procedure phase.
-
-\paragraph{General design principle.}
-The experience of moving from a mixed-abstraction ontology (v1) to a disciplined
-one (v2) yields a design principle that is explicit and transferable:
-%
 \begin{quote}
-\textbf{Design Principle:} VLM fact targets should be low-level, locally
-verifiable visual propositions. Higher-level procedural state judgments should be
-synthesised by downstream reasoning from multiple visual facts combined with
-temporal and telemetry context.
+\textbf{Visual fact targets should be low-level, locally verifiable visual
+propositions. Higher-level procedural state should be inferred downstream from
+visual facts, telemetry, temporal context, and procedure rules.}
 \end{quote}
-%
-This principle formalises the boundary between perception and reasoning.
-The VLM is responsible for answering ``what text, symbol, or display element is
-visible in this image region?''---questions that have ground-truth answers
-determinable from a single frame.
-The procedure engine is responsible for answering ``what does this combination of
-visual facts, telemetry variables, and temporal context imply about the current
-procedure state?''---questions that require multi-source integration.
-Enforcing this boundary at the ontology design stage, rather than discovering it
-through error analysis after training, is the primary design lesson of the
-ontology evolution.
 
-\subsection{Decomposition of Compound Targets}
+This principle matters beyond label naming. It affects annotation quality,
+training signal quality, error diagnosis, and runtime safety. A human reviewer
+can judge whether a piece of text is visible in a screenshot without knowing the
+procedure history. The same reviewer cannot always judge whether a procedure
+state is complete without knowing what happened before the image. When the fact
+contract respects that distinction, the model's output becomes easier to review
+and safer to combine with deterministic gates.
 
-The effectiveness of this decomposition is measurable.
-On the Run-002 holdout, the 8-fact v1 LoRA adapter produced 15 critical false
-positives, of which 13 (87\%) were on the compound target \texttt{ins\_go}.
-After decomposing \texttt{ins\_go} into the low-level visual propositions
-\texttt{ins\_grnd\_alignment\_text\_visible} and \texttt{ins\_ok\_text\_visible},
-the 13-fact v2 LoRA adapter reduced the critical false positive count from 15 to
-4, with the combined residual errors on these two decomposed facts falling to 3
-(1 on \texttt{ins\_grnd\_alignment\_text\_visible}, 2 on
-\texttt{ins\_ok\_text\_visible}).
-This is not simply a change of labels; it is a measurable improvement---from 13
-critical false positives to 3 on the same underlying visual content---that
-demonstrates the effect of applying the design principle in practice.
+Residual false positives on completion-type facts show the remaining edge of the
+method. Some states are visually similar across intermediate and final phases,
+especially when numeric readouts or transient display states are involved.
+Those cases may require more balanced data, higher-resolution crops, repeated
+observations, or explicitly temporal VLM inputs. The thesis therefore does not
+claim that the 13-fact ontology solves visual grounding generally. It offers a
+tested design discipline for one demanding procedure and a concrete method for
+discovering when a visual target is still too close to a procedural conclusion.
 
-The \texttt{ins\_go} $\rightarrow$ \{\texttt{ins\_ok\_text\_visible},
-\texttt{ins\_grnd\_alignment\_text\_visible}, \texttt{hsi\_map\_layer\_visible}\}
-decomposition is not the only example of this principle.
-The v1 fact \texttt{fcs\_bit\_result\_visible} was similarly a compound target
-that asked the VLM to recognise a final test result rather than the visual
-indicators that characterise it.
-In v2, this is decomposed into \texttt{fcsmc\_intermediate\_result\_visible},
-\texttt{fcsmc\_in\_test\_visible}, and \texttt{fcsmc\_final\_go\_result\_visible},
-each capturing a visually distinguishable stage in the FCS-MC test sequence.
-The downstream procedure engine can then interpret the sequence of these facts
---- together with telemetry state --- to determine whether the FCS BIT is
-complete.
-
-The general design principle can be stated as follows: if a human annotator
-cannot determine the fact label by looking at a single image without knowing the
-procedure step, the fact is likely too high-level and should be decomposed.
-This principle is operationalisable and transferable to other procedures.
-While demonstrated on cockpit displays, this principle applies to any VLM-based
-perception system that must distinguish visual presence from semantic state---for
-example, medical imaging (tissue visible vs.\ condition diagnosed), industrial
-inspection (gauge visible vs.\ value in range), and document understanding
-(signature field visible vs.\ form completed).
-
-\subsection{Residual Failure Modes and Their Implications}
-
-Despite the ontology redesign, completion-type facts remain the most challenging
-category.
-On the Run-004 random holdout, all 8 residual critical false positives for the
-Qwen LoRA adapter are on \texttt{fcsmc\_final\_go\_result\_visible}.
-This fact requires the model to recognise a specific numeric readout (the final
-GO result) and to distinguish it from visually similar intermediate numeric
-readouts that appear in the same screen region.
-
-There are two plausible interpretations of this residual difficulty.
-One is that it is a data coverage problem: the number of training examples in
-which the final GO result is visible is small, and the visual distinction
-between intermediate and final readouts may not be sufficiently represented.
-The other is that it is a fundamental resolution limitation: at the image
-resolution used for training and inference, the difference between an
-intermediate numeric value and the final GO value may be genuinely below the
-discriminative threshold of the model.
-Disambiguating these two interpretations would require a controlled experiment
-that varies image resolution and training-set composition independently, which
-is beyond the scope of the current work.
-
-\subsection{Implications for Future Ontology Design}
-
-The experience of designing two generations of visual fact ontology for the
-F/A-18C cold-start suggests three guidelines for ontology construction in
-related procedural domains:
-
-\begin{enumerate}
-  \item \textbf{Begin with a task analysis} that identifies which procedure
-    states require visual confirmation and which can be covered by telemetry or
-    rule-based inference.
-    The ontology should only contain facts for states that genuinely require
-    visual evidence.
-
-  \item \textbf{Enforce a single-frame verifiability test} during ontology
-    design: every fact should be evaluable from a single cockpit image without
-    procedural context.
-    Facts that fail this test should be decomposed or deferred to downstream
-    reasoning.
-
-  \item \textbf{Collect composition-rebalanced data} early in the process,
-    particularly hard negatives that expose the boundary between visually similar
-    but procedurally distinct states.
-    The Run-005 composition rebalance was added specifically to address
-    under-represented fact states, and its inclusion in the training recipe was
-    critical to the reduction in hallucination.
-\end{enumerate}
+As a heuristic for future domains, the rule is simple: if a fact cannot be
+labelled from one image without knowing the procedure step, it is probably too
+high-level for the VLM contract. It should be decomposed into visible atoms or
+deferred to the procedure engine. This is the point at which the thesis moves
+from a case-specific implementation detail to a reusable representation lesson.
 
 % ===========================================================================
 \section{Limitations}\label{sec:disc-limitations}
 
-% Evidence: paper_context/experiment_inventory.md §7
-% Evidence: paper_context/claims_registry.md (future-scope human-subject claims)
-% Evidence: paper_context/system_delta_from_proposal.md §4
+The contribution should be read inside the following limits.
 
-The following limitations bound the scope of conclusions that can be drawn from
-the present work.
-They are stated explicitly so that the contribution can be evaluated within its
-proper scope and so that future work can address them systematically.
+\subsection{Evaluation Scope}
 
-\subsection{Limitations of the Experimental Setup}
+All datasets, replay cases, and pilot trials concern one procedure: the F/A-18C
+cold-start. The visual extractor is trained and evaluated on a fixed composite
+cockpit panel with the same aircraft type and rendering environment. The
+holdout sets are independent sessions with zero training overlap, but they still
+measure within-domain generalisation. They do not establish cross-procedure,
+cross-aircraft, or cross-simulator generality.
 
-\textbf{Single procedure.}
-All experiments, benchmarks, and dataset curation efforts focus on a single
-procedure: the F/A-18C cold-start.
-There is no evidence that the 13-fact ontology, the training recipe, or the
-LoRA adaptation approach generalises to other procedures (e.g., taxi, takeoff,
-landing, or emergency procedures in DCS, or procedural tasks in other simulators).
-The ontology design principles articulated in
-Section~\ref{sec:disc-ontology} are plausible but untested beyond the cold-start
-domain.
+The largest training recipe contains 928 bilingual SFT rows after the Run-005
+oversampling step. This is deliberately small and practically useful for a
+domain-specific adaptation study, but it does not identify the minimum data
+requirement, the performance ceiling, or the effect of each recipe component.
+The thesis does not include ablations for bilingual rows, oversampling, LoRA
+rank, composition rebalance, or alternative fine-tuning methods.
 
-\textbf{Single composite-panel layout.}
-The visual fact extractor is trained and evaluated on a fixed three-display
-composite panel (left DDI, AMPCD, right DDI).
-Cockpit configurations that differ in the number, arrangement, or type of
-displays (e.g., the F-16C with two MFDs, or the A-10C with a different
-instrument layout) would require retraining with new data under a new layout
-description.
-The current models have not been tested on such configurations.
+\subsection{System and VLM Scope}
 
-\textbf{Small dataset sizes.}
-The largest training configuration uses 928 rows (Run-003 + Run-005$\times$2,
-bilingual).
-This is small by comparison with typical VLM fine-tuning datasets, which
-often use tens or hundreds of thousands of examples (e.g., LLaVA instruction
-tuning and broader instruction-tuned VLM recipes)~\citep{liu2023llava,dai2023instructblip}.
-While the results demonstrate that 928 rows can produce meaningful improvements,
-they do not establish the upper bound of what is achievable with more data.
-Conversely, the results do not establish the minimum data requirement; it is
-possible that comparable performance could be achieved with fewer examples,
-which would be practically relevant for domains where annotated data is scarce.
+The VLM is evaluated as a single-frame visual-fact extractor. It does not decide
+procedure progress, select final tutor actions, or control the overlay directly.
+Residual critical false positives on completion-like facts remain important
+because a false visual observation can still influence downstream reasoning if
+it is not checked by telemetry, temporal confirmation, or harness constraints.
+Sticky facts and confirmation policies mitigate this risk, but their complete
+end-to-end effect has not been isolated experimentally.
 
-\textbf{Holdout sets from the same aircraft and cockpit generation.}
-The holdout sets (Run-002 and Run-004) are independent sessions with verified
-zero overlap with the training data, but they are drawn from the same aircraft
-type, the same cockpit configuration, and the same rendering engine (DCS World).
-The benchmarks therefore measure \emph{within-domain} generalisation (new
-sessions for the same cockpit), not \emph{cross-domain} generalisation (new
-cockpit types or new simulators).
+The backbone comparison covers Qwen3.5-9B, Qwen3.6-27B, and Gemma-4-31B under a
+matched LoRA-style adaptation recipe. This is useful model-diversity evidence
+within the scope of the project, but it does not cover other VLM families,
+larger models, full fine-tuning, alternative adapters, or non-cockpit visual
+domains.
 
-\subsection{Limitations of the System}
+The runtime is implemented and exercised through replay, fixtures, desktop DCS,
+and the Quest~3 pilot. However, headset latency, overlay legibility, gaze or
+hand-tracking accuracy, and expert-rated response usefulness were not measured
+as controlled system-level outcomes.
 
-\textbf{VR runtime operational; pilot completed but controlled study pending.}
-The VR runtime has been exercised in a formative pilot study with nine
-participants (Section~\ref{sec:eval-pilot}), confirming that the tutoring
-system functions end-to-end in live VR operation. However, the pilot was small
-($n=9$), non-randomised, and descriptive. In-headset overlay rendering and
-latency characteristics under study conditions have been observed but not
-systematically measured.
+\subsection{Pilot Scope}
 
-\textbf{No controlled human-subject evaluation.}
-The formative pilot provides descriptive evidence of feasibility but does not
-constitute a controlled evaluation. The pilot provides no evidence about
-whether the tutoring system improves learning, retention, transfer, or
-workload relative to baseline conditions. The causal chain from tutoring
-system use to improved human learning outcomes remains untested. A larger
-controlled study with randomised assignment, pre-registered analysis, and
-adequate statistical power is required to establish pedagogical value.
+The pilot contains nine participants: four with tutor and five without tutor.
+Assignment was not randomised, prior DCS experience was not balanced, and the
+sample is too small for inferential statistics. Without-tutor trials stopped at
+different procedure points, so their durations are not comparable to completed
+with-tutor trials.
 
-\textbf{The benchmark measures fact extraction, not tutoring quality.}
-The VLM benchmarks reported in Section~\ref{sec:eval-rq2} are perception
-metrics computed on isolated single-frame fact extraction. They do not measure
-the quality, usefulness, or timeliness of the tutor's help responses, the
-correctness of overlay targets, or the coherence of multi-turn help sequences.
-The pilot study addresses some of these gaps at a formative level, but an
-end-to-end evaluation of the full help cycle under controlled conditions has
-not been conducted.
+Questionnaire and workload evidence is incomplete. P02's questionnaire metadata
+could not be confidently attributed, and NASA-TLX integration was not part of
+the completed export pipeline. The pilot therefore supports task-log and coding
+observations, not workload, confidence, or subjective-usability conclusions.
 
-\subsection{Limitations of the Pilot Study}
-
-\textbf{Small sample and non-random assignment.}
-The pilot's nine participants were assigned to conditions based on scheduling
-availability, not randomisation. With four with-tutor and five without-tutor
-participants, condition sizes are small and unbalanced. No inferential
-statistical tests are appropriate.
-
-\textbf{Variable participant experience.}
-Participants ranged from novice to frequent DCS users. Prior experience was
-not balanced across conditions, and the small sample precludes statistical
-control for experience effects.
-
-\textbf{Incomplete workload and questionnaire data.}
-P02's questionnaire file was mislabelled and could not be confidently
-attributed; workload, TLX, and confidence data are therefore incomplete.
-NASA-TLX integration was not yet implemented in the export pipeline for these
-trials.
-
-\textbf{Without-tutor duration not comparable.}
-Without-tutor trials ended at different procedure points (19--29 steps
-completed), so observed durations do not measure completion time and cannot be
-compared with with-tutor durations.
-
-\textbf{Passive visual verification limitation.}
-For without-tutor trials, step completion was inferred from passive telemetry
-gates and action timeline review, without active VLM visual confirmation.
-Steps requiring visual evidence (S08, S18) may be misclassified as completed
-or not completed based on incomplete telemetry evidence alone.
-
-\subsection{Limitations of the VLM Adaptation Results}
-
-\textbf{Residual critical false positives on completion-type facts.}
-As discussed in Section~\ref{sec:disc-ontology}, the Qwen LoRA adapter retains
-critical false positives on \texttt{fcsmc\_final\_go\_result\_visible} (1 on
-Run-002, 8 on Run-004).
-In a runtime deployment, each such false positive carries the risk that the
-tutoring system incorrectly concludes that the FCS-MC test is complete and
-advances the procedure prematurely.
-Mitigation strategies --- such as the sticky-fact TTL mechanism and the
-requirement for multiple confirming observations --- exist but have not been
-evaluated end-to-end.
-
-\textbf{Limited model diversity.}
-Two backbone models were evaluated (Qwen3.5-9B and Gemma-4-31B), both with
-LoRA fine-tuning using the Unsloth + PEFT + TRL stack.
-The results do not generalise to other model architectures (e.g., LLaVA-style
-models~\citep{liu2023llava}), other fine-tuning methods (e.g., full fine-tuning,
-QLoRA with different rank configurations), or other training frameworks.
-
-\textbf{No ablation of training components.}
-The training recipe combines several design choices --- bilingual SFT,
-Run-005$\times$2 oversampling, composition rebalancing, LoRA rank and alpha
-settings --- without isolating the contribution of each.
-It is therefore unclear which components are necessary and which are incidental.
-A systematic ablation study would clarify the design space but has not been
-conducted.
+Finally, manual review inferred without-tutor completion from passive telemetry
+gates and the action timeline. Because the active VLM pathway was not available
+in that condition, visually evidenced steps are less certain. This limitation
+does not invalidate the formative finding, but it shows why the next study needs
+stricter instrumentation and coding.
 
 \subsection{Scope Summary}
-These limitations bound the claims of this thesis.
-Within these bounds, the thesis demonstrates: (1) a working dual-platform
-tutoring runtime with automated tests and harness-level evidence validation;
-(2) a reproducible VLM adaptation pipeline achieving 0.99 fact accuracy on
-holdout data with cross-backbone evidence; (3) a pack-driven architecture
-supporting extension to new procedures and simulators; and (4) formative VR
-pilot evidence ($n=9$) that the tutor was associated with full procedural
-completion and fewer coded omission errors, while assistance-coupled errors
-persisted.
-These contributions do not depend on claims that exceed the stated bounds.
+
+Within these limits, the thesis supports four claims: an evidence-constrained
+procedural tutoring runtime can be implemented with explicit architecture
+boundaries; a small-data VLM adaptation pipeline can produce reliable
+visual-fact extraction on local holdouts; the visual ontology evolution provides
+a concrete design lesson about perception and reasoning; and the VR pilot shows
+that the system can be exercised with participants while producing analysable
+logs. It does not establish controlled educational effectiveness.
 
 % ===========================================================================
 \section{Future Work}\label{sec:disc-future}
 
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §9
-% Evidence: paper_context/paper_outline.md §2.7
-% Evidence: paper_context/system_delta_from_proposal.md §8
-% Claims: C-PROPOSAL-01, C-PROPOSAL-02, C-HUMAN-01, C-HUMAN-02, C-HUMAN-03 (future-scope)
-
-The limitations enumerated above define a concrete research agenda.
-This section outlines the principal directions for future work, ordered from the
-most immediate technical extensions to the longer-term thesis objectives.
+The limitations above lead to a focused research agenda.
 
 \subsection{Controlled Human-Subject Evaluation}
 
-The formative pilot study (Section~\ref{sec:eval-pilot}) demonstrated
-feasibility and instrumentation readiness but did not provide controlled
-evidence about learning, workload, or retention. The next research stage is a
-larger controlled between-subjects evaluation comparing the grounded tutor
-against an appropriate baseline condition (e.g., without-tutor or static
-checklist). This requires completing the participant/session metadata schema,
-NASA-TLX integration, quiz linkage, and anonymisation pipeline; recruiting an
-adequate sample with randomised assignment; and pre-registering the analysis
-plan. Given the pilot's observed effect on completion rates, a two-condition
-design (with-tutor vs.\ without-tutor) with $n \geq 15$ per condition would
-provide a more feasible starting point than the original three-condition
-proposal design.
+The next study should compare the grounded tutor against a baseline condition
+with randomised assignment, balanced participant metadata, pre-defined coding
+rules, and complete questionnaire and workload capture. A two-condition design
+would be more realistic than the original three-condition proposal for the next
+iteration, because the current priority is to establish whether the completed
+runtime produces measurable differences in completion, errors, workload, and
+retention under controlled conditions.
 
-\subsection{Extending the Visual Fact Ontology to Other Procedures}
+\subsection{Ontology Extension to Other Procedures}
 
-The current 13-fact ontology is specific to the F/A-18C cold-start.
-Extending the approach to other procedures --- within DCS (taxi, takeoff,
-landing, aerial refuelling, emergency procedures) or in other simulators ---
-would test the generality of the ontology design principles proposed in
-Section~\ref{sec:disc-ontology}.
-Each new procedure would require a task analysis to identify
-vision-priority steps, a new fact ontology designed under the single-frame
-verifiability constraint, capture and annotation of new training data, and
-independent holdout evaluation.
-Whether the data recipe (bilingual SFT, composition rebalancing, moderate
-oversampling) transfers to procedurally different domains is an open empirical
-question.
+The 13-fact ontology should be extended to additional procedures only after a new
+task analysis identifies which steps are telemetry-visible, vision-priority, or
+manual/out-of-layout. Each new procedure needs its own visual fact contract,
+reviewed data, holdout benchmark, and runtime bindings. This is the appropriate
+test of whether the ontology discipline transfers beyond cold-start.
 
-\subsection{Multi-Frame Temporal Reasoning}
+\subsection{Temporal and Multi-Frame Visual Reasoning}
 
-The current visual fact extraction operates on single composite-panel images.
-Several cockpit states of interest involve temporal dynamics that cannot be
-disambiguated from a single frame: countdown values on the INS alignment page,
-animation sequences on the FCS-MC test display, and transient warning indicators.
-Extending the VLM input to short frame sequences (e.g., 3--5 consecutive frames
-at 1--2-second intervals) could enable the model to capture these temporal cues
-directly.
-This extension would require changes to the data capture pipeline (recording
-frame sequences rather than isolated screenshots), the training format (video or
-multi-image inputs), and the benchmark protocol (temporal fact definitions).
-Whether current small-scale VLMs can effectively exploit temporal information
-for cockpit state recognition is uncertain. Whether multi-frame VLM input is
-feasible at the 9B-parameter scale under LoRA training has not been tested.
+Several residual errors involve states that are difficult to disambiguate from a
+single screenshot. Multi-frame inputs, short visual histories, or repeated
+confirmation gates could help distinguish intermediate and final display states.
+This would require changes to capture, annotation, model input format, and
+benchmark metrics.
 
-\subsection{Online Adaptation from In-Situ Corrections}
+\subsection{System-Level Help-Cycle Evaluation}
 
-The current VLM adaptation pipeline is an offline process: data is captured,
-pre-labeled, reviewed, and used to train a LoRA adapter in a batch cycle.
-In a deployed tutoring system, a learner or instructor may correct the system's
-visual fact predictions in real time (e.g., ``the OK text is not actually
-visible yet'').
-Collecting these in-situ corrections and using them for online or incremental
-model adaptation --- without requiring a full re-labeling and re-training cycle
---- could enable the system to improve its extraction accuracy over the course of
-a single training session or across multiple learners.
-This direction requires addressing challenges in label reliability (learner
-corrections may themselves be erroneous), catastrophic forgetting (online updates
-should not degrade performance on previously correct facts), and evaluation
-(online adaptation must be benchmarked against a fixed holdout set that remains
-untouched by the adaptation process). Whether the current Unsloth + PEFT + TRL
-stack supports incremental fine-tuning without full retraining has not been
-evaluated.
+A separate evaluation should measure the full help cycle rather than individual
+components: trigger-to-overlay latency, correctness of highlighted targets,
+frequency and type of harness repair, response usefulness under expert review,
+and whether vision-priority steps improve over telemetry-only baselines. This
+would connect the RQ1 and RQ2 technical evidence more directly to RQ3.
 
-\subsection{System-Level End-to-End Evaluation}
+\subsection{In-Situ Correction and Adaptation}
 
-Beyond the component-level VLM benchmarks reported in this thesis, a
-system-level evaluation of the full help cycle is needed.
-This would measure, under replay or live conditions: the end-to-end latency from
-help trigger to overlay rendering; the correctness of overlay targets on
-vision-priority steps; the rate of deterministic fallback (when model output
-fails validation); and the perceived usefulness of help responses as judged by
-domain experts reviewing replay logs.
-Such an evaluation would bridge the gap between the component-level benchmarks
-(reported here) and the pilot study (Section~\ref{sec:eval-pilot}), providing evidence
-about whether the system's components function correctly when integrated.
+The current VLM adaptation pipeline is offline. Future versions could collect
+instructor or learner corrections when a visual fact is wrong and feed those
+corrections into later review or incremental adaptation. This direction requires
+careful safeguards because in-situ labels may be noisy, and adaptation must not
+erase previously reliable behaviour.
 
 \subsection{Summary of Future Directions}
 
-Table~\ref{tab:future-work} summarises the principal future directions and their
-current status.
+Table~\ref{tab:future-work} summarises the main future-work directions and the
+limitation each direction addresses.
 
 \begin{table}[htbp]
   \centering
   \caption{Summary of future work directions.}
   \label{tab:future-work}
   \small
-  \begin{tabular}{@{}p{0.28\textwidth}p{0.30\textwidth}p{0.30\textwidth}@{}}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
   \toprule
-  \textbf{Direction} & \textbf{Current status} & \textbf{Key challenge} \\
+  \textbf{Direction} & \textbf{Current status} & \textbf{Main challenge} \\
   \midrule
-  Controlled human-subject evaluation &
-    Formative pilot completed ($n=9$); controlled study pending &
-    Recruitment, randomisation, statistical power \\
+  Controlled human-subject study &
+    Formative pilot completed; causal evidence pending &
+    Randomisation, metadata, workload, and statistical power \\
 
-  Ontology extension to other procedures &
-    13-fact v2 validated for cold-start only &
-    Task analysis, annotation effort, domain generality \\
+  Ontology extension &
+    Cold-start ontology evaluated only within current cockpit layout &
+    New task analysis, annotation, and holdout design \\
 
-  Multi-frame temporal reasoning &
-    Single-frame pipeline operational &
-    VLM capacity, training data volume, benchmark design \\
+  Temporal visual reasoning &
+    Current VLM uses single composite-panel frames &
+    Multi-frame data, model capacity, and temporal metrics \\
 
-  Online adaptation from corrections &
-    Not implemented &
-    Label reliability, catastrophic forgetting, evaluation \\
+  System-level help-cycle evaluation &
+    Component and replay evidence available &
+    Defining integrated latency, quality, and repair metrics \\
 
-  System-level end-to-end evaluation &
-    Not conducted &
-    Defining meaningful system-level metrics \\
+  In-situ correction and adaptation &
+    Offline review and LoRA pipeline implemented &
+    Noisy labels, forgetting, and safe update policies \\
 
   \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
-The work presented in this thesis provides the technical foundation for each of
-these directions.
-The architecture, data pipeline, training infrastructure, and benchmark protocol
-are designed to be extensible, and the lessons learned from the two-generation
-ontology evolution and the cross-backbone comparison provide evidence-based
-guidance for the next stages of the project.
+These directions keep the thesis spine intact. The next stage is not to make the
+foundation model less constrained, but to strengthen the evidence loop around
+it: broader procedure packs, better visual facts, richer temporal evidence,
+controlled human evaluation, and logs that make every tutor response auditable
+after the fact.
