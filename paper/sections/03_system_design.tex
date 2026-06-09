@@ -328,20 +328,11 @@ handling of moving/settling controls, and prevention of VLM evidence leakage
 into non-visual steps.
 \end{enumerate}
 
-Figure~\ref{fig:harness-validation} abstracts these implementation objects into
-the validation path used by the thesis argument: the harness converts a proposed
-tutor action into an auditable decision and falls back to repair or text-only
-guidance when overlay execution is not sufficiently grounded.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/fig_harness_validation.pdf}
-  \caption{Harness and evidence validation. Candidate tutor actions are checked
-  against schema constraints, UI allowlists, evidence consistency, and procedure
-  state before an overlay action plan is accepted; unsafe or under-grounded
-  actions are repaired, rejected, or downgraded to text-only guidance.}
-  \label{fig:harness-validation}
-\end{figure}
+The detailed validation diagram is retained in Appendix
+Figure~\ref{fig:harness-validation}. For the main thesis argument, the key point
+is that the harness converts a proposed tutor action into an auditable decision
+and falls back to repair or text-only guidance when overlay execution is not
+sufficiently grounded.
 
 \subsection{Fixture-Based Regression Testing}
 

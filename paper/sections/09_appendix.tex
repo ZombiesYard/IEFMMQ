@@ -203,8 +203,19 @@ instance.
 \section{Supplementary Architecture and Export Diagrams}\label{sec:appendix-figures}
 
 The main chapters use simplified diagrams to support the research argument.
-Figures~\ref{fig:deployment-topology} and~\ref{fig:experiment-export} retain
-additional engineering detail for reproducibility and operational context.
+Figures~\ref{fig:harness-validation}, \ref{fig:deployment-topology}, and
+\ref{fig:experiment-export} retain additional engineering detail for
+reproducibility and operational context.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_harness_validation.pdf}
+  \caption{Harness and evidence validation. Candidate tutor actions are checked
+  against schema constraints, UI allowlists, evidence consistency, and procedure
+  state before an overlay action plan is accepted; unsafe or under-grounded
+  actions are repaired, rejected, or downgraded to text-only guidance.}
+  \label{fig:harness-validation}
+\end{figure}
 
 \begin{figure}[htbp]
   \centering

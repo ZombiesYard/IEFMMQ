@@ -1101,22 +1101,20 @@ Overfull \hbox (33.341pt too wide) in paragraph at lines 307--314
 re state. A \T1/lmtt/m/n/12 HarnessDecision
  []
 
-File: figures/fig_harness_validation.pdf Graphic file (type pdf)
-<use figures/fig_harness_validation.pdf>
-[26] [27] [28]
-Overfull \hbox (2.08954pt too wide) in paragraph at lines 415--419
+[26] [27]
+Overfull \hbox (2.08954pt too wide) in paragraph at lines 406--410
 []\T1/lmr/m/n/12 The scor-ing en-gine counts omis-sions and state vi-ol-a-tions
  with con-fig-ur-able per-category
  []
 
 
-Overfull \hbox (20.51878pt too wide) in paragraph at lines 431--438
+Overfull \hbox (20.51878pt too wide) in paragraph at lines 422--429
 \T1/lmr/m/n/12 The VLM com-pon-ent ex-tracts struc-tured \T1/lmr/m/it/12 visual
  facts \T1/lmr/m/n/12 from cock-pit screenshots---intermediate
  []
 
-[29]
-Overfull \hbox (112.55978pt too wide) in paragraph at lines 444--447
+[28]
+Overfull \hbox (112.55978pt too wide) in paragraph at lines 435--438
 []\T1/lmr/bx/n/12 Left DDI\T1/lmr/m/n/12 : \T1/lmtt/m/n/12 tac_page_visible\T1/
 lmr/m/n/12 , \T1/lmtt/m/n/12 supt_page_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 
 fcs_page_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcs_page_x_marks_visible\T1/lm
@@ -1124,20 +1122,20 @@ r/m/n/12 .
  []
 
 
-Overfull \hbox (109.54765pt too wide) in paragraph at lines 447--450
+Overfull \hbox (109.54765pt too wide) in paragraph at lines 438--441
 []\T1/lmr/bx/n/12 Right DDI\T1/lmr/m/n/12 : \T1/lmtt/m/n/12 bit_root_page_visib
 le\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcsmc_page_visible\T1/lmr/m/n/12 , \T1/lmtt/
 m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 ,
  []
 
 
-Overfull \hbox (75.49962pt too wide) in paragraph at lines 450--453
+Overfull \hbox (75.49962pt too wide) in paragraph at lines 441--444
 []\T1/lmr/bx/n/12 AMPCD\T1/lmr/m/n/12 : \T1/lmtt/m/n/12 hsi_page_visible\T1/lmr
 /m/n/12 , \T1/lmtt/m/n/12 hsi_map_layer_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12
  ins_grnd_alignment_text_visible\T1/lmr/m/n/12 ,
  []
 
-) [30]
+) [29]
 \openout2 = `sections/04_methodology.aux'.
 
  (sections/04_methodology.tex
@@ -1154,15 +1152,15 @@ Overfull \hbox (0.15527pt too wide) in paragraph at lines 42--51
 ue hand-ling: miss-ing, source-
  []
 
-[31
+[30
 
 
 
 
-] [32]
+] [31]
 File: figures/fig_vlm_pipeline.pdf Graphic file (type pdf)
 <use figures/fig_vlm_pipeline.pdf>
- [33] [34]
+ [32] [33]
 Overfull \hbox (157.30492pt too wide) in paragraph at lines 177--189
  [][] 
  []
@@ -1173,7 +1171,7 @@ Overfull \hbox (8.58614pt too wide) in paragraph at lines 198--209
 ser-va-tions (\T1/lmtt/m/n/12 fcs_page_visible\T1/lmr/m/n/12 ),
  []
 
-[35]
+[34]
 File: figures/fig_ontology_evolution.pdf Graphic file (type pdf)
 <use figures/fig_ontology_evolution.pdf>
 
@@ -1189,7 +1187,7 @@ tt/m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcs
 mc_in_test_visible\T1/lmr/m/n/12 ,
  []
 
-[36]
+[35]
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 251.
@@ -1202,19 +1200,19 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 251.
 
-[37]
+[36]
 Overfull \hbox (3.66367pt too wide) in paragraph at lines 315--325
 \T1/lmr/m/n/12 in-jec-tion, vis-ion batch col-la-tion), PEFT (LoRA ad-apter def
 in-i-tion), and TRL \T1/lmtt/m/n/12 SFTTrainer
  []
 
-[38]
+[37]
 Overfull \hbox (13.4555pt too wide) in paragraph at lines 343--353
 \T1/lmr/m/n/12 in Run-003. Sev-eral crit-ical facts had ex-tremely low pos-it-i
 ve counts: \T1/lmtt/m/n/12 ins_ok_text_visible
  []
 
-[39]
+[38]
 Overfull \hbox (113.45284pt too wide) in paragraph at lines 378--388
 []\T1/lmr/m/n/12 Count of er-rors where any of 6 crit-ical facts (\T1/lmtt/m/n/
 12 fcs_page_x_marks_visible\T1/lmr/m/n/12 ,
@@ -1227,35 +1225,35 @@ Overfull \hbox (109.93063pt too wide) in paragraph at lines 378--388
 visible\T1/lmr/m/n/12 ,
  []
 
-[40]
+[39]
 Overfull \hbox (10.86617pt too wide) in paragraph at lines 434--438
 []\T1/lmr/m/n/12 P04, P05, P08, P09. Par-ti-cipants re-ceived the full telemetr
 y-grounded
  []
 
-[41]
+[40]
 Overfull \hbox (1.6486pt too wide) in paragraph at lines 467--470
 []\T1/lmtt/m/n/12 step_coding.csv\T1/lmr/m/n/12 : per-step cod-ing with auto-co
 ded er-rors (OM/-CO/OR/PA/SV),
  []
 
-[42]
+[41]
 Overfull \hbox (4.55605pt too wide) in paragraph at lines 511--517
 \T1/lmr/m/n/12 ex-port. P02's task met-rics (steps com-pleted, er-rors) are de-
 rived from \T1/lmtt/m/n/12 trial_summary.csv
  []
 
-) [43] [44]
+) [42] [43]
 \openout2 = `sections/05_implementation.aux'.
 
  (sections/05_implementation.tex
 chapter 5.
-[45
+[44
 
 
 
 
-] [46] [47]) [48]
+] [45] [46]) [47]
 \openout2 = `sections/06_evaluation.aux'.
 
  (sections/06_evaluation.tex
@@ -1267,12 +1265,12 @@ Overfull \hbox (116.07039pt too wide) in paragraph at lines 56--68
  [][] 
  []
 
-[49
+[48
 
 
 
 
-] [50]
+] [49]
 Overfull \hbox (6.77791pt too wide) in paragraph at lines 114--117
 []\T1/lmr/m/n/12 The re-sid-ual crit-ical false pos-it-ives in the LoRA ad-apte
 r are con-cen-trated on completion-
@@ -1289,7 +1287,7 @@ Overfull \hbox (12.21558pt too wide) in paragraph at lines 129--141
  [][] 
  []
 
-[51]
+[50]
 Overfull \hbox (48.93178pt too wide) in paragraph at lines 165--182
 \T1/lmr/m/n/12 apter's per-form-ance. \T1/lmr/bx/n/12 Coarse panel pres-ence \T
 1/lmr/m/n/12 (6 facts: \T1/lmtt/m/n/12 tac_page_visible\T1/lmr/m/n/12 , \T1/lmt
@@ -1329,26 +1327,26 @@ r/m/n/12 (2 facts: \T1/lmtt/m/n/12 ins_grnd_alignment_text_visible\T1/lmr/m/n/1
 2 ,
  []
 
-[52] [53] [54] [55]
+[51] [52] [53] [54]
 Overfull \hbox (34.161pt too wide) in paragraph at lines 380--385
 \T1/lmr/m/n/12 load, TLX, or con-fid-ence sum-mary. Task met-rics (steps, er-ro
 rs) from \T1/lmtt/m/n/12 trial_summary.csv
  []
 
-[56]) [57]
+[55]) [56]
 \openout2 = `sections/07_discussion.aux'.
 
  (sections/07_discussion.tex
 chapter 7.
-[58
+[57
 
 
 
 
-] [59] [60]
+] [58] [59]
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <14.4> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 161.
- [61] [62] [63]
+ [60] [61] [62]
 Overfull \hbox (50.8089pt too wide) in paragraph at lines 300--312
 \T1/lmr/m/n/12 sid-ual er-rors on these two de-com-posed facts fall-ing to 3 (1
  on \T1/lmtt/m/n/12 ins_grnd_alignment_text_visible\T1/lmr/m/n/12 ,
@@ -1375,13 +1373,13 @@ Overfull \hbox (101.47266pt too wide) in paragraph at lines 313--325
 ult_visible\T1/lmr/m/n/12 ,
  []
 
-[64] [65] [66] [67]
+[63] [64] [65] [66]
 Overfull \hbox (62.79707pt too wide) in paragraph at lines 498--508
 \T1/lmr/m/n/12 tion [][]7.4[][], the Qwen LoRA ad-apter re-tains crit-ical fals
 e pos-it-ives on \T1/lmtt/m/n/12 fcsmc_final_go_result_visible
  []
 
-[68] [69] [70]
+[67] [68] [69]
 Underfull \hbox (badness 1189) in paragraph at lines 641--641
 []|\T1/lmr/m/n/10.95 Formative pi-lot com-pleted
  []
@@ -1421,29 +1419,29 @@ Underfull \hbox (badness 10000) in paragraph at lines 656--656
 []|\T1/lmr/m/n/10.95 System-level end-to-end
  []
 
-) [71]
+) [70]
 \openout2 = `sections/08_conclusion.aux'.
 
  (sections/08_conclusion.tex
 chapter 8.
-[72
+[71
 
 
 
 
-] [73] [74]) [75] (main.bbl
+] [72] [73]) [74] (main.bbl
 chapter without number
-[76
+[75
 
 
 
 
-] [77]) [78]
+] [76]) [77]
 \openout2 = `sections/09_appendix.aux'.
 
  (sections/09_appendix.tex
 chapter 9.
-[79
+[78
 
 
 ]
@@ -1451,28 +1449,30 @@ Overfull \hbox (125.55147pt too wide) in paragraph at lines 103--122
  [][] 
  []
 
-[80] [81]
+[79] [80]
 Overfull \hbox (12.39745pt too wide) in paragraph at lines 197--201
 []\T1/lmr/m/n/12 Cases with \T1/lmtt/m/n/12 vision_status = available \T1/lmr/m
 /n/12 in-clude per-frame side-car files (\T1/lmtt/m/n/12 frames.jsonl\T1/lmr/m/
 n/12 )
  []
 
+File: figures/fig_harness_validation.pdf Graphic file (type pdf)
+<use figures/fig_harness_validation.pdf>
 File: figures/fig_deployment_topology.pdf Graphic file (type pdf)
 <use figures/fig_deployment_topology.pdf>
 File: figures/fig_experiment_export.pdf Graphic file (type pdf)
 <use figures/fig_experiment_export.pdf>
 
-Overfull \hbox (11.7108pt too wide) in paragraph at lines 237--252
+Overfull \hbox (11.7108pt too wide) in paragraph at lines 248--263
  [][] 
  []
 
-
-Overfull \hbox (18.68394pt too wide) in paragraph at lines 289--304
+[81] [82] [83] [84]
+Overfull \hbox (18.68394pt too wide) in paragraph at lines 300--315
  [][] 
  []
 
-[82] [83] [84]) [85] (main.aux (Preamble.aux) (sections/00_abstract.aux)
+) [85] (main.aux (Preamble.aux) (sections/00_abstract.aux)
 (sections/00_acknowledgements.aux) (sections/01_introduction.aux)
 (sections/02_background_related_work.aux) (sections/03_system_design.aux)
 (sections/04_methodology.aux) (sections/05_implementation.aux)
@@ -1481,4 +1481,4 @@ Overfull \hbox (18.68394pt too wide) in paragraph at lines 289--304
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  )
-Output written on main.xdv (99 pages, 414984 bytes).
+Output written on main.xdv (99 pages, 415180 bytes).
