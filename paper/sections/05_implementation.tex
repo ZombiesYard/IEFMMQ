@@ -6,152 +6,215 @@
 % ===========================================================================
 \chapter{Implementation}\label{ch:implementation}
 
-This chapter covers implementation-level specifics that directly support the
-research questions, focusing on the evidence-grounding enforcement mechanism,
-the deterministic fallback path, the VLM runtime integration, and the replay
-infrastructure. Implementation details not essential to the core thesis
-argument---CLI command reference, complete technology stack versions, Lua
-script inventory, and full hyperparameter configuration---are documented in
-Appendix~\ref{ch:appendix}.
+Chapters~\ref{ch:system-design} and~\ref{ch:methodology} described the
+architecture and methods of the evidence-grounded tutor. This chapter explains
+how those ideas are implemented as a running research artifact. The emphasis is
+selective: implementation details are included when they enforce an evidence
+boundary, preserve a Clean/Hexagonal separation, make a help cycle auditable,
+or support the evaluation artifacts used in Chapter~\ref{ch:evaluation}.
+
+The implementation question for the chapter is therefore not simply which
+modules exist, but where authority is checked before generated help reaches the
+learner. The answer is distributed across pack-derived schemas, evidence
+packets, response mapping, harness validation, bounded overlay execution,
+fallback logic, and append-only event logs. Operational details that do not
+change this argument, such as full command references and complete deployment
+topology, are kept in Appendix~\ref{ch:appendix}.
 
 % ===========================================================================
-\section{Technology Stack}\label{sec:impl-stack}
+\section{Runtime Boundary and Configuration}\label{sec:impl-stack}
 
-The Python codebase uses Python~3.10+ with Poetry for dependency management.
-Core library dependencies are minimal: \texttt{httpx} for HTTP, \texttt{PyYAML}
-for declarative configuration, \texttt{jsonschema} (Draft 2020-12) for
-validation of model outputs and telemetry frames, and \texttt{Pillow} for
-image handling in the VLM pipeline. Testing uses \texttt{pytest} with branch
-coverage.
+The codebase is organised around a Clean/Hexagonal boundary. Domain logic lives
+in \texttt{core/}; stable interfaces are declared in \texttt{ports/}; external
+systems are connected through \texttt{adapters/}; and task-specific procedure
+knowledge is stored in the F/A-18C procedure pack. This layout is an
+implementation decision, not only a code style preference. It keeps simulator
+transport, model providers, visual capture, retrieval, overlay dispatch, and
+experiment export outside the domain objects that decide what evidence is
+admissible.
 
-Model serving is provider-agnostic. The primary path uses an OpenAI-compatible
-API endpoint (configured for vLLM, llama.cpp, or TGI servers). An Ollama
-fallback provides local compatibility. A deterministic stub returns fixed
-responses for testing. Multimodal support is toggled via configuration.
+The Python project targets Python~3.10+ and uses the dependency set declared in
+\texttt{pyproject.toml}. The runtime depends on a small number of general
+libraries: \texttt{httpx} for HTTP model calls, \texttt{PyYAML} for declarative
+configuration, \texttt{jsonschema} for contract validation, and
+\texttt{Pillow} for image handling in the VLM path. Tests are implemented with
+\texttt{pytest}. These stack choices matter mainly because they support
+inspectable file-based configuration and reproducible validation.
 
-The DCS Lua-side integration comprises scripts for state export (DCS-BIOS
-protocol), overlay rendering (highlight, clear, and pulse commands via DCS's
-cockpit highlight API), and composite-panel screenshot capture. LoRA
-fine-tuning uses Unsloth with PEFT and TRL; pre-labeling and human review are
-conducted in Label Studio.
+Model access is intentionally provider-agnostic. The text-help path uses an
+OpenAI-compatible adapter and can be configured for servers such as vLLM,
+llama.cpp, or TGI. Local compatibility is provided through an Ollama adapter,
+and deterministic stubs support tests. The same boundary is used for the
+multimodal VLM path: the runtime treats visual fact extraction as an adapter
+that returns structured observations, not as a source of procedural authority.
+
+The DCS-side integration has a similarly narrow role. Lua scripts and sidecar
+components export DCS-BIOS state, trigger composite-panel capture, and apply
+overlay highlight commands. They do not decide the active procedure step, do
+not generate tutoring text, and do not bypass the Python-side validation chain.
+This keeps the simulator integration as an I/O adapter while the procedure
+pack, evidence packet, and harness remain the sources of tutoring authority.
 
 % ===========================================================================
 \section{Evidence Grounding Enforcement}\label{sec:impl-evidence}
 
-The evidence-grounding mechanism described in
-Section~\ref{sec:design-dataflow} is implemented through three coordinated
-components.
+Evidence grounding is enforced through several implementation gates, not only
+through prompt wording. The model may propose a diagnosis, next step,
+explanation, and overlay target, but that proposal must survive contracts
+generated from the procedure pack and checks against the evidence available in
+the current help cycle.
 
-\paragraph{Dynamic JSON Schema generation.}
-The function \texttt{build\_help\_response\_schema} generates the HelpResponse
-JSON Schema at runtime from the current procedure pack's step identifiers, UI
-map targets, and error taxonomy codes. For every overlay target in the
-schema's \texttt{targets} array, a conditional \texttt{if/then}
-sub-schema requires the \texttt{evidence} array to contain at least one item
-referencing that target. Each evidence item must declare a \texttt{type} from
-the five grounding kinds (\texttt{var}, \texttt{gate}, \texttt{rag},
-\texttt{delta}, \texttt{visual}) and carry a non-empty \texttt{ref} matching
-the corresponding prefix family. The schema is cached keyed on configuration
-file modification times, avoiding redundant regeneration during long-running
-sessions.
-% Evidence: core/llm_schema.py
+\paragraph{Pack-derived schemas.}
+The function \texttt{build\_help\_response\_schema} generates the
+\texttt{HelpResponse} JSON Schema at runtime. Step identifiers come from the
+step registry, overlay targets come from the UI map, and error categories come
+from the taxonomy. The schema requires each overlay target to have at least one
+corresponding evidence item. Evidence items must use one of the runtime
+grounding types: \texttt{var}, \texttt{gate}, \texttt{rag}, \texttt{delta}, or
+\texttt{visual}. This makes the output contract procedure-specific rather than
+a generic language-model format.
 
-\paragraph{Response validation and mapping.}
-Model output passes through a narrow JSON extraction pipeline (code fence
-removal and delimiter-based parsing only; transformations outside this set are
-rejected), schema validation via \texttt{Draft202012Validator}, and allowlist
-checks on step identifiers and overlay targets. The mapping function validates
-that every overlay target cited in the response has at least one evidence
-reference whose prefix matches a key actually present in the help-cycle
-context. Targets without grounding evidence are rejected, and the rejection is
-recorded in the response metadata.
-% Evidence: adapters/json_extract.py, adapters/response_mapping.py
+\paragraph{Evidence packet construction.}
+The help prompt is built from a structured context rather than from raw log
+fragments. \texttt{build\_evidence\_packet} aggregates telemetry evidence,
+gate evidence, recent actions, visual facts, deterministic candidates, and
+known conflicts into a compact packet. \texttt{build\_help\_prompt\_result}
+then includes this packet, the allowed evidence references, retrieved snippets,
+and the overlay target policy in the model-facing prompt. As a result, an
+evidence reference can later be checked against the same context that was shown
+to the model.
 
-\paragraph{Safety constraints.}
-The overlay action executor enforces three rules before dispatching to DCS:
-only \texttt{overlay} actions are executable (no control injection or key
-emulation); every target is verified against the UI target allowlist; at most
-one target may be highlighted concurrently. When a new highlight is requested,
-any prior highlight is automatically cleared.
-% Evidence: adapters/action_executor.py
+\paragraph{Model output mapping and harness validation.}
+The response path is deliberately narrow. JSON extraction removes code fences
+and reads the first valid object, but it does not repair arbitrary malformed
+text into a new answer. The parsed object is validated against the dynamic
+schema and then passed to the response mapper. The mapper checks that overlay
+evidence references are present in the help-cycle context, verifies overlay
+targets against allowlists, records mapping failures in metadata, and applies
+the configured overlay-target limit.
+
+The harness layer adds a second implementation boundary. The prompt exposes a
+\texttt{HarnessDecision} contract for candidate adjudication, while the public
+runtime output remains mapped through the stable \texttt{HelpResponse} path.
+\texttt{plan\_harness\_action} then checks the chosen step, candidate evidence,
+allowed overlay targets, evidence references, and final state consistency. It
+can accept a model proposal, repair it to a safer target, force text-only
+guidance, or reject overlay output. This is the concrete implementation of the
+architecture principle that the LLM is not the final authority.
+
+\paragraph{Bounded overlay execution.}
+The final executor accepts only actions of type \texttt{overlay}. It rejects
+control injection, key emulation, empty targets, unmappable targets, targets
+outside the UI allowlist, and evidence-required overlays without evidence
+references. The current runtime supports configurable multi-target guidance.
+Targets beyond the configured limit are dropped and recorded rather than
+silently executed. When the DCS sender emits acknowledgements, requested,
+applied, and failed overlay events are normalised into the same JSONL event
+stream as the rest of the help cycle.
 
 % ===========================================================================
 \section{Deterministic Fallback}\label{sec:impl-fallback}
 
-The fallback mechanism operates when no model is available, model output fails
-JSON extraction or schema validation, or response mapping produces an empty
-result. It examines the currently active step, evaluates unsatisfied gating
-rules, identifies missing conditions, and classifies each missing evidence
-source as a hard blocker (gate explicitly fails) or soft blocker (telemetry
-source absent). This distinction prevents the tutor from incorrectly claiming
-a step is unsatisfied when evidence is simply unavailable. The fallback produces
-a text-only hint restricted to the active step; overlay highlights are
-suppressed unless a local rule can uniquely determine a valid target from the
-current telemetry state.
-% Evidence: adapters/step_inference.py, core/step_hint.py
+Fallback is implemented as a conservative degradation path. It is used when the
+model is unavailable, JSON extraction fails, schema validation fails, response
+mapping rejects the proposed action, or the harness cannot produce a grounded
+overlay plan. The fallback examines the active procedure step, unsatisfied
+gates, recent actions, UI target bindings, and evidence availability.
+
+The important distinction is between hard and soft blockers. A hard blocker
+means that observed evidence shows a required condition is false. A soft
+blocker means that the required source is missing or not observable. The
+fallback can give corrective guidance for hard blockers, but it avoids claiming
+that a learner has failed a step when the necessary evidence is absent. Overlay
+output is suppressed unless the local procedure rules identify a unique valid
+target, or a bounded multi-target plan is explicitly allowed by the current
+configuration.
+
+This fallback path also preserves the thesis claim boundary. A help cycle may
+continue without a model or without vision evidence, but the resulting guidance
+is less ambitious: it relies on observed telemetry, procedure gates, and
+deterministic step hints rather than on invented visual or pedagogical
+interpretation.
 
 % ===========================================================================
 \section{VLM Visual Fact Extraction Runtime}\label{sec:impl-vlm}
 
-The VLM runtime operates as a pipeline triggered when the active step is
-vision-priority (S08, S15, S18). A capture request is dispatched to DCS via
-UDP; the Lua-side integration renders the three primary cockpit displays into a
-single composite PNG image. The Python-side buffered vision session maintains a
-sliding window of recent observations and selects both a pre-trigger frame (most
-recent frame before the trigger, within a 250\,ms sync window) and the trigger
-frame.
+The VLM runtime is implemented as a visual fact extractor, not as a tutor. The
+current procedure pack marks S08, S15, S18, and S19 as vision-priority steps.
+For those steps, the live runtime may request composite-panel capture before
+assembling the final help context. For other steps, stale visual facts are not
+allowed to override fresher telemetry or procedure-gate evidence.
 
-The selected frames are base64-encoded and inserted alongside the fact
-extraction prompt into a multimodal chat-completion request. The prompt
-enumerates all 13 facts, describes the three-region composite-panel layout, and
-provides detailed decision-boundary instructions per fact. The raw model output
-is parsed, sanitised (unknown keys and invalid fact IDs rejected, states
-restricted to the three admissible values), and validated against a
-dynamically generated JSON Schema. Sanitised facts are merged into the runtime
-vision fact snapshot with sticky preservation and TTL-based expiry.
+A capture request is sent to the DCS-side vision sidecar, which renders the
+left DDI, AMPCD, and right DDI into a composite image. The Python-side
+buffered vision session keeps recent observations and selects frames around
+the help trigger. In live mode the default synchronization window is
+250\,ms; replay uses a narrower deterministic window. The selected frame
+metadata records frame identifiers, capture time, synchronization status,
+delta from the trigger, and stale-frame flags.
 
-When the VLM is unavailable or the multimodal request fails, the help cycle
-proceeds with telemetry and knowledge only---a deliberate degradation property
-rather than a system failure.
-% Evidence: adapters/vision_fact_extractor.py, adapters/vision_fact_prompting.py,
-%           adapters/vision_sync.py
+The selected image frames are passed to the visual fact extractor. The
+extractor builds a prompt from the current 13-fact ontology, the composite
+layout, and fact-specific decision boundaries. The model response is parsed as
+JSON, sanitized, and validated against a schema whose fact identifiers come
+from the visual-facts pack. Unknown fact IDs, invalid states, incomplete fact
+objects, and non-schema fields are ignored or reported in metadata. Accepted
+facts are restricted to \texttt{seen}, \texttt{not\_seen}, and
+\texttt{uncertain}.
+
+Validated visual facts are merged into the runtime vision snapshot using the
+ontology's sticky and expiry policy. This implementation detail matters because
+some cockpit display states are transient: a fact may need to remain available
+briefly for a procedure gate or harness decision, while stale facts must expire
+before they can mislead later steps. If multimodal extraction is disabled or
+the VLM call fails, the help cycle continues with telemetry, retrieval, and
+fallback evidence only.
 
 % ===========================================================================
 \section{Replay and Logging Infrastructure}\label{sec:impl-replay}
 
-The JSONL event store is the sole persistence mechanism for runtime events,
-implementing append-only writing with immediate flush after each write for
-crash-safe logging. The replay module provides two entry points: full
-simulation using a mock environment adapter that replays pre-recorded
-observation sequences, and log validation that reconstructs the step state
-machine and verifies legal state transitions against a procedure pack.
+The implementation treats logging as part of the evidence chain. Runtime events
+are written to a JSONL store with immediate flush after each append. A help
+cycle therefore leaves an auditable trail of trigger metadata, telemetry
+context, vision selection, prompt construction metadata, model and mapping
+status, harness decisions, overlay execution, and failure reasons.
 
-The replay evaluation infrastructure supports suite-driven regression replay:
-a YAML suite file specifies test cases with expected outcomes, model
-configuration, and optional vision frame directories. Five replay cases cover
-distinct scenario types (no-operation, battery-on, engine-off, FCS BIT, INS
-alignment), each with DCS-BIOS raw captures and per-frame sidecar files. The
-suite also includes 20 live-fixture regression entries that validate specific
-evidence-grounding and overlay-target correctness properties
-(Section~\ref{sec:design-harness}).
+Replay uses the same boundary discipline as live operation. Pre-recorded
+DCS-BIOS captures can be replayed through the runtime, optionally with vision
+frame directories, while the procedure pack, UI map, telemetry map, source
+policy, and harness specs remain explicit inputs. The
+\texttt{fa18c\_startup\_v04} replay suite combines five scenario cases with
+live-fixture regression entries that cover stale VLM evidence, wrong-target
+prevention, moving-control settling, completion-already-true cases, and
+interaction-text semantics.
 
-Interaction metrics are derived from event logs: stall time per step, help
-request count, LLM trigger count, UI click and failure counts, and highlight
-request and acknowledgement counts.
-% Evidence: core/event_store.py, simtutor/runner.py, core/interaction_metrics.py
+These logs and replay suites do not demonstrate learning outcomes. Their role
+is technical: they make it possible to reproduce a help-cycle decision, inspect
+why an overlay was accepted, repaired, dropped, or rejected, and support the
+RQ1 readiness evidence reported in Chapter~\ref{ch:evaluation}.
 
 % ===========================================================================
 \section{Live Runtime Orchestration}\label{sec:impl-live}
 
-The live runtime orchestrates a continuous loop: DCS-BIOS UDP frames are
-ingested and enriched into normalised state variables; when a help trigger is
-received (hotkey or UDP message), the procedure engine computes a deterministic
-step hint, a vision capture is triggered if the active step requires it, BM25
-knowledge snippets are retrieved, the full prompt is assembled and sent to the
-model adapter, the response is validated and mapped to overlay actions, and the
-complete help cycle is logged. The runtime supports both real-time DCS
-operation and replay of pre-recorded BIOS captures through a shared code path.
+The live runtime connects the implementation pieces through a shared help-cycle
+path. A help trigger first creates a telemetry snapshot from DCS-BIOS frames.
+The telemetry pipeline enriches raw observations into runtime variables and
+recent deltas. If the current step requires visual confirmation, a capture
+request is issued and the buffered vision session selects synchronized frames.
+The procedure engine and gate evaluator produce deterministic candidates and
+missing-condition diagnostics. These observations are assembled into an
+evidence packet, retrieval adds source-controlled procedural snippets, and the
+prompt builder constructs the model request.
 
-Model access is configured through environment variables with a unified naming
-convention; the runtime validates all required configuration at startup and
-redacts API keys from all log output.
+The text model returns a structured response rather than a free-form command.
+That response is parsed, schema-validated, mapped to a runtime tutor response,
+checked by the harness, and converted into at most the configured number of
+overlay actions. The overlay executor dispatches only validated overlay
+intents to DCS and records acknowledgements or failures. The complete help
+cycle, including fallback and repair metadata, is appended to the JSONL log.
+
+This orchestration is also used by replay and regression tooling where
+possible. The shared path is important for the thesis because the evaluation is
+not based on a separate mock implementation of the tutor. The same contracts
+that constrain live tutoring also produce the logs, replay outputs, and
+quality gates used to evaluate technical readiness.
