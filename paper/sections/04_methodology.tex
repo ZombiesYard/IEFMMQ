@@ -6,99 +6,99 @@
 % ===========================================================================
 \chapter{Methodology}\label{ch:methodology}
 
-This chapter describes the methodological framework for the telemetry-grounded
-tutoring runtime and the VLM adaptation pipeline.
-Section~\ref{sec:method-telemetry} covers telemetry processing and gating rule
-evaluation. Section~\ref{sec:method-knowledge} describes knowledge grounding
-via BM25 retrieval with source policy.
-Section~\ref{sec:method-vlm-pipeline} presents the seven-stage visual fact
-data pipeline. Section~\ref{sec:method-datasets} details dataset curation and
-the ontology evolution from 8-fact v1 to 13-fact v2.
-Section~\ref{sec:method-lora-config} specifies the LoRA fine-tuning
-configuration for three backbone models under matched data recipe.
-Section~\ref{sec:method-benchmark} defines the benchmark protocol, metrics, and
-holdout strategy.
+Chapter~\ref{ch:system-design} presented the runtime architecture that keeps
+tutor output downstream of evidence and upstream of validation. This chapter
+describes how that evidence is produced, curated, and evaluated. The method is
+organised around a practical question: how can simulator telemetry, retrieved
+procedure knowledge, and VLM-derived visual facts become auditable inputs for a
+procedural tutor?
+
+The chapter has three roles. First, it defines the runtime evidence interfaces
+used by the procedure engine: telemetry variables, gating diagnostics,
+retrieved snippets, and deterministic fallback. Second, it presents the visual
+fact methodology for RQ2: screenshot capture, pre-labelling, human review,
+ontology revision, bilingual SFT export, LoRA adaptation, and holdout
+benchmarking. Third, it documents the formative VR pilot protocol for RQ3. The
+pilot is treated as descriptive evidence about feasibility and interaction
+patterns; it is not used for inferential claims about learning gains.
 
 % ===========================================================================
 \section{Procedure Runtime and Telemetry Grounding}\label{sec:method-telemetry}
 
-The procedure runtime ingests raw simulator telemetry, normalises it into
-stable state variables, evaluates gating rules to determine step eligibility,
-and provides the resulting state representation to the help-cycle context
-assembler.
+Telemetry and procedure gates provide the method-level state evidence on which
+the help cycle depends. The architectural placement of this layer was described
+in Chapter~\ref{ch:system-design}; the methodological concern here is how raw
+simulator observations become stable, inspectable variables for later
+benchmarking, replay, and help-cycle analysis.
 
 \subsection{Variable Resolution and Source-Missing Tracking}
 
-A telemetry map (declared in the procedure pack) defines how raw DCS-BIOS
-fields are projected onto normalised state variables. The variable resolver
-produces a flat dictionary of key--value pairs and tracks unavailable or
-unknown sources in a \texttt{vars\_source\_missing} set, enabling downstream
-components to distinguish ``the value is zero'' from ``the value is
-unknown''---a distinction essential for correct gating rule behaviour. A
-missing variable never silently evaluates to a successful condition.
+The procedure pack declares a telemetry map that projects raw DCS-BIOS fields
+onto normalised runtime variables. The resolver produces a flat dictionary of
+key--value pairs and separately tracks unavailable sources in
+\texttt{vars\_source\_missing}. This separation is important because a false
+value and an unobserved value should not have the same methodological meaning.
+A switch known to be off can support corrective guidance. A missing source
+supports only uncertainty-aware guidance or fallback.
 
 \subsection{Gating Rule Evaluation}
 
-The procedure engine evaluates two gate types per step: precondition gates
-(before activation) and completion gates (before marking done). The DSL
-supports four operators: \texttt{var\_gte} (threshold),
-\texttt{arg\_in\_range} (interval), \texttt{flag\_true} (boolean), and
-\texttt{time\_since} (elapsed time). The evaluator includes explicit
-unknown-value handling: missing, source-missing, or sentinel-value variables
-cause rule failure with a diagnostic reason. Rules short-circuit on first
-failure; the failure index and reason propagate to the deterministic step hint
-and help-cycle context.
+Each procedure step contains precondition and completion gates. The gate DSL
+supports threshold checks, range checks, boolean flags, and elapsed-time
+conditions. Missing, source-missing, or sentinel values fail with diagnostic
+reasons rather than being silently coerced. The failed gate and reason are
+included in the help-cycle context and can later be inspected in logs. This
+turns procedure progress into a rule-governed evidence claim rather than a
+model-inferred narrative.
 
 \subsection{Delta Sanitisation and Aggregation}
 
-Raw telemetry variables change at high frequency due to simulator physics even
-without learner action. Two processing stages produce a stable representation:
-delta sanitisation suppresses spurious changes via per-variable thresholds,
-debounce windows, and filtering rules; delta aggregation accumulates sanitised
-deltas over a configurable window and compresses them into a prompt-safe
-summary included in the help-cycle context.
+Raw telemetry can change at high frequency because of simulator physics,
+instrument jitter, and transitional switch states. Delta sanitisation applies
+per-variable thresholds, debounce windows, and filtering rules. Delta
+aggregation then compresses recent, sanitised changes into a prompt-safe
+summary. The resulting deltas are used as evidence of recent learner action
+without exposing every raw simulator frame to the language model.
 
 \subsection{Deterministic Fallback}
 
-When no language model is available or model output fails validation, the
-procedure runtime falls back to deterministic step inference. The fallback
-examines the active step, its unsatisfied gating rules, and recent UI targets
-to produce a text hint restricted to the active step. Overlay highlights are
-suppressed unless a local rule can prove a unique, valid target. The mechanism
-distinguishes hard blockers (gate explicitly fails) from soft blockers
-(telemetry source absent), preventing incorrect claims that a step is
-unsatisfied when evidence is simply unavailable.
+Fallback is part of the method rather than only an implementation safeguard.
+When model output is unavailable or invalid, the runtime computes a conservative
+hint from the active step, unsatisfied gates, recent actions, and evidence
+availability. The fallback distinguishes hard blockers, where observed evidence
+shows that a gate is unsatisfied, from soft blockers, where required evidence is
+missing. Overlay guidance is suppressed unless a local rule identifies a unique
+valid target.
 
 % ===========================================================================
 \section{Knowledge Grounding and Source Policy}\label{sec:method-knowledge}
 
-Knowledge retrieval uses BM25, a bag-of-words ranking function from the
-probabilistic information retrieval family. Documents are indexed at the
-sentence level from the F/A-18C NATOPS flight manual and supplemental
-cold-start documentation. At retrieval time, a grounding query is constructed
-from the active step identifier, its description, and the current telemetry
-observation. The query is scored against indexed sentences using standard BM25
-weighting ($k_1 = 1.2$, $b = 0.75$); the top-$k$ scoring snippets ($k=5$) are
-included as evidence context in the help-cycle prompt.
+Retrieved procedural knowledge supplies textual context for generated help, but
+it is deliberately source-controlled. The local retrieval adapter indexes
+curated procedure and aircraft documentation at sentence level and ranks
+snippets with BM25~\citep{robertson2009bm25}. A grounding query is constructed
+from the active step, its description, and the current observation; the top
+snippets are included in the help-cycle context.
 
-A declarative source policy enforces an allowlist of permitted document
-sources. Each indexed sentence carries a source identifier; only snippets from
-allowed sources are included in retrieval results. This prevents the model
-from being exposed to procedure variants that contradict the current pack
-configuration (e.g., carrier-based procedures when the current profile is
-airfield) and bounds the retrieval scope to curated, verified documentation.
+A declarative source policy restricts retrieval to allowed document sources.
+This prevents the model from receiving procedure variants outside the active
+procedure pack, such as carrier-specific instructions when the current profile
+is an airfield cold start. In the thesis method, retrieval is therefore not a
+general document search facility. It is a controlled evidence channel whose
+scope is part of the procedure configuration.
 
 % ===========================================================================
 \section{Visual Fact Data Pipeline}\label{sec:method-vlm-pipeline}
 
-The visual fact data pipeline transforms raw DCS cockpit screenshots into
-structured visual fact extraction models through seven stages. Each stage
-produces versioned, inspectable artifacts, enabling full traceability from raw
-image to benchmark metric.
+The visual fact pipeline is the main methodology for RQ2. It turns DCS cockpit
+screenshots into supervised examples and then into a benchmarked visual fact
+extractor. The pipeline is designed for traceability: a benchmark error should
+be traceable back to the model prediction, the human-reviewed label, the
+pre-label, and the original image.
 
-Figure~\ref{fig:vlm-pipeline} shows the pipeline as a methodological loop:
-holdout benchmark failures inform ontology revision and later data collection
-rather than being treated only as final scores.
+Figure~\ref{fig:vlm-pipeline} shows the pipeline as a loop. Holdout failures
+are not only final results; they can reveal weaknesses in the ontology and
+guide later data collection.
 
 \begin{figure}[htbp]
   \centering
@@ -111,105 +111,90 @@ rather than being treated only as final scores.
 \end{figure}
 
 \begin{enumerate}
-\item \textbf{Screenshot capture.} DCS renders the three primary multifunction
-displays into a single composite-panel image. Captures are triggered at
-configurable intervals and stored alongside a sidecar manifest. The composite
-format keeps training, pre-labeling, evaluation, and runtime inference on the
-same input distribution.
+\item \textbf{Screenshot capture.} DCS renders the left DDI, AMPCD, and right
+DDI into one composite-panel image. The same composite layout is used for data
+collection, pre-labelling, training, benchmarking, and runtime inference. This
+keeps the input distribution stable across the method.
 
-\item \textbf{VLM pre-labeling.} A large VLM (Qwen 397B-class, accessed via
-OpenAI-compatible API) produces initial per-fact labels and evidence notes for
-each image. Pre-labeling seeds annotations at scale; human review corrects
-errors in the next stage.
+\item \textbf{VLM pre-labelling.} A large external VLM produces initial labels
+and evidence notes for each image. Pre-labelling is used as an annotation aid,
+not as ground truth.
 
-\item \textbf{Human review in Label Studio.} Pre-labeled samples are imported
-into Label Studio. Each task presents the composite image, predicted labels,
-and a summary field. The reviewer corrects mislabeled facts and provides
-evidence notes. All reviewed samples carry an audit trail linking back to the
-raw image, the original pre-label, and the reviewer's corrections.
+\item \textbf{Human review.} Pre-labelled samples are reviewed in Label
+Studio~\citep{tkachenko2020labelstudio}. The reviewer corrects fact states and
+evidence notes while preserving a link to the raw image and pre-label.
 
-\item \textbf{Reviewed JSONL export.} Label Studio exports corrected labels as
-a JSONL file---the authoritative ground-truth artifact for all downstream
-stages.
+\item \textbf{Reviewed JSONL export.} The reviewed export is the authoritative
+ground-truth artifact for downstream training and evaluation.
 
-\item \textbf{Bilingual SFT JSONL generation.} Each reviewed sample produces
-two training rows---one English, one Chinese---sharing the same image and fact
-labels but differing in instruction text. Each row is a three-message
-conversation: system message (JSON-only instruction), user message (image +
-fact definitions + decision boundaries), and assistant message (ground-truth
-JSON with \texttt{facts} array and \texttt{summary}). External metadata fields
-(\texttt{frame\_id}, \texttt{session\_id}) are excluded from the training
-target.
+\item \textbf{Bilingual SFT generation.} Each reviewed image yields an English
+and a Chinese training row with the same image and fact labels. The assistant
+target is structured JSON containing visual facts and a short summary; external
+management fields such as frame identifiers, file paths, and confidence fields
+are excluded from the target.
 
-\item \textbf{LoRA fine-tuning.} The SFT JSONL files are used to fine-tune a
-base VLM via Low-Rank Adaptation (LoRA) using Unsloth (4-bit loading, LoRA
-injection, vision batch collation), PEFT (adapter definition), and TRL
-\texttt{SFTTrainer} (supervised fine-tuning loop). Adapter weights are saved
-separately from the base model.
+\item \textbf{LoRA adaptation.} The SFT rows are used to train LoRA adapters
+for VLM backbones~\citep{hu2021lora}. The implementation uses PEFT adapter
+definitions~\citep{mangrulkar2022peft}, TRL supervised fine-tuning
+infrastructure~\citep{vonwerra2020trl}, and Unsloth acceleration for 4-bit VLM
+training~\citep{unsloth2024}.
 
-\item \textbf{Base-vs-LoRA benchmark.} The fine-tuned LoRA adapter is evaluated
-against the unadapted base model on independent holdout sets. The benchmark
-script loads each model configuration in 4-bit inference mode, sends each
-sample through the same prompt used during training, validates output against
-the expected JSON schema, and computes metrics comparing predictions to
-human-reviewed ground-truth labels.
+\item \textbf{Holdout benchmark and revision.} Base and LoRA configurations are
+evaluated on independent holdout sets. Errors are inspected at fact level,
+especially for completion-critical facts, and the resulting failure modes feed
+back into ontology and dataset revisions.
 \end{enumerate}
 
-A defining methodological property is end-to-end traceability: every benchmark
-prediction can be traced back through training data, human-reviewed labels,
-VLM pre-labels, and the original DCS screenshot. The pipeline produces
-versioned artifacts at each stage, enabling rigorous audit from individual
-fact misclassification to aggregate benchmark metrics.
+The method intentionally keeps the VLM's task narrow. The model is trained to
+report visual facts with states \texttt{seen}, \texttt{not\_seen}, or
+\texttt{uncertain}. It is not trained to decide procedure completion or produce
+tutor actions. Those decisions remain in the procedure engine and harness.
 
 % ===========================================================================
 \section{Dataset Curation}\label{sec:method-datasets}
 
 \subsection{Dataset Overview}
 
-The visual fact data pipeline produced six datasets over successive capture and
-review cycles. Table~\ref{tab:datasets} summarises each dataset.
+Six reviewed datasets support the visual fact work across two ontology
+generations. Table~\ref{tab:datasets} lists their roles and tracked counts.
 
 \begin{table}[htbp]
   \centering
-  \caption{Dataset inventory. All counts from \texttt{stats.json} files.}
+  \caption{Dataset inventory used for visual fact extraction.}
   \label{tab:datasets}
   \small
-  \begin{tabular}{@{}lcccccc@{}}
+  \begin{tabularx}{\textwidth}{@{}lXcccX@{}}
   \toprule
-  \textbf{Dataset} & \textbf{Role} & \textbf{Samples} & \textbf{Ontology} & \textbf{Reviewed} & \textbf{Languages} \\
+  \textbf{Run} & \textbf{Dataset} & \textbf{Samples} & \textbf{Facts} & \textbf{Lang.} & \textbf{Role} \\
   \midrule
-  Run-001 (\texttt{vision\_sft}) & Training source & 180 & 8-fact v1 & 180 & en, zh \\
-  Run-002 (\texttt{vision\_sft\_holdout\_run002}) & Holdout & 50 & 8-fact v1 & 50 & en \\
-  Run-002 newfacts & Holdout & 50 & 13-fact v2 & 50 & en \\
-  Run-003 (\texttt{vision\_sft\_run003}) & Training source & 220 & 13-fact v2 & 220 & en, zh \\
-  Run-004 (\texttt{vision\_sft\_holdout\_run004\_random}) & Holdout & 100 & 13-fact v2 & 100 & en \\
-  Run-005 (\texttt{composition\_rebalance}) & Training supplement & 122 & 13-fact v2 & 122 & en, zh \\
+  Run-001 & v1 SFT & 180 & 8 & en/zh & v1 training source \\
+  Run-002 & v1 holdout & 50 & 8 & en & v1 holdout \\
+  Run-002 & v2 newfacts holdout & 50 & 13 & en & v2 holdout \\
+  Run-003 & v2 SFT & 220 & 13 & en/zh & v2 training source \\
+  Run-004 & v2 random holdout & 100 & 13 & en & v2 holdout \\
+  Run-005 & composition rebalance & 122 & 13 & en/zh & v2 training supplement \\
   \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
-Run-003 and Run-005 contain samples where the human reviewer left the summary
-field blank (82 and 25 samples, respectively). These samples remain valid for
-training and evaluation because the facts array---the primary supervised
-target---is fully annotated for every fact in every sample.
+Run-003 and Run-005 contain samples whose free-text summary field is blank
+(82 and 25 samples respectively). These samples remain valid for the visual
+fact task because every sample still contains a complete fact array. The
+supervised target used by the runtime and benchmark is the structured fact
+state, not the optional summary.
 
 \subsection{Ontology Evolution: 8-Fact v1 to 13-Fact v2}
 
-The initial 8-fact v1 ontology defined eight facts spanning three display
-regions. Two structural weaknesses were identified during early benchmark
-analysis. First, it mixed abstraction levels: some facts described low-level
-visual observations (\texttt{fcs\_page\_visible}), while others encoded
-higher-level procedural judgements (\texttt{ins\_go}, representing an INS
-alignment completion signal rather than a directly observable visual feature).
-Second, several facts shared overlapping semantics:
-\texttt{right\_ddi\_fcsmc\_page\_visible} conflated region identifiers with
-fact semantics, and the compound \texttt{ins\_go} fact asked a single-frame VLM
-to make a procedural completion judgement that conflated perception with
-reasoning.
+The first ontology contained eight facts over the composite cockpit panel. It
+established that a small reviewed dataset could improve structured cockpit
+fact extraction, but it also exposed a representation problem: some targets
+mixed visual observation with procedural interpretation. The clearest case was
+\texttt{ins\_go}, which asked a single-frame VLM to infer an INS completion
+state rather than report directly visible evidence.
 
-Figure~\ref{fig:ontology-evolution} illustrates the central ontology change.
-Compound procedural targets were split into visual atoms, leaving temporal and
-procedural interpretation to the tutor runtime.
+Figure~\ref{fig:ontology-evolution} illustrates the methodological correction.
+Compound procedural targets were decomposed into locally observable visual
+atoms, leaving temporal and procedural interpretation to the tutor runtime.
 
 \begin{figure}[htbp]
   \centering
@@ -221,325 +206,233 @@ procedural interpretation to the tutor runtime.
   \label{fig:ontology-evolution}
 \end{figure}
 
-The 13-fact v2 ontology, used in Run-003 through Run-005 and in the current
-runtime, addressed these weaknesses through three strategies:
+The current 13-fact ontology follows three design rules:
 
 \begin{enumerate}
-\item \textbf{Decomposition of compound targets.} The ambiguous
-\texttt{ins\_go} was decomposed into two lower-level, directly observable
-facts: \texttt{ins\_grnd\_alignment\_text\_visible} (requiring literal GRND
-alignment block text) and \texttt{ins\_ok\_text\_visible} (requiring clearly
-readable OK text near the alignment block). The FCS-MC state sequence was
-decomposed from a single \texttt{fcs\_bit\_result\_visible} into a four-state
-chain (\texttt{fcsmc\_page\_visible},
-\texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible},
-\texttt{fcsmc\_final\_go\_result\_visible}).
+\item \textbf{Decompose compound targets.} The \texttt{ins\_go} target is
+replaced by separate visual atoms for GRND alignment text and INS OK text. The
+FCS-MC sequence is represented by page, intermediate-result, in-test, and
+final-GO facts.
 
-\item \textbf{Region-independent naming.} Region identifiers were removed from
-fact names (\texttt{right\_ddi\_fcsmc\_page\_visible} became
-\texttt{fcsmc\_page\_visible}); page-visibility facts were added for TAC and
-SUPT menus to cover the left DDI; HSI-related facts were split into
-\texttt{hsi\_page\_visible} and \texttt{hsi\_map\_layer\_visible}.
+\item \textbf{Separate region from semantics.} Fact names describe the visible
+state rather than encoding the display region in the identifier. Region
+constraints are part of the ontology metadata.
 
-\item \textbf{Abstraction-level discipline.} Every v2 fact is a locally
-verifiable visual proposition evaluable from a single cockpit image without
-procedural context. The downstream procedure engine---not the VLM---combines
-atomic observations into procedural judgements using telemetry, phase, and
-timing information.
+\item \textbf{Keep facts locally observable.} Each fact should be decidable from
+the composite image without requiring procedure history. The procedure engine
+combines facts with telemetry, step bindings, and timing information later.
 \end{enumerate}
+
+This ontology discipline is central to the thesis. It defines the boundary
+between perception and procedural reasoning: the VLM reports visual evidence,
+while the runtime decides whether that evidence satisfies a procedural step.
 
 \subsection{Training Recipe: Run-003 + Run-005$\times$2}
 
-The primary training recipe combines Run-003 (220 reviewed samples, bilingual
-export: 220 EN + 220 ZH = 440 rows) with Run-005 composition rebalance data
-included twice (122 reviewed samples, bilingual export: $122 \times 2 \times 2
-= 488$ rows), yielding a combined training set of \textbf{928 rows}.
+The primary v2 training recipe combines Run-003 with a repeated Run-005
+composition-rebalance supplement. Run-003 contributes 220 reviewed images,
+exported bilingually as 440 SFT rows. Run-005 contributes 122 reviewed images,
+exported bilingually as 244 rows; this supplement is included twice, yielding
+488 rows. The final recipe therefore contains \textbf{928 SFT rows}.
 
-Run-005 was captured specifically to address class imbalance in Run-003, where
-several critical facts had extremely low \texttt{seen} counts:
-\texttt{ins\_ok\_text\_visible} (12 of 220), \texttt{fcs\_page\_x\_marks\_visible}
-(16), and the three FCS-MC sub-states (18 each). Run-005 targeted cockpit
-states in which these rare facts are \texttt{seen}; double-counting
-(Run-005$\times$2) further amplifies their representation. No internal
-evaluation split was used (\texttt{eval\_rows = 0}); all evaluation is
-performed on independent holdout datasets.
+Run-005 targets under-represented positive states from Run-003, including INS
+OK text, FCS page X marks, and FCS-MC sub-state facts. The repeated supplement
+is a deliberate composition rebalance strategy, not an independent validation
+set. For that reason, generalisation claims are based on external holdouts
+rather than on an internal same-pool evaluation split.
 
 \subsection{Holdout Independence}
 
-Two holdout sets were constructed for the 13-fact v2 evaluation: Run-002
-newfacts (50 samples, re-annotated from the Run-002 capture session) and
-Run-004 random (100 samples, uniformly random cockpit state sampling). Both
-are distinct DCS capture sessions with verified zero exact overlap with any
-training data---the overlap check compared image artifact paths and sample
-identifiers across training and holdout splits.
+Two 13-fact v2 holdouts are used for the main evaluation. Run-002 newfacts
+contains 50 images from an earlier capture session re-labelled under the
+13-fact ontology. Run-004 random contains 100 randomly sampled cockpit-state
+captures. Local overlap checks report zero exact overlap between either holdout
+and the Run-003 + Run-005 training union.
 
-In contrast, the Run-001 benchmark used in early 8-fact v1 experiments is a
-\textbf{contaminated development set}: the evaluation data pool overlaps with
-the training data pool. Run-001 results are reported for regression analysis
-only (see Appendix~\ref{ch:appendix}) and are explicitly distinguished from
-independent holdout results.
+The earlier Run-001 evaluation line is treated differently. Because it overlaps
+with the training data pool, it is useful as a contaminated development
+benchmark for checking schema learning and historical ontology behaviour, but
+it is not used as independent evidence for v2 generalisation.
 
 % ===========================================================================
 \section{LoRA Fine-Tuning Configuration}\label{sec:method-lora-config}
 
 \subsection{Backbone Models and Comparison Strategy}
 
-Three VLM backbones were fine-tuned under the matched Run-003 + Run-005$\times$2
-data recipe (928 bilingual rows, 13-fact v2 ontology), organised in three
-comparison tiers:
+The primary adaptation line uses \texttt{Qwen/Qwen3.5-9B-Base} with the
+Run-003 + Run-005$\times$2 recipe. Two supplementary backbones are included to
+test whether the same data recipe remains meaningful under scale, version, and
+family changes: \texttt{Qwen/Qwen3.6-27B} and \texttt{google/gemma-4-31B}.
+These comparisons are methodological controls rather than separate thesis
+claims. Chapter~\ref{ch:evaluation} reports the numerical results.
 
-\begin{description}
-\item[Primary --- Qwen3.5-9B.] A 9-billion-parameter VLM
-(\texttt{Qwen/Qwen3.5-9B-Base}). This is the primary experimental backbone,
-selected for its balance of capability and training efficiency. LoRA adapters
-are applied to both vision and language layers.
-
-\item[Scale/version comparison --- Qwen3.6-27B.] A 27-billion-parameter VLM
-from the same model family (\texttt{Qwen/Qwen3.6-27B}). This comparison
-examines the combined scale/version effect within the Qwen family under
-a matched data recipe and holdout protocol. The base model achieves
-substantially higher base-model performance (fact accuracy 0.91 on Run-002
-newfacts, vs.\ 0.87 for Qwen3.5-9B), but the LoRA improvement margin is
-narrower (fact accuracy $\Delta = +0.077$ vs.\ +0.123 for Qwen3.5-9B),
-consistent with the expectation that larger base models have less adaptation
-headroom under small-data fine-tuning.
-
-\item[Cross-family --- Gemma-4-31B.] A 31-billion-parameter VLM from Google
-DeepMind (\texttt{google/gemma-4-31B}). This comparison tests whether the data
-recipe generalises across model families. LoRA is restricted to language-only
-linear modules (\texttt{all-linear}; vision layers are not fine-tuned).
-\end{description}
+The comparison holds the main factors constant wherever possible: ontology,
+training recipe, benchmark prompt, holdout sets, generation temperature, output
+schema, and metric computation. Backbone-specific differences remain and are
+therefore reported explicitly. Qwen-family runs apply LoRA to vision and
+language modules; the Gemma run uses an all-linear LoRA configuration with
+vision layers not separately fine-tuned. Full settings appear in
+Appendix~\ref{ch:appendix}, Table~\ref{tab:lora-hyperparams-full}.
 
 \subsection{Training Stack and Hyperparameters}
 
-All three backbones share the same training stack: Unsloth (4-bit model
-loading, LoRA injection, vision batch collation), PEFT (LoRA adapter
-definition), and TRL \texttt{SFTTrainer} (supervised fine-tuning loop).
-Hyperparameters are matched wherever architecturally possible: learning rate
-$2 \times 10^{-4}$, LoRA rank $r=16$, $\alpha=16$, dropout $=0.0$, 4 epochs,
-effective batch size 4 (batch size 1 $\times$ gradient accumulation 4), maximum
-sequence length 4096, seed 3407, warmup ratio 0.1, weight decay 0.01.
-Backbone-specific differences---LoRA target modules, vision layer fine-tuning,
-chat template, and GPU memory utilisation---are documented in
-Appendix~\ref{ch:appendix}, Table~\ref{tab:lora-hyperparams-full}.
+All backbone runs use 4-bit loading, LoRA rank $r=16$, $\alpha=16$, dropout
+$0.0$, four epochs, learning rate $2 \times 10^{-4}$, effective batch size 4,
+maximum sequence length 4096, seed 3407, warmup ratio 0.1, and weight decay
+0.01. Adapter weights are saved separately from the base model.
 
-The epoch count of 4 was selected as a compromise for small-data domain
-adaptation: with 928 training examples, fewer epochs may not reliably teach
-the fixed JSON schema and cockpit fact boundaries, while more epochs risk
-overfitting to the training sessions. LoRA rank $r=16$ provides moderate
-adaptation capacity---sufficient for cockpit layout patterns and JSON
-formatting without the overfitting risk of high-capacity adapters ($r \geq
-64$). Dropout was set to zero for these first adaptation experiments,
-prioritising learnability over regularisation.
+The epoch count and LoRA rank are chosen for small-data domain adaptation.
+With 928 SFT rows, the adapter must learn both the fixed JSON schema and the
+visual boundaries of cockpit facts. A very small number of epochs may not teach
+those boundaries reliably, while excessive training would risk memorising the
+capture sessions. Rank 16 provides moderate adaptation capacity without turning
+the adapter into a high-capacity task-specific model.
 
 \subsection{Bilingual SFT and Composition Rebalance}
 
-The bilingual SFT strategy produces two training rows per reviewed sample
-(English and Chinese instructions, identical image and ground-truth labels).
-This increases instruction-following robustness without additional annotation
-effort, but does not substitute for additional cockpit-state screenshots or
-hard-negative visual data.
+The bilingual SFT strategy creates two instruction variants per reviewed image:
+one English and one Chinese. The image and fact labels remain identical. This
+increases instruction-format coverage without requiring additional image
+annotation. It does not replace the need for new cockpit states or hard
+negative examples.
 
-The composition rebalance strategy (Run-005) addresses the class imbalance
-observed in Run-003. Several critical facts had extremely low positive counts:
-\texttt{ins\_ok\_text\_visible} (12 of 220, 5.5\%),
-\texttt{fcs\_page\_x\_marks\_visible} (16, 7.3\%), and the three FCS-MC
-sub-states (18 each, 8.2\%). Run-005 captured 122 additional samples targeting
-cockpit states where these rare facts are \texttt{seen}, improving combined
-coverage substantially (e.g., \texttt{supt\_page\_visible} from 20 to 54
-combined seen; \texttt{hsi\_page\_visible} from 106 to 215; \texttt{ins\_grnd\_alignment\_text\_visible}
-from 58 to 130). Double-counting Run-005 in the recipe further amplifies the
-signal.
+Composition rebalance is handled through Run-005. Because rare positive facts
+are especially important for downstream procedure reasoning, the training
+recipe increases their exposure by adding targeted captures and repeating the
+Run-005 bilingual rows. The method therefore separates two questions: whether
+the adapter can learn the ontology from the rebalanced training recipe, and
+whether the learned extractor generalises to independent holdouts.
 
 % ===========================================================================
 \section{Benchmark Protocol}\label{sec:method-benchmark}
 
 \subsection{Metrics}
 
-The benchmark compares model predictions against human-reviewed ground-truth
-labels using the following metrics:
+The benchmark compares model predictions against human-reviewed ground truth at
+both sample and fact level. The metrics are selected to reflect downstream
+runtime risk:
 
-\begin{description}
-\item[\texttt{json\_valid\_rate}] Proportion of samples with parseable JSON
-output. Non-JSON responses (markdown, commentary, malformed braces) count as
-failures.
-\item[\texttt{schema\_valid\_rate}] Proportion of samples whose parsed JSON
-conforms to the expected schema (correct keys, all 13 fact IDs present exactly
-once, all states in \texttt{\{seen, not\_seen, uncertain\}}).
-\item[\texttt{fact\_accuracy}] Three-class accuracy over all facts in all
-samples.
-\item[\texttt{macro\_f1}] Macro-averaged F1 across three states, per fact,
-averaged over 13 facts.
-\item[\texttt{seen\_f1}] F1 for the positive \texttt{seen} class, per fact,
-averaged over 13 facts. This is a key metric because missing or hallucinating a
-\texttt{seen} state directly affects downstream procedure-state reasoning.
-\item[\texttt{sample\_exact\_match}] Proportion of samples where all 13 facts
-match ground truth exactly.
-\item[\texttt{critical\_false\_positive\_count}] Count of errors where any of 6
-critical facts (\texttt{fcs\_page\_x\_marks\_visible},
-\texttt{fcsmc\_intermediate\_result\_visible}, \texttt{fcsmc\_in\_test\_visible},
-\texttt{fcsmc\_final\_go\_result\_visible},
-\texttt{ins\_grnd\_alignment\_text\_visible}, \texttt{ins\_ok\_text\_visible})
-is predicted \texttt{seen} when ground truth is \texttt{not\_seen} or
-\texttt{uncertain}. These are tracked separately because they represent the
-most consequential error type: incorrectly reporting a completion-critical
-state as observed could cause the tutoring system to prematurely advance the
-procedure.
-\end{description}
+\begin{itemize}
+\item \texttt{json\_valid\_rate}: proportion of samples with parseable JSON
+output.
+\item \texttt{schema\_valid\_rate}: proportion of samples whose JSON contains
+the required fact identifiers exactly once and uses only valid states.
+\item \texttt{fact\_accuracy}: three-class accuracy over all facts and samples.
+\item \texttt{macro\_f1}: macro-averaged F1 over the three states, averaged
+over facts.
+\item \texttt{seen\_f1}: F1 for the positive \texttt{seen} class, averaged over
+facts. This matters because missed or hallucinated visible states change
+procedure evidence.
+\item \texttt{sample\_exact\_match}: proportion of samples where all 13 facts
+match the reviewed labels.
+\item \texttt{critical\_false\_positive\_count}: count of completion-critical
+facts predicted \texttt{seen} when the reviewed label is \texttt{not\_seen} or
+\texttt{uncertain}.
+\end{itemize}
+
+Critical false positives are tracked separately because they are the most
+dangerous visual error for the tutor. A false positive on a completion-critical
+fact could make the procedure engine believe that a display state has been
+observed when it has not.
 
 \subsection{Base vs.\ LoRA Comparison}
 
-Both configurations receive identical prompts, images, and generation
-parameters: temperature = 0.0 (greedy decoding), \texttt{max\_new\_tokens} =
-1024, seed = 3407. The benchmark runs each sample independently, serialises
-predictions to JSONL, and computes metrics without post-hoc filtering. A
-comparison artifact (\texttt{comparison.json}) computes delta metrics
-(LoRA $-$ Base) and an automated recommendation flag.
+Base and LoRA configurations receive the same prompt, images, generation
+parameters, and output schema. Decoding uses temperature 0.0, maximum new tokens
+1024, and seed 3407. Predictions are written to JSONL, parsed, normalised, and
+scored without post-hoc filtering. The comparison artifact reports LoRA-minus-
+base deltas, while Chapter~\ref{ch:evaluation} interprets those deltas.
 
 \subsection{Benchmark Categories}
 
-Each benchmark run is assigned a \texttt{benchmark\_kind}:
-\texttt{contaminated\_dev\_set} (evaluation data overlaps with training data
-pool; used for Run-001 regression only) or \texttt{heldout\_new\_session}
-(independent capture session with zero training overlap; used for Run-002
-newfacts and Run-004 random). This distinction is maintained rigorously
-throughout the benchmark infrastructure and evaluation chapter.
+Benchmark runs are classified by evidence status. Contaminated development sets
+come from the same data pool as training and are used only for regression and
+historical interpretation. Held-out new-session benchmarks use independent
+captures with zero exact training overlap. This distinction determines the
+strength of the claim that can be made from a metric.
 
 \subsection{Benchmark Artifacts}
 
-Each benchmark run produces a standardised directory: top-level summary with
-comparison deltas, per-model metric dictionaries with per-fact scores and
-confusion matrices, per-sample prediction and error JSONL files, a CSV table
-of per-fact per-model metrics, a human-readable markdown summary, and
-automatically generated charts (overall accuracy, per-fact macro F1, per-fact
-seen F1, critical false positives, and per-fact confusion matrices for both
-base and LoRA models). These artifacts constitute the full evidence chain for
-the technical results reported in Chapter~\ref{ch:evaluation}.
+Each benchmark run produces a standard directory with metrics for each model,
+per-sample predictions, error JSONL files, per-fact score CSVs, comparison
+summaries, human-readable reports, and charts. These artifacts form the
+evidence chain for the technical results reported in Chapter~\ref{ch:evaluation}.
 
 % ===========================================================================
 \section{Human-Subject Pilot Methodology}\label{sec:method-pilot}
 
 A small formative VR pilot study was conducted to gather descriptive evidence
-on how the tutoring system supports learners during the F/A-18C cold-start
-procedure compared with unaided practice. The pilot was designed as a
-preliminary field trial rather than a powered controlled experiment.
+about the tutor in use during the F/A-18C cold-start task. The pilot was not a
+powered controlled experiment. Its purpose was to exercise the runtime in a
+realistic VR setting, inspect interaction logs, and identify procedural error
+patterns for later study design.
 
 \subsection{Participants and Conditions}
 
-Nine participants (P01--P09) were recruited from a convenience sample of DCS
-users with varied experience levels. Each participant completed one trial in a
-between-subjects design with two conditions:
+Nine participants (P01--P09) completed one trial each. The study used a
+between-subjects design with non-random assignment based on scheduling
+availability:
 
 \begin{description}
-\item[With-tutor (n=4).] P04, P05, P08, P09. Participants received the full
-telemetry-grounded tutoring system with overlay highlights, VLM visual fact
-extraction, and structured help text displayed in the DCS in-game text area.
-Help was triggered via hotkey.
-\item[Without-tutor (n=5).] P01, P02, P03, P06, P07. Participants received no
-tutor assistance. Telemetry was recorded passively for later step inference
-and error coding, but no overlays or help text were shown.
+\item[With tutor (n=4).] P04, P05, P08, and P09 received overlay highlights,
+structured help text, telemetry-grounded step inference, and VLM visual fact
+support where applicable.
+\item[Without tutor (n=5).] P01, P02, P03, P06, and P07 received no tutor
+assistance. Telemetry was still recorded for offline step inference and error
+coding.
 \end{description}
 
-Assignment to conditions was not randomised; participants were assigned based
-on scheduling availability. Prior DCS and VR experience varied across
-participants (see Appendix~\ref{ch:appendix}, Table~\ref{tab:pilot-participants}).
+Participant experience profiles are reported in Appendix~\ref{ch:appendix},
+Table~\ref{tab:pilot-participants}. Because assignment was not randomised and
+the sample is small, condition comparisons are descriptive only.
 
 \subsection{Task and Apparatus}
 
-All trials used the F/A-18C cold-start procedure with the full 33-step pack
-(S01--S33) in DCS World on a Meta Quest~3 via Quest Link. The composite-panel
-layout (left DDI, AMPCD, right DDI) was rendered on an external monitor for
-experimenter observation. The tutoring runtime ran on a Windows PC with remote
-model inference via an OpenAI-compatible endpoint. Each trial ended when the
-participant either completed the procedure (confirmed by terminal step
-completion or tutor declaration) or stopped voluntarily after being unable to
-progress.
+All trials used the 33-step F/A-18C cold-start procedure in DCS World on a Meta
+Quest~3 via Quest Link. The composite cockpit panel was mirrored for
+experimenter observation. Tutor-condition trials used the live runtime with
+remote model inference through an OpenAI-compatible endpoint. A trial ended
+when the participant completed the procedure or voluntarily stopped after being
+unable to progress.
 
-\subsection{Data Sources and Export Pipeline}
+\subsection{Data Sources and Coding}
 
-For each trial, the experiment export pipeline produced a standardised set of
-artifacts:
-
-\begin{itemize}
-\item \texttt{trial\_summary.csv}: per-trial aggregate metrics (completion
-status, observed duration, help requests, LLM triggers, VLM calls, overlay
-executed/rejected, fallback count, step completion counts).
-\item \texttt{step\_coding.csv}: per-step coding with auto-coded errors
-(OM/CO/OR/PA/SV), evidence references, auto-confidence, and human review
-fields.
-\item \texttt{help\_cycles.csv}: per-help-cycle detail (generation mode,
-vision status, VLM call status, overlay targets, fallback reason) for
-tutor-condition trials.
-\item \texttt{action\_timeline.csv}: timestamped telemetry actions with fused
-step inference.
-\item \texttt{quality\_gate.json}: configuration hash verification, event
-count, and metadata completeness check.
-\item \texttt{session.json} / \texttt{summary.json}: per-trial session
-metadata and interaction summary.
-\end{itemize}
-
-\subsection{Error Taxonomy and Coding Policy}
-
-All steps were coded under a five-category error taxonomy: \textbf{OM}
-(omission --- step not completed), \textbf{CO} (commission --- step executed
-incorrectly or out of order), \textbf{OR} (order error), \textbf{PA}
-(prompting/assistance error --- step completed only after tutor intervention
-or with incorrect tutor guidance), and \textbf{SV} (state violation).
-
-The automated coding pipeline produced initial error labels (Auto\_Error\_*
-columns), which were then reviewed and corrected by a human coder
-(CodexTelemetryReview) using raw telemetry, help-cycle logs, and action
-timeline evidence. Human-coded columns (Error\_OM through Error\_SV) are the
-authoritative data source for all reported results.
+The export pipeline produced per-trial summaries, per-step coding files,
+help-cycle logs for tutor trials, action timelines, quality-gate metadata, and
+session summaries. Step errors were coded with five categories: omission (OM),
+commission (CO), order error (OR), prompting/assistance error (PA), and state
+violation (SV). The automated coding output was reviewed manually using
+telemetry, help-cycle logs, and action timelines; the human-coded columns are
+the authoritative source for reported pilot results.
 
 \subsection{Data-Quality Notes}
 
-Two trials require explicit data-quality documentation:
-
-\paragraph{P08 --- auto-summary override.}
-The automated trial summary reported P08 as incomplete (Completed=no,
-TotalStepsCompleted=5/33). However, manual telemetry review confirmed that all
-33 steps reached their required states. The auto-pipeline failed because it
-required explicit step evidence and gate completion signals that the passive
-visual inference path could not reconstruct for several vision-priority steps.
-Following the coding policy, manual coding overrides the auto-summary; P08 is
-reported as completed (33/33 steps) with zero manual errors. The pre-review
-coding file (\texttt{step\_coding.before\_codex\_log\_review.csv}) is preserved
-for audit in the experiment artifacts.
-
-\paragraph{P02 --- questionnaire metadata unresolved.}
-P02's trial directory contains a questionnaire JSON file with internal
-participant\_id = P01, indicating a file mislabelling during export. P02's
-task metrics (steps completed, errors) are derived from
-\texttt{trial\_summary.csv} and \texttt{step\_coding.csv} and are usable. P02
-is excluded from any workload, TLX, or confidence summaries because the
-questionnaire data cannot be confidently attributed.
+Two trial-level caveats affect interpretation. First, P08's automatic summary
+reported incomplete progress, but manual telemetry review confirmed completion
+of all 33 steps. The manual coding is used for analysis, and the pre-review
+file is preserved for audit. Second, P02's questionnaire metadata contains an
+internal participant-id mismatch. P02's task metrics are retained, but P02 is
+excluded from questionnaire-derived workload or confidence summaries.
 
 \subsection{Analysis Approach}
 
-Given the small sample ($n=9$) and non-random assignment, the analysis is
-strictly descriptive. No null-hypothesis significance tests are performed.
-Results are reported as per-participant counts and condition-level summaries.
-Observed trial durations are reported but cannot be interpreted as completion
-time comparisons because without-tutor trials were stopped at different points
-by participants who could not progress further. The analysis focuses on three
-descriptive questions: (1) whether participants completed the procedure,
-(2) what categories of procedural error occurred and how they differed between
-conditions, and (3) how tutor interaction was used (help requests, VLM calls,
-overlay actions, fallback events).
+The pilot analysis reports per-participant outcomes and condition-level
+descriptive summaries. No null-hypothesis significance tests are performed.
+Observed durations are documented but not interpreted as completion-time
+comparisons because incomplete without-tutor trials ended at different stopping
+points. The analysis focuses on completion status, manual error categories, and
+tutor interaction patterns such as help requests, VLM calls, overlay actions,
+and fallback events.
 
 % ===========================================================================
 \section{Summary}\label{sec:method-summary}
 
-The methodology is characterised by four properties. First, \emph{end-to-end
-traceability}: every benchmark metric can be traced through training data,
-human-reviewed labels, and original DCS screenshots. Second, \emph{strict
-holdout independence}: contaminated development benchmarks and independent
-holdout benchmarks are explicitly distinguished and interpreted differently.
-Third, \emph{matched comparison design}: the identical data recipe, benchmark
-protocol, and evaluation sets are applied across three backbones
-(Qwen3.5-9B, Qwen3.6-27B, Gemma-4-31B), enabling controlled comparison of
-model scale, version, and family effects while holding data and evaluation
-constant. Fourth, \emph{descriptive pilot analysis}: the human-subject pilot
-is analysed descriptively with explicit data-quality documentation and no
-inferential statistical claims.
+The methodology establishes the evidence chain used by the rest of the thesis.
+Telemetry and retrieval provide controlled runtime context. The visual fact
+pipeline produces a reviewed and benchmarked perception layer for RQ2. The
+13-fact ontology separates perception from procedural reasoning. The LoRA
+protocol uses matched data and holdouts to evaluate small-data adaptation
+without relying on contaminated development sets. The pilot protocol provides
+formative VR evidence for RQ3 while keeping its claims descriptive. Together,
+these methods make the later results auditable without overstating what the
+available evidence can prove.
