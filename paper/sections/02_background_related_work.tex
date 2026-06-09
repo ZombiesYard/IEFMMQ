@@ -174,7 +174,7 @@ one of three states:
     otherwise insufficient for a confident determination.
 \end{description}
 
-These facts are consumed downstream by the procedure engine (§\ref{sec:methods-architecture}),
+These facts are consumed downstream by the procedure engine (§\ref{sec:design-procedure}),
 which combines them with telemetry state, gating rules, and knowledge retrieval
 to decide whether a procedure step is visually confirmed, still pending, or
 blocked. This layered architecture isolates the VLM's responsibility to
@@ -388,7 +388,7 @@ methods, particularly Low-Rank Adaptation (LoRA), have made it feasible to adapt
 large pre-trained models to narrow domains with modest computational resources
 and small curated datasets~\citep{hu2021lora,mangrulkar2022peft,bai2023qwen,liu2023llava,dai2023instructblip}.
 
-The VLM adaptation pipeline in this thesis (§\ref{sec:methods-vlm}) follows a
+The VLM adaptation pipeline in this thesis (§\ref{sec:method-vlm-pipeline}) follows a
 capture-prelabel-review-train-benchmark loop that is notable for its use of
 human-reviewed small data (hundreds of images, not tens of thousands) to drive
 meaningful improvements in structured extraction accuracy. This contrasts with

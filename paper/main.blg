@@ -15,19 +15,3 @@ A level-1 auxiliary file: sections/08_conclusion.aux
 The style file: plainnat.bst
 A level-1 auxiliary file: sections/09_appendix.aux
 Database file #1: references.bib
-You're missing a field name---line 149 of file references.bib
- :   
- :   % TODO:VERIFY — exact initial release year; DCS World platform launched circa 2013
-(Error may have been on previous line)
-I'm skipping whatever remains of this entry
-You're missing a field name---line 169 of file references.bib
- : 
- : %    title   = {},
-(Error may have been on previous line)
-I'm skipping whatever remains of this entry
-You're missing a field name---line 180 of file references.bib
- : 
- : %    title     = {},
-(Error may have been on previous line)
-I'm skipping whatever remains of this entry
-(There were 3 error messages)
