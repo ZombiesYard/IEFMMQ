@@ -1,0 +1,82 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 606 428] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 3885 >>
+stream
+BT /F1 14.5 Tf 0.067 0.094 0.153 rg 18.0 404.0 Td (Harness and evidence validation) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 36.0 309.2 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 61.5 341.9 Td (EvidencePacket) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 53.9 330.4 Td (telemetry, gates,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 43.7 318.8 Td (vision facts, actions) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 36.0 201.2 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 51.3 233.9 Td (StepCandidate list) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 48.8 222.4 Td (ranked alternatives) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 51.3 210.8 Td (with evidence refs) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 36.0 93.2 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 59.0 125.9 Td (StepHarnessSpec) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 56.4 114.4 Td (allowed targets,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 61.5 102.8 Td (required facts) Tj ET
+q 0.859 0.918 0.996 rg 0.114 0.306 0.847 RG 1.2 w 237.6 291.2 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 260.6 318.2 Td (HarnessDecision) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 245.3 306.6 Td (LLM structured output) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 237.6 183.2 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 258.0 215.9 Td (Validation gates) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 268.2 204.4 Td (JSON Schema,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 250.4 192.8 Td (allowlist, evidence) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 237.6 75.2 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 247.8 107.9 Td (State-action planner) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 250.4 96.4 Td (repair or text-only) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 278.4 84.8 Td (fallback) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 439.2 251.6 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 457.1 284.3 Td (HarnessActionPlan) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 457.1 272.8 Td (accepted targets,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 462.2 261.2 Td (guidance, trace) Tj ET
+q 0.996 0.886 0.886 rg 0.725 0.110 0.110 RG 1.2 w 439.2 125.6 122.4 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 464.7 158.3 Td (Safe rejection) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 457.1 146.8 Td (no unsafe overlay) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 452.0 135.2 Td (when evidence fails) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  158.4 334.4 m 237.6 316.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 237.6 316.4 m 230.0 314.0 l 231.7 321.8 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  158.4 226.4 m 237.6 316.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 237.6 316.4 m 236.0 308.6 l 230.0 313.8 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  158.4 118.4 m 237.6 208.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 237.6 208.4 m 236.0 200.6 l 230.0 205.8 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  298.8 291.2 m 298.8 233.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 298.8 233.6 m 294.8 240.5 l 302.8 240.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  298.8 183.2 m 298.8 125.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 298.8 125.6 m 294.8 132.5 l 302.8 132.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  360.0 100.4 m 439.2 276.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 439.2 276.8 m 440.0 268.8 l 432.7 272.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [5 4] 0 d  360.0 208.4 m 439.2 150.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 439.2 150.8 m 431.2 151.6 l 435.9 158.1 l h f Q
+BT /F1 8.2 Tf 0.216 0.255 0.318 rg 364.5 183.6 Td (failed checks) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [5 4] 0 d  500.4 176.0 m 500.4 251.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 500.4 251.6 m 504.4 244.7 l 496.4 244.7 l h f Q
+BT /F1 8.2 Tf 0.216 0.255 0.318 rg 476.1 217.8 Td (text-only) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+4254
+%%EOF

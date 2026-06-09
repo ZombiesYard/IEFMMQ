@@ -1,0 +1,88 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 606 428] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 4419 >>
+stream
+BT /F1 14.5 Tf 0.067 0.094 0.153 rg 18.0 404.0 Td (Detailed experiment export pipeline) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 25.2 320.0 108.0 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 30.8 343.4 Td (Raw JSONL event log) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 33.3 331.8 Td (one file per trial) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 25.2 233.6 108.0 43.2 re B Q
+BT /F1 8.0 Tf 0.067 0.094 0.153 rg 45.9 261.4 Td (Session metadata) Tj ET
+BT /F1 8.0 Tf 0.067 0.094 0.153 rg 31.4 251.9 Td (participant, condition,) Tj ET
+BT /F1 8.0 Tf 0.067 0.094 0.153 rg 48.0 242.5 Td (study id, model) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 25.2 147.2 108.0 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 35.9 176.3 Td (Pack and taxonomy) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 43.5 164.8 Td (steps, UI map,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 51.2 153.2 Td (error codes) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 205.2 248.0 136.8 57.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 230.3 284.3 Td (experiment-export) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 217.5 272.8 Td (freezes one trial into) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 220.1 261.2 Td (study-ready artifacts) Tj ET
+q 0.953 0.910 1.000 rg 0.494 0.133 0.808 RG 1.2 w 205.2 147.2 136.8 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 243.0 176.3 Td (Quality gate) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 232.8 164.8 Td (completeness and) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 235.4 153.2 Td (metadata checks) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 414.0 327.2 151.2 39.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 446.3 343.0 Td (trial_summary.csv) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 414.0 276.8 151.2 39.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 451.4 292.6 Td (step_coding.csv) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 414.0 226.4 151.2 39.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 451.4 242.2 Td (help_cycles.csv) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 414.0 176.0 151.2 39.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 441.2 191.8 Td (action_timeline.csv) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 414.0 96.8 151.2 46.8 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 443.7 127.7 Td (experiment-analyze) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 438.6 116.2 Td (condition summaries,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 420.8 104.6 Td (step accuracy, help quality) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  133.2 341.6 m 205.2 276.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 205.2 276.8 m 197.4 278.5 l 202.7 284.4 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  133.2 255.2 m 205.2 276.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 205.2 276.8 m 199.7 271.0 l 197.4 278.6 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  133.2 168.8 m 205.2 276.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 205.2 276.8 m 204.7 268.8 l 198.0 273.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  273.6 190.4 m 273.6 248.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 273.6 248.0 m 277.6 241.1 l 269.6 241.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  342.0 276.8 m 414.0 347.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 347.0 m 411.8 339.3 l 406.2 345.0 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  342.0 276.8 m 414.0 296.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 296.6 m 408.4 290.9 l 406.3 298.6 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  342.0 276.8 m 414.0 246.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 246.2 m 406.1 245.2 l 409.2 252.6 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  342.0 276.8 m 414.0 195.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 195.8 m 406.4 198.3 l 412.4 203.6 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  489.6 327.2 m 489.6 143.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 489.6 143.6 m 485.6 150.5 l 493.6 150.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  489.6 276.8 m 489.6 143.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 489.6 143.6 m 485.6 150.5 l 493.6 150.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  489.6 226.4 m 489.6 143.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 489.6 143.6 m 485.6 150.5 l 493.6 150.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  489.6 176.0 m 489.6 143.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 489.6 143.6 m 485.6 150.5 l 493.6 150.5 l h f Q
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+4788
+%%EOF

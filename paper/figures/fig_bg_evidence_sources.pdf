@@ -1,0 +1,100 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 606 428] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 5366 >>
+stream
+BT /F1 14.5 Tf 0.067 0.094 0.153 rg 18.0 404.0 Td (F/A-18C cold-start evidence sources) Tj ET
+q 0.898 0.906 0.922 rg 0.420 0.447 0.502 RG 1.2 w 21.6 335.8 100.8 41.8 re B Q
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 27.5 364.0 Td (33-step cold-start) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 39.9 352.8 Td (ordered P1-P6) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 49.8 341.6 Td (procedure) Tj ET
+q 0.929 0.914 0.996 rg 0.427 0.157 0.851 RG 1.2 w 151.2 325.8 122.4 59.0 re B Q
+BT /F1 9.2 Tf 0.067 0.094 0.153 rg 157.4 367.8 Td (Telemetry-visible steps) Tj ET
+BT /F1 9.2 Tf 0.067 0.094 0.153 rg 169.3 356.9 Td (DCS-BIOS variables) Tj ET
+BT /F1 9.2 Tf 0.067 0.094 0.153 rg 169.3 346.1 Td (S01, S03-S13, S16,) Tj ET
+BT /F1 9.2 Tf 0.067 0.094 0.153 rg 195.7 335.2 Td (S20-S33) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 309.6 325.8 122.4 59.0 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 317.3 362.8 Td (Vision-priority steps) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 317.3 351.3 Td (composite panel + VLM) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 324.9 339.7 Td (S08, S15, S18, S19) Tj ET
+q 0.996 0.886 0.886 rg 0.725 0.110 0.110 RG 1.2 w 468.0 325.8 108.0 59.0 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 481.2 368.6 Td (Manual / out-of-) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 506.7 357.0 Td (layout) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 473.6 345.5 Td (expert confirmation) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 501.6 333.9 Td (S14, S17) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 151.2 245.1 122.4 46.1 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 174.2 275.7 Td (DCS-BIOS stream) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 169.1 264.1 Td (switches, gauges,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 176.7 252.6 Td (warning lights) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 309.6 245.1 122.4 46.1 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 317.3 275.7 Td (Composite panel image) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 330.0 264.1 Td (left DDI, AMPCD,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 347.9 252.6 Td (right DDI) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 468.0 245.1 108.0 46.1 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 476.1 275.7 Td (Operator judgement) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 481.2 264.1 Td (outside captured) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 509.3 252.6 Td (panel) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 219.6 147.9 158.4 46.1 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 260.6 178.5 Td (Evidence packet) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 237.6 166.9 Td (telemetry + visual facts) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 263.1 155.4 Td (+ manual state) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 406.8 147.9 129.6 46.1 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 433.4 178.5 Td (Procedure gates) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 428.3 166.9 Td (preconditions and) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 430.8 155.4 Td (completion rules) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 280.8 57.9 151.2 46.1 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 302.9 88.5 Td (Grounded tutor output) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 297.8 76.9 Td (step guidance + overlay) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 310.5 65.4 Td (with evidence refs) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  122.4 356.7 m 151.2 355.3 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 151.2 355.3 m 144.1 351.6 l 144.5 359.6 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  122.4 356.7 m 309.6 355.3 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 309.6 355.3 m 302.6 351.3 l 302.7 359.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  122.4 356.7 m 468.0 355.3 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 468.0 355.3 m 461.1 351.3 l 461.1 359.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  212.4 325.8 m 212.4 291.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 212.4 291.2 m 208.4 298.1 l 216.4 298.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  370.8 325.8 m 370.8 291.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 370.8 291.2 m 366.8 298.1 l 374.8 298.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  522.0 325.8 m 522.0 291.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 522.0 291.2 m 518.0 298.1 l 526.0 298.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  212.4 245.1 m 298.8 194.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 298.8 194.0 m 290.8 194.1 l 294.9 201.0 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  370.8 245.1 m 298.8 194.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 298.8 194.0 m 302.1 201.3 l 306.8 194.7 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  468.0 268.2 m 378.0 171.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 378.0 171.0 m 379.8 178.8 l 385.6 173.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  378.0 171.0 m 406.8 171.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 406.8 171.0 m 399.9 167.0 l 399.9 175.0 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  406.8 171.0 m 432.0 81.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 432.0 81.0 m 426.3 86.6 l 434.0 88.7 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  298.8 147.9 m 356.4 104.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 356.4 104.0 m 348.5 105.0 l 353.3 111.4 l h f Q
+BT /F1 7.8 Tf 0.294 0.333 0.388 rg 18.0 33.4 Td (The task cannot be grounded by language alone because completion evidence comes from mixed sources.) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+5735
+%%EOF

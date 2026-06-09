@@ -1,0 +1,89 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 606 428] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 4499 >>
+stream
+BT /F1 14.5 Tf 0.067 0.094 0.153 rg 18.0 404.0 Td (Visual fact ontology evolution) Tj ET
+q 0.996 0.886 0.886 rg 0.725 0.110 0.110 RG 1.2 w 28.8 323.6 151.2 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 81.5 356.3 Td (8-fact v1) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 43.2 344.8 Td (mixed abstraction levels) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 35.6 333.2 Td (compound completion targets) Tj ET
+q 0.996 0.886 0.886 rg 0.725 0.110 0.110 RG 1.2 w 43.2 251.6 122.4 39.6 re B Q
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 89.6 278.7 Td (ins_go) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 52.5 267.5 Td (procedural completion) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 82.2 256.3 Td (judgement) Tj ET
+q 0.996 0.886 0.886 rg 0.725 0.110 0.110 RG 1.2 w 43.2 183.2 122.4 39.6 re B Q
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 69.8 210.3 Td (fcs_bit_result) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 57.5 199.1 Td (single broad FCS-MC) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 67.3 187.9 Td (completion fact) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 424.8 323.6 151.2 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 474.9 356.3 Td (13-fact v2) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 454.5 344.8 Td (locally verifiable) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 469.8 333.2 Td (visual atoms) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 414.0 262.4 165.6 32.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 417.8 274.6 Td (ins_grnd_alignment_text_visible) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 414.0 222.8 165.6 32.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 448.4 235.0 Td (ins_ok_text_visible) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 414.0 171.0 165.6 30.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 450.9 182.1 Td (fcsmc_page_visible) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 414.0 135.0 165.6 30.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 412.7 146.1 Td (fcsmc_intermediate_result_visible) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 414.0 99.0 165.6 30.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 443.3 110.1 Td (fcsmc_in_test_visible) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 414.0 63.0 165.6 30.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 422.9 74.1 Td (fcsmc_final_go_result_visible) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 216.0 186.8 154.8 57.6 re B Q
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 256.4 233.0 Td (Design principle) Tj ET
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 240.2 222.5 Td (VLM extracts observable) Tj ET
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 272.6 212.0 Td (evidence;) Tj ET
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 235.6 201.4 Td (procedure engine performs) Tj ET
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 235.6 190.9 Td (procedural interpretation) Tj ET
+q 0.953 0.910 1.000 rg 0.494 0.133 0.808 RG 1.2 w 216.0 86.0 154.8 46.8 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 255.2 116.9 Td (Observed effect) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 232.2 105.4 Td (critical false positives) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 250.1 93.8 Td (reduced by 64-89%) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  180.0 348.8 m 216.0 215.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 216.0 215.6 m 210.3 221.2 l 218.1 223.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  370.8 215.6 m 424.8 348.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 424.8 348.8 m 425.9 340.9 l 418.5 343.9 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  165.6 271.4 m 414.0 278.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 278.6 m 407.2 274.4 l 407.0 282.4 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  165.6 271.4 m 414.0 239.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 239.0 m 406.6 235.9 l 407.6 243.9 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  165.6 203.0 m 414.0 186.1 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 186.1 m 406.8 182.6 l 407.4 190.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  165.6 203.0 m 414.0 150.1 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 150.1 m 406.4 147.6 l 408.1 155.4 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  165.6 203.0 m 414.0 114.1 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 114.1 m 406.1 112.6 l 408.8 120.2 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  165.6 203.0 m 414.0 78.1 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 414.0 78.1 m 406.0 77.6 l 409.6 84.8 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  293.4 186.8 m 293.4 132.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 293.4 132.8 m 289.4 139.7 l 297.4 139.7 l h f Q
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+4868
+%%EOF

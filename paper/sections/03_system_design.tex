@@ -107,6 +107,21 @@ ingestion, telemetry enrichment, knowledge retrieval, model-based help
 generation, VLM visual fact extraction, overlay execution, and event logging.
 \end{description}
 
+Figure~\ref{fig:system-architecture} summarises the thesis-level architecture.
+The figure abstracts away most file-level implementation details and emphasises
+the evidence flow between simulator state, procedure-pack configuration,
+foundation-model services, harness validation, and study outputs.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_system_architecture.pdf}
+  \caption{Evidence-grounded tutoring architecture. Simulator telemetry,
+  composite-panel vision, procedure-pack configuration, retrieved knowledge, and
+  model outputs are integrated through an evidence packet and checked by the
+  harness before any overlay or tutor text reaches the cockpit.}
+  \label{fig:system-architecture}
+\end{figure}
+
 The separation serves four purposes. \textbf{Testability}: core logic can be
 tested with mock adapters without DCS, a GPU, or network access.
 \textbf{Maintainability}: simulator API changes affect only the relevant
@@ -121,7 +136,19 @@ the tutoring runtime.
 The central architectural mechanism is the evidence-grounded help cycle: a
 structured pipeline from simulator observation through tutoring output and
 logging, in which every actionable output must carry a traceable evidence
-reference.
+reference. Figure~\ref{fig:help-cycle} shows this cycle from help trigger to
+overlay dispatch and event logging.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_help_cycle.pdf}
+  \caption{Live evidence-grounded help cycle. Each help request is converted
+  into a telemetry and vision observation, interpreted against procedure gates,
+  grounded with retrieved knowledge, passed through the text LLM, validated by
+  the harness, and then dispatched as overlay/text output with an event-log
+  trace.}
+  \label{fig:help-cycle}
+\end{figure}
 
 \subsection{Help Cycle Stages}
 
@@ -300,6 +327,21 @@ rejection of wrong-target proposals, repair of incomplete visual evidence,
 handling of moving/settling controls, and prevention of VLM evidence leakage
 into non-visual steps.
 \end{enumerate}
+
+Figure~\ref{fig:harness-validation} abstracts these implementation objects into
+the validation path used by the thesis argument: the harness converts a proposed
+tutor action into an auditable decision and falls back to repair or text-only
+guidance when overlay execution is not sufficiently grounded.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_harness_validation.pdf}
+  \caption{Harness and evidence validation. Candidate tutor actions are checked
+  against schema constraints, UI allowlists, evidence consistency, and procedure
+  state before an overlay action plan is accepted; unsafe or under-grounded
+  actions are repaired, rejected, or downgraded to text-only guidance.}
+  \label{fig:harness-validation}
+\end{figure}
 
 \subsection{Fixture-Based Regression Testing}
 

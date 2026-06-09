@@ -1,0 +1,80 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 606 428] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 3742 >>
+stream
+BT /F1 14.5 Tf 0.067 0.094 0.153 rg 18.0 404.0 Td (Evaluation data flow across research questions) Tj ET
+q 0.953 0.910 1.000 rg 0.494 0.133 0.808 RG 1.2 w 32.4 316.4 129.6 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 51.3 349.1 Td (RQ2 VLM evaluation) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 48.8 337.6 Td (holdout screenshots) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 66.6 326.0 Td (base vs LoRA) Tj ET
+q 0.953 0.910 1.000 rg 0.494 0.133 0.808 RG 1.2 w 237.6 316.4 129.6 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 243.8 349.1 Td (RQ1 technical readiness) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 271.8 337.6 Td (replay suite) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 261.6 326.0 Td (harness fixtures) Tj ET
+q 0.953 0.910 1.000 rg 0.494 0.133 0.808 RG 1.2 w 442.8 316.4 129.6 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 459.2 349.1 Td (RQ3 formative pilot) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 484.7 337.6 Td (VR trials) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 461.7 326.0 Td (with/without tutor) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 32.4 208.4 129.6 50.4 re B Q
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 50.3 240.9 Td (Benchmark artifacts) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 52.7 229.7 Td (fact accuracy, F1,) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 37.9 218.5 Td (critical false positives) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 237.6 208.4 129.6 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 259.1 241.1 Td (Runtime artifacts) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 274.4 229.6 Td (JSONL logs,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 269.3 218.0 Td (trace metrics) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 442.8 208.4 129.6 50.4 re B Q
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 475.5 246.5 Td (Pilot exports) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 478.0 235.3 Td (step coding,) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 458.2 224.1 Td (help cycles, quality) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 495.2 212.9 Td (notes) Tj ET
+q 0.925 0.988 0.796 rg 0.302 0.486 0.059 RG 1.2 w 129.6 86.0 151.2 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 161.9 118.7 Td (Evaluation tables) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 156.8 107.2 Td (technical and pilot) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 182.3 95.6 Td (summaries) Tj ET
+q 0.996 0.886 0.886 rg 0.725 0.110 0.110 RG 1.2 w 327.6 86.0 151.2 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 349.7 118.7 Td (Interpretation limits) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 347.1 107.2 Td (no inferential claims,) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 334.4 95.6 Td (no learning transfer claims) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  97.2 316.4 m 97.2 258.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 97.2 258.8 m 93.2 265.7 l 101.2 265.7 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  302.4 316.4 m 302.4 258.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 302.4 258.8 m 298.4 265.7 l 306.4 265.7 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  507.6 316.4 m 507.6 258.8 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 507.6 258.8 m 503.6 265.7 l 511.6 265.7 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  97.2 208.4 m 205.2 136.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 205.2 136.4 m 197.2 136.9 l 201.7 143.6 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  302.4 208.4 m 205.2 136.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 205.2 136.4 m 208.4 143.7 l 213.1 137.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  442.8 233.6 m 280.8 111.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 280.8 111.2 m 283.9 118.6 l 288.7 112.2 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  280.8 111.2 m 327.6 111.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 327.6 111.2 m 320.7 107.2 l 320.7 115.2 l h f Q
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+4111
+%%EOF

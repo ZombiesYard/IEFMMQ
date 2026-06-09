@@ -96,6 +96,20 @@ structured visual fact extraction models through seven stages. Each stage
 produces versioned, inspectable artifacts, enabling full traceability from raw
 image to benchmark metric.
 
+Figure~\ref{fig:vlm-pipeline} shows the pipeline as a methodological loop:
+holdout benchmark failures inform ontology revision and later data collection
+rather than being treated only as final scores.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_vlm_pipeline.pdf}
+  \caption{VLM adaptation pipeline. DCS composite screenshots are pre-labelled,
+  human-reviewed, converted into bilingual supervised fine-tuning rows, adapted
+  with LoRA, evaluated on independent holdout sets, and used to drive ontology
+  revision.}
+  \label{fig:vlm-pipeline}
+\end{figure}
+
 \begin{enumerate}
 \item \textbf{Screenshot capture.} DCS renders the three primary multifunction
 displays into a single composite-panel image. Captures are triggered at
@@ -192,6 +206,20 @@ Second, several facts shared overlapping semantics:
 fact semantics, and the compound \texttt{ins\_go} fact asked a single-frame VLM
 to make a procedural completion judgement that conflated perception with
 reasoning.
+
+Figure~\ref{fig:ontology-evolution} illustrates the central ontology change.
+Compound procedural targets were split into visual atoms, leaving temporal and
+procedural interpretation to the tutor runtime.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_ontology_evolution.pdf}
+  \caption{Ontology evolution from 8-fact v1 to 13-fact v2. Compound targets
+  such as \texttt{ins\_go} and broad FCS-MC completion facts were decomposed
+  into locally verifiable visual atoms; the procedure engine then combines
+  those observations with telemetry, phase, and timing evidence.}
+  \label{fig:ontology-evolution}
+\end{figure}
 
 The 13-fact v2 ontology, used in Run-003 through Run-005 and in the current
 runtime, addressed these weaknesses through three strategies:

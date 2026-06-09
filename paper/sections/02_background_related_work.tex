@@ -136,7 +136,19 @@ generators), S05 (right throttle idle), and S13 (radar mode OPR) are directly
 observable via DCS-BIOS and require no visual inference. Other steps, such as
 S08 and S18, involve display-page state that is not directly exported via
 DCS-BIOS and therefore rely on the visual fact extraction pipeline described
-below.
+below. Figure~\ref{fig:bg-evidence-sources} summarises the resulting evidence
+sources for the cold-start procedure.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_bg_evidence_sources.pdf}
+  \caption{Evidence sources for the F/A-18C cold-start task. The 33-step
+  procedure combines telemetry-visible steps, vision-priority display checks,
+  and a small number of manual or out-of-layout confirmations; downstream
+  tutoring decisions are grounded in the corresponding evidence source rather
+  than in language-model output alone.}
+  \label{fig:bg-evidence-sources}
+\end{figure}
 
 % ---------------------------------------------------------------------------
 \section{Visual Fact Ontology}\label{sec:bg-facts}
