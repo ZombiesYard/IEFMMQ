@@ -1,437 +1,387 @@
 % ===========================================================================
-%  02 — Background and Related Work
+%  02 — Theoretical Background and Related Work
 %
-%  Source of truth: paper_context/paper_outline.md §2.2, §2.3
-%  Terminology:  paper_context/terminology.md
-%  Claims:       C-VLM-01, C-VLM-02, C-VLM-07 (visual fact ontology)
+%  Purpose: ML systems + HCI/VR theory for the rest of the thesis.
 % ===========================================================================
-\chapter{Background and Related Work}\label{ch:background}
-
-The previous chapter framed the thesis around one requirement: generated
-procedural help should be grounded in evidence that can be inspected before and
-after it reaches the learner. This chapter explains why that requirement arises
-in the F/A-18C cold-start task and how it relates to existing work. The first
-part introduces the task, the available evidence channels, and the visual fact
-ontology used to turn cockpit screenshots into structured observations. The
-second part positions the thesis against intelligent tutoring systems,
-simulator-based training, rule-based state tracking, VLM adaptation, and
-grounded assistance in AR/VR.
-
-% ===========================================================================
-%  PART I — DOMAIN BACKGROUND
-% ===========================================================================
-
-% ---------------------------------------------------------------------------
-\section{The F/A-18C Cold-Start Task}\label{sec:bg-coldstart}
-
-% Evidence: packs/fa18c_startup/pack.yaml
-% Evidence: packs/fa18c_startup/step_registry.yaml
-% Evidence: Doc/Evaluation/fa18c_startup_master.md
-
-The procedural scenario studied in this thesis is the F/A-18C cold-start in DCS
-World, a pre-flight cockpit procedure that moves the aircraft from a cold and
-dark state to a taxi-ready configuration~\citep{dcsworld,eagledynamics2023hornetguide}.
-The task is useful as a research case because it is both bounded and
-state-sensitive. It has a known order of actions, yet successful completion
-depends on intermediate states that cannot be reduced to a text checklist:
-electrical power must be established before engine start, engine parameters
-must enter nominal ranges before the second engine is engaged, cockpit displays
-must show the expected pages, and some checks only make sense after earlier
-system transitions have occurred.
-
-For a tutoring system, the relevant property of the cold-start is therefore not
-only its length. It is the way the procedure forces the tutor to combine three
-kinds of evidence: sequence evidence about which steps have been completed,
-telemetry evidence about cockpit controls and instruments, and visual evidence
-about display-page content. A response that ignores any of these signals can be
-locally fluent but procedurally wrong.
-
-\subsection{Procedure Structure: S01--S33 and Phases P1--P6}
-
-The current procedure pack represents the cold-start as 33 numbered steps
-(S01--S33) grouped into six phases. The phase structure is used in the thesis as
-a compact description of the evidence demands imposed by the task:
-
-\begin{description}
-  \item[P1 (S01--S03):] Power-up and safety checks. Battery and generator
-    activation, fire-detection tests, and APU start establish the first
-    electrical and safety preconditions for the rest of the procedure.
-  \item[P2 (S04--S07):] Right engine start. Right engine crank, throttle
-    advance, bleed-air cycling, and caution/warning/advisory light testing
-    introduce telemetry-dependent timing and verification.
-  \item[P3 (S08--S09):] Displays and communications. The DDIs, AMPCD, HUD,
-    display pages, and COMM1 preset configuration make display state part of the
-    procedural evidence chain.
-  \item[P4 (S10--S14):] Left engine and core systems. Left engine start, INS
-    alignment mode selection, radar power, and OBOGS activation depend on earlier
-    engine and avionics state.
-  \item[P5 (S15--S27):] FCS and flight controls. FCS reset and BIT, flap/trim
-    configuration, launch-bar and arrestor-hook checks, refuelling probe checks,
-    and pitot heat configuration mix telemetry-visible controls with
-    display-based confirmation.
-  \item[P6 (S28--S33):] Pre-taxi instruments and final checks. Parking brake,
-    BINGO fuel, altimeter settings, standby attitude indicator uncaging, and
-    attitude-source selection complete the taxi-ready state.
-\end{description}
-
-Each step is represented in the procedure pack with precondition and completion
-gates. These gates make explicit which previous steps and which state variables
-must be satisfied before the tutor can treat a step as available or complete.
-For example, the right engine crank step depends on APU support, while the left
-engine start depends on right-engine parameters such as RPM, temperature, fuel
-flow, nozzle position, and oil pressure entering nominal ranges. This is why the
-task is a useful test case for evidence-grounded help: a tutor that advances the
-learner based on checklist order alone can miss the actual aircraft state.
-
-\subsection{Cockpit Displays and the Composite Panel}
-
-% Evidence: packs/fa18c_startup/vision_layout.yaml
-% Evidence: DCS/Scripts/Export.lua
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §1
-
-Many cold-start states are visible on the F/A-18C's cockpit displays rather
-than directly available as simple telemetry variables. The visual pipeline
-therefore operates on a fixed composite panel image containing three display
-regions:
-
-\begin{itemize}
-  \item \textbf{Left DDI (Digital Display Indicator):} used during the procedure
-    for pages such as FCS, SUPT, and TAC. In the evaluated cold-start flow, the
-    FCS page and FCS page markings are important visual confirmations.
-  \item \textbf{AMPCD (Advanced Multipurpose Color Display):} used for the HSI
-    page, map layer, and INS alignment text. These states are central to the
-    alignment-related visual facts.
-  \item \textbf{Right DDI:} used for the BIT root page and FCS-MC BIT sequence,
-    including intermediate, in-test, and final GO states.
-\end{itemize}
-
-Using a composite image keeps training and inference aligned: the model sees the
-same three-display layout during dataset construction, benchmarking, and runtime
-capture. More importantly, the composite panel defines a narrow perception
-boundary. The VLM is not asked to interpret the whole VR scene or infer the
-pilot's intention. It only reports whether specific cockpit-display facts are
-visible in known regions.
-
-\subsection{DCS-BIOS Telemetry}
-
-% Evidence: adapters/dcs_bios/receiver.py
-% Evidence: adapters/telemetry_pipeline.py
-% Evidence: packs/fa18c_startup/telemetry_map.yaml
-
-DCS-BIOS provides the main non-visual evidence source for the runtime. It
-exports cockpit switch positions, indicators, warning lights, gauges, and other
-instrument states from DCS World through a UDP telemetry stream
-\citep{dcsbiosdocs}. The tutoring runtime normalises this stream into stable
-variables such as \texttt{rpm\_r}, \texttt{apu\_ready}, and
-\texttt{ins\_mode}, applies delta sanitisation to reduce jitter, and tracks
-whether a source is missing rather than merely false.
-
-This telemetry channel is authoritative where it exists. Steps such as battery
-power, throttle movement, radar mode, and many final pre-taxi switch states can
-be checked without computer vision. At the same time, DCS-BIOS does not export
-all display-page content needed by the cold-start tutor. The runtime therefore
-uses vision only for states that telemetry cannot observe, such as whether the
-FCS page, BIT root page, FCS-MC BIT result, or INS alignment text is visible.
-Figure~\ref{fig:bg-evidence-sources} summarises this division of evidence across
-the 33-step procedure.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/fig_bg_evidence_sources.pdf}
-  \caption{Evidence sources for the F/A-18C cold-start task. The 33-step
-  procedure combines telemetry-visible steps, vision-priority display checks,
-  and a small number of manual or out-of-layout confirmations; downstream
-  tutoring decisions are grounded in the corresponding evidence source rather
-  than in language-model output alone.}
-  \label{fig:bg-evidence-sources}
-\end{figure}
-
-% ---------------------------------------------------------------------------
-\section{Visual Fact Ontology}\label{sec:bg-facts}
-
-% Evidence: packs/fa18c_startup/vision_facts.yaml
-% Evidence: core/vision_facts.py
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §1
-% Claims: C-VLM-01, C-VLM-02, C-VLM-07
-
-The visual fact ontology is the contract between perception and procedural
-reasoning. Rather than asking a VLM to produce a tutor decision such as "the
-learner should press this button next", the runtime asks it to produce a small
-set of structured propositions about the visible cockpit display state. Each
-fact is a discrete observation with one of three values:
-
-\begin{description}
-  \item[\texttt{seen}:] the specified visual evidence is clearly present;
-  \item[\texttt{not\_seen}:] the specified visual evidence is absent or not
-    discernible;
-  \item[\texttt{uncertain}:] the image quality, occlusion, crop, or display
-    state is insufficient for a confident decision.
-\end{description}
-
-This representation intentionally avoids mixing perception with task
-interpretation. The VLM reports whether visual evidence is visible. The
-procedure engine later combines those facts with telemetry, sequence state, and
-step bindings to decide whether a step is confirmed, pending, or blocked. The
-ontology is therefore not a minor implementation detail; it defines what kind of
-claim the model is allowed to make.
-
-\subsection{From 8-Fact v1 to 13-Fact v2}
-
-% Evidence: datasets/vision_sft/stats.json (8-fact v1)
-% Evidence: packs/fa18c_startup/vision_facts.yaml (13-fact v2)
-% Evidence: Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8
-
-The ontology evolved through two generations. The first version contained eight
-facts over the left DDI, right DDI, and AMPCD. It included useful display-level
-targets such as FCS page visibility, BIT page visibility, FCS-MC page state, and
-INS alignment page visibility. It also included compound targets such as
-\texttt{ins\_go}, which asked the model to infer a high-level procedural
-completion state from a single visual frame.
-
-That design produced a clear lesson. The first LoRA adapter, trained on 180
-human-reviewed Run-001 images, improved in-distribution behaviour but produced
-critical false positives on the independent Run-002 holdout: 13 of 50 samples
-were predicted as \texttt{seen} for \texttt{ins\_go} when the human label was
-\texttt{not\_seen}. The error was not only a model failure. It exposed a design
-problem in the target itself: \texttt{ins\_go} combined visual perception with
-procedural interpretation.
-
-The second-generation ontology replaces such compound targets with 13
-observable visual atoms:
-
-\begin{center}
-\footnotesize
-\begin{tabular}{@{}ll@{}}
-\textbf{Region} & \textbf{Visual fact} \\
-\hline
-Left DDI & \texttt{tac\_page\_visible} \\
-Left DDI & \texttt{supt\_page\_visible} \\
-Left DDI & \texttt{fcs\_page\_visible} \\
-Left DDI & \texttt{fcs\_page\_x\_marks\_visible} \\
-Right DDI & \texttt{bit\_root\_page\_visible} \\
-Right DDI & \texttt{fcsmc\_page\_visible} \\
-Right DDI & \texttt{fcsmc\_intermediate\_result\_visible} \\
-Right DDI & \texttt{fcsmc\_in\_test\_visible} \\
-Right DDI & \texttt{fcsmc\_final\_go\_result\_visible} \\
-AMPCD & \texttt{hsi\_page\_visible} \\
-AMPCD & \texttt{hsi\_map\_layer\_visible} \\
-AMPCD & \texttt{ins\_grnd\_alignment\_text\_visible} \\
-AMPCD & \texttt{ins\_ok\_text\_visible} \\
-\end{tabular}
-\end{center}
-
-The important change is not just the larger number of labels. The ontology moves
-from procedure-level judgement to observable evidence. For example, the v1
-\texttt{ins\_go} target is decomposed into AMPCD text and map-layer observations
-shown in the table above. The procedure engine then decides how these
-observations relate to the alignment step. This design principle carries the
-main scientific insight of the VLM part of the thesis: VLMs should extract local
-visual evidence, while procedural meaning should be assigned by explicit
-downstream rules.
-
-\subsection{Sticky Facts and Step Bindings}
-
-% Evidence: packs/fa18c_startup/vision_facts.yaml (sticky, step_bindings)
-% Evidence: core/vision_facts.py (merge_vision_fact_observation, facts_satisfy_step_binding)
-
-Two runtime mechanisms make the ontology usable during a live help cycle.
-
-\paragraph{Sticky facts.}
-Some visual events are transient but procedurally important. For example, the
-\texttt{fcsmc\_final\_go\_result\_visible} fact is marked as sticky with a
-time-to-live of 600 seconds. Once it has been observed as \texttt{seen}, later
-frames marked \texttt{not\_seen} or \texttt{uncertain} do not immediately erase
-the evidence. This prevents a completed visual event from disappearing merely
-because the learner changed pages, the display flickered, or the capture window
-missed the relevant moment. Non-sticky facts, such as page visibility facts,
-expire quickly and are re-evaluated continuously.
-
-\paragraph{Step bindings.}
-Visual facts become procedurally meaningful only through explicit bindings in
-\texttt{vision\_facts.yaml}. A binding specifies which facts must be visible for
-a step to be visually confirmed. Some bindings require all listed facts, such as
-S08 requiring both the FCS page on the left DDI and the BIT root page on the
-right DDI. Others allow one of several alternatives when multiple visual cues
-can support the same procedural state.
-
-The procedure pack also classifies each step by its preferred evidence source:
-
-\begin{itemize}
-  \item \texttt{bios\_priority\_steps} for telemetry-visible states;
-  \item \texttt{vision\_priority\_steps} for display-dependent states;
-  \item \texttt{manual\_or\_out\_of\_layout\_steps} for states requiring manual
-    confirmation or lying outside the three-display composite.
-\end{itemize}
-
-This classification is the practical expression of the thesis's
-evidence-grounding principle: each step is checked against the most reliable
-available signal before it is used in tutoring.
-
-% ===========================================================================
-%  PART II — RELATED WORK
-% ===========================================================================
-
-% ---------------------------------------------------------------------------
-\section{Intelligent Tutoring Systems and Procedural Training}\label{sec:rw-tutoring}
-
-Intelligent Tutoring Systems (ITS) provide the closest educational precedent for
-this work. Classic ITS research distinguishes expert knowledge, learner state,
-and tutoring feedback, and has shown that step-based computer tutors can be
-effective in structured learning domains~\citep{vanlehn2011relative}. In
-procedural settings, constraint-based and example-tracing tutors model expected
-actions and compare learner behaviour against authored task knowledge
-\citep{mitrovic2012constraint,aleven2009example}. These ideas directly inform
-the use of procedure packs and gates in this thesis.
-
-The difference is the observation interface. Many ITSs operate in environments
-where learner actions are already represented as formal events. The simulator
-used here is not tutor-native. The runtime must infer procedure state from
-DCS-BIOS telemetry, screenshots, sequence history, and occasional manual
-confirmations. This makes evidence integration part of the tutoring problem
-itself.
-
-LLMs add a further tension. They can produce fluent and flexible instructional
-dialogue, and recent educational discussions recognise their promise as well as
-their reliability risks~\citep{kasneci2023chatgpt}. For cockpit procedures,
-fluency is not enough. The contribution of this thesis is therefore not an
-open-ended LLM tutor, but a constrained tutoring runtime in which generated
-language is downstream of evidence collection, retrieval, procedure inference,
-and validation.
-
-% ---------------------------------------------------------------------------
-\section{Simulator-Based Training and Instrumentation}\label{sec:rw-sim}
-
-Simulator-based aviation training is a mature area, and prior work has examined
-how simulation supports skill acquisition and transfer in flight-training
-contexts~\citep{hays1992flight}. DCS World provides the high-fidelity simulation
-environment used in this thesis~\citep{dcsworld}. The relevant research issue
-for the present work is instrumentation: how the tutoring system observes what
-the learner and aircraft are doing without replacing the simulator with a custom
-tutor interface.
-
-DCS-BIOS addresses part of this problem by exposing cockpit state through a
-structured telemetry bridge~\citep{dcsbiosdocs}. Compared with screen capture
-alone, telemetry gives deterministic access to many switch positions, indicator
-states, and numerical values. However, telemetry does not cover every piece of
-evidence that matters for the cold-start, especially display-page content and
-text. The thesis therefore treats simulator instrumentation as a multimodal
-problem: telemetry is used where it is reliable and direct, while vision is
-reserved for the cockpit evidence that telemetry does not export.
-
-This separation also improves auditability. A logged help cycle can later show
-which state was read from DCS-BIOS, which facts came from the VLM, which rule
-made a step eligible or blocked, and which retrieved source supported the
-generated explanation. Instrumentation is thus not only an engineering
-requirement but a condition for evaluating the tutor's behaviour.
-
-% ---------------------------------------------------------------------------
-\section{Rule-Based and State-Aware Tutoring}\label{sec:rw-state}
-
-The tutoring runtime combines deterministic state tracking with model-generated
-language. Rule-based approaches to procedure tracking, including finite-state,
-production-rule, and constraint-oriented models, offer interpretability because
-they make task structure explicit. The procedure pack in this thesis follows
-that principle: steps, preconditions, completion gates, visual bindings, and
-error categories are authored as declarative configuration rather than hidden in
-prompts.
-
-The limitation of a purely rule-based tutor is that authored feedback can become
-brittle when the learner asks for help in an unexpected state or needs an
-explanation rather than a binary correction. The runtime therefore delegates
-natural-language formulation to an LLM, but not the authority to decide the
-procedure state. Step inference, eligibility, evidence availability, and overlay
-allowlists remain under deterministic control.
-
-This hybrid division is related to broader work on grounding language models in
-action feasibility and symbolic structure, such as SayCan-style grounding of
-language in robotic affordances~\citep{ahn2022saycan}. The present thesis
-adapts that grounding intuition to simulator tutoring: before a generated
-response can be acted upon, it must be tied to evidence that the runtime can
-observe, validate, and replay.
-
-% ---------------------------------------------------------------------------
-\section{Foundation Models and VLMs for Situated Assistance}\label{sec:rw-vlm}
-
-Foundation models provide two capabilities that are attractive for situated
-tutoring: language models can produce flexible explanations, and vision-language
-models can extract information from cockpit images. Parameter-efficient
-fine-tuning methods, especially Low-Rank Adaptation (LoRA), make it practical to
-adapt large models to narrow tasks with limited trainable parameters
-\citep{hu2021lora,mangrulkar2022peft}. The model backbones and VLM literature
-used in this thesis provide the general technical context for this adaptation
-setting~\citep{bai2023qwen,liu2023llava,dai2023instructblip}.
-
-The thesis uses these capabilities in a restricted way. The VLM is not asked for
-free-form cockpit descriptions, and the LLM is not asked to invent the next
-procedural state. Instead, the VLM outputs structured JSON visual facts, and the
-help-generation model receives an evidence packet assembled by the runtime. This
-choice follows the same general motivation as retrieval-augmented generation:
-model output should be conditioned on explicit external evidence rather than
-parametric memory alone~\citep{lewis2020rag}.
-
-The cockpit-display task also resembles structured screen understanding.
-Research on GUI and screen-content understanding has shown that visual models
-can reason about fixed regions, labels, and symbolic layout
-\citep{wang2021screen2words}. Cockpit displays share that structured quality,
-but the tutoring setting adds stricter consequences for false positives. A VLM
-that incorrectly reports a critical display state as visible may cause the tutor
-to advance the learner at the wrong time. This is why ontology design and
-critical-false-positive analysis are treated as central methodological issues in
-this thesis rather than as secondary benchmark details.
-
-% ---------------------------------------------------------------------------
-\section{Explainable and Grounded AI Assistance in AR/VR}\label{sec:rw-xai}
-
-The original proposal placed the tutor in an immersive Quest~3 cockpit
-experience, and the implemented system retains that evaluation direction through
-the VR pilot. Prior work on AR guidance for maintenance and procedural tasks
-shows the value of presenting instructions in the user's task context, often
-through spatially registered text, arrows, or animations
-\citep{palmarini2018ar}. Such systems demonstrate why in-context guidance is
-attractive: the learner can keep attention on the task environment rather than
-switching to external materials.
-
-The system studied here differs from pre-authored AR guidance because its help
-content is generated at runtime from current evidence. That makes explanation
-and traceability central. Work on explainable AI and human-AI interaction
-emphasises that users and developers need to understand why a system produced a
-recommendation, especially in high-stakes or safety-sensitive settings
-\citep{gunning2019xai,amershi2019guidelines}. In this thesis, the explanation
-need is operationalised through evidence references: each recommended step,
-overlay target, or refusal to advance can be traced back to telemetry, a rule, a
-visual fact, or a retrieved source.
-
-This grounding requirement also limits the claims made about VR. The pilot
-study in Chapter~\ref{ch:evaluation} shows that the runtime and instrumentation
-can be exercised with real participants in VR, but it does not establish
-controlled educational effectiveness. The VR contribution is therefore part of
-the evaluation framework and formative evidence, while the primary thesis claim
-remains the design and validation of the evidence-grounded tutoring runtime.
-
-% ---------------------------------------------------------------------------
-\section{Positioning of This Work}\label{sec:rw-positioning}
-
-The thesis sits at the intersection of the areas reviewed above, but its
-contribution is the particular integration rather than membership in any single
-area. From intelligent tutoring systems it takes the need for explicit task
-models and state-sensitive feedback. From simulator training it takes the need
-for instrumentation that observes real learner behaviour in a high-fidelity
-environment. From rule-based assistance it takes deterministic procedure gates.
-From foundation-model work it takes flexible language generation and
-domain-adapted visual extraction. From explainable and AR/VR assistance it takes
-the requirement that help remain inspectable in context.
-
-The resulting system is an evidence-grounded procedural tutoring runtime. Its
-procedure pack defines what counts as valid state evidence; DCS-BIOS supplies
-telemetry where available; the visual fact ontology supplies structured cockpit
-display observations where telemetry is missing; retrieval supplies procedural
-sources; and the help cycle constrains model output through validation,
-allowlists, fallbacks, logging, and replay. This is the research position
-developed in the rest of the thesis.
-
-The claim boundary is equally important. The technical chapters and benchmarks
-evaluate whether the architecture and visual fact pipeline can produce reliable,
-auditable evidence for tutoring. The formative VR pilot provides descriptive
-evidence about feasibility, completion, error patterns, and instrumentation with
-real participants. Larger controlled studies are still required before making
-claims about learning gains, workload reduction, retention, or transfer.
+\chapter{Theoretical Background and Related Work}\label{ch:background}
+
+The introduction framed the thesis as an evidence-design problem: a foundation
+model should explain a live training state only through evidence that the
+runtime can observe, validate, and replay. This chapter provides the theoretical
+and related-work background needed for that claim. It first introduces the
+procedural training setting and the observation problem created by DCS World.
+It then reviews the machine-learning concepts used in the thesis: VLMs,
+structured visual outputs, LoRA-based parameter-efficient adaptation, retrieval
+grounding, and reliability metrics. The final sections position the work
+against intelligent tutoring systems, simulator instrumentation, and grounded
+AI assistance in AR/VR.
+
+\section{Procedural Training in Immersive Simulation}\label{sec:bg-procedural}
+
+Procedural training differs from factual instruction because success depends on
+ordered action under state constraints. A learner must know not only what an
+action is, but when it is permissible, how to check that it has taken effect,
+and how to recover when an intermediate state differs from expectation. In
+aviation and industrial settings, these requirements are typically externalised
+through manuals, checklists, instructors, and simulator procedures. Intelligent
+Tutoring Systems (ITS) research has long treated explicit task models and
+learner-state tracking as central to effective tutoring
+\citep{vanlehn2011relative,mitrovic2012constraint,aleven2009example}. The
+challenge in this thesis is that the task environment is not built as a tutor.
+It is a high-fidelity simulator that must be instrumented.
+
+Virtual reality increases the need for in-context help. A learner using a
+Meta Quest~3 in DCS World can remain spatially present in the cockpit, but that
+presence is fragile. Searching a PDF, replaying a video, or asking an external
+chatbot breaks task flow. AR and VR guidance research has shown the value of
+placing instructions in the user's task context, especially in maintenance and
+procedural settings \citep{palmarini2018ar}. The thesis builds on that premise
+but adds a stricter requirement: if help is generated at runtime, it must be
+grounded in the current simulator state rather than presented as a generic
+overlay.
+
+\subsection{From Checklist Following to State Estimation}
+
+The cold-start task is easy to describe as a checklist and difficult to support
+as an interactive system. A printed checklist assumes that the learner can map a
+line of text to a cockpit region, execute the action, observe the result, and
+decide when to continue. A tutor that intervenes during the task has to perform
+part of that mapping explicitly. It must estimate which step is active, which
+preconditions are already satisfied, which completion evidence is missing, and
+whether the learner's most recent action moved the system toward or away from
+the expected state.
+
+This is a state-estimation problem rather than a pure natural-language problem.
+The procedure text alone is insufficient, because the correct explanation
+depends on the simulator state. Conversely, telemetry alone is insufficient,
+because a numerical or boolean simulator variable has to be interpreted through
+the authored procedure. The thesis therefore treats tutoring as an interaction
+between three representations: the authored procedural prior, the observed
+simulator state, and the generated explanation. The foundation model operates
+only in the third representation and receives the first two as evidence.
+
+This framing is also important for evaluation. A generic tutoring system might
+be evaluated by answer fluency or student satisfaction. A state-estimation
+tutor also has to be evaluated by whether its evidence contracts are correct,
+whether it can distinguish observed false states from unobserved states, and
+whether it avoids advancing the learner on weak evidence. Those concerns
+explain why this thesis gives substantial space to telemetry variables, visual
+fact ontologies, critical false positives, and replay logs. They are not
+incidental engineering details; they are the technical substrate that makes an
+interactive explanation about the current reality meaningful.
+
+\section{DCS World, F/A-18C Lot 20, and Observable State}\label{sec:bg-dcs}
+
+DCS World provides a high-fidelity simulation platform with detailed aircraft
+systems and VR support \citep{dcsworld}. The case study used here is the
+F/A-18C Lot~20 cold-start procedure \citep{eagledynamics2023hornetguide}. The
+procedure is suitable for this thesis because it is bounded, repeatable, and
+strongly state-dependent. The tutor must reason about electrical power, APU and
+engine state, display power, communications setup, navigation alignment,
+flight-control checks, and final pre-taxi settings.
+
+The procedure pack used by SimTutor is a manually decomposed training guide.
+It converts the DCS World F/A-18C manual and local evaluation materials into 33
+instructional steps with preconditions, completion gates, UI targets, and
+evidence requirements. This pack is a form of authored prior knowledge. It does
+not replace the simulator; it defines what the tutor is allowed to treat as a
+valid procedural state.
+
+The observation problem has two main channels. DCS-BIOS exposes many cockpit
+states through a telemetry interface \citep{dcsbiosdocs}. It is the preferred
+source for switch positions, engine parameters, and several indicator values.
+However, cockpit display content is not fully represented as simple telemetry.
+The left and right Digital Display Indicators (DDIs) and the Advanced
+Multipurpose Color Display (AMPCD) show pages and text that matter for the
+cold-start. This is why the thesis uses a VLM for selected display facts while
+keeping procedural interpretation in deterministic rules.
+
+\section{Foundation Models as Bounded Components}\label{sec:bg-foundation}
+
+Transformer-based foundation models provide the representational and
+instruction-following basis for modern language and multimodal systems
+\citep{vaswani2017attention}. In educational applications, large language
+models can generate flexible explanations, but they also introduce risks:
+unsupported confidence, hallucinated references, and fluent but context-free
+feedback \citep{kasneci2023chatgpt}. The design choice in this thesis is
+therefore not to ask a foundation model to be an unconstrained tutor. Instead,
+the model receives an evidence packet and returns a structured response that
+the runtime can validate before display.
+
+This view aligns with broader work on grounding model output in external
+evidence or action constraints. Retrieval-Augmented Generation (RAG) conditions
+language generation on retrieved documents rather than relying only on
+parametric memory \citep{lewis2020rag}. Work on grounded robotic language use,
+such as SayCan, similarly separates linguistic plausibility from action
+feasibility \citep{ahn2022saycan}. SimTutor adapts this principle to simulator
+tutoring: an answer may be linguistically plausible, but it is not actionable
+unless its step, explanation, and overlay target are supported by telemetry,
+procedure gates, retrieved sources, or visual facts.
+
+\subsection{Grounding, Authority, and Explanation}
+
+Grounding is used in several ways in the literature. In retrieval-augmented
+generation it often means that a model response is conditioned on external
+documents. In embodied language systems it can mean that a proposed action is
+feasible in the physical or simulated world. In explainable AI it can mean that
+the system exposes reasons for a recommendation. This thesis combines those
+meanings but keeps them operationally separate. Retrieved text grounds
+procedural wording; telemetry grounds simulator state; visual facts ground
+display observations; and the harness grounds actionability.
+
+The separation matters because a single natural-language explanation can hide
+several different authority claims. When a tutor says "press this button next",
+it may be claiming that the learner is on a specific step, that the previous
+step is complete, that a display cue has been observed, that the button is a
+valid target, and that the recommended action is safe within the procedure. If
+all of these claims are merged into one model-generated sentence, a fluent
+mistake is hard to diagnose. If each claim is tied to a distinct evidence type,
+the runtime can validate the parts before the learner sees the result.
+
+For that reason, the thesis uses explanation in a stricter sense than ordinary
+help text. An explanation should make the model's response inspectable against
+evidence. It should be possible to ask: which telemetry variable, gate failure,
+retrieved sentence, or visual fact supports this guidance? If the evidence is
+missing, the response should expose uncertainty instead of creating a confident
+story. This is the theoretical reason for treating the foundation model as a
+bounded component. The model is useful because it can combine context and phrase
+help flexibly; it is bounded because the procedure state, target space, and
+evidence references must remain outside its sole control.
+
+\section{Vision-Language Models and Structured Visual Facts}\label{sec:bg-vlm}
+
+Vision-language models extend foundation-model capabilities to image-text
+tasks. General VLM work such as Qwen-VL, Qwen3-VL, LLaVA, and InstructBLIP
+shows how visual encoders and language decoders can support image reasoning,
+visual question answering, instruction following, and text-rich perception
+\citep{bai2023qwen,qwen3vl2025,liu2023llava,dai2023instructblip}. The cockpit
+task in this thesis uses these capabilities in a narrow way. The VLM is not
+asked for a free-form description of the cockpit. It is asked to return a
+typed JSON object containing a fixed set of visual facts.
+
+The visual fact representation has three states:
+\texttt{seen}, \texttt{not\_seen}, and \texttt{uncertain}. A fact such as
+\texttt{fcsmc\_final\_go\_result\_visible} is a local claim about a visible
+display cue. It is not a claim that the whole FCS BIT step is complete. That
+distinction is central. The first 8-fact ontology contained more compound
+targets and exposed a recurring failure mode: the model could report a
+procedure-completion-like fact as \texttt{seen} even when the human label was
+\texttt{not\_seen}. The 13-fact ontology used by the current runtime decomposes
+such targets into visual atoms.
+
+This design also relates to screen and GUI understanding. Screen-content models
+must reason about fixed regions, symbolic text, and UI layout rather than
+ordinary natural images \citep{wang2021screen2words}. Cockpit displays share
+that structured quality. The thesis therefore evaluates not only aggregate
+accuracy but also per-fact behaviour and critical false positives, because a
+false positive on a completion-type fact may advance the tutoring state at the
+wrong time.
+
+\subsection{Structured Output as Visual Prediction}
+
+The VLM task is best understood as structured prediction over a small ontology.
+For each image, the model predicts a vector of categorical states rather than a
+caption. If the ontology contains \(K=13\) facts and each fact has three states,
+the target is a fixed-length output in a constrained label space. The JSON
+format is a convenient interface, but the learning problem is not merely JSON
+generation. The model has to align visual evidence with fact definitions,
+distinguish page labels from actual pages, separate transient intermediate
+states from final states, and decide when a cue is too ambiguous for a
+\texttt{seen} or \texttt{not\_seen} decision.
+
+Structured output changes the error surface. A free-form caption can be
+partially useful even if it omits a cue. A structured fact vector is either
+usable by downstream code or rejected by schema validation, and each fact state
+can affect a procedure gate differently. This is why JSON validity and schema
+validity are not cosmetic metrics. A model that understands the image but
+returns a malformed object cannot be integrated safely into the runtime. A
+model that returns valid JSON but hallucinates a completion fact is even more
+dangerous, because the output looks machine-readable while the underlying state
+claim is wrong.
+
+The cockpit domain also differs from common VLM benchmarks. Many benchmark
+images contain natural objects and open-ended descriptions. The cockpit images
+in this thesis are text-heavy, low-context, and region-structured. A small
+visual cue may be a pushbutton label, an option name, a page title, a row in a
+BIT result table, or a transient alignment message. The ontology therefore
+acts as a bridge between perception and control logic. It tells the model which
+propositions matter and tells the runtime how to consume them. The quality of
+that ontology is as important as the capacity of the backbone model.
+
+\subsection{Uncertainty as a First-Class State}
+
+The \texttt{uncertain} state is not a decorative third class. It is a mechanism
+for preserving epistemic caution in a pipeline that eventually affects user
+guidance. In a binary ontology, every ambiguous cue must be forced into
+\texttt{seen} or \texttt{not\_seen}. That can inflate false positives when the
+image is blurry or the display is partially occluded, and it can inflate false
+negatives when a cue is present but not readable enough for a confident label.
+By allowing \texttt{uncertain}, the VLM can report that the image does not
+support a clean claim.
+
+This design only helps if the downstream runtime respects it. In SimTutor,
+\texttt{uncertain} is not treated as completion evidence. It can be logged,
+surfaced to the language model as an uncertainty cue, or used to trigger a
+fresh observation, but it should not silently satisfy a procedure gate. This
+choice aligns the ML representation with the tutoring safety boundary: when the
+perception layer is unsure, the explanation should not pretend otherwise.
+Future temporal VLM work can reduce uncertainty by considering multiple frames,
+but the current single-frame method needs uncertainty as an explicit output
+state.
+
+\section{LoRA and Parameter-Efficient VLM Adaptation}\label{sec:bg-lora}
+
+Full fine-tuning of large multimodal models is often unnecessary or
+impractical for narrow domain tasks. Low-Rank Adaptation (LoRA) freezes the
+base model weights and learns low-rank update matrices for selected modules
+\citep{hu2021lora}. If a base weight matrix \(W\) is frozen, LoRA represents
+the update as:
+
+\[
+  W' = W + \Delta W,\qquad \Delta W = B A,
+\]
+
+where \(A\) and \(B\) are low-rank trainable matrices. This reduces the number
+of trainable parameters while preserving the base model. Parameter-efficient
+fine-tuning libraries such as PEFT and TRL provide practical tooling for this
+workflow \citep{mangrulkar2022peft,vonwerra2020trl}, while Unsloth is used in
+the local training reports for efficient VLM fine-tuning \citep{unsloth2024}.
+
+In this thesis, LoRA is used for a structured output task: image-to-facts JSON.
+The training examples pair a cockpit composite image with a target JSON schema
+containing fact states. The goal is not to make the model more generally
+knowledgeable about aviation. The goal is to make the model more reliable at a
+small set of display-state recognitions that the runtime needs. This is why
+the thesis treats ontology design, data curation, and holdout independence as
+part of the ML method rather than as peripheral engineering details.
+
+\subsection{Why PEFT Fits This Domain}
+
+The data regime in this thesis is closer to domain adaptation than to broad
+model training. The cockpit facts are specialised, the dataset is small, and
+the desired output format is narrow. Full fine-tuning would introduce several
+problems: it would require more compute, increase the risk of overfitting, make
+model distribution harder, and blur the boundary between the base model and the
+domain-specific adaptation. A LoRA adapter is a better fit because it stores
+the task-specific update separately from the base model and can be evaluated,
+replaced, or disabled as a distinct artifact.
+
+PEFT also matches the thesis's claim structure. The work does not claim to
+create a generally better VLM. It claims that a small adapter can improve one
+structured perception task when the ontology and data are aligned with the
+runtime. Keeping the adaptation small makes this claim more transparent. If a
+later procedure needs a different visual ontology, a new adapter can be trained
+and benchmarked without redefining the whole tutoring architecture. If a model
+family changes, the same data recipe can be tested on the new backbone, as done
+with Qwen3.6 and Gemma in the evaluation.
+
+There is also a practical reproducibility argument. Adapter training produces a
+manageable artifact that can be paired with benchmark JSON, per-sample
+predictions, and error reports. The adapter is not the only artifact that
+matters, but it is a compact representation of the learned part of the method.
+This makes the ML contribution easier to audit: the reader can separate the
+authored procedure pack, the reviewed labels, the training recipe, the adapter,
+and the holdout metrics.
+
+\subsection{Instruction Tuning and Schema Learning}
+
+The SFT rows used in the thesis teach two things at once. First, they teach the
+visual decision boundary for each fact. Second, they teach the model to emit
+the required JSON contract. These two objectives interact. A model may know
+that a page is visible but fail the runtime contract if it omits a fact, adds
+an unsupported field, or uses a state outside the allowed vocabulary.
+Conversely, a model may learn the schema while still making visual mistakes.
+This is why the evaluation separates JSON validity, schema validity, and
+fact-level accuracy.
+
+The bilingual English/Chinese export is also best viewed as instruction-format
+augmentation rather than new visual evidence. Each reviewed image contributes
+the same fact labels under two instruction variants. This can make the adapter
+less brittle to prompt language and target phrasing, but it does not create new
+cockpit states. The thesis therefore treats bilingual rows as useful
+supervision for interface robustness while still relying on independent holdout
+images for generalisation evidence.
+
+\section{Metrics for Reliability: Beyond Aggregate Accuracy}\label{sec:bg-metrics}
+
+The VLM evaluation uses several metrics because no single number captures the
+risk profile of a structured visual fact extractor. JSON validity and schema
+validity measure whether the model returned a usable object. Fact accuracy
+counts individual fact-state decisions. Macro F1 balances state classes across
+facts. Seen F1 focuses on the positive visual-detection state, which is often
+the state that confirms a cockpit display cue. Sample exact match is stricter:
+all facts in an image must be correct. Critical false positives count
+high-risk cases where the model predicts \texttt{seen} for facts that should
+not be considered visible.
+
+The last metric is especially important in a tutor. A false negative may cause
+the system to ask for another check. A false positive can cause it to treat a
+display state as achieved when it has not been achieved. The evaluation
+therefore interprets critical false positives separately from aggregate
+accuracy. This is one reason Gemma remains interesting as a comparison
+backbone: its adapted line is more conservative for some critical facts, even
+when its overall exact-match performance is lower than Qwen3.5.
+
+\subsection{Reliability Metrics in a Downstream System}
+
+The choice of metric depends on the downstream use. If the VLM were only used
+to summarise screenshots for a human analyst, macro F1 or qualitative caption
+quality might be enough. In this thesis the output can become part of a runtime
+evidence packet. That makes asymmetric errors important. A missed
+\texttt{seen} label may cause the tutor to ask the learner to check again, but
+a false \texttt{seen} label on a completion-critical fact can allow an unearned
+step transition or an incorrect explanation. This asymmetry motivates the
+separate critical-false-positive count.
+
+Sample exact match is also unusually strict but informative. The tutor does not
+consume only one fact in isolation; a help cycle may include a whole visual
+snapshot. If one of thirteen facts is wrong, the snapshot is not perfectly
+aligned with the reviewed label. Exact match therefore gives an intuitive
+measure of whether the entire visual state is clean enough for downstream
+reasoning. It should not replace fact-level analysis, because some facts are
+more important than others, but it exposes whether aggregate accuracy is hiding
+multi-fact residual errors.
+
+Finally, schema validity deserves attention because structured model output is
+a systems contract. In an offline benchmark, an invalid schema is an error. In
+a live tutor, it is also a control-flow event: the runtime has to reject,
+repair, or fall back. The ML evaluation therefore feeds directly into the RQ1
+runtime design. Reliable perception is not only about high accuracy; it is
+about producing outputs that the system can parse, validate, and safely combine
+with other evidence.
+
+\section{Grounded and Explainable Assistance in AR/VR}\label{sec:bg-xai}
+
+Explainable AI research argues that users and developers need to understand
+why a system produced a recommendation, especially when the recommendation
+affects action \citep{gunning2019xai}. Human-AI interaction guidelines similarly
+emphasise intelligibility, appropriate trust, and graceful handling of
+uncertainty \citep{amershi2019guidelines}. In this thesis, explanation is not
+only a textual feature. It is a runtime property: every actionable output
+should have an evidence path.
+
+The Meta Quest~3 setting makes this requirement concrete. A learner in VR has
+limited attention and limited tolerance for checking external material. The
+tutor must therefore be concise, but concision is not enough. It must also be
+clear why a highlighted control, a blocked step, or a recovery hint is being
+shown. SimTutor operationalises this through evidence references, response
+schemas, overlay allowlists, and replayable help-cycle logs.
+
+\section{Positioning of This Thesis}\label{sec:bg-positioning}
+
+The thesis sits between ML adaptation, tutoring systems, simulator
+instrumentation, and HCI/VR evaluation. From ITS research, it takes the need
+for explicit task structure. From RAG and grounded model work, it takes the
+principle that generated output should be conditioned on external evidence.
+From VLM research, it takes the ability to parse text-rich cockpit display
+images. From LoRA and PEFT, it takes the practical method for adapting large
+models to a narrow task. From AR/VR guidance, it takes the user-facing goal of
+keeping help inside the task environment.
+
+The novelty is the integration and the boundary discipline. The system does
+not claim to solve general cockpit autonomy, general VR tutoring, or general
+learning effectiveness. It shows how a foundation-model tutor for one
+high-fidelity VR procedure can be made more auditable by tying generated
+explanations to telemetry, authored procedure rules, retrieved sources, and
+structured visual facts. The remaining chapters turn that position into a
+method, a set of VLM benchmarks, and a formative Quest~3 pilot.

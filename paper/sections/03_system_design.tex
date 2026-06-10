@@ -1,435 +1,305 @@
 % ===========================================================================
-%  03 — System Architecture
+%  03 — Methods: Evidence-Grounded Runtime
 %
-%  Claims: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02,
-%          C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-RUNTIME-01
+%  Evidence: packs/fa18c_startup/*.yaml, adapters/*, live_dcs.py, replay docs.
 % ===========================================================================
-\chapter{System Architecture}\label{ch:system-design}
+\chapter{Methods: Evidence-Grounded Tutoring Runtime}\label{ch:system-design}
 
-This chapter answers RQ1 at the architectural level: how can simulator
-telemetry, retrieved procedural knowledge, and visual observations be integrated
-so that tutoring outputs remain state-aware, auditable, and safe for procedural
-guidance? The central design decision is to treat foundation-model output as
-one stage in an evidence-constrained runtime rather than as the tutor itself.
-Every help response is produced from an explicit evidence packet, checked
-against procedure-pack rules, validated by a harness, mapped through an overlay
-allowlist, and recorded for replay.
+This chapter answers RQ1 at the method level. It describes how SimTutor turns
+foundation-model assistance into an evidence-grounded help cycle for the
+F/A-18C Lot~20 cold-start task. The chapter is not organised as an
+implementation inventory. Instead, it describes the contracts that matter for
+interactive explanation: procedure modelling, telemetry grounding, retrieval,
+visual fact integration, response validation, overlay execution, and replay.
 
-The chapter first derives the design requirements from the evidence-grounding
-problem. It then presents the ports-and-adapters architecture, the live help
-cycle, the telemetry and procedure-gate evidence layers, the harness validation
-mechanism, the simulator adapter boundary, logging and replay infrastructure,
-and the runtime role of VLM-derived visual facts. Dataset construction and VLM
-fine-tuning methodology are deferred to Chapter~\ref{ch:methodology};
-implementation-level details appear in Chapter~\ref{ch:implementation}.
-
-% ===========================================================================
 \section{Design Requirements}\label{sec:design-goals}
 
-Evidence-grounded procedural tutoring imposes requirements that are different
-from a conventional checklist application or an unconstrained LLM chatbot. The
-runtime must observe state, reason over procedure order, explain help in
-language, and still prevent unsupported overlay actions from reaching the
-learner. Six requirements guide the architecture.
-
-\begin{itemize}
-\item \textbf{G1 -- Live procedural state observation.}
-The tutor must observe learner progress through simulator state rather than
-through self-report alone. In the F/A-18C case, this means using DCS-BIOS
-telemetry where available and visual facts where cockpit display state is not
-exported as structured data.
-
-\item \textbf{G2 -- Procedure-aware step inference.}
-The tutor must reason over preconditions, completion gates, and sequence
-history. The next useful help item is not necessarily the next checklist line;
-it is the next action that is valid given the current evidence.
-
-\item \textbf{G3 -- Explicit evidence for actionable output.}
-Every recommended step, overlay target, or refusal to advance must be traceable
-to evidence: telemetry, a gate result, a retrieved procedural source, a recent
-state change, or a visual fact. Model fluency alone is not acceptable evidence.
-
-\item \textbf{G4 -- Clean architectural boundaries.}
-Domain logic must remain independent of simulator APIs, model providers, GPU
-availability, and VR display plumbing. This permits the core procedure and
-validation logic to be tested without a running simulator.
-
-\item \textbf{G5 -- Graceful degradation.}
-When model output is unavailable, malformed, or insufficiently grounded, the
-runtime must fall back to deterministic text guidance or safe rejection rather
-than executing an unsafe overlay.
-
-\item \textbf{G6 -- Declarative procedure configuration.}
-Procedure steps, gates, telemetry mappings, UI targets, visual fact bindings,
-and error taxonomies must be represented as a procedure pack rather than hidden
-inside prompts or adapter code. This keeps the task model inspectable and
-versionable.
-\end{itemize}
-
-These requirements explain why the system is designed as an evidence pipeline.
-The architecture does not try to make the language model internally reliable
-enough to act alone. Instead, it surrounds generation with explicit state
-evidence, declarative rules, schema validation, allowlists, and replayable
-logs.
-
-% ===========================================================================
-\section{Ports-and-Adapters Architecture}\label{sec:design-arch}
-
-The runtime follows a ports-and-adapters architecture with a strict dependency
-direction: external systems connect through adapters, adapters implement stable
-ports, and the core contains the procedure and validation logic. The core never
-imports DCS-specific, provider-specific, or VR-specific modules. This boundary
-is central to the thesis claim because evidence-grounding must be testable and
-inspectable without depending on the live simulator.
-
-\begin{description}
-\item[Core layer.]
-The core contains simulator-independent domain logic: procedure state tracking,
-gate evaluation, visual fact state merging, BM25 retrieval primitives, event
-types, response schema generation, evidence packet construction, harness
-validation, scoring, and replay-oriented state checks.
-
-\item[Ports layer.]
-Ports define the stable interfaces between the domain core and the outside
-world. The main ports cover model inference, knowledge retrieval, visual input,
-and telemetry input. These ports make it possible to replace a model provider,
-knowledge backend, or simulator adapter without changing the procedure engine.
-
-\item[Adapters layer.]
-Adapters contain external integration code: DCS-BIOS receivers, telemetry
-sanitisation and aggregation, DCS overlay dispatch, OpenAI-compatible and local
-model clients, BM25 document retrieval, screenshot capture, and VLM visual fact
-extraction.
-
-\item[Procedure packs.]
-The procedure pack is the task-specific contract consumed by the core. The
-F/A-18C pack defines step order, precondition gates, completion gates, UI target
-identifiers, telemetry variable mappings, visual fact bindings, and error
-taxonomy. It is not an adapter because it does not talk to the simulator; it is
-the declarative domain specification.
-\end{description}
-
-Figure~\ref{fig:system-architecture} summarises this architecture. The diagram
-should be read from left to right as an evidence flow: simulator state and
-cockpit images enter through adapters, procedure-pack rules structure the
-runtime interpretation, retrieved sources and model services support help
-generation, and the harness checks the resulting action plan before any overlay
-or tutor text reaches the cockpit.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/fig_system_architecture.pdf}
-  \caption[Evidence-grounded tutoring architecture]{Evidence-grounded tutoring architecture. Simulator telemetry,
-  composite-panel vision, procedure-pack configuration, retrieved knowledge, and
-  model outputs are integrated through an evidence packet and checked by the
-  harness before any overlay or tutor text reaches the cockpit.}
-  \label{fig:system-architecture}
-\end{figure}
-
-The same boundary also supports the research workflow. Technical claims about
-gating, evidence packets, harness decisions, and replay can be tested with
-fixtures. Claims about visual fact extraction can be benchmarked separately
-from live tutoring. Claims about VR presentation can be treated as formative
-pilot evidence rather than as a prerequisite for validating the architecture.
-
-% ===========================================================================
-\section{The Evidence-Grounded Help Cycle}\label{sec:design-dataflow}
-
-The live help cycle is the core runtime calling chain. In compact form, it is:
-
-\begin{center}
-\small
-help trigger $\rightarrow$ telemetry snapshot $\rightarrow$ optional vision
-capture $\rightarrow$ step and gate inference $\rightarrow$ evidence packet
-$\rightarrow$ retrieval $\rightarrow$ model response $\rightarrow$ harness
-validation $\rightarrow$ overlay/text output $\rightarrow$ event log
-\end{center}
-
-This sequence matters because it fixes the order of authority. The model does
-not first decide what the simulator state means. Instead, the runtime assembles
-state evidence and candidate steps before generation, and validates the
-generated response before display. Figure~\ref{fig:help-cycle} shows this
-cycle.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/fig_help_cycle.pdf}
-  \caption{Live evidence-grounded help cycle. Each help request is converted
-  into a telemetry and vision observation, interpreted against procedure gates,
-  grounded with retrieved knowledge, passed through the text LLM, validated by
-  the harness, and then dispatched as overlay/text output with an event-log
-  trace.}
-  \label{fig:help-cycle}
-\end{figure}
-
-\subsection{Help Cycle Stages}
-
-\textbf{Observation.}
-The DCS-BIOS adapter receives simulator state and the telemetry pipeline
-normalises it into runtime variables. When the active or likely step requires
-display evidence, the vision adapter can capture the composite cockpit panel
-and request visual fact extraction.
-
-\textbf{Candidate inference.}
-The procedure engine evaluates precondition and completion gates, identifies
-candidate steps, and records missing or uncertain evidence. The resulting
-candidates are not natural-language suggestions; they are structured runtime
-objects derived from the current evidence.
-
-\textbf{Evidence packet assembly.}
-The runtime collects telemetry values, gate results, recent deltas, visual fact
-states, retrieved source references, and step candidates into an evidence
-packet. This packet is the boundary object between state interpretation and
-model-assisted help generation.
-
-\textbf{Model response.}
-The prompt asks the model to produce a structured help response grounded in the
-packet. The output must conform to the runtime HelpResponse schema. Free-form
-text that cannot be parsed or mapped safely does not become an action.
-
-\textbf{Validation and mapping.}
-The response passes through JSON extraction, schema validation, evidence
-reference checks, step and target allowlists, and harness validation. Only then
-can a response be mapped to overlay actions or tutor text. Failed validation
-triggers repair, rejection, or deterministic fallback.
-
-\textbf{Execution and logging.}
-Overlay commands are limited to safe display actions such as highlight, pulse,
-or clear. Control injection and auto-clicking are outside the architecture.
-Every help cycle is logged as structured events so that the decision can be
-replayed after the session.
-
-\subsection{Schema-Level Evidence Grounding}
-
-Evidence grounding is enforced before output execution. The HelpResponse schema
-is generated from the current procedure pack and UI map, so the set of valid
-steps and overlay targets is task-specific. Each target proposed by the model
-must be accompanied by evidence whose type and reference correspond to data
-available in the help-cycle context. The supported evidence kinds are telemetry
-variables (\texttt{var}), gate evaluations (\texttt{gate}), retrieved sources
-(\texttt{rag}), recent state changes (\texttt{delta}), and visual facts
-(\texttt{visual}).
-
-This design changes the failure mode of an unsupported model response. If the
-model proposes a plausible but ungrounded overlay, the response is not merely
-logged as questionable; it is structurally invalid for action execution. The
-system can then repair to an allowed target, fall back to text-only guidance, or
-reject the action plan.
-
-% ===========================================================================
-\section{Telemetry as State Evidence}\label{sec:design-telemetry}
-
-Telemetry is the primary evidence source for controls, indicators, and
-numerical state values that DCS-BIOS exports directly. The telemetry pipeline
-turns raw simulator frames into stable state evidence through four stages:
+The runtime was designed around six requirements.
 
 \begin{enumerate}
-\item \textbf{Raw ingestion.} DCS-BIOS UDP frames are decoded into structured
-observations with timestamps and sequence information.
-
-\item \textbf{Variable resolution.} Procedure-pack mappings project raw BIOS
-fields onto normalised variables such as \texttt{rpm\_r},
-\texttt{apu\_ready}, or \texttt{battery\_on}. The resolver also tracks missing
-sources so the runtime can distinguish an observed false value from an
-unavailable value.
-
-\item \textbf{Delta sanitisation.} Configured thresholds, debounce windows, and
-filtering policies suppress spurious changes from sensor jitter, switch bounce,
-and out-of-order frames.
-
-\item \textbf{Delta aggregation.} Recent state changes are compressed into a
-prompt-safe summary and an evidence source for help-cycle reasoning.
+\item \textbf{State-aware help.} The tutor must reason from the current
+simulator state, not only from a static checklist.
+\item \textbf{Evidence separation.} Telemetry, visual facts, retrieved text,
+and procedure rules must remain distinguishable after generation.
+\item \textbf{Bounded model authority.} The language model may phrase
+explanations, but it must not silently define the procedure state or invent
+overlay targets.
+\item \textbf{Inspectable visual perception.} The VLM should output structured
+facts that can be inspected and scored, not free-form cockpit narratives.
+\item \textbf{Replayability.} A help decision must be reconstructable from
+logged observations, evidence packets, model output, validation decisions, and
+overlay actions.
+\item \textbf{Pilot-readiness.} The runtime must generate participant-level
+artifacts for later analysis without turning the formative pilot into a hidden
+manual coding exercise.
 \end{enumerate}
 
-The missing-source distinction is important for procedural tutoring. A gate
-should not fail in the same way when a switch is known to be off and when the
-telemetry source is absent. The first case can justify corrective guidance; the
-second may require uncertainty-aware or text-only help.
+These requirements follow directly from the thesis title. Interactive
+explanation in VR is only defensible when the explanation can be traced to the
+simulated reality it describes.
 
-% ===========================================================================
-\section{Procedure Engine and Evidence Gates}\label{sec:design-procedure}
+\section{Evidence Object Model}\label{sec:design-evidence-model}
 
-The procedure engine maintains state over the ordered cold-start sequence. Each
-step can be pending, active, done, or blocked, and transitions are driven by
-precondition and completion gates. Gates are expressed declaratively in the
-procedure pack rather than embedded in prompts. This ensures that procedure
-state remains a rule-governed domain decision rather than a model inference.
+The runtime treats evidence as typed objects rather than as unstructured prompt
+text. This is a design choice with methodological consequences. A telemetry
+variable, a failed gate, a retrieved sentence, a visual fact, and a recent
+action are all useful to the tutor, but they should not have the same meaning.
+If they are collapsed into one paragraph before generation, the model can
+produce a fluent answer whose support is impossible to reconstruct. If they are
+kept as typed entries, the runtime can later check whether an overlay or
+diagnosis refers to evidence that actually existed.
 
-The gate evaluator supports threshold checks, range checks, boolean flags, and
-elapsed-time conditions. Missing, source-missing, or sentinel values produce
-diagnostic failures instead of being silently coerced into valid state. These
-diagnostics feed both the evidence packet and deterministic fallback.
+The evidence object model therefore records four properties for each usable
+piece of context. First, it records the evidence type, such as \texttt{var},
+\texttt{gate}, \texttt{rag}, \texttt{delta}, or \texttt{visual}. Second, it
+records a stable reference that can be used in prompts, validation, and logs.
+Third, it records the observed value or textual support. Fourth, it records
+availability and quality metadata where relevant, such as source-missing status,
+frame age, or retrieval source. This structure makes the help response
+auditable because a model cannot simply cite an arbitrary reason; the cited
+reason has to correspond to an evidence reference in the current packet.
 
-\subsection{Deterministic Fallback}
+The distinction between evidence and interpretation is deliberate. A visual
+fact can state that \texttt{fcsmc\_final\_go\_result\_visible} is
+\texttt{seen}; it should not state that the whole FCS BIT procedure is complete.
+A telemetry variable can state that the flap switch is in AUTO; it should not
+decide whether the learner understands why AUTO is required. The procedure
+engine and tutor response combine evidence into an explanation, but the raw
+evidence remains inspectable underneath that explanation.
 
-The deterministic fallback is part of the architecture, not an emergency
-afterthought. When no model is available or when model output fails validation,
-the runtime computes a conservative hint from the active step, unsatisfied
-gates, recent actions, and evidence availability. It distinguishes hard
-blockers, where evidence shows that a gate is unsatisfied, from soft blockers,
-where the required evidence is missing or uncertain. Overlay output is
-suppressed unless a local rule can uniquely determine a valid target.
+\section{Procedure Pack as Authoritative Prior}\label{sec:design-procedure}
 
-\subsection{Step Classification by Evidence Source}
+The procedure pack is the authored domain prior for the tutor. It represents
+the F/A-18C cold-start as 33 instructional steps derived from the DCS World manual
+and local training materials. Each step has a stable identifier, phase,
+preconditions, completion gates, evidence requirements, and UI targets. The
+pack is stored as configuration rather than embedded in prompts. This keeps the
+procedure auditable and separates domain knowledge from model wording.
 
-The current F/A-18C procedure pack classifies steps according to the most
-reliable available evidence source:
+The pack does three things during a help cycle. First, it constrains which
+steps may be considered next. A step cannot be recommended as available when
+its preconditions are unsatisfied. Second, it specifies the evidence used to
+confirm progress. Some steps are telemetry-dominant; display-dependent steps
+use visual fact bindings; other checks degrade conservatively when the
+required evidence is not available. Third, it defines the overlay target space.
+The model may suggest help, but the runtime maps visual highlights only to
+known cockpit targets.
 
-\begin{itemize}
-\item \textbf{Vision-priority steps:} S08, S15, S18, and S19 require cockpit
-display evidence from the visual fact pipeline.
-\item \textbf{BIOS-priority steps:} S01, S03--S13, S16, and S20--S33 are
-declared as primarily telemetry-verifiable in the pack metadata.
-\item \textbf{Manual or out-of-layout steps:} S14 and S17 require manual
-confirmation or involve cockpit areas outside the three-display composite.
-\end{itemize}
+This design avoids a common failure mode of prompt-driven tutors. If the
+procedure is represented only in natural language, the model can blend steps,
+skip preconditions, or invent target names. In SimTutor, the prompt receives a
+runtime-generated evidence packet, but the procedure itself remains a
+declarative object controlled by the system.
 
-The fire-test step S02 is handled through its own gate and recent-action
-contract rather than through the pack's three priority lists. The important
-architectural point is that the runtime does not ask the model to decide which
-evidence channel is authoritative for a step. That choice is declared by the
-procedure pack and consumed by the help cycle.
+\section{Authority Hierarchy}\label{sec:design-authority}
 
-% ===========================================================================
-\section{Harness Engineering and Evidence Validation}\label{sec:design-harness}
+The runtime uses an authority hierarchy to decide what can override what. The
+procedure pack has authority over step order, allowed targets, and evidence
+requirements. Telemetry has authority over directly exported simulator state.
+Reviewed visual facts have authority only over the defined visual propositions
+and only within their expiry and quality constraints. Retrieved text supports
+explanation but does not override gates. The LLM phrases guidance and may
+propose a diagnosis, but it does not define the final procedure state.
 
-The harness is the architecture's final safety boundary before output reaches
-the simulator. It converts a model-proposed response into a validated action
-plan, or into a repaired, rejected, or text-only outcome. The detailed object
-relationships are shown in Appendix Figure~\ref{fig:harness-validation}; the
-main architectural role is summarised here.
+This hierarchy prevents several subtle failures. Without it, a retrieved
+manual snippet could suggest a procedure variant that conflicts with the active
+airfield cold-start pack. A VLM could infer that a step is complete because it
+sees a related page, even when a required telemetry gate is false. An LLM could
+choose a plausible cockpit control that is not in the current UI allowlist.
+The hierarchy resolves these conflicts before user-facing output is produced:
+the stricter local contract wins over a broader or less reliable evidence
+source.
 
-The harness uses four conceptual objects:
+The hierarchy also supports graceful degradation. If a visual fact is missing,
+the runtime does not have to abandon the whole help cycle. It can still use
+telemetry, gates, recent actions, and retrieved procedure text. The generated
+response is simply constrained to what those evidence sources can support. In
+practice, this means that the tutor can say that visual confirmation is
+unavailable, can ask the learner to verify a display, or can give a text-only
+hint without highlighting a target. The user sees less ambitious help, but not
+invented certainty.
 
-\begin{description}
-\item[\texttt{EvidencePacket}.]
-A normalised snapshot of the current help cycle: telemetry state, gate
-diagnostics, recent actions, visual facts, retrieved references, and candidate
-step information.
+\section{Telemetry Grounding}\label{sec:design-telemetry}
 
-\item[\texttt{StepCandidate}.]
-A candidate explanation of where the learner may be in the procedure, derived
-from gates, telemetry, recent actions, and visual evidence.
+DCS-BIOS telemetry is the primary observation channel for simulator state. The
+runtime receives raw frames, normalises exported values, derives higher-level
+variables, and tracks missing sources separately from false values. This
+distinction is important. A variable can be false because the cockpit state is
+not satisfied, or it can be unavailable because the source was not exported or
+not observed in the current frame. Treating both cases as the same would make
+the tutor overconfident.
 
-\item[\texttt{StepHarnessSpec}.]
-A pack-derived contract for each step: allowed overlay targets, required
-observables, telemetry facts, vision facts, completion predicates, recovery
-policy, and signal freshness requirements.
+The telemetry pipeline also performs delta sanitisation and aggregation. Raw
+simulator signals can jitter, repeat, or change too quickly for a model prompt.
+The runtime therefore turns high-frequency state changes into stable variables
+and concise recent-action summaries. These summaries help the tutor explain
+what changed without exposing the model to an unbounded log.
 
-\item[\texttt{HarnessActionPlan}.]
-The validated result: selected step, selected overlay step, targets, evidence
-references, guidance text, text-only status, repair status, rejection status,
-and reasons.
-\end{description}
+Examples of telemetry-derived evidence include battery and generator state,
+APU readiness, engine RPM thresholds, throttle movement, INS mode, radar mode,
+flap state, parking-brake release, IFEI BINGO fuel settings, and attitude-source
+selection. Where telemetry is authoritative, the VLM is not used. This is a
+deliberate design choice: computer vision should not replace direct simulator
+state when direct state exists.
 
-The validation sequence has three effects. First, it prevents wrong-step or
-wrong-target outputs from bypassing the procedure pack. Second, it prevents
-stale or inappropriate evidence from driving a later step. Third, it creates
-machine-readable reasons for repairs and rejections, which are then available
-for replay and evaluation.
+\section{Retrieval and Source Policy}\label{sec:design-retrieval}
 
-\subsection{Fixture-Based Regression Testing}
+Retrieved procedural knowledge supports the natural-language explanation part
+of a help response. The runtime builds grounding queries from the current
+procedure candidate and simulator state, retrieves local manual or training
+snippets, and supplies them to the model as source material. A source policy
+restricts which documents and chunks are allowed. This keeps the model from
+receiving arbitrary repository text or unrelated simulator material.
 
-The harness is tested with live help fixtures: recorded telemetry snapshots and
-runtime contexts captured at procedure states that previously exposed failures.
-Each fixture is replayed through the help cycle and asserts the expected
-outcome, such as the correct target, a repaired target, text-only fallback, or
-safe rejection.
+Retrieval is therefore used for explanation, not for uncontrolled decision
+making. The procedure pack and telemetry decide whether a step is available or
+blocked; retrieved text helps phrase the action, check, and rationale. This
+division mirrors the thesis's broader boundary: foundation models should
+explain evidence, not replace the evidence.
 
-The current coverage matrix contains 20 live-fixture regression entries across
-S01--S33. These fixtures cover correct advancement, wrong-target rejection,
-repair of incomplete or mismatched visual evidence, prevention of stale VLM
-facts leaking into non-visual steps, moving-control wait guidance, and
-interaction semantics for switches, push buttons, and rotary controls. This
-coverage is not an educational evaluation; it is technical evidence that
-evidence-grounding constraints can be enforced systematically at the runtime
-boundary.
+\section{Visual Fact Integration}\label{sec:design-vision}
 
-% ===========================================================================
-\section{Adapter Boundary: Simulator, Overlay, and Vision}\label{sec:design-adapters}
+Visual facts enter the help cycle when display content cannot be read reliably
+from telemetry. The runtime uses a fixed composite panel layout covering the
+left DDI, right DDI, and AMPCD. The VLM receives one or more candidate frames
+and returns a JSON object with the allowed fact identifiers and states. The
+current 13-fact ontology includes page visibility facts, FCS page markings,
+FCS-MC BIT states, HSI/map-layer facts, and INS alignment text facts.
 
-The adapter layer isolates DCS-specific behaviour behind the ports used by the
-core. Three adapter responsibilities are central to the live runtime.
+The runtime treats these facts as observations, not as procedure decisions. A
+visual fact can satisfy a step binding only when the procedure pack says it is
+relevant. Some facts are short-lived and expire quickly; others, such as a
+final GO cue, may be sticky for a longer time because the display state can
+disappear after the learner changes pages. The sticky mechanism prevents the
+system from forgetting transient but important visual evidence, while still
+keeping the evidence explicit.
 
-\begin{description}
-\item[Telemetry input.]
-The telemetry adapter receives DCS-BIOS state data and feeds the telemetry
-pipeline. Its output is normalised state evidence rather than simulator-specific
-frame data.
+This architecture is what makes VLM benchmark performance relevant to the
+runtime. A higher fact accuracy matters because the downstream rule engine uses
+those facts as evidence. A critical false positive matters because it can make
+a completion-like visual cue appear present when it is absent. The runtime
+therefore logs visual fact calls and preserves their outputs for replay and
+error analysis.
 
-\item[Overlay output.]
-The overlay adapter maps abstract tutor targets to DCS overlay identifiers and
-sends highlight, pulse, or clear commands. It does not execute cockpit controls.
+\section{Help Cycle}\label{sec:design-help-cycle}
 
-\item[Vision input.]
-The vision adapter triggers screenshot capture and passes composite-panel
-images to the VLM fact extractor. The resulting visual facts return to the core
-as structured evidence.
-\end{description}
+A help cycle begins when the learner requests assistance, for example through
+the configured hotkey path used in the pilot. The runtime then performs the
+following sequence:
 
-The VR path follows the same boundary. VR mirror display, tutor text transport,
-and composite-panel capture are adapter concerns; procedure inference and
-harness validation remain in the core. The VR code path was exercised in the
-formative pilot study reported in Section~\ref{sec:eval-pilot}. Larger
-controlled human-subject evaluation remains future work.
+\begin{enumerate}
+\item Read the latest telemetry frame and derived variables.
+\item Merge recent actions and any available visual fact observations.
+\item Evaluate procedure preconditions and completion gates.
+\item Select the current blocked, pending, or next candidate step.
+\item Retrieve source snippets under the local source policy.
+\item Build a structured prompt containing the evidence packet.
+\item Request a model response.
+\item Parse the response against the expected schema.
+\item Validate overlay targets and evidence references.
+\item Execute, repair, or suppress overlay actions.
+\item Record the observation, model response, validation result, and action in
+the event log.
+\end{enumerate}
 
-% ===========================================================================
-\section{Event Logging and Replay}\label{sec:design-replay}
+The model is therefore invoked only after evidence assembly. The response is
+used only after validation. This sequencing is the runtime expression of
+``Explain Reality'': the model explains a bounded evidence packet and the
+system checks whether the explanation can be safely displayed.
 
-Auditability requires that help-cycle decisions survive beyond the live
-session. The runtime records versioned, timestamped events in JSONL format.
-Events include observations, help requests, evidence summaries, model outputs,
-harness decisions, overlay actions, and scoring-relevant interaction data.
+\section{Structured Response and Overlay Validation}\label{sec:design-validation}
 
-Replay uses these records to reconstruct step ordering, state-machine
-consistency, and help-cycle behaviour offline. The current replay evaluation
-suite includes five scenario types: no-operation, battery-on,
-battery-and-generator-off, FCS reset and BIT, and INS alignment. These cases use
-DCS-BIOS raw captures and, where available, vision sidecar artifacts.
+The tutor response is structured rather than free-form. It contains fields for
+diagnosis, recommended action, checks, explanation, and overlay targets. The
+runtime parses the response, validates it against a schema, and maps overlay
+targets through an allowlist. If a model proposes an unsupported target, a
+coarse target, or an action that lacks evidence, the runtime can repair the
+output, fall back to text-only guidance, or suppress the overlay.
 
-The logging and replay layer supports the thesis in two ways. During
-development, it makes regressions reproducible. During evaluation, it connects
-claims about readiness and instrumentation to concrete artifacts rather than to
-manual observation alone. Full end-to-end replay of multimodal human-in-the-loop
-sessions with synchronised vision frames remains a limitation.
+This validation layer matters for both safety and evaluation. It prevents a
+model from directly controlling visual highlights through arbitrary text. It
+also creates a record of how often model outputs required repair. In the pilot
+reported later, all executed overlay actions passed validation; fallback events
+were mainly repair or mapping events rather than full deterministic-only
+responses. That result supports RQ1 at the system level, while also showing
+where the model still needed runtime correction.
 
-% ===========================================================================
-\section{VLM Adapter for Visual Evidence}\label{sec:design-vlm}
+\section{Uncertainty and Degradation Modes}\label{sec:design-degradation}
 
-The VLM component supplies visual evidence for display states that telemetry
-does not export directly. Its runtime output is a set of visual facts, not a
-procedure decision. Each fact is a bounded proposition about visible cockpit
-display content, with state \texttt{seen}, \texttt{not\_seen}, or
-\texttt{uncertain}. The procedure engine and harness decide how those facts
-affect the help cycle.
+The runtime has to handle uncertainty as a normal operating state. In a live
+simulator, a help request can arrive while a switch is moving, while a display
+page is changing, while a DCS-BIOS variable is unavailable, or while the VLM
+frame is stale. Treating these cases as ordinary false values would make the
+tutor overconfident. Treating them as hard failures would make the system too
+fragile for live use. The method therefore defines degradation modes.
 
-The current runtime contract uses the 13-fact ontology introduced in
-Chapter~\ref{ch:background}. Facts have time-to-live settings, optional sticky
-semantics, and step bindings through all-of or any-of conditions. For example,
-facts related to FCS-MC final GO can be latched so that a transient completed
-display state is not lost when the learner changes pages.
+The first mode is \emph{evidence missing}. A required source is not available,
+or the source is known to be outside the current observation contract. The
+runtime may still provide general procedure guidance, but it should not claim
+that the state has been checked. The second mode is \emph{evidence conflicting}.
+For example, a visual fact and a telemetry-derived step candidate may point to
+different interpretations. In that case the stricter authority hierarchy and
+harness rules determine whether the response is repaired, downgraded, or held.
+The third mode is \emph{output invalid}. The model response fails schema,
+target, or evidence-reference validation, so the runtime falls back to a
+deterministic or text-only response.
 
-When a help request concerns a vision-priority step, the runtime may trigger a
-capture, extract visual facts, merge them into the current evidence snapshot,
-and include them in the evidence packet. If the vision adapter is unavailable
-or the multimodal request fails, the help cycle continues with telemetry,
-retrieval, and procedure gates. This graceful degradation preserves the
-telemetry-grounded core while allowing visual evidence to improve steps that
-need display interpretation.
+These modes matter because they make uncertainty visible in logs and, where
+appropriate, in user-facing language. A tutor that cannot tell the difference
+between "you did not do this" and "I cannot observe this" will mislead the
+learner. SimTutor's design keeps those cases separate. This is especially
+important in the F/A-18C cold-start because some steps combine slowly changing
+simulator state, transient display text, and manual cockpit navigation. The
+runtime can be helpful only if it knows when its own evidence is incomplete.
 
-The data pipeline, ontology evolution from 8 facts to 13 facts, LoRA
-fine-tuning configuration, and holdout benchmark protocol are methodological
-questions rather than architecture questions. They are therefore treated in
-Chapter~\ref{ch:methodology} and evaluated in Chapter~\ref{ch:evaluation}.
+\section{VR Interaction Boundary}\label{sec:design-vr-boundary}
 
-% ===========================================================================
-\section{Summary}\label{sec:design-summary}
+The Meta Quest~3 setting affects the runtime design even though this thesis is
+not primarily a VR interface study. In a desktop setting, a user can more
+easily switch between a simulator, a manual, a chat window, and logs. In a
+headset, that switching cost is much higher. Guidance must be brief, spatially
+useful, and timed to the learner's current action. At the same time, VR
+guidance can become intrusive if it highlights too many targets, uses stale
+state, or interrupts a learner who is already completing the action.
 
-The architecture presented in this chapter turns foundation-model tutoring into
-a constrained evidence-processing pipeline. Telemetry and visual facts provide
-observations, procedure packs define valid state transitions and evidence
-requirements, retrieval supplies source-grounded context, models generate
-structured help, the harness validates or repairs proposed actions, and logs
-make the decision replayable. This is the system-level answer to RQ1: procedural
-help becomes auditable when model output is made downstream of explicit
-evidence and upstream of enforced validation.
+The runtime therefore treats overlay guidance as a constrained output channel,
+not as decorative UI. Highlighted targets must come from the procedure pack's
+UI map. Multi-target guidance is bounded. Evidence references are required for
+overlay plans. When the model proposes a target that is too coarse or not
+grounded enough, the harness may repair it or suppress the overlay. The
+language part of the response remains available, but spatial guidance is held
+to a stricter standard because it directly shapes the learner's attention in
+the cockpit.
+
+This boundary also explains why the pilot logs matter. A successful VR trial is
+not only a participant reaching the last step. It is also a sequence of help
+requests, VLM calls, repairs, highlights, and state transitions that can be
+inspected afterward. Without that record, it would be difficult to tell whether
+the tutor helped because its evidence loop worked, because the participant was
+already experienced, or because a human observer filled gaps informally. The
+exported help-cycle artifacts make that distinction analyzable in future work.
+
+\section{Logging, Replay, and Export}\label{sec:design-replay}
+
+Every help cycle and trial-level event is written to logs that can be replayed
+and exported. Replay is important because a live VR session is difficult to
+inspect in the moment. The export pipeline produces trial summaries,
+per-step coding files, help-cycle tables, action timelines, quality gates, and
+session metadata. These artifacts support both regression testing and pilot
+analysis.
+
+The replay design also protects the interpretation of results. A benchmark
+metric by itself does not show how the tutor behaved in a live trial. A pilot
+completion table by itself does not show whether the overlay path was valid.
+By preserving evidence packets, model outputs, validation decisions, and
+participant-level exports, the thesis can connect ML reliability to the actual
+conditions under which a user saw help in VR.
+
+\section{Method Boundary}\label{sec:design-boundary}
+
+The runtime method has a clear boundary. It is not a certified flight-training
+system, not a general cockpit automation system, and not a proof of learning
+effectiveness. It is a research prototype for studying how evidence-grounded
+foundation-model explanations can operate inside an immersive simulator. The
+next chapters evaluate the two most important parts of that prototype: the VLM
+visual evidence layer and the formative Quest~3 pilot.

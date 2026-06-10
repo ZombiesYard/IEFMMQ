@@ -19,11 +19,11 @@ for procedural tutoring when they are placed inside an auditable evidence loop.
 
 The F/A-18C cold-start task provided a demanding case for that idea. It required
 the tutor to combine telemetry-visible cockpit state, visual evidence from
-display pages, retrieved procedural knowledge, manual or out-of-layout
-boundaries, and validation before producing overlay or textual guidance. The
-result is not a claim that learning effectiveness has already been proven. It is
-a technical and methodological contribution: a way to make model-assisted
-procedural help state-aware, inspectable, and bounded by available evidence.
+display pages, retrieved procedural knowledge, unavailable-source boundaries,
+and validation before producing overlay or textual guidance. The result is not
+a claim that learning effectiveness has already been proven. It is a technical
+and methodological contribution: a way to make model-assisted procedural help
+state-aware, inspectable, and bounded by available evidence.
 
 % ===========================================================================
 \section{Summary of Completed Work}\label{sec:conc-summary}
@@ -74,6 +74,24 @@ evaluation path for studying grounded tutoring with real VR participants. The
 important point across all three is not the presence of an LLM or VLM by itself,
 but the boundary placed around foundation-model output.
 
+That boundary is the main transferable idea. A foundation model can be useful
+in a high-fidelity procedural trainer, but only when its role is made explicit.
+The LLM is a language and explanation component, not the source of simulator
+truth. The VLM is a perception component, not the procedure engine. Retrieval
+is a source of textual grounding, not a licence to mix procedure variants.
+Telemetry is authoritative where it exists, but it is not a complete pedagogy.
+The runtime contribution is the mechanism that combines these partial
+authorities into one help cycle and records how the combination was made.
+
+The ML contribution is similarly bounded but concrete. The thesis does not
+claim that LoRA adaptation solves cockpit perception in general. It shows that
+with a carefully revised ontology, reviewed small data, composition rebalance,
+and independent holdouts, a VLM can become substantially more reliable on the
+specific structured visual facts needed by the tutor. The Qwen3.5, Qwen3.6, and
+Gemma comparison shows why this should be treated as a model-and-data decision
+rather than a simple choice of the largest backbone. Reliability depends on the
+fact contract, the error cost, and the downstream use of the prediction.
+
 The scope remains deliberately bounded. The evaluation covers one procedure,
 one cockpit layout, local visual holdouts, replay and harness readiness, and a
 small non-random pilot. The current evidence supports technical reliability and
@@ -100,7 +118,8 @@ beyond isolated screenshots where procedure state depends on temporal evidence:
 short visual histories, repeated confirmation, or multi-frame inputs are natural
 next mechanisms for completion-like facts. Finally, the full help cycle should
 be evaluated as an integrated system, including latency, overlay correctness,
-harness repair frequency, and expert-rated response usefulness.
+harness repair frequency, expert-rated response usefulness, and the moments
+where the assistant should withhold, defer, or explicitly state uncertainty.
 
 A longer-term version of the system could learn from in-situ corrections by
 instructors or learners. That direction would turn live tutoring into a data
@@ -108,10 +127,22 @@ collection loop, but it requires careful safeguards: correction labels may be
 noisy, updates must not erase already reliable behaviour, and every adapted
 model must still be evaluated against untouched holdouts.
 
+The broader research question is how to make AI a collaborator rather than an
+answer generator. In the setting studied here, collaboration means helping the
+learner act under uncertainty while preserving the learner's ability to inspect
+the situation. It means choosing when to highlight, when to explain, when to ask
+for confirmation, and when to remain silent. It also means leaving enough
+evidence behind that an instructor, researcher, or developer can reconstruct
+what the system believed and why it acted. The prototype in this thesis does
+not complete that agenda, but it establishes the evidence loop needed to pursue
+it.
+
 The title of this thesis, \emph{Explain Reality}, captures the final design
 commitment. A procedural tutor should not merely explain a checklist, and it
 should not merely generate plausible language about a task. It should explain
 the learner's current reality: what is observable, which evidence supports it,
 which procedure rule applies, what remains uncertain, and why the next response
-is allowed. The contribution of this thesis is an architecture and evidence
-method for making that explanation auditable.
+is allowed. That is also the long-term path toward AI as a trustworthy
+collaborator in dynamic, high-load, multimodal environments. The contribution
+of this thesis is an architecture and evidence method for making that
+explanation auditable.

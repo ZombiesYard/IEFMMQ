@@ -757,34 +757,34 @@ Package csquotes Info: Redefining alias 'default' -> 'british'.
 (sections/09_appendix.aux))
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 106.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 107.
 LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 1
-06.
+07.
  (ts1cmr.fd
 File: ts1cmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions
 )
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 106.
-LaTeX Font Info:    ... okay on input line 106.
-Package scrbase Info: activating british \contentsname on input line 106.
-Package scrbase Info: activating british \listfigurename on input line 106.
-Package scrbase Info: activating british \listtablename on input line 106.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 107.
+LaTeX Font Info:    ... okay on input line 107.
+Package scrbase Info: activating british \contentsname on input line 107.
+Package scrbase Info: activating british \listfigurename on input line 107.
+Package scrbase Info: activating british \listtablename on input line 107.
 
 (translations-basic-dictionary-english.trsl
 File: translations-basic-dictionary-english.trsl (english translation file `tra
@@ -795,13 +795,13 @@ File: translations-basic-dictionary-german.trsl (german translation file `trans
 lations-basic-dictionary')
 )
 Package translations Info: loading dictionary `translations-basic-dictionary' f
-or `german'. on input line 106.
+or `german'. on input line 107.
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: hyperref package is loaded.
 Package caption Info: listings package is loaded.
 Package caption Info: threeparttable package is loaded.
 Package caption Info: End \AtBeginDocument code.
-Package hyperref Info: Link coloring ON on input line 106.
+Package hyperref Info: Link coloring ON on input line 107.
  (nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
  (refcount.sty
@@ -812,9 +812,9 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count361
 )
-LaTeX Info: Redefining \ref on input line 106.
-LaTeX Info: Redefining \pageref on input line 106.
-LaTeX Info: Redefining \nameref on input line 106.
+LaTeX Info: Redefining \ref on input line 107.
+LaTeX Info: Redefining \pageref on input line 107.
+LaTeX Info: Redefining \nameref on input line 107.
  (main.out) (main.out)
 \@outlinefile=\write3
 \openout3 = `main.out'.
@@ -826,7 +826,7 @@ Class scrreprt Info: loading recommended package `bookmark'.
 (scrreprt)           `bookmarkpackage=false' before \begin{document} and
 (scrreprt)           you can avoid this message adding:
 (scrreprt)             \usepackage{bookmark}
-(scrreprt)           before \begin{document} on input line 106.
+(scrreprt)           before \begin{document} on input line 107.
  (bookmark.sty
 Package: bookmark 2020-11-06 v1.29 PDF bookmarks (HO)
  (bkm-dvipdfm.def
@@ -858,61 +858,50 @@ File: t1lmss.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 
 
 
-]) [4
+] [4]) [5
 
-]
+] [6]
 \openout2 = `sections/00_acknowledgements.aux'.
 
- (sections/00_acknowledgements.tex [5
+ (sections/00_acknowledgements.tex
+[7
 
 
 
 
-])
-[6
+]) [8
 
-] (main.toc [7
-
+] (main.toc [9
 
 
-] [8] [9]
-LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 1
-22.
- (t1lmtt.fd
-File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-) [10])
+
+] [10] [11] [12])
 \tf@toc=\write4
 \openout4 = `main.toc'.
 
- [11] (main.lof
-Overfull \hbox (1.87997pt too wide) in paragraph at lines 8--8
- [][] [][][]\T1/lmr/m/n/12 Evidence-grounded tu-tor-ing ar-chi-tec-ture. Sim-u-
-lator tele-metry, composite- 
- []
-
-
-Overfull \hbox (5.61491pt too wide) in paragraph at lines 8--8
- \T1/lmr/m/n/12 panel vis-ion, procedure-pack con-fig-ur-a-tion, re-trieved kno
-w-ledge, and model 
- []
-
-[12
-
-]
-Overfull \hbox (8.30852pt too wide) in paragraph at lines 22--22
- [][] [][][]\T1/lmr/m/n/12 Detailed ex-per-i-ment ex-port pipeline. Runtime eve
-nt logs and trial metadata 
- []
-
-)
+ [13] (main.lof
+LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 9
+.
+ (t1lmtt.fd
+File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
+))
 \tf@lof=\write5
 \openout5 = `main.lof'.
 
- [13] (main.lot)
+ [14
+
+]
+(main.lot
+Overfull \hbox (2.35197pt too wide) in paragraph at lines 18--18
+ [][] [][][]\T1/lmr/m/n/12 Short an-onymised par-ti-cipant com-ments, para-phra
+sed or lightly con-densed 
+ []
+
+)
 \tf@lot=\write6
 \openout6 = `main.lot'.
 
- [14
+ [15
 
 ]
 \openout2 = `sections/01_introduction.aux'.
@@ -934,326 +923,214 @@ Class scrreprt Warning: \float@addtolists detected!
 (scrreprt)              a package that still implements the
 (scrreprt)              deprecated \float@addtolist interface.
 
-
-Overfull \hbox (58.75232pt too wide) in paragraph at lines 24--32
-[]\T1/lmr/m/n/12 Traditional train-ing aids---video walk-throughs, prin-ted che
-ck-lists, instructor-led demonstrations---
- []
-
 [1
 
 
 
-] [2]
-Overfull \hbox (0.90868pt too wide) in paragraph at lines 126--129
-[]\T1/lmr/m/n/12 The tech-nical val-id-a-tion of the VLM ad-apt-a-tion pipeline
- through sys-tem-atic bench-
- []
-
-[3] [4] [5]
-Overfull \hbox (1.93352pt too wide) in paragraph at lines 261--264
-[]\T1/lmr/bx/n/12 Chapter [][]6[][] \T1/lmr/m/n/12 re-ports cur-rent tech-nical
- res-ults (VLM bench-marks, er-ror ana-lysis, runtime
- []
-
-)
-Overfull \hbox (0.25046pt too wide) in paragraph at lines 274--123
-[]\T1/lmr/bx/n/12 Appendix [][]9[][] \T1/lmr/m/n/12 con-tains sup-ple-ment-ary 
-tables, full hy-per-para-meter con-fig-ur-a-tions, data-
- []
-
-[6]
+] [2] [3] [4] [5] [6]) [7]
 \openout2 = `sections/02_background_related_work.aux'.
 
  (sections/02_background_related_work.tex
 chapter 2.
-[7
+[8
 
 
 
 
-]
-Overfull \hbox (18.30852pt too wide) in paragraph at lines 67--70
-[]\T1/lmr/m/n/12 Parking brake re-lease, BINGO
+] [9]
+Overfull \hbox (16.64807pt too wide) in paragraph at lines 101--110
+\T1/lmr/m/n/12 Transformer-based found-a-tion mod-els provide the rep-res-ent-a
+-tional and instruction-following
  []
 
-[8] [9]
-File: figures/fig_bg_evidence_sources.pdf Graphic file (type pdf)
-<use figures/fig_bg_evidence_sources.pdf>
-LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 170.
- [10]
-Overfull \hbox (142.25296pt too wide) in paragraph at lines 216--219
-[]\T1/lmr/bx/n/12 Right DDI facts: \T1/lmtt/m/n/12 bit_root_page_visible\T1/lmr
-/m/n/12 , \T1/lmtt/m/n/12 fcsmc_page_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fc
-smc_intermediate_result_visible\T1/lmr/m/n/12 ,
- []
-
-
-Overfull \hbox (108.20493pt too wide) in paragraph at lines 219--222
-[]\T1/lmr/bx/n/12 AMPCD facts: \T1/lmtt/m/n/12 hsi_page_visible\T1/lmr/m/n/12 ,
- \T1/lmtt/m/n/12 hsi_map_layer_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 ins_grnd
-_alignment_text_visible\T1/lmr/m/n/12 ,
- []
-
-[11]
-Overfull \hbox (11.70528pt too wide) in paragraph at lines 224--231
-\T1/lmr/m/n/12 (\T1/lmtt/m/n/12 ins_grnd_alignment_text_visible\T1/lmr/m/n/12 ,
- \T1/lmtt/m/n/12 ins_ok_text_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 hsi_map_la
-yer_visible\T1/lmr/m/n/12 )
- []
-
-
-Overfull \hbox (80.8044pt too wide) in paragraph at lines 240--249
-\T1/lmr/m/n/12 not be over-writ-ten by sub-sequent \T1/lmtt/m/n/12 not_seen \T1
-/lmr/m/n/12 frames. For ex-ample, the \T1/lmtt/m/n/12 fcsmc_final_go_result_vis
-ible
- []
-
-[12]
-Overfull \hbox (70.99129pt too wide) in paragraph at lines 271--280
-[]\T1/lmr/m/n/12 Steps that rely on visual con-firm-a-tion (S08, S15, S18, S19)
- are re-gistered as \T1/lmtt/m/n/12 vision_priority_steps
- []
-
-
-Overfull \hbox (29.24716pt too wide) in paragraph at lines 295--311
-\T1/lmr/m/n/12 been ap-plied to tasks such as air-craft main-ten-ance, pro-gram
--ming, and equip-ment troubleshoot-
- []
-
-[13]
-Overfull \hbox (1.12486pt too wide) in paragraph at lines 332--345
-\T1/lmr/m/n/12 developed tele-metry bridges). The present work uses DCS-BIOS, a
- community-developed
- []
-
-[14] [15] [16]) [17]
+[10] [11] [12] [13] [14] [15] [16]) [17]
 \openout2 = `sections/03_system_design.aux'.
 
  (sections/03_system_design.tex
 chapter 3.
-
-Overfull \hbox (17.31236pt too wide) in paragraph at lines 41--46
-[]\T1/lmr/m/n/12 The core tu-tor-ing logic---
- []
-
-
-Overfull \hbox (45.59686pt too wide) in paragraph at lines 48--50
-[]\T1/lmr/m/n/12 Every in-ter-ac-tion is re-cor-ded as struc-tured, timestamped
-
- []
-
-
-Overfull \hbox (0.61725pt too wide) in paragraph at lines 52--57
-[]\T1/lmr/m/n/12 When a lan-guage model
- []
-
 [18
 
 
 
 
-]
-Overfull \hbox (7.41747pt too wide) in paragraph at lines 59--63
-[]\T1/lmr/m/n/12 Procedure defin-i-tions, UI tar-gets, tele-metry
+] [19] [20]
+Overfull \hbox (0.47098pt too wide) in paragraph at lines 124--131
+\T1/lmr/m/n/12 DCS-BIOS tele-metry is the primary ob-ser-va-tion chan-nel for s
+im-u-lator state. The runtime
  []
 
-
-Overfull \hbox (12.42928pt too wide) in paragraph at lines 81--85
-[]\T1/lmr/m/n/12 Defines four stable Py-thon pro-to-cols: \T1/lmtt/m/n/12 Model
-Port \T1/lmr/m/n/12 (reas-on-ing), \T1/lmtt/m/n/12 KnowledgePort
- []
-
-
-Overfull \hbox (5.9156pt too wide) in paragraph at lines 81--85
-\T1/lmr/m/n/12 (re-trieval), \T1/lmtt/m/n/12 VisionPort \T1/lmr/m/n/12 (visual 
-in-put), and \T1/lmtt/m/n/12 TelemetryPort \T1/lmr/m/n/12 (sim-u-lator state). 
-These
- []
-
-[19]
-File: figures/fig_system_architecture.pdf Graphic file (type pdf)
-<use figures/fig_system_architecture.pdf>
-File: figures/fig_help_cycle.pdf Graphic file (type pdf)
-<use figures/fig_help_cycle.pdf>
- [20] [21] [22]
-Overfull \hbox (38.00435pt too wide) in paragraph at lines 201--208
-[]\T1/lmr/m/n/12 This mech-an-ism pro-duces a uni-fied audit trail. For ex-ampl
-e, high-light-ing the \T1/lmtt/m/n/12 battery_switch
- []
-
-
-Overfull \hbox (7.13809pt too wide) in paragraph at lines 201--208
-\T1/lmtt/m/n/12 "type": "var", "ref": "VARS.battery_switch", "quote": "0"}\T1/l
-mr/m/n/12 , tra-cing the ac-
- []
-
-[23]
-Overfull \hbox (0.15527pt too wide) in paragraph at lines 248--255
-\T1/lmr/m/n/12 (elapsed time). The eval-u-ator in-cludes ex-pli-cit unknown-val
-ue hand-ling: miss-ing, source-
- []
-
-[24] [25]
-Overfull \hbox (33.341pt too wide) in paragraph at lines 307--314
-\T1/lmr/m/n/12 and next-step re-com-mend-a-tions against the cur-rent pro-ced-u
-re state. A \T1/lmtt/m/n/12 HarnessDecision
- []
-
-[26] [27]
-Overfull \hbox (2.08954pt too wide) in paragraph at lines 406--410
-[]\T1/lmr/m/n/12 The scor-ing en-gine counts omis-sions and state vi-ol-a-tions
- with con-fig-ur-able per-category
- []
-
-
-Overfull \hbox (20.51878pt too wide) in paragraph at lines 422--429
-\T1/lmr/m/n/12 The VLM com-pon-ent ex-tracts struc-tured \T1/lmr/m/it/12 visual
- facts \T1/lmr/m/n/12 from cock-pit screenshots---intermediate
- []
-
-[28]
-Overfull \hbox (112.55978pt too wide) in paragraph at lines 435--438
-[]\T1/lmr/bx/n/12 Left DDI\T1/lmr/m/n/12 : \T1/lmtt/m/n/12 tac_page_visible\T1/
-lmr/m/n/12 , \T1/lmtt/m/n/12 supt_page_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 
-fcs_page_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcs_page_x_marks_visible\T1/lm
-r/m/n/12 . 
- []
-
-
-Overfull \hbox (109.54765pt too wide) in paragraph at lines 438--441
-[]\T1/lmr/bx/n/12 Right DDI\T1/lmr/m/n/12 : \T1/lmtt/m/n/12 bit_root_page_visib
-le\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcsmc_page_visible\T1/lmr/m/n/12 , \T1/lmtt/
-m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 ,
- []
-
-
-Overfull \hbox (75.49962pt too wide) in paragraph at lines 441--444
-[]\T1/lmr/bx/n/12 AMPCD\T1/lmr/m/n/12 : \T1/lmtt/m/n/12 hsi_page_visible\T1/lmr
-/m/n/12 , \T1/lmtt/m/n/12 hsi_map_layer_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12
- ins_grnd_alignment_text_visible\T1/lmr/m/n/12 ,
- []
-
-) [29]
+[21] [22] [23] [24]) [25]
 \openout2 = `sections/04_methodology.aux'.
 
  (sections/04_methodology.tex
 chapter 4.
-
-Overfull \hbox (17.53302pt too wide) in paragraph at lines 32--39
-\T1/lmr/m/n/12 ary of key--value pairs and tracks un-avail-able or un-known sou
-rces in a \T1/lmtt/m/n/12 vars_source_missing
- []
-
-
-Overfull \hbox (0.15527pt too wide) in paragraph at lines 42--51
-\T1/lmr/m/n/12 (elapsed time). The eval-u-ator in-cludes ex-pli-cit unknown-val
-ue hand-ling: miss-ing, source-
- []
-
-[30
+[26
 
 
 
 
-] [31]
+]
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[27]
 File: figures/fig_vlm_pipeline.pdf Graphic file (type pdf)
 <use figures/fig_vlm_pipeline.pdf>
- [32] [33]
-Overfull \hbox (157.30492pt too wide) in paragraph at lines 177--189
- [][] 
- []
 
 
-Overfull \hbox (8.58614pt too wide) in paragraph at lines 198--209
-\T1/lmr/m/n/12 ab-strac-tion levels: some facts de-scribed low-level visual ob-
-ser-va-tions (\T1/lmtt/m/n/12 fcs_page_visible\T1/lmr/m/n/12 ),
- []
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
 
-[34]
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[28]
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[29]
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[30]
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[31]
 File: figures/fig_ontology_evolution.pdf Graphic file (type pdf)
 <use figures/fig_ontology_evolution.pdf>
 
-Overfull \hbox (37.14557pt too wide) in paragraph at lines 228--237
-\T1/lmr/m/n/12 posed into two lower-level, dir-ectly ob-serv-able facts: \T1/lm
-tt/m/n/12 ins_grnd_alignment_text_visible
- []
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[32]
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[33]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 292.
 
 
-Overfull \hbox (76.27654pt too wide) in paragraph at lines 228--237
-\T1/lmr/m/n/12 chain (\T1/lmtt/m/n/12 fcsmc_page_visible\T1/lmr/m/n/12 , \T1/lm
-tt/m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcs
-mc_in_test_visible\T1/lmr/m/n/12 ,
- []
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\times' on input line 292.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 292.
+
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
+
+[34]
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
 
 [35]
 
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 251.
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
 
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\times' on input line 251.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 251.
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
 
 [36]
-Overfull \hbox (3.66367pt too wide) in paragraph at lines 315--325
-\T1/lmr/m/n/12 in-jec-tion, vis-ion batch col-la-tion), PEFT (LoRA ad-apter def
-in-i-tion), and TRL \T1/lmtt/m/n/12 SFTTrainer
- []
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
 
 [37]
-Overfull \hbox (13.4555pt too wide) in paragraph at lines 343--353
-\T1/lmr/m/n/12 in Run-003. Sev-eral crit-ical facts had ex-tremely low pos-it-i
-ve counts: \T1/lmtt/m/n/12 ins_ok_text_visible
- []
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
 
 [38]
-Overfull \hbox (113.45284pt too wide) in paragraph at lines 378--388
-[]\T1/lmr/m/n/12 Count of er-rors where any of 6 crit-ical facts (\T1/lmtt/m/n/
-12 fcs_page_x_marks_visible\T1/lmr/m/n/12 ,
- []
 
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
 
-Overfull \hbox (109.93063pt too wide) in paragraph at lines 378--388
-\T1/lmtt/m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/
-12 fcsmc_in_test_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcsmc_final_go_result_
-visible\T1/lmr/m/n/12 ,
- []
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
 
-[39]
-Overfull \hbox (10.86617pt too wide) in paragraph at lines 434--438
-[]\T1/lmr/m/n/12 P04, P05, P08, P09. Par-ti-cipants re-ceived the full telemetr
-y-grounded
- []
+[39])
+
+Package fancyhdr Warning: \headheight is too small (14.5pt): 
+(fancyhdr)                Make it at least 27.11652pt, for example:
+(fancyhdr)                \setlength{\headheight}{27.11652pt}.
+(fancyhdr)                You might also make \topmargin smaller to compensate:
+
+(fancyhdr)                \addtolength{\topmargin}{-12.61652pt}.
 
 [40]
-Overfull \hbox (1.6486pt too wide) in paragraph at lines 467--470
-[]\T1/lmtt/m/n/12 step_coding.csv\T1/lmr/m/n/12 : per-step cod-ing with auto-co
-ded er-rors (OM/-CO/OR/PA/SV),
- []
-
-[41]
-Overfull \hbox (4.55605pt too wide) in paragraph at lines 511--517
-\T1/lmr/m/n/12 ex-port. P02's task met-rics (steps com-pleted, er-rors) are de-
-rived from \T1/lmtt/m/n/12 trial_summary.csv
- []
-
-) [42] [43]
 \openout2 = `sections/05_implementation.aux'.
 
  (sections/05_implementation.tex
 chapter 5.
-[44
+[41
 
 
 
 
-] [45] [46]) [47]
+] [42] [43]
+Overfull \hbox (1.67918pt too wide) in paragraph at lines 151--159
+\T1/lmr/m/n/12 against \T1/lmtt/m/n/12 metrics_base.json\T1/lmr/m/n/12 , \T1/lm
+tt/m/n/12 metrics_lora.json\T1/lmr/m/n/12 , and \T1/lmtt/m/n/12 benchmark_summa
+ry.json\T1/lmr/m/n/12 . This
+ []
+
+[44] [45] [46]) [47]
 \openout2 = `sections/06_evaluation.aux'.
 
  (sections/06_evaluation.tex
@@ -1261,8 +1138,43 @@ chapter 6.
 File: figures/fig_evaluation_dataflow.pdf Graphic file (type pdf)
 <use figures/fig_evaluation_dataflow.pdf>
 
-Overfull \hbox (116.07039pt too wide) in paragraph at lines 56--68
- [][] 
+Underfull \hbox (badness 10000) in paragraph at lines 68--68
+\T1/lmr/m/n/10.95 from manu-al/train-ing
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 68--68
+[]|\T1/lmr/m/n/10.95 DCS-BIOS vari-ables,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 68--68
+\T1/lmr/m/n/10.95 ables, missing-source
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 68--68
+[]|\T1/lmr/m/n/10.95 Pack-derived re-sponse
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 68--68
+\T1/lmr/m/n/10.95 schema, UI al-lowl-
+ []
+
+
+Underfull \hbox (badness 3460) in paragraph at lines 68--68
+\T1/lmr/m/n/10.95 ists, evidence-reference
+ []
+
+
+Underfull \hbox (badness 1783) in paragraph at lines 68--68
+[]|\T1/lmr/m/n/10.95 Five re-play cases and
+ []
+
+
+Underfull \hbox (badness 4582) in paragraph at lines 68--68
+\T1/lmr/m/n/10.95 with sum-mar-ies, step
  []
 
 [48
@@ -1270,215 +1182,72 @@ Overfull \hbox (116.07039pt too wide) in paragraph at lines 56--68
 
 
 
-] [49]
-Overfull \hbox (6.77791pt too wide) in paragraph at lines 114--117
-[]\T1/lmr/m/n/12 The re-sid-ual crit-ical false pos-it-ives in the LoRA ad-apte
-r are con-cen-trated on completion-
- []
-
-
-Overfull \hbox (80.00124pt too wide) in paragraph at lines 114--117
-\T1/lmr/m/n/12 type facts: \T1/lmtt/m/n/12 fcsmc_final_go_result_visible \T1/lm
-r/m/n/12 (8 on Run-004, 1 on Run-002) and \T1/lmtt/m/n/12 ins_ok_text_visible
- []
-
-
-Overfull \hbox (12.21558pt too wide) in paragraph at lines 129--141
- [][] 
- []
-
-[50]
-Overfull \hbox (48.93178pt too wide) in paragraph at lines 165--182
-\T1/lmr/m/n/12 apter's per-form-ance. \T1/lmr/bx/n/12 Coarse panel pres-ence \T
-1/lmr/m/n/12 (6 facts: \T1/lmtt/m/n/12 tac_page_visible\T1/lmr/m/n/12 , \T1/lmt
-t/m/n/12 supt_page_visible\T1/lmr/m/n/12 ,
- []
-
-
-Overfull \hbox (16.5361pt too wide) in paragraph at lines 165--182
-\T1/lmtt/m/n/12 fcs_page_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 bit_root_page_
-visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcsmc_page_visible\T1/lmr/m/n/12 , \T1/
-lmtt/m/n/12 hsi_page_visible\T1/lmr/m/n/12 ):
- []
-
-
-Overfull \hbox (35.47157pt too wide) in paragraph at lines 165--182
-\T1/lmr/m/n/12 near-perfect clas-si-fic-a-tion, with the single ex-cep-tion of 
-two false neg-at-ives on \T1/lmtt/m/n/12 tac_page_visible
- []
-
-
-Overfull \hbox (79.93063pt too wide) in paragraph at lines 165--182
-\T1/lmtt/m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/
-12 fcsmc_in_test_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 fcsmc_final_go_result_
-visible\T1/lmr/m/n/12 ,
- []
-
-
-Overfull \hbox (108.83981pt too wide) in paragraph at lines 165--182
-\T1/lmtt/m/n/12 hsi_map_layer_visible\T1/lmr/m/n/12 ): per-fect on four facts; 
-re-sid-ual false pos-it-ives on \T1/lmtt/m/n/12 fcsmc_final_go_result_visible
- []
-
-
-Overfull \hbox (7.36191pt too wide) in paragraph at lines 165--182
-\T1/lmr/m/n/12 (8 on Run-004). \T1/lmr/bx/n/12 Small-text re-cog-ni-tion \T1/lm
-r/m/n/12 (2 facts: \T1/lmtt/m/n/12 ins_grnd_alignment_text_visible\T1/lmr/m/n/1
-2 ,
- []
-
-[51] [52] [53] [54]
-Overfull \hbox (34.161pt too wide) in paragraph at lines 380--385
-\T1/lmr/m/n/12 load, TLX, or con-fid-ence sum-mary. Task met-rics (steps, er-ro
-rs) from \T1/lmtt/m/n/12 trial_summary.csv
- []
-
-[55]) [56]
+] [49] [50] [51] [52]
+File: figures/fig_qwen35_run002_overall_accuracy.png Graphic file (type bmp)
+<figures/fig_qwen35_run002_overall_accuracy.png>
+File: figures/fig_qwen35_run004_critical_fp.png Graphic file (type bmp)
+<figures/fig_qwen35_run004_critical_fp.png>
+ [53] [54]
+File: figures/fig_qwen36_run002_overall_accuracy.png Graphic file (type bmp)
+<figures/fig_qwen36_run002_overall_accuracy.png>
+File: figures/fig_gemma_run002_overall_accuracy.png Graphic file (type bmp)
+<figures/fig_gemma_run002_overall_accuracy.png>
+ [55] [56] [57] [58] [59]) [60] [61]
 \openout2 = `sections/07_discussion.aux'.
 
- (sections/07_discussion.tex
+
+(sections/07_discussion.tex
 chapter 7.
-[57
+[62
 
 
 
 
-] [58] [59]
-LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <14.4> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 161.
- [60] [61] [62]
-Overfull \hbox (50.8089pt too wide) in paragraph at lines 300--312
-\T1/lmr/m/n/12 sid-ual er-rors on these two de-com-posed facts fall-ing to 3 (1
- on \T1/lmtt/m/n/12 ins_grnd_alignment_text_visible\T1/lmr/m/n/12 ,
- []
-
-
-Overfull \hbox (103.43564pt too wide) in paragraph at lines 313--325
-[]\T1/lmr/m/n/12 The \T1/lmtt/m/n/12 ins_go $\OMS/cmsy/m/n/12 !$ \T1/lmr/m/n/12
- {\T1/lmtt/m/n/12 ins_ok_text_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 ins_grnd_
-alignment_text_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 hsi_map_layer_visible\T1
-/lmr/m/n/12 }
- []
-
-
-Overfull \hbox (27.57773pt too wide) in paragraph at lines 313--325
-\T1/lmr/m/n/12 de-com-pos-i-tion is not the only ex-ample of this prin-ciple. T
-he v1 fact \T1/lmtt/m/n/12 fcs_bit_result_visible
- []
-
-
-Overfull \hbox (101.47266pt too wide) in paragraph at lines 313--325
-\T1/lmtt/m/n/12 fcsmc_intermediate_result_visible\T1/lmr/m/n/12 , \T1/lmtt/m/n/
-12 fcsmc_in_test_visible\T1/lmr/m/n/12 , and \T1/lmtt/m/n/12 fcsmc_final_go_res
-ult_visible\T1/lmr/m/n/12 ,
- []
-
-[63] [64] [65] [66]
-Overfull \hbox (62.79707pt too wide) in paragraph at lines 498--508
-\T1/lmr/m/n/12 tion [][]7.4[][], the Qwen LoRA ad-apter re-tains crit-ical fals
-e pos-it-ives on \T1/lmtt/m/n/12 fcsmc_final_go_result_visible
- []
-
-[67] [68] [69]
-Underfull \hbox (badness 1189) in paragraph at lines 641--641
-[]|\T1/lmr/m/n/10.95 Formative pi-lot com-pleted
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 642--643
-[]|\T1/lmr/m/n/10.95 Recruitment, ran-dom-isa-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 644--644
-[]|\T1/lmr/m/n/10.95 Ontology ex-ten-sion to
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 648--648
-[]|\T1/lmr/m/n/10.95 Multi-frame tem-poral
- []
-
-
-Underfull \hbox (badness 4108) in paragraph at lines 652--652
-[]|\T1/lmr/m/n/10.95 Online ad-apt-a-tion from
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 654--655
-[]|\T1/lmr/m/n/10.95 Label re-li-ab-il-ity, cata-
- []
-
-
-Underfull \hbox (badness 1831) in paragraph at lines 654--655
-\T1/lmr/m/n/10.95 strophic for-get-ting, eval-u-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 656--656
-[]|\T1/lmr/m/n/10.95 System-level end-to-end
- []
-
-) [70]
+] [63] [64] [65] [66] [67] [68] [69] [70] [71] [72]) [73] [74]
 \openout2 = `sections/08_conclusion.aux'.
 
- (sections/08_conclusion.tex
+
+(sections/08_conclusion.tex
 chapter 8.
-[71
-
-
-
-
-] [72] [73]) [74] (main.bbl
-chapter without number
 [75
 
 
 
 
-] [76]) [77]
+] [76] [77]) [78] (main.bbl
+chapter without number
+[79
+
+
+
+
+] [80] [81]) [82]
 \openout2 = `sections/09_appendix.aux'.
 
  (sections/09_appendix.tex
 chapter 9.
-[78
+[83
 
 
-]
-Overfull \hbox (125.55147pt too wide) in paragraph at lines 103--122
- [][] 
- []
-
-[79] [80]
-Overfull \hbox (12.39745pt too wide) in paragraph at lines 197--201
-[]\T1/lmr/m/n/12 Cases with \T1/lmtt/m/n/12 vision_status = available \T1/lmr/m
-/n/12 in-clude per-frame side-car files (\T1/lmtt/m/n/12 frames.jsonl\T1/lmr/m/
-n/12 )
- []
-
+] [84]
+LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 148.
+ [85]
 File: figures/fig_harness_validation.pdf Graphic file (type pdf)
 <use figures/fig_harness_validation.pdf>
+ [86]
 File: figures/fig_deployment_topology.pdf Graphic file (type pdf)
 <use figures/fig_deployment_topology.pdf>
 File: figures/fig_experiment_export.pdf Graphic file (type pdf)
 <use figures/fig_experiment_export.pdf>
-
-Overfull \hbox (11.7108pt too wide) in paragraph at lines 248--263
- [][] 
- []
-
-[81] [82] [83] [84]
-Overfull \hbox (18.68394pt too wide) in paragraph at lines 300--315
- [][] 
- []
-
-) [85] (main.aux (Preamble.aux) (sections/00_abstract.aux)
-(sections/00_acknowledgements.aux) (sections/01_introduction.aux)
-(sections/02_background_related_work.aux) (sections/03_system_design.aux)
-(sections/04_methodology.aux) (sections/05_implementation.aux)
-(sections/06_evaluation.aux) (sections/07_discussion.aux)
-(sections/08_conclusion.aux) (sections/09_appendix.aux))
+) [87] [88] [89] [90] (main.aux (Preamble.aux)
+(sections/00_abstract.aux) (sections/00_acknowledgements.aux)
+(sections/01_introduction.aux) (sections/02_background_related_work.aux)
+(sections/03_system_design.aux) (sections/04_methodology.aux)
+(sections/05_implementation.aux) (sections/06_evaluation.aux)
+(sections/07_discussion.aux) (sections/08_conclusion.aux)
+(sections/09_appendix.aux))
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  )
-Output written on main.xdv (99 pages, 415180 bytes).
+Output written on main.xdv (105 pages, 439540 bytes).

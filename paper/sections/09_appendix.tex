@@ -211,8 +211,9 @@ INS mode & S12 & yes & INS mode knob \\
 % Evidence: replay_eval/fa18c_startup_v04/suite.yaml
 
 Cases marked as vision available include per-frame sidecar files
-(\texttt{frames.jsonl}) in the corresponding DCS Saved Games capture. These
-files allow vision-dependent replay cases to run without a live DCS instance.
+(\texttt{frames.jsonl}) in the corresponding DCS World Saved Games capture.
+These files allow vision-dependent replay cases to run without a live DCS World
+instance.
 
 % ===========================================================================
 \section{Supplementary Architecture and Export Diagrams}\label{sec:appendix-figures}
@@ -254,29 +255,34 @@ reproducibility and operational context.
 % ===========================================================================
 \section{VR Pilot Study --- Supplementary Data}\label{sec:appendix-pilot}
 
-Table~\ref{tab:pilot-participants} lists participant experience profiles.
+Table~\ref{tab:pilot-participants} lists participant experience profiles used
+for descriptive interpretation. P02's questionnaire-derived fields are excluded
+from workload, confidence, usability, trust, and comment summaries because the
+available questionnaire metadata contains an internal participant-id mismatch.
+P08 uses manual completion coding, and P09 is treated as an independent
+participant after the correction recorded in the trial metadata.
 
 \begin{table}[htbp]
 \centering
 \caption{Pilot participant experience profiles (self-reported).}\label{tab:pilot-participants}
 \small
-\begin{tabularx}{\textwidth}{@{}ll>{\raggedright\arraybackslash}Xl@{}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lllllll@{}}
 \toprule
-\textbf{P} & \textbf{Condition} & \textbf{Self-reported experience} & \textbf{Group} \\
+\textbf{P} & \textbf{Condition} & \textbf{Group} & \textbf{DCS World} & \textbf{F/A-18C} & \textbf{Cold start} & \textbf{VR} \\
 \midrule
-P01 & No tutor & DCS frequent; flight simulation frequent; VR frequent; Quest 3 frequent & intermediate \\
-P02 & No tutor & DCS intermediate; flight simulation intermediate; VR frequent; Quest 3 frequent & n/r \\
-P03 & No tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 frequent & beginner \\
-P04 & Tutor & DCS intermediate; flight simulation intermediate; VR frequent; Quest 3 frequent & intermediate \\
-P05 & Tutor & DCS intermediate; flight simulation intermediate; VR frequent; Quest 3 frequent & n/r \\
-P06 & No tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 frequent & beginner \\
-P07 & No tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 frequent & beginner \\
-P08 & Tutor & DCS novice; flight simulation novice; VR frequent; Quest 3 frequent & n/r \\
-P09 & Tutor & DCS novice; flight simulation novice; VR intermediate; Quest 3 intermediate & beginner \\
+P01 & No tutor & novice & none & none & none & very little \\
+P02 & No tutor & intermediate & frequent & experienced & tried before & frequent \\
+P03 & No tutor & intermediate & occasional & tried before & tried before & occasional \\
+P04 & Tutor & intermediate & occasional & tried before & tried before & occasional \\
+P05 & Tutor & expert & frequent & experienced & can complete & frequent \\
+P06 & No tutor & expert & frequent & experienced & can complete & frequent \\
+P07 & No tutor & intermediate & occasional & tried before & tried before & occasional \\
+P08 & Tutor & intermediate & occasional & tried before & tried before & occasional \\
+P09 & Tutor & novice & none & none & none & very little \\
 \bottomrule
-\end{tabularx}
-
-n/r = not recorded.
+\end{tabular}
+}
 \end{table}
 
 Table~\ref{tab:pilot-uncompleted} lists the specific steps not completed by

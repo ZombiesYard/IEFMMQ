@@ -1,15 +1,14 @@
 # ===========================================================================
 #  SimTutor Paper — Makefile
 #  Usage:
-#    make           — build the PDF (pdflatex → bibtex → pdflatex ×2)
+#    make           — build the PDF with tectonic
 #    make clean     — remove build artifacts, keep PDF
 #    make distclean — remove everything including PDF
 #    make view      — open PDF with system viewer
 # ===========================================================================
 
 MAIN   = main
-LATEX  = pdflatex
-BIBTEX = bibtex
+TECTONIC = tectonic
 VIEWER = xdg-open
 
 .PHONY: all clean distclean view
@@ -26,10 +25,7 @@ $(MAIN).pdf: $(MAIN).tex sections/00_abstract.tex \
               sections/07_discussion.tex \
               sections/08_conclusion.tex \
               references.bib
-	$(LATEX) -interaction=nonstopmode $(MAIN).tex
-	$(BIBTEX) $(MAIN)
-	$(LATEX) -interaction=nonstopmode $(MAIN).tex
-	$(LATEX) -interaction=nonstopmode $(MAIN).tex
+	$(TECTONIC) --keep-logs --keep-intermediates $(MAIN).tex
 
 clean:
 	rm -f $(MAIN).aux $(MAIN).bbl $(MAIN).blg $(MAIN).log \

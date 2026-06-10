@@ -1,64 +1,102 @@
 % ===========================================================================
 %  00 — Abstract + Zusammenfassung
 %
-%  Evidence: paper_context/claims_registry.md (verified claims only)
-%  Terminology: paper_context/terminology.md
+%  Evidence: benchmark metrics under benchmarks/, VLM reports under
+%            Doc/Vision/Reports/, pilot exports under artifacts/experiments/.
 % ===========================================================================
 
 \chapter*{Abstract}
 
-Many safety- and skill-critical domains, including aviation, industrial
-maintenance, medicine, and emergency operations, require learners to practise
-ordered procedures whose next correct action depends on the current system
-state. As such training moves into high-fidelity and immersive simulation,
-tutoring systems must provide contextual help without relying on
-language-model fluency alone. This thesis studies that problem through the
-F/A-18C cold-start procedure in DCS World. It designs an evidence-grounded
-tutoring runtime that combines procedure-pack state tracking, retrieved
-procedural context, and a fine-tuned vision-language model (VLM) for structured
-visual fact extraction from cockpit displays. Two technical findings support
-the visual evidence layer. First, the 8-fact
-ontology exposed the risk of compound targets that mix perception with
-procedural completion. Second, the runtime-aligned 13-fact ontology, paired
-with small-data LoRA adaptation, reduced critical false positives by
-64--89\% in the primary Qwen3.5 base-versus-LoRA comparison on independent
-holdouts. The Qwen3.5-9B LoRA adapter, trained on 928 bilingual rows, achieves
-0.99 fact accuracy on two holdout sets with verified zero training overlap.
-Supplementary Qwen3.6 and Gemma-4 results show that the recipe can be applied
-to the evaluated backbones, while performance remains backbone-specific. A
-small formative VR pilot study with nine participants provides descriptive
-evidence: all four tutor-condition participants completed the full 33-step
-procedure, whereas none of the five without-tutor participants did; omission
-errors were largely replaced by assistance-coupled errors in the tutor condition.
-Controlled evaluation with larger samples remains future work.
+\emph{Explain Reality} studies how foundation models can give useful
+interactive explanations inside an immersive simulator without becoming
+unbounded conversational agents. The motivating setting is a Meta Quest~3
+training task in Digital Combat Simulator World: learners perform the
+F/A-18C Lot~20 cold-start procedure while the tutor must explain the next
+action from the aircraft state that is actually present. In this setting,
+``reality'' is not the physical aircraft but a live, high-load, multimodal
+simulation state. An explanation is useful only if it can be traced to
+inspectable evidence.
+
+This thesis presents SimTutor, an evidence-grounded procedural tutoring
+runtime that combines procedure-pack rules, DCS-BIOS telemetry, retrieved
+procedure knowledge, structured response validation, replayable logs, and a
+vision-language model (VLM) layer for cockpit display facts. The main machine
+learning contribution is a small-data LoRA adaptation pipeline for structured
+visual fact extraction. A first 8-fact ontology revealed that compound targets
+such as procedural completion states were prone to high-risk false positives.
+The revised 13-fact ontology instead asks the VLM for local visual evidence
+atoms and leaves procedural interpretation to deterministic downstream rules.
+
+On two independent 13-fact holdouts with verified zero exact overlap to the
+training set, the Qwen3.5 LoRA adapter trained with the Run-003 + Run-005x2
+recipe is the strongest offline line. On Run-002 newfacts, fact accuracy rises
+from 0.8677 to 0.9908 and sample exact match from 0.10 to 0.88; on Run-004
+random, fact accuracy rises from 0.8038 to 0.9931 and sample exact match from
+0.03 to 0.92. Critical false positives fall from 11 to 4 on Run-002 and from
+70 to 8 on Run-004. A matched Qwen3.6-27B experiment shows a stronger base
+model and a deployable LoRA candidate, but it does not surpass the Qwen3.5
+LoRA line on the current holdouts. Gemma improves substantially under the same
+data recipe and is more conservative on some critical facts, but remains below
+Qwen3.5 in overall exact-match behaviour.
+
+A formative non-random Quest~3 pilot with nine participants complements the
+technical evidence. The participant pool included novice, intermediate, and
+expert self-reported profiles. Four participants used the tutor and five
+performed a passive without-tutor condition. All four tutor-condition
+participants completed the manually reviewed 33-step procedure, whereas none
+of the five without-tutor participants did. The tutor condition showed zero
+manual omission errors but introduced assistance-coupled commission and
+prompting errors in several trials. Raw NASA-TLX and usability/trust responses
+are reported descriptively only; P02's questionnaire is excluded because of a
+metadata mismatch, and P08 uses manual completion coding. The pilot therefore
+supports feasibility, instrumentation, and error-pattern claims, not causal
+claims about learning gains, workload reduction, retention, transfer, or task
+speed.
+
+The thesis argues that reliable interactive explanation in immersive training
+is best treated as an evidence-design problem: foundation models should explain
+the live task state only through evidence that the runtime can observe,
+validate, and replay.
 
 \newpage
 \chapter*{Zusammenfassung}
 
 \begin{otherlanguage}{ngerman}
-Prozedurales Lernen in hochrealistischer Simulation erfordert das Ausf\"uhren
-geordneter, zustandsabh\"angiger Handlungsabfolgen bei gleichzeitiger
-\"Uberpr\"ufung von Systemzust\"anden. Herk\"ommliche Trainingshilfen
-unterbrechen jedoch entweder die Immersion oder haben keinen Zugriff auf den
-Simulatorzustand. Diese Arbeit begegnet dieser L\"ucke durch eine
-telemetriegest\"utzte Tutoring-Laufzeitumgebung, die paketbasierte
-Zustandsverfolgung, Retrieval-Augmented-LLM-Hilfegenerierung und ein
-feinabgestimmtes Vision-Language-Model (VLM) zur strukturierten Extraktion
-visueller Fakten aus Cockpit-Anzeigen kombiniert. Zwei technische Ergebnisse
-st\"utzen die visuelle Evidenzschicht. Erstens zeigte die 8-Fact-Ontologie das
-Risiko zusammengesetzter Ziele, die Wahrnehmung und prozedurale Fertigstellung
-vermischen. Zweitens reduzierte die runtime-ausgerichtete 13-Fact-Ontologie in
-Verbindung mit kleiner LoRA-Anpassung kritische False-Positives um 64--89\%
-im prim\"aren Qwen3.5-Base-gegen-LoRA-Vergleich auf unabh\"angigen Holdout-Sets.
-Der Qwen3.5-9B LoRA-Adapter, trainiert mit 928 bilingualen Datenzeilen,
-erreicht eine Fact-Genauigkeit von 0,99 auf zwei Holdout-Sets mit verifizierter
-Null-\"Uberlappung zum Training. Erg\"anzende Qwen3.6- und Gemma-4-Ergebnisse
-zeigen, dass die Rezeptur auf die untersuchten Backbones anwendbar ist; die
-Leistung bleibt jedoch backbone-spezifisch. Eine kleine formative
-VR-Pilotstudie mit neun Teilnehmern liefert deskriptive
-Evidenz: Alle vier Teilnehmer mit Tutor absolvierten die vollst\"andige
-33-Schritt-Prozedur, w\"ahrend keiner der f\"unf Teilnehmer ohne Tutor dies
-schaffte; Auslassungsfehler wurden in der Tutor-Bedingung weitgehend durch
-assistenzgekoppelte Fehler ersetzt. Eine kontrollierte Evaluation mit
-gr\"o\ss{}eren Stichproben bleibt zuk\"unftige Arbeit.
+\emph{Explain Reality} untersucht, wie Foundation Models in einer immersiven
+Simulationsumgebung interaktive Erkl\"arungen geben k\"onnen, ohne als
+unbegrenzte Dialogsysteme eingesetzt zu werden. Der Anwendungskontext ist ein
+Training mit der Meta Quest~3 in Digital Combat Simulator World, in dem
+Teilnehmende den Kaltstart der F/A-18C Lot~20 ausf\"uhren. Die Erkl\"arung des
+Systems muss sich auf den tats\"achlich beobachtbaren Simulatorzustand
+beziehen. ``Realit\"at'' bedeutet in dieser Arbeit daher den laufenden,
+multimodalen und kognitiv anspruchsvollen Zustand der Simulation.
+
+Die Arbeit stellt SimTutor vor, eine evidenzbasierte Laufzeitumgebung f\"ur
+prozedurales Tutoring. Sie kombiniert deklarative Prozedurregeln, DCS-BIOS-
+Telemetrie, Retrieval von Prozedurwissen, strukturierte Antwortvalidierung,
+Replay-Logs und ein Vision-Language Model f\"ur Cockpit-Anzeigen. Der zentrale
+Machine-Learning-Beitrag ist eine kleine LoRA-Anpassung f\"ur strukturierte
+visuelle Fakten. Eine fr\"uhe 8-Fact-Ontologie zeigte, dass zusammengesetzte
+Zielzust\"ande riskante False Positives erzeugen k\"onnen. Die revidierte
+13-Fact-Ontologie trennt deshalb lokale visuelle Evidenz von der sp\"ateren
+prozeduralen Interpretation.
+
+Auf zwei unabh\"angigen 13-Fact-Holdouts ist die Qwen3.5-LoRA-Linie mit
+Run-003 + Run-005x2 die st\"arkste Offline-Konfiguration. Die Fact Accuracy
+steigt auf Run-002 newfacts von 0,8677 auf 0,9908 und auf Run-004 random von
+0,8038 auf 0,9931; gleichzeitig sinken kritische False Positives von 11 auf 4
+beziehungsweise von 70 auf 8. Qwen3.6-27B liefert eine starke und deploybare
+Kandidatenlinie, \"ubertrifft die Qwen3.5-LoRA-Linie auf den aktuellen Holdouts
+jedoch nicht. Gemma profitiert ebenfalls von derselben Datenrezeptur, bleibt
+aber beim exakten Sample-Match hinter Qwen3.5.
+
+Eine formative, nicht randomisierte Quest-3-Pilotstudie mit neun Teilnehmenden
+erg\"anzt die technische Evaluation. Die Stichprobe enthielt selbstberichtete
+Novizen, intermedi\"are und erfahrene Teilnehmende. Vier Teilnehmende nutzten
+den Tutor, f\"unf absolvierten eine passive Bedingung ohne Tutor. Alle vier
+Tutor-Teilnehmenden vollendeten die manuell gepr\"ufte 33-Schritt-Prozedur;
+keiner der f\"unf Teilnehmenden ohne Tutor erreichte den Endzustand. Die
+Pilotdaten belegen Machbarkeit, Instrumentierung und Fehlermuster, aber keine
+kausalen Effekte auf Lernen, Arbeitsbelastung, Retention, Transfer oder
+Geschwindigkeit.
 \end{otherlanguage}

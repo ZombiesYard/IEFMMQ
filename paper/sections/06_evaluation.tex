@@ -1,271 +1,404 @@
 % ===========================================================================
-%  06 — Evaluation
+%  06 -- Results
 %
-%  Verified claims: C-VLM-04, C-VLM-05, C-VLM-06, C-VLM-03b, C-VLM-07,
-%                   C-DATA-01, C-VLM-03a, C-TRAIN-01
-%  Likely claims:   C-VLM-03b, C-RUNTIME-01
-%  Pilot claims:    descriptive/formative only (n=9), no inferential claims
+%  Claim boundary: RQ1 technical auditability, RQ2 VLM component reliability,
+%  and RQ3 formative descriptive pilot evidence. No inferential human-subject
+%  claims are made.
 % ===========================================================================
-\chapter{Evaluation}\label{ch:evaluation}
+\chapter{Results}\label{ch:evaluation}
 
-This chapter evaluates the thesis through three evidence lines, each with a
-different claim strength. The VLM benchmark line answers RQ2 by measuring
-structured visual fact extraction on independent holdout screenshots. The
-replay and harness line answers RQ1 by checking whether the evidence-grounded
-help cycle can be reproduced, validated, and bounded by regression fixtures.
-The VR pilot line answers RQ3 through descriptive observations from nine
-participant trials. These lines are deliberately not interchangeable:
-component accuracy is not a learning outcome, regression coverage is not a
-human-subject result, and the pilot is formative rather than inferential.
+This chapter reports the results in the same order as the research questions:
+RQ1 for the evidence-grounded tutoring runtime, RQ2 for VLM adaptation, and RQ3
+for the formative Quest~3 pilot. The three evidence lines have different claim
+strengths. Replay, harness, and export artifacts support a technical
+auditability claim for RQ1. Holdout benchmarks support a component-level
+machine-learning claim for RQ2. The pilot supports descriptive observations
+about live use, task completion, errors, workload ratings, usability/trust
+ratings, and comments for RQ3.
 
-Figure~\ref{fig:evaluation-dataflow} gives the chapter-level evidence map. It
-shows how benchmark artifacts, replay/harness logs, and pilot exports enter the
-evaluation without collapsing them into a single kind of proof.
+Figure~\ref{fig:evaluation-dataflow} summarises the evidence flow. The
+important point is that the three streams are not interchangeable. A VLM
+benchmark is not a learning outcome; a replay fixture is not a participant
+result; and a formative pilot is not a powered controlled experiment.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/fig_evaluation_dataflow.pdf}
-  \caption{Evaluation and data flow across research questions. VLM benchmark
-  artifacts support RQ2, replay and harness logs support RQ1 technical
-  readiness, and VR pilot exports support the descriptive RQ3 findings.}
+  \caption{Evaluation and data flow across research questions. Replay and
+  harness artifacts support RQ1, VLM benchmark artifacts support RQ2, and
+  Quest~3 pilot exports support RQ3 descriptive findings.}
   \label{fig:evaluation-dataflow}
 \end{figure}
 
 % ===========================================================================
-% --- RQ2: VLM Technical Evaluation ---
-% ===========================================================================
-\section{RQ2: VLM Technical Evaluation}\label{sec:eval-rq2}
+\section{RQ1: Evidence-Grounded Tutoring Runtime}\label{sec:eval-rq1}
 
-The technical evaluation addresses whether small-data LoRA adaptation can make
-a VLM reliable enough for the narrow task required by the tutor: extracting
-structured visual facts from F/A-18C cockpit display screenshots. The model is
-not evaluated as a tutor and is not credited with procedural reasoning. It is
-evaluated as a perception component whose output becomes one evidence source in
-the help cycle. All metrics are computed by the automated benchmark harness
-described in Section~\ref{sec:method-benchmark}.
+RQ1 asks how an evidence-grounded foundation-model tutoring runtime can
+integrate telemetry, retrieval, visual facts, and validation. The result is an
+operational runtime whose help-cycle decisions can be reconstructed from
+stored artifacts. The evidence is technical rather than pedagogical:
+configuration files define what evidence is admissible, replay and fixtures
+exercise known failure modes, and live pilot exports show that the same logging
+path ran during headset use.
 
-% ---------------------------------------------------------------------------
-\subsection{Dataset and Training Summary}\label{sec:eval-data}
+\subsection{Runtime Readiness Summary}
 
-The visual fact extraction task evolved across two generations of fact
-ontology. The first generation (v1) defined 8 visual facts and established the
-initial training pipeline. The second generation (v2) expanded the ontology to
-13 facts, aligned with the runtime contract. Table~\ref{tab:dataset-summary}
-summarises the six annotated datasets.
+Table~\ref{tab:rq1-readiness} summarises the RQ1 readiness evidence. It does
+not claim that every future help response will be correct. It shows that the
+current runtime places explicit checks between model generation and learner
+guidance.
 
 \begin{table}[htbp]
 \centering
-\caption{Summary of annotated visual fact datasets.}\label{tab:dataset-summary}
+\caption{RQ1 runtime-readiness evidence.}
+\label{tab:rq1-readiness}
 \small
-\begin{tabular}{@{}l c c c c l@{}}
+\begin{tabularx}{\textwidth}{@{}p{0.24\textwidth}p{0.26\textwidth}X@{}}
 \toprule
-\textbf{Source} & \textbf{Run} & \textbf{Facts} & \textbf{Tasks} & \textbf{Bilingual} & \textbf{Role} \\
+\textbf{Runtime element} & \textbf{Observed artifact} & \textbf{Resulting claim boundary} \\
 \midrule
-v1 train             & Run-001 & 8  & 180 & yes & Initial training \\
-v1 holdout           & Run-002 & 8  & 50  & no  & First holdout \\
-v2 newfacts holdout  & Run-002 & 13 & 50  & no  & Runtime-aligned holdout \\
-v2 train             & Run-003 & 13 & 220 & yes & Main training source \\
-v2 rebalance         & Run-005 & 13 & 122 & yes & Composition rebalance \\
-v2 random holdout    & Run-004 & 13 & 100 & no  & Independent holdout \\
+Procedure pack & 33-step F/A-18C Lot~20 cold-start pack derived from manual/training material & Step order, gate rules, UI targets, and source policy are explicit rather than invented by the model. \\
+Telemetry grounding & DCS-BIOS variables, normalised runtime variables, missing-source tracking & Observed values and absent sources remain distinguishable in the help context. \\
+Retrieval grounding & Source-controlled BM25 snippets & Retrieved text is scoped to allowed procedure/document sources. \\
+Visual fact channel & Vision-priority bindings for S08, S15, S18, and S19 & Display-page facts can enter the evidence packet without giving the VLM procedural authority. \\
+Schema and harness & Pack-derived response schema, UI allowlists, evidence-reference checks & Model proposals are validated, repaired, downgraded, or rejected before overlay execution. \\
+Replay and fixtures & Five replay cases and 20 live-fixture regression entries & Known grounding failures can be reproduced and checked outside a live headset session. \\
+Pilot export & Nine participant exports with summaries, step coding, help cycles, and quality gates & The live runtime produced audit-ready artifacts during the formative Quest~3 pilot. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Replay and Harness Results}
+
+The replay suite contains five cases covering early electrical power, engine
+and generator state, FCS reset/BIT interaction, and INS-mode evidence. Cases
+marked as vision available include sidecar frame files so that vision-dependent
+logic can be exercised without a live simulator. These cases confirm that
+recorded DCS-BIOS streams can be passed through the same procedure pack,
+telemetry map, source policy, UI map, and validation path used during live
+tutoring.
+
+The live-fixture regression matrix contains 20 entries. The entries cover five
+readiness risks: advancement when a step is already complete, wrong-target
+prevention and repair, stale VLM evidence leaking into non-visual steps,
+waiting behaviour for moving or settling controls, and preservation of
+interaction semantics such as mouse-wheel controls. This fixture evidence
+supports the RQ1 auditability claim: the system has executable checks for
+specific evidence-grounding failures. It does not prove educational
+effectiveness.
+
+\subsection{Live Export Results}
+
+All nine participant trials produced trial summaries, step coding, action
+timelines, raw-event copies, session metadata, and quality-gate reports. The
+four tutor-condition trials also produced help-cycle tables. No participant
+export had a blocking quality-gate failure. One trial, P04, retained metadata
+warnings for missing or incomplete linkage fields; those warnings limit
+traceability for those fields but do not change the manually reviewed task
+metrics reported below.
+
+Across the four tutor-condition trials, the runtime logged 77 help cycles, 23
+VLM calls, 82 overlay executions, zero overlay rejections, and 21 fallback or
+repair events. The zero overlay-rejection count should be interpreted
+carefully: it means final overlay actions passed the configured allowlist and
+evidence checks, not that model proposals were always directly correct. The 21
+repair/fallback events show that the validation layer was active during live
+use.
+
+\subsection{Example Evidence Path}
+
+The RQ1 result can be read as an evidence path rather than as a single system
+status. A typical vision-priority help cycle begins with telemetry-derived
+procedure context: the runtime identifies the current candidate step, evaluates
+preconditions and completion gates, and records unavailable sources separately
+from false values. If the active step requires display evidence, the runtime
+requests or selects a composite-panel frame and obtains structured visual facts.
+Retrieval then adds source-controlled procedural context. Only after these
+steps does the LLM receive a prompt.
+
+The model response is not immediately displayed. The JSON object is parsed,
+checked against the pack-derived schema, mapped to allowed response fields, and
+validated against UI target bindings and evidence references. If the model
+proposes a target that is too broad, the harness can repair it to a more
+specific target. If evidence is missing, the overlay can be suppressed or the
+response can degrade to text-only guidance. The event log preserves the
+telemetry snapshot, visual fact snapshot, prompt metadata, raw model output,
+mapping decision, harness decision, and overlay result.
+
+This example matters because it clarifies what RQ1 does and does not show. The
+runtime result is not "the model gave good answers". The result is that a help
+cycle can be decomposed into evidence production, model generation, validation,
+repair, and export. That decomposition is the technical foundation needed
+before a later controlled study can ask whether the tutor improves learning,
+trust, workload, or transfer.
+
+% ===========================================================================
+\section{RQ2: VLM Adaptation for Cockpit Visual Facts}\label{sec:eval-rq2}
+
+RQ2 asks whether a small-data LoRA-adapted VLM can improve reliable cockpit
+visual fact extraction. The primary result line is Qwen3.5-9B trained with the
+Run-003 + Run-005$\times$2 recipe. Qwen3.6-27B is reported as a larger
+deployable production candidate under the same recipe, and Gemma-4-31B is
+reported as a comparison backbone. All metrics in this section are copied from
+benchmark JSON artifacts and computed on independent 13-fact holdouts.
+
+\subsection{Dataset and Training Summary}
+
+The v2 training recipe combines Run-003 (220 reviewed images) with Run-005
+(122 reviewed images) repeated twice as a composition-rebalance supplement.
+Bilingual export yields 928 supervised fine-tuning rows. The two main holdouts
+are Run-002 newfacts (50 images) and Run-004 random (100 images), both scored
+under the 13-fact ontology with zero exact overlap against the training union.
+
+\begin{table}[htbp]
+\centering
+\caption{Visual-fact dataset inventory for the reported VLM results.}
+\label{tab:dataset-summary}
+\small
+\begin{tabular}{@{}lcccl@{}}
+\toprule
+\textbf{Source} & \textbf{Run} & \textbf{Facts} & \textbf{Images} & \textbf{Role} \\
+\midrule
+v1 training source & Run-001 & 8  & 180 & Historical 8-fact training source \\
+v1 holdout & Run-002 & 8  & 50  & Historical 8-fact holdout \\
+v2 newfacts holdout & Run-002 & 13 & 50  & Main holdout \\
+v2 training source & Run-003 & 13 & 220 & Main 13-fact training source \\
+v2 composition rebalance & Run-005 & 13 & 122 & Rebalanced supplement, used twice \\
+v2 random holdout & Run-004 & 13 & 100 & Main holdout \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The v2 training recipe combines Run-003 (220 reviewed tasks) with Run-005
-(122 reviewed tasks, collected to rebalance under-represented fact states),
-with Run-005 applied twice (Run-005$\times$2). Bilingual export (EN + ZH)
-yields a combined training set of \textbf{928 rows}. The two v2 holdouts,
-Run-002 newfacts (50 samples) and Run-004 random (100 samples), are
-English-only and have verified \textbf{zero exact overlap} with the training
-union. The benchmark therefore tests adaptation beyond exact image reuse, while
-remaining within the same simulator cockpit and procedure domain.
+\subsection{Primary Qwen3.5 Result}
 
-% ---------------------------------------------------------------------------
-\subsection{Qwen3.5 13-Fact V2 Results}\label{sec:eval-qwen-13fact}
-
-The primary technical result is the Qwen3.5-9B LoRA adapter trained on
-Run-003 + Run-005$\times$2 (928 rows, 4 epochs, learning rate
-$2{\times}10^{-4}$, LoRA $r=16$, $\alpha=16$). This is the strongest RQ2
-evidence because it compares the adapted model against the corresponding base
-model on two independent holdouts with the runtime-aligned 13-fact ontology.
-Table~\ref{tab:qwen-13fact} reports the result.
+Table~\ref{tab:qwen35-primary} reports the main Qwen3.5 base-versus-LoRA
+result. The adapted model improves JSON/schema reliability on Run-004, raises
+fact accuracy to approximately 0.99 on both holdouts, and reduces critical
+false positives from 11 to 4 on Run-002 and from 70 to 8 on Run-004.
 
 \begin{table}[htbp]
 \centering
-\caption{13-fact v2 benchmark: Qwen3.5-9B Base vs.\ LoRA on two holdout sets.}\label{tab:qwen-13fact}
+\caption{Primary 13-fact result: Qwen3.5-9B base vs.\ LoRA on two holdout sets.}
+\label{tab:qwen35-primary}
 \small
-\begin{tabular}{@{}l c c c c c c@{}}
+\begin{tabular}{@{}lccc ccc@{}}
 \toprule
 & \multicolumn{3}{c}{\textbf{Run-002 newfacts (50)}} & \multicolumn{3}{c}{\textbf{Run-004 random (100)}} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
 \textbf{Metric} & \textbf{Base} & \textbf{LoRA} & \textbf{$\Delta$} & \textbf{Base} & \textbf{LoRA} & \textbf{$\Delta$} \\
 \midrule
-JSON valid       & 1.0    & 1.0    & ---  & 0.96   & 1.0    & +0.04 \\
-Schema valid     & 1.0    & 1.0    & ---  & 0.96   & 1.0    & +0.04 \\
-Fact accuracy    & 0.8677 & \textbf{0.9908} & +0.1231 & 0.8038 & \textbf{0.9931} & +0.1892 \\
-Macro $F_1$      & 0.4513 & \textbf{0.6515} & +0.2002 & 0.4393 & \textbf{0.6100} & +0.1707 \\
-Seen $F_1$       & 0.5022 & \textbf{0.9648} & +0.4626 & 0.5659 & \textbf{0.9159} & +0.3500 \\
-Exact match      & 0.10   & \textbf{0.88}   & +0.78  & 0.03   & \textbf{0.92}   & +0.89 \\
-Critical FP      & 11     & \textbf{4}      & $-$7   & 70     & \textbf{8}      & $-$62 \\
+JSON valid & 1.0000 & 1.0000 & 0.0000 & 0.9600 & 1.0000 & +0.0400 \\
+Schema valid & 1.0000 & 1.0000 & 0.0000 & 0.9600 & 1.0000 & +0.0400 \\
+Fact accuracy & 0.8677 & \textbf{0.9908} & +0.1231 & 0.8038 & \textbf{0.9931} & +0.1893 \\
+Macro $F_1$ & 0.4513 & \textbf{0.6515} & +0.2002 & 0.4393 & \textbf{0.6100} & +0.1707 \\
+Seen $F_1$ & 0.5022 & \textbf{0.9648} & +0.4626 & 0.5659 & \textbf{0.9159} & +0.3500 \\
+Exact match & 0.1000 & \textbf{0.8800} & +0.7800 & 0.0300 & \textbf{0.9200} & +0.8900 \\
+Critical FP & 11 & \textbf{4} & $-7$ & 70 & \textbf{8} & $-62$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The adapted model reaches fact accuracy of 0.9908 on Run-002 and 0.9931 on
-Run-004, with sample exact match rates of 0.88 and 0.92. More important for
-the tutor is the change in critical false positives, because a false
-\texttt{seen} state can make a later help-cycle decision appear grounded when
-the display evidence is not actually present. Critical false positives drop
-from 11 to 4 on Run-002 and from 70 to 8 on Run-004. The base model's larger
-Run-004 failure is not a formatting problem alone: it includes four
-schema-invalid responses and a large number of rare-state hallucinations. The
-LoRA adapter restores JSON/schema reliability and reduces this hallucination
-pattern to a smaller set of interpretable residual errors.
+Figure~\ref{fig:qwen35-benchmark-charts} adds the corresponding training-report
+figures selected for the main text. The first chart visualises the Run-002
+accuracy improvement; the second highlights why critical false positives are
+tracked separately from aggregate accuracy on Run-004.
 
-The remaining LoRA critical false positives are concentrated on completion
-signals rather than page-presence signals. In practice, this means the
-adapted VLM is strong enough to support the visual-fact pipeline, but not strong
-enough to be treated as an independent source of procedural completion. That
-boundary matches the architecture in Chapter~\ref{ch:system-design}: visual
-facts are evidence inputs, not procedure decisions.
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_qwen35_run002_overall_accuracy.png}
+    \caption{Run-002 overall accuracy.}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_qwen35_run004_critical_fp.png}
+    \caption{Run-004 critical false positives.}
+  \end{subfigure}
+  \caption{Selected Qwen3.5 benchmark figures from the VLM training report.}
+  \label{fig:qwen35-benchmark-charts}
+\end{figure}
 
-% ---------------------------------------------------------------------------
-\subsection{Gemma-4 and Qwen3.6 Backbone Comparison}\label{sec:eval-backbones}
+The practical interpretation is not that the VLM can run the procedure. The
+adapter makes the visual-fact channel much more usable as one evidence source.
+Completion-like facts remain the main residual risk and must still be checked
+downstream by the procedure engine, telemetry, temporal context, and harness
+constraints.
 
-The same Run-003 + Run-005$\times$2 recipe was also applied to Qwen3.6-27B and
-Gemma-4-31B. This comparison is supplementary: it checks whether the
-data-and-ontology recipe remains usable on the evaluated supplementary
-backbones, while the Qwen3.5 base-versus-LoRA line remains the primary
-technical result.
-Table~\ref{tab:backbone-comparison} summarises the LoRA-only comparison.
+\subsection{Metric Interpretation for the Primary Result}
+
+The Qwen3.5 result is strongest when the metrics are interpreted together. JSON
+and schema validity show whether the model can participate in the runtime
+contract at all. On Run-004, the base model fails this contract for four
+samples, while the LoRA adapter returns valid and schema-valid objects for all
+samples. This matters because runtime rejection and fallback are triggered by
+format and schema failures before visual correctness is considered.
+
+Fact accuracy shows the broad improvement, but it understates the importance of
+seen-state behaviour. The visual facts that matter most during tutoring are
+often positive cues: a page is visible, a status text has appeared, or a final
+GO result can be read. Seen \(F_1\) therefore captures whether the adapter is
+better at recognising visible cues without hallucinating them too often. The
+increase from 0.5022 to 0.9648 on Run-002 and from 0.5659 to 0.9159 on Run-004
+is the most direct evidence that the adapter learned the positive visual
+states needed by the runtime.
+
+Sample exact match adds another view. A help cycle can carry a whole visual
+snapshot, so one wrong fact can still produce a misleading context. The
+Qwen3.5 adapter raises exact match from 0.10 to 0.88 on Run-002 and from 0.03
+to 0.92 on Run-004. This suggests that the adapted model is not merely
+improving a few easy facts while leaving most snapshots inconsistent. The
+critical-false-positive reduction is the final safety-oriented check: the
+adapter reduces the errors most likely to make the downstream tutor overstate a
+completion cue.
+
+\subsection{Qwen3.6 and Gemma Comparison}
+
+Table~\ref{tab:supplementary-backbones} reports the matched supplementary
+backbone results. Qwen3.6-27B has a stronger base model than Qwen3.5 on these
+holdouts, especially on Run-004, and remains a deployable production candidate
+after LoRA adaptation. However, the Qwen3.6 LoRA does not surpass the Qwen3.5
+LoRA on the primary metrics in this local benchmark. Gemma-4-31B improves
+under the same recipe, but its adapted exact-match and seen-$F_1$ values remain
+below the Qwen adapters, with a different critical-false-positive profile.
 
 \begin{table}[htbp]
 \centering
-\caption{13-fact v2 results across three backbones (LoRA models only).}\label{tab:backbone-comparison}
+\caption{Supplementary backbone comparison under the matched Run-003 + Run-005$\times$2 recipe.}
+\label{tab:supplementary-backbones}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}l c c c c c c@{}}
+\begin{tabular}{@{}llrrrrrrrr@{}}
 \toprule
-& \multicolumn{3}{c}{\textbf{Run-002 newfacts (50)}} & \multicolumn{3}{c}{\textbf{Run-004 random (100)}} \\
-\cmidrule(lr){2-4} \cmidrule(lr){5-7}
-\textbf{Metric} & \textbf{Q3.5-9B} & \textbf{Q3.6-27B} & \textbf{G-4-31B} & \textbf{Q3.5-9B} & \textbf{Q3.6-27B} & \textbf{G-4-31B} \\
+\textbf{Backbone} & \textbf{Model} &
+\multicolumn{4}{c}{\textbf{Run-002 newfacts}} &
+\multicolumn{4}{c}{\textbf{Run-004 random}} \\
+\cmidrule(lr){3-6}\cmidrule(lr){7-10}
+& & \textbf{Acc.} & \textbf{Seen $F_1$} & \textbf{Exact} & \textbf{Crit. FP} &
+\textbf{Acc.} & \textbf{Seen $F_1$} & \textbf{Exact} & \textbf{Crit. FP} \\
 \midrule
-Fact accuracy    & \textbf{0.9908} & 0.9877 & 0.9492 & \textbf{0.9931} & 0.9892 & 0.9715 \\
-Seen $F_1$       & \textbf{0.9648} & 0.9479 & 0.8123 & \textbf{0.9159} & 0.9147 & 0.7959 \\
-Exact match      & \textbf{0.88}   & 0.86   & 0.44   & \textbf{0.92}   & 0.86   & 0.74   \\
-Critical FP      & 4      & 3      & \textbf{0} & \textbf{8} & 8      & 13     \\
+Qwen3.5-9B & Base & 0.8677 & 0.5022 & 0.1000 & 11 & 0.8038 & 0.5659 & 0.0300 & 70 \\
+Qwen3.5-9B & LoRA & \textbf{0.9908} & \textbf{0.9648} & \textbf{0.8800} & 4 & \textbf{0.9931} & \textbf{0.9159} & \textbf{0.9200} & 8 \\
+Qwen3.6-27B & Base & 0.9108 & 0.6712 & 0.2600 & 1 & 0.9769 & 0.8211 & 0.7000 & 7 \\
+Qwen3.6-27B & LoRA & 0.9877 & 0.9479 & 0.8600 & 3 & 0.9892 & 0.9147 & 0.8600 & 7 \\
+Gemma-4-31B & Base & 0.8169 & 0.5128 & 0.0400 & 16 & 0.8146 & 0.6332 & 0.1200 & 47 \\
+Gemma-4-31B & LoRA & 0.9492 & 0.8123 & 0.4400 & \textbf{0} & 0.9715 & 0.7959 & 0.7400 & 13 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-Qwen3.6-27B produces a close result but does not surpass the smaller Qwen3.5
-adapter on the main metrics. This suggests that, for this narrow visual-fact
-task, a larger backbone does not automatically compensate for the value of a
-well-matched small-data adaptation recipe.
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}{0.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_qwen36_run002_overall_accuracy.png}
+    \caption{Qwen3.6 Run-002 overall accuracy.}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{figures/fig_gemma_run002_overall_accuracy.png}
+    \caption{Gemma Run-002 overall accuracy.}
+  \end{subfigure}
+  \caption{Selected supplementary backbone benchmark figures from the VLM
+  training reports.}
+  \label{fig:supplementary-benchmark-charts}
+\end{figure}
 
-Gemma-4-31B shows a different error style. On Run-002 it produces zero critical
-false positives, but its seen-state recall and sample exact match are lower
-than Qwen3.5. On Run-004, the Gemma adapter improves substantially over its base
-line but still records more critical false positives than the Qwen3.5 adapter.
-The comparison therefore supports a conservative conclusion: the 13-fact data
-recipe can be applied to the evaluated supplementary backbones, but the
-deployment choice remains backbone-specific. Qwen3.5 is the best-performing
-configuration in these local benchmarks; Gemma is more conservative in one
-holdout but less complete.
+The comparison supports a conservative conclusion. The data-and-ontology
+recipe is not tied to a single evaluated backbone, but deployment choice is
+model-specific. Qwen3.5 remains the main thesis result because it gives the
+best adapted accuracy/exact-match combination in the current holdouts. Qwen3.6
+is attractive as a production candidate because its base line is already
+stronger, while Gemma provides useful comparison evidence about a different
+error style.
 
-% ---------------------------------------------------------------------------
-\subsection{Error Analysis}\label{sec:eval-errors}
+\subsection{Model-Specific Interpretation}
 
-The Qwen LoRA error profile also explains why the ontology revision in
-Chapter~\ref{ch:methodology} matters. Coarse page-presence facts are nearly
-solved. Fine-grained state indicators are mostly reliable after adaptation, but
-completion-type signals remain the main residual risk. Small text facts are
-usable but still sensitive to ambiguous display states.
+The Qwen3.6 result is useful because it separates backbone strength from LoRA
+gain. Its base model is already much stronger than the Qwen3.5 base on the two
+holdouts, especially on Run-004 where it reaches 0.9769 fact accuracy and 0.70
+exact match before adaptation. The LoRA adapter still improves seen \(F_1\) and
+exact match, but the relative gain is smaller because the base line is already
+closer to the task. This is why Qwen3.6 is described as a deployable production
+candidate rather than as the primary thesis result: it is strong, but it does
+not change the main methodological conclusion that small-data adaptation plus a
+good ontology can make a VLM usable as a bounded perception component.
 
-The base model's dominant failure mode is unidirectional hallucination on rare
-states. In the larger Run-004 holdout, the FCS-MC intermediate result appears
-in only 7 of 100 samples, yet the base model asserts this state as
-\texttt{seen} in 60 additional samples. The LoRA adapter removes this diffuse
-hallucination pattern almost entirely. The remaining errors are fewer and more
-diagnosable, which is precisely the kind of error profile needed for
-evidence-grounded tutoring: the runtime can reason about a bounded set of
-known visual-fact risks instead of treating raw VLM text as opaque authority.
+Gemma shows the opposite pattern. Its base line is weaker than the Qwen3.6
+base and close to the Qwen3.5 base in broad accuracy, but the adapter reduces
+critical false positives to zero on Run-002. At the same time, its exact match
+and seen \(F_1\) remain lower than the Qwen adapters. This suggests a more
+conservative or incomplete adapted behaviour on the local data: fewer critical
+hallucinations in one holdout, but less complete recognition of positive
+states. For a tutor, that trade-off is not automatically worse or better. A
+conservative model may be safer for some display cues, but it may also force
+more repeated checks or fallback guidance.
+
+The matched comparison therefore supports a design conclusion rather than a
+leaderboard conclusion. Backbone choice should be made with downstream error
+costs in mind. A model with slightly lower aggregate accuracy may be acceptable
+if it avoids critical false positives for a safety-sensitive fact. A model with
+higher exact match may still need harness constraints if its residual errors
+cluster around completion cues. The thesis keeps Qwen3.5 as the main line
+because it has the best adapted balance in these benchmarks, while documenting
+Qwen3.6 and Gemma so that the model-choice boundary is visible.
+
+\subsection{Error Pattern}
+
+The base Qwen3.5 model's dominant failure mode is rare-state hallucination. In
+Run-004, the FCS-MC intermediate-result fact appears in only 7 of 100 samples,
+yet the base model predicts it as visible in many additional samples. LoRA
+adaptation removes most of this diffuse hallucination pattern. The remaining
+adapted errors are fewer and more concentrated around completion-like display
+signals, which are exactly the facts that the runtime treats with caution.
+
+This pattern explains why the 13-fact ontology matters. Page-presence facts are
+easier to learn than procedural completion states. Decomposing compound targets
+into locally observable visual atoms gives the model a better supervised task
+and gives the runtime a safer evidence boundary.
+
+The residual error pattern is also informative for future data collection.
+Additional random screenshots would not necessarily solve the hardest cases if
+they mostly repeat already easy page-presence states. The missing data are
+targeted hard negatives and temporally adjacent states: frames where a page is
+present but a final status is not yet visible, frames where intermediate and
+final BIT states look similar, and frames where display text is small or
+transient. These examples are more valuable than generic screenshots because
+they directly attack the remaining critical-false-positive risk.
+
+The benchmark therefore acts as an ontology audit. When a fact is easy for the
+adapter and stable across holdouts, it is probably a good local visual
+proposition. When a fact remains error-prone after adaptation, the problem may
+be insufficient data, visual ambiguity, or a fact definition that still embeds
+too much procedural reasoning. The thesis treats these cases as feedback to the
+representation, not only as model shortcomings.
 
 % ===========================================================================
-% --- RQ1: System-Level Technical Readiness ---
-% ===========================================================================
-\section{RQ1: System-Level Technical Readiness}\label{sec:eval-rq1}
+\section{RQ3: Formative Quest~3 Pilot}\label{sec:eval-pilot}
 
-RQ1 concerns whether the runtime can integrate evidence sources in a
-technically reliable and auditable way. The relevant evidence is therefore not
-participant performance, but reproducibility of help-cycle decisions,
-regression coverage of known failure modes, and export quality for later
-analysis.
+RQ3 asks what descriptive evidence a formative, non-random Quest~3 pilot
+provides about task completion, procedural errors, workload, trust/usability,
+comments, and the boundary of a trustworthy AI collaborator. Nine participants
+completed one trial each: four with tutor assistance and five without tutor
+assistance. The pilot is reported descriptively only. It does not support
+statistical significance, learning-gain, retention, transfer, workload-
+reduction, or speed claims.
 
-\subsection{Replay Evaluation}
+\subsection{Participants and Task Outcomes}
 
-The replay evaluation suite defines five test cases: no-operation, battery-on,
-battery-and-generator-off, FCS reset and BIT, and INS alignment (see
-Appendix~\ref{ch:appendix}, Table~\ref{tab:replay-cases}). Each case includes
-DCS-BIOS raw captures and, where applicable, per-frame sidecar files for
-vision-dependent steps. The suite exercises both telemetry-only and
-vision-assisted replay conditions. Its role is to show that recorded state can
-be driven through the same procedure pack, telemetry map, UI map, evidence
-policy, and harness contracts that constrain live tutoring.
-
-\subsection{Harness Fixture Regression}
-
-The step harness (Section~\ref{sec:design-harness}) is covered by 20
-live-fixture regression entries in the coverage matrix. Each entry replays a
-specific live telemetry snapshot through the help cycle and asserts an expected
-outcome. The fixtures cover five classes of readiness risk: advancement when a
-step is already complete, wrong-target prevention and repair, prevention of
-stale VLM evidence leaking into non-visual steps, waiting behaviour for
-moving/settling controls, and preservation of interaction semantics such as
-mouse-wheel controls. This coverage does not prove that the tutor is
-pedagogically effective; it shows that known evidence-grounding failures are
-captured as reproducible tests.
-
-\subsection{Experiment Export Infrastructure}
-
-The experiment export pipeline (Section~\ref{sec:method-pilot}) has been
-exercised on nine live VR trials, producing trial summaries, step coding, help
-cycles, action timelines, raw-event copies, and quality-gate reports for each
-trial. All nine exports have no blocking quality-gate errors, and the recorded
-procedure-pack, taxonomy, UI-map, and DCS-BIOS-to-UI hashes are consistent
-across the study. This supports the instrumentation part of RQ1: the runtime
-can produce audit-ready artifacts from real participant sessions. It also
-exposes a remaining limitation. One trial, P04, passed in non-strict mode with
-metadata warnings for missing questionnaire, recording, mission, and prompt
-linkage fields. Those warnings do not invalidate the task metrics used below,
-but they show that the participant/session metadata schema should be tightened
-before a larger controlled study.
-
-% ===========================================================================
-% --- RQ3: Formative VR Pilot Study ---
-% ===========================================================================
-\section{RQ3: Formative VR Pilot Study}\label{sec:eval-pilot}
-
-A small formative pilot study was conducted with nine participants. Four used
-the tutor during the F/A-18C cold-start task and five practised without tutor
-assistance. The purpose of this pilot is descriptive: it shows how the runtime,
-overlay guidance, visual evidence path, and export pipeline behaved in live VR
-use. It is not a powered controlled experiment, and it does not support
-inferential claims about learning gains, workload, retention, transfer, or task
-speed. Methodology details are reported in Section~\ref{sec:method-pilot}.
-
-\subsection{Participant and Trial Overview}
-
-Table~\ref{tab:pilot-overview} summarises each participant's condition,
-completion status, manually reviewed step completion, observed duration, and
-key interaction counts. The table uses manual step coding as the authoritative
-source where automatic reconstruction and human review disagree.
+Table~\ref{tab:pilot-overview} summarises trial outcomes and interaction
+counts. P08 uses the manual coding override described in
+Section~\ref{sec:method-pilot}; P09 is treated as an independent participant.
+Observed duration is the interval from first to last recorded event and is not
+a completion-time comparison because without-tutor trials ended at different
+procedure points.
 
 \begin{table}[htbp]
 \centering
-\caption{Participant and trial overview. Observed duration is the wall-clock
-interval from first telemetry event to last; it is not a completion time
-measure for incomplete trials.}\label{tab:pilot-overview}
+\caption{Participant and trial overview.}
+\label{tab:pilot-overview}
 \small
 \begin{tabular}{@{}llccccccc@{}}
 \toprule
@@ -277,39 +410,49 @@ P03 & without\_tutor & no & 24/33 & 243  & 0 & 0 & 0 & 0 \\
 P06 & without\_tutor & no & 29/33 & 269  & 0 & 0 & 0 & 0 \\
 P07 & without\_tutor & no & 19/33 & 218  & 0 & 0 & 0 & 0 \\
 \midrule
-P04 & with\_tutor    & yes & 33/33 & 442  & 19 & 6  & 22 & 6 \\
-P05 & with\_tutor    & yes & 33/33 & 317  & 7  & 2  & 6  & 2 \\
-P08 & with\_tutor    & yes$^*$ & 33/33 & 332  & 7  & 5  & 10 & 4 \\
-P09 & with\_tutor    & yes & 33/33 & 1033 & 44 & 10 & 44 & 9 \\
+P04 & with\_tutor & yes & 33/33 & 442  & 19 & 6  & 22 & 6 \\
+P05 & with\_tutor & yes & 33/33 & 317  & 7  & 2  & 6  & 2 \\
+P08 & with\_tutor & yes$^*$ & 33/33 & 332  & 7  & 5  & 10 & 4 \\
+P09 & with\_tutor & yes & 33/33 & 1033 & 44 & 10 & 44 & 9 \\
 \bottomrule
 \end{tabular}
 
-$^*$P08: auto-summary reports incomplete; manual coding confirms 33/33
-completed (see data-quality note below).
+$^*$P08: automatic summary reported incomplete progress; manual coding
+confirms 33/33 completed.
 \end{table}
 
-\textbf{Completion.} All four with-tutor participants reached the final
-33-step state under manual review. None of the five without-tutor participants
-completed the full procedure; they stopped after completing 19--29 steps. The
-most commonly missed without-tutor steps were S18 (FCS-MC BIT page), S19 (FCS
-BIT final GO), and S27 (flap switch to AUTO), each missed by all five
-without-tutor participants.
+In the reviewed data, all four tutor-condition participants reached the final
+33-step state, while none of the five without-tutor participants did. The most
+commonly missed without-tutor steps were S18 (FCS-MC BIT page), S19 (FCS BIT
+final GO), and S27 (flap switch to AUTO), each missed by all five
+without-tutor participants. This pattern identifies where participants
+struggled in the formative pilot; it is not a causal estimate of tutor effect.
 
-\textbf{Observed duration.} With-tutor trials ranged from 317\,s to 1033\,s
-(median 387\,s). Without-tutor trials ranged from 218\,s to 2015\,s. These
-values are reported as trace durations only. Because the without-tutor trials
-ended at different procedure points, the durations are not completion-time
-comparisons between conditions.
+The participant profiles make the descriptive boundary especially important.
+The sample includes novices, intermediate users, and expert users, but the
+conditions are not balanced by prior DCS World or F/A-18C experience. P05 and
+P06 were expert participants in different conditions, while P01 and P09 were
+novices. P09 is treated as an independent participant after the export
+correction, but the pilot still cannot rule out experience, scheduling, or
+session-context effects. The correct interpretation is therefore not "the tutor
+caused completion". The correct interpretation is that the completed runtime
+could support four tutor-condition participants through the full procedure in
+this formative sample, while the no-tutor runs revealed recurring failure
+points that deserve controlled follow-up.
 
-\subsection{Procedural Errors}
+\subsection{Procedural Error Pattern}
 
-Table~\ref{tab:pilot-errors} reports manual error counts per participant.
+Table~\ref{tab:pilot-errors} reports the manual error counts. The without-
+tutor trials are dominated by omissions, while the tutor trials shift toward
+commission and prompting/assistance errors. This shift is important for future
+design: assistance can keep a participant moving through the procedure while
+still introducing timing, interpretation, or over-guidance risks.
 
 \begin{table}[htbp]
 \centering
-\caption{Manual procedural error counts per participant (from manual step
-coding). OM = omission, CO = commission, OR = order error, PA = prompting/
-assistance error, SV = state violation.}\label{tab:pilot-errors}
+\caption{Manual procedural error counts. OM = omission, CO = commission, OR =
+order error, PA = prompting/assistance error, SV = state violation.}
+\label{tab:pilot-errors}
 \small
 \begin{tabular}{@{}llccccc@{}}
 \toprule
@@ -321,124 +464,116 @@ P03 & without\_tutor & 7  & 0 & 2 & 0 & 2 \\
 P06 & without\_tutor & 2  & 0 & 0 & 2 & 0 \\
 P07 & without\_tutor & 11 & 0 & 0 & 0 & 0 \\
 \midrule
-P04 & with\_tutor    & 0  & 3 & 0 & 3 & 1 \\
-P05 & with\_tutor    & 0  & 3 & 0 & 3 & 0 \\
-P08 & with\_tutor    & 0  & 0 & 0 & 0 & 0 \\
-P09 & with\_tutor    & 0  & 3 & 0 & 2 & 0 \\
+P04 & with\_tutor & 0  & 3 & 0 & 3 & 1 \\
+P05 & with\_tutor & 0  & 3 & 0 & 3 & 0 \\
+P08 & with\_tutor & 0  & 0 & 0 & 0 & 0 \\
+P09 & with\_tutor & 0  & 3 & 0 & 2 & 0 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Omission errors.} The without-tutor condition shows a clear omission
-pattern: four of five participants recorded omission errors, and three
-participants recorded seven or more. In contrast, the with-tutor condition
-recorded zero manual omission errors; every required step was ultimately
-completed under manual review.
+Without-tutor participants averaged 7.4 manually coded errors. Tutor-condition
+participants averaged 4.5 manually coded errors. These are descriptive
+statistics from a small non-random pilot. The more robust qualitative result is
+the error-type contrast: omissions dominate without tutor assistance, while
+assistance-coupled errors remain in the tutor condition.
 
-\textbf{Commission and prompting errors.} The with-tutor condition shows a
-different error profile. CO and PA errors appear in P04, P05, and P09, while
-P08 has no manually coded procedural errors after review. These errors are
-assistance-coupled: the participant often followed guidance, but the guidance
-or its timing did not fully match the procedure specification or current state.
-This is an important formative result. The tutor condition was associated with
-continued progression through the procedure, but it also introduced new
-categories of guidance risk that should be reduced before a larger study.
+The assistance-coupled errors are important because they show that a
+trustworthy assistant is not merely a completion machine. A participant can
+complete all steps while still receiving guidance that is mistimed, redundant,
+or too eager after a state has already been achieved. In the pilot, commission
+and prompting/assistance errors in the tutor condition point to these
+interaction risks. They motivate stricter confirmation logic, better detection
+of already-completed state, and clearer uncertainty handling in future
+versions.
 
-\textbf{Error totals.} Without-tutor participants averaged 7.4 manual errors;
-with-tutor participants averaged 4.5. This difference is descriptive only and
-should not be read as an inferential treatment effect. The more important
-finding is qualitative: without-tutor errors are dominated by omissions, while
-with-tutor errors shift toward commission, prompting/assistance, and one state
-violation.
+\subsection{Workload, Usability, Trust, and Comments}
 
-\subsection{Tutor Interaction}
-
-Table~\ref{tab:pilot-tutor} summarises tutor interaction metrics for the four
-with-tutor trials.
+P02 is excluded from all questionnaire-derived summaries because the
+questionnaire metadata contains an internal participant-id mismatch.
+Table~\ref{tab:pilot-questionnaire} reports the remaining raw questionnaire
+values.
+Scores are descriptive only. The tutor-specific rating is available only in the
+with-tutor condition; the general user/usability rating is available for both
+conditions.
 
 \begin{table}[htbp]
 \centering
-\caption{Tutor interaction summary (with-tutor condition only).}\label{tab:pilot-tutor}
+\caption{Post-trial questionnaire summary after excluding P02. Ratings use the
+recorded 1--7 response scale where applicable.}
+\label{tab:pilot-questionnaire}
 \small
-\begin{tabular}{@{}lccccc@{}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llcccc@{}}
 \toprule
-\textbf{P} & \textbf{Help cycles} & \textbf{VLM calls} & \textbf{Overlay exec.} & \textbf{Overlay rej.} & \textbf{Fallback} \\
+\textbf{P} & \textbf{Condition} & \textbf{Confidence} & \textbf{Raw TLX} & \textbf{Tutor rating} & \textbf{User rating} \\
 \midrule
-P04 & 19 & 6  & 22 & 0 & 6 \\
-P05 & 7  & 2  & 6  & 0 & 2 \\
-P08 & 7  & 5  & 10 & 0 & 4 \\
-P09 & 44 & 10 & 44 & 0 & 9 \\
+P01 & without\_tutor & 3.5 & 55.83 & n/a & 4.20 \\
+P03 & without\_tutor & 6.0 & 26.67 & n/a & 5.20 \\
+P06 & without\_tutor & 7.0 & 13.33 & n/a & 5.60 \\
+P07 & without\_tutor & 5.0 & 40.67 & n/a & 5.20 \\
 \midrule
-Total & 77 & 23 & 82 & 0 & 21 \\
+P04 & with\_tutor & 7.0 & 26.33 & 6.00 & 6.20 \\
+P05 & with\_tutor & 7.0 & 13.33 & 6.17 & 5.60 \\
+P08 & with\_tutor & 5.0 & 33.00 & 5.67 & 5.00 \\
+P09 & with\_tutor & 3.5 & 22.00 & 5.83 & 6.40 \\
+\midrule
+Mean without tutor & & 5.38 & 34.12 & n/a & 5.05 \\
+Mean with tutor & & 5.63 & 23.66 & 5.92 & 5.80 \\
 \bottomrule
 \end{tabular}
+}
 \end{table}
 
-All 77 help cycles used the model generation path; no cycle fell back to a
-deterministic-only response. VLM calls totalled 23 across the four with-tutor
-trials. The current procedure pack treats S08, S15, S18, and S19 as
-vision-priority steps, but the pilot logs also reveal occasional unnecessary
-VLM calls around non-visual or already-progressed states. That over-triggering
-is a runtime tuning issue rather than a participant outcome.
+The raw TLX values range from 13.33 to 55.83 without tutor and from 13.33 to
+33.00 with tutor. The descriptive means are 34.12 and 23.66 respectively, but
+the sample is too small and unbalanced for a workload-reduction claim. The
+tutor-specific ratings in the with-tutor group are consistently above the
+midpoint of the scale, with a mean of 5.92. These scores support a formative
+interpretation: participants generally rated the tutor positively, while the
+logs and error coding still show unresolved assistance risks.
 
-\textbf{Overlay rejection rate was zero}: all 82 executed overlay actions
-passed the runtime's evidence-grounding, allowlist, and schema checks. The 21
-fallback events (21/77 = 27\% of help cycles) were not deterministic-only
-fallbacks. They were harness or validator repairs of the model's proposed
-overlay plan, such as remapping a coarse display target to the more specific
-BIT-root sub-state target. This supports the RQ1 claim that the live system can
-repair model output before it reaches the overlay, while also showing where the
-model still needed runtime correction.
+The questionnaire values are useful because they complicate a purely log-based
+reading. P09 had many help requests and the longest tutor-condition trace, yet
+the recorded user rating was high and the comments described grounded feedback
+as helpful. P05, an expert participant, needed fewer help cycles and recorded a
+low TLX value, but still had assistance-coupled errors. These examples suggest
+that future evaluation should not reduce the tutor to one outcome variable.
+Completion, workload, perceived usefulness, trust, error type, and help-cycle
+repair frequency may move differently for novices and experts.
 
-\subsection{Data-Quality Notes}
+Table~\ref{tab:pilot-comments} summarises short anonymised comments. The
+comments are not coded as themes with inter-rater reliability; they are used to
+explain concrete interaction frictions observed in the pilot.
 
-\begin{enumerate}
-\item \textbf{P08 auto-summary correction.} The automated pipeline reported
-P08 as incomplete (5/33 steps). Manual telemetry review confirmed all 33 steps
-reached required states. The auto-pipeline failed to reconstruct completion
-evidence for vision-priority steps from passive telemetry. Manual coding
-overrides the auto-summary; P08 is reported as completed with 0 manual errors.
+\begin{table}[htbp]
+\centering
+\caption{Short anonymised participant comments, paraphrased or lightly
+condensed for space.}
+\label{tab:pilot-comments}
+\small
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+\textbf{Condition} & \textbf{Theme} & \textbf{Comment summary} \\
+\midrule
+Without tutor & Checklist legibility & A participant reported that kneeboard reading was difficult and that small fixed text was hard to use in VR. \\
+Without tutor & Procedure mapping & A participant reported that some checklist steps did not match their cockpit experience clearly enough. \\
+With tutor & Missed operations & A participant reported that the tutor helped fill in operations they had missed. \\
+With tutor & Grounded feedback & A novice participant described step-by-step guidance that identified where they were stuck and did not advance when the action was wrong. \\
+With tutor & Cognitive effort & A participant still needed to compare cockpit displays with AI instructions and found abbreviations such as FCS and BIT confusing. \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-\item \textbf{P02 questionnaire exclusion.} P02's questionnaire JSON file
-contains an internal participant-id mismatch, indicating mislabelling. P02 is
-excluded from any workload, TLX, or confidence summary. Task metrics from the
-trial summary and manual step coding are retained.
+\subsection{RQ3 Summary}
 
-\item \textbf{Quality-gate interpretation.} All nine participant exports passed
-without blocking quality-gate errors. P04 nevertheless has metadata warnings
-for missing questionnaire, recording, mission, and prompt linkage fields. These
-warnings limit questionnaire-level analysis and traceability, but they do not
-contradict the task metrics reported in Tables~\ref{tab:pilot-overview}
-and~\ref{tab:pilot-errors}.
-
-\item \textbf{Duration interpretation.} Without-tutor trials ended at
-different procedure points when participants could not progress further.
-Observed durations are reported for completeness but do not support
-completion-time comparison between conditions.
-
-\item \textbf{Non-random assignment.} Participants were assigned to conditions
-based on scheduling availability, not randomisation. Prior DCS and VR
-experience varied across participants (see
-Appendix~\ref{ch:appendix}, Table~\ref{tab:pilot-participants}).
-\end{enumerate}
-
-\subsection{Summary of Pilot Findings}
-
-The pilot provides three pieces of formative evidence. First, the tutor
-condition supported procedural progression in these four trials: all four
-with-tutor participants completed the reviewed 33-step procedure, while none of
-the five without-tutor participants did. Second, the error pattern changed. The
-tutor condition removed coded omissions, but it did not remove all procedural
-problems; assistance-coupled CO and PA errors appeared in three of four
-with-tutor trials. Third, the live tutoring infrastructure operated through 77
-help cycles and 82 overlay executions without overlay rejection, while logging
-the repairs and fallback decisions needed for audit.
-
-Across the full chapter, the strongest empirical claim is the RQ2 VLM result:
-small-data LoRA adaptation produced a much more reliable 13-fact visual
-extractor on local holdouts. RQ1 is supported by replay, harness, and export
-evidence showing that the runtime can be audited and regression-tested. RQ3 is
-supported by a completed formative VR pilot, but only at descriptive strength.
-The results do not establish learning improvement, workload reduction, faster
-skill acquisition, retention, or transfer. A larger, randomised, controlled
-study would be required for those claims.
+The pilot provides three descriptive findings. First, the runtime could be used
+live in a Quest~3 setting and produced analyzable exports. Second, reviewed
+task logs show complete progression for all four tutor-condition participants
+and incomplete progression for all five without-tutor participants in this
+non-random sample. Third, the tutor changed the observed error pattern rather
+than eliminating all errors: omissions disappeared in the tutor condition, but
+commission and prompting/assistance errors remained. These findings motivate
+the future-work question of how AI can become a trustworthy collaborator in
+dynamic, high-load, multimodal environments rather than merely a fluent source
+of instructions.

@@ -4,20 +4,20 @@
 %  Claims: C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-03a,
 %          C-VLM-03b, C-VLM-07, C-DATA-01, C-TRAIN-01, C-PROC-01, C-PROC-02
 % ===========================================================================
-\chapter{Methodology}\label{ch:methodology}
+\chapter{Methods: Visual Fact Adaptation and Pilot Protocol}\label{ch:methodology}
 
 Chapter~\ref{ch:system-design} presented the runtime architecture that keeps
 tutor output downstream of evidence and upstream of validation. This chapter
-describes how that evidence is produced, curated, and evaluated. The method is
-organised around a practical question: how can simulator telemetry, retrieved
-procedure knowledge, and VLM-derived visual facts become auditable inputs for a
-procedural tutor?
+describes how the remaining empirical evidence is produced, curated, and
+evaluated. The method is organised around a practical question: how can a small
+set of reviewed cockpit images, structured labels, and formative VR sessions
+become auditable evidence for a machine-learning tutoring system?
 
-The chapter has three roles. First, it defines the runtime evidence interfaces
-used by the procedure engine: telemetry variables, gating diagnostics,
-retrieved snippets, and deterministic fallback. Second, it presents the visual
-fact methodology for RQ2: screenshot capture, pre-labelling, human review,
-ontology revision, bilingual SFT export, LoRA adaptation, and holdout
+The chapter has three roles. First, it records the runtime evidence interfaces
+used in later replay and pilot analysis: telemetry variables, gating
+diagnostics, retrieved snippets, and deterministic fallback. Second, it presents
+the visual fact methodology for RQ2: screenshot capture, pre-labelling, human
+review, ontology revision, bilingual SFT export, LoRA adaptation, and holdout
 benchmarking. Third, it documents the formative VR pilot protocol for RQ3. The
 pilot is treated as descriptive evidence about feasibility and interaction
 patterns; it is not used for inferential claims about learning gains.
@@ -90,7 +90,7 @@ scope is part of the procedure configuration.
 % ===========================================================================
 \section{Visual Fact Data Pipeline}\label{sec:method-vlm-pipeline}
 
-The visual fact pipeline is the main methodology for RQ2. It turns DCS cockpit
+The visual fact pipeline is the main methodology for RQ2. It turns DCS World cockpit
 screenshots into supervised examples and then into a benchmarked visual fact
 extractor. The pipeline is designed for traceability: a benchmark error should
 be traceable back to the model prediction, the human-reviewed label, the
@@ -103,7 +103,7 @@ guide later data collection.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/fig_vlm_pipeline.pdf}
-  \caption{VLM adaptation pipeline. DCS composite screenshots are pre-labelled,
+  \caption{VLM adaptation pipeline. DCS World composite screenshots are pre-labelled,
   human-reviewed, converted into bilingual supervised fine-tuning rows, adapted
   with LoRA, evaluated on independent holdout sets, and used to drive ontology
   revision.}
@@ -111,7 +111,7 @@ guide later data collection.
 \end{figure}
 
 \begin{enumerate}
-\item \textbf{Screenshot capture.} DCS renders the left DDI, AMPCD, and right
+\item \textbf{Screenshot capture.} DCS World renders the left DDI, AMPCD, and right
 DDI into one composite-panel image. The same composite layout is used for data
 collection, pre-labelling, training, benchmarking, and runtime inference. This
 keeps the input distribution stable across the method.
@@ -150,6 +150,40 @@ report visual facts with states \texttt{seen}, \texttt{not\_seen}, or
 \texttt{uncertain}. It is not trained to decide procedure completion or produce
 tutor actions. Those decisions remain in the procedure engine and harness.
 
+\subsection{Annotation Unit and Decision Boundaries}
+
+The annotation unit is one composite-panel screenshot paired with the complete
+13-fact label vector. A sample is not labelled only for the fact that triggered
+collection; every fact in the ontology is reviewed. This full-vector labelling
+is important because the benchmark later evaluates complete visual snapshots.
+It also prevents the training data from becoming a set of isolated positive
+examples with poorly defined negatives.
+
+Reviewers apply fact-specific decision boundaries. A page option label is not
+the same thing as the page itself. A visible FCS-MC entry on a BIT root page is
+not the FCS-MC subpage. A PBIT GO status is not the same as the final FCS-MC GO
+result. HSI symbology without a coloured map layer is not sufficient for the
+map-layer fact. INS OK must be clearly readable near the alignment block rather
+than inferred from the elapsed procedure phase. These rules are written into
+the benchmark prompt and reflected in the ontology, so the model is trained and
+evaluated against the same conceptual contract.
+
+The \texttt{uncertain} label is used when the screenshot does not support a
+clean decision. This includes blurred frames, partially obstructed display
+regions, ambiguous text, or states that require temporal history rather than a
+single image. The reviewer is not asked to guess what the simulator probably
+did before or after the screenshot. That discipline keeps the VLM task aligned
+with the runtime boundary: single-frame perception reports visible facts, while
+procedure reasoning happens downstream.
+
+Pre-labelling accelerates the process but does not define ground truth. The
+external VLM's output is treated as an annotation proposal. Human review can
+change the state, revise the evidence note, or preserve uncertainty. The final
+reviewed JSONL, not the pre-label, is the source used for SFT and benchmark
+scoring. This distinction is essential because otherwise the benchmark would
+measure agreement with another model rather than agreement with reviewed visual
+facts.
+
 % ===========================================================================
 \section{Dataset Curation}\label{sec:method-datasets}
 
@@ -182,6 +216,34 @@ Run-003 and Run-005 contain samples whose free-text summary field is blank
 fact task because every sample still contains a complete fact array. The
 supervised target used by the runtime and benchmark is the structured fact
 state, not the optional summary.
+
+\subsection{Dataset Quality Checks}
+
+The dataset pipeline applies several checks before a reviewed export is used for
+training or benchmarking. First, every sample must include the expected fact
+identifiers exactly once. Missing or duplicated fact IDs would make it unclear
+whether a model error is visual or structural. Second, every fact state must be
+one of the allowed states. Third, the image path must resolve to the composite
+panel image used during review. Fourth, training and holdout sets are checked
+for exact image overlap before the holdout metrics are interpreted as
+independent evidence.
+
+The quality checks do not guarantee that every label is perfect. They guarantee
+that the data artifacts have the structure needed for a meaningful benchmark.
+This is a different but important claim. In small-data adaptation, a few
+ambiguous labels can have a visible effect, especially for rare positive facts.
+The thesis therefore treats error analysis as part of the data workflow. If a
+holdout error reveals that a fact definition is too close to a procedural
+conclusion, the correct response is not simply to collect more data; it may be
+to revise the ontology.
+
+Run-005 is an example of data-centric correction. The original Run-003 training
+source contained useful coverage but under-represented several rare states. The
+composition-rebalance supplement intentionally increases exposure to those
+states. This does not make the training set statistically representative of all
+possible cockpit states, and it is not presented that way. Its role is
+practical: expose the adapter to positive examples that matter for downstream
+procedure evidence and then test behaviour on independent holdouts.
 
 \subsection{Ontology Evolution: 8-Fact v1 to 13-Fact v2}
 
@@ -303,6 +365,29 @@ Run-005 bilingual rows. The method therefore separates two questions: whether
 the adapter can learn the ontology from the rebalanced training recipe, and
 whether the learned extractor generalises to independent holdouts.
 
+\subsection{Training Target Construction}
+
+The SFT target is intentionally smaller than the runtime observation object.
+It contains the short summary field and the array of fact objects with
+\texttt{fact\_id}, \texttt{state}, and \texttt{evidence\_note}. It excludes
+frame identifiers, file paths, confidence values, sticky/expiry metadata, and
+procedure suggestions. Those excluded fields are runtime management metadata,
+not visual labels. Including them would teach the model to emit data it cannot
+observe from the image and would make the output harder to validate.
+
+The target also avoids asking for explanatory prose beyond short evidence
+notes. Long free-form explanations would make the SFT objective less focused
+and introduce additional evaluation ambiguity. The downstream language model
+can later turn facts into user-facing tutoring language. The VLM adapter is
+trained to supply the visual facts that such language may reference.
+
+This separation keeps the training recipe aligned with the system architecture.
+The VLM is not rewarded for sounding helpful, predicting the next step, or
+explaining the procedure. It is rewarded for returning a complete, parseable,
+ontology-aligned fact vector. That is why benchmark gains in this thesis are
+interpreted as perception-layer gains, not as evidence that the full tutor is
+pedagogically better.
+
 % ===========================================================================
 \section{Benchmark Protocol}\label{sec:method-benchmark}
 
@@ -358,6 +443,25 @@ per-sample predictions, error JSONL files, per-fact score CSVs, comparison
 summaries, human-readable reports, and charts. These artifacts form the
 evidence chain for the technical results reported in Chapter~\ref{ch:evaluation}.
 
+\subsection{Error Review Protocol}
+
+The benchmark is followed by qualitative error review. The review focuses first
+on critical false positives, because those are the errors most likely to create
+unsafe evidence for a procedure gate. It then inspects false negatives for
+vision-priority facts, because repeated false negatives can make the tutor ask
+for unnecessary checks or fail to recognise progress. Finally, it inspects
+schema and exact-match failures to identify whether the remaining problem is
+formatting, visual ambiguity, or fact-definition mismatch.
+
+This review is deliberately tied to the runtime use case. A generic ML report
+might stop after accuracy and F1. For a tutor, the relevant question is what a
+specific error would do downstream. A hallucinated FCS-MC final GO result is
+more serious than a conservative \texttt{not\_seen} prediction for a page that
+can be rechecked. A schema-invalid output is less visually interesting but more
+important operationally because it triggers fallback. The benchmark protocol
+therefore connects numerical metrics to the validation and degradation paths
+described in Chapter~\ref{ch:system-design}.
+
 % ===========================================================================
 \section{Human-Subject Pilot Methodology}\label{sec:method-pilot}
 
@@ -399,11 +503,43 @@ unable to progress.
 
 The export pipeline produced per-trial summaries, per-step coding files,
 help-cycle logs for tutor trials, action timelines, quality-gate metadata, and
-session summaries. Step errors were coded with five categories: omission (OM),
-commission (CO), order error (OR), prompting/assistance error (PA), and state
-violation (SV). The automated coding output was reviewed manually using
-telemetry, help-cycle logs, and action timelines; the human-coded columns are
-the authoritative source for reported pilot results.
+session summaries. Post-trial forms recorded participant experience, confidence
+before the trial, raw NASA-TLX workload dimensions~\citep{hart1988nasa},
+condition-specific tutor ratings where applicable, general usability/user
+ratings, and free-text comments.
+
+Step errors were coded with five categories: omission (OM), commission (CO),
+order error (OR), prompting/assistance error (PA), and state violation (SV).
+The automated coding output was reviewed manually using telemetry, help-cycle
+logs, and action timelines; the human-coded columns are the authoritative
+source for reported pilot results.
+
+\subsection{Questionnaire and Comment Instruments}
+
+The post-trial form records raw NASA-TLX workload dimensions, not weighted
+NASA-TLX. The thesis reports the raw average because the formative pilot was
+not designed to estimate a psychometric workload effect. The form also records
+pre-trial confidence, condition-specific tutor ratings where the tutor was
+available, general usability/user ratings, and short open comments. The rating
+values are kept on their recorded scale and are not normalised into a single
+composite effectiveness score.
+
+The comments are used cautiously. They are not treated as coded qualitative
+themes with inter-rater reliability. Instead, they provide context for
+observed log and questionnaire patterns. For example, comments about small
+fixed checklist text help explain why a no-tutor participant could struggle in
+VR even when a procedure list was technically available. Comments about the AI
+identifying where the learner was stuck help explain why tutor-condition
+participants may have perceived the system as useful even when assistance-
+coupled errors remained.
+
+This instrument design matches the pilot's formative status. The questionnaire
+and comments can reveal usability problems, trust signals, and cognitive
+frictions that should shape the next study. They cannot establish causal
+changes in workload, trust, or learning. That boundary is maintained in the
+results chapter by excluding P02's mismatched questionnaire, reporting P08 with
+manual task coding, and treating P09 as an independent participant after the
+metadata correction.
 
 \subsection{Data-Quality Notes}
 
@@ -412,7 +548,9 @@ reported incomplete progress, but manual telemetry review confirmed completion
 of all 33 steps. The manual coding is used for analysis, and the pre-review
 file is preserved for audit. Second, P02's questionnaire metadata contains an
 internal participant-id mismatch. P02's task metrics are retained, but P02 is
-excluded from questionnaire-derived workload or confidence summaries.
+excluded from questionnaire-derived workload, confidence, usability, trust, or
+comment summaries. P09 is treated as an independent participant after the
+export correction recorded in the trial metadata.
 
 \subsection{Analysis Approach}
 
@@ -420,9 +558,11 @@ The pilot analysis reports per-participant outcomes and condition-level
 descriptive summaries. No null-hypothesis significance tests are performed.
 Observed durations are documented but not interpreted as completion-time
 comparisons because incomplete without-tutor trials ended at different stopping
-points. The analysis focuses on completion status, manual error categories, and
-tutor interaction patterns such as help requests, VLM calls, overlay actions,
-and fallback events.
+points. Questionnaire values are reported as raw descriptive scores only. The
+analysis focuses on completion status, manual error categories, tutor
+interaction patterns such as help requests, VLM calls, overlay actions, and
+fallback events, and short anonymised comments that clarify interaction
+frictions.
 
 % ===========================================================================
 \section{Summary}\label{sec:method-summary}

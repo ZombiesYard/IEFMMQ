@@ -11,13 +11,13 @@
 \chapter{Discussion}\label{ch:discussion}
 
 Chapter~\ref{ch:evaluation} reported three evidence lines with different claim
-strengths: visual-fact benchmarks for RQ2, replay and harness readiness evidence
-for RQ1, and a formative VR pilot for RQ3. This chapter interprets those
-evidence lines together. The main claim is not that the tutor has already been
-proven to improve learning. Rather, the thesis shows how a procedural tutor can
-be made technically auditable by placing telemetry, procedural rules, retrieved
-sources, VLM-derived visual facts, and harness validation between the learner and
-the foundation-model response.
+strengths: replay and harness readiness evidence for RQ1, visual-fact
+benchmarks for RQ2, and a formative VR pilot for RQ3. This chapter interprets
+those evidence lines together. The main claim is not that the tutor has already
+been proven to improve learning. Rather, the thesis shows how a procedural
+tutor can be made technically auditable by placing telemetry, procedural rules,
+retrieved sources, VLM-derived visual facts, and harness validation between the
+learner and the foundation-model response.
 
 Section~\ref{sec:disc-evolution} explains how the implemented work differs from
 the original proposal. Section~\ref{sec:disc-interpretation} interprets the
@@ -41,12 +41,13 @@ used for a formative pilot rather than for a controlled effectiveness claim.
 This shift was not only an engineering convenience. The cold-start procedure
 made a prior problem visible: before a tutor can give useful procedural help, it
 must know which state it is allowed to trust. Some required evidence is exported
-as telemetry through DCS-BIOS. Some evidence is visible only on cockpit displays.
-Some steps are manual, out of layout, or unsuitable for automatic confirmation.
-The thesis therefore had to build the evidence layer first: procedure packs,
-gate inference, evidence packets, retrieval boundaries, VLM visual facts,
-schema-constrained model output, harness validation, overlay allowlists, and
-replayable logs.
+as telemetry through DCS-BIOS. Some evidence is visible only on cockpit
+displays. Some evidence is outside the current telemetry or visual-fact
+contract, so the runtime must treat it as unavailable rather than silently
+turning it into a confident state claim. The thesis therefore had to build the
+evidence layer first: procedure packs, gate inference, evidence packets,
+retrieval boundaries, VLM visual facts, schema-constrained model output,
+harness validation, overlay allowlists, and replayable logs.
 
 The VLM work grew out of the same pressure. The proposal assumed that simulator
 state would be sufficient for procedural tracking. In practice, display-page
@@ -59,10 +60,11 @@ perception component rather than as an unconstrained judge of procedure state.
 The completed VR pilot partially returns to the original proposal's
 human-subject ambition. It shows that the evidence-grounded runtime can be
 exercised in headset with real participants and that the export pipeline can
-capture the data needed for later analysis. It does not, however, complete the
-controlled three-condition study proposed at the beginning of the project. With
-$n=9$, non-random assignment, and unresolved questionnaire data for one
-participant, the pilot is formative and descriptive.
+capture task logs, workload ratings, usability/trust ratings, and comments for
+later analysis. It does not, however, complete the controlled three-condition
+study proposed at the beginning of the project. With $n=9$, non-random
+assignment, P02 excluded from questionnaire-derived summaries, and P08 requiring
+manual completion coding, the pilot is formative and descriptive.
 
 % ===========================================================================
 \section{Interpretation of Technical Evidence}\label{sec:disc-interpretation}
@@ -119,6 +121,71 @@ The evaluation therefore supports an integrated artifact claim: the implemented
 system shows a technically auditable way to combine these elements. It does not
 rank every design choice against alternatives.
 
+\subsection{Data-Centric Interpretation of the VLM Result}
+
+The VLM result is partly a model result, but it is more importantly a
+data-and-representation result. The most visible improvement comes from LoRA
+adaptation, yet the adapter is only one part of the system that changed between
+the weak early visual pipeline and the current result. The ontology was revised,
+the label contract was narrowed, the training distribution was rebalanced, and
+the benchmark separated independent holdouts from contaminated development
+sets. Those choices are data-centric ML choices. They define what the model is
+asked to learn and what kind of error is considered dangerous.
+
+This distinction matters for future work. It would be easy to interpret the
+Qwen3.5 numbers as evidence that a larger or newer backbone is the primary
+solution. The Qwen3.6 comparison argues against that simple reading. A stronger
+base model helps, but it does not remove the need for a task-specific ontology
+or a holdout benchmark that measures the right failures. The Gemma comparison
+also argues against a single-metric reading: a model can be more conservative
+on one critical-false-positive measure while still less complete on exact match
+and seen-state recognition. The practical lesson is that model selection should
+be downstream-risk aware.
+
+The same lesson applies to training data. Adding more examples is useful only
+when the examples target the remaining decision boundaries. After the current
+adaptation, page visibility is less interesting than temporally adjacent
+completion cues, rare positive states, and hard negatives where labels or page
+names appear without the target page being active. Future data collection
+should therefore be driven by benchmark failures, not by a desire to enlarge
+the dataset uniformly.
+
+\subsection{Implications for ML System Design}
+
+The thesis also suggests a broader ML systems pattern. Foundation models are
+most useful in this setting when the system designer narrows the model's job
+until its outputs can be tested. The VLM is not asked to understand the whole
+cockpit; it is asked to predict a small fact vector. The LLM is not asked to
+run the procedure; it is asked to explain a current evidence packet. The
+runtime is not asked to trust either model unconditionally; it validates and
+logs their outputs. This division of labour turns a broad foundation-model
+capability into a set of smaller contracts.
+
+This pattern differs from simply adding guardrails around a chatbot. Guardrails
+often operate after a model has produced a free-form answer. In SimTutor, the
+contract exists before generation: the procedure pack defines the target space,
+the evidence packet defines what the model is allowed to cite, the visual
+ontology defines what the VLM may report, and the harness defines what can
+become an overlay. The model still contributes flexibility, but the shape of
+the problem is defined outside the model. That is why the thesis can make an
+auditability claim even though it cannot prove full educational effectiveness.
+
+For deployable ML systems, this distinction is important. A model-centric
+approach asks which model is strong enough to solve the task. An evidence-
+centric approach asks which parts of the task should be assigned to learned
+models, which parts should remain symbolic or authored, and how conflicts
+should be resolved. The cockpit tutor benefits from the second approach because
+the costs of different mistakes are not symmetric. A wrong synonym in an
+explanation is less serious than a wrong overlay target. A missed visual cue is
+less serious than a hallucinated completion cue. A schema-invalid VLM response
+is less dangerous if the runtime rejects it before it becomes evidence.
+
+The resulting system is not simpler than an unconstrained chatbot, but it is
+more inspectable. Every added constraint creates an artifact: a schema, a
+source policy, an ontology, a UI map, a benchmark, or a replay fixture. Those
+artifacts are the engineering cost of turning foundation-model fluency into a
+research object that can be evaluated.
+
 % ===========================================================================
 \section{Interpretation of Pilot Findings}\label{sec:disc-pilot}
 
@@ -130,6 +197,15 @@ mean of 5.6 omission errors in the without-tutor condition. These observations
 are consistent with the intended function of the tutor: it keeps the current
 procedure step visible, retrieves relevant procedural context, and can point the
 learner toward cockpit controls.
+
+The questionnaire data add a second, weaker descriptive layer. After excluding
+P02, the raw NASA-TLX means were 34.12 without tutor and 23.66 with tutor, and
+the with-tutor group gave a mean tutor-specific rating of 5.92 on the recorded
+1--7 scale. These values are useful for formative interpretation, especially
+when read together with comments about grounded feedback, missed operations,
+small VR checklist text, and confusing abbreviations. They should not be read
+as evidence that the tutor reduced workload or increased trust in a controlled
+sense.
 
 The same data also show that assistance does not eliminate procedural error.
 Commission and prompt-assistance errors remained in the tutor condition. This is
@@ -154,6 +230,35 @@ instrumented tutoring runtime can be used in a live VR setting and produce
 analysable logs. Second, it reveals the kind of human-system interaction data
 that a later controlled study should measure more carefully. It does not support
 causal claims about learning, workload, retention, transfer, or task speed.
+
+\subsection{Boundary Between Assistance and Collaboration}
+
+The pilot also clarifies what is meant by a trustworthy AI collaborator. A
+collaborator is not simply a system that supplies more instructions. In a
+high-load VR cockpit, more instructions can increase cognitive work if they
+arrive at the wrong time, use unfamiliar abbreviations, or force the learner to
+compare multiple sources of evidence. A trustworthy collaborator must regulate
+its own certainty, decide when to highlight and when to remain text-only, and
+help the learner understand the evidence behind the next step.
+
+The with-tutor trials show both sides of this boundary. Completion and omission
+patterns suggest that step-aware guidance can keep learners oriented. The
+commission and prompting/assistance errors show that orientation is not enough.
+The system also has to avoid repeated or stale guidance after a state has
+already been achieved. P09's comments are especially instructive: the tutor was
+valued because it identified where the participant was stuck and did not simply
+advance, but the same participant still reported needing to compare the display
+with AI instructions and struggling with abbreviations. Trust, in this context,
+is not blind acceptance. It is an interaction in which the learner can see why
+the assistant is making a claim and can recover when the claim is incomplete.
+
+This interpretation strengthens the thesis title. To explain reality is not to
+replace the learner's situational awareness. It is to support it by making the
+state, the evidence, and the uncertainty easier to act on. The current prototype
+implements only an early version of that idea. It has evidence packets, visual
+facts, validation, and logs, but it does not yet optimise when help should be
+minimal, when it should be explicit, and when it should ask the learner or an
+instructor for confirmation.
 
 % ===========================================================================
 \section{Ontology Design Lessons}\label{sec:disc-ontology}
@@ -239,23 +344,51 @@ within the scope of the project, but it does not cover other VLM families,
 larger models, full fine-tuning, alternative adapters, or non-cockpit visual
 domains.
 
-The runtime is implemented and exercised through replay, fixtures, desktop DCS,
+The runtime is implemented and exercised through replay, fixtures, desktop DCS World,
 and the Quest~3 pilot. However, headset latency, overlay legibility, gaze or
 hand-tracking accuracy, and expert-rated response usefulness were not measured
 as controlled system-level outcomes.
 
+\subsection{Construct Validity}
+
+Several constructs in the thesis are proxies. The VLM benchmark measures
+single-frame visual fact extraction, not human understanding of cockpit
+displays. Replay fixtures measure whether known evidence-grounding cases are
+handled, not whether every possible live help request is safe. Manual step
+completion measures whether procedure states were reached, not whether the
+learner can later perform the task unaided. Raw NASA-TLX values measure
+reported workload after one formative trial, not stable workload reduction.
+
+These proxies are still useful because they match the development stage of the
+system. Before testing learning outcomes, the tutor must be able to observe
+state, produce bounded visual facts, validate model output, and export
+interpretable logs. The constructs chosen here therefore prioritise technical
+readiness and descriptive interaction evidence. A later controlled study should
+add constructs that the current thesis does not measure: retention after a
+delay, transfer to a different start-up scenario, expert-rated explanation
+quality, overlay legibility in headset, and calibrated trust.
+
+The construct-validity boundary also protects the ML results from overreach.
+High VLM accuracy is necessary for the visual evidence channel, but it is not a
+direct measure of explanation quality. Conversely, a participant may rate the
+tutor positively even if some visual facts or overlays required repair. The
+evaluation therefore keeps component reliability, system auditability, and
+human response as separate constructs.
+
 \subsection{Pilot Scope}
 
 The pilot contains nine participants: four with tutor and five without tutor.
-Assignment was not randomised, prior DCS experience was not balanced, and the
+Assignment was not randomised, prior DCS World experience was not balanced, and the
 sample is too small for inferential statistics. Without-tutor trials stopped at
 different procedure points, so their durations are not comparable to completed
 with-tutor trials.
 
-Questionnaire and workload evidence is incomplete. P02's questionnaire metadata
-could not be confidently attributed, and NASA-TLX integration was not part of
-the completed export pipeline. The pilot therefore supports task-log and coding
-observations, not workload, confidence, or subjective-usability conclusions.
+Questionnaire evidence is usable but limited. P02's questionnaire metadata
+could not be confidently attributed and is excluded from all questionnaire-
+derived summaries. The remaining raw NASA-TLX, tutor-rating, usability/user
+rating, and free-text comment data are descriptive only. They support
+formative interpretation, not workload, confidence, trust, or usability claims
+with inferential strength.
 
 Finally, manual review inferred without-tutor completion from passive telemetry
 gates and the action timeline. Because the active VLM pathway was not available
@@ -276,7 +409,13 @@ logs. It does not establish controlled educational effectiveness.
 % ===========================================================================
 \section{Future Work}\label{sec:disc-future}
 
-The limitations above lead to a focused research agenda.
+The limitations above lead to one larger research agenda: how can AI become a
+trustworthy collaborator in dynamic, high-load, multimodal training
+environments? In this thesis, trustworthiness does not mean that the model
+sounds confident. It means that the assistant can expose the evidence behind
+its guidance, know when a modality is unavailable, defer to explicit procedure
+rules, recover from uncertainty, and leave an audit trail that instructors can
+inspect. The following directions extend that agenda.
 
 \subsection{Controlled Human-Subject Evaluation}
 
@@ -290,11 +429,12 @@ retention under controlled conditions.
 
 \subsection{Ontology Extension to Other Procedures}
 
-The 13-fact ontology should be extended to additional procedures only after a new
-task analysis identifies which steps are telemetry-visible, vision-priority, or
-manual/out-of-layout. Each new procedure needs its own visual fact contract,
-reviewed data, holdout benchmark, and runtime bindings. This is the appropriate
-test of whether the ontology discipline transfers beyond cold-start.
+The 13-fact ontology should be extended to additional procedures only after a
+new task analysis identifies which states are telemetry-visible,
+vision-priority, or outside the current evidence-source contract. Each new
+procedure needs its own visual fact contract, reviewed data, holdout benchmark,
+and runtime bindings. This is the appropriate test of whether the ontology
+discipline transfers beyond cold-start.
 
 \subsection{Temporal and Multi-Frame Visual Reasoning}
 
@@ -311,6 +451,32 @@ components: trigger-to-overlay latency, correctness of highlighted targets,
 frequency and type of harness repair, response usefulness under expert review,
 and whether vision-priority steps improve over telemetry-only baselines. This
 would connect the RQ1 and RQ2 technical evidence more directly to RQ3.
+
+For the trustworthy-collaborator agenda, this system-level evaluation should
+also measure when the assistant should stay silent, ask for confirmation, or
+state uncertainty instead of giving another instruction. In high-load VR use,
+too much guidance can be as harmful as too little guidance if it competes with
+the learner's attention or obscures the evidence needed for action.
+
+\subsection{Multimodal Collaboration Policies}
+
+Future work should treat modality selection as a policy problem. The assistant
+can respond with text, a spatial overlay, a request for visual confirmation, a
+retrieved manual excerpt, or silence. Each modality has a cost. Text consumes
+reading and memory resources. Overlays consume visual attention and may pull
+the learner toward one control. VLM calls consume latency and may return
+uncertain facts. Retrieval can add authority but can also lengthen the message.
+A trustworthy collaborator should choose the lightest modality that is
+sufficient for the current evidence state.
+
+Such a policy could begin deterministically. For example, if telemetry already
+confirms completion, the tutor should avoid repeating an instruction. If a
+visual fact is uncertain, it should ask for confirmation rather than highlight a
+completion target. If the learner is on a known high-confusion step, the tutor
+could give a shorter explanation first and reveal more detail only on request.
+Later work could learn parts of this policy from expert corrections, but the
+policy should remain auditable: every modality choice should still be tied to
+state, evidence, and uncertainty.
 
 \subsection{In-Situ Correction and Adaptation}
 

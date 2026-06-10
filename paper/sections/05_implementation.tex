@@ -1,220 +1,281 @@
 % ===========================================================================
-%  05 — Implementation
+%  05 -- Reproducibility and Artifact Provenance
 %
-%  Claims: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-VLM-01, C-VLM-02,
-%          C-TELEM-01, C-RAG-01, C-PROC-01, C-RUNTIME-01
+%  Purpose: replace a technology-report implementation chapter with the
+%  reproducibility layer needed to interpret the methods and results.
 % ===========================================================================
-\chapter{Implementation}\label{ch:implementation}
+\chapter{Reproducibility and Artifact Provenance}\label{ch:implementation}
 
-Chapters~\ref{ch:system-design} and~\ref{ch:methodology} described the
-architecture and methods of the evidence-grounded tutor. This chapter explains
-how those ideas are implemented as a running research artifact. The emphasis is
-selective: implementation details are included when they enforce an evidence
-boundary, preserve a Clean/Hexagonal separation, make a help cycle auditable,
-or support the evaluation artifacts used in Chapter~\ref{ch:evaluation}.
+The preceding methods chapters define the evidence-grounded tutoring runtime,
+the visual-fact adaptation pipeline, and the formative Quest~3 pilot protocol.
+This chapter records how those methods are made reproducible in the repository.
+It deliberately avoids a module-by-module code tour. Implementation details
+are included only when they determine the provenance of a reported result,
+constrain a foundation-model output, or explain why a later claim can be
+audited from local artifacts.
 
-The implementation question for the chapter is therefore not simply which
-modules exist, but where authority is checked before generated help reaches the
-learner. The answer is distributed across pack-derived schemas, evidence
-packets, response mapping, harness validation, bounded overlay execution,
-fallback logic, and append-only event logs. Operational details that do not
-change this argument, such as full command references and complete deployment
-topology, are kept in Appendix~\ref{ch:appendix}.
+The chapter therefore has a narrow role in the thesis structure. It connects
+the conceptual method to files, logs, configuration boundaries, and exported
+analysis tables. Chapter~\ref{ch:evaluation} then uses those artifacts as
+evidence for RQ1, RQ2, and RQ3.
 
 % ===========================================================================
-\section{Runtime Boundary and Configuration}\label{sec:impl-stack}
+\section{Repository-Level Boundaries}\label{sec:impl-boundaries}
 
-The codebase is organised around a Clean/Hexagonal boundary. Domain logic lives
-in \texttt{core/}; stable interfaces are declared in \texttt{ports/}; external
-systems are connected through \texttt{adapters/}; and task-specific procedure
-knowledge is stored in the F/A-18C procedure pack. This layout is an
-implementation decision, not only a code style preference. It keeps simulator
-transport, model providers, visual capture, retrieval, overlay dispatch, and
-experiment export outside the domain objects that decide what evidence is
-admissible.
+The research artifact is organised around a separation between procedural
+knowledge, runtime logic, external systems, and exported evidence. The
+procedure pack stores the F/A-18C Lot~20 cold-start steps, gate definitions,
+telemetry bindings, UI targets, and visual-fact bindings. The Python runtime
+loads those declarations and produces evidence packets, model prompts, harness
+decisions, overlay actions, and event logs. DCS World, DCS-BIOS, the Quest~3
+display path, model servers, and screenshot capture are treated as external
+adapters.
 
-The Python project targets Python~3.10+ and uses the dependency set declared in
-\texttt{pyproject.toml}. The runtime depends on a small number of general
-libraries: \texttt{httpx} for HTTP model calls, \texttt{PyYAML} for declarative
-configuration, \texttt{jsonschema} for contract validation, and
-\texttt{Pillow} for image handling in the VLM path. Tests are implemented with
-\texttt{pytest}. These stack choices matter mainly because they support
-inspectable file-based configuration and reproducible validation.
+This boundary is important for reproducibility. A result in the thesis should
+be traceable to one of three artifact classes:
 
-Model access is intentionally provider-agnostic. The text-help path uses an
-OpenAI-compatible adapter and can be configured for servers such as vLLM,
-llama.cpp, or TGI. Local compatibility is provided through an Ollama adapter,
-and deterministic stubs support tests. The same boundary is used for the
-multimodal VLM path: the runtime treats visual fact extraction as an adapter
-that returns structured observations, not as a source of procedural authority.
+\begin{itemize}
+\item \textbf{Declarative configuration:} procedure steps, telemetry maps,
+visual-fact ontologies, UI targets, source-policy rules, and replay-suite
+definitions.
+\item \textbf{Generated evidence:} JSONL event logs, trial summaries, step
+coding, help-cycle tables, benchmark predictions, benchmark metrics, and
+quality-gate reports.
+\item \textbf{Human-reviewed evidence:} reviewed visual labels, manual step
+coding overrides, questionnaire records after exclusion rules, and anonymised
+free-text comments.
+\end{itemize}
 
-The DCS-side integration has a similarly narrow role. Lua scripts and sidecar
-components export DCS-BIOS state, trigger composite-panel capture, and apply
-overlay highlight commands. They do not decide the active procedure step, do
-not generate tutoring text, and do not bypass the Python-side validation chain.
-This keeps the simulator integration as an I/O adapter while the procedure
-pack, evidence packet, and harness remain the sources of tutoring authority.
+The thesis does not treat generated text from the model as an unverified
+research observation. Model output becomes evidence only after it has passed a
+schema, mapping, harness, benchmark, or manual-review step appropriate to the
+claim being made.
 
-% ===========================================================================
-\section{Evidence Grounding Enforcement}\label{sec:impl-evidence}
+\subsection{Artifact Granularity}
 
-Evidence grounding is enforced through several implementation gates, not only
-through prompt wording. The model may propose a diagnosis, next step,
-explanation, and overlay target, but that proposal must survive contracts
-generated from the procedure pack and checks against the evidence available in
-the current help cycle.
+The repository stores artifacts at different granularities because the research
+questions require different forms of inspection. RQ1 needs help-cycle
+granularity: the relevant unit is a learner request, the evidence available at
+that moment, the model response, the validation decision, and the overlay
+result. RQ2 needs sample and fact granularity: the relevant unit is an image,
+its reviewed fact vector, the model prediction, and the per-fact confusion
+entry. RQ3 needs participant and step granularity: the relevant unit is a
+trial, a procedure step, a coded error, a questionnaire row, or a comment.
 
-\paragraph{Pack-derived schemas.}
-The function \texttt{build\_help\_response\_schema} generates the
-\texttt{HelpResponse} JSON Schema at runtime. Step identifiers come from the
-step registry, overlay targets come from the UI map, and error categories come
-from the taxonomy. The schema requires each overlay target to have at least one
-corresponding evidence item. Evidence items must use one of the runtime
-grounding types: \texttt{var}, \texttt{gate}, \texttt{rag}, \texttt{delta}, or
-\texttt{visual}. This makes the output contract procedure-specific rather than
-a generic language-model format.
+Keeping these granularities separate prevents evidence transfer. A high VLM
+accuracy number cannot be used to justify a participant outcome unless the live
+trial actually invoked the vision path and logged the resulting facts. A
+participant completion row cannot be used to claim that the model was always
+correct unless the help-cycle and validation logs support that interpretation.
+A questionnaire score cannot be used as task performance evidence. The thesis
+therefore reports each artifact class in the section where it has the right
+claim strength.
 
-\paragraph{Evidence packet construction.}
-The help prompt is built from a structured context rather than from raw log
-fragments. \texttt{build\_evidence\_packet} aggregates telemetry evidence,
-gate evidence, recent actions, visual facts, deterministic candidates, and
-known conflicts into a compact packet. \texttt{build\_help\_prompt\_result}
-then includes this packet, the allowed evidence references, retrieved snippets,
-and the overlay target policy in the model-facing prompt. As a result, an
-evidence reference can later be checked against the same context that was shown
-to the model.
-
-\paragraph{Model output mapping and harness validation.}
-The response path is deliberately narrow. JSON extraction removes code fences
-and reads the first valid object, but it does not repair arbitrary malformed
-text into a new answer. The parsed object is validated against the dynamic
-schema and then passed to the response mapper. The mapper checks that overlay
-evidence references are present in the help-cycle context, verifies overlay
-targets against allowlists, records mapping failures in metadata, and applies
-the configured overlay-target limit.
-
-The harness layer adds a second implementation boundary. The prompt exposes a
-\texttt{HarnessDecision} contract for candidate adjudication, while the public
-runtime output remains mapped through the stable \texttt{HelpResponse} path.
-\texttt{plan\_harness\_action} then checks the chosen step, candidate evidence,
-allowed overlay targets, evidence references, and final state consistency. It
-can accept a model proposal, repair it to a safer target, force text-only
-guidance, or reject overlay output. This is the concrete implementation of the
-architecture principle that the LLM is not the final authority.
-
-\paragraph{Bounded overlay execution.}
-The final executor accepts only actions of type \texttt{overlay}. It rejects
-control injection, key emulation, empty targets, unmappable targets, targets
-outside the UI allowlist, and evidence-required overlays without evidence
-references. The current runtime supports configurable multi-target guidance.
-Targets beyond the configured limit are dropped and recorded rather than
-silently executed. When the DCS sender emits acknowledgements, requested,
-applied, and failed overlay events are normalised into the same JSONL event
-stream as the rest of the help cycle.
+This granularity also helps future replication. A researcher who wants to check
+the VLM result can inspect benchmark directories without replaying a headset
+session. A researcher who wants to check a tutor-condition pilot claim can
+inspect trial summaries and step coding without retraining the VLM. A developer
+who wants to debug an overlay mistake can inspect one help cycle without
+re-running all benchmarks. This is the practical value of artifact provenance:
+it makes the research object divisible into auditable units.
 
 % ===========================================================================
-\section{Deterministic Fallback}\label{sec:impl-fallback}
+\section{Runtime Evidence Provenance}\label{sec:impl-runtime-provenance}
 
-Fallback is implemented as a conservative degradation path. It is used when the
-model is unavailable, JSON extraction fails, schema validation fails, response
-mapping rejects the proposed action, or the harness cannot produce a grounded
-overlay plan. The fallback examines the active procedure step, unsatisfied
-gates, recent actions, UI target bindings, and evidence availability.
+RQ1 depends on whether help-cycle decisions can be reconstructed. The runtime
+therefore writes append-only JSONL events and analysis exports rather than only
+rendering transient headset guidance. A help cycle records its trigger context,
+telemetry snapshot, recent deltas, active step, gate diagnostics, retrieved
+snippets, visual-fact snapshot when available, prompt-construction metadata,
+model-response status, mapping and harness results, overlay execution status,
+and fallback or repair metadata.
 
-The important distinction is between hard and soft blockers. A hard blocker
-means that observed evidence shows a required condition is false. A soft
-blocker means that the required source is missing or not observable. The
-fallback can give corrective guidance for hard blockers, but it avoids claiming
-that a learner has failed a step when the necessary evidence is absent. Overlay
-output is suppressed unless the local procedure rules identify a unique valid
-target, or a bounded multi-target plan is explicitly allowed by the current
-configuration.
+The same event format supports live sessions and replay. Replay can feed a
+recorded DCS-BIOS stream through the telemetry map, procedure gates, source
+policy, and harness contracts used by the live runtime. This is the practical
+meaning of an auditable tutor in the thesis: a later reader can inspect why a
+help cycle was accepted, repaired, downgraded, or rejected without relying on
+the model's natural-language explanation alone.
 
-This fallback path also preserves the thesis claim boundary. A help cycle may
-continue without a model or without vision evidence, but the resulting guidance
-is less ambitious: it relies on observed telemetry, procedure gates, and
-deterministic step hints rather than on invented visual or pedagogical
-interpretation.
-
-% ===========================================================================
-\section{VLM Visual Fact Extraction Runtime}\label{sec:impl-vlm}
-
-The VLM runtime is implemented as a visual fact extractor, not as a tutor. The
-current procedure pack marks S08, S15, S18, and S19 as vision-priority steps.
-For those steps, the live runtime may request composite-panel capture before
-assembling the final help context. For other steps, stale visual facts are not
-allowed to override fresher telemetry or procedure-gate evidence.
-
-A capture request is sent to the DCS-side vision sidecar, which renders the
-left DDI, AMPCD, and right DDI into a composite image. The Python-side
-buffered vision session keeps recent observations and selects frames around
-the help trigger. In live mode the default synchronization window is
-250\,ms; replay uses a narrower deterministic window. The selected frame
-metadata records frame identifiers, capture time, synchronization status,
-delta from the trigger, and stale-frame flags.
-
-The selected image frames are passed to the visual fact extractor. The
-extractor builds a prompt from the current 13-fact ontology, the composite
-layout, and fact-specific decision boundaries. The model response is parsed as
-JSON, sanitized, and validated against a schema whose fact identifiers come
-from the visual-facts pack. Unknown fact IDs, invalid states, incomplete fact
-objects, and non-schema fields are ignored or reported in metadata. Accepted
-facts are restricted to \texttt{seen}, \texttt{not\_seen}, and
-\texttt{uncertain}.
-
-Validated visual facts are merged into the runtime vision snapshot using the
-ontology's sticky and expiry policy. This implementation detail matters because
-some cockpit display states are transient: a fact may need to remain available
-briefly for a procedure gate or harness decision, while stale facts must expire
-before they can mislead later steps. If multimodal extraction is disabled or
-the VLM call fails, the help cycle continues with telemetry, retrieval, and
-fallback evidence only.
+The procedure pack also constrains the response schema at runtime. Step
+identifiers, overlay targets, and admissible evidence-reference types are not
+free-form strings invented by the LLM. They are derived from the active pack,
+UI map, source policy, and evidence packet. This provenance is relevant to
+RQ1 because it turns a model response into a checked proposal rather than an
+unbounded command.
 
 % ===========================================================================
-\section{Replay and Logging Infrastructure}\label{sec:impl-replay}
+\section{Visual-Fact Training and Benchmark Provenance}\label{sec:impl-vlm-provenance}
 
-The implementation treats logging as part of the evidence chain. Runtime events
-are written to a JSONL store with immediate flush after each append. A help
-cycle therefore leaves an auditable trail of trigger metadata, telemetry
-context, vision selection, prompt construction metadata, model and mapping
-status, harness decisions, overlay execution, and failure reasons.
+RQ2 depends on benchmark numbers, not on informal inspection of model output.
+Every visual-fact metric reported in Chapter~\ref{ch:evaluation} is copied from
+local benchmark artifacts such as \texttt{metrics\_base.json},
+\texttt{metrics\_lora.json}, \texttt{benchmark\_summary.json}, and per-fact
+score files. The selected main figures in the results chapter are copied from
+the same benchmark-report directories.
 
-Replay uses the same boundary discipline as live operation. Pre-recorded
-DCS-BIOS captures can be replayed through the runtime, optionally with vision
-frame directories, while the procedure pack, UI map, telemetry map, source
-policy, and harness specs remain explicit inputs. The
-\texttt{fa18c\_startup\_v04} replay suite combines five scenario cases with
-live-fixture regression entries that cover stale VLM evidence, wrong-target
-prevention, moving-control settling, completion-already-true cases, and
-interaction-text semantics.
+The VLM evidence chain has five stages:
 
-These logs and replay suites do not demonstrate learning outcomes. Their role
-is technical: they make it possible to reproduce a help-cycle decision, inspect
-why an overlay was accepted, repaired, dropped, or rejected, and support the
-RQ1 readiness evidence reported in Chapter~\ref{ch:evaluation}.
+\begin{enumerate}
+\item DCS World cockpit states are captured as fixed composite images containing the
+left Digital Display Indicator, the Advanced Multipurpose Color Display, and
+the right Digital Display Indicator.
+\item Images are pre-labelled and then corrected during human review. The
+reviewed JSONL export is treated as ground truth for training and scoring.
+\item Reviewed labels are converted into bilingual supervised fine-tuning rows.
+The English and Chinese rows share the same image and fact labels.
+\item LoRA adapters are trained for the evaluated backbones with the
+Run-003 + Run-005$\times$2 recipe.
+\item Base and adapted models are benchmarked on independent holdouts with the
+same prompt, schema, generation settings, and metric computation.
+\end{enumerate}
+
+This chain preserves the key machine-learning boundary of the thesis. The VLM
+is evaluated as a structured perception component. It predicts visual facts
+with states \texttt{seen}, \texttt{not\_seen}, and \texttt{uncertain}; it does
+not decide procedure completion and does not directly choose tutor actions.
+Critical false positives are therefore reported separately because they are the
+visual error most likely to corrupt downstream evidence.
+
+\subsection{Benchmark Metric Traceability}
+
+The benchmark directories preserve more than the summary values used in the
+main tables. They include per-sample predictions, parsed outputs, error files,
+fact-level score tables, and comparison reports. This matters because a single
+metric can hide different causes. A drop in exact match may come from one
+systematic fact error, from many rare formatting errors, or from ambiguous
+labels. A critical false positive count can be inspected by fact to see whether
+the remaining risk is concentrated on INS text, FCS-MC final results, or
+another completion-like cue.
+
+The thesis uses rounded values in the PDF, but the JSON artifacts retain the
+exact values. During writing, the reported Qwen3.5, Qwen3.6, and Gemma metrics
+were checked against \texttt{metrics\_base.json},
+\texttt{metrics\_lora.json}, and \texttt{benchmark\_summary.json}. This is
+why the results chapter can compare base and LoRA lines without relying on
+informal model-card summaries. The same traceability rule applies to selected
+figures: the main-text VLM charts are copied from benchmark-report assets, and
+the source directory remains part of the evidence map.
+
+Metric traceability does not solve all validity problems. The holdouts are
+independent of the training union by exact-overlap checks, but they remain
+within the same simulator, cockpit layout, and procedure family. The benchmark
+therefore supports within-domain adaptation claims. It does not establish that
+the adapter will generalise to other aircraft, other cockpit layouts, other
+rendering conditions, or other simulator procedures without new reviewed data
+and holdout evaluation.
 
 % ===========================================================================
-\section{Live Runtime Orchestration}\label{sec:impl-live}
+\section{Pilot Export Provenance}\label{sec:impl-pilot-provenance}
 
-The live runtime connects the implementation pieces through a shared help-cycle
-path. A help trigger first creates a telemetry snapshot from DCS-BIOS frames.
-The telemetry pipeline enriches raw observations into runtime variables and
-recent deltas. If the current step requires visual confirmation, a capture
-request is issued and the buffered vision session selects synchronized frames.
-The procedure engine and gate evaluator produce deterministic candidates and
-missing-condition diagnostics. These observations are assembled into an
-evidence packet, retrieval adds source-controlled procedural snippets, and the
-prompt builder constructs the model request.
+RQ3 depends on exported pilot artifacts. Each participant trial is represented
+by a trial directory containing the raw event stream, trial summary, step
+coding, action timeline, help-cycle table, session metadata, and quality-gate
+report. Tutor-condition trials additionally contain help-cycle and VLM-call
+counts. Post-trial CSV forms provide participant experience, confidence,
+NASA-TLX dimensions, tutor-specific ratings where applicable, general
+usability/user ratings, and free-text comments.
 
-The text model returns a structured response rather than a free-form command.
-That response is parsed, schema-validated, mapped to a runtime tutor response,
-checked by the harness, and converted into at most the configured number of
-overlay actions. The overlay executor dispatches only validated overlay
-intents to DCS and records acknowledgements or failures. The complete help
-cycle, including fallback and repair metadata, is appended to the JSONL log.
+The reported pilot analysis applies three provenance rules. First, manual step
+coding is authoritative when it conflicts with automatic reconstruction. This
+rule is used for P08, whose automatic summary reported incomplete progress
+while manual telemetry review confirmed all 33 steps. Second, P02's task-log
+metrics are retained, but P02's questionnaire-derived values are excluded
+because the questionnaire metadata contains an internal participant-id
+mismatch. Third, P09 is analysed as an independent participant after the
+participant-correction note recorded in the metadata.
 
-This orchestration is also used by replay and regression tooling where
-possible. The shared path is important for the thesis because the evaluation is
-not based on a separate mock implementation of the tutor. The same contracts
-that constrain live tutoring also produce the logs, replay outputs, and
-quality gates used to evaluate technical readiness.
+These rules keep the pilot claim bounded. The pilot can describe observed
+completion, errors, workload ratings, usability ratings, comments, and
+tutor-interaction counts in this small formative sample. It cannot support
+statistical significance, causal learning effects, retention, transfer, or
+completion-time claims.
+
+\subsection{Manual Review as a Provenance Step}
+
+Manual review appears in two places in the artifact chain. The first is visual
+label review for the VLM datasets. The second is pilot step coding. In both
+cases, review is not a hidden correction performed after results are known; it
+is a documented provenance step that determines which artifact is authoritative
+for the reported claim. Reviewed JSONL labels are authoritative for VLM
+training and scoring. Human-coded step columns are authoritative for pilot
+completion and error counts when automatic reconstruction disagrees.
+
+P08 illustrates why this rule is necessary. The automatic trial summary
+reported incomplete progress because passive reconstruction did not capture all
+completion evidence for the relevant steps. Manual telemetry review confirmed
+33/33 steps, so the thesis reports the manual coding and preserves the automatic
+summary as a data-quality note. This is not an attempt to hide automation
+failure. It is a useful result: automatic exports are valuable, but formative
+pilot data still require explicit review when visual, temporal, or passive
+telemetry evidence is incomplete.
+
+P02 illustrates a different provenance problem. The task log and step coding
+remain usable, but the questionnaire metadata contains an internal participant-
+identifier mismatch. The thesis therefore keeps P02 for task metrics and
+excludes P02 from questionnaire-derived summaries. This avoids discarding a
+whole trial unnecessarily while preventing mismatched subjective data from
+entering workload, confidence, usability, trust, or comment summaries.
+
+% ===========================================================================
+\section{Figure and Table Provenance}\label{sec:impl-figure-provenance}
+
+The main text uses simplified figures for argument clarity and selected
+benchmark figures for empirical support. Architecture and pipeline diagrams are
+derived from repository-level design artifacts and rendered into the
+\texttt{paper/figures/} directory. Benchmark charts are copied from the VLM
+training-report assets so that the PDF does not depend on external paths at
+compile time.
+
+Tables in Chapter~\ref{ch:evaluation} follow a stricter rule: numerical model
+metrics are taken from benchmark JSON artifacts, and pilot metrics are taken
+from exported trial summaries, manually reviewed step-coding tables, and
+questionnaire CSV files after the exclusion rules above. When the main text
+uses rounded values, the underlying artifact retains the exact values.
+
+\subsection{Audit Trail for Claims}
+
+The thesis uses a simple claim-audit logic. A claim about architecture must be
+supported by a method description, configuration boundary, or runtime log. A
+claim about VLM reliability must be supported by a benchmark artifact. A claim
+about participant behaviour must be supported by trial exports and manual step
+coding. A claim about participant perception must be supported by questionnaire
+or comment artifacts after exclusion rules. Claims that lack the right artifact
+type are either removed or explicitly marked as future work.
+
+This audit trail is especially important for negative boundaries. The thesis
+states several things it does not prove: learning gains, retention, transfer,
+statistical significance, workload reduction, faster completion, and broad
+cross-domain generalisation. These limits are not rhetorical hedges. They
+follow from the artifact chain. The current data include component benchmarks,
+replay/fixture evidence, and a small formative pilot. They do not include a
+randomised powered study, retention test, transfer task, or multi-domain
+benchmark. The claim boundary is therefore a property of the evidence, not only
+of cautious writing.
+
+The audit trail also makes the thesis extensible. If a later study adds a
+randomised controlled pilot, the new evidence can be added as a new artifact
+class rather than rewriting the whole runtime argument. If a later model
+improves the VLM benchmark, the same benchmark schema can compare it against
+the current Qwen and Gemma lines. If a new procedure pack is added, its
+evidence-source mapping can be audited against the same design principles.
+
+% ===========================================================================
+\section{Reproducibility Limits}\label{sec:impl-repro-limits}
+
+The repository supports local inspection and LaTeX compilation of the thesis,
+but complete reruns of every experiment require external state: DCS World, an
+F/A-18C module installation, DCS-BIOS integration, a Quest~3 setup, model
+server access, and GPU resources for VLM fine-tuning and benchmarking. The
+thesis therefore distinguishes \emph{artifact reproducibility} from
+\emph{full experimental rerun reproducibility}. The former is the claim made
+here: the reported results can be traced to stored artifacts and checked for
+internal consistency. The latter would require recreating the simulator,
+hardware, model, and participant conditions.
+
+This distinction also applies to the original thesis proposal. The proposal
+described a broader VR tutoring study; the completed thesis reports a narrower
+but more auditable artifact. The evidence available now supports an
+evidence-grounded ML tutoring runtime, a small-data VLM adaptation result, and
+a formative Quest~3 pilot. A larger controlled human-subject study remains
+future work.
