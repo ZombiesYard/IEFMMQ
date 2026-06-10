@@ -1,299 +1,79 @@
 % ===========================================================================
 %  05 — 实现
-%  声明：C-ARCH-01, C-ARCH-02, C-ARCH-03, C-VLM-01, C-VLM-02, C-VLM-03,
+%
+%  声明: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-VLM-01, C-VLM-02,
 %        C-TELEM-01, C-RAG-01, C-PROC-01, C-RUNTIME-01
 % ===========================================================================
 \chapter{实现}\label{ch:implementation}
 
-本章描述 SimTutor 系统的具体实现，其设计已在第\ref{ch:system-design}章中呈现。本章涵盖技术栈、核心领域模块、遥测与 DCS 集成流水线、结构化帮助生成子系统、VLM 视觉事实提取运行时、回放与日志基础设施，以及 CLI 和实时运行时入口点。方法论层面的细节——VLM 适配协议、数据集构建和基准测试设计——见第\ref{ch:methodology}章。
+第~\ref{ch:system-design}章和第~\ref{ch:methodology}章描述了基于证据的教学系统的架构与方法。本章阐述这些思想如何被实现为一个可运行的研究原型系统。论述重点是有选择性的：仅当实现细节用于执行证据边界、保持清洁/六边形架构分离、使帮助循环可审计，或支撑第~\ref{ch:evaluation}章所用的评估产物时，才予以包含。
+
+因此，本章的实现问题并非简单地回答存在哪些模块，而是回答：在生成的教学帮助到达学习者之前，在何处进行了权限检查。答案分布在多个层面：从过程包派生的 Schema、证据包、响应映射、Harness 验证、有边界的叠加层执行、降级逻辑，以及追加式事件日志。不改变上述论证的操作性细节（如完整的命令参考和完整部署拓扑）置于附录~\ref{ch:appendix}中。
 
 % ===========================================================================
-\section{技术栈}\label{sec:impl-stack}
-% 证据：pyproject.toml, model_access.md
+\section{运行时边界与配置}\label{sec:impl-stack}
 
-SimTutor Python 代码库使用 Poetry\footnote{版本 0.1.0，在 \texttt{pyproject.toml} 中以包名 \texttt{simtutor-core} 声明。} 管理，要求 Python 3.10 或更高版本。核心库依赖保持最小化：\texttt{httpx}（v0.28+）用于 HTTP 客户端功能，\texttt{PyYAML}（v6+）用于所有声明式配置，\texttt{jsonschema}（v4.23+）用于模型输出和遥测帧的 Draft 2020-12 JSON Schema 验证，以及 \texttt{Pillow}（v12+）用于 VLM 流水线中的图像处理。测试依赖 \texttt{pytest}（v7.4+）和 \texttt{pytest-cov}（v5.0+）并启用分支覆盖率。
-% 证据：pyproject.toml 第 21-29 行
+代码库围绕清洁/六边形架构边界组织。领域逻辑位于 \texttt{core/}；稳定接口在 \texttt{ports/} 中声明；外部系统通过 \texttt{adapters/} 连接；任务相关的程序知识存储在 F/A-18C 过程包中。这种布局是一种实现决策，而非仅仅是代码风格偏好。它将仿真器传输、模型提供方、视觉采集、检索、叠加层分发和实验导出等外部关注与决定什么证据可采信的领域对象隔离开来。
 
-DCS Lua 端集成包含部署到 DCS \texttt{Saved Games} 目录的五个脚本：\texttt{Export.lua} 引导 DCS-BIOS 导出协议；\texttt{VRHilite.lua} 和 \texttt{SimTutorHighlight.lua} 在 UDP 套接字上监听高亮、清除和脉冲命令，并通过 \texttt{net.dostring\_in} 将它们渲染为座舱叠加；\texttt{SimTutor.lua} 及其配套 \texttt{SimTutor Function.lua} 处理复合面板截图捕获和 DCS-BIOS 集线器集成。
-% 证据：DCS/Scripts/Export.lua, DCS/Scripts/Hooks/VRHilite.lua,
-%       DCS/Scripts/SimTutor/SimTutor.lua
+Python 项目目标为 Python~3.10+，使用 \texttt{pyproject.toml} 中声明的依赖集。运行时依赖少量通用库：\texttt{httpx} 用于 HTTP 模型调用，\texttt{PyYAML} 用于声明式配置，\texttt{jsonschema} 用于契约验证，\texttt{Pillow} 用于 VLM 路径中的图像处理。测试使用 \texttt{pytest} 实现。这些技术栈选择之所以重要，主要是因为它们支持可检查的基于文件的配置和可复现的验证。
 
-模型服务是提供者无关的。主要路径使用 OpenAI 兼容 API 端点（适用于 vLLM、llama.cpp 或 TGI 服务器），通过环境变量 \texttt{SIMTUTOR\_MODEL\_PROVIDER=openai\_compat} 以及基础 URL 和 API 密钥进行配置。Ollama 降级方案（\texttt{SIMTUTOR\_MODEL\_PROVIDER=ollama}）提供无需 API 密钥的本地兼容性。确定性桩（\texttt{SIMTUTOR\_MODEL\_PROVIDER=stub}）为测试返回固定响应，无需任何外部模型服务。通过设置 \texttt{SIMTUTOR\_MODEL\_ENABLE\_MULTIMODAL=1} 启用多模态支持，使 OpenAI 兼容适配器在请求负载中包含 base64 编码的图像。
-% 证据：model_access.md §§1-5
+模型访问在设计中保持提供方无关。文本帮助路径使用 OpenAI 兼容适配器，可配置用于 vLLM、llama.cpp 或 TGI 等服务器。通过 Ollama 适配器提供本地兼容性，确定性 stub 则支持测试。同样的边界也用于多模态 VLM 路径：运行时将视觉事实提取视为返回结构化观测的适配器，而非程序决策的权威来源。
 
-视觉语言模型的 LoRA 微调使用 Unsloth 库配合 PEFT 和 TRL，以 Qwen3.5-9B-Base 为主要骨干，Gemma-4-31B 为补充线。视觉事实标注的预标注和人工审查在 Label Studio 中进行。
-% 证据：tools/train_qwen35_vlm_unsloth.py, tools/train_gemma4_vlm_unsloth.py,
-%       tools/generate_vlm_prelabels.py
+DCS 端集成扮演着同样狭窄的角色。Lua 脚本和 sidecar 组件导出 DCS-BIOS 状态、触发复合面板截图，并应用叠加层高亮指令。它们不决定当前过程步骤、不生成教学文本，也不绕过 Python 端的验证链。这使得仿真器集成保持为 I/O 适配器，而过程包、证据包和 Harness 仍然是教学决策的权威来源。
 
 % ===========================================================================
-\section{核心领域层}\label{sec:impl-core}
-% 证据：core/procedure.py, core/gating.py, core/scoring.py,
-%       core/vision_facts.py, core/llm_schema.py, core/types.py,
-%       core/types_v2.py, core/event_store.py, core/vars.py,
-%       core/overlay.py, core/knowledge.py
-% 声明：C-ARCH-01, C-PROC-01
+\section{证据根基执行}\label{sec:impl-evidence}
 
-核心层实现所有独立于特定仿真器、模型提供者或外部服务的领域逻辑。它被组织为大约十五个模块，每个模块具有明确的单一职责。
+证据根基通过多个实现关卡来执行，而非仅仅通过提示词措辞。模型可以提出诊断、下一步建议、解释和叠加层目标，但该提议必须通过从过程包生成的契约，以及针对当前帮助循环中可用证据的检查。
 
-\subsection{程序引擎}
+\paragraph{从过程包派生的 Schema。}
+函数 \texttt{build\_help\_response\_schema} 在运行时生成 \texttt{HelpResponse} JSON Schema。步骤标识符来自步骤注册表，叠加层目标来自 UI 映射，错误类别来自分类法。Schema 要求每个叠加层目标至少有一项相应的证据项。证据项必须使用下列运行时根基类型之一：\texttt{var}、\texttt{gate}、\texttt{rag}、\texttt{delta} 或 \texttt{visual}。这使得输出契约针对具体过程，而非一个通用的语言模型格式。
 
-\texttt{core/procedure.py} 中的 \texttt{ProcedureEngine} 类实现了第\ref{sec:design-procedure}节描述的步骤状态机。每个步骤由一个 \texttt{StepState} 数据类表示，包含步骤标识符和 \texttt{StepStatus} 枚举定义的四种状态之一：\texttt{PENDING}、\texttt{ACTIVE}、\texttt{DONE} 或 \texttt{BLOCKED}。引擎强制确保在任何时刻最多只有一个步骤为 \texttt{ACTIVE}。暴露五个操作：\texttt{activate\_next} 将下一个 \texttt{PENDING} 步骤推进到 \texttt{ACTIVE}；\texttt{complete\_active} 将活跃步骤转换为 \texttt{DONE}；\texttt{block\_active} 将其标记为 \texttt{BLOCKED}；\texttt{rewind} 将已完成步骤返回到 \texttt{ACTIVE}；\texttt{check\_timeout} 测试活跃步骤是否超过可配置的挂钟时限。所有状态转换发出带有 ISO-8601 时间戳和可选原因字符串的内部事件记录；这些事件随后传播到 JSONL 事件存储。
-% 证据：core/procedure.py 第 10-60 行
+\paragraph{证据包构建。}
+帮助提示词是由结构化上下文而非原始日志片段构建的。\texttt{build\_evidence\_packet} 将遥测证据、门控证据、最近操作、视觉事实、确定性候选和已知冲突聚合成一个紧凑的证据包。\texttt{build\_help\_prompt\_result} 然后将此证据包、允许的证据引用、检索到的片段以及叠加层目标策略纳入面向模型的提示词中。因此，证据引用可以在之后针对展示给模型的同一上下文进行检查。
 
-\subsection{门控规则引擎}
+\paragraph{模型输出映射与 Harness 验证。}
+响应路径故意保持狭窄。JSON 提取会移除代码围栏并读取第一个有效对象，但不会将任意格式错误的文本修复为新的答案。解析后的对象先对照动态 Schema 进行验证，然后传递给响应映射器。映射器检查叠加层证据引用是否存在于帮助循环上下文中，对照白名单验证叠加层目标，在元数据中记录映射失败，并应用配置的叠加层目标数量限制。
 
-\texttt{core/gating.py} 中的门控引擎评估以前述小型领域特定语言表达的前提门控和完成门控。实现了四种操作符：\texttt{var\_gte}（遥测值阈值）、\texttt{arg\_in\_range}（数值区间成员）、\texttt{flag\_true}（带字符串强转的布尔标志）和 \texttt{time\_since}（自标记事件以来的挂钟时间）。每条规则返回一个 \texttt{RuleResult} 数据类，携带布尔状态、点号表示法的失败路径以及人类可读的原因。评估器包含显式的未知值处理：哨兵字符串 \texttt{"unknown"}、\texttt{"unk"}、\texttt{"missing"}、\texttt{"n/a"} 和 \texttt{"na"} 导致规则失败并附诊断消息，而非静默地视为 \texttt{False}。规则在首次失败时短路；首个未满足规则的索引和原因输入确定性步骤推理逻辑。
-% 证据：core/gating.py 第 1-80 行
+Harness 层添加了第二个实现边界。提示词暴露了用于候选决策的 \texttt{HarnessDecision} 契约，而公共运行时输出仍然通过稳定的 \texttt{HelpResponse} 路径映射。\texttt{plan\_harness\_action} 然后检查所选步骤、候选证据、允许的叠加层目标、证据引用和最终状态一致性。它可以接受模型提议、将其修复为更安全的目标、强制仅文本指导，或拒绝叠加层输出。这是架构原则"LLM 不是最终权威"的具体实现。
 
-\subsection{评分引擎}
-
-\texttt{core/scoring.py} 中的评分模块实现了一个简单的事件日志评分器，遵循程序包中定义的错误分类法。它统计两类错误：遗漏（\texttt{OM}），定义为从未完成直到最大观察到步骤的规范步骤；以及状态违反（\texttt{SV}），通过观察负载中的 \texttt{"state\_violation"} 标签识别。对步骤注册表中标记为 \texttt{critical} 的步骤遗漏应用关键步骤乘数。三个额外类别（\texttt{CO}、\texttt{OR}、\texttt{PA}）的分类法定义了计数器和基础权重，但在当前 v1 评分实现中默认值为零。总错误分数计算为向上取整的加权和。
-% 证据：core/scoring.py 第 1-101 行
-
-\subsection{视觉事实本体与状态管理}
-
-\texttt{core/vision\_facts.py} 中的视觉事实模块将 13-fact v2 本体集中为 \texttt{VISION\_FACT\_IDS} 元组，包含诸如 \texttt{tac\_page\_visible}、\texttt{fcsmc\_final\_go\_result\_visible} 和 \texttt{ins\_ok\_text\_visible} 等标识符。配置通过一个文件系统 stat 缓存、LRU 缓存的加载器（\texttt{load\_vision\_facts\_config}）从 \texttt{vision\_facts.yaml} 加载，该加载器规范化事实规范（粘性标志、毫秒 TTL、预期区域、关联步骤 ID）和步骤绑定（\texttt{all\_of} 和 \texttt{any\_of} 条件）。
-
-\texttt{merge\_vision\_fact\_observation} 中的核心合并逻辑实现了三种关键语义。第一，\emph{粘性保留}：先前状态为 \texttt{seen}、其 \texttt{sticky} 标志为 \texttt{True} 且其 TTL 未过期的事实不会被后续的 \texttt{not\_seen} 或 \texttt{uncertain} 观察覆盖——只有后续的 \texttt{seen} 或过期才能替换它。第二，\emph{基于 TTL 的过期}：\texttt{prune\_expired\_facts} 丢弃任何 \texttt{expires\_at\_wall\_ms} 早于当前挂钟时间的事实。第三，\emph{步骤绑定满足}：\texttt{facts\_satisfy\_step\_binding} 检查 \texttt{all\_of} 列表中的所有事实均为 \texttt{seen} 且 \texttt{any\_of} 列表中至少有一个事实（如果已定义）为 \texttt{seen}。
-% 证据：core/vision_facts.py 第 1-552 行
-
-对于 \texttt{fcsmc\_final\_go\_result\_visible} 事实（步骤 S18），一个额外的强制转换层检查 \texttt{result\_kind} 字段和 \texttt{evidence\_note} 文本，对照一组正则表达式（如 \texttt{"MC1:\ GO"}、\texttt{"FCSA:\ GO"}）。\texttt{seen} 状态仅在分类产生 \texttt{"final\_go"} 时保留；中间状态（如 \texttt{"intermediate\_go"}、\texttt{"in\_test"} 或 \texttt{"not\_ready"}）被强制转换为 \texttt{"not\_seen"}，其他任何状态被强制转换为 \texttt{"uncertain"}。
-% 证据：core/vision_facts.py 第 293-306 行（_coerce_s18_result_fact_state, _normalize_result_kind）
-
-\subsection{动态 HelpResponse 模式}
-
-\texttt{core/llm\_schema.py} 模块在运行时而非从静态文件生成结构化帮助响应的 JSON Schema。函数 \texttt{build\_help\_response\_schema} 接收三个枚举值列表——来自步骤注册表（或包配置）的步骤标识符、来自 UI 映射的叠加目标名称，以及来自分类法的错误类别代码——并构建一个具有四个必需顶层键的 Draft 2020-12 模式：\texttt{diagnosis}、\texttt{next}、\texttt{overlay} 和 \texttt{explanations}。模式中一个特别详细的部分是 \texttt{overlay.evidence} 数组：对于每个叠加目标，一个条件子模式（\texttt{if}/\texttt{then}）要求证据数组至少包含一个引用该目标的项目，从而强制模型不能在不引用推断该目标所依据的证据源的情况下请求叠加。该模式还要求每个证据项携带一个限制在集合 \texttt{\{"var", "gate", "rag", "delta", "visual"\}} 中的 \texttt{type} 字段、非空的 \texttt{ref} 和 \texttt{quote}，以及介于 $0.0$ 和 $1.0$ 之间的 \texttt{grounding\_confidence}。计算出的模式基于其源文件的文件系统修改时间和大小进行缓存键控，从而在长时间运行会话中避免模式重新生成。
-% 证据：core/llm_schema.py 第 132-325 行
-
-\subsection{数据契约}
-
-两个版本的数据契约共存。\texttt{core/types.py} 中的 v1 类型定义了整个运行时使用的四个核心数据类：\texttt{Observation}（带时间戳的仿真器状态，包含可选程序提示和标签）、\texttt{TutorRequest}（学习者发起的帮助意图，包含观察引用和上下文字典）、\texttt{TutorResponse}（教学输出，包含状态、消息、叠加操作和解释）以及 \texttt{Event}（通用日志条目，包含会话标识符、事件类型、带版本号的负载和可扩展元数据）。所有四个类都带有基于 UUID 的标识符、ISO-8601 挂钟时间戳和 \texttt{to\_dict} 序列化方法。
-% 证据：core/types.py 第 1-94 行
-
-\texttt{core/types\_v2.py} 中的 v2 类型扩展了契约空间，增加了仿真器特定结构：\texttt{DcsObservation}（原始 DCS-BIOS 帧，包含序列号和座舱字典）、\texttt{TelemetryFrame}（增强状态，包含规范化的 \texttt{vars}、BIOS 快照和座舱参数）、\texttt{VisionObservation}（截图元数据，包含帧标识符、布局标识符、捕获时间戳和图像 URI）、\texttt{VisionFact}（单个视觉事实，包含标识符、三值状态、源帧引用、TTL 和证据注释）以及 \texttt{VisionFactObservation}（提取器返回的事实集合，携带触发时间戳和帧标识符列表）。
-% 证据：core/types_v2.py 第 1-118 行
-
-\subsection{其他核心模块}
-
-若干支撑性核心模块完善了领域层。\texttt{core/vars.py} 实现了 \texttt{VarResolver}——一个遥测变量解析器，评估受限的 Python 表达式（数值算术、布尔逻辑、比较和 \texttt{num()} 强制转换函数）以将原始 BIOS 数据投影到规范化状态变量上，同时跟踪 \texttt{vars\_source\_missing} 以实现键级可观测性。
-% 证据：core/vars.py 第 1-311 行
-\texttt{core/knowledge.py} 提供了一个 \texttt{BM25Retriever} 类，实现了具有 Okapi 风格 IDF 的标准 BM25 词项加权，供本地知识适配器用于文档片段检索。
-% 证据：core/knowledge.py
-\texttt{core/overlay.py} 定义了 \texttt{OverlayPlanner} 类，使用程序包的 UI 映射将抽象目标名称（如 \texttt{battery\_switch}）映射到 DCS 内部点代码，并生成具有三种意图之一的 \texttt{OverlayIntent} 对象：\texttt{highlight}、\texttt{clear} 或 \texttt{pulse}。
-% 证据：core/overlay.py 第 1-64 行
-\texttt{core/step\_signal\_metadata.py} 提供可观测性状态规范化和 \texttt{compute\_requires\_visual\_confirmation}，该函数基于步骤的 \texttt{observability} 字段和 \texttt{evidence\_requirements} 列表确定步骤是否需要视觉证据。
-% 证据：core/step_signal_metadata.py
-\texttt{core/help\_cycle\_audit.py} 定义了规范集合的帮助循环审计字段（\texttt{generation\_mode}、\texttt{vision\_used}、\texttt{frame\_id}、\texttt{sync\_delta\_ms} 等）以及一个被实时运行和回放路径一致使用的规范化函数。
-% 证据：core/help_cycle_audit.py
+\paragraph{有边界的叠加层执行。}
+最终执行器仅接受类型为 \texttt{overlay} 的操作。它拒绝控制注入、按键仿真、空目标、无法映射的目标、超出 UI 白名单的目标，以及需要证据但缺少证据引用的叠加层。当前运行时支持可配置的多目标指导。超过配置限制的目标将被丢弃并记录，而非静默执行。当 DCS 发送端发出确认消息时，请求、应用和失败的叠加层事件会被规范化到与帮助循环其余部分相同的 JSONL 事件流中。
 
 % ===========================================================================
-\section{遥测与 DCS 集成}\label{sec:impl-telemetry}
-% 证据：adapters/telemetry_pipeline.py, adapters/delta_sanitizer.py,
-%       adapters/delta_aggregator.py, adapters/dcs_bios/receiver.py,
-%       adapters/dcs_bios/bios_ui_map.py, packs/fa18c_startup/telemetry_map.yaml,
-%       packs/fa18c_startup/delta_policy.yaml
-% 声明：C-TELEM-01
+\section{确定性降级}\label{sec:impl-fallback}
 
-遥测集成流水线分四个阶段运行，每个阶段由一个专用适配器模块实现。
+降级被实现为一条保守的退化路径。当模型不可用、JSON 提取失败、Schema 验证失败、响应映射拒绝提议的操作，或 Harness 无法生成有根基的叠加层计划时，系统会使用降级路径。降级逻辑检查当前活动过程步骤、未满足的门控条件、最近操作、UI 目标绑定和证据可用性。
 
-\textbf{原始 DCS-BIOS 摄入。}
-\texttt{DcsBiosRawReceiver} 类打开一个 UDP 套接字并监听 DCS-BIOS 二进制导出帧。原始帧被解码为 UTF-8 JSON 并直接写入 JSONL 文件而不做处理，从而支持独立于实时运行时离线回放 BIOS 数据。配套的 \texttt{DcsBiosReceiver} 类提供更高层的接口，解析 BIOS 负载，强制单调序列号，将全状态增量合并到累积状态字典中，并生成供教学运行时消费的 \texttt{Observation} 对象。
-% 证据：adapters/dcs_bios/receiver.py 第 1-60 行；live_dcs.py 第 24-25 行
+重要的是区分硬阻塞和软阻塞。硬阻塞意味着观测到的证据显示某个必要条件为假。软阻塞意味着所需的证据源缺失或不可观测。对于硬阻塞，降级可以给出纠正性指导；但对于软阻塞，当必要证据缺失时，降级路径避免声称学习者未能完成某个步骤。叠加层输出被抑制，除非本地过程规则识别出唯一有效的目标，或当前配置明确允许有边界的多目标计划。
 
-\textbf{BIOS 到 UI 的映射。}
-\texttt{BiosUiMapper} 类从程序包加载 \texttt{bios\_to\_ui.yaml}，将 DCS-BIOS 键名映射到抽象 UI 目标标识符。此映射使增量聚合流水线和确定性步骤推理模块能够将原始遥测变化转换为语义上有意义的 UI 引用。
-% 证据：adapters/dcs_bios/bios_ui_map.py
-
-\textbf{变量解析与增强。}
-\texttt{adapters/telemetry\_pipeline.py} 中的 \texttt{enrich\_bios\_observation} 将 \texttt{VarResolver} 应用于 \texttt{TelemetryFrame}，在 \texttt{vars} 字典中生成规范化的键值对。解析器通过 \texttt{telemetry\_map.yaml} 中定义的表达式从四个引用根（\texttt{bios}、\texttt{lo}、\texttt{cockpit\_args}、\texttt{vars}）进行投影。源引用缺失或表达式求值为 \texttt{None} 的变量在 \texttt{vars\_source\_missing} 中被跟踪，为下游组件提供键级可观测性。
-% 证据：adapters/telemetry_pipeline.py 第 1-80 行；core/vars.py 第 256-297 行
-
-\textbf{增量去噪与聚合。}
-\texttt{adapters/delta\_sanitizer.py} 中的 \texttt{DeltaSanitizer} 类应用从 \texttt{delta\_policy.yaml} 加载的可配置 \texttt{DeltaPolicy} 以抑制虚假状态变化。该策略指定了逐变量数值变化阈值、防抖动窗口和过滤规则。验证后的变化作为 \texttt{SanitizedDelta} 记录发出，携带保留和丢弃的变化计数以及逐原因细分。\texttt{adapters/delta\_aggregator.py} 中的 \texttt{DeltaAggregator} 在可配置的时间窗口内累积去噪增量，并将其压缩为包含最近 UI 目标（通过 \texttt{BiosUiMapper} 映射）、top-$k$ 键变化和丢弃变化统计的 \texttt{DeltaSummary}。这些摘要包含在帮助循环提示上下文和实时运行时使用的最近操作环形缓冲区中。
-% 证据：adapters/delta_sanitizer.py 第 1-60 行；adapters/delta_aggregator.py 第 1-60 行
-
-\textbf{遥测帧模式。}
-v2 遥测帧模式（\texttt{simtutor/schemas/v2/telemetry\_frame.json}）定义了增强遥测记录的规范结构，包括挂钟时间戳、会话标识符、BIOS 快照、座舱参数、规范化变量和可选的底层输出。所有实时和回放路径在发射点根据此模式验证遥测帧。
-% 证据：simtutor/schemas/v2/telemetry_frame.json
-
-整个遥测流水线作为连续后台线程在实时运行时中运行，独立于任何特定的帮助循环。
+这条降级路径同样维护了论文声明的边界。帮助循环可以在没有模型或没有视觉证据的情况下继续，但由此产生的指导会更加保守：它依赖观测到的遥测数据、过程门控和确定性步骤提示，而非编造的视觉或教学解读。
 
 % ===========================================================================
-\section{结构化帮助生成}\label{sec:impl-help}
-% 证据：adapters/prompting.py, adapters/openai_compat_model.py,
-%       adapters/ollama_model.py, adapters/model_stub.py,
-%       adapters/json_extract.py, adapters/response_mapping.py,
-%       adapters/action_executor.py, adapters/step_inference.py,
-%       core/llm_schema.py
-% 声明：C-ARCH-03
+\section{VLM 视觉事实提取运行时}\label{sec:impl-vlm}
 
-帮助生成子系统将教学请求及其组装的上下文转换为经过验证的、可执行的教学响应。它经过六个阶段进行处理。
+VLM 运行时被实现为视觉事实提取器，而非教学导师。当前过程包将 S08、S15、S18 和 S19 标记为视觉优先步骤。对于这些步骤，实时运行时可以在组装最终帮助上下文之前请求复合面板截图。对于其他步骤，过期的视觉事实不允许覆盖更新鲜的遥测或过程门控证据。
 
-\subsection{提示构建}
+截图请求被发送到 DCS 端的视觉 sidecar，后者将左 DDI、AMPCD 和右 DDI 渲染为复合图像。Python 端的缓冲视觉会话保留最近的观测记录，并选择帮助触发时刻附近的帧。在实时模式下，默认同步窗口为 250\,ms；回放使用更窄的确定性窗口。所选帧的元数据记录了帧标识符、截图时间、同步状态、与触发时刻的偏差以及过期帧标志。
 
-\texttt{adapters/prompting.py} 中的 \texttt{build\_help\_prompt\_result} 函数组装发送给语言模型的完整提示。它包括：当前仿真器状态（\texttt{vars}）、去噪后的最近增量、带可观测性状态和视觉确认要求的候选程序步骤、确定性步骤提示及其缺失条件列表、叠加目标允许列表、BM25 检索的知识片段（最多五个，每个截断为 220 字符），以及当可用时的当前视觉事实摘要。提示受硬字符上限（9000）约束，预估令牌限制为 2400。开关位置、旋钮旋转和按钮点击约定的交互策略规则以中文或英文包含。
-% 证据：adapters/prompting.py 第 1-80 行
+选定的图像帧被传递给视觉事实提取器。提取器根据当前的 13 项事实本体、复合布局和事实特定的决策边界构建提示词。模型响应被解析为 JSON，经清理后对照一个其事实标识符来自视觉事实包配置的 Schema 进行验证。未知的事实 ID、无效状态、不完整的事实对象和非 Schema 字段将被忽略或记录在元数据中。被接受的事实仅限于 \texttt{seen}、\texttt{not\_seen} 和 \texttt{uncertain} 三种状态。
 
-\subsection{模型适配器}
-
-模型适配器层通过统一接口支持三种后端。\texttt{OpenAICompatModel}（在 \texttt{adapters/openai\_compat\_model.py} 中）将聊天完成请求发送到 OpenAI 兼容端点，将 \texttt{/v1/chat/completions} 追加到配置的基础 URL。它要求 API 密钥，支持可配置的超时和最大令牌限制，并可切换到多模态模式。\texttt{OllamaModel}（在 \texttt{adapters/ollama\_model.py} 中）是用于本地 Ollama 服务器的零依赖适配器。\texttt{ModelStub}（在 \texttt{adapters/model\_stub.py} 中）为测试返回固定的确定性响应，使得完整的帮助生成流水线无需外部模型服务即可运行。所有适配器通过统一的调用接口返回原始文本响应。
-% 证据：adapters/openai_compat_model.py, adapters/ollama_model.py,
-%       adapters/model_stub.py, model_access.md
-
-\subsection{带最小修复的 JSON 提取}
-
-模型响应不保证仅包含有效的 JSON。\texttt{adapters/json\_extract.py} 模块实现了一个 \texttt{parse\_first\_json} 函数，具有刻意限制为四种转换的修复集：(1) 移除平衡的 Markdown 代码块（三重反引号 JSON 块），(2) 移除导言 \texttt{<think>...</think>} 块，(3) 丢弃第一个 \texttt{\{} 或 \texttt{[} 之前的非 JSON 前缀文本，(4) 丢弃闭合括号之后的后续文本。此集合之外的任何转换均被拒绝。提取使用基于栈的解析器，跟踪字符串引号和转义序列以正确定位平衡的 JSON 分隔符。每次提取返回一个 \texttt{JsonExtractionResult}，记录是否应用了修复以及具体的修复原因枚举。
-% 证据：adapters/json_extract.py 第 1-160 行
-
-\subsection{模式验证}
-
-提取的 JSON 对象使用 \texttt{jsonschema} 库的 \texttt{Draft202012Validator} 根据运行时生成的 HelpResponse 模式（第\ref{sec:impl-core}节）进行验证。验证错误以从验证器错误路径派生的 JSON Path 位置报告。该模式强制执行四类约束：(1) 必需的顶层键，(2) 步骤标识符和错误类别代码的枚举成员资格，(3) 叠加目标唯一性和允许列表成员资格，(4) 每个提及的叠加目标必须存在证据项。
-% 证据：core/llm_schema.py 第 345-360 行
-
-\subsection{响应映射与证据溯源}
-
-\texttt{adapters/response\_mapping.py} 中的 \texttt{map\_help\_response\_to\_tutor\_response} 函数将经过验证的 HelpResponse 转换为运行时 \texttt{TutorResponse}。它通过 \texttt{OverlayPlanner}（查询 \texttt{ui\_map.yaml}）将叠加目标解析为 DCS 内部元素标识符。映射函数还验证响应中引用的每个叠加目标至少有一个证据引用，其前缀（\texttt{VARS.}、\texttt{GATES.}、\texttt{VISION\_FACTS.}、\texttt{RAG\_SNIPPETS.} 或 \texttt{DELTA\_KEYS.}）与帮助循环上下文中实际存在的键匹配。没有溯源证据的目标被拒绝，拒绝被记录在响应元数据中。解释和诊断字段原样传递。\texttt{TutorResponse} 状态在完全成功时设置为 \texttt{"ok"}，在发生映射失败时设置为 \texttt{"partial"} 或 \texttt{"fallback"}。
-% 证据：adapters/response_mapping.py 第 1-60 行；adapters/evidence_refs.py 第 1-60 行
-
-\subsection{确定性降级}
-
-当没有模型可用、模型输出未通过 JSON 提取或模式验证、或响应映射产生空或无效结果时，系统降级到确定性步骤推理。\texttt{adapters/step\_inference.py} 中的 \texttt{StepInferenceResult} 类检查活跃步骤，评估未满足的门控规则，识别缺失条件，通过硬编码查找表将条件引用映射到可能的 UI 目标，并生成限制在当前活跃步骤的文本提示。默认情况下，确定性降级不触发叠加高亮，除非本地规则能够基于当前遥测状态证明一个唯一、有效的目标。降级结果连同降级原因记录在帮助循环审计元数据中。
-% 证据：adapters/step_inference.py 第 1-60 行；core/step_hint.py
-
-\subsection{操作执行安全}
-
-\texttt{adapters/action\_executor.py} 中的 \texttt{OverlayActionExecutor} 在通过 UDP 向 DCS 分发操作之前对所有操作强制执行三项安全约束。第一，仅类型为 \texttt{"overlay"} 的操作可执行——无控件注入、无按键模拟、无点击模拟。第二，每个叠加目标均根据从程序包的 \texttt{ui\_targets} 字段导出的 UI 目标允许列表进行检查；不在允许列表中的目标被拒绝并记录。第三，同一时间最多高亮一个目标（\texttt{max\_targets=1}）。当请求新的高亮时，先前的活跃高亮被自动清除以防止视觉混乱。\texttt{pulse} 意图在分发清除命令之前使用阻塞睡眠（\texttt{ttl\_s}），这会阻塞调用线程但保证脉冲的完整传递。可配置的确认接收器（\texttt{DcsOverlayAckReceiver}）可以通过监听来自 Lua 端叠加脚本的 UDP 确认消息来可选地验证传递。
-% 证据：adapters/action_executor.py 第 1-80 行；adapters/dcs/overlay/sender.py
-
-% ===========================================================================
-\section{VLM 视觉事实提取}\label{sec:impl-vlm}
-% 证据：adapters/vision_fact_extractor.py, adapters/vision_fact_prompting.py,
-%       adapters/openai_compat_multimodal.py, adapters/vision_sync.py,
-%       adapters/vision_capture_trigger.py, core/vision_facts.py
-% 声明：C-VLM-01, C-VLM-02
-
-VLM 视觉事实提取运行时被实现为核心的、可独立运行的子系统，通过结构化观察与教学运行时通信。
-
-\subsection{捕获触发与帧选择}
-
-当活跃步骤为视觉优先（S08、S15 或 S18）且帮助请求到达时，通过 \texttt{adapters/vision\_capture\_trigger.py} 中的 \texttt{build\_capture\_request\_payload} 向 DCS 发送 UDP 捕获请求。Lua 端 \texttt{SimTutor.lua} 脚本将三个主要座舱显示器（左 DDI、AMPCD、右 DDI）渲染为单个复合 PNG 图像。Python 端 \texttt{BufferedVisionSession}（在 \texttt{adapters/vision\_sync.py} 中）维护最近视觉观察的滑动缓冲区并执行帧选择：默认情况下，它检索预触发帧（可配置同步窗口 250 ms 内紧接触发事件之前的最近帧）和触发帧本身。如果窗口内预触发帧不可用，会话降级为仅触发帧模式。帧过时和同步缺失原因记录在帧负载元数据中。
-% 证据：adapters/vision_sync.py 第 1-60 行；adapters/vision_capture_trigger.py
-
-\subsection{多模态负载构建}
-
-选定的候选帧由 \texttt{adapters/openai\_compat\_multimodal.py} 中的 \texttt{build\_multimodal\_image\_contents} 转换为多模态聊天完成负载。可配置根目录下的本地帧文件被读取并以 \texttt{data:} URL 形式进行 base64 编码，并检测 MIME 类型。远程 URL 和内联数据 URL 被拒绝。可配置的最大文件大小防范意外的大图像。该函数生成一组 \texttt{image\_url} 内容块，每个块标记有帧的角色（\texttt{"pre\_trigger"} 或 \texttt{"trigger"}），这些块与文本提示一起插入到 OpenAI 兼容请求的 messages 数组中。
-% 证据：adapters/openai_compat_multimodal.py 第 1-80 行
-
-\subsection{13-Fact 提示}
-
-视觉事实提取的提示由 \texttt{adapters/vision\_fact\_prompting.py} 中的 \texttt{build\_vision\_fact\_prompt} 构建。它枚举所有 13 个已配置的事实，描述三区域复合面板布局（上：左 DDI；中：AMPCD；下：右 DDI），并为每个事实提供详细的决策边界指令：例如，\texttt{tac\_page\_visible} 要求实际的 TAC 页面内容，而不仅仅是 TAC 菜单标签；\texttt{fcsmc\_final\_go\_result\_visible} 要求所有四个通道（MC1、MC2、FCSA、FCSB）的最终 GO 结果；\texttt{ins\_ok\_text\_visible} 要求在 INS 校准块附近清晰可读的 \texttt{OK} 文本。提示通过 \texttt{lang} 参数以中文和英文两种语言可用。
-% 证据：adapters/vision_fact_prompting.py 第 1-80 行
-
-\subsection{模型响应清洗}
-
-原始模型输出由 \texttt{adapters/vision\_fact\_extractor.py} 中的 \texttt{\_sanitize\_model\_response} 解析为 JSON 并进行清洗。清洗函数剥离未知的顶层键，拒绝不是映射的事实数组条目，拒绝缺失必需字段（\texttt{fact\_id}、\texttt{state}、\texttt{evidence\_note}）的条目，并拒绝 \texttt{fact\_id} 不属于配置中定义的有效事实 ID 集合的事实条目。仅接受三种事实状态：\texttt{"seen"}、\texttt{"not\_seen"} 和 \texttt{"uncertain"}。使用 \texttt{\_vision\_fact\_response\_schema} 从允许的事实 ID 动态生成 JSON Schema，清洗后的输出通过 \texttt{Draft202012Validator} 根据该模式进行验证。
-% 证据：adapters/vision_fact_extractor.py 第 1-80 行
-
-\subsection{事实合并与后端兼容性}
-
-清洗后的事实通过 \texttt{merge\_vision\_fact\_observation}（第\ref{sec:impl-core}节）合并到运行时视觉事实快照中，该函数在更新快照之前应用粘性保留和基于 TTL 的过期。\texttt{adapters/openai\_compat\_multimodal.py} 中的 VLM 后端兼容性层处理特定于提供者的错误条件，包括检测表明多模态或 JSON Schema 不支持后端的 \texttt{400} 响应，以及区分真实错误与 DashScope 为多模态响应发送的 \texttt{null} 负载。当 VLM 不可用或多模态请求失败时，帮助循环仅使用遥测和知识继续，在视觉降级元数据中记录原因。
-% 证据：adapters/openai_compat_multimodal.py 第 1-30 行
-
-\subsection{VR 兼容性}
-
-当前 VLM 运行时从复合面板布局（左 DDI、AMPCD、右 DDI）提取事实。复合面板捕获已在 VR 模式（Quest~3）下验证兼容性，使用 VR\_MIRROR 和 VR\_allow\_MFD\_out\_of\_HMD 配置。视觉端口抽象支持替代帧来源而无需更改提取或合并逻辑。
-% 证据：ports/vision_port.py
+经过验证的视觉事实按照本体的粘性和过期策略合并到运行时视觉快照中。这一实现细节很重要，因为某些座舱显示状态是瞬态的：某项事实可能需要短暂保持可用以满足过程门控或 Harness 决策，而过期事实必须在误导后续步骤之前失效。如果多模态提取被禁用或 VLM 调用失败，帮助循环仅依靠遥测、检索和降级证据继续。
 
 % ===========================================================================
 \section{回放与日志基础设施}\label{sec:impl-replay}
-% 证据：core/event_store.py, simtutor/runner.py, simtutor/replay_eval.py,
-%       core/scoring.py, core/interaction_metrics.py
-% 声明：C-RUNTIME-01
 
-\subsection{JSONL 事件存储}
+该实现将日志视为证据链的一部分。运行时事件被写入 JSONL 存储，并在每次追加后立即刷新。因此，一个帮助循环会留下可审计的轨迹，包括触发元数据、遥测上下文、视觉帧选择、提示词构建元数据、模型和映射状态、Harness 决策、叠加层执行和失败原因。
 
-\texttt{core/event\_store.py} 中的 \texttt{JsonlEventStore} 类是运行时事件的唯一持久化机制。它实现了一个仅追加写入器，并在每次写入后立即 \texttt{flush}，确保崩溃安全的日志记录。该存储支持上下文管理器用法（\texttt{\_\_enter\_\_} / \texttt{\_\_exit\_\_}），并提供一个静态 \texttt{load} 方法，将整个 JSONL 文件读入内存作为字典列表。事件序列化接受 \texttt{Event} 数据类实例和普通字典，当提供前者时委托给 \texttt{Event.to\_dict()}。
-% 证据：core/event_store.py 第 1-43 行
+回放使用与实时操作相同的边界准则。预录的 DCS-BIOS 捕获可以通过运行时回放，并可选择附带视觉帧目录，而过程包、UI 映射、遥测映射、源策略和 Harness 规格仍然是显式输入。\texttt{fa18c\_startup\_v04} 回放套件组合了五个场景案例和实时 fixture 回归条目，覆盖了 VLM 过期证据、错误目标阻止、移动控件稳定、已完成的完成条件以及交互文本语义等情况。
 
-\subsection{回放与验证}
-
-\texttt{simtutor/runner.py} 中的回放模块提供两个入口点。\texttt{run\_simulation} 使用重放预录制观察序列的 \texttt{MockEnvAdapter} 驱动完整仿真，与 \texttt{ProcedureEngine} 实例协调，并将生成的事件日志写入带时间戳的 JSONL 文件。\texttt{replay\_log} 通过根据程序包重放来验证现有事件日志：它重建步骤状态机，验证每个事件的步骤状态转换是否合法（例如，步骤不能在激活之前完成），并返回布尔成功标志和诊断消息。回放验证包括对遥测追踪中单调序列号和时间戳的检查。
-% 证据：simtutor/runner.py 第 1-80 行
-
-\texttt{simtutor/replay\_eval.py} 中的回放评估基础设施将回放扩展到支持套件驱动的评估：YAML 套件文件指定程序包路径、一组测试用例、模型配置和可选的视觉帧目录，从而在遥测层面和视觉副文件场景中实现系统性的回归回放。
-% 证据：simtutor/replay_eval.py 第 1-60 行
-
-\subsection{交互度量}
-
-\texttt{core/interaction\_metrics.py} 中的 \texttt{compute\_interaction\_metrics} 函数从事件日志中派生行为度量。它计算：每步骤停滞时间（总计和最大，从 \texttt{step\_activated} 到 \texttt{step\_completed} 间隔派生）、帮助请求计数、LLM 触发计数（带模型元数据的教学响应）、UI 点击计数和失败计数，以及高亮/清除请求和确认计数。输出是一个带有 \texttt{to\_dict} 序列化方法的 \texttt{InteractionMetrics} 数据类。
-% 证据：core/interaction_metrics.py 第 1-103 行
-
-\subsection{当前局限}
-
-日志和回放基础设施已通过合成回归场景（模拟环境、预录制观察序列和离线 BIOS 捕获）进行了演练。来自真人的人在环运行的带同步视觉帧的完整多模态会话的端到端回放尚未验证。
-% 证据：replay_eval/fa18c_startup_v04/（合成套件存在，人类运行不存在）
+这些日志和回放套件并不证明学习效果。它们的技术作用是：使帮助循环决策可复现，检查叠加层为何被接受、修复、丢弃或拒绝，并为第~\ref{ch:evaluation}章报告的 RQ1 就绪性证据提供支撑。
 
 % ===========================================================================
-\section{CLI 与运行时入口点}\label{sec:impl-cli}
-% 证据：simtutor/__main__.py, live_dcs.py, DCS/Scripts/
-% 声明：C-ARCH-02
+\section{实时运行时编排}\label{sec:impl-live}
 
-\subsection{CLI 命令}
+实时运行时通过一条共享的帮助循环路径连接各实现组件。帮助触发首先从 DCS-BIOS 帧创建遥测快照。遥测管线将原始观测富化为运行时变量和最近增量。如果当前步骤需要视觉确认，则发出截图请求，缓冲视觉会话选择同步的帧。过程引擎和门控评估器生成确定性候选和缺失条件诊断。这些观测被组装为证据包，检索添加源受控的过程知识片段，提示词构建器构造模型请求。
 
-\texttt{simtutor} 包通过 \texttt{simtutor/\_\_main\_\_.py} 提供命令行界面。实现了以下命令：
+文本模型返回结构化响应而非自由形式的指令。该响应被解析、Schema 验证、映射为运行时教学响应、经 Harness 检查，并转换为最多不超过配置数量的叠加层操作。叠加层执行器仅将经过验证的叠加层意图分发到 DCS，并记录确认或失败。完整的帮助循环（包括降级和修复元数据）被追加到 JSONL 日志中。
 
-\begin{description}
-\item[\texttt{run}.] 使用带有预录制场景文件的 \texttt{MockEnvAdapter} 执行仿真，并将事件日志写入带时间戳的 JSONL 文件。
-\item[\texttt{replay}.] 根据程序包验证现有事件日志，检查步骤排序和状态机一致性。
-\item[\texttt{score}.] 使用评分引擎对事件日志进行评分，生成遗漏计数、状态违反计数和总错误分数。
-\item[\texttt{record-vlm}.] 在一组视觉观察上运行 VLM 事实提取并记录预测以进行基准测试。
-\item[\texttt{replay-bios}.] 通过遥测流水线重放原始 DCS-BIOS 捕获（\texttt{dcs\_bios\_raw.jsonl}），并可选择调用帮助生成循环，生成新的带时间戳事件日志。
-\item[\texttt{validate}.] 根据模式注册表中的命名模式（如 \texttt{dcs\_bios\_frame}、\texttt{telemetry\_frame}、\texttt{vision\_fact\_observation}）验证 JSONL 文件。
-\end{description}
-% 证据：simtutor/__main__.py 第 1-80 行
-
-所有命令接受 \texttt{--model-provider}、\texttt{--model-name}、\texttt{--model-base-url} 和 \texttt{--model-timeout-s} 参数，允许在命令行覆盖模型配置。\texttt{--lang} 标志在中文（\texttt{zh}）和英文（\texttt{en}）提示与输出语言之间切换。
-% 证据：simtutor/__main__.py 第 69-80 行
-
-\subsection{实时运行时编排}
-
-\texttt{live\_dcs.py} 模块是主要的实时运行时入口点。它编排以下连续循环：
-
-\begin{enumerate}
-\item \texttt{DcsBiosRawReceiver} 或 \texttt{DcsBiosReceiver} 从 DCS 摄入 UDP 帧。
-\item 每个原始帧通过 \texttt{enrich\_bios\_observation} 进行增强以生成规范化的状态变量。
-\item 当接收到帮助触发器时（通过 \texttt{WindowsGlobalHelpTrigger} 的热键或 UDP 消息），帮助循环开始：
-  \begin{itemize}
-  \item 通过 \texttt{infer\_step\_id} 计算确定性步骤提示，根据当前遥测评估程序包门控。
-  \item 如果活跃步骤需要视觉确认，发送视觉捕获触发器并调用 VLM 事实提取器。
-  \item 构建 BM25 溯源查询并检索知识片段。
-  \item 组装完整提示并发送给模型适配器。
-  \item 模型响应被解析、验证并映射为 \texttt{TutorResponse}。
-  \item 叠加操作通过 \texttt{OverlayActionExecutor} 执行，并进行允许列表和基数强制。
-  \item 完整帮助循环（请求、响应、操作、视觉事实、降级原因（如有））被记录为 \texttt{Event} 记录。
-  \end{itemize}
-\item 循环持续直至终止。
-\end{enumerate}
-
-实时运行时通过共享代码路径同时支持实时 DCS 操作和预录制 BIOS 捕获的回放，由 \texttt{--replay-bios} 标志控制。所有线程（BIOS 接收器、叠加确认接收器、帮助循环处理）均通过 Python 标准库线程原语进行管理，线程间通信基于队列。
-% 证据：live_dcs.py 第 1-100 行
-
-\subsection{DCS Lua 脚本}
-
-三类 Lua 脚本在 DCS 进程内执行：
-
-\begin{description}
-\item[状态导出。] \texttt{Export.lua} 加载 DCS-BIOS 和 SimTutor 集成模块，建立状态导出链。
-\item[叠加渲染。] \texttt{VRHilite.lua} 在端口 7778 上绑定 UDP 套接字并监听纯文本叠加命令（\texttt{HIGHLIGHT <pnt>}、\texttt{CLEAR}、\texttt{PULSE <pnt> <ttl\_s>}）。高亮通过 DCS 的 \texttt{a\_cockpit\_highlight} / \texttt{a\_cockpit\_remove\_highlight} API 渲染，该 API 通过 \texttt{net.dostring\_in} 访问。\texttt{SimTutorHighlight.lua} 为 SimTutor 特定的高亮上下文提供替代渲染路径。
-\item[SimTutor 集成。] \texttt{SimTutor.lua} 加载包含捕获和导出逻辑的 \texttt{SimTutor Function.lua}，并安装导出链。\texttt{SimTutorDcsBiosHub.lua} 将 SimTutor 特定的状态查询桥接到 DCS-BIOS 数据模型。
-\end{description}
-% 证据：DCS/Scripts/Export.lua, DCS/Scripts/Hooks/VRHilite.lua,
-%       DCS/Scripts/SimTutor/SimTutor.lua
-
-\subsection{模型提供者配置}
-
-模型访问通过具有统一命名约定的环境变量进行配置（第\ref{sec:design-arch}节）。实时运行时在启动时验证所有必需的配置，发出非敏感的摘要（提供者、模型名称、超时、语言、基础 URL），并在任何必需变量缺失时以明确的错误消息拒绝会话。API 密钥从不包含在日志输出或异常消息中，由 \texttt{core/security.py} 中的 \texttt{redact\_sensitive\_text} 函数强制执行。
-% 证据：live_dcs.py 第 79-85 行（安全导入）；model_access.md §§2-5
-
-% ===========================================================================
-% 05_implementation.tex 结束
+在可能的情况下，回放和回归工具也使用相同的编排路径。共享路径对论文而言很重要，因为评估并非基于一个独立的教学系统模拟实现。约束实时教学的同一套契约也产出了用于评估技术就绪性的日志、回放输出和质量门控。

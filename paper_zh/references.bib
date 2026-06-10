@@ -1,7 +1,7 @@
 % ===========================================================================
 %  SimTutor Paper — references.bib
-%  TODO: populate with all citations before submission.
-%  Placeholder entries are marked with TODO:CITE.
+%  Bibliography gaps remain for exact model-card references where metadata has
+%  not yet been verified.
 % ===========================================================================
 
 % ---------------------------------------------------------------------------
@@ -41,8 +41,34 @@
   year      = {2023}
 }
 
-% TODO:CITE — Qwen3.5-9B-Base model card / paper (Qwen3 family technical report, 2025)
-% TODO:CITE — Gemma-4-31B model card / paper
+% Bibliography gap: exact Qwen3.5-9B-Base model card / paper not yet verified.
+% Bibliography gap: exact Gemma-4-31B model card / paper not yet verified.
+
+@article{liu2023llava,
+  title     = {Visual Instruction Tuning},
+  author    = {Liu, Haotian and Li, Chunyuan and Wu, Qingyang and Lee, Yong Jae},
+  journal   = {Advances in Neural Information Processing Systems},
+  volume    = {36},
+  year      = {2023},
+  doi       = {10.48550/arXiv.2304.08485}
+}
+
+@inproceedings{dai2023instructblip,
+  title     = {{InstructBLIP}: Towards General-purpose Vision-Language Models with Instruction Tuning},
+  author    = {Dai, Wenliang and Li, Junnan and Li, Dongxu and Tiong, Anthony Meng Huat and Zhao, Junqi and Wang, Weisheng and Li, Boyang and Fung, Pascale and Hoi, Steven},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {36},
+  year      = {2023},
+  doi       = {10.48550/arXiv.2305.06500}
+}
+
+@article{wang2021screen2words,
+  title   = {{Screen2Words}: Automatic Mobile {UI} Summarization with Multimodal Learning},
+  author  = {Wang, Bryan and Li, Gang and Zhou, Xin and Chen, Zhourong and Grossman, Tovi and Li, Yang},
+  journal = {arXiv preprint arXiv:2108.03353},
+  year    = {2021},
+  doi     = {10.48550/arXiv.2108.03353}
+}
 
 % ---------------------------------------------------------------------------
 %  Parameter-efficient fine-tuning libraries & tools
@@ -103,9 +129,37 @@
   doi       = {10.1080/00461520.2011.611369}
 }
 
-% TODO:CITE — constraint-based modeling for procedural training
-% TODO:CITE — example-tracing tutors / cognitive tutors in procedural domains
-% TODO:CITE — LLM-based tutoring systems or dialogue-based tutors
+@article{mitrovic2012constraint,
+  title   = {Fifteen Years of Constraint-Based Tutors: What We Have Achieved and Where We Are Going},
+  author  = {Mitrovic, Antonija},
+  journal = {User Modeling and User-Adapted Interaction},
+  volume  = {22},
+  number  = {1--2},
+  pages   = {39--72},
+  year    = {2012},
+  doi     = {10.1007/s11257-011-9105-9}
+}
+
+@article{aleven2009example,
+  title   = {A New Paradigm for Intelligent Tutoring Systems: Example-Tracing Tutors},
+  author  = {Aleven, Vincent and McLaren, Bruce M. and Sewall, Jonathan and Koedinger, Kenneth R.},
+  journal = {International Journal of Artificial Intelligence in Education},
+  volume  = {19},
+  number  = {2},
+  pages   = {105--154},
+  year    = {2009},
+  doi     = {10.3233/IRG-2009-19(2)02}
+}
+
+@article{kasneci2023chatgpt,
+  title   = {{ChatGPT} for Good? On Opportunities and Challenges of Large Language Models for Education},
+  author  = {Kasneci, Enkelejda and Se{\ss}ler, Kathrin and K{\"u}chemann, Stefan and Bannert, Maria and Dementieva, Daryna and Fischer, Frank and Gasser, Urs and Groh, Georg and G{\"u}nnemann, Stephan and H{\"u}llermeier, Eyke and Krusche, Stephan and Kutyniok, Gitta and Michaeli, Tilman and Nerdel, Claudia and Pfeffer, J{\"u}rgen and Poquet, Oleksandra and Sailer, Michael and Schmidt, Albrecht and Seidel, Tina and Stadler, Matthias and Kasneci, Gjergji},
+  journal = {Learning and Individual Differences},
+  volume  = {103},
+  pages   = {102274},
+  year    = {2023},
+  doi     = {10.1016/j.lindif.2023.102274}
+}
 
 % ---------------------------------------------------------------------------
 %  User workload & evaluation
@@ -123,7 +177,15 @@
   doi       = {10.1016/S0166-4115(08)62386-9}
 }
 
-% TODO:CITE — Procedural learning in VR / AR
+@article{palmarini2018ar,
+  title   = {A Systematic Review of Augmented Reality Applications in Maintenance},
+  author  = {Palmarini, Riccardo and Erkoyuncu, John Ahmet and Roy, Rajkumar and Torabmostaedi, Hosein},
+  journal = {Robotics and Computer-Integrated Manufacturing},
+  volume  = {49},
+  pages   = {215--228},
+  year    = {2018},
+  doi     = {10.1016/j.rcim.2017.06.002}
+}
 
 % ---------------------------------------------------------------------------
 %  Thesis proposal
@@ -148,8 +210,61 @@
   note      = {Digital Combat Simulator. Available at: \url{https://www.digitalcombatsimulator.com/}}
 }
 
-% TODO:CITE — F/A-18C cold-start procedure reference (NATOPS / official manual)
-% TODO:CITE — simulator-based training evaluation / transfer-of-training studies
+@misc{eagledynamics2023hornetguide,
+  title  = {{DCS}: {F/A-18C} Early Access Guide},
+  author = {{Eagle Dynamics}},
+  year   = {2023},
+  note   = {Updated 18 July 2023. Available at: \url{https://www.digitalcombatsimulator.com/en/downloads/documentation/dcs-hornet_early_access_guide_en/}}
+}
+
+@misc{dcsbiosdocs,
+  title  = {{DCS-BIOS} Documentation},
+  author = {{DCS-BIOS Project}},
+  year   = {n.d.},
+  note   = {DCS-BIOS v0.10.0 documentation. Accessed 2026-06-05. Available at: \url{https://dcs-bios.readthedocs.io/en/latest/}}
+}
+
+@article{hays1992flight,
+  title   = {Flight Simulator Training Effectiveness: A Meta-Analysis},
+  author  = {Hays, Robert T. and Jacobs, John W. and Prince, Carolyn and Salas, Eduardo},
+  journal = {Military Psychology},
+  volume  = {4},
+  number  = {2},
+  pages   = {63--74},
+  year    = {1992},
+  doi     = {10.1207/s15327876mp0402_1}
+}
+
+% ---------------------------------------------------------------------------
+%  Grounded and explainable AI assistance
+% ---------------------------------------------------------------------------
+@inproceedings{ahn2022saycan,
+  title     = {Do As I Can, Not As I Say: Grounding Language in Robotic Affordances},
+  author    = {Ahn, Michael and Brohan, Anthony and Brown, Noah and Chebotar, Yevgen and Cortes, Omar and David, Byron and Finn, Chelsea and others},
+  booktitle = {Proceedings of the 6th Conference on Robot Learning},
+  year      = {2022},
+  doi       = {10.48550/arXiv.2204.01691}
+}
+
+@article{gunning2019xai,
+  title   = {{XAI}---Explainable Artificial Intelligence},
+  author  = {Gunning, David and Stefik, Mark and Choi, Jaesik and Miller, Timothy and Stumpf, Simone and Yang, Guang-Zhong},
+  journal = {Science Robotics},
+  volume  = {4},
+  number  = {37},
+  pages   = {eaay7120},
+  year    = {2019},
+  doi     = {10.1126/scirobotics.aay7120}
+}
+
+@inproceedings{amershi2019guidelines,
+  title     = {Guidelines for Human-{AI} Interaction},
+  author    = {Amershi, Saleema and Weld, Dan and Vorvoreanu, Mihaela and Fourney, Adam and Nushi, Besmira and Collisson, Penny and Suh, Jina and Iqbal, Shamsi and Bennett, Paul N. and Inkpen, Kori and Teevan, Jaime and Kikin-Gil, Ruth and Horvitz, Eric},
+  booktitle = {Proceedings of the 2019 {CHI} Conference on Human Factors in Computing Systems},
+  pages     = {1--13},
+  year      = {2019},
+  doi       = {10.1145/3290605.3300233}
+}
 
 % ---------------------------------------------------------------------------
 %  Software architecture
@@ -160,4 +275,3 @@
   year      = {2005},
   note      = {Available at: \url{https://alistair.cockburn.us/hexagonal-architecture/}}
 }
-

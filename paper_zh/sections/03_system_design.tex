@@ -1,335 +1,225 @@
 % ===========================================================================
-%  03 — 系统设计
+%  03 — 系统架构
 %
-%  事实来源：paper_context/repo_inventory.md §1–11
-%  声明：     C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02,
-%            C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-RUNTIME-01
+%  声明: C-ARCH-01, C-ARCH-02, C-ARCH-03, C-PROC-01, C-PROC-02,
+%        C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-RUNTIME-01
 % ===========================================================================
-\chapter{系统设计}\label{ch:system-design}
+\chapter{系统架构}\label{ch:system-design}
 
-本章描述了一个基于遥测数据基础的教学运行时的设计，用于 DCS F/A-18C 冷启动任务中的程序性训练。本章涵盖系统架构、组件设计和设计原理。详细的方法论——包括 VLM 适配协议、数据集构建和基准测试设计——延至第\ref{ch:methodology}章；具体模块的实现级细节见第\ref{ch:implementation}章。第\ref{sec:design-goals}节从论文问题陈述中推导设计目标。第\ref{sec:design-arch}节呈现整体架构以及核心教学逻辑与仿真器特定适配器的分离。第\ref{sec:design-dataflow}节描述主帮助循环中的运行时数据流。第\ref{sec:design-telemetry}和\ref{sec:design-procedure}节涵盖遥测处理流水线以及程序和门控规则引擎。第\ref{sec:design-adapters}节详述仿真器适配层及 Lua 端集成。第\ref{sec:design-replay}节描述事件日志、回放和评分基础设施。第\ref{sec:design-vlm}节介绍用于视觉状态理解的 VLM 适配组件。
+本章从架构层面回答RQ1：如何将模拟器遥测、检索到的过程性知识以及视觉观测整合在一起，使得教学输出保持状态感知、可审计且对过程性引导安全？核心设计决策是将基础模型的输出视为证据约束运行时中的一个阶段，而非教学者本身。每一条帮助响应都由显式证据包生成，对照过程包规则进行检查，由校验器验证，通过覆盖层白名单映射，并记录以供回放。
 
-% ===========================================================================
-\section{设计目标与需求}\label{sec:design-goals}
-
-本论文解决的是为操作复杂仿真器的学习者提供基于证据、上下文感知的程序性指导这一问题。在目标场景——DCS World 中 F/A-18C 冷启动程序——中，学习者必须执行跨越六个阶段（P1--P6）的 25 个固定步骤序列（S01--S25），从电瓶供电开始，历经发动机启动、航电配置、飞行控制检查，直至滑行准备。
-% 证据：packs/fa18c_startup/pack.yaml（跨 P1--P6 阶段的 25 个步骤）, packs/fa18c_startup/step_registry.yaml
-每个步骤都有执行前必须满足的特定前提条件和推进前必须满足的完成条件。错误包括遗漏、顺序错误、参数设置错误和状态违反——这些类别在第\ref{ch:methodology}章描述的错误分类法中予以形式化。
-
-基于此问题，我们推导出以下设计目标：
-
-\begin{description}
-\item[G1 -- 基于仿真器的程序性教学。]
-系统必须通过仿真器状态观察学习者的操作，确定学习者当前正在尝试的程序步骤，并在学习者卡住或请求帮助时提供及时、基于证据的指导。教学输出必须引用具体的座舱元素，并引用来自遥测、文档或视觉事实的证据。
-% 证据：core/procedure.py, core/gating.py, core/step_hint.py, help_flow_en.md
-
-\item[G2 -- 状态感知的步骤指导。]
-系统必须通过形式化状态机跟踪程序进度。在允许步骤变为活跃状态之前，必须评估前提条件；在推进之前，必须验证完成条件。指导必须以当前仿真器状态为条件，而不仅仅是步骤顺序。
-% 证据：core/procedure.py（状态机跟踪）, core/gating.py（状态依赖的门控）
-
-\item[G3 -- 教学逻辑与仿真器特定集成的分离。]
-核心教学逻辑——程序跟踪、门控、评分和帮助生成——必须独立于任何特定仿真器、模型提供者或知识源。仿真器特定代码、模型提供者代码和知识检索代码必须隔离在稳定接口之后，使核心能够在没有运行仿真器的情况下进行测试，并可移植到其他仿真器或训练领域。
-% 证据：ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
-
-\item[G4 -- 可回放性和可检查性。]
-学习者、教学系统和仿真器之间的每次交互都必须记录为结构化、带时间戳的事件。这些事件日志必须支持用于调试的离线回放、针对程序包的自动化评分，以及学习者行为的事后分析。它们还必须支持 VLM 适配流水线的遥测捕获和基准测试追踪的回放。
-% 证据：core/event_store.py, simtutor/runner.py
-
-\item[G5 -- 基础模型与基于VLM的视觉事实提取。]
-系统必须能够在有大语言模型或无大语言模型的情况下运行。当模型可用时，它可以提供更丰富的诊断和解释。当模型不可用或其输出验证失败时，系统必须优雅降级到确定性的基于规则的降级行为。基于视觉语言模型（VLM）从座舱截图中提取视觉事实是一个核心系统组件，它通过为 DCS-BIOS 未导出的显示页面状态提供结构化视觉证据来补充遥测门控。
-% 证据：help_flow_en.md §5, model_access.md
-
-\item[G6 -- 对不同仿真器和程序的可扩展性。]
-程序定义、UI 目标映射、遥测映射、错误分类法和知识源策略必须以声明式配置（YAML 文件）表达，而非硬编码在源代码中。添加新程序或将系统适配到不同仿真器应该仅需新的配置工件，而无需更改核心教学逻辑。
-% 证据：packs/fa18c_startup/*.yaml
-\end{description}
-
-这些目标直接影响以下各节描述的架构决策。
+本章首先从证据锚定问题出发推导设计需求。随后介绍端口-适配器架构、实时帮助循环、遥测与过程门控证据层、校验器验证机制、模拟器适配器边界、日志与回放基础设施，以及VLM衍生视觉事实的运行时角色。数据集构建与VLM微调方法论留待第~\ref{ch:methodology}~章讨论；实现层面的细节见第~\ref{ch:implementation}~章。
 
 % ===========================================================================
-\section{整体架构}\label{sec:design-arch}
+\section{设计需求}\label{sec:design-goals}
 
-% 证据：README.md; pyproject.toml; live_dcs.py
-% 声明：C-ARCH-01
+基于证据的过程性教学对系统提出了与传统清单式应用或不受约束的LLM聊天机器人截然不同的需求。运行时必须观测状态、根据过程顺序进行推理、以语言解释帮助内容，同时防止未经支持的覆盖层操作到达学习者。以下六项需求指导架构设计。
 
-该系统遵循端口-适配器（六边形）架构。该系统组织为三个主要层次，每个层次具有明确定义的职责和依赖方向。
+\begin{itemize}
+\item \textbf{G1 -- 实时过程状态观测。}
+教学者必须通过模拟器状态（而非仅靠学习者自述）来观测学习者的进度。在F/A-18C场景中，这意味着在有结构化数据导出的地方使用DCS-BIOS遥测，在座舱显示状态未以结构化数据形式导出的地方使用视觉事实。
+
+\item \textbf{G2 -- 过程感知的步骤推断。}
+教学者必须基于前置条件、完成门控和序列历史进行推理。下一个有用的帮助条目不一定是清单上的下一行，而是在当前证据下有效的下一个操作。
+
+\item \textbf{G3 -- 可操作输出的显式证据。}
+每一个推荐的步骤、覆盖层目标或拒绝推进的决定都必须可追溯到证据：遥测数据、门控结果、检索到的过程性来源、最近的状态变化或视觉事实。仅凭模型流畅的语言输出不足以作为证据。
+
+\item \textbf{G4 -- 清晰的架构边界。}
+领域逻辑必须独立于模拟器API、模型提供方、GPU可用性以及VR显示管道。这使得核心过程逻辑和验证逻辑可以在没有运行中模拟器的情况下进行测试。
+
+\item \textbf{G5 -- 优雅降级。}
+当模型输出不可用、格式错误或证据锚定不足时，运行时必须回退到确定性文本引导或安全拒绝，而非执行不安全的覆盖层操作。
+
+\item \textbf{G6 -- 声明式过程配置。}
+过程步骤、门控、遥测映射、UI目标、视觉事实绑定以及错误分类标准必须表示为一个过程包，而非隐藏在提示词或适配器代码中。这使得任务模型可检查且可版本控制。
+\end{itemize}
+
+这些需求解释了为什么系统被设计为证据管线。该架构并不试图让语言模型本身足够可靠以独立行动，而是用显式状态证据、声明式规则、Schema验证、白名单和可回放日志来包围模型的生成过程。
+
+% ===========================================================================
+\section{端口-适配器架构}\label{sec:design-arch}
+
+运行时遵循端口-适配器架构，依赖方向严格：外部系统通过适配器连接，适配器实现稳定的端口，核心层包含过程逻辑和验证逻辑。核心层绝不导入DCS特定、提供方特定或VR特定的模块。这一边界对论文的核心论点至关重要，因为证据锚定必须能够在脱离实时模拟器的条件下进行测试和检查。
 
 \begin{description}
-\item[核心层（\texttt{core/}）。]
-核心包含所有独立于任何特定仿真器、模型提供者或外部服务的领域逻辑。它定义了运行时消息传递的数据契约（第\ref{sec:design-dataflow}节）、程序状态机和门控规则引擎（第\ref{sec:design-procedure}节）、评分和交互度量引擎、视觉事实本体及粘性/TTL 持久化语义、BM25 检索实现、HelpResponse 模式构建器，以及安全和审计基础设施。按设计，核心仅依赖标准 Python 库和端口层中定义的抽象接口。
-% 证据：core/procedure.py, core/gating.py, core/scoring.py, core/vision_facts.py,
-%       core/types.py, core/types_v2.py, core/knowledge.py, core/llm_schema.py
+\item[核心层 (Core layer).]
+核心层包含与模拟器无关的领域逻辑：过程状态追踪、门控评估、视觉事实状态合并、BM25检索原语、事件类型、响应Schema生成、证据包构造、校验器验证、评分以及面向回放的状态检查。
 
-\item[端口层（\texttt{ports/}）。]
-端口层为核心在运行时可能需要的四个外部依赖定义了稳定的、技术无关的 Python 协议：模型推理（\texttt{ModelPort}）、知识检索（\texttt{KnowledgePort}）、视觉输入（\texttt{VisionPort}）和遥测输入（\texttt{TelemetryPort}）。这些接口是核心与外部世界之间的唯一依赖注入点。
-% 证据：ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
+\item[端口层 (Ports layer).]
+端口层定义领域核心与外部世界之间的稳定接口。主要端口涵盖模型推理、知识检索、视觉输入和遥测输入。这些端口使得替换模型提供方、知识后端或模拟器适配器时无需修改过程引擎。
 
-\item[适配器层（\texttt{adapters/}）。]
-适配器层包含所有仿真器特定、提供者特定和基础设施特定的代码。它包括 DCS-BIOS 遥测接收器、遥测增强与增量去噪流水线、DCS 叠加发送器、OpenAI 兼容模型客户端（带和不带多模态支持）、Ollama 降级客户端、用于测试的确定性模型桩、本地 BM25 知识适配器、视觉事实提取运行时，以及连接模型输出与运行时行为的响应映射和操作执行组件。适配器依赖于它们所实现的端口以及它们生成和消费的核心类型；它们从不向核心引入反向依赖。
-% 证据：adapters/telemetry_pipeline.py, adapters/dcs_adapter.py,
-%       adapters/openai_compat_model.py, adapters/vision_fact_extractor.py,
-%       adapters/knowledge_local.py, adapters/action_executor.py
+\item[适配器层 (Adapters layer).]
+适配器层包含外部集成代码：DCS-BIOS接收器、遥测数据清洗与聚合、DCS覆盖层分发、OpenAI兼容及本地模型客户端、BM25文档检索、截图捕获以及VLM视觉事实提取。
+
+\item[过程包 (Procedure packs).]
+过程包是核心层消费的任务特定契约。F/A-18C过程包定义了步骤顺序、前置门控、完成门控、UI目标标识符、遥测变量映射、视觉事实绑定以及错误分类标准。它不是适配器，因为它不与模拟器通信；它是声明式的领域规格说明。
 \end{description}
 
-三个层次由另外两个结构元素补充：
-
-\begin{description}
-\item[程序包（\texttt{packs/}）。]
-程序包是一个声明式 YAML 配置文件的目录，完整描述一个程序性任务。包定义了步骤列表、前提条件和完成条件（门控规则）、UI 目标及其仿真器特定元素标识符、遥测变量映射、错误分类法类别和评分权重、增量去噪策略、带步骤绑定的视觉事实本体，以及视觉布局描述。当前代码仓库包含一个包：\texttt{fa18c\_startup}，涵盖完整的 F/A-18C 冷启动程序。
-% 证据：packs/fa18c_startup/pack.yaml, packs/fa18c_startup/step_registry.yaml,
-%       packs/fa18c_startup/taxonomy.yaml, packs/fa18c_startup/ui_map.yaml,
-%       packs/fa18c_startup/vision_facts.yaml
-
-\item[CLI 与运行时入口点（\texttt{simtutor/}、\texttt{live\_dcs.py}）。]
-\texttt{simtutor} 包提供命令行界面，用于运行模拟场景、回放和验证事件日志、评分运行、记录 VLM 预测以进行基准测试，以及回放 DCS-BIOS 原始捕获。\texttt{live\_dcs.py} 模块编排完整的实时运行时循环：它将 DCS-BIOS 接收器、遥测增强流水线、知识检索、基于模型的帮助生成、VLM 视觉事实提取、叠加操作执行和事件日志记录连接成一个长期运行进程。
-% 证据：simtutor/__main__.py, live_dcs.py
-\end{description}
-
-图\ref{fig:architecture}展示了高层组件图。
+图~\ref{fig:system-architecture}~总结了该架构。该图应从左到右解读为一条证据流：模拟器状态与座舱图像通过适配器进入，过程包规则构建运行时的解释框架，检索到的来源与模型服务支持帮助生成，校验器在输出到达座舱之前检查生成的操作计划。
 
 \begin{figure}[htbp]
   \centering
-  % TODO: 插入架构图。
-  % \includegraphics[width=\textwidth]{figures/architecture.pdf}
-  \caption{所提出的系统架构。核心层包含仿真器无关的领域逻辑。端口层定义抽象接口。适配器层为 DCS、模型提供者、知识源和视觉流水线提供具体实现。程序包提供声明式配置。}
-  \label{fig:architecture}
+  \includegraphics[width=\textwidth]{figures/fig_system_architecture.pdf}
+  \caption[证据约束教学架构]{证据约束教学架构。模拟器遥测、复合面板视觉、过程包配置、检索到的知识以及模型输出通过证据包整合，并在覆盖层或教学文本到达座舱之前由校验器进行检查。}
+  \label{fig:system-architecture}
 \end{figure}
 
-% ===========================================================================
-\section{核心教学逻辑与仿真器适配器的分离}\label{sec:design-separation}
-
-% 证据：ports/model_port.py, ports/knowledge_port.py, ports/vision_port.py, ports/telemetry.py
-% 声明：C-ARCH-01
-
-仿真器无关核心逻辑与仿真器特定适配器之间的分离服务于四个具体目的：
-
-\begin{enumerate}
-\item \textbf{可测试性。}
-核心逻辑可以使用模拟适配器和确定性场景进行测试，无需运行中的 DCS 实例、GPU 或到模型服务器的网络连接。代码仓库包含一个重放预录制观察序列的 \texttt{MockEnvAdapter} 和一个返回确定性响应的 \texttt{ModelStub}，从而支持快速、可复现的单元和集成测试。
-% 证据：adapters/mock_env.py, adapters/model_stub.py
-
-\item \textbf{可维护性。}
-当仿真器 API 发生变化时，只需更新受影响的适配器；核心保持不变。当模型提供者发生变化时（例如，从 Ollama 变为 OpenAI 兼容的 vLLM 服务器），只有模型适配器配置受到影响。通过单一配置接口支持三种提供者（\texttt{openai\_compat}、\texttt{ollama}、\texttt{stub}）。
-% 证据：simtutor/config.py, model_access.md
-
-\item \textbf{可移植性。}
-将系统移植到新仿真器或飞机只需编写新的遥测和叠加适配器并创建新的程序包。程序性推理、门控、评分和帮助生成基础设施可以原样复用。端口接口有意保持最小化：遥测端口需要 \texttt{start}、\texttt{poll} 和 \texttt{stop} 方法；叠加端口仅需向命名座舱元素发送高亮、清除和脉冲命令的能力。
-% 证据：ports/telemetry.py (TelemetryPort), adapters/dcs_adapter.py（叠加方法）
-
-\item \textbf{VLM 流水线的独立演进。}
-VLM 视觉事实提取组件通过视觉端口和视觉事实观察模式与教学运行时通信，而非直接耦合。VLM 流水线可以独立于教学运行时进行开发、训练和基准测试。运行时部署可以包含 VLM 组件、完全省略它，或用不同的感知后端替换它，而不影响教学逻辑。
-\end{enumerate}
+同样的边界也支持研究工作流程。关于门控、证据包、校验器决策和回放的技术声明可以使用fixture进行测试。关于视觉事实提取的声明可以与实时教学分开进行基准测评。关于VR呈现的声明可以作为形成性先导证据处理，而非验证架构的前提条件。
 
 % ===========================================================================
-\section{数据流}\label{sec:design-dataflow}
+\section{证据约束帮助循环}\label{sec:design-dataflow}
 
-% 证据：live_dcs.py; repo_inventory.md §11
-% 声明：C-ARCH-02
+实时帮助循环是核心运行时的调用链。简洁地表示为：
 
-运行时数据流遵循从仿真器观察到教学输出和日志记录的结构化流水线。图\ref{fig:dataflow}提供了可视化摘要。
+\begin{center}
+\small
+帮助触发 $\rightarrow$ 遥测快照 $\rightarrow$ 可选视觉捕获 $\rightarrow$ 步骤与门控推断 $\rightarrow$ 证据包 $\rightarrow$ 检索 $\rightarrow$ 模型响应 $\rightarrow$ 校验器验证 $\rightarrow$ 覆盖层/文本输出 $\rightarrow$ 事件日志
+\end{center}
+
+这个顺序很重要，因为它确定了权威的来源顺序。模型并非首先决定模拟器状态意味着什么。相反，运行时在生成之前组装状态证据和候选步骤，并在显示之前验证生成的响应。图~\ref{fig:help-cycle}~展示了这一循环。
 
 \begin{figure}[htbp]
   \centering
-  % TODO: 插入数据流图。
-  % \includegraphics[width=\textwidth]{figures/dataflow.pdf}
-  \caption{主帮助循环中的运行时数据流。}
-  \label{fig:dataflow}
+  \includegraphics[width=\textwidth]{figures/fig_help_cycle.pdf}
+  \caption{实时证据约束帮助循环。每一次帮助请求被转换为遥测和视觉观测，对照过程门控进行解释，通过检索到的知识进行锚定，经过文本LLM处理后由校验器验证，然后以覆盖层/文本输出形式分发，并附带事件日志追踪。}
+  \label{fig:help-cycle}
 \end{figure}
 
-\subsection{观察}
-仿真器适配器——在当前实现中为 DCS-BIOS UDP 接收器——产生一组\emph{观察}流：带有版本号和时间戳的数据对象，包含原始仿真器状态以及增强后的一组规范化状态变量。
-% 证据：core/types.py:Observation, adapters/dcs_bios/receiver.py
+\subsection{帮助循环各阶段}
 
-\subsection{教学请求}
-当学习者触发帮助时——通过热键或 UDP 消息——将创建一个\emph{教学请求}。该请求携带一个意图（\texttt{help}）、一个可选的自由文本消息、对当前观察的引用，以及由运行时编排器填充的上下文字典。
-% 证据：core/types.py:TutorRequest
+\textbf{观测 (Observation).}
+DCS-BIOS适配器接收模拟器状态，遥测管线将其规范化为运行时变量。当活跃或可能活跃的步骤需要显示证据时，视觉适配器可以捕获复合座舱面板图像并请求视觉事实提取。
 
-\subsection{上下文组装}
-运行时编排器通过收集以下内容为帮助循环组装上下文：
-\begin{itemize}
-\item \textbf{状态变量}（\texttt{vars}）：来自最近遥测观察的规范化键值对。
-\item \textbf{最近增量}（\texttt{recent\_deltas}）：最近状态变化的去噪、聚合摘要。
-\item \textbf{候选步骤}（\texttt{candidate\_steps}）：来自程序包的合格步骤标识符。
-\item \textbf{确定性步骤提示}（\texttt{deterministic\_step\_hint}）：来自基于规则推理的本地计算的降级建议，同时用作提示指导和模型输出不可用时的降级方案。
-\item \textbf{叠加目标允许列表}（\texttt{overlay\_target\_allowlist}）：模型被允许引用的 UI 元素集合。
-\item \textbf{知识片段}（\texttt{rag\_topk}，可选）：top-$k$ BM25 检索结果，仅在存在知识索引时包含。
-\end{itemize}
-% 证据：adapters/prompting.py, adapters/telemetry_pipeline.py, help_flow_en.md §3
+\textbf{候选推断 (Candidate inference).}
+过程引擎评估前置条件和完成门控，识别候选步骤，并记录缺失或不确定的证据。生成的候选不是自然语言建议，而是从当前证据中推导出的结构化运行时对象。
 
-\subsection{模型推理}
-如果 ModelPort 实现可用，组装后的上下文将被格式化为提示并发送给语言模型。模型返回一个符合 HelpResponse 模式的 JSON 结构化对象，该模式在运行时从程序包、UI 映射和分类法动态生成。
-% 证据：core/llm_schema.py:get_help_response_schema
+\textbf{证据包组装 (Evidence packet assembly).}
+运行时收集遥测值、门控结果、最近变化增量、视觉事实状态、检索到的来源引用以及步骤候选，组装为证据包。该证据包是状态解释与模型辅助帮助生成之间的边界对象。
 
-\subsection{响应验证与映射}
-原始模型输出通过验证流水线：(1) 带最小修复的 JSON 提取，(2) 模式验证，(3) 对诊断步骤 ID、下一步步骤 ID 和叠加目标的允许列表检查，(4) 证据溯源验证。如果验证成功，帮助对象被映射为 \texttt{TutorResponse}，叠加操作通过 UI 映射解析。如果验证失败，或没有可用模型，系统进入确定性降级。
-% 证据：adapters/json_extract.py, adapters/response_mapping.py, help_flow_en.md §4--5
+\textbf{模型响应 (Model response).}
+提示词要求模型基于证据包生成结构化的帮助响应。输出必须符合运行时HelpResponse Schema。无法解析或无法安全映射的自由文本不会成为可执行操作。
 
-\paragraph{模式级证据溯源。}
-证据约束在模式层面而非事后检查层面运作。\texttt{HelpResponse} JSON Schema 在运行时从程序包和 UI 映射动态生成（第\ref{sec:design-arch}节）。对于模式中 \texttt{targets} 数组里的每个叠加目标，一条 \texttt{if/then} 规则要求相应的 \texttt{evidence} 数组至少包含一个 \texttt{target} 字段与该叠加目标匹配的条目。每个证据条目还必须声明一个 \texttt{type}，来自五种溯源类型——\texttt{var}（遥测变量）、\texttt{gate}（门控规则）、\texttt{rag}（知识片段）、\texttt{delta}（最近状态变化）、\texttt{visual}（视觉事实）——每种类型带有对应的 \texttt{ref} 前缀（\texttt{VARS.}、\texttt{GATES.}、\texttt{RAG\_SNIPPETS.}、\texttt{DELTA\_KEYS.}、\texttt{VISION\_FACTS.}）。若 LLM 响应提出一个叠加高亮却没有匹配的、类型有效的证据条目，则该响应在结构上无效，并将在\emph{任何}操作到达仿真器之前被拒绝。这创建了一个统一的审计追溯：例如，高亮 \texttt{battery\_switch} 必须附带一条证据条目，形如 \texttt{\{"target": "battery\_switch", "type": "var", "ref": "VARS.battery\_switch", "quote": "0"\}}，将操作追溯回为其提供理由的遥测变量。
-% 证据：core/llm_schema.py:get_help_response_schema（if/then 叠加目标 × 证据规则）,
-%       adapters/evidence_refs.py（五种证据类型及前缀族）
+\textbf{验证与映射 (Validation and mapping).}
+响应经过JSON提取、Schema验证、证据引用检查、步骤与目标白名单以及校验器验证。只有通过这些检查的响应才能映射为覆盖层操作或教学文本。验证失败会触发修复、拒绝或确定性回退。
 
-\subsection{操作执行}
-教学响应可能包含针对特定座舱元素的叠加操作（高亮、清除或脉冲）。操作执行器根据 UI 目标允许列表验证每个操作，限制并发高亮数量（默认：一个），并通过 UDP 将命令分发到仿真器。自动点击和控件注入操作在设计上被禁止。
-% 证据：adapters/action_executor.py, adapters/dcs_adapter.py, help_flow_en.md §7
+\textbf{执行与日志 (Execution and logging).}
+覆盖层命令仅限于安全的显示操作，如高亮、脉冲或清除。控制注入和自动点击不在架构范围内。每一次帮助循环均被记录为结构化事件，以便会话结束后可回放。
 
-\subsection{事件日志记录}
-帮助循环的每个阶段被记录为带版本号和时间戳的 \texttt{Event} 对象，并追加到 JSONL 事件日志中，该日志作为所有下游分析、回放和评分的权威记录。
-% 证据：core/event_store.py, core/types.py:Event
+\subsection{Schema级别证据锚定}
+
+证据锚定在输出执行之前强制执行。HelpResponse Schema根据当前过程包和UI映射生成，因此有效步骤和覆盖层目标的集合是任务特定的。模型提出的每个目标必须附带证据，其类型和引用必须与帮助循环上下文中可用的数据相对应。支持的证据类型包括遥测变量（\texttt{var}）、门控评估（\texttt{gate}）、检索到的来源（\texttt{rag}）、最近状态变化（\texttt{delta}）以及视觉事实（\texttt{visual}）。
+
+这种设计改变了未经支持的模型响应的失败模式。如果模型提出了一个貌似合理但未经锚定的覆盖层操作，该响应不仅是作为可疑记录记入日志，而是在结构上对操作执行无效。系统随后可以修复到允许的目标、回退到纯文本引导，或拒绝该操作计划。
 
 % ===========================================================================
-\section{遥测处理}\label{sec:design-telemetry}
+\section{遥测作为状态证据}\label{sec:design-telemetry}
 
-% 证据：adapters/telemetry_pipeline.py, adapters/delta_sanitizer.py,
-%       adapters/delta_aggregator.py, core/vars.py
-% 声明：C-TELEM-01
-
-遥测处理子系统通过四个阶段将原始仿真器数据转换为规范化状态表示：
+遥测是控制器、指示器和DCS-BIOS直接导出的数值状态值的主要证据来源。遥测管线通过四个阶段将原始模拟器帧转换为稳定的状态证据：
 
 \begin{enumerate}
-\item \textbf{原始数据摄入。}
-DCS-BIOS 接收器在 UDP 套接字上监听二进制 DCS-BIOS 导出帧，将每帧解码为结构化 JSON 对象，附带挂钟时间戳和单调递增的序列号。
-% 证据：adapters/dcs_bios/receiver.py
+\item \textbf{原始摄入 (Raw ingestion).} DCS-BIOS UDP帧被解码为带有时间戳和序列信息的结构化观测。
 
-\item \textbf{变量解析。}
-遥测映射规定原始 BIOS 字段如何投影到规范化状态变量上。变量解析器生成一个扁平的键值对字典，并在 \texttt{vars\_source\_missing} 集合中跟踪不可用或未知的来源，使下游组件能够区分"值为零"和"值未知"。
-% 证据：core/vars.py, packs/fa18c_startup/telemetry_map.yaml
+\item \textbf{变量解析 (Variable resolution).} 过程包映射将原始BIOS字段投影到规范化变量上，例如 \texttt{rpm\_r}、\texttt{apu\_ready} 或 \texttt{battery\_on}。解析器同时追踪缺失的数据源，使运行时能够区分观测到的假值与不可用的值。
 
-\item \textbf{增量去噪处理。}
-可配置的策略（阈值、防抖动窗口、逐变量过滤规则）抑制由开关回弹、传感器漂移和 UDP 乱序传递引起的虚假变化。
-% 证据：adapters/delta_sanitizer.py, packs/fa18c_startup/delta_policy.yaml
+\item \textbf{增量清洗 (Delta sanitisation).} 配置的阈值、去抖窗口和过滤策略抑制由传感器抖动、开关弹跳和乱序帧引起的虚假变化。
 
-\item \textbf{增量聚合。}
-去噪后的增量在可配置时间窗口内累积并被压缩为紧凑摘要以供提示上下文使用。
-% 证据：adapters/delta_aggregator.py
+\item \textbf{增量聚合 (Delta aggregation).} 最近的状态变化被压缩为适合提示词的摘要，并作为帮助循环推理的证据来源。
 \end{enumerate}
 
-遥测流水线持续运行，独立于帮助循环。
+缺失来源的区分对于过程性教学很重要。当开关已知为关闭状态与遥测来源缺失时，门控的失败方式不应相同。第一种情况可以证明纠正性引导是合理的；第二种情况可能需要带有不确定性或纯文本的帮助。
 
 % ===========================================================================
-\section{程序引擎与门控规则引擎}\label{sec:design-procedure}
+\section{过程引擎与证据门控}\label{sec:design-procedure}
 
-% 证据：core/procedure.py, core/gating.py, core/step_hint.py
-% 声明：C-PROC-01, C-PROC-02
+过程引擎维护有序冷启动序列的状态。每个步骤可以是待处理、活跃、已完成或阻塞状态，状态转移由前置条件和完成门控驱动。门控以声明式方式在过程包中表达，而非嵌入提示词中。这确保过程状态是由规则支配的领域决策，而非模型推断。
 
-\subsection{程序引擎}
-程序引擎在步骤有序序列上维护一个有限状态机。每个步骤处于四种状态之一：\texttt{pending}、\texttt{active}（最多一个）、\texttt{done} 或 \texttt{blocked}。操作包括 \texttt{activate\_next}、\texttt{complete\_active}、\texttt{block\_active}、\texttt{rewind} 和 \texttt{check\_timeout}。所有转换被记录为内部事件并传播到事件日志。
-% 证据：core/procedure.py:ProcedureEngine
+门控评估器支持阈值检查、范围检查、布尔标志和经过时间条件。缺失、来源缺失或哨兵值会产生诊断性失败，而非被静默地强制转换为有效状态。这些诊断信息同时反馈给证据包和确定性回退。
 
-\subsection{门控规则引擎}
-门控规则引擎使用具有四个操作符的 v1 DSL 评估前提门控和完成门控：\texttt{var\_gte}、\texttt{arg\_in\_range}、\texttt{flag\_true} 和 \texttt{time\_since}。评估器包含显式的未知值处理：缺失、来源缺失或哨兵值变量会导致规则失败并附诊断原因，而非静默地视为 false。规则在首次失败时短路；失败索引和原因被输入确定性步骤提示。
-% 证据：core/gating.py
+\subsection{确定性回退}
 
-\subsection{基于确定性降级的优雅降级}
-当没有模型可用或模型输出未通过模式验证时，系统并非简单地返回错误。相反，它通过确定性推理主动计算有用的步骤提示——这一设计选择将所提出的系统与那些没有模型就无法运行的依赖 LLM 的教学系统区分开来。确定性降级分析三个信息来源：(1) 来自程序引擎的活跃步骤及其未满足的门控规则，(2) 学习者最近的 UI 交互（来自增量聚合），(3) 可观测性元数据，该元数据将每个缺失的证据来源分类为\emph{硬阻塞}（门控显式失败——例如，开关处于错误位置）或\emph{软阻塞}（遥测源缺失——例如，传感器未被 DCS-BIOS 导出，因此真实状态未知而非 false）。这一区分防止教学者在证据仅是不可用时错误地声称某步骤未满足。降级产生仅限于当前活跃步骤的纯文本提示；叠加高亮被抑制，除非本地规则能够根据当前遥测状态唯一确定一个有效目标。这一机制使教学系统在 LLM 不可用时仍能保持部分功能——这是一个刻意的架构属性，而非事后补救。
-% 证据：core/step_hint.py（软/硬阻塞分类）, adapters/step_inference.py（降级提示生成）, help_flow_en.md §5
+确定性回退是架构的一部分，而非事后的紧急补救措施。当模型不可用或模型输出验证失败时，运行时根据活跃步骤、未满足的门控、最近操作和证据可用性计算出保守的提示。它区分硬阻塞（证据显示某门控未满足）和软阻塞（所需证据缺失或不确定）。覆盖层输出被抑制，除非局部规则能够唯一确定一个有效目标。
 
-\subsection{程序包结构}
-程序包是驱动整个教学运行时的声明式配置。每个步骤按主要证据来源分类：
+\subsection{按证据来源进行步骤分类}
+
+当前的F/A-18C过程包根据最可靠的可获得证据来源对步骤进行分类：
+
 \begin{itemize}
-\item \textbf{BIOS 优先步骤}（S01, S03--S07, S09--S13, S21）：主要通过 DCS-BIOS 遥测变量进行验证。
-\item \textbf{视觉优先步骤}（S02, S08, S14--S20, S22--S25）：通过 VLM 从座舱显示器中提取视觉事实进行验证。
+\item \textbf{视觉优先步骤：} S08、S15、S18和S19需要来自视觉事实管线的座舱显示证据。
+\item \textbf{BIOS优先步骤：} S01、S03--S13、S16和S20--S33在过程包元数据中声明为主要通过遥测验证。
+\item \textbf{手动或面板外步骤：} S14和S17需要手动确认，或涉及三屏复合面板之外的座舱区域。
 \end{itemize}
-所有步骤都可通过这两种机制中的至少一种进行观测。包还定义了每个步骤的门控规则、UI 目标、教学提示和配置文件覆盖（陆基 vs.\ 航母）。
-% 证据：packs/fa18c_startup/pack.yaml
-% 声明：C-PROC-01, C-PROC-02
+
+火警测试步骤S02通过其自身的门控和最近操作契约处理，而非通过过程包中的三个优先级列表。重要的架构要点是：运行时不会让模型来决定哪个证据通道对某个步骤具有权威性。该选择由过程包声明，并由帮助循环消费。
 
 % ===========================================================================
-\section{仿真器适配层}\label{sec:design-adapters}
+\section{校验器工程与证据验证}\label{sec:design-harness}
 
-% 证据：adapters/dcs_adapter.py, adapters/dcs_bios/, DCS/Scripts/
-% 声明：C-ARCH-01, C-ARCH-02
+校验器是输出到达模拟器之前的最终安全边界。它将模型提出的响应转换为经过验证的操作计划，或转换为修复、拒绝或纯文本结果。详细的对象关系见附录图~\ref{fig:harness-validation}；此处仅概述其主要的架构角色。
 
-\subsection{遥测输入适配器}
-通过 UDP 接收 DCS-BIOS 状态数据。Python 端 \texttt{DcsBiosRawReceiver} 解析二进制协议并发射原始帧作为 JSONL 记录，供给遥测增强流水线。
-% 证据：adapters/dcs_bios/receiver.py
+校验器使用四个概念对象：
 
-\subsection{叠加输出适配器}
-通过纯文本 UDP 消息向 DCS 发送高亮、清除和脉冲命令。DCS 内的 Lua 脚本（\texttt{VRHilite.lua}）在座舱元素上渲染图形叠加。适配器使用程序包的 UI 映射将抽象目标名称映射到 DCS 内部点代码。
-% 证据：adapters/dcs_adapter.py, DCS/Scripts/Hooks/VRHilite.lua
+\begin{description}
+\item[\texttt{EvidencePacket}.]
+当前帮助循环的规范化快照：遥测状态、门控诊断、最近操作、视觉事实、检索到的引用以及候选步骤信息。
 
-\subsection{视觉输入适配器}
-通过基于 UDP 的捕获触发器触发 DCS 中的截图捕获。Lua 端 \texttt{SimTutor.lua} 将三个主要座舱显示器渲染到单个复合图像中。Python 端适配器选择预触发帧和触发帧，并将它们传递给视觉事实提取器。
-% 证据：adapters/vision_capture_trigger.py, DCS/Scripts/SimTutor/SimTutor.lua
+\item[\texttt{StepCandidate}.]
+关于学习者可能位于过程哪个位置的候选解释，由门控、遥测、最近操作和视觉证据推导得出。
 
-\subsection{Lua 端集成}
-三类 Lua 脚本在 DCS 内执行：
-\begin{itemize}
-\item \textbf{状态导出}（\texttt{Export.lua}）：配置 DCS-BIOS 导出。
-\item \textbf{叠加渲染}（\texttt{Hooks/VRHilite.lua}、\texttt{Hooks/SimTutorHighlight.lua}）：接收并渲染高亮命令。
-\item \textbf{SimTutor 集成}（\texttt{SimTutor/SimTutor.lua}、\texttt{SimTutor/SimTutor Function.lua}、\texttt{SimTutor/SimTutorDcsBiosHub.lua}）：处理捕获和复合面板渲染。
-\end{itemize}
-% 证据：DCS/Scripts/Export.lua, DCS/Scripts/Hooks/VRHilite.lua,
-%       DCS/Scripts/SimTutor/SimTutor.lua
+\item[\texttt{StepHarnessSpec}.]
+每个步骤的过程包派生契约：允许的覆盖层目标、所需的可观测项、遥测事实、视觉事实、完成谓词、恢复策略和信号新鲜度要求。
 
-\subsection{计划中及部分实现的适配器}
-当前代码仓库包含一个 \texttt{MockEnvAdapter}，用于无需运行仿真器的确定性测试。
-% 证据：adapters/mock_env.py
-VR 运行时代码路径已实现，包括 Quest~3 VR 模式下的 VR\_MIRROR 和 VR\_allow\_MFD\_out\_of\_HMD 配置、教学文本通过 UDP 注入 DCS 游戏内文本区域，以及 VR 模式下复合面板捕获兼容性验证。VR 代码路径尚未通过受控人因实验进行验证（第\ref{sec:eval-planned}节）。
-% 证据：system_delta_from_proposal.md §4
+\item[\texttt{HarnessActionPlan}.]
+验证后的结果：选中的步骤、选中的覆盖层步骤、目标、证据引用、引导文本、纯文本状态、修复状态、拒绝状态及原因。
+\end{description}
+
+验证序列具有三个效果。第一，它防止错误步骤或错误目标的输出绕过过程包。第二，它防止陈旧或不适当的证据驱动后续步骤。第三，它为修复和拒绝创建机器可读的原因，这些原因随后可用于回放和评估。
+
+\subsection{基于Fixture的回归测试}
+
+校验器通过实时帮助fixture进行测试：在曾经暴露失败的特定过程状态下记录的遥测快照和运行时上下文。每个fixture通过帮助循环回放，并断言期望的结果，例如正确的目标、修复后的目标、纯文本回退或安全拒绝。
+
+当前的覆盖矩阵包含20个实时fixture回归条目，覆盖S01--S33。这些fixture涵盖正确推进、错误目标拒绝、不完整或不匹配视觉证据的修复、防止陈旧的VLM事实泄漏到非视觉步骤、移动控件等待引导，以及开关、按钮和旋转控件的交互语义。这一覆盖范围并非教育评估，而是技术证据，证明证据锚定约束可以在运行时边界上被系统性地执行。
+
+% ===========================================================================
+\section{适配器边界：模拟器、覆盖层与视觉}\label{sec:design-adapters}
+
+适配器层将DCS特定行为隔离在核心层使用的端口之后。三个适配器职责对实时运行时至关重要。
+
+\begin{description}
+\item[遥测输入 (Telemetry input).]
+遥测适配器接收DCS-BIOS状态数据并馈送给遥测管线。其输出是规范化的状态证据，而非模拟器特定的帧数据。
+
+\item[覆盖层输出 (Overlay output).]
+覆盖层适配器将抽象的教学目标映射为DCS覆盖层标识符，并发送高亮、脉冲或清除命令。它不执行座舱控制操作。
+
+\item[视觉输入 (Vision input).]
+视觉适配器触发截图捕获，并将复合面板图像传递给VLM事实提取器。生成的视觉事实作为结构化证据返回核心层。
+\end{description}
+
+VR路径遵循相同的边界。VR镜面显示、教学文本传输和复合面板捕获属于适配器的关注范围；过程推断和校验器验证保留在核心层。VR代码路径已在第~\ref{sec:eval-pilot}~节报告的形成性先导研究中得到使用。更大规模的受控人类受试者评估仍属未来工作。
 
 % ===========================================================================
 \section{事件日志与回放}\label{sec:design-replay}
 
-% 证据：core/event_store.py, simtutor/runner.py, core/scoring.py,
-%       core/interaction_metrics.py
-% 声明：C-RUNTIME-01
+可审计性要求帮助循环决策在实时会话结束后仍然可被追溯。运行时以JSONL格式记录版本化、带时间戳的事件。事件包括观测、帮助请求、证据摘要、模型输出、校验器决策、覆盖层操作以及与评分相关的交互数据。
 
-\subsection{事件模型}
-所有运行时事件均表示为具有固定模式的 \texttt{Event} 对象：唯一标识符、挂钟时间戳、会话标识符、事件类型（\texttt{observation}、\texttt{tutor\_request}、\texttt{tutor\_response}、\texttt{overlay\_requested}、\texttt{overlay\_applied}、\texttt{overlay\_failed}）、类型化负载、模式版本和可扩展元数据。
-% 证据：core/types.py:Event, help_flow_en.md §6
+回放使用这些记录离线重建步骤顺序、状态机一致性和帮助循环行为。当前的回放评估套件包括五种场景类型：无操作、接通电池、电池与发电机断开、FCS重置与BIT以及INS对准。这些案例使用DCS-BIOS原始捕获数据，并在可能的情况下使用视觉sidecar产物。
 
-\subsection{JSONL 事件存储}
-事件通过 \texttt{JsonlEventStore} 以 JSONL 格式持久化，支持仅追加写入和全文件加载。
-% 证据：core/event_store.py
-
-\subsection{回放与验证}
-录制的事件日志可离线回放，以验证步骤顺序和状态机一致性。遥测日志经过独立验证以确保单调序列号和时间戳。回放基础设施已在代码层面实现并使用录制的遥测追踪进行了演练；尚未通过端到端的人在环会话进行验证。
-% 证据：simtutor/runner.py
-
-\subsection{评分与交互度量}
-评分引擎使用可配置的逐类别权重和关键步骤乘数计算遗漏和状态违反。交互度量刻画学习者行为：停滞时间、帮助请求、LLM 触发、UI 点击次数以及叠加请求/确认次数。
-% 证据：core/scoring.py, core/interaction_metrics.py
-
-\subsection{当前局限}
-回放基础设施当前支持遥测层面的合成回归回放，包括带视觉帧副文件的场景（\texttt{replay\_eval/fa18c\_startup\_v04/}）。来自真人运行的带同步视觉帧的完整多模态会话的端到端回放尚未验证。
+日志和回放层从两个方面支撑本论文。在开发过程中，它使回归可重现。在评估过程中，它将关于就绪性和仪表化的声明的论证基础连接到具体的产物，而非仅依赖人工观察。具有同步视觉帧的多模态人在回路会话的完整端到端回放目前仍是一个局限。
 
 % ===========================================================================
-\section{用于视觉状态理解的 VLM 适配}\label{sec:design-vlm}
+\section{VLM视觉证据适配器}\label{sec:design-vlm}
 
-% 证据：adapters/vision_fact_extractor.py, adapters/vision_fact_prompting.py,
-%       packs/fa18c_startup/vision_facts.yaml, tools/train_qwen35_vlm_unsloth.py
-% 声明：C-VLM-01, C-VLM-02
+VLM组件为遥测未直接导出的显示状态提供视觉证据。其运行时输出是一组视觉事实，而非过程决策。每个事实是关于可见座舱显示内容的有限命题，状态为 \texttt{seen}、\texttt{not\_seen} 或 \texttt{uncertain}。过程引擎和校验器决定这些事实如何影响帮助循环。
 
-所提出的系统中的视觉感知是一个核心的、可独立运行的子系统。
+当前运行时契约使用第~\ref{ch:background}~章中介绍的本体，包含13个事实。事实具有生存时间（TTL）设置、可选的粘性语义，以及通过all-of或any-of条件的步骤绑定。例如，与FCS-MC最终GO相关的事实可以被锁存，以便学习者在切换页面时不会丢失已完成的瞬态显示状态。
 
-\subsection{VLM 组件的角色}
-VLM 组件从座舱截图中提取结构化\emph{视觉事实}——关于可见显示内容的中间命题。视觉事实不是最终的教学决策；它们提供视觉证据，教学运行时将其与遥测、程序状态和文档相结合。这种分解使每个组件能够独立开发、测试和评估。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §2
+当帮助请求涉及视觉优先步骤时，运行时可以触发截图捕获，提取视觉事实，将其合并到当前证据快照中，并纳入证据包。如果视觉适配器不可用或多模态请求失败，帮助循环将继续使用遥测、检索和过程门控。这种优雅降级保留了遥测锚定的核心功能，同时允许视觉证据改善需要显示内容解释的步骤。
 
-\subsection{视觉事实本体}
-当前本体（v2）定义了跨三个显示区域的 13 个事实：
-\begin{itemize}
-\item \textbf{左 DDI}: \texttt{tac\_page\_visible}、\texttt{supt\_page\_visible}、\texttt{fcs\_page\_visible}、\texttt{fcs\_page\_x\_marks\_visible}。
-\item \textbf{右 DDI}: \texttt{bit\_root\_page\_visible}、\texttt{fcsmc\_page\_visible}、\texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible}、\texttt{fcsmc\_final\_go\_result\_visible}。
-\item \textbf{AMPCD}: \texttt{hsi\_page\_visible}、\texttt{hsi\_map\_layer\_visible}、\texttt{ins\_grnd\_alignment\_text\_visible}、\texttt{ins\_ok\_text\_visible}。
-\end{itemize}
-% 证据：packs/fa18c_startup/vision_facts.yaml; core/vision_facts.py:VISION_FACT_IDS
+数据管线、本体从8个事实到13个事实的演进、LoRA微调配置以及留出集基准测评协议属于方法论问题而非架构问题，因此安排在第~\ref{ch:methodology}~章讨论，并在第~\ref{ch:evaluation}~章进行评估。
 
-每个事实具有三值状态（\texttt{seen}、\texttt{not\_seen}、\texttt{uncertain}）、生存时间、可选的 \texttt{sticky} 标志，以及通过 \texttt{all\_of} / \texttt{any\_of} 条件实现的步骤绑定。
-% 证据：packs/fa18c_startup/vision_facts.yaml; core/vision_facts.py
+% ===========================================================================
+\section{本章小结}\label{sec:design-summary}
 
-\subsection{VLM 在帮助循环中的集成}
-当帮助请求到达且活跃步骤为视觉优先（S08、S15、S18）时，向 DCS 发送捕获触发器。预触发帧和触发帧被渲染并发送给 VLM。返回的事实被合并到视觉事实快照中（具有粘性和 TTL 语义），并包含在帮助循环上下文中。如果视觉适配器不可用或多模态请求失败，帮助循环仅使用遥测和知识继续。
-% 证据：adapters/vision_fact_extractor.py:extract, adapters/vision_sync.py
-
-\subsection{VLM 适配流水线}
-运行时使用的 VLM 经过微调。适配流水线——详见第\ref{ch:methodology}章——包括截图捕获、由大型 VLM 进行预标注、在 Label Studio 中进行人工审查、双语 SFT 导出、LoRA 微调（Unsloth + PEFT + TRL），以及在独立留出会话上进行基础模型与 LoRA 对比基准测试。该流水线构成一个自成一体的贡献，涵盖从数据捕获到基准测试评估的全过程。
-% 证据：tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
-%       tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py,
-%       tools/benchmark_qwen35_vlm_facts.py
-
-\subsection{与基于规则的状态门控的区别}
-基于规则的门控确定性地评估遥测变量；它是确定性的和可审计的，但限于遥测可表示的条件。基于 VLM 的视觉事实提取解释没有遥测表示的显示内容。这两种机制是互补的：门控引擎提供主要的程序跟踪骨干；视觉事实为那些无法仅从遥测推断完成情况的步骤提供补充证据。
-% 证据：packs/fa18c_startup/pack.yaml（vision_priority_steps, bios_priority_steps）
-% 声明：C-PROC-02
+本章提出的架构将基础模型教学转变为受约束的证据处理管线。遥测和视觉事实提供观测数据，过程包定义有效的状态转移和证据需求，检索提供来源锚定的上下文，模型生成结构化的帮助，校验器验证或修复提出的操作，日志使决策可回放。这是从系统层面回答RQ1：当模型输出被置于显式证据的下游和强制验证的上游时，过程性帮助就变得可审计。

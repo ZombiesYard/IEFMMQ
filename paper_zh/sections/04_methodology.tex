@@ -1,527 +1,225 @@
 % ===========================================================================
 %  04 — 方法论
 %
-%  事实来源：paper_context/repo_inventory.md §2--8
-%  声明：     C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-03a,
-%            C-VLM-03b, C-VLM-07, C-DATA-01, C-TRAIN-01, C-PROC-01, C-PROC-02
+%  声明: C-TELEM-01, C-RAG-01, C-VLM-01, C-VLM-02, C-VLM-03, C-VLM-03a,
+%        C-VLM-03b, C-VLM-07, C-DATA-01, C-TRAIN-01, C-PROC-01, C-PROC-02
 % ===========================================================================
 \chapter{方法论}\label{ch:methodology}
 
-本章描述支撑已实现系统的方法论框架。第\ref{sec:method-telemetry}节涵盖将原始 DCS-BIOS 数据转换为规范化运行时状态的遥测处理流水线。第\ref{sec:method-knowledge}节描述知识溯源子系统，包括 BM25 检索和来源策略执行。第\ref{sec:method-vlm-pipeline}节介绍从截图捕获到 LoRA 微调再到基准测试评估的七阶段视觉事实数据流水线。第\ref{sec:method-datasets}节详述六个精选数据集、从 8-fact v1 到 13-fact v2 的本体演进以及训练方案构建。第\ref{sec:method-lora-config}节说明 LoRA 微调配置，包括两个骨干模型的确切超参数。第\ref{sec:method-benchmark}节定义基准测试协议、度量和留出策略。本章为第\ref{ch:system-design}章呈现的系统设计和第\ref{ch:evaluation}章报告的技术结果提供了方法论基础。
+第~\ref{ch:system-design}~章给出了将教学输出置于证据下游和验证上游的运行时架构。本章描述这些证据如何被产生、筛选和评估。方法论围绕一个实际问题展开：如何将模拟器遥测、检索到的过程性知识和VLM衍生的视觉事实转变为过程性教学者的可审计输入？
+
+本章承担三个角色。第一，它定义了过程引擎使用的运行时证据接口：遥测变量、门控诊断、检索到的文本片段以及确定性回退。第二，它为RQ2呈现了视觉事实方法论：截图捕获、预标注、人工审核、本体修订、双语SFT导出、LoRA适配以及留出集基准测评。第三，它为RQ3记录了形成性VR先导研究协议。先导研究被视为关于可行性和交互模式的描述性证据，不用于提出关于学习收益的推断性声明。
 
 % ===========================================================================
-\section{程序运行时与遥测溯源}\label{sec:method-telemetry}
+\section{过程运行时与遥测锚定}\label{sec:method-telemetry}
 
-% 证据：adapters/telemetry_pipeline.py, core/gating.py, core/vars.py
-% 声明：C-TELEM-01, C-PROC-01, C-PROC-02
+遥测和过程门控提供了帮助循环所依赖的方法论层面的状态证据。该层的架构布局已在第~\ref{ch:system-design}~章中描述；此处的方法论关注点在于原始模拟器观测如何成为稳定的、可检查的变量，以便后续用于基准测评、回放和帮助循环分析。
 
-程序运行时是本系统跟踪学习者 F/A-18C 冷启动程序进度并生成有依据、状态感知教学输出的核心机制。它摄入原始仿真器遥测数据，将其规范化为稳定的状态变量，评估门控规则以确定步骤合格性，并将结果状态表示提供给帮助循环上下文组装器。本节描述遥测处理链的每个阶段以及门控规则评估框架。
+\subsection{变量解析与来源缺失追踪}
 
-\subsection{DCS-BIOS 原始帧摄入}
-
-% 证据：adapters/dcs_bios/receiver.py, simtutor/schemas/v2/dcs_bios_frame.json
-
-遥测子系统始于原始 DCS-BIOS 数据摄入。DCS-BIOS 接收器在 UDP 套接字上监听仿真器发送的二进制 DCS-BIOS 导出帧。每帧被解码为结构化 JSON 对象，附带挂钟时间戳和单调递增的序列号。解码后的帧被写入 JSONL 文件用于存档和回放目的，并转发到遥测增强流水线中。
-% 证据：adapters/dcs_bios/receiver.py, simtutor/schemas/v2/telemetry_frame.json
-
-DCS-BIOS 协议涵盖广泛的座舱控件和指示器——开关位置、旋钮状态、警告灯以及显示相关状态标志——但原始帧是嘈杂的。开关回弹、传感器漂移、快速波动的仪表值以及 UDP 乱序传递会产生虚假变化，如果直接传递给教学运行时，将产生虚假的状态变化事件并触发不必要的帮助循环。后续流水线阶段系统地解决了这些问题。
-
-\subsection{变量解析与源丢失跟踪}
-
-% 证据：core/vars.py, packs/fa18c_startup/telemetry_map.yaml
-
-遥测映射（在程序包的 \texttt{telemetry\_map.yaml} 中指定）定义了原始 DCS-BIOS 字段如何投影到规范化状态变量上。变量解析器消费增强后的遥测观察，并生成一个扁平的键值对字典，其中每个键对应程序包中的一个命名变量（如 \texttt{apu\_ready}、\texttt{battery\_switch\_on}）。
-% 证据：core/vars.py, packs/fa18c_startup/telemetry_map.yaml
-
-至关重要的是，解析器跟踪不可用或未知的来源，使下游组件能够区分"值为零"和"值未知"，这对正确的门控规则行为至关重要。缺失的变量永远不会静默地评估为成功条件。
-% 证据：core/vars.py（vars_source_missing 跟踪）
+过程包声明了一个遥测映射，将原始DCS-BIOS字段投影到规范化的运行时变量上。解析器生成一个扁平的键值对字典，并在 \texttt{vars\_source\_missing} 中单独追踪不可用的数据源。这种分离很重要，因为假值与未观测到的值在方法论上不应具有相同的含义。已知为关闭状态的开关可以支持纠正性引导。缺失的数据源仅能支持带有不确定性意识的引导或回退。
 
 \subsection{门控规则评估}
 
-% 证据：core/gating.py, packs/fa18c_startup/pack.yaml
+每个过程步骤包含前置条件和完成门控。门控DSL支持阈值检查、范围检查、布尔标志和经过时间条件。缺失、来源缺失或哨兵值会带着诊断原因失败，而非被静默地强制转换。失败的门控及其原因被包含在帮助循环上下文中，并可在日志中事后检查。这将过程进度转变为由规则支配的证据声明，而非模型推断的叙事。
 
-程序引擎为每个步骤评估两种类型的门控：前提门控（在步骤变为活跃之前必须满足）和完成门控（在步骤被标记为完成之前必须满足）。门控规则 DSL 支持四种操作符：
+\subsection{增量清洗与聚合}
 
-\begin{description}
-\item[\texttt{var\_gte}] --- 命名变量必须大于或等于阈值。
-\item[\texttt{arg\_in\_range}] --- 命名变量必须落在指定范围内。
-\item[\texttt{flag\_true}] --- 布尔标志必须为 true。
-\item[\texttt{time\_since}] --- 自指定事件以来必须经过最小时间。
-\end{description}
+原始遥测数据可能因模拟器物理、仪表抖动和过渡性开关状态而以高频率变化。增量清洗应用逐变量阈值、去抖窗口和过滤规则。增量聚合随后将最近、清洗后的变化压缩为适合提示词的摘要。生成的增量被用作最近学习者操作的证据，而无需将每个原始模拟器帧暴露给语言模型。
 
-% 证据：core/gating.py（evaluate_gate, evaluate_rule）
+\subsection{确定性回退}
 
-评估器包含显式的未知值处理：缺失、来源缺失或哨兵值变量会导致规则失败并附诊断原因，而非静默地视为 false。规则在首次失败时短路，失败索引和原因被传播到下游组件，包括确定性步骤提示和帮助循环上下文。
-% 证据：core/gating.py, core/step_hint.py
-
-门控规则以声明方式在程序包的配置中指定。F/A-18C 冷启动程序中的每个步骤都根据程序的操作要求被分配了前提门控和完成门控。分类为 BIOS 优先的步骤（S01、S03--S07、S09--S13、S21）主要依赖基于遥测的门控规则进行完成检测。分类为视觉优先的步骤（S08、S15、S18）以视觉事实证据补充门控评估，因为它们的完成条件涉及遥测中未反映的座舱显示状态。
-% 证据：packs/fa18c_startup/pack.yaml（bios_priority_steps, vision_priority_steps）
-% 声明：C-PROC-01, C-PROC-02
-
-\subsection{增量去噪与聚合}
-
-% 证据：adapters/delta_sanitizer.py, adapters/delta_aggregator.py, packs/fa18c_startup/delta_policy.yaml
-
-原始遥测变量由于仿真器物理以高频率变化，即使没有执行任何学习者操作。为产生适合提示上下文的稳定状态表示，流水线应用两个连续的处理阶段。
-
-\textbf{增量去噪。}
-可配置的策略（在程序包的 \texttt{delta\_policy.yaml} 中指定）定义了逐变量阈值、防抖动窗口和过滤规则。由开关回弹、传感器噪声和 UDP 乱序传递引起的虚假变化被抑制。只有超过配置阈值并在防抖动窗口后持续存在的变化才被提升到去噪后的增量流中。
-% 证据：adapters/delta_sanitizer.py, packs/fa18c_startup/delta_policy.yaml
-% 声明：C-TELEM-01
-
-\textbf{增量聚合。}
-去噪后的增量在可配置时间窗口内累积，并被压缩为紧凑的、人类可读的摘要。该摘要被包含在帮助循环上下文中，为语言模型提供最近学习者操作和状态转换的简洁表示，而不暴露原始高频遥测数据。
-% 证据：adapters/delta_aggregator.py
-
-\subsection{确定性降级}
-
-% 证据：core/step_hint.py, adapters/step_inference.py
-
-当没有语言模型可用或模型输出验证失败时，程序运行时降级到确定性步骤推理。降级机制检查当前活跃步骤、其未满足的门控规则以及最近的 UI 目标，以产生限制在当前活跃步骤的文本提示。默认情况下，除非本地规则能够根据当前遥测状态证明一个唯一、有效的目标，否则在降级模式下不发送叠加高亮。这确保系统即使在没有模型的情况下也能保持运行和安全。
-% 证据：core/step_hint.py, help_flow_en.md §5
-
-\subsection{运行时效率缓存}
-
-% 证据：core/llm_schema.py（lru_cache on build_help_response_schema）, core/vision_facts.py（lru_cache on load_vision_facts_config）
-
-程序运行时中若干对性能至关重要的路径采用LRU缓存，以避免在长时间的辅导会话中重复计算。HelpResponse JSON Schema验证每次模型生成的叠加层和解释是否符合当前程序包配置，该Schema以其源配置文件的文件系统修改时间为键进行缓存；当配置未变更时跳过Schema重新生成，消除了每次帮助循环中冗余的YAML解析和JSON Schema构建。视觉事实配置加载器采用相同的缓存策略，避免在每次视觉观察合并时重复解析和规范化13-fact本体。这些缓存点被选择性地应用于那些本会重复相同I/O和验证工作的路径，体现了对运行时效率的关注，同时避免了缓存失效复杂性的引入。
+回退是方法论的一部分，而非仅仅是实现层面上的安全措施。当模型输出不可用或无效时，运行时根据活跃步骤、未满足的门控、最近操作和证据可用性计算出保守的提示。回退区分硬阻塞（观测到的证据显示某门控未满足）和软阻塞（所需证据缺失）。覆盖层引导被抑制，除非局部规则能够识别出唯一有效的目标。
 
 % ===========================================================================
-\section{知识溯源与来源策略}\label{sec:method-knowledge}
+\section{知识锚定与来源策略}\label{sec:method-knowledge}
 
-% 证据：adapters/knowledge_local.py, core/knowledge.py, knowledge_source_policy.yaml
-% 声明：C-RAG-01
+检索到的过程性知识为生成的帮助提供文本上下文，但它被刻意地进行了来源控制。本地检索适配器以句子级别索引经过筛选的过程文档和飞机文档，并使用BM25~\citep{robertson2009bm25}对文本片段进行排序。锚定查询由活跃步骤、其描述和当前观测构造；得分最高的文本片段被包含在帮助循环上下文中。
 
-知识溯源子系统为教学运行时提供检索增强的程序性文档。它从已索引的文档集合中检索相关文本片段，并强制执行限制哪些文档可以呈现给模型的来源策略。知识溯源是教学运行时的核心架构特性：每次帮助循环从当前程序状态组装溯源查询，检索相关文档片段，并将其作为证据上下文包含在模型提示中。
-
-\subsection{BM25 检索}
-
-% 证据：core/knowledge.py（BM25Retriever）, adapters/knowledge_local.py
-
-知识检索使用 BM25，一种来自概率信息检索家族的词袋排序函数。文档在句子级别进行索引：F/A-18C NATOPS 飞行手册和补充冷启动文档被预处理为本地 JSON 索引。
-% 证据：tools/index_docs.py
-
-在检索时，从当前程序状态构造一个溯源查询：活跃步骤标识符、其在步骤注册表中的描述以及最近的遥测观察。查询使用标准 BM25 加权函数以默认参数（$k_1 = 1.2$，$b = 0.75$）进行分词并与索引句子进行评分。返回 top-$k$ 得分片段（默认 $k = 5$），并作为证据上下文包含在帮助循环提示中。
-% 证据：adapters/knowledge_local.py（build_grounding_query）
-
-\subsection{来源策略}
-
-% 证据：adapters/knowledge_source_policy.py, knowledge_source_policy.yaml
-
-并非所有知识源都适用于每种教学上下文。声明式来源策略（在 \texttt{knowledge\_source\_policy.yaml} 中指定）定义了允许的文档来源允许列表。每个索引句子携带一个来源标识符，策略强制执行只有来自允许来源的片段才包含在检索结果中。
-% 证据：adapters/knowledge_source_policy.py, knowledge_source_policy.yaml
-
-来源策略服务于两个目的。首先，它防止模型暴露于与当前程序包相矛盾的程序变体——例如，当当前配置文件为陆基时的航母程序。其次，它将检索范围限制在经过筛选、已验证的文档中，降低因过时或不相关来源产生幻觉的风险。
-% 证据：tests/test_knowledge_source_policy.py
+声明式来源策略将检索限制在允许的文档来源内。这防止模型接收到当前活跃过程包之外的过程变体，例如当前配置文件为陆基冷启动时接收到航母特定的指令。因此，在本论文的方法论中，检索不是一个通用的文档搜索设施。它是一个受控的证据通道，其范围属于过程配置的一部分。
 
 % ===========================================================================
-\section{视觉事实数据流水线}\label{sec:method-vlm-pipeline}
+\section{视觉事实数据管线}\label{sec:method-vlm-pipeline}
 
-% 证据：tools/capture_vlm_dataset.py, tools/generate_vlm_prelabels.py,
-%       tools/export_vision_sft_dataset.py, tools/train_qwen35_vlm_unsloth.py,
-%       tools/benchmark_qwen35_vlm_facts.py
-% 声明：C-VLM-01, C-VLM-03, C-VLM-07
+视觉事实管线是RQ2的主要方法论。它将DCS座舱截图转换为监督学习示例，再转换为经过基准测评的视觉事实提取器。该管线为可追溯性而设计：一个基准测评错误应可追溯到模型预测、人工审核标签、预标签和原始图像。
 
-视觉事实数据流水线将原始 DCS 座舱截图转换为结构化视觉事实提取模型。它包含七个阶段，涵盖数据捕获、人工标注、监督微调数据集生成、模型训练和基准测试评估。每个阶段产生带版本号、可检查的工件，实现从原始图像到基准测试指标的完全可追溯性。图\ref{fig:vlm-pipeline}提供了概览。
+图~\ref{fig:vlm-pipeline}~以循环形式展示了该管线。留出集失败不仅是最终结果，还可以揭示本体中的弱点并指导后续数据采集。
 
 \begin{figure}[htbp]
   \centering
-  % TODO: 插入 VLM 流水线图。
-  % \includegraphics[width=\textwidth]{figures/vlm_pipeline.pdf}
-  \caption{七阶段视觉事实数据流水线。捕获和预标注供给人工审查；经审查的标注驱动双语 SFT 导出；导出的数据训练 LoRA 适配器；基础模型和 LoRA 模型在独立留出集上进行基准测试。}
+  \includegraphics[width=\textwidth]{figures/fig_vlm_pipeline.pdf}
+  \caption{VLM适配管线。DCS复合截图经预标注、人工审核，转换为双语监督微调数据行，通过LoRA进行适配，在独立留出集上评估，并用于驱动本体修订。}
   \label{fig:vlm-pipeline}
 \end{figure}
 
-\subsection{第一阶段：DCS 截图捕获}
+\begin{enumerate}
+\item \textbf{截图捕获。} DCS将左DDI、AMPCD和右DDI渲染为一张复合面板图像。相同的复合布局用于数据采集、预标注、训练、基准测评和运行时推理。这保持了整个方法论中输入分布的稳定性。
 
-% 证据：tools/capture_vlm_dataset.py
+\item \textbf{VLM预标注。} 一个大型外部VLM为每张图像生成初始标签和证据注释。预标注用作标注辅助手段，而非真实标签。
 
-第一阶段从 DCS World 捕获座舱截图。DCS 将三个主要多功能显示器——左 DDI、AMPCD 和右 DDI——渲染为单个复合面板图像。捕获过程以可配置间隔触发截图，将每次捕获与一个会话标识符和挂钟时间戳关联，并存储原始图像及副文件清单。
-% 证据：tools/capture_vlm_dataset.py, DCS/Scripts/SimTutor/SimTutor.lua
+\item \textbf{人工审核。} 预标注样本在Label Studio~\citep{tkachenko2020labelstudio}中进行审核。审核者纠正事实状态和证据注释，同时保留与原始图像和预标签的链接。
 
-选择复合面板格式是为了使训练、预标注、评估和运行时使用保持在同一输入分布上，避免训练-评估不匹配——即模型在训练期间接收三个分离的区域裁剪图像，但在推理时接收单个复合图像。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §2
+\item \textbf{审核后JSONL导出。} 审核后的导出是下游训练和评估的权威真实标签工件。
 
-\subsection{第二阶段：初始 VLM 预标注}
+\item \textbf{双语SFT生成。} 每张审核后的图像生成一行英文和一行中文训练数据，共享相同的图像和事实标签。助手目标是包含视觉事实和简短摘要的结构化JSON；外部管理字段如帧标识符、文件路径和置信度字段被排除在目标之外。
 
-% 证据：tools/generate_vlm_prelabels.py
+\item \textbf{LoRA适配。} SFT数据行用于为VLM骨干模型训练LoRA适配器~\citep{hu2021lora}。实现使用PEFT适配器定义~\citep{mangrulkar2022peft}、TRL监督微调基础设施~\citep{vonwerra2020trl}以及Unsloth加速用于4位VLM训练~\citep{unsloth2024}。
 
-每张捕获的复合面板图像由大型 VLM（通过 OpenAI 兼容 API 访问的 Qwen 397B 级模型）使用目标视觉事实本体作为提示契约进行预标注。预标注脚本将每张图像与一个结构化提示一起发送，该提示枚举本体中的所有事实、其定义以及三种可接受状态（\texttt{seen}、\texttt{not\_seen}、\texttt{uncertain}）。VLM 返回一个包含逐事实标签和证据注释的 JSON 对象。
-% 证据：tools/generate_vlm_prelabels.py, tools/generate_vlm_prelabels_en.py, tools/generate_vlm_prelabels_zh.py
+\item \textbf{留出集基准测评与修订。} 基础模型和LoRA配置在独立留出集上进行评估。错误在事实层面进行检查，特别是对完成关键事实，由此发现的失败模式反馈到本体和数据集修订中。
+\end{enumerate}
 
-预标注作为种子步骤：它大规模生成初始标注，然后通过人工审查加以完善。预标注 VLM 是大型通用模型；它未在座舱领域进行微调，经常在模糊或稀有视觉状态上出错。下一阶段的人工审查纠正这些错误。
-
-\subsection{第三阶段：Label Studio 人工审查}
-
-% 证据：tools/generate_vlm_prelabels.py（Label Studio 导出路径）
-
-预标注样本被导入 Label Studio，一个开源数据标注平台。每个任务向审查者呈现复合面板图像、VLM 对所有事实的预测标签以及一个自由文本摘要字段。审查者检查图像，纠正任何标注错误的事实，并为每处更正提供证据注释。审查界面强制要求每个事实接收三种可接受状态之一，并且摘要字段必须填写。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §3
-
-人工审查是质量控制瓶颈：每个捕获会话包含 50 到 220 张图像，每张图像的审查时间取决于可见事实的数量和审查者对座舱显示的熟悉程度。所有经审查的样本都带有审计追踪，可追溯到原始图像、原始 VLM 预标注和审查者的更正。
-
-\subsection{第四阶段：经审查的 JSONL 导出}
-
-人工审查后，Label Studio 将更正后的标签导出为 JSONL 文件。每行包含任务标识符、原始图像路径、带逐事实状态和证据注释的经审查事实，以及经审查的摘要。此经审查的 JSONL 是所有下游阶段（SFT 导出、训练和基准测试）的权威真实标注工件。
-
-\subsection{第五阶段：双语 SFT JSONL 生成}
-
-% 证据：tools/export_vision_sft_dataset.py
-
-经审查的 JSONL 被转换为 OpenAI 兼容的多模态对话 SFT 格式。每个经审查的样本生成两行训练数据——一行英文和一行中文——共享相同的复合面板图像和相同的事实标签，但在系统和用户指令文本上有所不同。
-% 证据：tools/export_vision_sft_dataset.py, Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4
-
-每个 SFT 行是一个三消息对话：一则系统消息指示模型仅输出 JSON，一则用户消息包含 base64 编码的图像和文本指令（枚举所有事实、其定义和决策边界），以及一则助手消息包含带有 \texttt{facts} 数组和 \texttt{summary} 字符串的真实标注 JSON 对象。助手输出中的每个事实条目恰好包含三个字段：\texttt{fact\_id}、\texttt{state} 和 \texttt{evidence\_note}。外部元数据字段如 \texttt{frame\_id}、\texttt{session\_id}、\texttt{confidence} 和图像路径被排除在训练目标之外，因为它们是数据集管理字段，而非视觉可推断属性。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4.1--4.2
-
-双语 SFT 增加的是指令多样性而非视觉多样性：英文和中文示例共享相同的图像和事实标签。其目的是提高两种语言下的 JSON 格式鲁棒性，并支持最终的双语运行时部署。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4
-
-\subsection{第六阶段：LoRA 微调}
-
-% 证据：tools/train_qwen35_vlm_unsloth.py, models/*/train_summary.json
-
-导出的 SFT JSONL 文件用于通过低秩适配（LoRA）微调基础 VLM。训练栈组合三个组件：Unsloth 用于 4 位 VLM 加载、LoRA 注入和视觉批次整理；PEFT（参数高效微调）用于 LoRA 适配器定义；TRL \texttt{SFTTrainer} 用于监督微调循环。
-% 证据：tools/train_qwen35_vlm_unsloth.py（FastVisionModel, get_peft_model, SFTTrainer）
-
-训练脚本通过 Unsloth 的 \texttt{FastVisionModel.from\_pretrained} 以 4 位精度加载基础模型，对视觉和语言层（Qwen）或仅语言线性层（Gemma）应用 LoRA 适配器，并在双语 SFT 数据上进行训练。适配器权重与基础模型分开保存，便于高效存储和推理时加载。完整的训练配置细节见第\ref{sec:method-lora-config}节。
-% 证据：models/qwen35_vlm_lora/README.md, models/gemma4_vlm_lora/.../train_summary.json
-
-\subsection{第七阶段：基础模型与 LoRA 对比基准测试}
-
-% 证据：tools/benchmark_qwen35_vlm_facts.py
-
-最后阶段在留出数据集上评估微调后的 LoRA 适配器与未适配基础模型。基准测试脚本以 4 位推理模式加载每个模型（基础模型和基础模型加 LoRA），通过训练期间使用的相同提示发送每个留出样本，根据预期 JSON 模式解析和验证模型输出，并计算一套将模型预测与人工审查真实标注进行比较的度量。基准测试协议详见第\ref{sec:method-benchmark}节。
-% 证据：tools/benchmark_qwen35_vlm_facts.py
-
-\subsection{端到端可追溯性}
-
-% 声明：C-VLM-03
-
-该流水线的一个定义性方法论属性是端到端可追溯性。每个基准测试预测都可以通过训练数据、人工审查标签、VLM 预标注和原始 DCS 截图进行追溯。流水线在每个阶段产生带版本号的工件：捕获清单、预标注 JSONL 文件、Label Studio 导出文件、SFT JSONL 文件、LoRA 适配器权重、\texttt{train\_summary.json} 文件、基准测试预测以及基准测试度量摘要。这一监管链使得对任何观察到的模型行为进行严格审计成为可能，从单个事实误分类到聚合基准测试度量。
-% 证据：benchmarks/qwen35_vlm_finetune/*/predictions_*.jsonl,
-%       benchmarks/qwen35_vlm_finetune/*/errors_*.jsonl,
-%       benchmarks/qwen35_vlm_finetune/*/benchmark_summary.json
+该方法论刻意将VLM的任务保持狭窄。模型被训练为以 \texttt{seen}、\texttt{not\_seen} 或 \texttt{uncertain} 状态报告视觉事实。它不被训练来决定过程完成或产生教学操作。这些决策仍保留在过程引擎和校验器中。
 
 % ===========================================================================
 \section{数据集构建}\label{sec:method-datasets}
 
-% 证据：datasets/*/stats.json
-% 声明：C-DATA-01, C-VLM-07
-
 \subsection{数据集概览}
 
-视觉事实数据流水线在连续的捕获和审查周期中生成了六个数据集。表\ref{tab:datasets}总结了每个数据集的角色、样本数、事实本体版本、审查状态和导出语言。
+六个经审核的数据集支撑跨两个本体版本的视觉事实工作。表~\ref{tab:datasets}~列出了它们的角色和追踪的样本数量。
 
 \begin{table}[htbp]
   \centering
-  \caption{数据集清单。所有样本数来自相应的 \texttt{stats.json} 文件。}
+  \caption{用于视觉事实提取的数据集清单。}
   \label{tab:datasets}
   \small
-  \begin{tabular}{@{}lcccccc@{}}
+  \begin{tabularx}{\textwidth}{@{}lXcccX@{}}
   \toprule
-  \textbf{数据集} & \textbf{角色} & \textbf{样本} & \textbf{本体} & \textbf{已审查} & \textbf{语言} \\
+  \textbf{运行批次} & \textbf{数据集} & \textbf{样本数} & \textbf{事实数} & \textbf{语言} & \textbf{角色} \\
   \midrule
-  Run-001 (\texttt{vision\_sft}) & 训练源（8-fact v1） & 180 & 8-fact v1 & 180 & en, zh \\
-  \addlinespace
-  Run-002 (\texttt{vision\_sft\_holdout\_run002}) & 留出（8-fact v1） & 50 & 8-fact v1 & 50 & en \\
-  \addlinespace
-  Run-002 newfacts (\texttt{vision\_sft\_holdout\_run002\_newfacts}) & 留出（13-fact v2） & 50 & 13-fact v2 & 50 & en \\
-  \addlinespace
-  Run-003 (\texttt{vision\_sft\_run003}) & 训练源（13-fact v2） & 220 & 13-fact v2 & 220 & en, zh \\
-  \addlinespace
-  Run-004 (\texttt{vision\_sft\_holdout\_run004\_random}) & 留出（13-fact v2） & 100 & 13-fact v2 & 100 & en \\
-  \addlinespace
-  Run-005 (\texttt{vision\_sft\_run005\_composition\_rebalance}) & 训练补充（13-fact v2） & 122 & 13-fact v2 & 122 & en, zh \\
+  Run-001 & v1 SFT & 180 & 8 & en/zh & v1训练源 \\
+  Run-002 & v1留出集 & 50 & 8 & en & v1留出集 \\
+  Run-002 & v2新事实留出集 & 50 & 13 & en & v2留出集 \\
+  Run-003 & v2 SFT & 220 & 13 & en/zh & v2训练源 \\
+  Run-004 & v2随机留出集 & 100 & 13 & en & v2留出集 \\
+  Run-005 & 组合再平衡 & 122 & 13 & en/zh & v2训练补充 \\
   \bottomrule
-  \end{tabular}
+  \end{tabularx}
 \end{table}
 
-% 证据：datasets/vision_sft/stats.json（180 样本）
-% 证据：datasets/vision_sft_holdout_run002/stats.json（50 样本）
-% 证据：datasets/vision_sft_holdout_run002_newfacts/stats.json（50 样本）
-% 证据：datasets/vision_sft_run003/stats.json（220 样本, missing_summary_count=82）
-% 证据：datasets/vision_sft_holdout_run004_random/stats.json（100 样本）
-% 证据：datasets/vision_sft_run005_composition_rebalance/stats.json（122 样本, missing_summary_count=25）
+Run-003和Run-005包含自由文本摘要字段为空的样本（分别为82和25个样本）。这些样本对视觉事实任务仍然有效，因为每个样本仍然包含完整的事实数组。运行时和基准测评使用的监督目标是结构化的事实状态，而非可选的摘要。
 
-每个数据集均经过完全人工审查：每个样本都已在 Label Studio 中检查并更正。Run-003 和 Run-005 包含人工审查者将摘要字段留空的样本（分别有 82 和 25 个样本，如 \texttt{missing\_summary\_count} 字段所记录）。这些样本对训练和评估仍然有效，因为事实数组——主要监督目标——对每个样本中的每个事实都已完全标注。
-% 证据：datasets/vision_sft_run003/stats.json（missing_summary_count=82）,
-%       datasets/vision_sft_run005_composition_rebalance/stats.json（missing_summary_count=25）
+\subsection{本体演进：从8-Fact v1到13-Fact v2}
 
-\subsection{本体演进：从 8-Fact v1 到 13-Fact v2}
+第一个本体包含覆盖复合座舱面板的8个事实。它证明了小型经审核数据集可以改进结构化座舱事实提取，但也暴露了一个表示问题：一些目标将视觉观测与过程解释混合在一起。最明显的案例是 \texttt{ins\_go}，它要求单帧VLM推断INS完成状态，而非报告直接可见的证据。
 
-% 证据：packs/fa18c_startup/vision_facts.yaml, datasets/vision_sft/stats.json,
-%       datasets/vision_sft_run003/stats.json
-% 声明：C-VLM-07
+图~\ref{fig:ontology-evolution}~说明了方法论上的纠正。复合过程性目标被分解为局部可观测的视觉原子，将时间和过程解释留给教学运行时。
 
-初始的 8-fact v1 本体（用于 Run-001 和 Run-002）定义了八个事实：
-\texttt{fcs\_page\_visible}、
-\texttt{bit\_root\_page\_visible}、
-\texttt{bit\_page\_failure\_visible}、
-\texttt{right\_ddi\_fcsmc\_page\_visible}、
-\texttt{right\_ddi\_in\_test\_visible}、
-\texttt{fcs\_bit\_result\_visible}、
-\texttt{ins\_alignment\_page\_visible}
-和 \texttt{ins\_go}。
-% 证据：datasets/vision_sft/stats.json（fact_state_counts 键）
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_ontology_evolution.pdf}
+  \caption{从8-fact v1到13-fact v2的本体演进。诸如 \texttt{ins\_go} 和宽泛的FCS-MC完成事实等复合目标被分解为局部可验证的视觉原子；过程引擎随后将这些观测与遥测、阶段和时间证据结合。}
+  \label{fig:ontology-evolution}
+\end{figure}
 
-v1 本体在初始基准分析中暴露出两个结构性弱点。首先，它混合了抽象层次：一些事实描述低层视觉观察（如 \texttt{fcs\_page\_visible}），而另一些则编码了更高层的程序性判断（如 \texttt{ins\_go}，它代表 INS 校准过程的完成信号而非直接可观察的视觉特征）。其次，若干事实共享重叠语义：\texttt{bit\_root\_page\_visible} 和 \texttt{bit\_page\_failure\_visible} 可能在某些座舱状态下重叠，而 \texttt{right\_ddi\_fcsmc\_page\_visible} 将区域标识符与事实语义混淆。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8.2
-
-13-fact v2 本体（用于 Run-003、Run-004、Run-005 及当前运行时）重新设计并扩展了事实集。v2 事实为：
-\texttt{tac\_page\_visible}、
-\texttt{supt\_page\_visible}、
-\texttt{fcs\_page\_visible}、
-\texttt{fcs\_page\_x\_marks\_visible}、
-\texttt{bit\_root\_page\_visible}、
-\texttt{fcsmc\_page\_visible}、
-\texttt{fcsmc\_intermediate\_result\_visible}、
-\texttt{fcsmc\_in\_test\_visible}、
-\texttt{fcsmc\_final\_go\_result\_visible}、
-\texttt{hsi\_page\_visible}、
-\texttt{hsi\_map\_layer\_visible}、
-\texttt{ins\_grnd\_alignment\_text\_visible}
-和 \texttt{ins\_ok\_text\_visible}。
-% 证据：packs/fa18c_startup/vision_facts.yaml, tools/benchmark_qwen35_vlm_facts.py（CORE_FACT_IDS）
-
-v2 重新设计通过三种策略解决了 v1 的弱点。首先，模糊的 \texttt{ins\_go} 事实被分解为两个低层、直接可观察的事实：\texttt{ins\_grnd\_alignment\_text\_visible}（要求字面 GRND 校准块文本）和 \texttt{ins\_ok\_text\_visible}（要求校准块附近清晰可读的 OK 文本）。其次，区域标识符从事实名称中移除（\texttt{right\_ddi\_fcsmc\_page\_visible} 变为 \texttt{fcsmc\_page\_visible}），并为 TAC 和 SUPT 菜单添加了页面可见性事实以覆盖左 DDI。第三，FCS-MC 状态序列被分解为更细粒度的四状态链（\texttt{page}、\texttt{intermediate\_result}、\texttt{in\_test}、\texttt{final\_go\_result}），替换了单一的 \texttt{fcs\_bit\_result\_visible} 事实。第四，HSI 相关事实被拆分为 \texttt{hsi\_page\_visible} 和 \texttt{hsi\_map\_layer\_visible}，FCS X 标记事实与 FCS 页面可见性分离。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §9,
-%       Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
-
-\subsection{训练方案：Run-003 + Run-005x2}
-
-% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
-
-13-fact v2 模型的主要训练方案将 Run-003（220 个经审查样本，双语导出生成 220 条英文和 220 条中文训练行）与包含两次的 Run-005 组合再平衡数据（122 个经审查样本，双语导出生成 $122 \times 2 = 244$ 条英文和 $122 \times 2 = 244$ 条中文训练行）相结合。得到的训练集包含 928 行。
-% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json（train_rows=928）
-
-Run-005 专门作为组合再平衡数据集采集。对 Run-003 事实状态分布的分析揭示了严重的类别不平衡：若干关键事实（如 \texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible}、\texttt{fcsmc\_final\_go\_result\_visible}、\texttt{ins\_ok\_text\_visible}）在训练数据中具有极少的 \texttt{seen} 示例。Run-005 设计了目标座舱状态转换以过采样这些代表性不足的视觉状态。
-% 证据：datasets/vision_sft_run003/stats.json（fact_state_counts 显示 ins_ok_text_visible 的 seen 计数低至 12）,
-%       datasets/vision_sft_run005_composition_rebalance/stats.json（fact_state_counts 显示改善的平衡性）
-
-Run-005 的双重计数（Run-005x2）进一步放大了这些稀有状态在训练分布中的代表性。该训练运行的输入文件为：来自 Run-003 的 \texttt{sft\_en.jsonl} 和 \texttt{sft\_zh.jsonl}，加上来自 Run-005 的 \texttt{sft\_en.jsonl} 和 \texttt{sft\_zh.jsonl} 各两份副本，共计六个输入文件。
-% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json（input_files 数组）
-
-未使用内部评估划分：训练配置设置 \texttt{eval\_rows = 0}。所有评估均在独立留出数据集上执行。
-% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json（eval_rows=0）
-
-\subsection{留出集独立性验证}
-
-% 证据：Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
-% 声明：C-VLM-03a
-
-留出集独立性是一项关键的方法论要求：基准测试必须测量跨会话泛化，而非分布内记忆。构建了两个留出集：
-
-\begin{itemize}
-\item \textbf{Run-002}（及其 13-fact 重标注 \texttt{run002\_newfacts}）：一个与所有训练会话不同的新 DCS 捕获会话。包含 50 个经审查样本。
-\item \textbf{Run-004 random}：一个进一步独立的捕获会话，采用均匀随机采样的座舱状态。包含 100 个经审查样本。
-\end{itemize}
-
-% 证据：Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
-
-每个留出集与训练数据之间的完全重叠经验证为零（0）。重叠检查比较了训练和留出划分中的图像工件路径和样本标识符。没有留出样本出现在任何训练输入文件中。
-% 证据：Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md（完全重叠 = 0）
-
-相比之下，早期 8-fact v1 实验中使用的 Run-001 基准测试是一个\textbf{受污染开发集}：训练示例所来源的同一数据池被用于评估。Run-001 结果仅为回归分析报告，并与独立留出结果明确区分。
-% 证据：benchmarks/qwen35_vlm_finetune/base_vs_lora_current180_v1/benchmark_summary.json（benchmark_kind=contaminated_dev_set）
-
-% ===========================================================================
-\section{LoRA 微调配置}\label{sec:method-lora-config}
-
-% 证据：models/*/train_summary.json, tools/train_qwen35_vlm_unsloth.py,
-%       tools/train_gemma4_vlm_unsloth.py
-% 声明：C-TRAIN-01
-
-\subsection{基础模型}
-
-两种基础 VLM 架构在相同训练数据方案下进行了微调以实现骨干对比：
-
-\begin{description}
-\item[Qwen/Qwen3.5-9B-Base] --- 一个 90 亿参数的视觉语言模型，支持多模态输入（图像 + 文本）和文本生成。这是主要的实验骨干。
-% 证据：tools/train_qwen35_vlm_unsloth.py（model_name 默认值）
-
-\item[google/gemma-4-31B] --- 来自 Google DeepMind 的 310 亿参数视觉语言模型。这是补充对比骨干，用于检验相同训练数据方案是否可跨模型家族泛化。
-% 证据：models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
-\end{description}
-
-两个模型均通过 Unsloth 的 \texttt{FastVisionModel.from\_pretrained} 以 4 位精度加载。对 Qwen，LoRA 适配器应用于视觉层和语言层（\texttt{finetune\_vision\_layers=True}、\texttt{finetune\_language\_layers=True}）。对 Gemma，LoRA 被限制在所有线性模块（\texttt{lora\_target\_modules=all-linear}），且视觉层未微调（\texttt{finetune\_vision\_layers=False}）。
-% 证据：tools/train_qwen35_vlm_unsloth.py（get_peft_model 调用）,
-%       models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
-
-\subsection{训练栈}
-
-% 证据：tools/train_qwen35_vlm_unsloth.py
-
-训练栈包含三个集成组件：
+当前的13-fact本体遵循三条设计规则：
 
 \begin{enumerate}
-\item \textbf{Unsloth} --- 处理 4 位模型加载、LoRA 注入、通过 \texttt{UnslothVisionDataCollator} 进行视觉批次整理，以及 FP16/BF16 自动精度选择。
-\item \textbf{PEFT（参数高效微调）} --- 定义 LoRA 适配器格式，包括秩、alpha、dropout 和目标模块选择。
-\item \textbf{TRL SFTTrainer} --- 以可配置的批次大小、梯度累积、轮数、学习率、预热和权重衰减运行监督微调循环。
+\item \textbf{分解复合目标。} \texttt{ins\_go}目标被替换为GRND对准文字和INS OK文字的独立视觉原子。FCS-MC序列以页面、中间结果、测试中和最终GO事实表示。
+
+\item \textbf{将区域与语义分离。} 事实名称描述可见状态，而非在标识符中编码显示区域。区域约束属于本体元数据的一部分。
+
+\item \textbf{保持事实局部可观测。} 每个事实应可从复合图像中判定，而不需要过程历史。过程引擎稍后将事实与遥测、步骤绑定和时间信息结合。
 \end{enumerate}
 
-% 证据：tools/train_qwen35_vlm_unsloth.py（导入和 trainer_args）
+这种本体纪律对论文至关重要。它定义了感知与过程推理之间的边界：VLM报告视觉证据，而运行时决定该证据是否满足过程步骤。
 
-\subsection{超参数配置}
+\subsection{训练方案：Run-003 + Run-005$\times$2}
 
-表\ref{tab:lora-hyperparams}列出了主要训练运行（Run-003 + Run-005x2）使用的精确超参数，在两个骨干间匹配。所有值取自 \texttt{train\_summary.json} 工件。
+主要的v2训练方案将Run-003与重复的Run-005组合再平衡补充数据合并。Run-003贡献220张经审核的图像，以双语导出为440行SFT数据。Run-005贡献122张经审核的图像，以双语导出为244行数据；该补充数据被包含两次，产生488行数据。因此，最终方案包含\textbf{928行SFT数据}。
 
-\begin{table}[htbp]
-  \centering
-  \caption{LoRA 微调超参数，在 Qwen3.5-9B 和 Gemma-4-31B 间匹配。}
-  \label{tab:lora-hyperparams}
-  \small
-  \begin{tabular}{@{}lll@{}}
-  \toprule
-  \textbf{参数} & \textbf{Qwen3.5-9B} & \textbf{Gemma-4-31B} \\
-  \midrule
-  \texttt{max\_seq\_length} & 4096 & 4096 \\
-  \texttt{num\_train\_epochs} & 4.0 & 4.0 \\
-  \texttt{learning\_rate} & 2$\times 10^{-4}$ & 2$\times 10^{-4}$ \\
-  \texttt{per\_device\_train\_batch\_size} & 1 & 1 \\
-  \texttt{gradient\_accumulation\_steps} & 4 & 4 \\
-  \texttt{lora\_r} & 16 & 16 \\
-  \texttt{lora\_alpha} & 16 & 16 \\
-  \texttt{lora\_dropout} & 0.0 & 0.0 \\
-  \texttt{seed} & 3407 & 3407 \\
-  \texttt{load\_in\_4bit} & True & True \\
-  \texttt{warmup\_ratio} & 0.1 & 0.1 \\
-  \texttt{weight\_decay} & 0.01 & 0.01 \\
-  \texttt{train\_rows} & 928 & 928 \\
-  \texttt{eval\_rows} & 0 & 0 \\
-  \midrule
-  \textbf{骨干特定} & & \\
-  \midrule
-  视觉 LoRA & 启用 & 禁用 \\
-  LoRA 目标模块 & vision + language + attention + MLP & all-linear \\
-  对话模板 & Qwen 默认 & gemma-4 \\
-  GPU 内存利用率 & 0.6 & 0.95 \\
-  \midrule
-  \textbf{训练结果} & & \\
-  \midrule
-  训练运行时间（秒） & 6419.16 & 8049.65 \\
-  训练损失（最终） & 0.2156 & 0.0474 \\
-  \bottomrule
-  \end{tabular}
-\end{table}
+Run-005针对Run-003中代表性不足的正类状态，包括INS OK文字、FCS页面X标记和FCS-MC子状态事实。重复补充数据是一种刻意的组合再平衡策略，而非独立的验证集。因此，泛化声明基于外部留出集，而非内部同池评估划分。
 
-% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
-% 证据：models/gemma4_vlm_lora/full_gemma4_31b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
-% 证据：Doc/Vision/Reports/vlm_backbone_comparison_summary_EN.md
+\subsection{留出集独立性}
 
-最终训练损失值（Qwen 为 0.2156，Gemma 为 0.0474）不应在骨干间直接比较，因为分词器行为、对话模板结构、目标序列分布和模型参数化各不相同。4 个轮数的选择是作为小数据领域适配的折衷：仅有 928 个训练样本，更少的轮数可能无法可靠地教会模型固定的 JSON 模式和座舱事实边界，而更多的轮数则有过度拟合训练会话的风险。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §5
+两个13-fact v2留出集用于主要评估。Run-002 newfacts包含50张来自更早捕获会话的图像，在13-fact本体下重新标注。Run-004 random包含100张随机采样的座舱状态截图。本地重叠检查报告两个留出集与Run-003 + Run-005训练并集之间零精确重叠。
 
-LoRA 秩 $r = 16$ 和 alpha $\alpha = 16$ 提供适度的适配能力：足以学习座舱布局模式和 JSON 格式，但不像高容量适配器（$r \geq 64$）那样可能更激进地过度拟合小数据集。在主要运行中将 Dropout 设置为零，在首次适配实验中优先考虑可学习性而非正则化。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §5
-
-\subsection{双语 SFT 策略}
-
-% 证据：tools/export_vision_sft_dataset.py
-
-双语 SFT 策略为每个经审查样本生成两行训练数据：一行使用英文系统和用户指令，一行使用中文指令。两行共享相同的图像（base64 编码）和相同的助手目标（真实标注事实 JSON）。英文助手目标被复用于中文行；模型的任务是从图像中提取视觉事实，而非生成语言特定的自然语言描述。
-% 证据：tools/export_vision_sft_dataset.py, Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §4
-
-这种方法在不增加额外人工标注工作量的情况下提高了跨语言指令遵循的鲁棒性。然而，它不能替代额外的座舱状态截图或困难负样本视觉数据。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §8.3
-
-\subsection{组合再平衡策略}
-
-% 证据：datasets/vision_sft_run005_composition_rebalance/stats.json
-
-组合再平衡策略（Run-005）解决了主要训练源（Run-003）中观察到的类别不平衡。在 Run-003 中，若干事实具有极低的正例（\texttt{seen}）计数：\texttt{ins\_ok\_text\_visible} 在 220 个样本中仅有 12 个 \texttt{seen} 示例（5.5\%）；\texttt{fcs\_page\_x\_marks\_visible} 有 16 个（7.3\%）；\texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible} 和 \texttt{fcsmc\_final\_go\_result\_visible} 各有 18 个（8.2\%）。
-% 证据：datasets/vision_sft_run003/stats.json（fact_state_counts）
-
-Run-005 捕获了 122 个额外样本，针对这些稀有事实为 \texttt{seen} 的座舱状态。在 Run-005 增强后，组合训练集提供了对先前代表性不足事实的改进覆盖：\texttt{supt\_page\_visible}（组合 seen 从 20 到 54）、\texttt{fcsmc\_page\_visible}（从 55 到 111）、\texttt{hsi\_page\_visible}（从 106 到 215）以及 \texttt{ins\_grnd\_alignment\_text\_visible}（从 58 到 130）。
-% 证据：datasets/vision_sft_run003/stats.json, datasets/vision_sft_run005_composition_rebalance/stats.json
-
-Run-005 数据在训练方案中被包含两次（Run-005x2），进一步放大了这些代表性不足视觉状态的信号。
-% 证据：models/qwen35_vlm_lora/full_qwen35_9b_base_bilingual_run003_plus_run005x2_v1/train_summary.json
+较早的Run-001评估线被区别对待。由于它与训练数据池有重叠，它作为受污染开发基准可用于检查Schema学习和历史本体行为，但不作为v2泛化的独立证据使用。
 
 % ===========================================================================
-\section{基准测试协议}\label{sec:method-benchmark}
+\section{LoRA微调配置}\label{sec:method-lora-config}
 
-% 证据：tools/benchmark_qwen35_vlm_facts.py
-% 声明：C-VLM-04, C-VLM-05, C-VLM-06
+\subsection{骨干模型与对比策略}
+
+主要的适配线使用 \texttt{Qwen/Qwen3.5-9B-Base} 配合Run-003 + Run-005$\times$2方案。两个补充骨干模型被纳入，以检验相同的数据方案在规模、版本和模型家族变化下是否仍然有意义：\texttt{Qwen/Qwen3.6-27B} 和 \texttt{google/gemma-4-31B}。这些对比是方法论对照组，而非独立的论文声明。第~\ref{ch:evaluation}~章报告数值结果。
+
+对比在可控范围内尽可能保持主要因素不变：本体、训练方案、基准测评提示词、留出集、生成温度、输出Schema和度量计算。骨干特定的差异仍然存在，因此被显式报告。Qwen家族运行对视觉和语言模块施加LoRA；Gemma运行使用all-linear LoRA配置，视觉层不单独微调。完整设置见附录~\ref{ch:appendix}，表~\ref{tab:lora-hyperparams-full}。
+
+\subsection{训练栈与超参数}
+
+所有骨干运行使用4位加载，LoRA秩 $r=16$，$\alpha=16$，dropout $0.0$，4个epoch，学习率 $2 \times 10^{-4}$，有效批次大小4，最大序列长度4096，种子3407，预热比例0.1，权重衰减0.01。适配器权重与基础模型分开保存。
+
+Epoch数和LoRA秩的选择针对小数据领域适配。在928行SFT数据下，适配器必须同时学习固定的JSON Schema和座舱事实的视觉边界。过少的epoch可能无法可靠地教会这些边界，而过多的训练则存在记忆捕获会话的风险。秩16提供适度的适配容量，而不会将适配器变成高容量的任务特定模型。
+
+\subsection{双语SFT与组合再平衡}
+
+双语SFT策略为每张经审核的图像创建两个指令变体：一个英文和一个中文。图像和事实标签保持相同。这在无需额外图像标注的情况下增加了指令格式的覆盖范围。它不替代对新的座舱状态或困难负例的需求。
+
+组合再平衡通过Run-005处理。由于稀有正类事实对下游过程推理特别重要，训练方案通过添加针对性捕获和重复Run-005双语数据行来增加它们的曝光度。因此，该方法论分离了两个问题：适配器是否能从再平衡后的训练方案中学习本体，以及学习到的提取器是否能泛化到独立留出集。
+
+% ===========================================================================
+\section{基准测评协议}\label{sec:method-benchmark}
 
 \subsection{度量指标}
 
-基准测试使用以下度量比较模型预测与人工审查真实标注标签：
-
-\begin{description}
-\item[\texttt{json\_valid\_rate}] --- 模型输出可被解析为 JSON 对象的样本比例。此处的失败表明模型产生了非 JSON 文本（如 markdown、自然语言评论或格式错误的括号）。
-\item[\texttt{schema\_valid\_rate}] --- 解析后的 JSON 符合预期模式的样本比例：顶层对象仅包含 \texttt{summary} 和 \texttt{facts} 键，\texttt{facts} 数组中每个条目恰好包含 \texttt{fact\_id}、\texttt{state} 和 \texttt{evidence\_note}，所有 13 个事实 ID 均恰好出现一次，所有状态均在 \texttt{\{seen, not\_seen, uncertain\}} 中。
-\item[\texttt{fact\_accuracy}] --- 所有样本中所有事实的三类准确率，计算为与真实标注标签匹配的单个事实预测的比例。
-\item[\texttt{macro\_f1}] --- 跨三种状态（\texttt{seen}、\texttt{not\_seen}、\texttt{uncertain}）的宏平均 F1 分数，逐事实计算后跨所有 13 个事实平均。
-\item[\texttt{seen\_f1}] --- 正类 \texttt{seen} 的 F1 分数，逐事实计算后跨所有 13 个事实平均。这是一个特别重要的指标，因为遗漏 \texttt{seen} 状态（假阴性）或幻觉出 \texttt{seen} 状态（假阳性）直接影响下游程序状态推理。
-\item[\texttt{sample\_exact\_match}] --- 所有 13 个事实与真实标注标签完全匹配的样本比例。单个事实的误分类计为样本级失败。
-\item[\texttt{critical\_false\_positive\_count}] --- 分类为\emph{关键}的事实子集（6 个事实的子集：\texttt{fcs\_page\_x\_marks\_visible}、\texttt{fcsmc\_intermediate\_result\_visible}、\texttt{fcsmc\_in\_test\_visible}、\texttt{fcsmc\_final\_go\_result\_visible}、\texttt{ins\_grnd\_alignment\_text\_visible}、\texttt{ins\_ok\_text\_visible}）中，当真实标注为 \texttt{not\_seen} 或 \texttt{uncertain} 时被预测为 \texttt{seen} 的错误计数。
-\end{description}
-
-% 证据：tools/benchmark_qwen35_vlm_facts.py（compute_metrics, CRITICAL_FACT_IDS）
-
-关键假阳性被单独跟踪，因为它们代表了教学上下文中最具后果性的错误类型：错误地报告一个完成关键状态为已观察而实际上并非如此。例如，一个错误地认为 INS 校准已完成（基于 \texttt{ins\_ok\_text\_visible} 假阳性）的导师可能跳过必要的指导，潜在地导致程序性错误。
-% 证据：Doc/Vision/Reports/qwen35_vlm_finetune_report_EN.md §6
-
-基准测试还计算逐事实混淆矩阵以及逐事实的精确率、召回率和 F1 分数，这些存储在 \texttt{fact\_scores.csv} 中，并附带自动生成的图表（总体准确率、样本完全匹配、逐事实宏 F1、逐事实 seen F1、关键假阳性以及逐事实混淆矩阵）。
-% 证据：tools/benchmark_qwen35_vlm_facts.py（_make_charts, _write_fact_scores_csv）
-
-\subsection{基础模型与 LoRA 对比方法论}
-
-% 证据：tools/benchmark_qwen35_vlm_facts.py
-
-基准测试协议比较两种模型配置在相同真实标注标签上的表现：
-
-\begin{enumerate}
-\item \textbf{基础模型}：未适配的基础 VLM，以 4 位推理模式加载，不带任何 LoRA 适配器。
-\item \textbf{LoRA 模型}：相同基础 VLM，以 4 位推理模式加载，通过 PEFT 的 \texttt{PeftModel.from\_pretrained} 加载 LoRA 适配器权重。
-\end{enumerate}
-
-两种配置接收相同的提示、相同的图像和相同的生成参数：temperature = 0.0（贪婪解码）、\texttt{max\_new\_tokens} = 1024、seed = 3407。基准测试独立运行每个样本，将预测序列化到 JSONL 中，并在没有任何事后过滤或排除的情况下计算度量。
-% 证据：tools/benchmark_qwen35_vlm_facts.py（_run_predictions, temperature=0.0）
-
-对比脚本（\texttt{comparison.json}）计算增量度量（LoRA 减去基础模型）和一个自动化推荐标志（\texttt{recommend\_simtutor\_chain\_validation}），该标志在 LoRA 适配器同时提升 JSON 有效性、事实准确率、seen F1，且不增加关键假阳性时激活。
-% 证据：tools/benchmark_qwen35_vlm_facts.py（_compare_metrics）
-
-\subsection{留出定义与基准测试类别}
-
-% 证据：benchmarks/qwen35_vlm_finetune/*/benchmark_summary.json
-
-每个基准测试运行被赋予一个 \texttt{benchmark\_kind}，决定其结果应如何解读：
-
-\begin{description}
-\item[\texttt{contaminated\_dev\_set}] --- 评估集从与训练集相同的数据池中抽取。结果表明模型是否学会了模式和分布内视觉边界，但不能支持泛化声明。用于 Run-001 基准测试。
-% 证据：benchmarks/qwen35_vlm_finetune/base_vs_lora_current180_v1/benchmark_summary.json
-
-\item[\texttt{heldout\_new\_session}] --- 评估集是一个完全独立的捕获会话，与任何训练数据零重叠。结果支持跨会话泛化声明。这是主要评估类别。Run-002 newfacts 和 Run-004 random 基准测试属于此类别。
-% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/benchmark_summary.json（benchmark_kind=holdout_run002_newfacts）
-\end{description}
-
-受污染与留出基准测试之间的区分在整个基准测试基础设施中被严格执行，并反映在结果章节（第\ref{ch:evaluation}章）中。
-% 证据：paper_outline.md §4
-
-\subsection{基准测试工件}
-
-% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/
-
-每个基准测试运行生成一个标准化的工件目录：
+基准测评在样本和事实两个层面比较模型预测与人工审核的真实标签。度量指标的选择反映了下游运行时风险：
 
 \begin{itemize}
-\item \texttt{benchmark\_summary.json} --- 顶层摘要，包含对比增量和图表路径。
-\item \texttt{metrics\_base.json} / \texttt{metrics\_lora.json} --- 完整度量字典，包括逐事实分数和混淆矩阵。
-\item \texttt{predictions\_base.jsonl} / \texttt{predictions\_lora.jsonl} --- 逐样本模型输出，每行一个 JSON 对象。
-\item \texttt{errors\_base.jsonl} / \texttt{errors\_lora.jsonl} --- 单个预测错误，包含金标签、预测标签和原始模型文本。
-\item \texttt{comparison.json} --- 增量度量和推荐标志。
-\item \texttt{fact\_scores.csv} --- 逐事实逐模型度量的 CSV 表。
-\item \texttt{report.md} --- 人类可读的 markdown 摘要。
-\item \texttt{charts/} --- 自动生成图表：总体准确率、样本完全匹配、逐事实宏 F1、逐事实 seen F1、关键假阳性，以及基础模型和 LoRA 模型的逐事实混淆矩阵。
+\item \texttt{json\_valid\_rate}：输出可解析为JSON的样本比例。
+\item \texttt{schema\_valid\_rate}：JSON包含所需事实标识符恰好一次且仅使用有效状态的样本比例。
+\item \texttt{fact\_accuracy}：所有事实和样本上的三分类准确率。
+\item \texttt{macro\_f1}：三种状态上的宏平均F1值，在事实间平均。
+\item \texttt{seen\_f1}：正类 \texttt{seen} 的F1值，在事实间平均。这很重要，因为遗漏或幻觉的可见状态会改变过程证据。
+\item \texttt{sample\_exact\_match}：所有13个事实与审核标签匹配的样本比例。
+\item \texttt{critical\_false\_positive\_count}：当审核标签为 \texttt{not\_seen} 或 \texttt{uncertain} 时，完成关键事实被预测为 \texttt{seen} 的次数。
 \end{itemize}
 
-% 证据：benchmarks/qwen35_vlm_finetune/run003_plus_run005x2_vs_base_holdout_run002_newfacts_v1/benchmark_summary.json
+关键假阳性被单独跟踪，因为它们是对教学者最危险的视觉错误。完成关键事实的假阳性可能使过程引擎相信某显示状态已被观测到，而实际上并未。
 
-这些工件构成了第\ref{ch:evaluation}章中报告的技术结果的完整证据链。通过使用相同的经审查 JSONL 和 LoRA 适配器权重重新运行基准测试脚本，每个度量、图表和错误记录都是可复现的。
+\subsection{基础模型与LoRA对比}
+
+基础模型和LoRA配置接收相同的提示词、图像、生成参数和输出Schema。解码使用温度0.0、最大新tokens 1024和种子3407。预测写入JSONL，经解析、规范化后评分，不做事后过滤。对比工件报告LoRA减去基础模型的增量，第~\ref{ch:evaluation}~章对这些增量进行解释。
+
+\subsection{基准测评类别}
+
+基准测评运行按证据状态分类。受污染开发集来自与训练相同的数据池，仅用于回归和历史解释。留出的新会话基准使用独立捕获，与训练数据零精确重叠。这种区分决定了从某个度量中可以得出的声明的强度。
+
+\subsection{基准测评工件}
+
+每个基准测评运行产出一个标准目录，内含每个模型的度量、逐样本预测、错误JSONL文件、逐事实评分CSV、对比摘要、人类可读报告和图表。这些工件构成第~\ref{ch:evaluation}~章报告的技术结果的证据链。
+
+% ===========================================================================
+\section{人类受试者先导研究方法论}\label{sec:method-pilot}
+
+开展了一项小型形成性VR先导研究，以收集关于教学者在F/A-18C冷启动任务中实际使用情况的描述性证据。该先导研究并非具有统计效力的受控实验。其目的是在真实的VR环境中运行教学系统，检查交互日志，并为后续研究设计识别过程性错误模式。
+
+\subsection{参与者与条件}
+
+9名参与者（P01--P09）每人完成一次试验。研究采用受试者间设计，基于日程可用性进行非随机分配：
+
+\begin{description}
+\item[有教学者组（n=4）。] P04、P05、P08和P09接收覆盖层高亮、结构化帮助文本、遥测锚定的步骤推断以及适用的VLM视觉事实支持。
+\item[无教学者组（n=5）。] P01、P02、P03、P06和P07未接收教学辅助。遥测仍被记录，用于离线步骤推断和错误编码。
+\end{description}
+
+参与者经验概况见附录~\ref{ch:appendix}，表~\ref{tab:pilot-participants}。由于分配未随机且样本量小，条件间对比仅为描述性。
+
+\subsection{任务与设备}
+
+所有试验使用DCS World中33步F/A-18C冷启动程序，通过Quest Link在Meta Quest~3上进行。复合座舱面板被镜像以供实验者观察。教学者条件下的试验使用带有远程模型推理（OpenAI兼容端点）的实时运行时。试验在参与者完成程序或无法继续后自愿停止时结束。
+
+\subsection{数据来源与编码}
+
+导出管线生成每次试验的摘要、每步编码文件、教学者试验的帮助循环日志、操作时间线、质量门控元数据以及会话摘要。步骤错误编码为五类：遗漏（OM）、执行错误（CO）、顺序错误（OR）、提示/辅助错误（PA）和状态违反（SV）。自动编码输出通过遥测、帮助循环日志和操作时间线进行人工审核；人工编码列为报告先导结果的权威来源。
+
+\subsection{数据质量说明}
+
+两个试验层面的注意事项影响解读。第一，P08的自动摘要报告了不完整的进度，但人工遥测审核确认完成了全部33步。分析使用人工编码，审核前的文件保留以供审计。第二，P02的问卷元数据包含内部参与者ID不匹配。P02的任务度量被保留，但P02被排除在问卷衍生的工作负荷或信心摘要之外。
+
+\subsection{分析方法}
+
+先导分析报告每位参与者的结果和条件层面的描述性摘要。不执行零假设显著性检验。观测到的持续时间被记录，但不解释为完成时间比较，因为未完成的无教学者试验在不同停止点结束。分析聚焦于完成状态、人工错误类别以及教学者交互模式，如帮助请求、VLM调用、覆盖层操作和回退事件。
 
 % ===========================================================================
 \section{本章小结}\label{sec:method-summary}
 
-本章描述了本系统的四个方法论支柱：基于遥测证据的程序运行时、以 BM25 检索和来源策略为基础的知识溯源、从截图捕获到基准测试的七阶段视觉事实数据流水线，以及在两个骨干架构间匹配超参数的 LoRA 微调协议。该方法论的特征在于端到端可追溯性——每个基准测试度量可通过训练数据、人工审查标签和原始截图进行追溯——以及受污染开发基准测试与独立留出基准测试之间的严格分离。这些方法论选择直接支撑了第\ref{ch:evaluation}和第\ref{ch:discussion}章中呈现的声明和结果。
+本章方法论建立了论文其余部分使用的证据链。遥测和检索提供受控的运行时上下文。视觉事实管线为RQ2产出一个经审核和基准测评的感知层。13-fact本体将感知与过程推理分离。LoRA协议使用匹配的数据和留出集来评估小数据适配，而不依赖受污染的开发集。先导研究协议为RQ3提供形成性VR证据，同时将其声明保持为描述性。这些方法论共同使后续结果可审计，而不夸大现有证据所能证明的范围。

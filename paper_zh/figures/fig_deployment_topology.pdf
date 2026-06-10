@@ -1,0 +1,92 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 606 428] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 4657 >>
+stream
+BT /F1 14.5 Tf 0.067 0.094 0.153 rg 18.0 404.0 Td (Deployment topology) Tj ET
+q 0.898 0.906 0.922 rg 0.420 0.447 0.502 RG 1.2 w 39.6 320.0 118.8 43.2 re B Q
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 48.1 348.5 Td (Windows simulator host) Tj ET
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 59.7 338.0 Td (DCS World F/A-18C) Tj ET
+BT /F1 8.9 Tf 0.067 0.094 0.153 rg 45.8 327.4 Td (Quest 3 via Oculus Link) Tj ET
+q 0.898 0.906 0.922 rg 0.420 0.447 0.502 RG 1.2 w 39.6 240.8 118.8 39.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 78.6 262.4 Td (DCS-BIOS) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 65.9 250.8 Td (UDP telemetry) Tj ET
+q 0.988 0.906 0.953 rg 0.745 0.094 0.365 RG 1.2 w 39.6 161.6 118.8 39.6 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 63.3 183.2 Td (Vision sidecar) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 55.7 171.6 Td (VR mirror capture) Tj ET
+q 0.878 0.949 0.996 rg 0.012 0.412 0.631 RG 1.2 w 223.2 294.8 133.2 50.4 re B Q
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 247.8 332.9 Td (SimTutor live-dcs) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 257.7 321.7 Td (help trigger,) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 255.2 310.5 Td (orchestration,) Tj ET
+BT /F1 9.5 Tf 0.067 0.094 0.153 rg 250.3 299.3 Td (overlay dispatch) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 223.2 201.2 133.2 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 251.6 230.3 Td (Saved Games DCS) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 243.9 218.8 Td (SimTutorConfig.lua) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 231.2 207.2 Td (overlay command channel) Tj ET
+q 0.996 0.953 0.780 rg 0.706 0.325 0.035 RG 1.2 w 223.2 100.4 133.2 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 259.2 129.5 Td (Runtime logs) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 249.0 118.0 Td (JSONL events and) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 256.7 106.4 Td (trial exports) Tj ET
+q 0.859 0.918 0.996 rg 0.114 0.306 0.847 RG 1.2 w 428.4 312.8 136.8 50.4 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 453.5 345.5 Td (Remote GPU server) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 463.7 334.0 Td (vLLM endpoint) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 471.3 322.4 Td (SSH tunnel) Tj ET
+q 0.859 0.918 0.996 rg 0.114 0.306 0.847 RG 1.2 w 428.4 226.4 136.8 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 458.6 249.8 Td (Text help model) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 443.3 238.2 Td (OpenAI-compatible API) Tj ET
+q 0.863 0.988 0.906 rg 0.082 0.502 0.239 RG 1.2 w 428.4 140.0 136.8 43.2 re B Q
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 466.2 169.1 Td (Vision model) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 458.6 157.6 Td (Qwen/Gemma LoRA) Tj ET
+BT /F1 9.8 Tf 0.067 0.094 0.153 rg 440.7 146.0 Td (visual fact extraction) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  99.0 320.0 m 99.0 280.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 99.0 280.4 m 95.0 287.3 l 103.0 287.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  99.0 320.0 m 99.0 201.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 99.0 201.2 m 95.0 208.1 l 103.0 208.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  158.4 260.6 m 223.2 320.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 223.2 320.0 m 220.8 312.4 l 215.4 318.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  158.4 181.4 m 223.2 320.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 223.2 320.0 m 223.9 312.0 l 216.6 315.4 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  289.8 294.8 m 289.8 244.4 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 289.8 244.4 m 285.8 251.3 l 293.8 251.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [5 4] 0 d  223.2 222.8 m 158.4 341.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 158.4 341.6 m 165.2 337.4 l 158.2 333.6 l h f Q
+BT /F1 8.2 Tf 0.216 0.255 0.318 rg 171.9 286.2 Td (overlay) Tj ET
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  289.8 294.8 m 289.8 143.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 289.8 143.6 m 285.8 150.5 l 293.8 150.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  356.4 320.0 m 428.4 338.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 428.4 338.0 m 422.6 332.4 l 420.7 340.2 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  496.8 312.8 m 496.8 269.6 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 496.8 269.6 m 492.8 276.5 l 500.8 276.5 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [] 0 d  496.8 312.8 m 496.8 183.2 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 496.8 183.2 m 492.8 190.1 l 500.8 190.1 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [5 4] 0 d  428.4 248.0 m 356.4 320.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 356.4 320.0 m 364.1 317.9 l 358.5 312.3 l h f Q
+q 0.216 0.255 0.318 RG 1.2 w [5 4] 0 d  428.4 161.6 m 356.4 320.0 l S Q
+q 0.216 0.255 0.318 rg 0.216 0.255 0.318 RG 356.4 320.0 m 362.9 315.3 l 355.6 312.0 l h f Q
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+5026
+%%EOF
