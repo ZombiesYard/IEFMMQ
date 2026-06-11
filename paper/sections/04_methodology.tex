@@ -13,62 +13,36 @@ evaluated. The method is organised around a practical question: how can a small
 set of reviewed cockpit images, structured labels, and formative VR sessions
 become auditable evidence for a machine-learning tutoring system?
 
-The chapter has three roles. First, it records the runtime evidence interfaces
-used in later replay and pilot analysis: telemetry variables, gating
-diagnostics, retrieved snippets, and deterministic fallback. Second, it presents
-the visual fact methodology for RQ2: screenshot capture, pre-labelling, human
-review, ontology revision, bilingual SFT export, LoRA adaptation, and holdout
-benchmarking. Third, it documents the formative VR pilot protocol for RQ3. The
-pilot is treated as descriptive evidence about feasibility and interaction
-patterns; it is not used for inferential claims about learning gains.
+The chapter therefore treats the runtime, the VLM data pipeline, and the pilot
+as linked evidence protocols rather than as implementation inventories. For
+RQ1, it records which runtime signals are allowed to support replay and pilot
+analysis. For RQ2, it defines how screenshots become reviewed visual-fact
+labels, training rows, LoRA adapters, and independent holdout benchmarks. For
+RQ3, it documents the formative VR pilot protocol and keeps its claims
+descriptive: the pilot can inform feasibility and interaction patterns, but not
+infer learning gains.
 
 % ===========================================================================
 \section{Procedure Runtime and Telemetry Grounding}\label{sec:method-telemetry}
 
-Telemetry and procedure gates provide the method-level state evidence on which
-the help cycle depends. The architectural placement of this layer was described
-in Chapter~\ref{ch:system-design}; the methodological concern here is how raw
-simulator observations become stable, inspectable variables for later
-benchmarking, replay, and help-cycle analysis.
+Telemetry and procedure gates provide the state evidence on which the help
+cycle depends. Raw DCS-BIOS fields are projected onto normalised runtime
+variables, while unavailable sources are tracked separately in
+\texttt{vars\_source\_missing}. This distinction matters methodologically: a
+known false value can support corrective guidance, but an unobserved value can
+only support uncertainty-aware guidance or fallback.
 
-\subsection{Variable Resolution and Source-Missing Tracking}
-
-The procedure pack declares a telemetry map that projects raw DCS-BIOS fields
-onto normalised runtime variables. The resolver produces a flat dictionary of
-key--value pairs and separately tracks unavailable sources in
-\texttt{vars\_source\_missing}. This separation is important because a false
-value and an unobserved value should not have the same methodological meaning.
-A switch known to be off can support corrective guidance. A missing source
-supports only uncertainty-aware guidance or fallback.
-
-\subsection{Gating Rule Evaluation}
-
-Each procedure step contains precondition and completion gates. The gate DSL
-supports threshold checks, range checks, boolean flags, and elapsed-time
-conditions. Missing, source-missing, or sentinel values fail with diagnostic
-reasons rather than being silently coerced. The failed gate and reason are
-included in the help-cycle context and can later be inspected in logs. This
-turns procedure progress into a rule-governed evidence claim rather than a
-model-inferred narrative.
-
-\subsection{Delta Sanitisation and Aggregation}
-
-Raw telemetry can change at high frequency because of simulator physics,
-instrument jitter, and transitional switch states. Delta sanitisation applies
-per-variable thresholds, debounce windows, and filtering rules. Delta
-aggregation then compresses recent, sanitised changes into a prompt-safe
-summary. The resulting deltas are used as evidence of recent learner action
-without exposing every raw simulator frame to the language model.
-
-\subsection{Deterministic Fallback}
-
-Fallback is part of the method rather than only an implementation safeguard.
-When model output is unavailable or invalid, the runtime computes a conservative
-hint from the active step, unsatisfied gates, recent actions, and evidence
-availability. The fallback distinguishes hard blockers, where observed evidence
-shows that a gate is unsatisfied, from soft blockers, where required evidence is
-missing. Overlay guidance is suppressed unless a local rule identifies a unique
-valid target.
+Each procedure step then evaluates precondition and completion gates over these
+variables. The gate DSL covers threshold checks, ranges, boolean flags, and
+elapsed-time conditions. Missing, source-missing, or sentinel values fail with
+diagnostic reasons rather than being silently coerced, and those reasons are
+logged with the help-cycle context. Recent learner action is represented through
+sanitised telemetry deltas, using per-variable thresholds, debounce windows, and
+filtering before a compact prompt-safe summary is produced. If model output is
+unavailable or invalid, the deterministic fallback computes a conservative hint
+from the active step, unsatisfied gates, recent actions, and evidence
+availability; overlay guidance remains suppressed unless a local rule identifies
+a unique valid target.
 
 % ===========================================================================
 \section{Knowledge Grounding and Source Policy}\label{sec:method-knowledge}
@@ -607,7 +581,7 @@ conflicts, but to make the analysis rule visible before the results chapter.
 \caption{Pilot data-quality issues and final analysis authority.}
 \label{tab:pilot-authority-rules}
 \small
-\begin{tabularx}{\textwidth}{@{}p{0.11\textwidth}p{0.30\textwidth}p{0.31\textwidth}X@{}}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.10\textwidth}YYY@{}}
 \toprule
 \textbf{Case} & \textbf{Data-quality issue} & \textbf{Final analysis rule} & \textbf{Reported use} \\
 \midrule

@@ -13,7 +13,7 @@
 
 在两个独立且经验证与训练集零完全重叠的 13 事实留出集上，使用 Run-003 + Run-005x2 配方训练的 Qwen3.5 LoRA 适配器是最强的离线产品线。在 Run-002 newfacts 上，事实准确率从 0.8677 升至 0.9908，样本完全匹配率从 0.10 升至 0.88；在 Run-004 random 上，事实准确率从 0.8038 升至 0.9931，样本完全匹配率从 0.03 升至 0.92。关键假阳性在 Run-002 上从 11 降至 4，在 Run-004 上从 70 降至 8。匹配的 Qwen3.6-27B 实验显示出一个更强的基座模型和一个适用于本地服务部署的 LoRA 候选，但它在当前留出集上并未超越 Qwen3.5 LoRA 产品线。Gemma 在相同数据配方下显著改善，在某些关键事实上更加保守，但在整体完全匹配行为上仍低于 Qwen3.5。
 
-一项非随机的形成性 Quest~3 试点研究（9 名参与者）补充了技术证据。参与者群体包括自报的新手、中级和专家用户。4 名参与者使用教学系统，5 名在无教学系统的被动条件下进行。所有 4 名教学系统条件下的参与者完成了经人工审核的 33 步程序，而无教学系统条件下的 5 名参与者均未完成。教学系统条件下的遗漏错误为零，但在若干试验中引入了与辅助耦合的执行错误和提示错误。原始 NASA-TLX 和可用性/信任度评分仅为描述性报告；P02 的问卷因元数据不匹配被排除，P08 使用人工完成编码。因此，该试点支持可行性、仪器化和错误模式声明，但不支持关于学习收益、工作负荷降低、记忆保持、迁移效果或任务速度的因果性声明。
+一项非随机的形成性 Quest~3 试点研究（9 名参与者）补充了技术证据。参与者群体包括自报的新手、中级和专家用户。4 名参与者使用教学系统，5 名在无教学系统的被动条件下进行。经人工审核，所有 4 名教学系统条件下的参与者均达到最终 33 步状态；无教学系统条件下的 5 次试验均未达到经确认的最终 33 步状态。教学系统条件下的遗漏错误为零，但在若干试验中引入了与辅助耦合的执行错误和提示错误。原始 NASA-TLX 和可用性/信任度评分仅为描述性报告；P02 的问卷因元数据不匹配被排除，P08 使用人工完成编码。因此，该试点支持可行性、仪器化和错误模式声明，但不支持关于学习收益、工作负荷降低、记忆保持、迁移效果或任务速度的因果性声明。
 
 本文认为，沉浸式训练中的可靠交互式解释最好作为一个证据设计问题来处理：基础模型应仅通过运行时能够观测、验证和回放的证据来解释实时的任务状态。
 
@@ -44,8 +44,8 @@ Auf zwei unabh\"angigen 13-Fact-Holdouts ist die Qwen3.5-LoRA-Linie mit
 Run-003 + Run-005x2 die st\"arkste Offline-Konfiguration. Die Fact Accuracy
 steigt auf Run-002 newfacts von 0,8677 auf 0,9908 und auf Run-004 random von
 0,8038 auf 0,9931; gleichzeitig sinken kritische False Positives von 11 auf 4
-beziehungsweise von 70 auf 8. Qwen3.6-27B liefert eine starke und deploybare
-Kandidatenlinie fuer das lokale Serving, \"ubertrifft die Qwen3.5-LoRA-Linie
+beziehungsweise von 70 auf 8. Qwen3.6-27B liefert eine starke
+Kandidatenlinie f\"ur das lokale Serving, \"ubertrifft die Qwen3.5-LoRA-Linie
 auf den aktuellen Holdouts jedoch nicht. Gemma profitiert ebenfalls von
 derselben Datenrezeptur, bleibt aber beim exakten Sample-Match hinter Qwen3.5.
 
@@ -53,8 +53,9 @@ Eine formative, nicht randomisierte Quest-3-Pilotstudie mit neun Teilnehmenden
 erg\"anzt die technische Evaluation. Die Stichprobe enthielt selbstberichtete
 Novizen, intermedi\"are und erfahrene Teilnehmende. Vier Teilnehmende nutzten
 den Tutor, f\"unf absolvierten eine passive Bedingung ohne Tutor. Alle vier
-Tutor-Teilnehmenden vollendeten die manuell gepr\"ufte 33-Schritt-Prozedur;
-keiner der f\"unf Teilnehmenden ohne Tutor erreichte den Endzustand. Die
+Tutor-Teilnehmenden erreichten den manuell gepr\"uften finalen
+33-Schritt-Zustand; keine der f\"unf Sitzungen ohne Tutor erreichte einen
+best\"atigten finalen 33-Schritt-Zustand. Die
 Pilotdaten belegen Machbarkeit, Instrumentierung und Fehlermuster, aber keine
 kausalen Effekte auf Lernen, Arbeitsbelastung, Retention, Transfer oder
 Geschwindigkeit.
