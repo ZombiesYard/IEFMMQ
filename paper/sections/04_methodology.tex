@@ -83,9 +83,9 @@ snippets are included in the help-cycle context.
 A declarative source policy restricts retrieval to allowed document sources.
 This prevents the model from receiving procedure variants outside the active
 procedure pack, such as carrier-specific instructions when the current profile
-is an airfield cold start. In the thesis method, retrieval is therefore not a
-general document search facility. It is a controlled evidence channel whose
-scope is part of the procedure configuration.
+is an airfield cold start. Retrieval is therefore not a general document search
+facility. It is a controlled evidence channel whose scope is part of the
+procedure configuration.
 
 % ===========================================================================
 \section{Visual Fact Data Pipeline}\label{sec:method-vlm-pipeline}
@@ -188,8 +188,8 @@ The reviewed labels were not independently double-coded. They should therefore
 be interpreted as single-reviewer, human-reviewed labels rather than as an
 inter-rater-reliability study. This is acceptable for the component benchmark
 reported here because the thesis claim is within-domain adapter reliability on
-the reviewed artifact set, but it remains a limitation for future ACM-style
-evaluation, especially for rare completion-critical facts.
+the reviewed artifact set, but it remains a limitation for later reliability
+studies, especially for rare completion-critical facts.
 
 % ===========================================================================
 \section{Dataset Curation}\label{sec:method-datasets}
@@ -466,14 +466,14 @@ for unnecessary checks or fail to recognise progress. Finally, it inspects
 schema and exact-match failures to identify whether the remaining problem is
 formatting, visual ambiguity, or fact-definition mismatch.
 
-This review is deliberately tied to the runtime use case. A generic ML report
-might stop after accuracy and F1. For a tutor, the relevant question is what a
-specific error would do downstream. A hallucinated FCS-MC final GO result is
-more serious than a conservative \texttt{not\_seen} prediction for a page that
-can be rechecked. A schema-invalid output is less visually interesting but more
-important operationally because it triggers fallback. The benchmark protocol
-therefore connects numerical metrics to the validation and degradation paths
-described in Chapter~\ref{ch:system-design}.
+This review is deliberately tied to the runtime use case. Aggregate accuracy
+and \(F_1\) are insufficient because a tutor consumes errors asymmetrically. A
+hallucinated FCS-MC final GO result is more serious than a conservative
+\texttt{not\_seen} prediction for a page that can be rechecked. A
+schema-invalid output is less visually interesting but more important
+operationally because it triggers fallback. The benchmark protocol therefore
+connects numerical metrics to the validation and degradation paths described
+in Chapter~\ref{ch:system-design}.
 
 % ===========================================================================
 \section{Human-Subject Pilot Methodology}\label{sec:method-pilot}
@@ -590,7 +590,7 @@ conflicts, but to make the analysis rule visible before the results chapter.
 \small
 \begin{tabularx}{\textwidth}{@{}p{0.11\textwidth}p{0.30\textwidth}p{0.31\textwidth}X@{}}
 \toprule
-\textbf{Case} & \textbf{Raw artifact issue} & \textbf{Final analysis rule} & \textbf{Paper use} \\
+\textbf{Case} & \textbf{Data-quality issue} & \textbf{Final analysis rule} & \textbf{Reported use} \\
 \midrule
 P08 & Automatic \texttt{trial\_summary.csv} reported incomplete progress. &
 Manual telemetry review and reviewed \texttt{step\_coding.csv} columns are the

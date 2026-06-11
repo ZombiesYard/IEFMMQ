@@ -1799,7 +1799,7 @@ chapter 5.
 
 
 ]
-Overfull \hbox (1.5191pt too wide) in paragraph at lines 65--76
+Overfull \hbox (1.5191pt too wide) in paragraph at lines 65--75
 \T1/lmr/m/n/12 copied from local bench-mark ar-ti-facts such as \T1/lmtt/m/n/12
  metrics_base.json\T1/lmr/m/n/12 , \T1/lmtt/m/n/12 metrics_lora.json\T1/lmr/m/n
 /12 ,
@@ -2157,4 +2157,4 @@ Underfull \hbox (badness 10000) in paragraph at lines 375--375
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  )
-Output written on main.xdv (102 pages, 430896 bytes).
+Output written on main.xdv (102 pages, 430664 bytes).

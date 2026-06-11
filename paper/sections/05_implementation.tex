@@ -1,17 +1,17 @@
 % ===========================================================================
 %  05 -- Reproducibility and Artifact Provenance
 %
-%  Purpose: preserve the artifact boundary without becoming a repository manual.
+%  Purpose: define the artifact boundary for reproducibility claims.
 % ===========================================================================
 \chapter{Reproducibility and Artifact Provenance}\label{ch:implementation}
 
 The preceding methods chapters define the evidence-grounded tutoring loop, the
 visual-fact adaptation protocol, and the formative Quest~3 pilot. This chapter
-has a narrower role: it records which artifacts support which claims and where
-the reproducibility boundary lies. It is not a module-by-module implementation
-tour. Engineering details are included only when they determine claim
-provenance, constrain model authority, or explain why a reported result can be
-audited.
+links those methods to the artifacts used to support the reported claims. It
+defines the artifact classes, authority rules, and reproducibility limits that
+make the results auditable. Implementation details are included where they
+determine claim provenance, constrain model authority, or define how a reported
+result can be checked.
 
 \section{Artifact and Claim Boundaries}\label{sec:impl-boundaries}
 
@@ -70,9 +70,8 @@ the same report assets. The evidence chain is: cockpit image capture, human
 label review, bilingual supervised fine-tuning row generation, LoRA training,
 and independent holdout benchmarking with a fixed prompt, schema, generation
 settings, and metric computation. Training-runtime and loss values are treated
-as report-level provenance when the local checkout does not include full model
-directories; the thesis claims rely on the benchmark JSON and reviewed-label
-artifacts.
+as training-report provenance; the reported claims rely on the benchmark JSON and
+reviewed-label artifacts.
 
 \paragraph{RQ3: pilot data authority.}
 Each participant trial is represented by a trial directory containing event
