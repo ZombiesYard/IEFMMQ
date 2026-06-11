@@ -184,6 +184,13 @@ scoring. This distinction is essential because otherwise the benchmark would
 measure agreement with another model rather than agreement with reviewed visual
 facts.
 
+The reviewed labels were not independently double-coded. They should therefore
+be interpreted as single-reviewer, human-reviewed labels rather than as an
+inter-rater-reliability study. This is acceptable for the component benchmark
+reported here because the thesis claim is within-domain adapter reliability on
+the reviewed artifact set, but it remains a limitation for future ACM-style
+evaluation, especially for rare completion-critical facts.
+
 % ===========================================================================
 \section{Dataset Curation}\label{sec:method-datasets}
 
@@ -324,9 +331,15 @@ it is not used as independent evidence for v2 generalisation.
 The primary adaptation line uses \texttt{Qwen/Qwen3.5-9B-Base} with the
 Run-003 + Run-005$\times$2 recipe. Two supplementary backbones are included to
 test whether the same data recipe remains meaningful under scale, version, and
-family changes: \texttt{Qwen/Qwen3.6-27B} and \texttt{google/gemma-4-31B}.
-These comparisons are methodological controls rather than separate thesis
-claims. Chapter~\ref{ch:evaluation} reports the numerical results.
+family changes: \texttt{Qwen/Qwen3.6-27B} and \texttt{google/gemma-4-31B}
+\citep{gemma2024,gemma32025}. These strings are the model identifiers used in
+the local benchmark artifacts and serving setup; the citations provide
+model-family context, not a claim that every local endpoint detail is described
+by the public reports. In this thesis, "production candidate" means a candidate
+for the project's local serving/deployment path after successful base-model
+serving, LoRA loading, and benchmark execution. It does not mean a generally
+validated product model. Chapter~\ref{ch:evaluation} reports the numerical
+results.
 
 The comparison holds the main factors constant wherever possible: ontology,
 training recipe, benchmark prompt, holdout sets, generation temperature, output
@@ -471,6 +484,26 @@ powered controlled experiment. Its purpose was to exercise the runtime in a
 realistic VR setting, inspect interaction logs, and identify procedural error
 patterns for later study design.
 
+\subsection{Ethics, Consent, and Data Protection}
+
+The pilot was conducted as a formative, non-clinical procedural training study.
+The study operation protocol required a welcome and consent step before the VR
+session. Participants were told that the study evaluated the training system
+rather than personal ability, that they could stop at any time, and that they
+could pause or terminate the session if VR discomfort occurred. The same
+protocol instructed the experimenter not to provide procedural step hints
+except for technical issues.
+
+The thesis reports participants only with pseudonymous identifiers
+P01--P09. Exported artifacts used for analysis contain simulator telemetry,
+runtime events, tutor interactions, step coding, questionnaire fields, and
+short comments; names, email addresses, and student identifiers are not reported
+in the thesis. Questionnaire and comment evidence is reported descriptively,
+aggregated where appropriate, and anonymised or paraphrased in the main text.
+No formal external ethics-approval identifier is claimed in this thesis; the
+study is therefore reported conservatively as a local formative pilot with no
+inferential human-subject effectiveness claims.
+
 \subsection{Participants and Conditions}
 
 Nine participants (P01--P09) completed one trial each. The study used a
@@ -508,11 +541,14 @@ before the trial, raw NASA-TLX workload dimensions~\citep{hart1988nasa},
 condition-specific tutor ratings where applicable, general usability/user
 ratings, and free-text comments.
 
-Step errors were coded with five categories: omission (OM), commission (CO),
-order error (OR), prompting/assistance error (PA), and state violation (SV).
-The automated coding output was reviewed manually using telemetry, help-cycle
-logs, and action timelines; the human-coded columns are the authoritative
-source for reported pilot results.
+Step errors were coded with five categories: omission (OM, a required action
+was not completed), commission (CO, an unnecessary or wrong action was
+performed), order error (OR, an action was performed in the wrong sequence),
+prompting/assistance error (PA, interaction with the tutor or experiment setup
+affected the step), and state violation (SV, the aircraft state contradicted
+the expected condition). The automated coding output was reviewed manually
+using telemetry, help-cycle logs, and action timelines; the human-coded columns
+are the authoritative source for reported pilot results.
 
 \subsection{Questionnaire and Comment Instruments}
 
@@ -543,14 +579,40 @@ metadata correction.
 
 \subsection{Data-Quality Notes}
 
-Two trial-level caveats affect interpretation. First, P08's automatic summary
-reported incomplete progress, but manual telemetry review confirmed completion
-of all 33 steps. The manual coding is used for analysis, and the pre-review
-file is preserved for audit. Second, P02's questionnaire metadata contains an
-internal participant-id mismatch. P02's task metrics are retained, but P02 is
-excluded from questionnaire-derived workload, confidence, usability, trust, or
-comment summaries. P09 is treated as an independent participant after the
-export correction recorded in the trial metadata.
+Table~\ref{tab:pilot-authority-rules} records the final authority rules for
+known pilot data-quality issues. The purpose is not to hide raw-artifact
+conflicts, but to make the analysis rule visible before the results chapter.
+
+\begin{table}[htbp]
+\centering
+\caption{Pilot data-quality issues and final analysis authority.}
+\label{tab:pilot-authority-rules}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.11\textwidth}p{0.30\textwidth}p{0.31\textwidth}X@{}}
+\toprule
+\textbf{Case} & \textbf{Raw artifact issue} & \textbf{Final analysis rule} & \textbf{Paper use} \\
+\midrule
+P08 & Automatic \texttt{trial\_summary.csv} reported incomplete progress. &
+Manual telemetry review and reviewed \texttt{step\_coding.csv} columns are the
+authority for completion and error counts. & Counted as 33/33 completed with
+zero manual procedural errors. \\
+P02 & Questionnaire file under P02 contains an internal participant-ID
+mismatch. & Task logs and step coding are retained; questionnaire-derived
+confidence, TLX, usability/trust, and comments are excluded. & Included in
+task/error tables; excluded from questionnaire summaries. \\
+P07 & Without-tutor form contains tutor-specific numeric fields despite
+condition/NA flags. & Tutor-specific fields are ignored unless the participant
+is in the tutor condition and the NA flag is false. & User rating retained;
+tutor rating reported as N/A. \\
+P04 & Quality gate reports non-blocking linkage warnings. & Task metrics are
+retained; affected linkage fields are not overinterpreted. & Included in trial
+overview with provenance caveat. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+P09 is treated as an independent participant after the export correction
+recorded in the trial metadata.
 
 \subsection{Analysis Approach}
 

@@ -342,3 +342,35 @@ Auto-coded errors are from the automated pipeline (Auto\_Error\_* columns in
 (Error\_*). P08's auto errors were all overridden to zero by manual review
 (see data-quality note in Section~\ref{sec:eval-pilot}).
 \end{table}
+
+Table~\ref{tab:pilot-data-quality-authority} records the supplementary
+artifact authority rules used when raw exports and manually reviewed evidence
+diverge.
+
+\begin{table}[htbp]
+\centering
+\caption{Supplementary pilot data-quality authority rules.}
+\label{tab:pilot-data-quality-authority}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.11\textwidth}p{0.30\textwidth}p{0.31\textwidth}X@{}}
+\toprule
+\textbf{Case} & \textbf{Artifact issue} & \textbf{Authority rule} & \textbf{Use in thesis} \\
+\midrule
+P08 & \texttt{trial\_summary.csv} reports incomplete progress, while reviewed
+\texttt{step\_coding.csv} marks all 33 steps completed. & Manual telemetry
+review and reviewed step-coding columns override the automatic trial summary. &
+Reported as completed 33/33 with zero manual procedural errors. \\
+P02 & Questionnaire JSON is stored under P02 but contains a P01 participant-ID
+metadata mismatch. & Task logs remain usable; questionnaire-derived fields are
+excluded. & Included in task and error tables; excluded from TLX, ratings, and
+comment summaries. \\
+P07 & Without-tutor questionnaire contains tutor-specific numeric fields even
+though tutor-specific NA flags are true. & Condition and NA flags override raw
+tutor-specific numeric fields. & General user rating retained; tutor rating
+reported as N/A. \\
+P04 & Quality-gate metadata contains non-blocking linkage warnings. & Retain
+manual task metrics and help-cycle counts; do not overinterpret affected
+linkage fields. & Included in trial overview with provenance caveat. \\
+\bottomrule
+\end{tabularx}
+\end{table}

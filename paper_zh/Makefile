@@ -9,6 +9,7 @@
 
 MAIN   = main
 TECTONIC = tectonic
+TECTONIC_OPTS = --keep-logs --keep-intermediates
 VIEWER = xdg-open
 
 .PHONY: all clean distclean view
@@ -26,7 +27,7 @@ $(MAIN).pdf: $(MAIN).tex sections/00_abstract.tex \
               sections/08_conclusion.tex \
               references.bib \
               Preamble.tex
-	$(TECTONIC) $(MAIN).tex
+	$(TECTONIC) $(TECTONIC_OPTS) $(MAIN).tex
 
 clean:
 	rm -f $(MAIN).aux $(MAIN).bbl $(MAIN).blg $(MAIN).log \

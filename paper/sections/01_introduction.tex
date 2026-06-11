@@ -30,16 +30,14 @@ fluency alone does not make an instruction safe, timely, or inspectable. A
 tutor that explains the wrong state can be worse than a static checklist,
 because it appears adaptive while silently losing contact with the simulator.
 
-The original proposal for this thesis framed the problem as a Quest~3,
-in-headset guidance system for sequence-sensitive training
-\citep{ThesisProposal1128}. That proposal remains the user-facing motivation:
-learners should not have to remove the headset, search a PDF, replay a video,
-or lose spatial context every time they need a hint. The implementation and
-evaluation developed during the thesis, however, shifted the scientific centre
-of gravity toward a machine-learning systems question: how can a foundation-
-model tutor be constrained by evidence from a simulator, by authored procedure
-rules, and by a domain-adapted vision-language model (VLM) that reports
-structured cockpit visual facts?
+The motivating scenario is therefore not a generic chatbot for aviation
+questions, but an in-headset tutor for sequence-sensitive procedural training.
+Learners should not have to remove the headset, search a PDF, replay a video,
+or lose spatial context every time they need a hint. The scientific centre of
+gravity is a machine-learning systems question: how can a foundation-model
+tutor be constrained by evidence from a simulator, by authored procedure rules,
+and by a domain-adapted vision-language model (VLM) that reports structured
+cockpit visual facts?
 
 This shift is not a detour from the title. It is the technical condition for
 making the title credible. In a dynamic, high-load, multimodal VR task, an AI
@@ -218,34 +216,34 @@ appear. It is not used as a powered human-subject effectiveness study.
 
 \section{Contributions}\label{sec:intro-contributions}
 
-This thesis makes four contributions.
+The central contribution is an evidence-grounded foundation-model tutoring loop
+for high-fidelity procedural simulation. The loop treats generated explanation
+as a bounded system action: DCS-BIOS telemetry, authored procedure gates,
+retrieved source snippets, structured visual facts, response schemas, overlay
+allowlists, deterministic repair/fallback behaviour, and replay logs all sit
+between the model and the learner. This is the main thesis contribution and
+directly addresses RQ1.
+
+Three evidence pillars support that contribution.
 
 \begin{enumerate}
-\item \textbf{An evidence-grounded foundation-model tutoring runtime.}
-The thesis presents a runtime architecture that connects DCS-BIOS telemetry,
-procedure-pack gates, retrieval, visual facts, structured response validation,
-overlay allowlists, deterministic repair/fallback behaviour, and replayable
-logs. This addresses RQ1 by showing how generated procedural explanations can
-be constrained by observable evidence rather than model fluency alone.
+\item \textbf{A visual fact ontology and LoRA adaptation protocol.}
+The thesis develops a 13-fact ontology for F/A-18C cockpit display state and
+uses it in a small-data LoRA adaptation pipeline. The ontology separates local
+visual perception from procedural interpretation, addressing the critical
+false-positive risk exposed by the 8-fact baseline. This pillar addresses RQ2.
 
-\item \textbf{A visual fact ontology for cockpit evidence.}
-The thesis develops a 13-fact ontology for F/A-18C cockpit display state. The
-ontology is designed to separate local visual perception from procedural
-interpretation. This addresses one of the central risks identified in the
-8-fact baseline: compound visual targets can create critical false positives
-when they ask the VLM to infer procedure completion directly.
-
-\item \textbf{A small-data LoRA VLM adaptation and backbone comparison.}
-The thesis evaluates a Run-003 + Run-005x2 training recipe across Qwen3.5,
-Qwen3.6, and Gemma backbones. Qwen3.5 is the main result line because it
-achieves the strongest offline exact-match behaviour on the current holdouts.
-Qwen3.6 is treated as a strong deployable candidate, while Gemma provides a
-different conservative error profile. This addresses RQ2.
+\item \textbf{A matched VLM backbone comparison.}
+The thesis evaluates the same Run-003 + Run-005x2 recipe across Qwen3.5,
+Qwen3.6, and Gemma backbones. Qwen3.5 remains the primary result line because
+it achieves the strongest adapted exact-match behaviour on the reported
+holdouts. Qwen3.6 is treated as a local serving/deployment candidate, while
+Gemma provides a different comparison error profile.
 
 \item \textbf{A formative Quest~3 pilot with bounded human-facing evidence.}
 The thesis reports a non-random pilot with nine participant-coded trials,
-including participant experience profiles, completion and error patterns,
-Raw NASA-TLX, usability/trust scores, and anonymised short comments. This
+including participant experience profiles, completion and error patterns, Raw
+NASA-TLX, usability/trust scores, and anonymised short comments. This pillar
 addresses RQ3 by showing feasibility, instrumentation readiness, and
 assistance-coupled risks without making causal learning claims.
 \end{enumerate}

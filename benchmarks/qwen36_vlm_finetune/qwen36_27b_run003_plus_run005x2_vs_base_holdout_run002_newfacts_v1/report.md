@@ -1,4 +1,4 @@
-# Qwen3.5 VLM Fact Benchmark
+# Qwen3.6-27B VLM Fact Benchmark
 
 - benchmark_kind: `holdout_run002_newfacts`
 - dataset: `/scratch/yz50/iefmmq_vlm_ft_unsloth/data/holdout_run002_newfacts/reviewed.jsonl`
