@@ -1468,77 +1468,77 @@ File: figures/fig_deployment_topology.pdf Graphic file (type pdf)
 File: figures/fig_experiment_export.pdf Graphic file (type pdf)
 <use figures/fig_experiment_export.pdf>
  [85] [86] [87] [88]
-Underfull \hbox (badness 2503) in paragraph at lines 381--381
+Underfull \hbox (badness 2503) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 marks all 33 steps com-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 []|\T1/lmr/m/n/10.95 Manual tele-metry re-view
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 and re-viewed step-coding
  []
 
 
-Underfull \hbox (badness 1132) in paragraph at lines 381--381
+Underfull \hbox (badness 1132) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 zero manual pro-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 []|\T1/lmr/m/n/10.95 Questionnaire JSON is
  []
 
 
-Underfull \hbox (badness 5878) in paragraph at lines 381--381
+Underfull \hbox (badness 5878) in paragraph at lines 383--383
 []|\T1/lmr/m/n/10.95 Task logs re-main us-able;
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 questionnaire-derived fields
  []
 
 
-Underfull \hbox (badness 3690) in paragraph at lines 381--381
+Underfull \hbox (badness 3690) in paragraph at lines 383--383
 []|\T1/lmr/m/n/10.95 Included in task
  []
 
 
-Underfull \hbox (badness 2205) in paragraph at lines 381--381
+Underfull \hbox (badness 2205) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 and er-ror tables;
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 ex-cluded from
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 []|\T1/lmr/m/n/10.95 Without-tutor ques-tion-
  []
 
 
-Underfull \hbox (badness 1803) in paragraph at lines 381--381
+Underfull \hbox (badness 1803) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 ride raw tutor-specific nu-
  []
 
 
-Underfull \hbox (badness 1527) in paragraph at lines 381--381
+Underfull \hbox (badness 1527) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 tains non-blocking link-age
  []
 
 
-Underfull \hbox (badness 3439) in paragraph at lines 381--381
+Underfull \hbox (badness 3439) in paragraph at lines 383--383
 []|\T1/lmr/m/n/10.95 Included in trial
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 381--381
+Underfull \hbox (badness 10000) in paragraph at lines 383--383
 \T1/lmr/m/n/10.95 over-view with
  []
 
@@ -1551,4 +1551,4 @@ Underfull \hbox (badness 10000) in paragraph at lines 381--381
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  )
-Output written on main.xdv (105 pages, 437488 bytes).
+Output written on main.xdv (105 pages, 438260 bytes).
