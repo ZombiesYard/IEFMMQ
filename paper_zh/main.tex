@@ -5,7 +5,7 @@
 %  由 paper/main.tex 翻译而来。
 %  使用 tectonic（基于 XeTeX）编译，原生支持中文。
 % ===========================================================================
-\documentclass[12pt,a4paper,bibtotoc,numbers=noenddot]{scrreprt}
+\documentclass[12pt,a4paper,bibliography=totoc,numbers=noenddot]{scrreprt}
 
 % ---------------------------------------------------------------------------
 %  Language — babel for German Zusammenfassung, ctex for Chinese
@@ -57,7 +57,7 @@
 \fancyhf{}
 \fancyhead[R]{\leftmark}
 \fancyfoot[R]{\thepage}
-\setlength{\headheight}{14.5pt}
+\setlength{\headheight}{28pt}
 
 % ---------------------------------------------------------------------------
 %  Hyperlinks (load late)
@@ -79,6 +79,7 @@
 \usepackage{colortbl}
 \usepackage{threeparttable}
 \usepackage[numbers,sort&compress]{natbib}
+\setlength{\emergencystretch}{2em}
 
 % ---------------------------------------------------------------------------
 %  Code listings

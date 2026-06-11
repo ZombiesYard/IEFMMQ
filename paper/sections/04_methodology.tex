@@ -296,7 +296,7 @@ This ontology discipline is central to the thesis. It defines the boundary
 between perception and procedural reasoning: the VLM reports visual evidence,
 while the runtime decides whether that evidence satisfies a procedural step.
 
-\subsection{Training Recipe: Run-003 + Run-005$\times$2}
+\subsection{Training Recipe: Run-003 + Run-005x2}
 
 The primary v2 training recipe combines Run-003 with a repeated Run-005
 composition-rebalance supplement. Run-003 contributes 220 reviewed images,
@@ -335,8 +335,8 @@ family changes: \texttt{Qwen/Qwen3.6-27B} and \texttt{google/gemma-4-31B}
 \citep{gemma2024,gemma32025}. These strings are the model identifiers used in
 the local benchmark artifacts and serving setup; the citations provide
 model-family context, not a claim that every local endpoint detail is described
-by the public reports. In this thesis, "production candidate" means a candidate
-for the project's local serving/deployment path after successful base-model
+by the public reports. In this thesis, "local deployment candidate" means a
+candidate for the project's local serving path after successful base-model
 serving, LoRA loading, and benchmark execution. It does not mean a generally
 validated product model. Chapter~\ref{ch:evaluation} reports the numerical
 results.
@@ -504,6 +504,17 @@ No formal external ethics-approval identifier is claimed in this thesis; the
 study is therefore reported conservatively as a local formative pilot with no
 inferential human-subject effectiveness claims.
 
+Recruitment and assignment were handled as local convenience scheduling for a
+master's-thesis pilot, not as random sampling. The retained analysis package is
+organised by pseudonymous participant directories; raw participant artifacts
+are not released as a public dataset, and the thesis does not publish headset
+video or personally identifying recruitment records. Access to non-public raw
+materials is treated as project-internal for thesis preparation and supervisory
+review. Participants could stop during the VR session, and withdrawal or
+deletion requests would be handled while data remained identifiable to the
+author. The thesis does not report monetary compensation and does not use any
+compensation-dependent analysis.
+
 \subsection{Participants and Conditions}
 
 Nine participants (P01--P09) completed one trial each. The study used a
@@ -549,6 +560,14 @@ affected the step), and state violation (SV, the aircraft state contradicted
 the expected condition). The automated coding output was reviewed manually
 using telemetry, help-cycle logs, and action timelines; the human-coded columns
 are the authoritative source for reported pilot results.
+
+The coding distinguishes \emph{not confirmed as completed} from \emph{coded
+omission}. This distinction matters for without-tutor trials, where passive
+logging did not run the VLM page checks used by the tutor condition. A
+visual-only step may therefore remain unconfirmed in the \texttt{Completed}
+column even when telemetry or action-timeline evidence prevents scoring it as
+a participant omission. The results chapter reports confirmed-step counts and
+manual error counts as separate descriptive measures.
 
 \subsection{Questionnaire and Comment Instruments}
 

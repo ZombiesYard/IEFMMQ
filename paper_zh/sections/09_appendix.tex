@@ -130,7 +130,7 @@ Run-005 与 Run-003 合并后增加了若干稀疏目标的覆盖：SUPT 页面�
 \item[\texttt{validate}.] 根据 Schema 注册库中的指定 Schema 验证 JSONL 文件。
 \end{description}
 
-所有命令均接受模型配置覆盖参数（\texttt{--model-provider}、\texttt{--model-name}、\texttt{--model-base-url}、\texttt{--model-timeout-s}）和语言切换参数（\texttt{--lang}）。
+所有命令均接受模型配置覆盖参数（\texttt{--model-\allowbreak provider}、\texttt{--model-\allowbreak name}、\texttt{--model-\allowbreak base-\allowbreak url}、\texttt{--model-\allowbreak timeout-\allowbreak s}）和语言切换参数（\texttt{--lang}）。
 
 % ===========================================================================
 \section{模型提供方配置}\label{sec:appendix-model-config}
@@ -228,15 +228,15 @@ P09 & 有 tutor & 新手 & 无 & 无 & 无 & 非常少 \\
 }
 \end{table}
 
-表~\ref{tab:pilot-uncompleted}~列出了每位无 tutor 参与者未完成的具体步骤。
+表~\ref{tab:pilot-uncompleted}~列出了每位无 tutor 参与者在可用导出证据下未被确认为完成的具体步骤。它需要与第~\ref{ch:evaluation}~章的人工错误表一起阅读，因为无 tutor 的被动记录没有运行 tutor 试验中使用的 VLM 页面检查。
 
 \begin{table}[htbp]
 \centering
-\caption{无 tutor 条件下未完成的步骤（人工编码）。}\label{tab:pilot-uncompleted}
+\caption{无 tutor 条件下未被确认为完成的步骤。}\label{tab:pilot-uncompleted}
 \small
 \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
 \toprule
-\textbf{P} & \textbf{未完成的步骤} \\
+\textbf{P} & \textbf{未确认的步骤} \\
 \midrule
 P01 & S09, S12, S18, S19, S20, S22, S24, S27, S29, S31 \\
 P02 & S02, S14, S18, S19, S27, S30 \\
@@ -246,7 +246,7 @@ P07 & S02, S09, S12, S13, S16, S17, S18, S19, S22, S26, S27, S28, S29, S32 \\
 \bottomrule
 \end{tabularx}
 
-S18（右侧 DDI 上的 FCS-MC BIT 页面）和 S19（FCS BIT 最终 GO 结果）被所有五位无 tutor 参与者遗漏，且属于视觉优先的显示检查。S27（襟翼开关拨至 AUTO）同样被所有五位遗漏，但过程包将其归类为 BIOS 优先，具有变量和门控证据而非 VLM 绑定的视觉证据。因此，该模式是描述性的：它显示了参与者在哪些地方遇到了困难，而非说明某个证据来源解释了这些遗漏。
+S18（右侧 DDI 上的 FCS-MC BIT 页面）和 S19（FCS BIT 最终 GO 结果）在五个无 tutor 导出行中都保持未确认，且属于视觉优先的显示检查。这并不意味着五位参与者都遗漏了这两个动作：操作时间线审核发现，P02、P03、P06 和 P07 在右 DDI PB5 和/或 FCS BIT 开关上存在相关活动。S27（襟翼开关拨至 AUTO）同样在五个行中均未确认，但过程包将其归类为 BIOS 优先，具有变量和门控证据而非 VLM 绑定的视觉证据。因此，该模式是描述性的：它显示了参与者或被动导出流水线在哪些地方遇到了困难，而非说明某个证据来源解释了全部遗漏。
 \end{table}
 
 表~\ref{tab:pilot-errors-auto}~报告了自动编码的错误计数（人工审核前）与人工错误计数的对比，显示了在试点解读之前自动化导出需要进行多少纠正。

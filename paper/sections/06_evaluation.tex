@@ -382,8 +382,8 @@ gain. Its base model is already much stronger than the Qwen3.5 base on the two
 holdouts, especially on Run-004 where it reaches 0.9769 fact accuracy and 0.70
 exact match before adaptation. The LoRA adapter still improves seen \(F_1\) and
 exact match, but the relative gain is smaller because the base line is already
-closer to the task. This is why Qwen3.6 is described as a production candidate
-in the local serving setup rather than as the primary thesis result: it is
+closer to the task. This is why Qwen3.6 is described as a local deployment
+candidate in the local serving setup rather than as the primary thesis result: it is
 strong, but it does not change the main methodological conclusion that
 small-data adaptation plus a good ontology can make a VLM usable as a bounded
 perception component.
@@ -464,10 +464,11 @@ procedure points.
 \centering
 \caption{Participant and trial overview.}
 \label{tab:pilot-overview}
-\small
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}llccccccc@{}}
 \toprule
-\textbf{P} & \textbf{Condition} & \textbf{Completed} & \textbf{Steps} & \textbf{Dur. (s)} & \textbf{Help} & \textbf{VLM} & \textbf{Ovrl.} & \textbf{Fallbk.} \\
+\textbf{P} & \textbf{Condition} & \textbf{Completed} & \textbf{Confirmed} & \textbf{Dur. (s)} & \textbf{Help} & \textbf{VLM} & \textbf{Ovrl.} & \textbf{Fallbk.} \\
 \midrule
 P01 & without\_tutor & no & 23/33 & 2015 & 0 & 0 & 0 & 0 \\
 P02 & without\_tutor & no & 27/33 & 739  & 0 & 0 & 0 & 0 \\
@@ -486,12 +487,26 @@ $^*$P08: automatic summary reported incomplete progress; manual coding
 confirms 33/33 completed.
 \end{table}
 
+The confirmed-step count is not the same measure as the manual omission count
+in Table~\ref{tab:pilot-errors}. It counts whether a step was confirmed by the
+available export evidence. In the without-tutor condition, passive logging did
+not run the VLM/video page checks used by tutor trials. As a result, the
+visual-only FCS BIT page and final-GO checks (S18 and S19) remain unconfirmed
+in all five without-tutor step-count rows. Manual action-timeline review,
+however, found telemetry or control evidence that prevented scoring most of
+these rows as user omissions: P02, P03, P06, and P07 show right-DDI PB5 and/or
+FCS BIT switch activity for S18/S19, while P01 is coded as an omission only
+for S19.
+
 In the reviewed data, all four tutor-condition participants reached the final
 33-step state, while none of the five without-tutor participants did. The most
-commonly missed without-tutor steps were S18 (FCS-MC BIT page), S19 (FCS BIT
-final GO), and S27 (flap switch to AUTO), each missed by all five
-without-tutor participants. This pattern identifies where participants
-struggled in the formative pilot; it is not a causal estimate of tutor effect.
+commonly unconfirmed without-tutor steps were S18 (FCS-MC BIT page), S19 (FCS
+BIT final GO), and S27 (flap switch to AUTO), each unconfirmed in all five
+without-tutor step-count rows. The manual omission codes tell a narrower story:
+S09, S27, and S29 are the most frequent omission-coded steps, each appearing in
+three of the five without-tutor trials. This pattern identifies where
+participants or the passive export pipeline struggled in the formative pilot;
+it is not a causal estimate of tutor effect.
 
 The participant profiles make the descriptive boundary especially important.
 The sample includes novices, intermediate users, and expert users, but the

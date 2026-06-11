@@ -16,7 +16,9 @@ VIEWER = xdg-open
 
 all: $(MAIN).pdf
 
-$(MAIN).pdf: $(MAIN).tex sections/00_abstract.tex \
+$(MAIN).pdf: $(MAIN).tex Preamble.tex \
+              sections/00_abstract.tex \
+              sections/00_acknowledgements.tex \
               sections/01_introduction.tex \
               sections/02_background_related_work.tex \
               sections/03_system_design.tex \
@@ -25,8 +27,8 @@ $(MAIN).pdf: $(MAIN).tex sections/00_abstract.tex \
               sections/06_evaluation.tex \
               sections/07_discussion.tex \
               sections/08_conclusion.tex \
-              references.bib \
-              Preamble.tex
+              sections/09_appendix.tex \
+              references.bib
 	$(TECTONIC) $(TECTONIC_OPTS) $(MAIN).tex
 
 clean:

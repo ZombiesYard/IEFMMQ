@@ -46,12 +46,12 @@ actionable and which evidence supports that decision.
 
 Virtual reality increases the cost of weak assistance. A learner in a headset
 has less tolerance for switching to a PDF, searching a desktop window, or
-replaying an external video. AR and VR guidance research has shown the value
-of placing instructions inside the user's task context, especially for
-maintenance and procedural work \citep{palmarini2018ar}. This thesis adopts
-that in-context motivation, but adds a stricter condition: generated help must
-be grounded in the current simulator state, not only placed visually near the
-cockpit.
+replaying an external video. AR guidance for assembly and maintenance shows
+the value of placing instructions inside the user's task context
+\citep{tang2003arassembly,henderson2011ar,palmarini2018ar}. This thesis
+adopts that in-context motivation, but adds a stricter systems condition:
+generated help must be grounded in the current simulator state, not only
+placed visually near the cockpit.
 
 \section{Existing Assistance Approaches}\label{sec:bg-existing}
 
@@ -69,9 +69,9 @@ being described.
 Intelligent Tutoring Systems (ITS) research has long treated explicit task
 models, learner-state tracking, feedback, and constraint-based diagnosis as
 central to effective tutoring
-\citep{vanlehn2011relative,mitrovic2012constraint,aleven2009example}. This is
-directly relevant to SimTutor: a tutor needs more than conversational ability;
-it needs a representation of the task and the learner's progress. The
+\citep{vanlehn2011relative,kulik2016its,mitrovic2012constraint,aleven2009example}.
+This is directly relevant to SimTutor: a tutor needs more than conversational
+ability; it needs a representation of the task and the learner's progress. The
 difference is the operating substrate. The present system is not a classic ITS
 with a closed problem interface. It observes a high-fidelity simulator through
 telemetry, cockpit display images, authored gates, and event logs while using
@@ -82,8 +82,10 @@ RAG conditions language generation on retrieved documents rather than relying
 only on parametric memory \citep{lewis2020rag}. In education, large language
 models can generate flexible explanations and feedback, but they also risk
 unsupported confidence, hallucinated references, and fluent but context-free
-answers \citep{kasneci2023chatgpt}. Grounded action work such as SayCan
-separates linguistic plausibility from action feasibility
+answers \citep{kasneci2023chatgpt,ji2023hallucination}. Faithfulness work in
+neural generation similarly shows that fluent generated text can diverge from
+its source evidence \citep{maynez2020faithfulness}. Grounded action work such
+as SayCan separates linguistic plausibility from action feasibility
 \citep{ahn2022saycan}. SimTutor follows the same design instinct: a response
 may be fluent and sourced, but it should not be shown as procedural guidance
 unless the runtime can validate the state, step, evidence references, and
@@ -148,12 +150,14 @@ confident story.
 
 Human-AI interaction and explainable-AI work motivate this caution. Explainable
 AI research emphasises the need to understand why a system produced a
-recommendation \citep{gunning2019xai}. Human-AI interaction guidelines
-emphasise intelligibility, appropriate trust, uncertainty handling, and
-recoverability \citep{amershi2019guidelines}. SimTutor operationalises these
-ideas in a narrow procedural setting: the response schema, evidence-reference
-types, source policy, overlay allowlist, and replay logs are the mechanism by
-which a fluent model answer becomes inspectable.
+recommendation and how such explanations should be evaluated
+\citep{gunning2019xai,hoffman2018metrics}. Human-AI interaction and automation
+research emphasise intelligibility, appropriate reliance, uncertainty
+handling, and recoverability \citep{lee2004trust,amershi2019guidelines}.
+SimTutor operationalises these ideas in a narrow procedural setting: the
+response schema, evidence-reference types, source policy, overlay allowlist,
+and replay logs are the mechanism by which a fluent model answer becomes
+inspectable.
 
 \section{Visual Fact Extraction and PEFT Adaptation}\label{sec:bg-vlm}
 
@@ -176,12 +180,13 @@ procedure-completion-like fact as \texttt{seen} even when the human label was
 \texttt{not\_seen}. The current 13-fact ontology decomposes such targets into
 local visual atoms that the downstream procedure engine can interpret.
 
-This design relates to screen and GUI understanding. Screen-content models
-must reason about fixed regions, symbolic text, and layout rather than ordinary
-natural images \citep{wang2021screen2words}. Cockpit displays share that
-structured quality. A small visual cue may be a pushbutton label, a page title,
-a row in a BIT result table, or a transient alignment message. The ontology
-therefore acts as a bridge between perception and control logic.
+This design relates to screen and GUI understanding. Screen-content models and
+UI datasets emphasise fixed regions, symbolic text, and layout rather than
+ordinary natural images \citep{deka2017rico,wang2021screen2words}. Cockpit
+displays share that structured quality. A small visual cue may be a pushbutton
+label, a page title, a row in a BIT result table, or a transient alignment
+message. The ontology therefore acts as a bridge between perception and
+control logic.
 
 \subsection{Structured Output and Reliability Metrics}\label{sec:bg-metrics}
 
@@ -236,54 +241,54 @@ decision.
 
 \section{Positioning and Closest-Work Gap}\label{sec:bg-positioning}
 
-Table~\ref{tab:closest-work-gap} summarises the closest named lines of work
-and the remaining gap addressed by the thesis. The table is intentionally
-specific: it does not claim that prior work is weak in its own setting. It
-shows why the present setting requires an integrated evidence contract.
+Table~\ref{tab:closest-work-gap} summarises the closest lines of work and the
+remaining gap addressed by the thesis. The cited discussion above names the
+representative sources; the table keeps the argument compact. It does not
+claim that prior work is weak in its own setting. It shows why the present
+setting requires an integrated evidence contract.
 
 \begin{table}[htbp]
 \centering
 \caption{Closest-work positioning for an evidence-grounded tutoring loop in procedural VR simulation.}
 \label{tab:closest-work-gap}
-\small
-\begin{tabularx}{\textwidth}{@{}p{0.17\textwidth}p{0.20\textwidth}p{0.22\textwidth}p{0.20\textwidth}X@{}}
+\footnotesize
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\textwidth}{@{}p{0.21\textwidth}p{0.24\textwidth}p{0.25\textwidth}X@{}}
 \toprule
-\textbf{Line of work} & \textbf{Representative sources} &
-\textbf{Useful idea} & \textbf{Remaining gap here} &
-\textbf{This thesis} \\
+\textbf{Line of work} & \textbf{Useful idea} &
+\textbf{Remaining gap here} & \textbf{Thesis response} \\
 \midrule
 ITS and constraint-based tutoring &
-\citet{vanlehn2011relative}; \citet{mitrovic2012constraint}; \citet{aleven2009example} &
 Explicit task models, learner-state reasoning, feedback constraints &
-Usually assumes a tutor-controlled interface rather than a live multimodal simulator with generative explanations &
-Uses authored procedure gates and telemetry predicates as the authority layer for model-generated help. \\
+Usually assumes a tutor-controlled interface rather than a live multimodal
+simulator with generative explanations &
+Uses procedure gates and telemetry predicates as the authority layer for generated help. \\
 \addlinespace
 RAG and grounded LLM/action systems &
-\citet{lewis2020rag}; \citet{ahn2022saycan}; \citet{kasneci2023chatgpt} &
 Ground generated language in retrieved sources or feasible actions &
-Retrieved text and linguistic plausibility do not establish cockpit state or overlay validity &
+Retrieved text and linguistic plausibility do not establish cockpit state or
+overlay validity &
 Combines retrieval with telemetry, visual facts, schema validation, and replay logs. \\
 \addlinespace
 VLM screen/document understanding &
-\citet{wang2021screen2words}; \citet{bai2023qwen}; \citet{liu2023llava}; \citet{dai2023instructblip} &
 Recognise text-rich visual content with multimodal models &
-Free-form visual descriptions are too broad for procedure gates and can hide high-risk false positives &
+Free-form visual descriptions are too broad for procedure gates and can hide
+high-risk false positives &
 Defines a 13-fact cockpit ontology and scores exact match, seen \(F_1\), and critical false positives. \\
 \addlinespace
 PEFT for foundation models &
-\citet{hu2021lora}; \citet{dettmers2023qlora}; \citet{kopiczko2023vera}; \citet{mangrulkar2022peft} &
 Adapt large models with a small trainable footprint &
-PEFT alone does not specify the task ontology, evidence semantics, or downstream risk metric &
+PEFT alone does not specify the task ontology, evidence semantics, or
+downstream risk metric &
 Uses LoRA as one mechanism inside a visual-fact evidence pipeline, not as a new adapter method. \\
 \addlinespace
 AR/VR procedural guidance &
-\citet{palmarini2018ar} &
 Keep instructions in the user's embodied task context &
-Guidance may be authored or static, and often does not expose live-state evidence for generated actions &
+Guidance may be authored or static, and often does not expose live-state
+evidence for generated actions &
 Places help in the Quest~3 workflow while binding generated output to evidence and overlay allowlists. \\
 \addlinespace
 Human-AI trust and explainability &
-\citet{gunning2019xai}; \citet{amershi2019guidelines} &
 Make recommendations intelligible and calibrate user reliance &
 General guidelines need an operational contract in the concrete tutoring runtime &
 Implements evidence references, uncertainty states, validation, and replay as the audit trail for explanation. \\
@@ -298,3 +303,7 @@ contribution is the disciplined integration: in a high-load VR procedural
 training setting, a foundation model can provide auditable interactive
 explanation only when telemetry, procedure rules, retrieval, visual facts,
 validation, and replay logs constrain what the model is allowed to say and do.
+No prior line surveyed above jointly provides all of these requirements for
+the present case: live simulator-state evidence, multimodal cockpit facts,
+procedure-level authority, bounded foundation-model generation, headset-facing
+guidance, and replayable audit logs.

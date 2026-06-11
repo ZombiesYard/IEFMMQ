@@ -34,10 +34,10 @@ DCS World中，学习者佩戴Meta Quest~3头戴设备，操作F/A-18C Lot~20。
 但交互式导师必须知道当前哪个步骤可执行，以及哪些证据支持这一判断。
 
 虚拟现实提高了弱辅助的代价。头戴设备中的学习者更难忍受切换到PDF、搜索桌面
-窗口或重放外部视频。AR/VR引导研究已经证明，将指令保留在用户任务情境中对
-维护和程序性工作很有价值 \citep{palmarini2018ar}。本论文接受这种情境内帮助
-的动机，但增加更严格的条件：生成式帮助必须根植于当前仿真器状态，而不仅仅是
-视觉上靠近座舱。
+窗口或重放外部视频。面向装配和维护的AR引导研究已经证明，将指令保留在用户
+任务情境中具有价值 \citep{tang2003arassembly,henderson2011ar,palmarini2018ar}。
+本论文接受这种情境内帮助的动机，但增加更严格的系统条件：生成式帮助必须根植
+于当前仿真器状态，而不仅仅是视觉上靠近座舱。
 
 \section{已有辅助方法}\label{sec:bg-existing}
 
@@ -51,20 +51,21 @@ DCS World中，学习者佩戴Meta Quest~3头戴设备，操作F/A-18C Lot~20。
 \paragraph{智能辅导与约束式辅导。}
 智能辅导系统（ITS）研究长期将显式任务模型、学习者状态跟踪、反馈和约束式诊断
 视为有效辅导的核心
-\citep{vanlehn2011relative,mitrovic2012constraint,aleven2009example}。这与
-SimTutor直接相关：导师需要的不只是会话能力，还需要任务表示和进度状态。差异在
-于运行基底。本文系统不是一个拥有封闭题目界面的经典ITS，而是通过遥测、座舱
-显示图像、人工编写的门控和事件日志观察高保真仿真器，并将基础模型作为有边界
-的组件使用。
+\citep{vanlehn2011relative,kulik2016its,mitrovic2012constraint,aleven2009example}。
+这与SimTutor直接相关：导师需要的不只是会话能力，还需要任务表示和进度状态。
+差异在于运行基底。本文系统不是一个拥有封闭题目界面的经典ITS，而是通过遥测、
+座舱显示图像、人工编写的门控和事件日志观察高保真仿真器，并将基础模型作为
+有边界的组件使用。
 
 \paragraph{RAG与有依据的语言模型辅助。}
 RAG使语言生成以检索到的文档为条件，而不是只依赖参数化记忆
 \citep{lewis2020rag}。在教育中，大语言模型可以生成灵活的解释和反馈，但也存在
-无依据自信、幻觉引用和流畅但脱离情境的回答等风险 \citep{kasneci2023chatgpt}。
-SayCan等有依据的行动研究则将语言合理性与操作可行性分开
-\citep{ahn2022saycan}。SimTutor沿用同一设计直觉：一个回答可能流畅且有来源，
-但除非运行时能够验证状态、步骤、证据引用和叠加层目标，否则它不应被显示为
-程序性指导。
+无依据自信、幻觉引用和流畅但脱离情境的回答等风险
+\citep{kasneci2023chatgpt,ji2023hallucination}。神经生成中的faithfulness研究
+同样表明，流畅文本可能偏离其来源证据 \citep{maynez2020faithfulness}。SayCan等
+有依据的行动研究则将语言合理性与操作可行性分开 \citep{ahn2022saycan}。SimTutor
+沿用同一设计直觉：一个回答可能流畅且有来源，但除非运行时能够验证状态、步骤、
+证据引用和叠加层目标，否则它不应被显示为程序性指导。
 
 \paragraph{AR/VR引导与仿真器遥测。}
 AR/VR程序性引导解决的是将帮助保留在任务情境中的交互问题
@@ -105,10 +106,11 @@ DCS-BIOS。本文贡献从DCS-BIOS导出仿真器状态之后开始：SimTutor�
 证据是否存在。如果证据缺失，模型不应被允许用自信叙事填补空白。
 
 人机交互和可解释AI研究支持这种谨慎。可解释AI强调需要理解系统为何产生某个
-推荐 \citep{gunning2019xai}。人机交互指南强调可理解性、适当信任、不确定性
-处理和可恢复性 \citep{amershi2019guidelines}。SimTutor在一个狭窄的程序性场景
-中将这些思想操作化：响应schema、证据引用类型、来源策略、叠加层白名单和回放
-日志共同构成使模型回答可审查的机制。
+推荐，以及如何评估解释是否有效 \citep{gunning2019xai,hoffman2018metrics}。
+人机交互与自动化研究强调可理解性、适当依赖、不确定性处理和可恢复性
+\citep{lee2004trust,amershi2019guidelines}。SimTutor在一个狭窄的程序性场景中
+将这些思想操作化：响应schema、证据引用类型、来源策略、叠加层白名单和回放日志
+共同构成使模型回答可审查的机制。
 
 \section{视觉事实提取与PEFT适配}\label{sec:bg-vlm}
 
@@ -121,16 +123,16 @@ InstructBLIP等通用VLM工作展示了视觉编码器和语言解码器如何�
 
 视觉事实表示包含三种状态：
 \texttt{seen}、\texttt{not\_seen}和\texttt{uncertain}。例如
-\texttt{fcsmc\_final\_go\_result\_visible}是关于一个可见显示提示的局部主张，
+\texttt{fcsmc\_final\_go\_}\allowbreak\texttt{result\_visible}是关于一个可见显示提示的局部主张，
 而不是声称整个FCS BIT步骤已经完成。这一区分是核心。最初的8事实本体包含更多
 复合目标，并暴露出一种反复出现的失效模式：即使人工标签为\texttt{not\_seen}，
 模型也可能将类似程序完成的事实报告为\texttt{seen}。当前13事实本体将此类目标
 分解为本地视觉原子，再由下游程序引擎解释。
 
-这一设计也与屏幕和GUI理解相关。屏幕内容模型必须推理固定区域、符号文本和布局，
-而不是普通自然图像 \citep{wang2021screen2words}。座舱显示器具有同样的结构化
-特征。一个很小的视觉线索可能是按键标签、页面标题、BIT结果表中的一行，或一个
-短暂的对准消息。因此，本体是感知与控制逻辑之间的桥梁。
+这一设计也与屏幕和GUI理解相关。屏幕内容模型和UI数据集强调固定区域、符号文本
+和布局，而不是普通自然图像 \citep{deka2017rico,wang2021screen2words}。座舱显示器
+具有同样的结构化特征。一个很小的视觉线索可能是按键标签、页面标题、BIT结果表中
+的一行，或一个短暂的对准消息。因此，本体是感知与控制逻辑之间的桥梁。
 
 \subsection{结构化输出与可靠性指标}\label{sec:bg-metrics}
 
@@ -170,53 +172,47 @@ PEFT变体说明，该领域存在多种降低适配成本或参数规模的方�
 
 \section{定位与最接近工作的缺口}\label{sec:bg-positioning}
 
-表~\ref{tab:closest-work-gap}总结了最接近的具名研究线索和本论文所处理的剩余
-缺口。该表有意保持具体：它并不声称既有工作在自身场景中薄弱，而是说明为什么
-本文场景需要一个整合式证据契约。
+表~\ref{tab:closest-work-gap}总结了最接近的研究线索和本论文所处理的剩余缺口。
+上文已经给出代表性来源；该表保留的是压缩后的论证结构。它并不声称既有工作在
+自身场景中薄弱，而是说明为什么本文场景需要一个整合式证据契约。
 
 \begin{table}[htbp]
 \centering
 \caption{面向程序性VR仿真的基于证据辅导循环的最接近工作定位。}
 \label{tab:closest-work-gap}
-\small
-\begin{tabularx}{\textwidth}{@{}p{0.17\textwidth}p{0.20\textwidth}p{0.22\textwidth}p{0.20\textwidth}X@{}}
+\footnotesize
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\textwidth}{@{}p{0.21\textwidth}p{0.24\textwidth}p{0.25\textwidth}X@{}}
 \toprule
-\textbf{研究线索} & \textbf{代表来源} &
-\textbf{可借鉴思想} & \textbf{在本文场景中的缺口} &
-\textbf{本文处理方式} \\
+\textbf{研究线索} & \textbf{可借鉴思想} &
+\textbf{在本文场景中的缺口} & \textbf{本文处理方式} \\
 \midrule
 ITS与约束式辅导 &
-\citet{vanlehn2011relative}; \citet{mitrovic2012constraint}; \citet{aleven2009example} &
 显式任务模型、学习者状态推理和反馈约束 &
 通常假设导师控制的问题界面，而非带生成式解释的实时多模态仿真器 &
 使用人工编写的程序门控和遥测谓词作为模型生成帮助的权限层。 \\
 \addlinespace
 RAG与有依据的LLM/行动系统 &
-\citet{lewis2020rag}; \citet{ahn2022saycan}; \citet{kasneci2023chatgpt} &
 将生成语言根植于检索来源或可行动作 &
 检索文本和语言合理性不能证明座舱状态或叠加层目标有效 &
 将检索与遥测、视觉事实、schema验证和回放日志结合。 \\
 \addlinespace
 VLM屏幕/文档理解 &
-\citet{wang2021screen2words}; \citet{bai2023qwen}; \citet{liu2023llava}; \citet{dai2023instructblip} &
 用多模态模型识别富文本视觉内容 &
 自由描述过宽，难以直接用于程序门控，且会隐藏高风险假阳性 &
 定义13事实座舱本体，并报告完全匹配、seen \(F_1\)和关键假阳性。 \\
 \addlinespace
 基础模型PEFT &
-\citet{hu2021lora}; \citet{dettmers2023qlora}; \citet{kopiczko2023vera}; \citet{mangrulkar2022peft} &
 以较小训练参数量适配大型模型 &
 PEFT本身不规定任务本体、证据语义或下游风险指标 &
 将LoRA作为视觉事实证据管线中的一种机制，而非新的适配器方法。 \\
 \addlinespace
 AR/VR程序性引导 &
-\citet{palmarini2018ar} &
 将指令保留在用户的具身任务情境中 &
 引导可能是人工编写或静态的，并不总是暴露生成动作的实时状态证据 &
 在Quest~3工作流中提供帮助，同时将生成输出绑定到证据和叠加层白名单。 \\
 \addlinespace
 人机信任与可解释性 &
-\citet{gunning2019xai}; \citet{amershi2019guidelines} &
 使推荐可理解并校准用户依赖 &
 一般性指南需要在具体辅导运行时中被转化为操作契约 &
 通过证据引用、不确定性状态、验证和回放实现解释审计线索。 \\
@@ -228,3 +224,5 @@ AR/VR程序性引导 &
 不是发明手册、遥测、RAG、VLM、LoRA或AR/VR引导，而是有纪律的整合：在高负荷
 VR程序性训练中，只有当遥测、程序规则、检索、视觉事实、验证和回放日志约束
 模型可以说什么、做什么时，基础模型才能提供可审计的交互式解释。
+上文所综述的任何单一研究线索，都没有同时为本文场景提供实时仿真状态证据、多模态
+座舱事实、过程层级权限、受边界约束的基础模型生成、头戴设备内指导和可回放审计日志。
