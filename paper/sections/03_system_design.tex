@@ -12,6 +12,20 @@ that matter for interactive explanation: procedure modelling, telemetry
 grounding, retrieval, visual fact integration, response validation, overlay
 execution, and replay.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_system_architecture.pdf}
+  \caption{Evidence-grounded SimTutor architecture. Simulator observations,
+  authored procedure rules, foundation-model outputs, and user-facing overlay
+  actions are separated by explicit runtime contracts.}
+  \label{fig:system-architecture}
+  \Description[SimTutor system architecture]{A five-lane architecture diagram
+  shows simulator and headset inputs, evidence adapters, the SimTutor runtime
+  contract, foundation-model services, and user-facing output. Telemetry and
+  vision feed an evidence packet; model outputs pass through validation before
+  overlay and logging.}
+\end{figure}
+
 \section{Design Requirements}\label{sec:design-goals}
 
 The runtime was designed around six requirements.
@@ -119,6 +133,20 @@ unavailable, can ask the learner to verify a display, or can give a text-only
 hint without highlighting a target. The user sees less ambitious help, but not
 invented certainty.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_evidence_authority.pdf}
+  \caption{Authority boundaries for grounded tutoring. Procedure rules and
+  telemetry constrain state; reviewed visual facts provide bounded display
+  evidence; retrieval and LLM output support explanation but do not override
+  gates or UI allowlists.}
+  \label{fig:evidence-authority}
+  \Description[Authority hierarchy diagram]{A vertical hierarchy places the
+  procedure pack, telemetry, reviewed visual facts, retrieved text, and LLM
+  output in descending authority order. Arrows point to procedure-state
+  computation, overlay validation, and downgrade or fallback behaviour.}
+\end{figure}
+
 \section{Telemetry Grounding}\label{sec:design-telemetry}
 
 DCS-BIOS telemetry is the primary observation channel for simulator state. The
@@ -186,6 +214,19 @@ error analysis.
 A help cycle begins when the learner requests assistance, for example through
 the configured hotkey path used in the pilot. The runtime then performs the
 following sequence:
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_help_cycle.pdf}
+  \caption{Live evidence-grounded help cycle. Assistance begins with an
+  observation snapshot, turns it into an evidence packet, asks the model for a
+  structured response, validates the result, and logs the displayed output.}
+  \label{fig:help-cycle}
+  \Description[Live help cycle diagram]{A clockwise loop starts with a headset
+  help request, then telemetry and vision snapshot, gate inference, evidence
+  packet construction, source-grounded prompting, model response, harness
+  validation, overlay or fallback output, and replayable event logging.}
+\end{figure}
 
 \begin{enumerate}
 \item Read the latest telemetry frame and derived variables.

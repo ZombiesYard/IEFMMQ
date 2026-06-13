@@ -28,6 +28,11 @@ result; and a formative pilot is not a powered controlled experiment.
   harness artifacts support RQ1, VLM benchmark artifacts support RQ2, and
   Quest~3 pilot exports support RQ3 descriptive findings.}
   \label{fig:evaluation-dataflow}
+  \Description[Evaluation dataflow]{A three-column diagram separates RQ1
+  runtime replay and fixtures, RQ2 VLM holdout benchmarks, and RQ3 formative
+  pilot exports. The streams feed a bounded interpretation that combines
+  technical auditability, component reliability, and descriptive pilot
+  evidence without treating them as interchangeable.}
 \end{figure}
 
 % ===========================================================================
@@ -228,26 +233,22 @@ generalisation claim from these small holdouts. The labels were human-reviewed
 but not independently double-coded, so rare completion-critical facts remain
 the most important target for future label audit and data collection.
 
-Figure~\ref{fig:qwen35-benchmark-charts} adds the corresponding training-report
-figures selected for the main text. The first chart visualises the Run-002
-accuracy improvement; the second highlights why critical false positives are
-tracked separately from aggregate accuracy on Run-004.
+Figure~\ref{fig:qwen35-benchmark-charts} visualises the primary Qwen3.5 result
+in publication form. It shows the accuracy and exact-match improvements beside
+the critical false-positive counts that are tracked separately from aggregate
+accuracy.
 
 \begin{figure}[htbp]
   \centering
-  \begin{subfigure}{0.49\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig_qwen35_run002_overall_accuracy.png}
-    \caption{Run-002 overall accuracy.}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}{0.49\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig_qwen35_run004_critical_fp.png}
-    \caption{Run-004 critical false positives.}
-  \end{subfigure}
-  \caption{Selected Qwen3.5 benchmark figures from the VLM training report.}
+  \includegraphics[width=\textwidth]{figures/fig_primary_vlm_results.pdf}
+  \caption{Primary Qwen3.5 benchmark summary. The left panel reports
+  fact-accuracy and exact-match rates on Run-002 and Run-004; the right panel
+  reports completion-critical false-positive counts.}
   \label{fig:qwen35-benchmark-charts}
+  \Description[Primary Qwen3.5 benchmark chart]{A two-panel bar chart compares
+  Qwen3.5 base and LoRA. The first panel shows fact accuracy and exact match
+  for Run-002 and Run-004. The second panel shows critical false-positive
+  counts for the same holdouts, with LoRA lower than base in both cases.}
 \end{figure}
 
 The practical interpretation is not that the VLM can run the procedure. The
@@ -351,20 +352,14 @@ Model choice should depend on downstream risk, not leaderboard rank alone. \\
 
 \begin{figure}[htbp]
   \centering
-  \begin{subfigure}{0.49\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig_qwen36_run002_overall_accuracy.png}
-    \caption{Qwen3.6 Run-002 overall accuracy.}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}{0.49\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{figures/fig_gemma_run002_overall_accuracy.png}
-    \caption{Gemma Run-002 overall accuracy.}
-  \end{subfigure}
-  \caption{Selected supplementary backbone benchmark figures from the VLM
-  training reports.}
+  \includegraphics[width=\textwidth]{figures/fig_backbone_comparison.pdf}
+  \caption{Matched backbone comparison for Qwen3.5, Qwen3.6, and Gemma under
+  the Run-003 + Run-005$\times$2 recipe. Panels report fact accuracy,
+  exact-match rate, and critical false-positive count for Run-002 and Run-004.}
   \label{fig:supplementary-benchmark-charts}
+  \Description[Backbone comparison chart]{A six-panel bar chart compares base
+  and LoRA variants of Qwen3.5, Qwen3.6, and Gemma. The panels cover Run-002
+  and Run-004 fact accuracy, exact match, and critical false-positive counts.}
 \end{figure}
 
 The comparison supports a conservative conclusion. The data-and-ontology
@@ -447,6 +442,20 @@ completed one trial each: four with tutor assistance and five without tutor
 assistance. The pilot is reported descriptively only. It does not support
 statistical significance, learning-gain, retention, transfer, workload-
 reduction, or speed claims.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/fig_pilot_protocol.pdf}
+  \caption{Formative Quest~3 pilot protocol and analysis authority. The pilot
+  links one-trial participant sessions to runtime logs, questionnaires, manual
+  step coding, and descriptive-only interpretation.}
+  \label{fig:pilot-protocol}
+  \Description[Pilot protocol diagram]{A protocol diagram shows convenience
+  participants assigned to with-tutor or without-tutor trials for the F/A-18C
+  cold-start task. Runtime logs, questionnaires, and manual coding feed study
+  exports and descriptive findings only, with manual coding marked as final
+  authority for reviewed task outcomes.}
+\end{figure}
 
 \subsection{Participants and Task Outcomes}
 

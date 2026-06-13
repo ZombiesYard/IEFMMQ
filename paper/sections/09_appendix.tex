@@ -231,6 +231,10 @@ reproducibility and operational context.
   state before an overlay action plan is accepted; unsafe or under-grounded
   actions are repaired, rejected, or downgraded to text-only guidance.}
   \label{fig:harness-validation}
+  \Description[Harness validation boundary]{A flow diagram shows an evidence
+  packet and ranked step candidates feeding a structured model response. Schema
+  and evidence-reference checks either accept a known UI target or send the
+  response to repair, downgrade, or text-only fallback.}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -241,6 +245,10 @@ reproducibility and operational context.
   separated so that live trials and offline analysis can use the same evidence
   and logging contracts.}
   \label{fig:deployment-topology}
+  \Description[Prototype deployment topology]{A deployment diagram shows the
+  Windows simulator host with DCS World, Quest 3, DCS-BIOS telemetry, and a
+  vision sidecar connected to the SimTutor runtime. The runtime exchanges model
+  calls with a remote GPU server and writes JSONL and CSV logs.}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -250,6 +258,10 @@ reproducibility and operational context.
   metadata are transformed into participant-level summaries, step coding,
   help-cycle records, quality gates, and study-level analysis tables.}
   \label{fig:experiment-export}
+  \Description[Experiment export pipeline]{A pipeline diagram shows raw JSONL
+  trial logs, session metadata, and pack taxonomy entering the experiment
+  export step. The outputs are trial summary, step coding, help cycle, action
+  timeline, and quality-gate files.}
 \end{figure}
 
 % ===========================================================================

@@ -82,6 +82,11 @@ guide later data collection.
   with LoRA, evaluated on independent holdout sets, and used to drive ontology
   revision.}
   \label{fig:vlm-pipeline}
+  \Description[VLM adaptation pipeline]{A two-row pipeline shows cockpit
+  screenshots moving through AI pre-labels, human review, reviewed labels,
+  bilingual supervised fine-tuning rows, LoRA adapters, independent holdout
+  benchmarks, error review, ontology revision, and runtime visual-fact
+  extraction.}
 \end{figure}
 
 \begin{enumerate}
@@ -247,6 +252,11 @@ atoms, leaving temporal and procedural interpretation to the tutor runtime.
   into locally verifiable visual atoms; the procedure engine then combines
   those observations with telemetry, phase, and timing evidence.}
   \label{fig:ontology-evolution}
+  \Description[Visual-fact ontology evolution]{A before-and-after diagram shows
+  the 8-fact ontology using compound labels such as ins go and FCS bit result,
+  a central design rule that the VLM should report visible evidence only, and
+  the 13-fact ontology with separate observable atoms such as INS text and FCS
+  page or final GO visibility.}
 \end{figure}
 
 The current 13-fact ontology follows three design rules:
