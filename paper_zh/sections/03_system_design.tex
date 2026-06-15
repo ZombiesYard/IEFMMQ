@@ -9,7 +9,7 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_system_architecture.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_system_architecture.png}
   \caption{基于证据的教学运行时架构。模拟器观察、预编写的程序规则、基础模型输出以及面向用户的叠加层动作，由显式的运行时契约分隔。}
   \label{fig:system-architecture}
   \Description[教学运行时系统架构]{五通道架构图展示了模拟器和头盔输入、证据适配器、教学运行时契约、基础模型服务以及面向用户的输出。遥测和视觉数据馈入证据包；模型输出在叠加层显示和日志记录之前通过验证。}
@@ -56,7 +56,7 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_evidence_authority.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_evidence_authority.png}
   \caption{基于证据的教学的权威边界。程序规则和遥测约束状态；审查过的视觉事实提供有边界的显示证据；检索和 LLM 输出支持解释但不覆盖门控条件或 UI 白名单。}
   \label{fig:evidence-authority}
   \Description[权威层级图]{一个垂直层级将程序包、遥测、审查过的视觉事实、检索文本和 LLM 输出按降序排列。箭头指向程序状态计算、叠加层验证以及降级或回退行为。}
@@ -90,7 +90,7 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_help_cycle.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_help_cycle.png}
   \caption{实时基于证据的帮助周期。辅助始于观察快照，将其转化为证据包，请求模型给出结构化响应，验证结果，并记录显示的输出。}
   \label{fig:help-cycle}
   \Description[实时帮助周期图]{顺时针循环：从头盔帮助请求开始，到遥测和视觉快照、门控条件推理、证据包构造、基于来源的提示词生成、模型响应、约束验证、叠加层或回退输出，以及可回放事件日志。}

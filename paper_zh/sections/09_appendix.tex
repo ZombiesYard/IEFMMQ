@@ -181,7 +181,7 @@ INS mode & S12 & yes & INS 模式旋钮 \\
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_harness_validation.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_harness_validation.png}
   \caption{约束层与证据验证。候选教学动作在接受叠加层行动计划之前，须经过模式约束、UI 白名单、证据一致性和程序状态的检查；不安全或依据不足的动作被修复、拒绝或降级为仅文本引导。}
   \label{fig:harness-validation}
   \Description[约束验证边界]{一个流程图展示了证据包和排序后的候选步骤馈入结构化模型响应。模式和证据引用检查要么接受已知的 UI 目标，要么将响应送入修复、降级或仅文本回退。}
@@ -189,7 +189,7 @@ INS mode & S12 & yes & INS 模式旋钮 \\
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_deployment_topology.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_deployment_topology.png}
   \caption{原型使用的部署拓扑。模拟器、Quest 3 叠加层路径、本地运行时、回放工具和远程模型提供方被分离，以使实时试验和离线分析能够使用相同的证据和日志契约。}
   \label{fig:deployment-topology}
   \Description[原型部署拓扑]{一份部署图展示了 Windows 模拟器主机（包含 DCS World、Quest 3、外部遥测接口和视觉侧车）连接到教学运行时。运行时与远程 GPU 服务器交换模型调用，并写入 JSONL 和 CSV 日志。}
@@ -197,7 +197,7 @@ INS mode & S12 & yes & INS 模式旋钮 \\
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_experiment_export.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_experiment_export.png}
   \caption[详细的实验导出流水线]{详细的实验导出流水线。运行时事件日志和试验元数据被转化为参与者级摘要、步骤编码、帮助周期记录、质量门控条件和研究级分析表。}
   \label{fig:experiment-export}
   \Description[实验导出流水线]{一个流水线图展示了原始 JSONL 试验日志、会话元数据和包分类法进入实验导出步骤。输出为试验摘要、步骤编码、帮助周期、动作时间线和质量门控文件。}

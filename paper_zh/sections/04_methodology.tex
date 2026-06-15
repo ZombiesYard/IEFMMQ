@@ -33,7 +33,7 @@
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_vlm_pipeline.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_vlm_pipeline.png}
   \caption{VLM 适配流水线。DCS World 复合截图经预标注、人工审查、转换为双语监督微调行、使用 LoRA 适配、在独立验证集上评估，并用于驱动本体论修订。}
   \label{fig:vlm-pipeline}
   \Description[VLM 适配流水线]{一个两行流水线展示了座舱截图经过 AI 预标注、人工审查、审查标签、双语监督微调行、LoRA 适配器、独立验证集基准测试、错误审查、本体论修订以及运行时视觉事实提取。}
@@ -113,7 +113,7 @@ Run-005 是一次以数据为中心的修正。原始 Run-003 训练源提供了
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/fig_ontology_evolution.pdf}
+  \includegraphics[width=\textwidth]{figures/fig_ontology_evolution.png}
   \caption{从 8 事实 v1 到 13 事实 v2 的本体论演化。诸如 \texttt{ins\_go} 和宽泛的 FCS-MC 完成事实等复合目标被分解为局部可验证的视觉原子；程序引擎随后将这些观察与遥测、阶段和时序证据相结合。}
   \label{fig:ontology-evolution}
   \Description[视觉事实本体论演化]{一张前后对比图展示了使用复合标签的 8 事实本体论（如 ins go 和 FCS bit 结果），一条核心设计规则（VLM 应仅报告可见证据），以及具有独立可观察原子的 13 事实本体论（如 INS 文本和 FCS 页面或最终 GO 可见性）。}
