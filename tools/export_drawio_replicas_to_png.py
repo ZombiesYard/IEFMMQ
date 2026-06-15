@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Export thesis draw.io replica pages as cropped PNG assets.
+"""Export thesis draw.io replica pages as PNG assets.
 
 The important constraint is that draw.io must do the rendering. This script
-only calls the draw.io CLI and then removes the bottom note row from the
-resulting PNG. It does not parse or redraw diagram geometry.
+only calls the draw.io CLI; it does not parse or redraw diagram geometry.
 """
 
 from __future__ import annotations
@@ -33,10 +32,7 @@ PAGE_NAMES = [
     "fig_experiment_export",
 ]
 
-DEFAULT_SOURCE = (
-    "paper_rewriting_output/final_paper/figures/drawio/"
-    "imagegen_cropped_replicas/cropped_replicas_all.drawio"
-)
+DEFAULT_SOURCE = "paper/figures/drawio/cropped_replicas_all.drawio"
 
 DEFAULT_OUTPUT_ROOTS = ["paper/figures", "paper_zh/figures"]
 
@@ -279,7 +275,12 @@ def crop_png_bottom_note(source: Path, destination: Path) -> tuple[int, int, int
 
 
 def export_page(
-    drawio: str, source: Path, page_index: int, destination: Path, tmp_dir: Path
+    drawio: str,
+    source: Path,
+    page_index: int,
+    destination: Path,
+    tmp_dir: Path,
+    crop_bottom: bool,
 ) -> tuple[int, int, int]:
     raw = tmp_dir / f"{PAGE_NAMES[page_index]}_raw.png"
     cmd = [
@@ -297,7 +298,22 @@ def export_page(
     if not raw.exists():
         raise FileNotFoundError(f"draw.io did not create {raw}")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    return crop_png_bottom_note(raw, destination)
+    if crop_bottom:
+        return crop_png_bottom_note(raw, destination)
+    shutil.copyfile(raw, destination)
+    width, height, _bit_depth = png_dimensions(raw)
+    return width, height, height
+
+
+def png_dimensions(source: Path) -> tuple[int, int, int]:
+    chunks = read_chunks(source.read_bytes())
+    ihdr_chunks = [data for chunk_type, data in chunks if chunk_type == b"IHDR"]
+    if len(ihdr_chunks) != 1:
+        raise PngError("PNG must contain one IHDR chunk")
+    width, height, bit_depth, _color_type, _compression, _filter_method, _interlace = (
+        struct.unpack(">IIBBBBB", ihdr_chunks[0])
+    )
+    return width, height, bit_depth
 
 
 def copy_drawio_source(source: Path) -> None:
@@ -324,6 +340,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not copy the source .drawio into paper figure source folders.",
     )
+    parser.add_argument(
+        "--crop-bottom-note",
+        action="store_true",
+        help="Crop the bottom note row after draw.io export. Disabled by default.",
+    )
     return parser.parse_args()
 
 
@@ -340,7 +361,12 @@ def main() -> int:
         for page_index, page_name in enumerate(PAGE_NAMES):
             first_target = tmp_dir / f"{page_name}.png"
             width, original_height, cropped_height = export_page(
-                drawio, source, page_index, first_target, tmp_dir
+                drawio,
+                source,
+                page_index,
+                first_target,
+                tmp_dir,
+                args.crop_bottom_note,
             )
             for output_root in output_roots:
                 target = output_root / f"{page_name}.png"
