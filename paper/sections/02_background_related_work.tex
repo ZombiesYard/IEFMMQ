@@ -51,7 +51,10 @@ the value of placing instructions inside the user's task context
 \citep{tang2003arassembly,henderson2011ar,palmarini2018ar}. This thesis
 adopts that in-context motivation, but adds a stricter systems condition:
 generated help must be grounded in the current simulator state, not only
-placed visually near the cockpit.
+placed visually near the cockpit. Work on HMD-based and immersive VR learning
+similarly cautions that instructional design, task fit, cognitive load, and
+evaluation design determine whether immersion helps rather than distracts
+\citep{jensen2018vrhmd,radianti2020ivr,makransky2021camil}.
 
 \section{Existing Assistance Approaches}\label{sec:bg-existing}
 
@@ -193,8 +196,10 @@ control logic.
 
 The VLM task is structured prediction over a small ontology. For each image,
 the model predicts a vector of categorical states rather than a caption. The
-JSON format is the integration interface, but the learning problem is not
-merely JSON generation. The model must align visual evidence with fact
+JSON format is the integration interface, and JSON Schema provides the formal
+validation contract used to reject malformed or out-of-ontology outputs
+\citep{pezoa2016jsonschema}. Still, the learning problem is not merely JSON
+generation. The model must align visual evidence with fact
 definitions, distinguish page labels from actual pages, separate transient
 intermediate states from final states, and decide when a cue is too ambiguous
 for a \texttt{seen} or \texttt{not\_seen} decision.
@@ -208,7 +213,10 @@ positives count high-risk cases where the model predicts \texttt{seen} for a
 fact that should not be considered visible. This last metric matters because a
 false \texttt{seen} label on a completion-like cue can corrupt downstream
 procedure reasoning more severely than a missed cue that merely triggers
-another check.
+another check. This explicit metric mix follows broader classification-
+evaluation work showing that accuracy, \(F_1\), and macro metrics answer
+different questions and require task-specific justification
+\citep{powers2011evaluation,opitz2024metrics}.
 
 \subsection{Parameter-Efficient Adaptation}\label{sec:bg-lora}
 

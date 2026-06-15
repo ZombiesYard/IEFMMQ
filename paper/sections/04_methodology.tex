@@ -68,7 +68,10 @@ The visual fact pipeline is the main methodology for RQ2. It turns DCS World coc
 screenshots into supervised examples and then into a benchmarked visual fact
 extractor. The pipeline is designed for traceability: a benchmark error should
 be traceable back to the model prediction, the human-reviewed label, the
-pre-label, and the original image.
+pre-label, and the original image. This reflects dataset-documentation practice
+that treats motivation, composition, collection, recommended use, and provenance
+as part of the dataset artifact rather than as external notes
+\citep{gebru2021datasheets}.
 
 Figure~\ref{fig:vlm-pipeline} shows the pipeline as a loop. Holdout failures
 are not only final results; they can reveal weaknesses in the ontology and
@@ -399,7 +402,9 @@ pedagogically better.
 
 The benchmark compares model predictions against human-reviewed ground truth at
 both sample and fact level. The metrics are selected to reflect downstream
-runtime risk:
+runtime risk, following the general caution that metric choice shapes
+classification interpretation and should be justified for the task
+\citep{powers2011evaluation,opitz2024metrics}:
 
 \begin{itemize}
 \item \texttt{json\_valid\_rate}: proportion of samples with parseable JSON
@@ -579,8 +584,9 @@ not designed to estimate a psychometric workload effect. The form also records
 pre-trial confidence, condition-specific tutor ratings where the tutor was
 available, general user ratings, and short open comments. These tutor/user
 ratings are custom post-trial items, not validated SUS, trust, or usability
-instruments. The rating values are kept on their recorded scale and are not
-normalised into a single composite effectiveness score.
+instruments \citep{lee2004trust,visser2023trust}. The rating values are kept on
+their recorded scale and are not normalised into a single composite
+effectiveness score.
 
 The comments are used cautiously. They are not treated as coded qualitative
 themes with inter-rater reliability. Instead, they provide context for
@@ -595,9 +601,9 @@ This instrument design matches the pilot's formative status. The questionnaire
 and comments can reveal perceived usefulness, interaction friction, and
 trust-related signals that should shape the next study. They cannot establish
 causal changes in workload, trust, usability, or learning. That boundary is
-maintained in the results chapter by excluding P02's mismatched questionnaire,
-reporting P08 with manual task coding, and treating P09 as an independent
-participant after the metadata correction.
+maintained in the results chapter by reporting questionnaire values only as
+descriptive summaries and keeping task coding separate from questionnaire-
+derived evidence.
 
 \subsection{Data-Quality Notes}
 

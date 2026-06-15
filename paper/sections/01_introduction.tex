@@ -29,6 +29,9 @@ proper phase. A foundation model can produce fluent procedural language, but
 fluency alone does not make an instruction safe, timely, or inspectable. A
 tutor that explains the wrong state can be worse than a static checklist,
 because it appears adaptive while silently losing contact with the simulator.
+This risk is consistent with education-facing LLM work and broader findings on
+hallucination and faithfulness in neural generation
+\citep{kasneci2023chatgpt,ji2023hallucination,maynez2020faithfulness}.
 
 The motivating scenario is therefore not a generic chatbot for aviation
 questions, but an in-headset tutor for sequence-sensitive procedural training.
@@ -45,7 +48,10 @@ assistant becomes useful only when it can explain the learner's actual task
 state. The system therefore has to observe enough of that state, bind model
 outputs to evidence, reject or repair unsupported actions, and preserve a log
 that can be replayed after the session. This thesis calls that design principle
-\emph{evidence-grounded interactive explanation}.
+\emph{evidence-grounded interactive explanation}. The principle is aligned
+with retrieval-grounded generation and grounded action systems, but it applies
+those ideas to a live procedural-training state rather than to text retrieval
+or robot affordances alone \citep{lewis2020rag,ahn2022saycan}.
 
 \subsection{What ``Reality'' Means in This Thesis}
 
@@ -77,14 +83,19 @@ attention to the wrong object at the wrong time. A correct but unsupported
 explanation can still encourage over-trust if the learner cannot see why it was
 given. The thesis therefore treats VR not as a decorative output medium, but as
 the setting that forces evidence-grounded explanation to be precise, concise,
-and auditable.
+and auditable. Reviews and models of HMD-based immersive learning support this
+caution: benefits depend on task fit, instructional design, cognitive load, and
+evaluation design rather than on immersion alone
+\citep{jensen2018vrhmd,radianti2020ivr,makransky2021camil}.
 
 This framing also explains why the work emphasises machine learning rather than
 only interface design. The system needs a perception component that can read
 text-rich cockpit displays, a language component that can phrase help from
 evidence, and a runtime that prevents either component from exceeding its
-authority. The ML contribution is not merely the use of a VLM or an LLM. It is
-the way model outputs are transformed into bounded, checkable claims inside a
+authority. General VLM work and LoRA adaptation provide the model-family and
+fine-tuning context for this choice \citep{bai2023qwen,liu2023llava,hu2021lora}.
+The ML contribution is not merely the use of a VLM or an LLM. It is the way
+model outputs are transformed into bounded, checkable claims inside a
 procedural tutoring loop.
 
 \section{Case Study: F/A-18C Lot 20 Cold Start in DCS World}\label{sec:intro-case}
@@ -135,7 +146,7 @@ does not provide a complete explanation channel by itself. It exposes state; it
 does not decide how to phrase a just-in-time hint or how to explain why a step
 is blocked. Third, foundation models can generate flexible language and parse
 visual input, but they require runtime constraints when their outputs may guide
-procedural action.
+procedural action \citep{vaswani2017attention,gunning2019xai,amershi2019guidelines}.
 
 The contribution of this thesis lies in connecting these pieces. The language
 model is not treated as the tutor by itself. It is one component inside a
