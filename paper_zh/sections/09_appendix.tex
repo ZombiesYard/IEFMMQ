@@ -8,7 +8,7 @@
 % ===========================================================================
 \section{完整 LoRA 超参数配置}\label{sec:appendix-hyperparams}
 
-表~\ref{tab:lora-hyperparams-full} 列出了匹配的 Run-003 + Run-005$\times$2 方案下三个骨干模型的完整超参数配置。数值来自可用的训练报告和基准测试工件。
+表~\ref{tab:lora-hyperparams-full} 列出了匹配的 Run-003 + Run-005$\times$2 方案下三个骨干模型的完整超参数配置。数值来自可用的训练报告和基准测试输出。
 
 \begin{table}[htbp]
   \centering
@@ -49,7 +49,7 @@
   \end{tabular}
 \end{table}
 
-注意：训练损失值因分词器行为、对话模板结构、目标序列分布和模型参数化的不同，在骨干模型之间不可直接比较。训练运行时间和最终损失为训练报告溯源；所报告的主要 VLM 声明依赖于本地基准测试 JSON 和审查标签工件。
+注意：训练损失值因分词器行为、对话模板结构、目标序列分布和模型参数化的不同，在骨干模型之间不可直接比较。训练运行时间和最终损失为训练报告溯源；所报告的主要 VLM 声明依赖于本地基准测试 JSON 和审查标签。
 
 % ===========================================================================
 \section{8 事实 V1 基线基准测试}\label{sec:appendix-8fact}
@@ -277,7 +277,7 @@ P09 & 有教学 & 0  & 3  & 0  & 3 & 5  \\
 自动编码错误来自自动化流水线（\texttt{step\_coding.csv} 中的 Auto\_Error\_* 列）。人工错误来自人工审查列（Error\_*）。P08 的自动错误在人工审查中全部被覆盖为零（见第~\ref{sec:eval-pilot} 节的数据质量注释）。
 \end{table}
 
-表~\ref{tab:pilot-data-quality-authority} 记录了当原始导出与人工审查证据不一致时使用的补充工件权威规则。
+表~\ref{tab:pilot-data-quality-authority} 记录了当原始导出与人工审查证据不一致时使用的补充研究工件权威规则。
 
 \begin{table}[htbp]
 \centering
