@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<mxfile host="app.diagrams.net" modified="2026-06-09T00:00:00.000Z" agent="SimTutor thesis figure generator" version="24.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-06-09T00:00:00.000Z" agent="thesis figure generator" version="24.0.0" type="device">
   <diagram id="fig_bg_evidence_sources.pdf" name="2.1 Evidence Sources">
     <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="842" pageHeight="595" math="0" shadow="0">
       <root>
@@ -11,7 +11,7 @@
         <mxCell id="3" value="33-step cold-start&lt;br&gt;ordered P1-P6 procedure" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="30" y="70" width="140" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="4" value="Telemetry-visible steps&lt;br&gt;DCS-BIOS variables&lt;br&gt;S01, S03-S13, S16,&lt;br&gt;S20-S33" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#ede9fe;strokeColor=#6d28d9;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="4" value="Telemetry-visible steps&lt;br&gt;telemetry variables&lt;br&gt;S01, S03-S13, S16,&lt;br&gt;S20-S33" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#ede9fe;strokeColor=#6d28d9;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="210" y="60" width="170" height="82" as="geometry" />
         </mxCell>
         <mxCell id="5" value="Vision-priority steps&lt;br&gt;composite panel + VLM&lt;br&gt;S08, S15, S18, S19" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#dcfce7;strokeColor=#15803d;align=center;verticalAlign=middle;" vertex="1" parent="1">
@@ -20,7 +20,7 @@
         <mxCell id="6" value="Manual / out-of-layout&lt;br&gt;expert confirmation&lt;br&gt;S14, S17" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fee2e2;strokeColor=#b91c1c;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="650" y="60" width="150" height="82" as="geometry" />
         </mxCell>
-        <mxCell id="7" value="DCS-BIOS stream&lt;br&gt;switches, gauges,&lt;br&gt;warning lights" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="7" value="Telemetry stream&lt;br&gt;switches, gauges,&lt;br&gt;warning lights" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="210" y="190" width="170" height="64" as="geometry" />
         </mxCell>
         <mxCell id="8" value="Composite panel image&lt;br&gt;left DDI, AMPCD,&lt;br&gt;right DDI" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
@@ -88,7 +88,7 @@
         <mxCell id="3" value="DCS F/A-18C&lt;br&gt;Quest 3 VR session" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="30" y="85" width="130" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="4" value="DCS-BIOS&lt;br&gt;telemetry stream" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="4" value="Simulator&lt;br&gt;telemetry stream" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="30" y="200" width="130" height="56" as="geometry" />
         </mxCell>
         <mxCell id="5" value="Vision sidecar&lt;br&gt;composite capture" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
@@ -100,7 +100,7 @@
         <mxCell id="7" value="Procedure pack&lt;br&gt;steps, gates,&lt;br&gt;UI targets, facts" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="205" y="205" width="150" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="8" value="SimTutor runtime&lt;br&gt;help-cycle orchestration" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e0f2fe;strokeColor=#0369a1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="8" value="Runtime&lt;br&gt;help-cycle orchestration" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e0f2fe;strokeColor=#0369a1;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="400" y="80" width="170" height="80" as="geometry" />
         </mxCell>
         <mxCell id="9" value="Evidence packet&lt;br&gt;state, gates, facts,&lt;br&gt;recent actions" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e0f2fe;strokeColor=#0369a1;align=center;verticalAlign=middle;" vertex="1" parent="1">
@@ -520,16 +520,16 @@
         <mxCell id="3" value="Windows simulator host&lt;br&gt;DCS World F/A-18C&lt;br&gt;Quest 3 via Oculus Link" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="55" y="90" width="165" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="4" value="DCS-BIOS&lt;br&gt;UDP telemetry" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="4" value="Simulator&lt;br&gt;UDP telemetry" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e5e7eb;strokeColor=#6b7280;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="55" y="205" width="165" height="55" as="geometry" />
         </mxCell>
         <mxCell id="5" value="Vision sidecar&lt;br&gt;VR mirror capture" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fce7f3;strokeColor=#be185d;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="55" y="315" width="165" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="6" value="SimTutor live-dcs&lt;br&gt;help trigger, orchestration,&lt;br&gt;overlay dispatch" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e0f2fe;strokeColor=#0369a1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="6" value="Live help runtime&lt;br&gt;help trigger, orchestration,&lt;br&gt;overlay dispatch" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#e0f2fe;strokeColor=#0369a1;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="310" y="115" width="185" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="7" value="Saved Games DCS&lt;br&gt;SimTutorConfig.lua&lt;br&gt;overlay command channel" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="7" value="Saved Games DCS&lt;br&gt;overlay config&lt;br&gt;overlay command channel" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="310" y="255" width="185" height="60" as="geometry" />
         </mxCell>
         <mxCell id="8" value="Runtime logs&lt;br&gt;JSONL events and&lt;br&gt;trial exports" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fontFamily=Helvetica;fillColor=#fef3c7;strokeColor=#b45309;align=center;verticalAlign=middle;" vertex="1" parent="1">
