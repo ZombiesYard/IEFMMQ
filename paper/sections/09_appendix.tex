@@ -57,7 +57,9 @@ and benchmark artifacts.
 
 Note: training loss values are not directly comparable across backbones due to
 differences in tokenizer behaviour, chat-template structure, target-sequence
-distribution, and model parameterisation.
+distribution, and model parameterisation. Training runtime and final loss are
+training-report provenance; the primary reported VLM claims rely on local
+benchmark JSON and reviewed-label artifacts.
 
 % ===========================================================================
 \section{8-Fact V1 Baseline Benchmark}\label{sec:appendix-8fact}
@@ -142,7 +144,7 @@ the resulting training recipe improves model behaviour on holdout sets.
 % ===========================================================================
 \section{CLI Command Reference}\label{sec:appendix-cli}
 
-The \texttt{simtutor} package provides the following CLI commands:
+The repository prototype provides the following CLI commands:
 
 \begin{description}
 \item[\texttt{run}.] Executes a simulation using a mock environment adapter
@@ -153,7 +155,7 @@ pack, checking step ordering and state-machine consistency.
 omission counts, state-violation counts, and a total error score.
 \item[\texttt{record-vlm}.] Runs VLM fact extraction on a set of vision
 observations and records predictions for benchmarking.
-\item[\texttt{replay-bios}.] Replays a raw DCS-BIOS capture through the
+\item[\texttt{replay-telemetry}.] Replays a raw telemetry capture through the
 telemetry pipeline and optionally invokes the help generation loop.
 \item[\texttt{validate}.] Validates JSONL files against a named schema from
 the schema registry.
@@ -167,20 +169,18 @@ and a language switch (\texttt{--lang}).
 \section{Model Provider Configuration}\label{sec:appendix-model-config}
 
 Model access is configured through environment variables and validated at
-runtime:
+runtime. The configuration items are:
 
 \begin{description}
-\item[Provider.] \texttt{SIMTUTOR\_MODEL\_PROVIDER} selects
-\texttt{openai\_compat}, \texttt{ollama}, or \texttt{stub}.
-\item[Base URL.] \texttt{SIMTUTOR\_MODEL\_BASE\_URL} sets the provider
-endpoint.
-\item[Model.] \texttt{SIMTUTOR\_MODEL\_NAME} selects the model name.
-\item[Timeout.] \texttt{SIMTUTOR\_MODEL\_TIMEOUT\_S} sets the request timeout.
-\item[Credentials.] \texttt{SIMTUTOR\_MODEL\_API\_KEY} is required for the
-\texttt{openai\_compat} provider. API keys are redacted from log output.
-\item[Images.] \texttt{SIMTUTOR\_MODEL\_ENABLE\_MULTIMODAL} toggles base64
-image encoding in requests.
-\item[Language.] \texttt{SIMTUTOR\_LANG} selects \texttt{zh} or \texttt{en}.
+\item[Provider.] Model provider, selected from \texttt{openai\_compat},
+\texttt{ollama}, or \texttt{stub}.
+\item[Base URL.] Provider endpoint.
+\item[Model.] Model name.
+\item[Timeout.] Request timeout.
+\item[Credentials.] API key for the \texttt{openai\_compat} provider. API keys
+are redacted from log output.
+\item[Images.] Whether base64 image encoding is enabled in requests.
+\item[Language.] Output language, selected from \texttt{zh} or \texttt{en}.
 \end{description}
 
 % ===========================================================================
@@ -246,8 +246,8 @@ reproducibility and operational context.
   and logging contracts.}
   \label{fig:deployment-topology}
   \Description[Prototype deployment topology]{A deployment diagram shows the
-  Windows simulator host with DCS World, Quest 3, DCS-BIOS telemetry, and a
-  vision sidecar connected to the SimTutor runtime. The runtime exchanges model
+  Windows simulator host with DCS World, Quest 3, an external telemetry
+  interface, and a vision sidecar connected to the tutoring runtime. The runtime exchanges model
   calls with a remote GPU server and writes JSONL and CSV logs.}
 \end{figure}
 
@@ -268,11 +268,10 @@ reproducibility and operational context.
 \section{VR Pilot Study --- Supplementary Data}\label{sec:appendix-pilot}
 
 Table~\ref{tab:pilot-participants} lists participant experience profiles used
-for descriptive interpretation. P02's questionnaire-derived fields are excluded
-from workload, confidence, usability, trust, and comment summaries because the
-available questionnaire metadata contains an internal participant-id mismatch.
-P08 uses manual completion coding, and P09 is treated as an independent
-participant after the correction recorded in the trial metadata.
+for descriptive interpretation. Questionnaire, step-coding, and participant
+metadata quality rules are listed separately in
+Table~\ref{tab:data-quality-rules}, so that data-cleaning details do not
+obscure the participant overview itself.
 
 \begin{table}[htbp]
 \centering
@@ -328,7 +327,7 @@ and P07. The remaining uncertainty is whether the page transition and final GO
 result were visually present, because passive without-tutor export did not run
 the VLM/page checks used in tutor trials. S27 (flap switch to AUTO) is also
 unconfirmed by all five rows, but the procedure pack classifies it as
-BIOS-priority with variable and gate evidence rather than VLM-bound visual
+telemetry-priority with variable and gate evidence rather than VLM-bound visual
 evidence. The table is therefore an export-confirmation table, not a direct
 omission table.
 \end{table}

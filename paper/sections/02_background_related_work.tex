@@ -70,7 +70,7 @@ Intelligent Tutoring Systems (ITS) research has long treated explicit task
 models, learner-state tracking, feedback, and constraint-based diagnosis as
 central to effective tutoring
 \citep{vanlehn2011relative,kulik2016its,mitrovic2012constraint,aleven2009example}.
-This is directly relevant to SimTutor: a tutor needs more than conversational
+This is directly relevant to the prototype: a tutor needs more than conversational
 ability; it needs a representation of the task and the learner's progress. The
 difference is the operating substrate. The present system is not a classic ITS
 with a closed problem interface. It observes a high-fidelity simulator through
@@ -86,7 +86,7 @@ answers \citep{kasneci2023chatgpt,ji2023hallucination}. Faithfulness work in
 neural generation similarly shows that fluent generated text can diverge from
 its source evidence \citep{maynez2020faithfulness}. Grounded action work such
 as SayCan separates linguistic plausibility from action feasibility
-\citep{ahn2022saycan}. SimTutor follows the same design instinct: a response
+\citep{ahn2022saycan}. The prototype follows the same design instinct: a response
 may be fluent and sourced, but it should not be shown as procedural guidance
 unless the runtime can validate the state, step, evidence references, and
 overlay target.
@@ -94,21 +94,22 @@ overlay target.
 \paragraph{AR/VR guidance and simulator telemetry.}
 AR/VR procedural guidance addresses the interaction problem of keeping help in
 the task context \citep{palmarini2018ar}. Simulator telemetry addresses a
-different problem: observing state. In this thesis, DCS-BIOS is used as an
-external telemetry and cockpit I/O interface \citep{dcsbiosdocs}. This thesis
-does not implement DCS-BIOS. The contribution starts after DCS-BIOS exports
-simulator state: SimTutor selects relevant variables, maps raw controls to
-procedure-level predicates, distinguishes source-missing from observed-false
-values, combines telemetry with visual facts and procedure gates, and logs the
-resulting evidence for replay.
+different problem: observing state. In this thesis, an external telemetry
+interface is used only as an input channel for raw simulator state. The thesis
+does not claim that interface itself as an implementation contribution. The
+contribution starts after raw telemetry enters the tutoring runtime: the system
+selects relevant variables, maps raw controls to procedure-level predicates,
+distinguishes source-missing from observed-false values, combines telemetry
+with visual facts and procedure gates, and logs the resulting evidence for
+replay.
 
 \section{Why Existing Approaches Are Insufficient Here}\label{sec:bg-gap}
 
 The case study requires four properties at once. First, assistance must be
 live-state aware. A system that only retrieves the right manual paragraph can
 still recommend the wrong action if the simulator state has not reached the
-required precondition. Second, assistance must be multimodal. DCS-BIOS exposes
-many switch positions and indicators, but cockpit display pages and text cues
+required precondition. Second, assistance must be multimodal. Raw telemetry
+covers many switch positions and indicators, but cockpit display pages and text cues
 also matter. The left and right Digital Display Indicators (DDIs) and the
 Advanced Multipurpose Color Display (AMPCD) contain cold-start evidence that
 is not always reducible to simple telemetry fields.
@@ -154,7 +155,7 @@ recommendation and how such explanations should be evaluated
 \citep{gunning2019xai,hoffman2018metrics}. Human-AI interaction and automation
 research emphasise intelligibility, appropriate reliance, uncertainty
 handling, and recoverability \citep{lee2004trust,amershi2019guidelines}.
-SimTutor operationalises these ideas in a narrow procedural setting: the
+The prototype operationalises these ideas in a narrow procedural setting: the
 response schema, evidence-reference types, source policy, overlay allowlist,
 and replay logs are the mechanism by which a fluent model answer becomes
 inspectable.

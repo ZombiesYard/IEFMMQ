@@ -13,8 +13,8 @@ for the formative Quest~3 pilot. The three evidence lines have different claim
 strengths. Replay, harness, and export artifacts support a technical
 auditability claim for RQ1. Holdout benchmarks support a component-level
 machine-learning claim for RQ2. The pilot supports descriptive observations
-about live use, task completion, errors, workload ratings, usability/trust
-ratings, and comments for RQ3.
+about live use, task completion, errors, raw workload ratings, custom
+post-trial ratings, and comments for RQ3.
 
 Figure~\ref{fig:evaluation-dataflow} summarises the evidence flow. The
 important point is that the three streams are not interchangeable. A VLM
@@ -66,7 +66,7 @@ Procedure pack & 33 steps & Step order, gate rules, UI targets, and source polic
 Telemetry grounding & Runtime variable map & Source-missing evidence remains distinct from observed false values. & Present & State-aware evidence packets. \\
 Vision binding & S08, S15, S18, S19 & Visual facts can support display-dependent steps without deciding procedure completion. & Present & Bounded VLM authority. \\
 Response schema and overlay harness & Pack-derived schema and UI allowlists & Unknown or over-broad targets are repaired, downgraded, or rejected before overlay execution. & Present & Bounded action surface. \\
-Replay cases & 5 cases & Recorded DCS-BIOS streams and vision sidecars exercise the same pack, source policy, and validation path outside live VR. & Pass as replay coverage & Reproducible grounding checks. \\
+Replay cases & 5 cases & Recorded telemetry streams and vision sidecars exercise the same pack, source policy, and validation path outside live VR. & Pass as replay coverage & Reproducible grounding checks. \\
 Live fixtures & 20 entries & Stale VLM evidence must not satisfy non-visual steps; moving controls must be handled as settling states. & Pass as fixture coverage & Regression checks for grounding failures. \\
 Pilot exports & 9 trials; 4 tutor trials with help-cycle logs & Trial summaries, step coding, action timelines, quality gates, and help-cycle tables are produced after live use. & Pass with P04 warning & Audit-ready live export. \\
 \bottomrule
@@ -79,7 +79,7 @@ The replay suite contains five cases covering early electrical power, engine
 and generator state, FCS reset/BIT interaction, and INS-mode evidence. Cases
 marked as vision available include sidecar frame files so that vision-dependent
 logic can be exercised without a live simulator. These cases confirm that
-recorded DCS-BIOS streams can be passed through the same procedure pack,
+recorded telemetry streams can be passed through the same procedure pack,
 telemetry map, source policy, UI map, and validation path used during live
 tutoring.
 
@@ -109,6 +109,41 @@ carefully: it means final overlay actions passed the configured allowlist and
 evidence checks, not that model proposals were always directly correct. The 21
 repair/fallback events show that the validation layer was active during live
 use.
+
+Table~\ref{tab:rq1-help-cycle-breakdown} breaks down the live help-cycle
+exports. The reason codes should be read as runtime handling categories, not
+as independent user-facing failures: some codes repair an overlay target,
+others replace the model's target with a state-action planner choice, and
+others keep the response text-only or require stronger evidence.
+
+\begin{table}[htbp]
+\centering
+\caption{Live help-cycle breakdown across tutor-condition trials.}
+\label{tab:rq1-help-cycle-breakdown}
+\small
+\begin{tabularx}{\textwidth}{@{}lXr@{}}
+\toprule
+\textbf{Measure} & \textbf{Interpretation} & \textbf{Count} \\
+\midrule
+Help cycles & User-triggered tutor cycles with exported evidence rows & 77 \\
+VLM calls & Cycles where a visual-fact call was required and executed & 23 \\
+Vision not required & Cycles where the active evidence path did not require a VLM call & 54 \\
+Overlay executions & Accepted overlay target executions after validation or repair & 82 \\
+Overlay rejections & Final overlay actions rejected by the allowlist & 0 \\
+Fallback overlays used & Cycles where fallback or repair supplied the overlay action & 21 \\
+State-action planner repair & Fallback overlay reason \texttt{state\_action\_planner} & 7 \\
+Final-evidence consistency repair & Fallback overlay reason \texttt{final\_evidence\_consistency\_validator} with fallback used & 6 \\
+Validator action-hint repair & Fallback overlay reason \texttt{validator\_action\_hint} & 6 \\
+Model-provided fallback & Fallback overlay reason \texttt{model} & 2 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The same exported rows record a visual evidence synchronization field
+\texttt{sync\_delta\_ms}. Across the 77 cycles, it ranges from 50 to 134 ms
+with a median of 84 ms. This number checks alignment between the help-cycle row
+and the selected visual frame; it is not an end-to-end model-response latency
+measurement.
 
 \subsection{Example Evidence Path}
 
@@ -153,7 +188,8 @@ The v2 training recipe combines Run-003 (220 reviewed images) with Run-005
 (122 reviewed images) repeated twice as a composition-rebalance supplement.
 Bilingual export yields 928 supervised fine-tuning rows. The two main holdouts
 are Run-002 newfacts (50 images) and Run-004 random (100 images), both scored
-under the 13-fact ontology with zero exact overlap against the training union.
+under the 13-fact ontology with zero exact image overlap against the training
+union.
 
 \begin{table}[htbp]
 \centering
@@ -206,7 +242,7 @@ Critical FP & 11 & \textbf{4} & $-7$ & 70 & \textbf{8} & $-62$ \\
 Table~\ref{tab:qwen35-counts} gives the same result in count form. This is
 important because the holdouts are small: Run-002 contains 50 images, or 650
 fact decisions, and Run-004 contains 100 images, or 1,300 fact decisions. The
-LoRA line makes 645/650 correct fact-state decisions on Run-002 and 1,291/1,300
+LoRA line makes 644/650 correct fact-state decisions on Run-002 and 1,291/1,300
 on Run-004. Exact-match improvement is also visible as sample counts: 44/50
 and 92/100 full visual snapshots are completely correct after adaptation. The
 residual critical false positives remain concentrated in completion-like facts.
@@ -220,8 +256,32 @@ residual critical false positives remain concentrated in completion-like facts.
 \toprule
 \textbf{Holdout} & \textbf{Facts} & \textbf{Base correct} & \textbf{LoRA correct} & \textbf{LoRA exact} & \textbf{LoRA residual critical FP} \\
 \midrule
-Run-002 newfacts & 650 & 564 & 645 & 44/50 & 4 total: FCS-MC final GO 1, INS GRND text 1, INS OK text 2 \\
+Run-002 newfacts & 650 & 564 & 644 & 44/50 & 4 total: FCS-MC final GO 1, INS GRND text 1, INS OK text 2 \\
 Run-004 random & 1,300 & 1,045 & 1,291 & 92/100 & 8 total: FCS-MC final GO 8 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Table~\ref{tab:qwen35-residual-facts} shows where the remaining Qwen3.5 LoRA
+errors occur at fact level. Most facts are error-free on both holdouts after
+adaptation. The residuals are concentrated in a small number of page/text facts
+and, most importantly, completion-like FCS-MC final-GO evidence.
+
+\begin{table}[htbp]
+\centering
+\caption{Residual per-fact errors for the Qwen3.5 LoRA line.}
+\label{tab:qwen35-residual-facts}
+\small
+\begin{tabularx}{\textwidth}{@{}llrrrX@{}}
+\toprule
+\textbf{Holdout} & \textbf{Fact} & \textbf{Errors} & \textbf{Seen FP} & \textbf{Seen FN} & \textbf{Interpretation} \\
+\midrule
+Run-002 & TAC page visible & 2 & 0 & 2 & Missed visible page evidence; conservative rather than completion-hallucinating. \\
+Run-002 & FCS-MC final GO visible & 1 & 1 & 0 & Residual completion-like false positive. \\
+Run-002 & INS GRND text visible & 1 & 1 & 0 & Residual text-state false positive. \\
+Run-002 & INS OK text visible & 2 & 2 & 0 & Residual completion-like text false positives. \\
+Run-004 & FCS-MC in-test visible & 1 & 0 & 1 & Missed intermediate-state evidence. \\
+Run-004 & FCS-MC final GO visible & 8 & 8 & 0 & Main remaining critical false-positive cluster. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -231,7 +291,10 @@ statistical estimate over all cockpit states. No confidence interval or
 significance test is reported because the thesis does not make an inferential
 generalisation claim from these small holdouts. The labels were human-reviewed
 but not independently double-coded, so rare completion-critical facts remain
-the most important target for future label audit and data collection.
+the most important target for future label audit and data collection. The
+residual table also shows why future data collection should target hard
+negative and temporally adjacent FCS-MC states rather than simply adding more
+generic cockpit screenshots.
 
 Figure~\ref{fig:qwen35-benchmark-charts} visualises the primary Qwen3.5 result
 in publication form. It shows the accuracy and exact-match improvements beside
@@ -436,10 +499,11 @@ representation, not only as model shortcomings.
 \section{RQ3: Formative Quest~3 Pilot}\label{sec:eval-pilot}
 
 RQ3 asks what descriptive evidence a formative, non-random Quest~3 pilot
-provides about task completion, procedural errors, workload, trust/usability,
-comments, and the boundary of a trustworthy AI collaborator. Nine participants
-completed one trial each: four with tutor assistance and five without tutor
-assistance. The pilot is reported descriptively only. It does not support
+provides about task completion, procedural errors, raw workload ratings,
+custom post-trial ratings, comments, and the boundary between assistance and
+future trustworthy collaboration. Nine participants completed one trial each:
+four with tutor assistance and five without tutor assistance. The pilot is
+reported descriptively only. It does not support
 statistical significance, learning-gain, retention, transfer, workload-
 reduction, or speed claims.
 
@@ -510,14 +574,19 @@ cannot confirm that the FCS-MC page and final GO result were actually visible.
 
 In the reviewed data, all four tutor-condition participants reached the final
 33-step state, while none of the five without-tutor trials reached a confirmed
-final 33-step state. If the export-only confirmed-step rows are ranked, S18
-(FCS-MC BIT page), S19 (FCS BIT final GO), and S27 (flap switch to AUTO) are
-tied because each remains unconfirmed in all five without-tutor rows. This
+final 33-step state. This contrast is the most visible pilot observation, but
+it is also the most confounded one: assignment was not random, prior experience
+was not balanced, and the without-tutor condition lacked the active VLM/page
+checks available to tutor-condition trials. If the export-only confirmed-step
+rows are ranked, S18 (FCS-MC BIT page), S19 (FCS BIT final GO), and S27 (flap
+switch to AUTO) are tied because each remains unconfirmed in all five
+without-tutor rows. This
 ranking should not be read as a participant-error ranking. For S18 and S19 it
 mainly exposes a passive-export measurement blind spot; for S27 it overlaps
 with a manually coded procedure issue. The manual omission codes therefore tell
-the more relevant behavioural story: S09, S27, and S29 are the most frequent omission-coded steps, each
-appearing in three of the five without-tutor trials. This pattern identifies
+the more relevant behavioural story: S09, S27, and S29 are the most frequent
+omission-coded steps, each appearing in three of the five without-tutor trials.
+This pattern identifies
 where participants struggled and where the passive export pipeline lacked
 visual confirmation; it is not a causal estimate of tutor effect.
 
@@ -580,15 +649,16 @@ interaction risks. They motivate stricter confirmation logic, better detection
 of already-completed state, and clearer uncertainty handling in future
 versions.
 
-\subsection{Workload, Usability, Trust, and Comments}
+\subsection{Workload, Custom Ratings, and Comments}
 
 P02 is excluded from all questionnaire-derived summaries because the
 questionnaire metadata contains an internal participant-id mismatch.
 Table~\ref{tab:pilot-questionnaire} reports the remaining raw questionnaire
 values.
 Scores are descriptive only. The tutor-specific rating is available only in the
-with-tutor condition; the general user/usability rating is available for both
-conditions.
+with-tutor condition; the general custom user rating is available for both
+conditions. These ratings are custom post-trial items and should not be read as
+validated SUS, trust, or usability scales.
 
 \begin{table}[htbp]
 \centering
@@ -633,8 +703,9 @@ the recorded user rating was high and the comments described grounded feedback
 as helpful. P05, an expert participant, needed fewer help cycles and recorded a
 low TLX value, but still had assistance-coupled errors. These examples suggest
 that future evaluation should not reduce the tutor to one outcome variable.
-Completion, workload, perceived usefulness, trust, error type, and help-cycle
-repair frequency may move differently for novices and experts.
+Completion, workload, perceived usefulness, calibrated trust, error type, and
+help-cycle repair frequency may move differently for novices and experts, but
+the present pilot only records formative proxies for those future constructs.
 
 Table~\ref{tab:pilot-comments} summarises short anonymised comments. The
 comments are not coded as themes with inter-rater reliability; they are used to
@@ -654,7 +725,7 @@ condensed for space.}
 \textbf{Condition} & \textbf{Theme} & \textbf{Comment summary} \\
 \midrule
 Without tutor & Checklist legibility & A participant reported that kneeboard reading was difficult and that small fixed text was hard to use in VR. \\
-Without tutor & Procedure mapping & A participant reported that some checklist steps did not match their cockpit experience clearly enough. \\
+Without tutor & Procedure mapping & A participant reported that some checklist steps did not match their cockpit experience well enough. \\
 With tutor & Missed operations & A participant reported that the tutor helped fill in operations they had missed. \\
 With tutor & Grounded feedback & A novice participant described step-by-step guidance that identified where they were stuck and did not advance when the action was wrong. \\
 With tutor & Cognitive effort & A participant still needed to compare cockpit displays with AI instructions and found abbreviations such as FCS and BIT confusing. \\

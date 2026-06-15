@@ -1,7 +1,7 @@
 % ===========================================================================
-%  前导页 — 标题页 + 原创性声明
-%  改编自 paperwork/Preamble.tex（TU Clausthal ISSE 论文模板）。
-%  证据：paperwork/Preamble.tex
+%  前页 — 标题页 + 原创性声明
+%  改编自 paperwork/Preamble.tex（克劳斯塔尔工业大学 ISSE 论文模板）
+%  证据来源：paperwork/Preamble.tex
 % ===========================================================================
 
 \begin{titlepage}
@@ -9,7 +9,7 @@
 	{\flushleft{\includegraphics[scale=0.7]{images/Logo_TUC_de_CMYK.jpg}}\par}
 	\centering
 	\vspace*{\fill}
-	{\large \textbf{硕士学位论文}\\ 作者：\\ \textbf{\@author}\par}
+	{\large \textbf{硕士论文}\\ 作者：\\ \textbf{\@author}\par}
 	\vspace*{\fill}
 	{\Large \textbf{\@title}\par}
 	\vspace*{\fill}
@@ -20,15 +20,15 @@
 				\centering
 				第一导师： & \textbf{Prof. Dr. Christian Bartelt}\\
 				& \\
-				第二导师： & \textbf{Prof. Dr. Rüdiger Ehlers}\\
+				第二导师： & \textbf{Dr. Sascha Marton}\\
 			\end{tabularx}
 		\end{table}
 	\end{centering}
 	\vspace*{\fill}
-{\britishdate\displaydate{hand-in}}\vfill
-\flushleft
-软件与系统工程研究所\\
-克劳斯塔尔工业大学
+	\today\vfill
+	\flushleft
+	软件与系统工程研究所\\
+	克劳斯塔尔工业大学
 \makeatother
 \end{titlepage}
 
@@ -37,9 +37,9 @@
 \section*{原创性声明}
 \vspace{15ex}
 
-本人已阅读并理解克劳斯塔尔工业大学以及 ISSE 公告中发布的各项指南，包括关于使用文献及其他来源的规定。
+本人已阅读并理解克劳斯塔尔工业大学及 ISSE 公告中发布的各项指南，包括关于使用文献和其他来源的规定。
 本人确认已独立完成本论文。
-任何取自其他来源并在本论文中复制的信息均已明确标注。
+凡引用他人成果并在本论文中复现的内容，均已作出适当引用标注。
 \vspace{7.5ex}
 
 \noindent
@@ -47,11 +47,11 @@
 \vspace{7.5ex}
 
 \noindent
-本人特此同意，本人的硕士学位论文可在本研究所图书馆内展出并供查阅。
+本人同意将本硕士论文陈列于研究所图书馆，供查阅使用。
 
 \makeatletter
 \vspace{15ex}
-\parbox{0.475\textwidth}{\centering 克劳斯塔尔-采勒费尔德，{\britishdate\displaydate{hand-in}} \hrule\strut\centering\footnotesize 地点，日期} \hfill
-\parbox{0.475\textwidth}{\vphantom{克劳斯塔尔-采勒费尔德，{\britishdate\displaydate{hand-in}}} \hrule\strut\centering\footnotesize \@author}
+\parbox{0.475\textwidth}{\centering 克劳斯塔尔-采勒费尔德，\today \hrule\strut\centering\footnotesize 地点，日期} \hfill
+\parbox{0.475\textwidth}{\vphantom{克劳斯塔尔-采勒费尔德，\today} \hrule\strut\centering\footnotesize \@author}
 \makeatother
 \vfill

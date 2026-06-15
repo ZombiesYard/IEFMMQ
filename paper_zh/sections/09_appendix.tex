@@ -3,16 +3,16 @@
 % ===========================================================================
 \chapter{附录}\label{ch:appendix}
 
-本附录支撑方法论、实现和评估各章。它保留了原始的配置、数据集、回放、图表和试点编码材料，而未扩展正文各章所声明的声明边界。
+本附录支撑方法、实现和评估章节。它保存原始配置、数据集、回放、图表和先导实验编码材料，而不扩展正文各章中所述的声明边界。
 
 % ===========================================================================
 \section{完整 LoRA 超参数配置}\label{sec:appendix-hyperparams}
 
-表~\ref{tab:lora-hyperparams-full}~列出了三种骨干模型在匹配的 Run-003 + Run-005$\times$2 配方下的完整超参数配置。数值来源于可用的训练报告和基准测试工件。
+表~\ref{tab:lora-hyperparams-full} 列出了匹配的 Run-003 + Run-005$\times$2 方案下三个骨干模型的完整超参数配置。数值来自可用的训练报告和基准测试工件。
 
 \begin{table}[htbp]
   \centering
-  \caption{三种骨干模型的完整 LoRA 微调超参数配置。}
+  \caption{三个骨干模型的完整 LoRA 微调超参数。}
   \label{tab:lora-hyperparams-full}
   \small
   \begin{tabular}{@{}llll@{}}
@@ -34,123 +34,123 @@
   \texttt{train\_rows} & 928 & 928 & 928 \\
   \texttt{eval\_rows} & 0 & 0 & 0 \\
   \midrule
-  \textbf{骨干模型特定参数} & & & \\
+  \textbf{骨干特定} & & & \\
   \midrule
-  视觉 LoRA & 已启用 & 已启用 & 已禁用 \\
+  Vision LoRA & 启用 & 启用 & 禁用 \\
   LoRA 目标模块 & vision+lang & vision+lang & all-linear \\
   对话模板 & Qwen 默认 & Qwen 默认 & gemma-4 \\
-  GPU 内存使用率 & 0.6 & 0.6 & 0.95 \\
+  GPU 内存利用率 & 0.6 & 0.6 & 0.95 \\
   \midrule
   \textbf{训练结果} & & & \\
   \midrule
-  训练时长 (s) & 6419 & 12619 & 8050 \\
-  训练损失 (最终) & 0.2156 & 0.1068 & 0.0474 \\
+  训练运行时间 (s) & 6419 & 12619 & 8050 \\
+  训练损失（最终） & 0.2156 & 0.1068 & 0.0474 \\
   \bottomrule
   \end{tabular}
 \end{table}
 
-注意：由于不同骨干模型在分词器行为、对话模板结构、目标序列分布和模型参数化方面存在差异，训练损失值不可直接跨骨干比较。
+注意：训练损失值因分词器行为、对话模板结构、目标序列分布和模型参数化的不同，在骨干模型之间不可直接比较。训练运行时间和最终损失为训练报告溯源；所报告的主要 VLM 声明依赖于本地基准测试 JSON 和审查标签工件。
 
 % ===========================================================================
-\section{8 事实 v1 基线基准测试}\label{sec:appendix-8fact}
+\section{8 事实 V1 基线基准测试}\label{sec:appendix-8fact}
 
-最早的完整基准测试使用基于 Run-001（180 个任务）训练的 8 事实 LoRA 适配器，并在 Run-002 留存验证集（50 个样本）上评估。该基线先于 13 事实本体，收录于此仅供参考历史。
+最早的完整基准测试使用在 Run-001（180 个任务）上训练的 8 事实 LoRA 适配器，并在 Run-002 验证集（50 个样本）上评估。此线早于 13 事实本体论，纳入仅为历史参考。
 
 \begin{table}[htbp]
 \centering
-\caption{8 事实 v1 基准测试：Qwen3.5-9B 基础模型 vs.\ LoRA-v1 在 Run-002 留存验证集上（50 样本，英文）。}\label{tab:appendix-qwen-8fact}
+\caption{8 事实 v1 基准测试：Qwen3.5-9B 基座 vs. LoRA-v1 在 Run-002 验证集上（50 样本，英文）。}\label{tab:appendix-qwen-8fact}
 \begin{tabular}{l c c c}
 \toprule
-\textbf{指标} & \textbf{基础模型} & \textbf{LoRA-v1} & \textbf{$\Delta$} \\
+\textbf{指标} & \textbf{基座} & \textbf{LoRA-v1} & \textbf{$\Delta$} \\
 \midrule
-JSON 合法率          & 1.0    & 1.0    & --- \\
-Schema 合法率        & 1.0    & 1.0    & --- \\
-事实准确率           & 0.7600 & 0.9150 & +0.1550 \\
-宏观 $F_1$           & 0.4241 & 0.5847 & +0.1605 \\
-已见 $F_1$           & 0.4714 & 0.8380 & +0.3666 \\
-样本精确匹配率       & 0.06   & 0.36   & +0.30 \\
-关键假阳性           & 13     & 15     & +2 \\
+JSON valid rate       & 1.0    & 1.0    & --- \\
+Schema valid rate     & 1.0    & 1.0    & --- \\
+Fact accuracy         & 0.7600 & 0.9150 & +0.1550 \\
+Macro $F_1$           & 0.4241 & 0.5847 & +0.1605 \\
+Seen $F_1$            & 0.4714 & 0.8380 & +0.3666 \\
+Sample exact match    & 0.06   & 0.36   & +0.30 \\
+Critical false positives & 13  & 15     & +2 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% Evidence: benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/
+% 证据来源：benchmarks/qwen35_vlm_finetune/base_vs_lora_holdout_run002_v1/
 
-LoRA 适配器显著提升了事实层面的指标，但将关键假阳性从 13 增至 15。这一历史结果展示了 8 事实 v1 本体的结构性弱点：诸如 \texttt{ins\_go} 等复合目标无法从单帧中进行视觉验证，并在完成类事实上产生了系统性的假阳性错误。
+LoRA 适配器显著改善了事实级指标，但将关键假阳性从 13 增加到 15。这一历史结果说明了 8 事实 v1 本体论的结构性弱点：诸如 \texttt{ins\_go} 的复合目标无法从单帧图像中进行视觉验证，并在完成类事实上产生了系统性的假阳性错误。
 
 % ===========================================================================
 \section{数据集事实分布}\label{sec:appendix-datasets}
 
-表~\ref{tab:fact-distributions}~报告了两个主要训练来源（Run-003、Run-005）和两个 13 事实留存验证集（Run-002 newfacts、Run-004 random）中每个事实的 \texttt{seen} 计数。计数数据来源于相应的 \texttt{stats.json} 文件。表中使用了简短的显示标签；权威的事实标识符定义在过程包所使用的视觉事实本体文件中。
+表~\ref{tab:fact-distributions} 报告了两个主要训练源（Run-003、Run-005）和两个 13 事实验证集（Run-002 newfacts、Run-004 random）的逐事实 \texttt{seen} 计数。计数取自相应的 \texttt{stats.json} 文件。表格使用简短显示标签；权威事实标识符定义在程序包使用的视觉事实本体论文件中。
 
 \begin{table}[htbp]
 \centering
-\caption{训练集和留存验证集中各事实 \texttt{seen} 计数（13 事实 v2 本体）。}
+\caption{训练集与验证集之间的逐事实 \texttt{seen} 计数（13 事实 v2 本体论）。}
 \label{tab:fact-distributions}
 \small
 \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}Xrrrr@{}}
 \toprule
 \textbf{事实标签} & \textbf{Run-003} & \textbf{Run-005} & \textbf{Run-002} & \textbf{Run-004} \\
 \midrule
-TAC 页面可见              & 46  & 24  & 23 & 3  \\
-SUPT 页面可见             & 20  & 34  & 5  & 3  \\
-FCS 页面可见              & 30  & 40  & 13 & 94 \\
-FCS X 标记可见            & 16  & 18  & 1  & 5  \\
-BIT 根页面可见            & 18  & 43  & 9  & 16 \\
-FCS-MC 页面可见           & 55  & 56  & 9  & 84 \\
-FCS-MC 中间结果           & 18  & 15  & 1  & 7  \\
-FCS-MC 测试中状态         & 18  & 19  & 6  & 17 \\
-FCS-MC 最终 GO 结果       & 18  & 22  & 2  & 60 \\
-HSI 页面可见              & 106 & 109 & 49 & 100 \\
-HSI 地图图层可见          & 79  & 37  & 27 & 50 \\
-INS 地面校准文字          & 58  & 72  & 42 & 69 \\
-INS OK 文字               & 12  & 14  & 4  & 0  \\
+TAC page visible            & 46  & 24  & 23 & 3  \\
+SUPT page visible           & 20  & 34  & 5  & 3  \\
+FCS page visible            & 30  & 40  & 13 & 94 \\
+FCS X marks visible         & 16  & 18  & 1  & 5  \\
+BIT root page visible       & 18  & 43  & 9  & 16 \\
+FCS-MC page visible         & 55  & 56  & 9  & 84 \\
+FCS-MC intermediate result  & 18  & 15  & 1  & 7  \\
+FCS-MC in-test state        & 18  & 19  & 6  & 17 \\
+FCS-MC final GO result      & 18  & 22  & 2  & 60 \\
+HSI page visible            & 106 & 109 & 49 & 100 \\
+HSI map layer visible       & 79  & 37  & 27 & 50 \\
+INS GRND alignment text     & 58  & 72  & 42 & 69 \\
+INS OK text                 & 12  & 14  & 4  & 0  \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-% Evidence: datasets/vision_sft_run003/stats.json,
-%           datasets/vision_sft_run005_composition_rebalance/stats.json,
-%           datasets/vision_sft_holdout_run002_newfacts/stats.json,
+% 证据来源：datasets/vision_sft_run003/stats.json，
+%           datasets/vision_sft_run005_composition_rebalance/stats.json，
+%           datasets/vision_sft_holdout_run002_newfacts/stats.json，
 %           datasets/vision_sft_holdout_run004_random/stats.json
 
-Run-005 与 Run-003 合并后增加了若干稀疏目标的覆盖：SUPT 页面观察从 20 升至 54，FCS-MC 页面观察从 55 升至 111，INS 地面校准文字观察从 58 升至 130。此表记录了数据来源；第~\ref{ch:evaluation}~章评估了由此产生的训练配方是否在留存验证集上改善了模型行为。
+Run-005 与 Run-003 结合时增加了若干稀疏目标的覆盖：SUPT 页面观察从 20 升至 54，FCS-MC 页面观察从 55 升至 111，INS GRND 校准文本观察从 58 升至 130。此表格记录数据溯源；第~\ref{ch:evaluation} 章评估了所得训练方案是否在验证集上改善了模型行为。
 
 % ===========================================================================
 \section{CLI 命令参考}\label{sec:appendix-cli}
 
-\texttt{simtutor} 包提供以下 CLI 命令：
+仓库中的原型 CLI 提供以下命令：
 
 \begin{description}
-\item[\texttt{run}.] 使用模拟环境适配器和预录制的场景文件执行模拟，并写入事件日志。
-\item[\texttt{replay}.] 根据过程包验证现有事件日志，检查步骤顺序和状态机一致性。
-\item[\texttt{score}.] 使用评分引擎对事件日志进行评分，产生遗漏计数、状态违规计数和总错误分数。
-\item[\texttt{record-vlm}.] 对一组视觉观察执行 VLM 事实提取，并记录预测结果用于基准测试。
-\item[\texttt{replay-bios}.] 通过遥测管线回放原始 DCS-BIOS 捕获数据，并可选择调用帮助生成循环。
-\item[\texttt{validate}.] 根据 Schema 注册库中的指定 Schema 验证 JSONL 文件。
+\item[\texttt{run}.] 使用模拟环境适配器配合预记录的场景文件执行模拟，并写入事件日志。
+\item[\texttt{replay}.] 对照程序包验证已有的事件日志，检查步骤排序和状态机一致性。
+\item[\texttt{score}.] 使用评分引擎对事件日志进行评分，生成遗漏计数、状态违规计数和总错误得分。
+\item[\texttt{record-vlm}.] 对一组视觉观察执行 VLM 事实提取，并记录预测以供基准测试。
+\item[\texttt{replay-telemetry}.] 通过遥测流水线回放原始遥测捕获，并可选择性地调用帮助生成循环。
+\item[\texttt{validate}.] 对照模式注册表中的命名模式验证 JSONL 文件。
 \end{description}
 
-所有命令均接受模型配置覆盖参数（\texttt{--model-\allowbreak provider}、\texttt{--model-\allowbreak name}、\texttt{--model-\allowbreak base-\allowbreak url}、\texttt{--model-\allowbreak timeout-\allowbreak s}）和语言切换参数（\texttt{--lang}）。
+所有命令接受模型配置覆盖（\texttt{--model-provider}、\texttt{--model-name}、\texttt{--model-base-url}、\texttt{--model-timeout-s}）和语言切换（\texttt{--lang}）。
 
 % ===========================================================================
 \section{模型提供方配置}\label{sec:appendix-model-config}
 
-模型访问通过环境变量配置，并在运行时验证：
+模型访问通过环境变量配置并在运行时验证。配置项包括：
 
 \begin{description}
-\item[提供方.] \texttt{SIMTUTOR\_MODEL\_PROVIDER} 选择 \texttt{openai\_compat}、\texttt{ollama} 或 \texttt{stub}。
-\item[Base URL.] \texttt{SIMTUTOR\_MODEL\_BASE\_URL} 设置提供方端点。
-\item[模型.] \texttt{SIMTUTOR\_MODEL\_NAME} 选择模型名称。
-\item[超时.] \texttt{SIMTUTOR\_MODEL\_TIMEOUT\_S} 设置请求超时时间。
-\item[凭证.] \texttt{SIMTUTOR\_MODEL\_API\_KEY} 是 \texttt{openai\_compat} 提供方所必需的。API 密钥在日志输出中会被遮盖。
-\item[图像.] \texttt{SIMTUTOR\_MODEL\_ENABLE\_MULTIMODAL} 切换请求中的 base64 图像编码。
-\item[语言.] \texttt{SIMTUTOR\_LANG} 选择 \texttt{zh} 或 \texttt{en}。
+\item[Provider.] 模型提供方，可选择 \texttt{openai\_compat}、\texttt{ollama} 或 \texttt{stub}。
+\item[Base URL.] 提供方端点。
+\item[Model.] 模型名称。
+\item[Timeout.] 请求超时。
+\item[Credentials.] \texttt{openai\_compat} 提供方所需的 API 密钥；密钥在日志输出中被遮蔽。
+\item[Images.] 是否在请求中启用 base64 图像编码。
+\item[Language.] 输出语言，选择 \texttt{zh} 或 \texttt{en}。
 \end{description}
 
 % ===========================================================================
 \section{回放评估套件}\label{sec:appendix-replay}
 
-表~\ref{tab:replay-cases}~列出了 \texttt{fa18c\_startup\_v04} 套件中的五个回放评估案例。此处显示标签为简写；套件文件保留了确切的 \texttt{case\_id} 字符串。
+表~\ref{tab:replay-cases} 列出了 \texttt{fa18c\_startup\_v04} 套件中的五个回放评估案例。此处显示标签经缩短；套件文件保存了精确的 \texttt{case\_id} 字符串。
 
 \begin{table}[htbp]
 \centering
@@ -161,78 +161,81 @@ Run-005 与 Run-003 合并后增加了若干稀疏目标的覆盖：SUPT 页面�
 \toprule
 \textbf{案例} & \textbf{步骤} & \textbf{视觉} & \textbf{目标} \\
 \midrule
-空操作捕获 & S01 & 否 & 电池开关 \\
-电池开启 & S02 & 否 & 火警测试开关 \\
-电池开启，发动机发电机关闭 & S01 & 否 & 左侧发电机开关 \\
-FCS 重置 / FCS BIT & S18 & 是 & FCS BIT 开关 \\
-INS 模式 & S12 & 是 & INS 模式旋钮 \\
+No-op capture & S01 & no & 电池开关 \\
+Battery on & S02 & no & 火警测试开关 \\
+Battery on, engine generator off & S01 & no & 左发电机开关 \\
+FCS reset / FCS BIT & S18 & yes & FCS BIT 开关 \\
+INS mode & S12 & yes & INS 模式旋钮 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-% Evidence: replay_eval/fa18c_startup_v04/suite.yaml
+% 证据来源：replay_eval/fa18c_startup_v04/suite.yaml
 
-标记为视觉可用的案例包含在相应 DCS World Saved Games 捕获中的逐帧 sidecar 文件（\texttt{frames.jsonl}）。这些文件允许依赖视觉的回放案例在没有实时 DCS World 实例的情况下运行。
+标记为视觉可用的案例包含相应的 DCS World Saved Games 截图中的逐帧侧车文件（\texttt{frames.jsonl}）。这些文件使视觉依赖的回放案例可以在没有实时 DCS World 实例的情况下运行。
 
 % ===========================================================================
-\section{补充架构与导出图示}\label{sec:appendix-figures}
+\section{补充架构与导出图表}\label{sec:appendix-figures}
 
-正文各章使用简化图示来支撑研究论证。图~\ref{fig:harness-validation}、\ref{fig:deployment-topology}和\ref{fig:experiment-export}保留了额外的工程细节，以便复现和操作上下文。
+正文各章使用简化图表来支撑研究论证。图~\ref{fig:harness-validation}、\ref{fig:deployment-topology} 和 \ref{fig:experiment-export} 保留了额外的工程细节，供可复现性和操作上下文参考。
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/fig_harness_validation.pdf}
-  \caption{Harness 与证据验证。候选 tutor 动作在接受为叠加层动作计划之前，需经过 Schema 约束、UI 白名单、证据一致性和过程状态的检查；不安全或证据不足的动作会被修复、拒绝或降级为纯文字指导。}
+  \caption{约束层与证据验证。候选教学动作在接受叠加层行动计划之前，须经过模式约束、UI 白名单、证据一致性和程序状态的检查；不安全或依据不足的动作被修复、拒绝或降级为仅文本引导。}
   \label{fig:harness-validation}
+  \Description[约束验证边界]{一个流程图展示了证据包和排序后的候选步骤馈入结构化模型响应。模式和证据引用检查要么接受已知的 UI 目标，要么将响应送入修复、降级或仅文本回退。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/fig_deployment_topology.pdf}
-  \caption{原型所使用的部署拓扑。模拟器、Quest 3 叠加层路径、本地运行时、回放工具和远程模型提供方被分离开来，使得实时试验和离线分析可以使用相同的证据和日志契约。}
+  \caption{原型使用的部署拓扑。模拟器、Quest 3 叠加层路径、本地运行时、回放工具和远程模型提供方被分离，以使实时试验和离线分析能够使用相同的证据和日志契约。}
   \label{fig:deployment-topology}
+  \Description[原型部署拓扑]{一份部署图展示了 Windows 模拟器主机（包含 DCS World、Quest 3、外部遥测接口和视觉侧车）连接到教学运行时。运行时与远程 GPU 服务器交换模型调用，并写入 JSONL 和 CSV 日志。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/fig_experiment_export.pdf}
-  \caption[详细的实验导出管线]{详细的实验导出管线。运行时事件日志和试验元数据被转换为参与者级别的汇总、步骤编码、帮助循环记录、质量门控和研究级分析表。}
+  \caption[详细的实验导出流水线]{详细的实验导出流水线。运行时事件日志和试验元数据被转化为参与者级摘要、步骤编码、帮助周期记录、质量门控条件和研究级分析表。}
   \label{fig:experiment-export}
+  \Description[实验导出流水线]{一个流水线图展示了原始 JSONL 试验日志、会话元数据和包分类法进入实验导出步骤。输出为试验摘要、步骤编码、帮助周期、动作时间线和质量门控文件。}
 \end{figure}
 
 % ===========================================================================
-\section{VR 试点研究——补充数据}\label{sec:appendix-pilot}
+\section{VR 先导实验——补充数据}\label{sec:appendix-pilot}
 
-表~\ref{tab:pilot-participants}~列出了用于描述性解读的参与者经验画像。P02 的问卷衍生字段被排除在工作负荷、信心、可用性、信任和评论汇总之外，因为可用的问卷元数据中存在内部参与者 ID 不匹配。P08 使用人工完成编码，P09 在经过试验元数据记录的纠正后被视为独立参与者。
+表~\ref{tab:pilot-participants} 列出了用于描述性解读的参与者经验概况。问卷、步骤编码和参与者元数据的质量处理规则在表~\ref{tab:data-quality-rules} 中单独列出，以避免将数据清洗细节混入参与者概况本身。
 
 \begin{table}[htbp]
 \centering
-\caption{试点参与者经验画像（自我报告）。}\label{tab:pilot-participants}
+\caption{先导实验参与者经验概况（自我报告）。}\label{tab:pilot-participants}
 \small
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}lllllll@{}}
 \toprule
-\textbf{P} & \textbf{条件} & \textbf{组别} & \textbf{DCS World} & \textbf{F/A-18C} & \textbf{冷启动} & \textbf{VR} \\
+\textbf{P} & \textbf{条件} & \textbf{分组} & \textbf{DCS World} & \textbf{F/A-18C} & \textbf{冷启动} & \textbf{VR} \\
 \midrule
-P01 & 无 tutor & 新手 & 无 & 无 & 无 & 非常少 \\
-P02 & 无 tutor & 中级 & 频繁 & 有经验 & 尝试过 & 频繁 \\
-P03 & 无 tutor & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
-P04 & 有 tutor & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
-P05 & 有 tutor & 专家 & 频繁 & 有经验 & 可以完成 & 频繁 \\
-P06 & 无 tutor & 专家 & 频繁 & 有经验 & 可以完成 & 频繁 \\
-P07 & 无 tutor & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
-P08 & 有 tutor & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
-P09 & 有 tutor & 新手 & 无 & 无 & 无 & 非常少 \\
+P01 & 无教学 & 新手 & 无 & 无 & 无 & 非常少 \\
+P02 & 无教学 & 中级 & 频繁 & 有经验 & 尝试过 & 频繁 \\
+P03 & 无教学 & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
+P04 & 有教学 & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
+P05 & 有教学 & 专家 & 频繁 & 有经验 & 能完成 & 频繁 \\
+P06 & 无教学 & 专家 & 频繁 & 有经验 & 能完成 & 频繁 \\
+P07 & 无教学 & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
+P08 & 有教学 & 中级 & 偶尔 & 尝试过 & 尝试过 & 偶尔 \\
+P09 & 有教学 & 新手 & 无 & 无 & 无 & 非常少 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-表~\ref{tab:pilot-uncompleted}~列出了每位无 tutor 参与者在可用导出证据下未被确认为完成的具体步骤。它需要与第~\ref{ch:evaluation}~章的人工错误表一起阅读，因为无 tutor 的被动记录没有运行 tutor 试验中使用的 VLM 页面检查。
+表~\ref{tab:pilot-uncompleted} 列出了每名无教学参与者未被可用导出证据确认为已完成的特定步骤。应与第~\ref{ch:evaluation} 章中的人工错误表一起阅读，因为被动无教学日志记录未运行教学试验使用的 VLM 页面检查。
 
 \begin{table}[htbp]
 \centering
-\caption{无 tutor 条件下未被确认为完成的步骤。}\label{tab:pilot-uncompleted}
+\caption{无教学条件下未确认为已完成的步骤。}\label{tab:pilot-uncompleted}
 \small
 \begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
 \toprule
@@ -246,49 +249,49 @@ P07 & S02, S09, S12, S13, S16, S17, S18, S19, S22, S26, S27, S28, S29, S32 \\
 \bottomrule
 \end{tabularx}
 
-S18（右侧 DDI 上的 FCS-MC BIT 页面）和 S19（FCS BIT 最终 GO 结果）在五个无 tutor 导出行中都保持未确认，且属于视觉优先的显示检查。这并不意味着五位参与者都遗漏了这两个动作。操作时间线审核发现，五位无 tutor 参与者均存在右 DDI PB5 活动，且 P02、P03、P06 和 P07 存在 FCS BIT 开关拨起活动。剩余的不确定性是页面跳转和最终 GO 结果是否在视觉上出现，因为无 tutor 的被动导出没有运行 tutor 试验中使用的 VLM/页面检查。S27（襟翼开关拨至 AUTO）同样在五个行中均未确认，但过程包将其归类为 BIOS 优先，具有变量和门控证据而非 VLM 绑定的视觉证据。因此，该表是导出确认表，而不是直接的遗漏表。
+S18（右侧 DDI 上的 FCS-MC BIT 页面）和 S19（FCS BIT 最终 GO 结果）在所有五个无教学导出行中保持未确认，且属于视觉优先的显示检查。这并不意味着所有五名参与者均遗漏了这两个动作。动作时间线审查发现所有五名无教学参与者存在右侧-DDI PB5 活动，P02、P03、P06 和 P07 存在 FCS BIT 开关向上活动。剩余不确定性在于页面转换和最终 GO 结果是否在视觉上出现，因为被动无教学导出未运行教学试验使用的 VLM/页面检查。S27（襟翼开关到 AUTO）同样在所有五行中未确认，但程序包将其分类为遥测优先，具有变量和门控证据而非 VLM 绑定的视觉证据。因此，该表是导出确认表，而非直接的遗漏表。
 \end{table}
 
-表~\ref{tab:pilot-errors-auto}~报告了自动编码的错误计数（人工审核前）与人工错误计数的对比，显示了在试点解读之前自动化导出需要进行多少纠正。
+表~\ref{tab:pilot-errors-auto} 报告了自动编码错误计数（人工审查前）与人工错误计数并排，展示了自动导出在用于先导实验解读之前需要多大程度的修正。
 
 \begin{table}[htbp]
 \centering
-\caption{每位参与者的自动编码 vs.\ 人工错误计数。}\label{tab:pilot-errors-auto}
+\caption{逐参与者的自动编码 vs. 人工错误计数。}\label{tab:pilot-errors-auto}
 \small
 \begin{tabular}{@{}llrrrrr@{}}
 \toprule
 \textbf{P} & \textbf{条件} & \textbf{自动 OM} & \textbf{自动 CO} & \textbf{人工 OM} & \textbf{人工 CO} & \textbf{人工总计} \\
 \midrule
-P01 & 无 tutor & 4  & 3  & 8  & 0 & 10 \\
-P02 & 无 tutor & 0  & 3  & 0  & 0 & 1  \\
-P03 & 无 tutor & 0  & 4  & 7  & 0 & 11 \\
-P06 & 无 tutor & 0  & 3  & 2  & 0 & 4  \\
-P07 & 无 tutor & 1  & 9  & 11 & 0 & 11 \\
-P04 & 有 tutor & 0  & 4  & 0  & 3 & 7  \\
-P05 & 有 tutor & 0  & 3  & 0  & 3 & 6  \\
-P08 & 有 tutor & 0  & 3  & 0  & 0 & 0  \\
-P09 & 有 tutor & 0  & 3  & 0  & 3 & 5  \\
+P01 & 无教学 & 4  & 3  & 8  & 0 & 10 \\
+P02 & 无教学 & 0  & 3  & 0  & 0 & 1  \\
+P03 & 无教学 & 0  & 4  & 7  & 0 & 11 \\
+P06 & 无教学 & 0  & 3  & 2  & 0 & 4  \\
+P07 & 无教学 & 1  & 9  & 11 & 0 & 11 \\
+P04 & 有教学 & 0  & 4  & 0  & 3 & 7  \\
+P05 & 有教学 & 0  & 3  & 0  & 3 & 6  \\
+P08 & 有教学 & 0  & 3  & 0  & 0 & 0  \\
+P09 & 有教学 & 0  & 3  & 0  & 3 & 5  \\
 \bottomrule
 \end{tabular}
 
-自动编码错误来自自动化管线（\texttt{step\_coding.csv} 中的 Auto\_Error\_* 列）。人工错误来自人工审核列（Error\_*）。P08 的自动错误在人工审核中全部被覆盖为零（参见第~\ref{sec:eval-pilot}~节中的数据质量说明）。
+自动编码错误来自自动化流水线（\texttt{step\_coding.csv} 中的 Auto\_Error\_* 列）。人工错误来自人工审查列（Error\_*）。P08 的自动错误在人工审查中全部被覆盖为零（见第~\ref{sec:eval-pilot} 节的数据质量注释）。
 \end{table}
 
-表~\ref{tab:pilot-data-quality-authority}~记录了当原始导出数据与人工审核证据出现分歧时使用的补充工件权威规则。
+表~\ref{tab:pilot-data-quality-authority} 记录了当原始导出与人工审查证据不一致时使用的补充工件权威规则。
 
 \begin{table}[htbp]
 \centering
-\caption{试点补充数据质量权威规则。}
+\caption{补充先导实验数据质量权威规则。}
 \label{tab:pilot-data-quality-authority}
 \small
 \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.10\textwidth}YYY@{}}
 \toprule
-\textbf{案例} & \textbf{工件问题} & \textbf{权威规则} & \textbf{在论文中的使用} \\
+\textbf{案例} & \textbf{数据质量问题} & \textbf{权威规则} & \textbf{报告用途} \\
 \midrule
-P08 & \texttt{trial\_summary.csv} 报告未完成的进展，而经审核的 \texttt{step\_coding.csv} 标记全部 33 步已完成。 & 人工遥测审核和经审核的步骤编码列覆盖自动化试验汇总。 & 报告为完成 33/33，零人工过程性错误。 \\
-P02 & 问卷 JSON 存储在 P02 下，但包含 P01 的参与者 ID 元数据不匹配。 & 任务日志仍可使用；问卷衍生字段被排除。 & 纳入任务和错误表；排除在 TLX、评分和评论汇总之外。 \\
-P07 & 无 tutor 问卷包含 tutor 专项数值字段，尽管 tutor 专项的 NA 标志为 true。 & 条件和 NA 标志覆盖原始的 tutor 专项数值字段。 & 保留通用用户评分；tutor 评分报告为 N/A。 \\
-P04 & 质量门控元数据包含非阻塞的关联警告。 & 保留人工任务指标和帮助循环计数；不过度解读受影响的关联字段。 & 纳入试验概览，并注明来源注意事项。 \\
+P08 & \texttt{trial\_summary.csv} 报告不完整进展，而审查后的 \texttt{step\_coding.csv} 标记全部 33 步完成。 & 人工遥测审查和审查后的步骤编码列覆盖自动试验摘要。 & 报告为 33/33 完成，零人工程序错误。 \\
+P02 & 问卷 JSON 存储在 P02 下，但包含 P01 参与者 ID 元数据不匹配。 & 任务日志仍可用；问卷推导字段被排除。 & 纳入任务和错误表；排除于 TLX、评分和评论汇总。 \\
+P07 & 无教学问卷包含教学特定数值字段，即便教学特定 NA 标志为 true。 & 条件和 NA 标志覆盖原始教学特定数值字段。 & 通用用户评分保留；教学评分报告为 N/A。 \\
+P04 & 质量门控元数据包含非阻塞性链接警告。 & 保留人工任务指标和帮助周期计数；不过度解读受影响的链接字段。 & 纳入试验概览，附溯源说明。 \\
 \bottomrule
 \end{tabularx}
 \end{table}

@@ -41,7 +41,7 @@ used for a formative pilot rather than for a controlled effectiveness claim.
 This shift was not only an engineering convenience. The cold-start procedure
 made a prior problem visible: before a tutor can give useful procedural help, it
 must know which state it is allowed to trust. Some required evidence is exported
-as telemetry through DCS-BIOS. Some evidence is visible only on cockpit
+as raw telemetry through an external telemetry interface. Some evidence is visible only on cockpit
 displays. Some evidence is outside the current telemetry or visual-fact
 contract, so the runtime must treat it as unavailable rather than silently
 turning it into a confident state claim. The thesis therefore had to build the
@@ -60,8 +60,9 @@ perception component rather than as an unconstrained judge of procedure state.
 The completed VR pilot partially returns to the original proposal's
 human-subject ambition. It shows that the evidence-grounded runtime can be
 exercised in headset with real participants and that the export pipeline can
-capture task logs, workload ratings, usability/trust ratings, and comments for
-later analysis. It does not, however, complete the controlled three-condition
+capture task logs, raw workload ratings, custom post-trial ratings, and
+comments for later analysis. It does not, however, complete the controlled
+three-condition
 study proposed at the beginning of the project. With $n=9$, non-random
 assignment, P02 excluded from questionnaire-derived summaries, and P08 requiring
 manual completion coding, the pilot is formative and descriptive.
@@ -162,7 +163,7 @@ logs their outputs. This division of labour turns a broad foundation-model
 capability into a set of smaller contracts.
 
 This pattern differs from simply adding guardrails around a chatbot. Guardrails
-often operate after a model has produced a free-form answer. In SimTutor, the
+often operate after a model has produced a free-form answer. In the prototype, the
 contract exists before generation: the procedure pack defines the target space,
 the evidence packet defines what the model is allowed to cite, the visual
 ontology defines what the VLM may report, and the harness defines what can
@@ -204,8 +205,8 @@ the with-tutor group gave a mean tutor-specific rating of 5.92 on the recorded
 1--7 scale. These values are useful for formative interpretation, especially
 when read together with comments about grounded feedback, missed operations,
 small VR checklist text, and confusing abbreviations. They should not be read
-as evidence that the tutor reduced workload or increased trust in a controlled
-sense.
+as evidence that the tutor reduced workload or improved calibrated trust or
+usability with inferential strength.
 
 The same data also show that assistance does not eliminate procedural error.
 Commission and prompt-assistance errors remained in the tutor condition. This is
@@ -231,15 +232,16 @@ analysable logs. Second, it reveals the kind of human-system interaction data
 that a later controlled study should measure more carefully. It does not support
 causal claims about learning, workload, retention, transfer, or task speed.
 
-\subsection{Boundary Between Assistance and Collaboration}
+\subsection{Boundary Between Assistance and Future Collaboration}
 
-The pilot also clarifies what is meant by a trustworthy AI collaborator. A
-collaborator is not simply a system that supplies more instructions. In a
-high-load VR cockpit, more instructions can increase cognitive work if they
-arrive at the wrong time, use unfamiliar abbreviations, or force the learner to
-compare multiple sources of evidence. A trustworthy collaborator must regulate
-its own certainty, decide when to highlight and when to remain text-only, and
-help the learner understand the evidence behind the next step.
+The pilot helps define prerequisites for a future trustworthy AI collaborator,
+but it does not evaluate that construct directly. A collaborator is not simply
+a system that supplies more instructions. In a high-load VR cockpit, more
+instructions can increase cognitive work if they arrive at the wrong time, use
+unfamiliar abbreviations, or force the learner to compare multiple sources of
+evidence. A trustworthy collaborator must regulate its own certainty, decide
+when to highlight and when to remain text-only, and help the learner understand
+the evidence behind the next step.
 
 The with-tutor trials show both sides of this boundary. Completion and omission
 patterns suggest that step-aware guidance can keep learners oriented. The
@@ -388,10 +390,10 @@ with-tutor trials.
 
 Questionnaire evidence is usable but limited. P02's questionnaire metadata
 could not be confidently attributed and is excluded from all questionnaire-
-derived summaries. The remaining raw NASA-TLX, tutor-rating, usability/user
-rating, and free-text comment data are descriptive only. They support
-formative interpretation, not workload, confidence, trust, or usability claims
-with inferential strength.
+derived summaries. The remaining raw NASA-TLX, custom tutor/user ratings, and
+free-text comment data are descriptive only. They support formative
+interpretation, not workload, confidence, trust, or usability claims with
+inferential strength.
 
 Finally, manual review inferred without-tutor completion from passive telemetry
 gates and the action timeline. Because the active VLM pathway was not available

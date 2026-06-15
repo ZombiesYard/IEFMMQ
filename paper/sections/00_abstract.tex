@@ -17,8 +17,8 @@ action from the aircraft state that is actually present. In this setting,
 simulation state. An explanation is useful only if it can be traced to
 inspectable evidence.
 
-This thesis presents SimTutor, an evidence-grounded procedural tutoring
-runtime that combines procedure-pack rules, DCS-BIOS telemetry, retrieved
+This thesis presents an evidence-grounded procedural tutoring runtime that
+combines procedure-pack rules, raw simulator telemetry, retrieved
 procedure knowledge, structured response validation, replayable logs, and a
 vision-language model (VLM) layer for cockpit display facts. The main machine
 learning contribution is a small-data LoRA adaptation pipeline for structured
@@ -27,7 +27,7 @@ such as procedural completion states were prone to high-risk false positives.
 The revised 13-fact ontology instead asks the VLM for local visual evidence
 atoms and leaves procedural interpretation to deterministic downstream rules.
 
-On two independent 13-fact holdouts with verified zero exact overlap to the
+On two independent 13-fact holdouts with verified zero exact image overlap to the
 training set, the Qwen3.5 LoRA adapter trained with the Run-003 + Run-005x2
 recipe is the strongest offline line. On Run-002 newfacts, fact accuracy rises
 from 0.8677 to 0.9908 and sample exact match from 0.10 to 0.88; on Run-004
@@ -46,9 +46,9 @@ performed a passive without-tutor condition. All four tutor-condition
 participants reached the manually reviewed final 33-step state, whereas none
 of the five without-tutor trials reached a confirmed final 33-step state. The
 tutor condition showed zero manual omission errors but introduced
-assistance-coupled commission and prompting errors in several trials. Raw NASA-TLX and usability/trust responses
-are reported descriptively only; P02's questionnaire is excluded because of a
-metadata mismatch, and P08 uses manual completion coding. The pilot therefore
+assistance-coupled commission and prompting errors in several trials. Raw
+NASA-TLX and custom post-trial tutor/user ratings are reported descriptively
+only. The pilot therefore
 supports feasibility, instrumentation, and error-pattern claims, not causal
 claims about learning gains, workload reduction, retention, transfer, or task
 speed.
@@ -71,9 +71,9 @@ Systems muss sich auf den tats\"achlich beobachtbaren Simulatorzustand
 beziehen. ``Realit\"at'' bedeutet in dieser Arbeit daher den laufenden,
 multimodalen und kognitiv anspruchsvollen Zustand der Simulation.
 
-Die Arbeit stellt SimTutor vor, eine evidenzbasierte Laufzeitumgebung f\"ur
-prozedurales Tutoring. Sie kombiniert deklarative Prozedurregeln, DCS-BIOS-
-Telemetrie, Retrieval von Prozedurwissen, strukturierte Antwortvalidierung,
+Die Arbeit stellt eine evidenzbasierte Laufzeitumgebung f\"ur
+prozedurales Tutoring vor. Sie kombiniert deklarative Prozedurregeln,
+Simulatortelemetrie, Retrieval von Prozedurwissen, strukturierte Antwortvalidierung,
 Replay-Logs und ein Vision-Language Model f\"ur Cockpit-Anzeigen. Der zentrale
 Machine-Learning-Beitrag ist eine kleine LoRA-Anpassung f\"ur strukturierte
 visuelle Fakten. Eine fr\"uhe 8-Fact-Ontologie zeigte, dass zusammengesetzte

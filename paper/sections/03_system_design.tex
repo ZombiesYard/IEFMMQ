@@ -5,7 +5,7 @@
 % ===========================================================================
 \chapter{Methods: Evidence-Grounded Tutoring Runtime}\label{ch:system-design}
 
-This chapter answers RQ1 at the method level. It describes how SimTutor turns
+This chapter answers RQ1 at the method level. It describes how the prototype turns
 foundation-model assistance into an evidence-grounded help cycle for the
 F/A-18C Lot~20 cold-start task. The runtime method is defined by the contracts
 that matter for interactive explanation: procedure modelling, telemetry
@@ -15,12 +15,12 @@ execution, and replay.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/fig_system_architecture.pdf}
-  \caption{Evidence-grounded SimTutor architecture. Simulator observations,
+  \caption{Evidence-grounded tutoring-runtime architecture. Simulator observations,
   authored procedure rules, foundation-model outputs, and user-facing overlay
   actions are separated by explicit runtime contracts.}
   \label{fig:system-architecture}
-  \Description[SimTutor system architecture]{A five-lane architecture diagram
-  shows simulator and headset inputs, evidence adapters, the SimTutor runtime
+  \Description[Tutoring-runtime system architecture]{A five-lane architecture diagram
+  shows simulator and headset inputs, evidence adapters, the tutoring runtime
   contract, foundation-model services, and user-facing output. Telemetry and
   vision feed an evidence packet; model outputs pass through validation before
   overlay and logging.}
@@ -101,7 +101,7 @@ known cockpit targets.
 
 This design avoids a common failure mode of prompt-driven tutors. If the
 procedure is represented only in natural language, the model can blend steps,
-skip preconditions, or invent target names. In SimTutor, the prompt receives a
+skip preconditions, or invent target names. In the prototype, the prompt receives a
 runtime-generated evidence packet, but the procedure itself remains a
 declarative object controlled by the system.
 
@@ -149,7 +149,7 @@ invented certainty.
 
 \section{Telemetry Grounding}\label{sec:design-telemetry}
 
-DCS-BIOS telemetry is the primary observation channel for simulator state. The
+Raw simulator telemetry from an external telemetry interface is the primary observation channel for simulator state. The
 runtime receives raw frames, normalises exported values, derives higher-level
 variables, and tracks missing sources separately from false values. This
 distinction is important. A variable can be false because the cockpit state is
@@ -269,7 +269,7 @@ where the model still needed runtime correction.
 
 The runtime has to handle uncertainty as a normal operating state. In a live
 simulator, a help request can arrive while a switch is moving, while a display
-page is changing, while a DCS-BIOS variable is unavailable, or while the VLM
+page is changing, while a telemetry variable is unavailable, or while the VLM
 frame is stale. Treating these cases as ordinary false values would make the
 tutor overconfident. Treating them as hard failures would make the system too
 fragile for live use. The method therefore defines degradation modes.
@@ -288,7 +288,7 @@ deterministic or text-only response.
 These modes matter because they make uncertainty visible in logs and, where
 appropriate, in user-facing language. A tutor that cannot tell the difference
 between "you did not do this" and "I cannot observe this" will mislead the
-learner. SimTutor's design keeps those cases separate. This is especially
+learner. The design keeps those cases separate. This is especially
 important in the F/A-18C cold-start because some steps combine slowly changing
 simulator state, transient display text, and manual cockpit navigation. The
 runtime can be helpful only if it knows when its own evidence is incomplete.

@@ -91,7 +91,7 @@ procedural tutoring loop.
 
 The empirical setting is the F/A-18C Lot~20 cold-start procedure in DCS World
 \citep{dcsworld,eagledynamics2023hornetguide}. The procedure pack used by
-SimTutor is not an invented prompt script. It is a manually decomposed training
+the prototype is not an invented prompt script. It is a manually decomposed training
 guide derived from the DCS World F/A-18C manual and local evaluation materials,
 represented as an authoritative prior for tutoring and scoring. The current
 pack contains 33 ordered instructional steps, grouped into phases from initial
@@ -99,7 +99,7 @@ electrical power through engine start, avionics preparation, flight-control
 checks, and final pre-taxi configuration.
 
 This task is compact enough to study in a thesis, but demanding enough to
-expose the evidence problem. Some states are available through DCS-BIOS
+expose the evidence problem. Some states are available through simulator
 telemetry, such as switch positions, engine parameters, or indicator values.
 Other states are visible on cockpit displays. The left and right Digital
 Display Indicators (DDIs) and the Advanced Multipurpose Color Display (AMPCD)
@@ -168,10 +168,11 @@ critical false positives?
 
 \paragraph{RQ3 --- Formative Quest 3 pilot evidence.}
 What descriptive evidence does a formative, non-random Quest~3 pilot provide
-about task completion, procedural errors, workload/trust responses, participant
-comments, and the boundary between assistance and trustworthy collaboration?
+about task completion, procedural errors, raw workload ratings, custom
+post-trial ratings, participant comments, and the boundary between assistance
+and future trustworthy collaboration?
 
-RQ1 is answered through the implemented SimTutor runtime, procedure pack,
+RQ1 is answered through the implemented tutoring runtime, procedure pack,
 validation logic, replay/export infrastructure, and live help-cycle evidence.
 RQ2 is answered through the visual fact ontology, dataset curation pipeline,
 LoRA training recipe, and base-versus-LoRA holdout benchmarks for Qwen3.5,
@@ -187,7 +188,7 @@ learning adaptation pipeline.
 
 The runtime side represents the F/A-18C cold-start as a declarative procedure
 pack. Steps, preconditions, completion gates, source priorities, visual fact
-bindings, and overlay targets are kept outside model prompts. DCS-BIOS
+bindings, and overlay targets are kept outside model prompts. Raw simulator
 telemetry is normalised and aggregated into runtime variables. Retrieved manual
 and training-guide snippets provide textual grounding for explanations. When a
 help request occurs, the runtime assembles a structured evidence packet before
@@ -209,16 +210,18 @@ The pilot side places the system back into the original Quest~3 motivation.
 Four participants used the tutor and five participants completed passive
 without-tutor trials. Participant profiles ranged from novice to expert by
 self-report. The study records completion state, manual error coding, help
-cycles, VLM calls, overlay actions, Raw NASA-TLX, usability/trust responses,
+cycles, VLM calls, overlay actions, Raw NASA-TLX, custom tutor/user ratings,
 and open comments. The pilot is included because it tests whether the system
 can be exercised with real participants in VR and what kinds of failure modes
-appear. It is not used as a powered human-subject effectiveness study.
+appear. The custom ratings are formative post-trial items, not validated
+trust or usability scales, and the pilot is not used as a powered
+human-subject effectiveness study.
 
 \section{Contributions}\label{sec:intro-contributions}
 
 The central contribution is an evidence-grounded foundation-model tutoring loop
 for high-fidelity procedural simulation. The loop treats generated explanation
-as a bounded system action: DCS-BIOS telemetry, authored procedure gates,
+as a bounded system action: simulator telemetry, authored procedure gates,
 retrieved source snippets, structured visual facts, response schemas, overlay
 allowlists, deterministic repair/fallback behaviour, and replay logs all sit
 between the model and the learner. This is the main thesis contribution and
@@ -243,9 +246,9 @@ Gemma provides a different comparison error profile.
 \item \textbf{A formative Quest~3 pilot with bounded human-facing evidence.}
 The thesis reports a non-random pilot with nine participant-coded trials,
 including participant experience profiles, completion and error patterns, Raw
-NASA-TLX, usability/trust scores, and anonymised short comments. This pillar
-addresses RQ3 by showing feasibility, instrumentation readiness, and
-assistance-coupled risks without making causal learning claims.
+NASA-TLX, custom post-trial tutor/user ratings, and anonymised short comments.
+This pillar addresses RQ3 by showing feasibility, instrumentation readiness,
+and assistance-coupled risks without making causal learning claims.
 \end{enumerate}
 
 \section{Thesis Structure}\label{sec:intro-structure}
@@ -270,8 +273,9 @@ Chapter~\ref{ch:evaluation} reports the results for RQ1, RQ2, and RQ3 in that
 order: runtime readiness, VLM adaptation benchmarks, and the formative pilot.
 
 Chapter~\ref{ch:discussion} interprets the findings and limitations, then
-uses the idea of AI as a trustworthy collaborator in dynamic, high-load,
-multimodal environments to define future work.
+uses the idea of future trustworthy collaboration in dynamic, high-load,
+multimodal environments to define what the current evidence loop still needs
+to support.
 
 Chapter~\ref{ch:conclusion} summarises the contributions and claim boundaries.
 Appendix~\ref{ch:appendix} contains supplementary tables, charts, command

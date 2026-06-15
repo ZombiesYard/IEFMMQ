@@ -1,5 +1,5 @@
 # ===========================================================================
-#  SimTutor Paper — Makefile
+#  Evidence-grounded VR tutoring paper -- Makefile
 #  Usage:
 #    make           — build the PDF with tectonic
 #    make clean     — remove build artifacts, keep PDF

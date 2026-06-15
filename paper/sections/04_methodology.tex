@@ -26,7 +26,7 @@ infer learning gains.
 \section{Procedure Runtime and Telemetry Grounding}\label{sec:method-telemetry}
 
 Telemetry and procedure gates provide the state evidence on which the help
-cycle depends. Raw DCS-BIOS fields are projected onto normalised runtime
+cycle depends. Raw simulator telemetry fields are projected onto normalised runtime
 variables, while unavailable sources are tracked separately in
 \texttt{vars\_source\_missing}. This distinction matters methodologically: a
 known false value can support corrective guidance, but an unobserved value can
@@ -95,9 +95,9 @@ DDI into one composite-panel image. The same composite layout is used for data
 collection, pre-labelling, training, benchmarking, and runtime inference. This
 keeps the input distribution stable across the method.
 
-\item \textbf{VLM pre-labelling.} A large external VLM produces initial labels
-and evidence notes for each image. Pre-labelling is used as an annotation aid,
-not as ground truth.
+\item \textbf{VLM pre-labelling.} An external VLM produces initial labels and
+evidence notes for each image. Pre-labelling is used as an annotation aid and
+workflow provenance, not as ground truth or as a benchmark baseline.
 
 \item \textbf{Human review.} Pre-labelled samples are reviewed in Label
 Studio~\citep{tkachenko2020labelstudio}. The reviewer corrects fact states and
@@ -142,7 +142,7 @@ Reviewers apply fact-specific decision boundaries. A page option label is not
 the same thing as the page itself. A visible FCS-MC entry on a BIT root page is
 not the FCS-MC subpage. A PBIT GO status is not the same as the final FCS-MC GO
 result. HSI symbology without a coloured map layer is not sufficient for the
-map-layer fact. INS OK must be clearly readable near the alignment block rather
+map-layer fact. INS OK must be readable near the alignment block rather
 than inferred from the elapsed procedure phase. These rules are written into
 the benchmark prompt and reflected in the ontology, so the model is trained and
 evaluated against the same conceptual contract.
@@ -161,14 +161,14 @@ change the state, revise the evidence note, or preserve uncertainty. The final
 reviewed JSONL, not the pre-label, is the source used for SFT and benchmark
 scoring. This distinction is essential because otherwise the benchmark would
 measure agreement with another model rather than agreement with reviewed visual
-facts.
+facts. The pre-label source is therefore part of the annotation trail, not part
+of the evidence used to claim model accuracy.
 
 The reviewed labels were not independently double-coded. They should therefore
 be interpreted as single-reviewer, human-reviewed labels rather than as an
-inter-rater-reliability study. This is acceptable for the component benchmark
-reported here because the thesis claim is within-domain adapter reliability on
-the reviewed artifact set, but it remains a limitation for later reliability
-studies, especially for rare completion-critical facts.
+inter-rater-reliability study. The thesis claim is within-domain adapter
+reliability on the reviewed artifact set; for later reliability studies,
+especially for rare completion-critical facts, this remains a limitation.
 
 % ===========================================================================
 \section{Dataset Curation}\label{sec:method-datasets}
@@ -299,8 +299,15 @@ rather than on an internal same-pool evaluation split.
 Two 13-fact v2 holdouts are used for the main evaluation. Run-002 newfacts
 contains 50 images from an earlier capture session re-labelled under the
 13-fact ontology. Run-004 random contains 100 randomly sampled cockpit-state
-captures. Local overlap checks report zero exact overlap between either holdout
-and the Run-003 + Run-005 training union.
+captures. Local overlap checks report zero exact image overlap between either
+holdout and the Run-003 + Run-005 training union.
+
+This is an exact-overlap claim, not a broader leakage audit. The thesis does
+not claim perceptual-nearest-neighbour separation, scene-level independence, or
+absence of visually similar cockpit states across training and holdout
+captures. Those stronger split audits are appropriate future artifact work,
+especially because cockpit displays can contain near-duplicate states even when
+image identities differ.
 
 The earlier Run-001 evaluation line is treated differently. Because it overlaps
 with the training data pool, it is useful as a contaminated development
@@ -485,18 +492,21 @@ short comments; names, email addresses, and student identifiers are not reported
 in the thesis. Questionnaire and comment evidence is reported descriptively,
 aggregated where appropriate, and anonymised or paraphrased in the main text.
 No formal external ethics-approval identifier is claimed in this thesis; the
-study is therefore reported conservatively as a local formative pilot with no
-inferential human-subject effectiveness claims.
+study is therefore reported conservatively as a local master's-thesis
+formative pilot with informed consent and no inferential human-subject
+effectiveness claims.
 
 Recruitment and assignment were handled as local convenience scheduling for a
 master's-thesis pilot, not as random sampling. The retained analysis package is
 organised by pseudonymous participant directories; raw participant artifacts
-are not released as a public dataset, and the thesis does not publish headset
-video or personally identifying recruitment records. Access to non-public raw
-materials is treated as project-internal for thesis preparation and supervisory
-review. Participants could stop during the VR session, and withdrawal or
-deletion requests would be handled while data remained identifiable to the
-author. The thesis does not report monetary compensation and does not use any
+are not released as a public dataset. Some session metadata contain recording
+references, but external video is not used as analysis evidence in this thesis
+and no identifiable video, audio, names, email addresses, student identifiers,
+or recruitment records are published. Access to non-public raw materials is
+treated as project-internal for thesis preparation and supervisory review.
+Participants could stop during the VR session, and withdrawal or deletion
+requests would be handled while data remained identifiable to the author. The
+thesis does not report monetary compensation and does not use any
 compensation-dependent analysis.
 
 \subsection{Participants and Conditions}
@@ -533,7 +543,7 @@ The export pipeline produced per-trial summaries, per-step coding files,
 help-cycle logs for tutor trials, action timelines, quality-gate metadata, and
 session summaries. Post-trial forms recorded participant experience, confidence
 before the trial, raw NASA-TLX workload dimensions~\citep{hart1988nasa},
-condition-specific tutor ratings where applicable, general usability/user
+condition-specific tutor ratings where applicable, general custom user
 ratings, and free-text comments.
 
 Step errors were coded with five categories: omission (OM, a required action
@@ -544,6 +554,14 @@ affected the step), and state violation (SV, the aircraft state contradicted
 the expected condition). The automated coding output was reviewed manually
 using telemetry, help-cycle logs, and action timelines; the human-coded columns
 are the authoritative source for reported pilot results.
+
+The manual review was a project-side reconstruction pass, not a blinded
+multi-coder reliability study. It used the recorded telemetry, action
+timeline, help-cycle evidence where available, and observation notes to decide
+whether each step was confirmed and whether a manual error category applied.
+Where automatic reconstruction disagreed with reviewed evidence, the review
+rule is declared before the results rather than hidden inside the outcome
+table.
 
 The coding distinguishes \emph{not confirmed as completed} from \emph{coded
 omission}. This distinction matters for without-tutor trials, where passive
@@ -559,9 +577,10 @@ The post-trial form records raw NASA-TLX workload dimensions, not weighted
 NASA-TLX. The thesis reports the raw average because the formative pilot was
 not designed to estimate a psychometric workload effect. The form also records
 pre-trial confidence, condition-specific tutor ratings where the tutor was
-available, general usability/user ratings, and short open comments. The rating
-values are kept on their recorded scale and are not normalised into a single
-composite effectiveness score.
+available, general user ratings, and short open comments. These tutor/user
+ratings are custom post-trial items, not validated SUS, trust, or usability
+instruments. The rating values are kept on their recorded scale and are not
+normalised into a single composite effectiveness score.
 
 The comments are used cautiously. They are not treated as coded qualitative
 themes with inter-rater reliability. Instead, they provide context for
@@ -573,12 +592,12 @@ participants may have perceived the system as useful even when assistance-
 coupled errors remained.
 
 This instrument design matches the pilot's formative status. The questionnaire
-and comments can reveal usability problems, trust signals, and cognitive
-frictions that should shape the next study. They cannot establish causal
-changes in workload, trust, or learning. That boundary is maintained in the
-results chapter by excluding P02's mismatched questionnaire, reporting P08 with
-manual task coding, and treating P09 as an independent participant after the
-metadata correction.
+and comments can reveal perceived usefulness, interaction friction, and
+trust-related signals that should shape the next study. They cannot establish
+causal changes in workload, trust, usability, or learning. That boundary is
+maintained in the results chapter by excluding P02's mismatched questionnaire,
+reporting P08 with manual task coding, and treating P09 as an independent
+participant after the metadata correction.
 
 \subsection{Data-Quality Notes}
 
@@ -601,7 +620,7 @@ authority for completion and error counts. & Counted as 33/33 completed with
 zero manual procedural errors. \\
 P02 & Questionnaire file under P02 contains an internal participant-ID
 mismatch. & Task logs and step coding are retained; questionnaire-derived
-confidence, TLX, usability/trust, and comments are excluded. & Included in
+confidence, TLX, custom rating, and comments are excluded. & Included in
 task/error tables; excluded from questionnaire summaries. \\
 P07 & Without-tutor form contains tutor-specific numeric fields despite
 condition/NA flags. & Tutor-specific fields are ignored unless the participant

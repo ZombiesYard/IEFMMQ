@@ -1,21 +1,21 @@
 % ===========================================================================
 %  00 — 摘要 + Zusammenfassung
 %
-%  证据：benchmarks/ 下的基准指标，Doc/Vision/Reports/ 下的 VLM 报告，
-%        artifacts/experiments/ 下的试点导出数据。
+%  证据来源：benchmarks/ 下的基准测试指标，Doc/Vision/Reports/ 下的 VLM 报告，
+%            artifacts/experiments/ 下的实验导出数据。
 % ===========================================================================
 
 \chapter*{摘要}
 
-\emph{解释现实}研究基础模型如何在沉浸式仿真器中提供有用的交互式解释，同时避免成为无界的对话代理。研究的动机场景是一个在数字战斗模拟器世界（DCS World）中的 Meta Quest~3 训练任务：学习者执行 F/A-18C Lot~20 冷启动程序，而教学系统必须根据实际存在的飞机状态解释下一步操作。在此场景中，"现实"并非物理飞机，而是一个实时的、高负荷的、多模态的仿真状态。只有当解释能够追溯到可检查的证据时，它才是有用的。
+\emph{解释现实（Explain Reality）}研究基础模型如何在沉浸式模拟器中提供有用的交互式解释，同时避免成为不受限的对话代理。其应用场景为在数字战斗模拟世界（Digital Combat Simulator World）中使用 Meta Quest~3 进行训练：学习者执行 F/A-18C Lot~20 冷启动程序，教学系统必须依据实际存在的飞机状态来解释下一步操作。在此场景中，"现实"并非物理飞机，而是一个实时、高负载、多模态的模拟状态。解释只有在可追溯至可检查的证据时才具有实际价值。
 
-本文提出 SimTutor，一个基于证据的程序性教学运行时系统，结合了程序包规则、DCS-BIOS 遥测、检索到的程序知识、结构化响应验证、可回放日志，以及用于座舱显示事实的视觉语言模型（VLM）层。主要的机器学习贡献是一个用于结构化视觉事实提取的小数据 LoRA 适配流水线。最初的 8 事实本体揭示了一个问题：诸如程序完成状态之类的复合目标容易产生高风险假阳性。修订后的 13 事实本体则要求 VLM 提供局部视觉证据原子，并将程序性解释留给确定性的下游规则。
+本论文提出一个基于证据的程序化教学运行时系统，它结合了程序包规则、模拟器原始遥测数据、检索到的程序知识、结构化响应验证、可回放日志，以及用于座舱显示事实的视觉语言模型（VLM）层。主要的机器学习贡献是一个面向结构化视觉事实提取的小数据 LoRA 适配流水线。最初设计的 8 事实本体论暴露了复合目标（如程序完成状态）容易产生高风险假阳性的问题。修订后的 13 事实本体论转而要求 VLM 输出局部视觉证据原子，将程序性解释交由确定性的下游规则处理。
 
-在两个独立且经验证与训练集零完全重叠的 13 事实留出集上，使用 Run-003 + Run-005x2 配方训练的 Qwen3.5 LoRA 适配器是最强的离线产品线。在 Run-002 newfacts 上，事实准确率从 0.8677 升至 0.9908，样本完全匹配率从 0.10 升至 0.88；在 Run-004 random 上，事实准确率从 0.8038 升至 0.9931，样本完全匹配率从 0.03 升至 0.92。关键假阳性在 Run-002 上从 11 降至 4，在 Run-004 上从 70 降至 8。匹配的 Qwen3.6-27B 实验显示出一个更强的基座模型和一个适用于本地服务部署的 LoRA 候选，但它在当前留出集上并未超越 Qwen3.5 LoRA 产品线。Gemma 在相同数据配方下显著改善，在某些关键事实上更加保守，但在整体完全匹配行为上仍低于 Qwen3.5。
+在两个独立的 13 事实验证集（与训练集经核验零精确图像重叠）上，采用 Run-003 + Run-005×2 方案训练的 Qwen3.5 LoRA 适配器是最强的离线模型。在 Run-002 newfacts 上，事实准确率从 0.8677 提升至 0.9908，样本完全匹配率从 0.10 提升至 0.88；在 Run-004 random 上，事实准确率从 0.8038 提升至 0.9931，样本完全匹配率从 0.03 提升至 0.92。关键假阳性在 Run-002 上从 11 降至 4，在 Run-004 上从 70 降至 8。匹配的 Qwen3.6-27B 实验展示了更强的基座模型，作为本地部署候选方案，但在当前验证集上并未超越 Qwen3.5 LoRA 模型。Gemma 在相同数据方案下有显著改进，且在某些关键事实上更为保守，但在整体完全匹配表现上仍低于 Qwen3.5。
 
-一项非随机的形成性 Quest~3 试点研究（9 名参与者）补充了技术证据。参与者群体包括自报的新手、中级和专家用户。4 名参与者使用教学系统，5 名在无教学系统的被动条件下进行。经人工审核，所有 4 名教学系统条件下的参与者均达到最终 33 步状态；无教学系统条件下的 5 次试验均未达到经确认的最终 33 步状态。教学系统条件下的遗漏错误为零，但在若干试验中引入了与辅助耦合的执行错误和提示错误。原始 NASA-TLX 和可用性/信任度评分仅为描述性报告；P02 的问卷因元数据不匹配被排除，P08 使用人工完成编码。因此，该试点支持可行性、仪器化和错误模式声明，但不支持关于学习收益、工作负荷降低、记忆保持、迁移效果或任务速度的因果性声明。
+一项包含九名参与者的形成性非随机 Quest~3 先导实验补充了技术证据。参与者群体包括自述为新手、中级和专家水平的用户。其中四名参与者使用教学系统，五名在无助教条件下进行操作。全部四名教学条件下的参与者均达到了经人工审核的最终 33 步完成状态，而五名无助教试验中无一达到已确认的最终 33 步状态。教学条件下未出现漏操作错误，但在若干试验中引入了与辅助相关的误操作和提示性错误。原始 NASA-TLX 和自定义试验后教学/用户评分仅作描述性汇报。因此，该先导实验支持可行性、仪器适配性和错误模式声明，但不支持关于学习收益、工作负荷降低、记忆保持、迁移或任务速度的因果声明。
 
-本文认为，沉浸式训练中的可靠交互式解释最好作为一个证据设计问题来处理：基础模型应仅通过运行时能够观测、验证和回放的证据来解释实时的任务状态。
+本论文论证，沉浸式训练中可靠的交互式解释最好被视为一个证据设计问题：基础模型应仅通过运行时系统能够观察、验证和回放的证据来解释当前任务状态。
 
 \newpage
 \chapter*{Zusammenfassung}
@@ -30,9 +30,9 @@ Systems muss sich auf den tats\"achlich beobachtbaren Simulatorzustand
 beziehen. ``Realit\"at'' bedeutet in dieser Arbeit daher den laufenden,
 multimodalen und kognitiv anspruchsvollen Zustand der Simulation.
 
-Die Arbeit stellt SimTutor vor, eine evidenzbasierte Laufzeitumgebung f\"ur
-prozedurales Tutoring. Sie kombiniert deklarative Prozedurregeln, DCS-BIOS-
-Telemetrie, Retrieval von Prozedurwissen, strukturierte Antwortvalidierung,
+Die Arbeit stellt eine evidenzbasierte Laufzeitumgebung f\"ur
+prozedurales Tutoring vor. Sie kombiniert deklarative Prozedurregeln,
+Simulatortelemetrie, Retrieval von Prozedurwissen, strukturierte Antwortvalidierung,
 Replay-Logs und ein Vision-Language Model f\"ur Cockpit-Anzeigen. Der zentrale
 Machine-Learning-Beitrag ist eine kleine LoRA-Anpassung f\"ur strukturierte
 visuelle Fakten. Eine fr\"uhe 8-Fact-Ontologie zeigte, dass zusammengesetzte

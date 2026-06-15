@@ -1,15 +1,14 @@
 # ===========================================================================
-#  SimTutor Paper (Chinese) — Makefile
-#  Usage:
-#    make           — build the PDF (tectonic, single pass)
-#    make clean     — remove build artifacts, keep PDF
-#    make distclean — remove everything including PDF
-#    make view      — open PDF with system viewer
+#  基于证据的 VR 教学论文 — 中文版 Makefile
+#  用法：
+#    make           — 使用 tectonic 构建 PDF
+#    make clean     — 移除构建产物，保留 PDF
+#    make distclean — 移除包括 PDF 在内的所有构建产物
+#    make view      — 使用系统查看器打开 PDF
 # ===========================================================================
 
 MAIN   = main
 TECTONIC = tectonic
-TECTONIC_OPTS = --keep-logs --keep-intermediates
 VIEWER = xdg-open
 
 .PHONY: all clean distclean view
@@ -29,7 +28,7 @@ $(MAIN).pdf: $(MAIN).tex Preamble.tex \
               sections/08_conclusion.tex \
               sections/09_appendix.tex \
               references.bib
-	$(TECTONIC) $(TECTONIC_OPTS) $(MAIN).tex
+	$(TECTONIC) --keep-logs --keep-intermediates $(MAIN).tex
 
 clean:
 	rm -f $(MAIN).aux $(MAIN).bbl $(MAIN).blg $(MAIN).log \

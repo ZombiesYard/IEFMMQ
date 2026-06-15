@@ -1,45 +1,46 @@
 % ===========================================================================
-%  SimTutor — 硕士学位论文（中文版）
-%  TU Clausthal, Institute for Software and Systems Engineering (ISSE)
+%  基于证据的 VR 教学论文 — 硕士论文
+%  克劳斯塔尔工业大学，软件与系统工程研究所 (ISSE)
 %
-%  由 paper/main.tex 翻译而来。
-%  使用 tectonic（基于 XeTeX）编译，原生支持中文。
+%  模板改编自 paperwork/Thesis.tex（scrreprt，英式英语，natbib）。
+%  此文件位于 paper_zh/ 目录下，作为论文的中文翻译版本。
 % ===========================================================================
 \documentclass[12pt,a4paper,bibliography=totoc,numbers=noenddot]{scrreprt}
 
 % ---------------------------------------------------------------------------
-%  Language — babel for German Zusammenfassung, ctex for Chinese
+%  语言与中文支持
 % ---------------------------------------------------------------------------
-\usepackage[main=english,ngerman]{babel}
-\usepackage[UTF8,heading]{ctex}
+\usepackage[heading]{ctex}
+\usepackage[ngerman,shorthands=off]{babel}
 
 % ---------------------------------------------------------------------------
-%  Spacing
+%  行距
 % ---------------------------------------------------------------------------
 \usepackage[onehalfspacing]{setspace}
 
 % ---------------------------------------------------------------------------
-%  Encoding (XeTeX native UTF-8)
+%  编码
 % ---------------------------------------------------------------------------
 \usepackage[T1]{fontenc}
 \usepackage{textcomp}
 
 % ---------------------------------------------------------------------------
-%  Tables, figures, maths
+%  表格、图形与数学
 % ---------------------------------------------------------------------------
 \usepackage{graphicx}
+\providecommand{\Description}[2][]{}
 \usepackage{booktabs}
 \usepackage{array,longtable,tabularx,multirow}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 \usepackage{amsmath,amssymb,mathtools}
 
 % ---------------------------------------------------------------------------
-%  Units
+%  单位
 % ---------------------------------------------------------------------------
 \usepackage{siunitx}
 
 % ---------------------------------------------------------------------------
-%  Captions
+%  图题与表题
 % ---------------------------------------------------------------------------
 \usepackage[
   format=plain,
@@ -51,7 +52,7 @@
 \usepackage{subcaption}
 
 % ---------------------------------------------------------------------------
-%  Page style
+%  页面样式
 % ---------------------------------------------------------------------------
 \usepackage{fancyhdr}
 \pagestyle{fancy}
@@ -61,19 +62,14 @@
 \setlength{\headheight}{28pt}
 
 % ---------------------------------------------------------------------------
-%  Hyperlinks (load late)
+%  超链接（后加载）
 % ---------------------------------------------------------------------------
 \usepackage[bookmarksnumbered=true,colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\Urlmuskip=0mu plus 2mu\relax
+\def\UrlBreaks{\do\/\do-\do\_\do.\do:\do\?\do=}
 
 % ---------------------------------------------------------------------------
-%  Date formatting (British style)
-% ---------------------------------------------------------------------------
-\usepackage{datetime}
-\newdateformat{britishdate}{\ordinal{DAY} \monthname[\THEMONTH] \THEYEAR}
-\newdate{hand-in}{\day}{\month}{\year}
-
-% ---------------------------------------------------------------------------
-%  Misc
+%  杂项
 % ---------------------------------------------------------------------------
 \usepackage{csquotes}
 \usepackage[table]{xcolor}
@@ -83,7 +79,7 @@
 \setlength{\emergencystretch}{2em}
 
 % ---------------------------------------------------------------------------
-%  Code listings
+%  代码列表
 % ---------------------------------------------------------------------------
 \usepackage{listings}
 \lstset{
@@ -96,16 +92,16 @@
 }
 
 % ---------------------------------------------------------------------------
-%  Metadata (TODO: finalise title before submission)
+%  元数据
 % ---------------------------------------------------------------------------
-\author{Yu Zhang}
-\title{解释现实：基于基础模型的Meta Quest 3交互式解释}
+\author{张宇}
+\title{解释现实：基于基础模型与Meta Quest 3的交互式教学解释}
 \date{\today}
 
 % ===========================================================================
 \begin{document}
 
-% --- Front matter (Roman page numbers) ---
+% --- 前页（罗马数字页码）---
 \pagenumbering{Roman}
 
 \include{Preamble}
@@ -116,7 +112,7 @@
 \listoffigures
 \listoftables
 
-% --- Main content (Arabic page numbers) ---
+% --- 正文（阿拉伯数字页码）---
 \cleardoublepage
 \pagenumbering{arabic}
 
@@ -129,13 +125,13 @@
 \include{sections/07_discussion}
 \include{sections/08_conclusion}
 
-% --- Bibliography ---
+% --- 参考文献 ---
 \cleardoublepage
 \renewcommand{\bibname}{参考文献}
 \bibliographystyle{plainnat}
 \bibliography{references}
 
-% --- Appendix ---
+% --- 附录 ---
 \include{sections/09_appendix}
 
 \end{document}
