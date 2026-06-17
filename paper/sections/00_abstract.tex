@@ -62,53 +62,60 @@ validate, and replay.
 \chapter*{Zusammenfassung}
 
 \begin{otherlanguage}{ngerman}
-\emph{Explain Reality} untersucht, wie Foundation Models in einer immersiven
-Simulationsumgebung interaktive Erkl\"arungen geben k\"onnen, ohne als
-unbegrenzte Dialogsysteme eingesetzt zu werden. Der Anwendungskontext ist ein
-Training mit der Meta Quest~3 in Digital Combat Simulator World, in dem
-Teilnehmende den Kaltstart der F/A-18C Lot~20 ausf\"uhren. Die Erkl\"arung des
-Systems muss sich auf den tats\"achlich beobachtbaren Simulatorzustand
-beziehen. ``Realit\"at'' bedeutet in dieser Arbeit daher den laufenden,
-multimodalen und kognitiv anspruchsvollen Zustand der Simulation.
+\emph{Explain Reality} untersucht, wie Foundation Models in einem immersiven
+Simulator n\"utzliche interaktive Erkl\"arungen geben k\"onnen, ohne zu
+unbegrenzten konversationellen Agenten zu werden. Der motivierende
+Anwendungsfall ist eine Trainingsaufgabe mit der Meta Quest~3 in Digital Combat
+Simulator World: Lernende f\"uhren die Kaltstartprozedur der F/A-18C Lot~20 aus,
+w\"ahrend der Tutor die n\"achste Handlung aus dem tats\"achlich vorhandenen
+Flugzeugzustand erkl\"aren muss. In diesem Kontext ist ``Realit\"at'' nicht das
+physische Flugzeug, sondern ein laufender, hoch belastender, multimodaler
+Simulationszustand. Eine Erkl\"arung ist nur dann n\"utzlich, wenn sie auf
+pr\"ufbare Evidenz zur\"uckgef\"uhrt werden kann.
 
-Die Arbeit stellt eine evidenzbasierte Laufzeitumgebung f\"ur
-prozedurales Tutoring vor. Sie kombiniert deklarative Prozedurregeln,
-Simulatortelemetrie, Retrieval von Prozedurwissen, strukturierte Antwortvalidierung,
-Replay-Logs und ein Vision-Language Model f\"ur Cockpit-Anzeigen. Der zentrale
-Machine-Learning-Beitrag ist eine kleine LoRA-Anpassung f\"ur strukturierte
-visuelle Fakten. Eine fr\"uhe 8-Fact-Ontologie zeigte, dass zusammengesetzte
-Zielzust\"ande riskante False Positives erzeugen k\"onnen. Die revidierte
-13-Fact-Ontologie trennt deshalb lokale visuelle Evidenz von der sp\"ateren
-prozeduralen Interpretation. Eine Erkl\"arung ist in diesem Ansatz nur dann
-n\"utzlich, wenn sie auf pr\"ufbare Evidenz zur\"uckgef\"uhrt werden kann.
+Diese Arbeit stellt eine evidenzbasierte Laufzeitumgebung f\"ur prozedurales
+Tutoring vor, die Procedure-Pack-Regeln, rohe Simulatortelemetrie, abgerufenes
+Prozedurwissen, strukturierte Antwortvalidierung, replaybare Logs und eine
+Vision-Language-Model-(VLM)-Schicht f\"ur Cockpit-Anzeigenfakten kombiniert. Der
+wichtigste Machine-Learning-Beitrag ist eine Small-Data-LoRA-Anpassungspipeline
+f\"ur strukturierte visuelle Faktenextraktion. Eine erste 8-Fact-Ontologie
+zeigte, dass zusammengesetzte Ziele wie prozedurale Abschlusszust\"ande
+anf\"allig f\"ur risikoreiche False Positives waren. Die revidierte
+13-Fact-Ontologie fragt das VLM stattdessen nach lokalen visuellen
+Evidenzatomen und \"uberl\"asst die prozedurale Interpretation deterministischen
+nachgelagerten Regeln.
 
-Auf zwei unabh\"angigen 13-Fact-Holdouts ist die Qwen3.5-LoRA-Linie mit
-Run-003 + Run-005x2 die st\"arkste Offline-Konfiguration. Die Fact Accuracy
-steigt auf Run-002 newfacts von 0,8677 auf 0,9908 und auf Run-004 random von
-0,8038 auf 0,9931. Der exakte Sample-Match steigt von 0,10 auf 0,88
-beziehungsweise von 0,03 auf 0,92; gleichzeitig sinken kritische False
-Positives von 11 auf 4 beziehungsweise von 70 auf 8. Qwen3.6-27B liefert eine
-starke Kandidatenlinie f\"ur das lokale Serving, \"ubertrifft die
-Qwen3.5-LoRA-Linie auf den aktuellen Holdouts jedoch nicht. Gemma profitiert
-ebenfalls von
-derselben Datenrezeptur, bleibt aber beim exakten Sample-Match hinter Qwen3.5.
+Auf zwei unabh\"angigen 13-Fact-Holdouts mit verifizierter Null-\"Uberlappung
+exakter Bilder mit dem Trainingssatz ist der mit dem Rezept Run-003 +
+Run-005x2 trainierte Qwen3.5-LoRA-Adapter die st\"arkste Offline-Linie. Auf
+Run-002 newfacts steigt die Fact Accuracy von 0,8677 auf 0,9908 und der exakte
+Sample-Match von 0,10 auf 0,88; auf Run-004 random steigt die Fact Accuracy von
+0,8038 auf 0,9931 und der exakte Sample-Match von 0,03 auf 0,92. Kritische False
+Positives sinken auf Run-002 von 11 auf 4 und auf Run-004 von 70 auf 8. Ein
+abgestimmtes Qwen3.6-27B-Experiment zeigt ein st\"arkeres Basismodell und einen
+LoRA-Kandidaten f\"ur das lokale Serving-Setup, \"ubertrifft die
+Qwen3.5-LoRA-Linie auf den aktuellen Holdouts jedoch nicht. Gemma verbessert
+sich unter demselben Datenrezept deutlich und ist bei einigen kritischen Fakten
+konservativer, bleibt aber im gesamten Exact-Match-Verhalten unter Qwen3.5.
 
 Eine formative, nicht randomisierte Quest-3-Pilotstudie mit neun Teilnehmenden
-erg\"anzt die technische Evaluation. Die Stichprobe enthielt selbstberichtete
-Novizen, intermedi\"are und erfahrene Teilnehmende. Vier Teilnehmende nutzten
-den Tutor, f\"unf absolvierten eine passive Bedingung ohne Tutor. Alle vier
-Tutor-Teilnehmenden erreichten den manuell gepr\"uften finalen
-33-Schritt-Zustand; keine der f\"unf Sitzungen ohne Tutor erreichte einen
-best\"atigten finalen 33-Schritt-Zustand. In der Tutor-Bedingung traten keine
-manuell kodierten Auslassungsfehler auf, jedoch zeigten mehrere Trials
-assistenzgekoppelte Kommissions- und Prompting-Fehler. Raw NASA-TLX sowie
-benutzerdefinierte Tutor- und User-Ratings werden nur deskriptiv berichtet.
-Die Pilotdaten belegen Machbarkeit, Instrumentierung und Fehlermuster, aber
-keine kausalen Effekte auf Lernen, Arbeitsbelastung, Retention, Transfer oder
-Geschwindigkeit.
+erg\"anzt die technische Evidenz. Die Stichprobe umfasste selbstberichtete
+Profile auf Novizen-, intermedi\"arem und Expertenniveau. Vier Teilnehmende
+nutzten den Tutor, und f\"unf f\"uhrten eine passive Bedingung ohne Tutor aus.
+Alle vier Teilnehmenden der Tutor-Bedingung erreichten den manuell gepr\"uften
+finalen 33-Schritt-Zustand, w\"ahrend keine der f\"unf Trials ohne Tutor einen
+best\"atigten finalen 33-Schritt-Zustand erreichte. Die Tutor-Bedingung zeigte
+null manuell kodierte Auslassungsfehler, f\"uhrte aber in mehreren Trials
+assistenzgekoppelte Kommissions- und Prompting-Fehler ein. Raw NASA-TLX und
+benutzerdefinierte Tutor-/User-Ratings nach dem Trial werden nur deskriptiv
+berichtet. Die Pilotstudie st\"utzt daher Aussagen zu Machbarkeit,
+Instrumentierung und Fehlermustern, jedoch keine kausalen Aussagen \"uber
+Lernzuw\"achse, Arbeitsbelastungsreduktion, Retention, Transfer oder
+Aufgabengeschwindigkeit.
 
-Die Arbeit argumentiert damit, dass zuverl\"assige interaktive Erkl\"arung in
-immersivem Training vor allem ein Evidenzdesign-Problem ist: Foundation Models
-sollten den aktuellen Aufgabenstatus nur durch Evidenz erkl\"aren, die die
-Laufzeitumgebung beobachten, validieren und wiedergeben kann.
+Die Arbeit argumentiert, dass zuverl\"assige interaktive Erkl\"arung in
+immersivem Training am besten als Evidenzdesign-Problem behandelt wird:
+Foundation Models sollten den laufenden Aufgabenstatus nur durch Evidenz
+erkl\"aren, die die Laufzeitumgebung beobachten, validieren und wiedergeben
+kann.
 \end{otherlanguage}
