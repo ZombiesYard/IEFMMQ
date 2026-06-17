@@ -231,7 +231,7 @@ Package: longtable 2021-09-01 v4.17 Multi-page Table package (DPC)
 \c@LT@chunks=\count267
 \LT@p@ftn=\toks18
 )
-Class scrreprt Info: longtable captions redefined on input line 33.
+Class scrreprt Info: longtable captions redefined on input line 34.
  (tabularx.sty
 Package: tabularx 2020/01/15 v2.11c `tabularx' package (DPC)
 \TX@col@width=\dimen158
@@ -439,7 +439,7 @@ Class scrreprt Warning: Usage of package `fancyhdr' together
 (scrreprt)              `\addtokomafont' for the page style elements need
 (scrreprt)              explicite user intervention to work.
 (scrreprt)              Nevertheless, using requested
-(scrreprt)              package `fancyhdr' on input line 57.
+(scrreprt)              package `fancyhdr' on input line 58.
 
 (fancyhdr.sty
 Package: fancyhdr 2021/01/28 v4.0.1 Extensive control of page headers and foote
@@ -728,34 +728,34 @@ Package csquotes Info: Redefining alias 'default' -> 'british'.
 (sections/09_appendix.aux))
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 108.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 109.
 LaTeX Font Info:    Trying to load font information for TS1+cmr on input line 1
-08.
+09.
  (ts1cmr.fd
 File: ts1cmr.fd 2019/12/16 v2.5j Standard LaTeX font definitions
 )
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 108.
-LaTeX Font Info:    ... okay on input line 108.
-Package scrbase Info: activating british \contentsname on input line 108.
-Package scrbase Info: activating british \listfigurename on input line 108.
-Package scrbase Info: activating british \listtablename on input line 108.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for TU/lmr/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 109.
+LaTeX Font Info:    ... okay on input line 109.
+Package scrbase Info: activating british \contentsname on input line 109.
+Package scrbase Info: activating british \listfigurename on input line 109.
+Package scrbase Info: activating british \listtablename on input line 109.
 
 (translations-basic-dictionary-english.trsl
 File: translations-basic-dictionary-english.trsl (english translation file `tra
@@ -766,13 +766,13 @@ File: translations-basic-dictionary-german.trsl (german translation file `trans
 lations-basic-dictionary')
 )
 Package translations Info: loading dictionary `translations-basic-dictionary' f
-or `german'. on input line 108.
+or `german'. on input line 109.
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: hyperref package is loaded.
 Package caption Info: listings package is loaded.
 Package caption Info: threeparttable package is loaded.
 Package caption Info: End \AtBeginDocument code.
-Package hyperref Info: Link coloring ON on input line 108.
+Package hyperref Info: Link coloring ON on input line 109.
  (nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
  (refcount.sty
@@ -783,9 +783,9 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count361
 )
-LaTeX Info: Redefining \ref on input line 108.
-LaTeX Info: Redefining \pageref on input line 108.
-LaTeX Info: Redefining \nameref on input line 108.
+LaTeX Info: Redefining \ref on input line 109.
+LaTeX Info: Redefining \pageref on input line 109.
+LaTeX Info: Redefining \nameref on input line 109.
  (main.out) (main.out)
 \@outlinefile=\write3
 \openout3 = `main.out'.
@@ -797,7 +797,7 @@ Class scrreprt Info: loading recommended package `bookmark'.
 (scrreprt)           `bookmarkpackage=false' before \begin{document} and
 (scrreprt)           you can avoid this message adding:
 (scrreprt)             \usepackage{bookmark}
-(scrreprt)           before \begin{document} on input line 108.
+(scrreprt)           before \begin{document} on input line 109.
  (bookmark.sty
 Package: bookmark 2020-11-06 v1.29 PDF bookmarks (HO)
  (bkm-dvipdfm.def
@@ -830,9 +830,9 @@ File: t1lmss.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 
 
 
-] [4]) [5
+] [4] [5
 
-] [6]
+]) [6]
 \openout2 = `sections/00_acknowledgements.aux'.
 
  (sections/00_acknowledgements.tex
@@ -852,24 +852,34 @@ File: t1lmss.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 \openout4 = `main.toc'.
 
  [12] (main.lof
-LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 9
-.
- (t1lmtt.fd
+Underfull \hbox (badness 1348) in paragraph at lines 7--7
+ [][] [][][]\T1/lmr/m/n/12 Evidence-grounded tutoring-runtime ar-chi-tec-ture. 
+Sim-u-lator ob-ser- 
+ []
+
+
+Underfull \hbox (badness 1881) in paragraph at lines 7--7
+ \T1/lmr/m/n/12 va-tions, au-thored pro-ced-ure rules, foundation-model out-put
+s, and 
+ []
+
+LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 1
+2.
+(t1lmtt.fd
 File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-))
+) [13
+
+])
 \tf@lof=\write5
 \openout5 = `main.lof'.
 
- [13
-
-] (main.lot
-[14
+ [14] (main.lot [15
 
 ])
 \tf@lot=\write6
 \openout6 = `main.lot'.
 
- [15]
+ [16]
 \openout2 = `sections/01_introduction.aux'.
 
  (sections/01_introduction.tex
@@ -904,39 +914,47 @@ chapter 2.
 
 
 
-] [9] [10] [11] [12]) [13] [14]
+] [9] [10] [11] [12]) [13] [14] [15]
 \openout2 = `sections/03_system_design.aux'.
 
  (sections/03_system_design.tex
 chapter 3.
-[15
+File: figures/fig_system_architecture.png Graphic file (type bmp)
+<figures/fig_system_architecture.png>
+[16
 
 
 
 
-] [16] [17] [18] [19] [20] [21]) [22]
+] [17] [18]
+File: figures/fig_evidence_authority.png Graphic file (type bmp)
+<figures/fig_evidence_authority.png>
+ [19] [20]
+File: figures/fig_help_cycle.png Graphic file (type bmp)
+<figures/fig_help_cycle.png>
+ [21] [22] [23] [24]) [25]
 \openout2 = `sections/04_methodology.aux'.
 
  (sections/04_methodology.tex
 chapter 4.
-[23
+[26
 
 
 
 
 ]
-File: figures/fig_vlm_pipeline.pdf Graphic file (type pdf)
-<use figures/fig_vlm_pipeline.pdf>
- [24] [25] [26] [27] [28]
-File: figures/fig_ontology_evolution.pdf Graphic file (type pdf)
-<use figures/fig_ontology_evolution.pdf>
- [29] [30] [31] [32] [33] [34] [35] [36]) [37]
-[38] [39]
+File: figures/fig_vlm_pipeline.png Graphic file (type bmp)
+<figures/fig_vlm_pipeline.png>
+ [27] [28] [29] [30]
+File: figures/fig_ontology_evolution.png Graphic file (type bmp)
+<figures/fig_ontology_evolution.png>
+ [31] [32] [33] [34] [35] [36] [37] [38] [39] [40])
+[41]
 \openout2 = `sections/05_implementation.aux'.
 
  (sections/05_implementation.tex
 chapter 5.
-[40
+[42
 
 
 
@@ -948,276 +966,339 @@ Overfull \hbox (1.5191pt too wide) in paragraph at lines 65--75
 /12 ,
  []
 
-[41]) [42]
+[43]) [44]
 \openout2 = `sections/06_evaluation.aux'.
 
  (sections/06_evaluation.tex
 chapter 6.
-File: figures/fig_evaluation_dataflow.pdf Graphic file (type pdf)
-<use figures/fig_evaluation_dataflow.pdf>
+File: figures/fig_evaluation_dataflow.png Graphic file (type bmp)
+<figures/fig_evaluation_dataflow.png>
+[45
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+
+
+
+]
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/bx/n/10 Observed
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Authored pro-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Runtime
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 vari-able
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 State-aware
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 evid-ence pack-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 S08, S15,
  []
 
 
-Underfull \hbox (badness 5388) in paragraph at lines 68--68
+Underfull \hbox (badness 5388) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Visual facts can sup-port
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 display-dependent steps
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Bounded VLM
  []
 
 
-Underfull \hbox (badness 3312) in paragraph at lines 68--68
+Underfull \hbox (badness 3312) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Response schema
  []
 
 
-Underfull \hbox (badness 2111) in paragraph at lines 68--68
+Underfull \hbox (badness 2111) in paragraph at lines 73--73
 \T1/lmr/m/n/10 and over-lay har-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Pack-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 derived
  []
 
 
-Underfull \hbox (badness 5064) in paragraph at lines 68--68
+Underfull \hbox (badness 5064) in paragraph at lines 73--73
 \T1/lmr/m/n/10 gets are re-paired, down-
  []
 
 
-Underfull \hbox (badness 1515) in paragraph at lines 68--68
+Underfull \hbox (badness 1515) in paragraph at lines 73--73
 \T1/lmr/m/n/10 graded, or re-jec-ted be-fore
  []
 
 
-Underfull \hbox (badness 1661) in paragraph at lines 68--68
+Underfull \hbox (badness 1661) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Bounded ac-tion
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-[]|\T1/lmr/m/n/10 Recorded DCS-BIOS
- []
-
-
-Underfull \hbox (badness 6876) in paragraph at lines 68--68
-\T1/lmr/m/n/10 streams and vis-ion side-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Reproducible
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 ground-ing
  []
 
 
-Underfull \hbox (badness 1558) in paragraph at lines 68--68
+Underfull \hbox (badness 1558) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Stale VLM evid-ence must
  []
 
 
-Underfull \hbox (badness 4531) in paragraph at lines 68--68
+Underfull \hbox (badness 4531) in paragraph at lines 73--73
 \T1/lmr/m/n/10 mov-ing con-trols must be
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 Regression
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 checks for
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 ground-ing fail-
  []
 
 
-Underfull \hbox (badness 2401) in paragraph at lines 68--68
+Underfull \hbox (badness 2401) in paragraph at lines 73--73
 []|\T1/lmr/m/n/10 9 tri-als; 4
  []
 
 
-Underfull \hbox (badness 4391) in paragraph at lines 68--68
+Underfull \hbox (badness 4391) in paragraph at lines 73--73
 \T1/lmr/m/n/10 tu-tor tri-als
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 73--73
 \T1/lmr/m/n/10 with help-
  []
 
-[43
+[46] [47]
+Underfull \hbox (badness 10000) in paragraph at lines 139--139
+[]|\T1/lmr/m/n/10.95 Fallback over-lay reason
+ []
 
 
+Underfull \hbox (badness 10000) in paragraph at lines 139--139
+\T1/lmtt/m/n/10.95 final_evidence_consistency_validator
+ []
 
 
-] [44] [45] [46] [47]
-Underfull \hbox (badness 10000) in paragraph at lines 221--221
+Underfull \hbox (badness 10000) in paragraph at lines 139--139
+[]|\T1/lmr/m/n/10.95 Fallback over-lay reason
+ []
+
+
+Overfull \hbox (0.24464pt too wide) in paragraph at lines 142--147
+[]\T1/lmr/m/n/12 The same ex-por-ted rows re-cord a visual evid-ence syn-chron-
+iz-a-tion field \T1/lmtt/m/n/12 sync_delta_ms\T1/lmr/m/n/12 .
+ []
+
+[48] [49]
+Underfull \hbox (badness 10000) in paragraph at lines 262--262
 []|\T1/lmr/bx/n/10.95 LoRA
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 221--221
+Underfull \hbox (badness 10000) in paragraph at lines 262--262
 \T1/lmr/bx/n/10.95 re-sid-ual
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 221--221
+Underfull \hbox (badness 10000) in paragraph at lines 262--262
 \T1/lmr/m/n/10.95 MC fi-nal
  []
 
 
-Underfull \hbox (badness 3601) in paragraph at lines 221--221
+Underfull \hbox (badness 3601) in paragraph at lines 262--262
 \T1/lmr/m/n/10.95 GO 1, INS
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 221--221
+Underfull \hbox (badness 10000) in paragraph at lines 262--262
 \T1/lmr/m/n/10.95 GRND text
  []
 
 
-Underfull \hbox (badness 3657) in paragraph at lines 221--221
+Underfull \hbox (badness 3657) in paragraph at lines 262--262
 \T1/lmr/m/n/10.95 1, INS OK
  []
 
-[48]
-File: figures/fig_qwen35_run002_overall_accuracy.png Graphic file (type bmp)
-<figures/fig_qwen35_run002_overall_accuracy.png>
-File: figures/fig_qwen35_run004_critical_fp.png Graphic file (type bmp)
-<figures/fig_qwen35_run004_critical_fp.png>
- [49]
-Underfull \hbox (badness 10000) in paragraph at lines 349--349
+[50]
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+[]|\T1/lmr/m/n/10.95 Missed vis-ible
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+\T1/lmr/m/n/10.95 page evid-ence;
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+\T1/lmr/m/n/10.95 than completion-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+[]|\T1/lmr/m/n/10.95 Residual
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+\T1/lmr/m/n/10.95 completion-like
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+[]|\T1/lmr/m/n/10.95 Residual
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+\T1/lmr/m/n/10.95 completion-like
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+[]|\T1/lmr/m/n/10.95 Missed
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+\T1/lmr/m/n/10.95 intermediate-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+[]|\T1/lmr/m/n/10.95 Main re-main-ing
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 286--286
+\T1/lmr/m/n/10.95 crit-ical false-
+ []
+
+File: figures/fig_primary_vlm_results.pdf Graphic file (type pdf)
+<use figures/fig_primary_vlm_results.pdf>
+[51] [52]
+Underfull \hbox (badness 10000) in paragraph at lines 413--413
 []|\T1/lmr/m/n/10.95 Qwen3.5 base vs.
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 349--349
+Underfull \hbox (badness 10000) in paragraph at lines 413--413
 []|\T1/lmr/m/n/10.95 Qwen3.5 LoRA vs.
  []
 
 
-Underfull \hbox (badness 2181) in paragraph at lines 349--349
+Underfull \hbox (badness 2181) in paragraph at lines 413--413
 \T1/lmr/m/n/10.95 fact-accuracy and exact-match
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 349--349
+Underfull \hbox (badness 10000) in paragraph at lines 413--413
 []|\T1/lmr/m/n/10.95 Gemma un-der the
  []
 
 
-Underfull \hbox (badness 5741) in paragraph at lines 349--349
+Underfull \hbox (badness 5741) in paragraph at lines 413--413
 []|\T1/lmr/m/n/10.95 No eval-u-ated line dom-in-ates
  []
 
-File: figures/fig_qwen36_run002_overall_accuracy.png Graphic file (type bmp)
-<figures/fig_qwen36_run002_overall_accuracy.png>
-File: figures/fig_gemma_run002_overall_accuracy.png Graphic file (type bmp)
-<figures/fig_gemma_run002_overall_accuracy.png>
-[50] [51] [52] [53] [54] [55] [56]) [57] [58]
+File: figures/fig_backbone_comparison.pdf Graphic file (type pdf)
+<use figures/fig_backbone_comparison.pdf>
+[53] [54] [55] [56]
+File: figures/fig_pilot_protocol.png Graphic file (type bmp)
+<figures/fig_pilot_protocol.png>
+ [57] [58] [59] [60] [61]) [62]
 \openout2 = `sections/07_discussion.aux'.
 
  (sections/07_discussion.tex
 chapter 7.
-[59
+[63
 
 
 
 
-] [60] [61] [62] [63] [64] [65] [66] [67] [68] [69]) [70] [71]
+] [64] [65] [66] [67] [68] [69] [70] [71] [72] [73]) [74] [75]
 \openout2 = `sections/08_conclusion.aux'.
 
 
 (sections/08_conclusion.tex
 chapter 8.
-[72
-
-
-
-
-] [73] [74]) [75] (main.bbl
-chapter without number
 [76
 
 
 
 
+] [77] [78]) [79] (main.bbl
+chapter without number
+[80
 
-] [77] [78] [79]) [80]
+
+
+
+
+] [81] [82] [83] [84]) [85]
 \openout2 = `sections/09_appendix.aux'.
 
  (sections/09_appendix.tex
 chapter 9.
-[81
+[86
 
 
-] [82]
+] [87]
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 148.
- [83]
-File: figures/fig_harness_validation.pdf Graphic file (type pdf)
-<use figures/fig_harness_validation.pdf>
- [84]
-File: figures/fig_deployment_topology.pdf Graphic file (type pdf)
-<use figures/fig_deployment_topology.pdf>
-File: figures/fig_experiment_export.pdf Graphic file (type pdf)
-<use figures/fig_experiment_export.pdf>
- [85] [86] [87] [88]) [89] [90] (main.aux (Preamble.aux)
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 150.
+ [88] [89]
+File: figures/fig_harness_validation.png Graphic file (type bmp)
+<figures/fig_harness_validation.png>
+File: figures/fig_deployment_topology.png Graphic file (type bmp)
+<figures/fig_deployment_topology.png>
+File: figures/fig_experiment_export.png Graphic file (type bmp)
+<figures/fig_experiment_export.png>
+ [90] [91]) [92] [93] (main.aux (Preamble.aux)
 (sections/00_abstract.aux) (sections/00_acknowledgements.aux)
 (sections/01_introduction.aux) (sections/02_background_related_work.aux)
 (sections/03_system_design.aux) (sections/04_methodology.aux)
@@ -1227,4 +1308,4 @@ File: figures/fig_experiment_export.pdf Graphic file (type pdf)
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  )
-Output written on main.xdv (105 pages, 433104 bytes).
+Output written on main.xdv (109 pages, 456800 bytes).

@@ -12,6 +12,6 @@ A level-1 auxiliary file: sections/05_implementation.aux
 A level-1 auxiliary file: sections/06_evaluation.aux
 A level-1 auxiliary file: sections/07_discussion.aux
 A level-1 auxiliary file: sections/08_conclusion.aux
-The style file: plainnat.bst
+The style file: unsrtnat.bst
 A level-1 auxiliary file: sections/09_appendix.aux
 Database file #1: references.bib

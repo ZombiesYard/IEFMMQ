@@ -79,15 +79,18 @@ Machine-Learning-Beitrag ist eine kleine LoRA-Anpassung f\"ur strukturierte
 visuelle Fakten. Eine fr\"uhe 8-Fact-Ontologie zeigte, dass zusammengesetzte
 Zielzust\"ande riskante False Positives erzeugen k\"onnen. Die revidierte
 13-Fact-Ontologie trennt deshalb lokale visuelle Evidenz von der sp\"ateren
-prozeduralen Interpretation.
+prozeduralen Interpretation. Eine Erkl\"arung ist in diesem Ansatz nur dann
+n\"utzlich, wenn sie auf pr\"ufbare Evidenz zur\"uckgef\"uhrt werden kann.
 
 Auf zwei unabh\"angigen 13-Fact-Holdouts ist die Qwen3.5-LoRA-Linie mit
 Run-003 + Run-005x2 die st\"arkste Offline-Konfiguration. Die Fact Accuracy
 steigt auf Run-002 newfacts von 0,8677 auf 0,9908 und auf Run-004 random von
-0,8038 auf 0,9931; gleichzeitig sinken kritische False Positives von 11 auf 4
-beziehungsweise von 70 auf 8. Qwen3.6-27B liefert eine starke
-Kandidatenlinie f\"ur das lokale Serving, \"ubertrifft die Qwen3.5-LoRA-Linie
-auf den aktuellen Holdouts jedoch nicht. Gemma profitiert ebenfalls von
+0,8038 auf 0,9931. Der exakte Sample-Match steigt von 0,10 auf 0,88
+beziehungsweise von 0,03 auf 0,92; gleichzeitig sinken kritische False
+Positives von 11 auf 4 beziehungsweise von 70 auf 8. Qwen3.6-27B liefert eine
+starke Kandidatenlinie f\"ur das lokale Serving, \"ubertrifft die
+Qwen3.5-LoRA-Linie auf den aktuellen Holdouts jedoch nicht. Gemma profitiert
+ebenfalls von
 derselben Datenrezeptur, bleibt aber beim exakten Sample-Match hinter Qwen3.5.
 
 Eine formative, nicht randomisierte Quest-3-Pilotstudie mit neun Teilnehmenden
@@ -96,8 +99,16 @@ Novizen, intermedi\"are und erfahrene Teilnehmende. Vier Teilnehmende nutzten
 den Tutor, f\"unf absolvierten eine passive Bedingung ohne Tutor. Alle vier
 Tutor-Teilnehmenden erreichten den manuell gepr\"uften finalen
 33-Schritt-Zustand; keine der f\"unf Sitzungen ohne Tutor erreichte einen
-best\"atigten finalen 33-Schritt-Zustand. Die
-Pilotdaten belegen Machbarkeit, Instrumentierung und Fehlermuster, aber keine
-kausalen Effekte auf Lernen, Arbeitsbelastung, Retention, Transfer oder
+best\"atigten finalen 33-Schritt-Zustand. In der Tutor-Bedingung traten keine
+manuell kodierten Auslassungsfehler auf, jedoch zeigten mehrere Trials
+assistenzgekoppelte Kommissions- und Prompting-Fehler. Raw NASA-TLX sowie
+benutzerdefinierte Tutor- und User-Ratings werden nur deskriptiv berichtet.
+Die Pilotdaten belegen Machbarkeit, Instrumentierung und Fehlermuster, aber
+keine kausalen Effekte auf Lernen, Arbeitsbelastung, Retention, Transfer oder
 Geschwindigkeit.
+
+Die Arbeit argumentiert damit, dass zuverl\"assige interaktive Erkl\"arung in
+immersivem Training vor allem ein Evidenzdesign-Problem ist: Foundation Models
+sollten den aktuellen Aufgabenstatus nur durch Evidenz erkl\"aren, die die
+Laufzeitumgebung beobachten, validieren und wiedergeben kann.
 \end{otherlanguage}
