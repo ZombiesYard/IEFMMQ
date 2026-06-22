@@ -1,0 +1,252 @@
+﻿field,value
+age_range,25-34
+assignment_P01_assigned,
+assignment_P01_experimenter,
+assignment_P01_notes,
+assignment_P01_participant,P01
+assignment_P01_suggested,with_tutor
+assignment_P01_trial,T01
+assignment_P02_assigned,
+assignment_P02_experimenter,
+assignment_P02_notes,
+assignment_P02_participant,P02
+assignment_P02_suggested,without_tutor
+assignment_P02_trial,T01
+assignment_P03_assigned,
+assignment_P03_experimenter,
+assignment_P03_notes,
+assignment_P03_participant,P03
+assignment_P03_suggested,without_tutor
+assignment_P03_trial,T01
+assignment_P04_assigned,
+assignment_P04_experimenter,
+assignment_P04_notes,
+assignment_P04_participant,P04
+assignment_P04_suggested,with_tutor
+assignment_P04_trial,T01
+assignment_P05_assigned,with_tutor
+assignment_P05_experimenter,
+assignment_P05_notes,
+assignment_P05_participant,P05
+assignment_P05_suggested,with_tutor
+assignment_P05_trial,T01
+assignment_P06_assigned,without_tutor
+assignment_P06_experimenter,
+assignment_P06_notes,
+assignment_P06_participant,P06
+assignment_P06_suggested,without_tutor
+assignment_P06_trial,T01
+assignment_P07_assigned,
+assignment_P07_experimenter,
+assignment_P07_notes,
+assignment_P07_participant,P07
+assignment_P07_suggested,without_tutor
+assignment_P07_trial,T01
+assignment_P08_assigned,
+assignment_P08_experimenter,
+assignment_P08_notes,
+assignment_P08_participant,P08
+assignment_P08_suggested,with_tutor
+assignment_P08_trial,T01
+assignment_P09_assigned,
+assignment_P09_experimenter,
+assignment_P09_notes,
+assignment_P09_participant,P09
+assignment_P09_suggested,with_tutor
+assignment_P09_trial,T01
+assignment_P10_assigned,
+assignment_P10_experimenter,
+assignment_P10_notes,
+assignment_P10_participant,P10
+assignment_P10_suggested,without_tutor
+assignment_P10_trial,T01
+assignment_P11_assigned,
+assignment_P11_experimenter,
+assignment_P11_notes,
+assignment_P11_participant,P11
+assignment_P11_suggested,without_tutor
+assignment_P11_trial,T01
+assignment_P12_assigned,
+assignment_P12_experimenter,
+assignment_P12_notes,
+assignment_P12_participant,P12
+assignment_P12_suggested,with_tutor
+assignment_P12_trial,T01
+aviation_english_familiarity,7
+baseline_checklist_format,VR kneeboard plus tutor overlay/help
+baseline_checklist_no_hmd_removal,yes
+baseline_checklist_used,yes
+checklist_pages,DCS FA-18C Early Access Guide CN pp.93-98 on VR kneeboard; tutor help available via X1
+cold_start_experience,can complete
+completed,是的
+condition,with_tutor
+condition_specific_notes,"With-tutor run completed end-to-end. Telemetry/log summary: HelpRequests=7, LLMTriggers=7, VLMCalls=2, OverlayExecuted=6, OverlayRejected=0, FallbackCount=2, TotalStepsCompleted=33/33. Main residual issues: one unintended VLM call on S20, and system-induced repeated four-down guidance after probe/launch-bar/hook had already completed once."
+confidence_before,7
+date,2026-05-30
+dcs_aircraft,FA-18C_hornet
+dcs_experience,frequent
+dcs_mission,
+dominant_hand,right
+end_reason,完全的
+end_time,00:15:06Z
+experimenter_id,E01
+experimenter_intervention,没有任何
+fa18c_experience,experienced
+flight_sim_experience,frequent
+git_commit,
+git_dirty,not recorded
+help_hotkey,X1
+hotas_experience,frequent
+launcher_used,not recorded; live-dcs run inferred from exported log
+manual_coding_required,yes
+model_endpoint,openai_compat remote endpoint; exact URL not exported
+monitor_setup,fa18c_composite_panel_v2
+multi_target_overlay_visible,not directly evaluated in this run; final exported overlays were single-target
+notable_request_ids,1219a648-c997-4ad8-9789-d03252958656; fb7e291a-e83b-443a-8217-bf9ca0fcd2e5; 0f04cbe0-8449-4f33-8acb-026e5f0d4f31; 60f1e81a-7660-400e-b477-106f0e71e336; 5a65e1f9-2fa4-4e41-ba86-a628d6e2884d
+obs_1_notes,Positive evidence for the visual harness path; no user error coded.
+obs_1_observation,Tutor/VLM correctly detected TAC page and BIT root anchors and guided left DDI PB18 for S08 page recovery.
+obs_1_participant_behavior,Participant followed the display/page guidance and proceeded through COMM entry.
+obs_1_request_id,1219a648-c997-4ad8-9789-d03252958656
+obs_1_severity,info
+obs_1_step_phase,S08 / P3
+obs_1_system_behavior,VLM call was expected for S08; overlay target left_mdi_pb18 was issued.
+obs_1_time,00:11:44Z-00:11:52Z
+obs_2_notes,Coded CO=1 and PA=1 on S20; VLM leakage recorded as non-blocking technical issue.
+obs_2_observation,"Refueling probe cycle had already completed once, but tutor returned to S20 and participant repeated the probe extension/retraction."
+obs_2_participant_behavior,Participant repeated the probe operation after tutor guidance.
+obs_2_request_id,fb7e291a-e83b-443a-8217-bf9ca0fcd2e5
+obs_2_severity,moderate
+obs_2_step_phase,S20-S21 / P6
+obs_2_system_behavior,S20 also triggered an unintended VLM extraction even though this is not a visual-priority step.
+obs_2_time,00:13:41Z-00:13:59Z
+obs_3_notes,Coded CO=1 and PA=1 on S22.
+obs_3_observation,"Launch bar cycle was repeated after S22 guidance, despite a prior launch-bar extend/retract cycle."
+obs_3_participant_behavior,Participant repeated launch bar extend/retract following the highlighted step.
+obs_3_request_id,0f04cbe0-8449-4f33-8acb-026e5f0d4f31
+obs_3_severity,moderate
+obs_3_step_phase,S22-S23 / P6
+obs_3_system_behavior,"Validator/action planner advanced to S22, but prior completion latch did not prevent repeated action."
+obs_3_time,00:14:12Z-00:14:24Z
+obs_4_notes,Coded CO=1 and PA=1 on S24.
+obs_4_observation,"Arresting hook cycle was repeated after S24 guidance, despite an earlier hook down/up cycle."
+obs_4_participant_behavior,Participant lowered and raised the hook again after tutor guidance.
+obs_4_request_id,60f1e81a-7660-400e-b477-106f0e71e336
+obs_4_severity,moderate
+obs_4_step_phase,S24-S25 / P6
+obs_4_system_behavior,Repeated four-down guidance persisted into the hook step.
+obs_4_time,00:14:28Z-00:14:41Z
+obs_5_notes,No user error coded; useful positive evidence for post-model validation.
+obs_5_observation,"Final checks completed. Pre-guardrail model text briefly regressed to S28/S29, but final validator output advanced to BINGO and then S33 completion."
+obs_5_participant_behavior,Participant released parking brake and set BINGO fuel; final state satisfied S33.
+obs_5_request_id,a0c7c2a1-4c0a-4bea-91a4-823d8d5db92e; 5a65e1f9-2fa4-4e41-ba86-a628d6e2884d
+obs_5_severity,info
+obs_5_step_phase,S28-S33 / P6
+obs_5_system_behavior,Final evidence consistency validator repaired stale model outputs and avoided an unnecessary final overlay.
+obs_5_time,00:14:50Z-00:15:04Z
+obs_6_notes,"Recorded as quality note, not coded as participant error beyond the repeated four-down steps."
+obs_6_observation,"Only 7 help requests were needed and the trial completed, but two fallbacks/repairs were recorded."
+obs_6_participant_behavior,Participant used tutor sparingly and completed the startup.
+obs_6_request_id,n/a
+obs_6_severity,minor
+obs_6_step_phase,system quality
+obs_6_system_behavior,FallbackCount=2; overlay_rejected=0; non-blocking repair/fallback behavior observed.
+obs_6_time,whole trial
+obs_7_notes,
+obs_7_observation,
+obs_7_participant_behavior,
+obs_7_request_id,
+obs_7_severity,
+obs_7_step_phase,
+obs_7_system_behavior,
+obs_7_time,
+obs_8_notes,
+obs_8_observation,
+obs_8_participant_behavior,
+obs_8_request_id,
+obs_8_severity,
+obs_8_step_phase,
+obs_8_system_behavior,
+obs_8_time,
+open_checklist_access,
+open_difficult_part,
+open_most_confusing,
+open_most_helpful,It helped me fill in some operations that I had missed.
+open_other_comments,
+open_tutor_wrong_unclear,
+open_vr_effect,
+overlay_visible_vr,not directly recorded; overlay_executed=6 and overlay_rejected=0 in exported log
+participant_group,expert
+participant_id,P05
+participant_understood_task,yes; participant completed all S01-S33 with 7 tutor help requests
+pre_trial_notes,
+quality_10_notes,action_timeline.csv exists with 308 rows.
+quality_10_status,pass
+quality_11_notes,VLM leakage observed on S20; VLMCalls=2 includes expected S08 plus unexpected non-visual S20.
+quality_11_status,fail
+quality_12_notes,Non-blocking system issues were recorded in observation notes; no trial-stopping technical failure occurred.
+quality_12_status,pass
+quality_13_notes,"Export directory exists with raw log, summary, quality gate, step coding, help cycles, action timeline, and trial summary artifacts."
+quality_13_status,pass
+quality_1_notes,logs/P05_T01_with_tutor.jsonl exists and raw_events.jsonl was copied into the export directory.
+quality_1_status,pass
+quality_2_notes,No external video/VR recording_path was provided in the exported form.
+quality_2_status,fail
+quality_3_notes,This exported questionnaire/form CSV exists for P05/T01.
+quality_3_status,pass
+quality_4_notes,quality_gate.json reports strict=true and no errors.
+quality_4_status,pass
+quality_5_notes,quality_gate.json passed=true.
+quality_5_status,pass
+quality_6_notes,trial_summary.csv condition is with_tutor.
+quality_6_status,pass
+quality_7_notes,trial_summary.csv participant/trial IDs are P05/T01.
+quality_7_status,pass
+quality_8_notes,step_coding.csv contains all S01-S33 rows and human error columns are filled.
+quality_8_status,pass
+quality_9_notes,"help_cycles.csv has 7 rows, matching HelpRequests=7."
+quality_9_status,pass
+quest3_experience,frequent
+questionnaire_path,
+randomization_method,
+raw_log_path,logs/P05_T01_with_tutor.jsonl
+recording_path,
+start_time,00:09:47Z
+study_id,fa18c_quest3_simitutor_2026
+technical_issue_occurred,yes; non-blocking VLM leakage on S20 and repeated four-down guidance observed
+text_model,simtutor-base
+tlx_effort,12
+tlx_frustration,6
+tlx_mental_demand,22
+tlx_performance,7
+tlx_physical_demand,28
+tlx_raw,13.33
+tlx_temporal_demand,5
+trial_id,T01
+trial_outcome_notes,"Completed successfully. Telemetry window 00:09:47Z-00:15:06Z, task time 316.70s. HelpRequests=7, LLMTriggers=7, VLMCalls=2, OverlayExecuted=6, OverlayRejected=0, FallbackCount=2, CriticalStepsCompleted=29, TotalStepsCompleted=33, StepCompletionAccuracy=1.0. Manual telemetry coding after fire-test order override: OM=0, CO=3, OR=0, PA=3, SV=0. Main coded issues were system-induced repeated refueling-probe, launch-bar, and hook cycles after the first four-down cycle had already completed."
+tutor_language,zh
+usability_t1_na,false
+usability_t1_score,7
+usability_t2_na,false
+usability_t2_score,7
+usability_t3_na,false
+usability_t3_score,6
+usability_t4_na,false
+usability_t4_score,6
+usability_t5_na,false
+usability_t5_score,5
+usability_t6_na,false
+usability_t6_score,6
+usability_u1_na,false
+usability_u1_score,7
+usability_u2_na,false
+usability_u2_score,1
+usability_u3_na,false
+usability_u3_score,7
+usability_u4_na,false
+usability_u4_score,7
+usability_u5_na,false
+usability_u5_score,6
+vision_model,simtutor-vision
+vr_discomfort_history,no
+vr_experience,frequent
+vr_setup,Quest 3 Link

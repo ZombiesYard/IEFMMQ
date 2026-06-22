@@ -1,0 +1,253 @@
+field,value
+age_range,25-34
+assignment_P01_assigned,
+assignment_P01_experimenter,
+assignment_P01_notes,not part of this corrected P09/T01 trial
+assignment_P01_participant,
+assignment_P01_suggested,with_tutor
+assignment_P01_trial,
+assignment_P02_assigned,n/a
+assignment_P02_experimenter,n/a
+assignment_P02_notes,not part of this exported P09/T01 trial
+assignment_P02_participant,P02
+assignment_P02_suggested,without_tutor
+assignment_P02_trial,T01
+assignment_P03_assigned,n/a
+assignment_P03_experimenter,n/a
+assignment_P03_notes,not part of this exported P09/T01 trial
+assignment_P03_participant,P03
+assignment_P03_suggested,without_tutor
+assignment_P03_trial,T01
+assignment_P04_assigned,n/a
+assignment_P04_experimenter,n/a
+assignment_P04_notes,not part of this exported P09/T01 trial
+assignment_P04_participant,P04
+assignment_P04_suggested,with_tutor
+assignment_P04_trial,T01
+assignment_P05_assigned,n/a
+assignment_P05_experimenter,n/a
+assignment_P05_notes,not part of this exported P09/T01 trial
+assignment_P05_participant,P05
+assignment_P05_suggested,with_tutor
+assignment_P05_trial,T01
+assignment_P06_assigned,n/a
+assignment_P06_experimenter,n/a
+assignment_P06_notes,not part of this exported P09/T01 trial
+assignment_P06_participant,P06
+assignment_P06_suggested,without_tutor
+assignment_P06_trial,T01
+assignment_P07_assigned,n/a
+assignment_P07_experimenter,n/a
+assignment_P07_notes,not part of this exported P09/T01 trial
+assignment_P07_participant,P07
+assignment_P07_suggested,without_tutor
+assignment_P07_trial,T01
+assignment_P08_assigned,n/a
+assignment_P08_experimenter,n/a
+assignment_P08_notes,not part of this exported P09/T01 trial
+assignment_P08_participant,P08
+assignment_P08_suggested,with_tutor
+assignment_P08_trial,T01
+assignment_P09_assigned,with_tutor
+assignment_P09_experimenter,E01
+assignment_P09_notes,Actual exported trial was originally P01/T02 with_tutor; corrected to P09/T01 because P01/T01 and this trial were different participants.
+assignment_P09_participant,P09
+assignment_P09_suggested,with_tutor
+assignment_P09_trial,T01
+assignment_P10_assigned,n/a
+assignment_P10_experimenter,n/a
+assignment_P10_notes,not part of this exported P09/T01 trial
+assignment_P10_participant,P10
+assignment_P10_suggested,without_tutor
+assignment_P10_trial,T01
+assignment_P11_assigned,n/a
+assignment_P11_experimenter,n/a
+assignment_P11_notes,not part of this exported P09/T01 trial
+assignment_P11_participant,P11
+assignment_P11_suggested,without_tutor
+assignment_P11_trial,T01
+assignment_P12_assigned,n/a
+assignment_P12_experimenter,n/a
+assignment_P12_notes,not part of this exported P09/T01 trial
+assignment_P12_participant,P12
+assignment_P12_suggested,with_tutor
+assignment_P12_trial,T01
+aviation_english_familiarity,1
+baseline_checklist_format,VR kneeboard
+baseline_checklist_no_hmd_removal,yes
+baseline_checklist_used,yes
+checklist_pages,DCS FA-18C Early Access Guide CN pp.93-98 on VR kneeboard
+cold_start_experience,none
+completed,yes
+condition,with_tutor
+condition_specific_notes,"With-tutor run completed end-to-end. Telemetry/log summary: HelpRequests=44, LLMTriggers=44, VLMCalls=10, OverlayExecuted=44, OverlayRejected=0, FallbackCount=9, TotalStepsCompleted=33/33. Visual chain was available for S08/S18/S19; one S20/S21 refuel-probe oscillation was observed from novice confusion plus prior tutor prompt coupling. Participant ID correction: original export P01/T02 is now coded as P09/T01 because P01/T01 and P01/T02 were different people."
+confidence_before,3.5
+date,2026-05-28
+dcs_aircraft,FA-18C_hornet
+dcs_experience,none
+dcs_mission,FA-18C airfield cold-start trial; exact .miz name not recorded in telemetry
+dominant_hand,right
+end_reason,completed
+end_time,23:55:17Z
+experimenter_id,E01
+experimenter_intervention,仅限技术方面
+fa18c_experience,none
+flight_sim_experience,none
+git_commit,d624df1
+git_dirty,yes; paper/*.tex and paper/references.bib modified at review time
+help_hotkey,X1
+hotas_experience,none
+launcher_used,no; manual live-dcs command inferred from exported log
+manual_coding_required,yes
+model_endpoint,"not recorded in exported telemetry; model calls succeeded in log (LLM=44, VLM=10)"
+monitor_setup,fa18c_composite_panel_v2
+multi_target_overlay_visible,yes
+notable_request_ids,"S20/S21 refuel-probe coupling: da7d4dfe, f1c708d6, 675b8517, ef544d2c, cbd10710, ae40c640; terminal completion: 0e588fc9"
+obs_1_notes,Positive evidence that visual harness path worked in this run.
+obs_1_observation,"VLM was available and tracked page progression from no display/page, to TAC/BIT, to SUPT/BIT, then FCS/BIT."
+obs_1_participant_behavior,Participant followed repeated tutor prompts to power displays and navigate left DDI to FCS.
+obs_1_request_id,9af933fa / 7ce9d9d5 / c442e726 / 0f2bdd7b
+obs_1_severity,low
+obs_1_step_phase,S08 display power and DDI page setup
+obs_1_system_behavior,"Tutor used multi-target display-power overlay first, then single PB18/PB15 page navigation. Guidance and highlights matched the visual facts."
+obs_1_time,23:41:46Z-23:44:03Z
+obs_2_notes,No S09 error coded despite auto OR/SV stale selector hint.
+obs_2_observation,COMM1 frequency reached 134.000 MHz and comm1_freq_134_000 became true.
+obs_2_participant_behavior,Participant completed frequency programming after tutor help.
+obs_2_request_id,e7800d20
+obs_2_severity,low
+obs_2_step_phase,S09 COMM1 frequency entry
+obs_2_system_behavior,Tutor prompted COMM1 selector / frequency workflow; final telemetry confirms completion.
+obs_2_time,23:44:03Z-23:44:31Z
+obs_3_notes,Strong successful visual-confirmation segment.
+obs_3_observation,"VLM facts showed FCS page, FCS-MC intermediate/PBIT GO, IN TEST, and final GO in sequence."
+obs_3_participant_behavior,Participant entered FCS-MC and completed the FCS BIT flow with tutor guidance.
+obs_3_request_id,027205b5 / 9d1f331b / 92555468 / 855a429a / 76083a17
+obs_3_severity,low
+obs_3_step_phase,S18-S19 FCS-MC and FCS BIT
+obs_3_system_behavior,"Tutor gave PB5 guidance, then FCS BIT + PB5, then wait/release guidance, then advanced after final GO."
+obs_3_time,23:47:47Z-23:49:32Z
+obs_4_notes,"Step coding: S21 CO=1, PA=1. Not a pure participant-only error."
+obs_4_observation,"Refueling probe extended, then during retract the switch was toggled repeatedly: 2->1->0->1->2->1, causing a second extend/retract cycle before completion."
+obs_4_participant_behavior,Novice participant appeared confused about probe switch logic and clicked repeatedly; this interacted with a prior S20-style extend prompt.
+obs_4_request_id,da7d4dfe / f1c708d6 / 675b8517 / ef544d2c / cbd10710 / ae40c640
+obs_4_severity,medium
+obs_4_step_phase,S20-S21 refueling probe
+obs_4_system_behavior,"Tutor mostly indicated S20 complete / proceed to S21, but one prompt returned to S20 EXTEND while the desired next state was retract, contributing to a human-machine coupling oscillation."
+obs_4_time,23:49:48Z-23:51:23Z
+obs_5_notes,No error coded.
+obs_5_observation,Launch bar extended and retracted successfully before advancing to hook checks.
+obs_5_participant_behavior,Participant operated launch bar correctly after tutor guidance.
+obs_5_request_id,f3628b33
+obs_5_severity,low
+obs_5_step_phase,S22-S23 launch bar
+obs_5_system_behavior,Tutor highlighted launch_bar_switch; final telemetry confirms both extended and retracted states occurred.
+obs_5_time,23:51:43Z-23:51:49Z
+obs_6_notes,"Step coding: S25 CO=1, PA=1 for unnecessary repeated action and wrong intermediate position."
+obs_6_observation,"Hook was lowered and raised, then lowered again and raised again before final completion."
+obs_6_participant_behavior,Participant performed an extra hook cycle while completing the up/retract step.
+obs_6_request_id,cc45ec07 / 022a0321
+obs_6_severity,medium
+obs_6_step_phase,S24-S25 arresting hook
+obs_6_system_behavior,Tutor highlighted arresting_hook_handle; final state was correct.
+obs_6_time,23:52:09Z-23:52:27Z
+obs_7_notes,Step coding: S31 CO=1 only; no PA because final setting was correct.
+obs_7_observation,RADALT_TEST_SW was pressed twice before the radar-altimeter bug was adjusted with the correct control to about 188.65 ft.
+obs_7_participant_behavior,"Participant initially interacted with a non-required RADALT test switch, then correctly used the bug adjustment."
+obs_7_request_id,cb0153e4
+obs_7_severity,low
+obs_7_step_phase,S31 radar altimeter bug
+obs_7_system_behavior,Tutor instructed the radar-altimeter bug knob/wheel target; final value satisfied the airfield 200 ft tolerance.
+obs_7_time,23:54:22Z-23:54:49Z
+obs_8_notes,Overall successful with_tutor trial.
+obs_8_observation,Tutor reported attitude source AUTO and cold-start completion. Trial summary shows 33/33 steps completed.
+obs_8_participant_behavior,Participant reached terminal state with tutor support.
+obs_8_request_id,0e588fc9
+obs_8_severity,low
+obs_8_step_phase,S33 terminal completion
+obs_8_system_behavior,No overlay target was needed for terminal S33; final evidence consistency validator accepted completion.
+obs_8_time,23:55:12Z-23:55:17Z
+open_checklist_access,not specifically answered; baseline checklist format was VR kneeboard
+open_difficult_part,"You need to constantly check whether what is displayed matches the AI's instructions, because you need to understand the instructions first and then find the relevant buttons. This process is quite difficult, and beginners may not understand it and need to check repeatedly."
+open_most_confusing,"I don't know what some abbreviations mean, such as FCS and BIT. I usually don't know what they're referring to."
+open_most_helpful,"The AI ​​provides step-by-step guidance, accurately pinpointing where you're stuck if you get stuck. Even if you repeatedly get stuck, the AI ​​will point out the location of the problem in a clear and easy-to-understand way. It won't mistakenly advance to the next step if you're doing something incorrectly. It can accurately determine whether you're doing something correctly, which is better than a manual, as manuals lack feedback. The AI ​​instructions let me know what I'm doing and what the function of each step is, making it easier for me to remember and understand."
+open_other_comments,No additional participant comment recorded in export.
+open_tutor_wrong_unclear,"no,There was not much lag, and the completion speed was very fast."
+open_vr_effect,"easier, vision look is wide and space feeling more precision.
+feeling know how to handle the plane in VR instead of playing games in screen"
+overlay_visible_vr,yes
+participant_group,novice
+participant_id,P09
+participant_understood_task,not directly recorded; task was completed with tutor help
+pre_trial_notes,Same participant as T01 without_tutor. Novice participant; previous T01 run provided exposure to the cockpit/procedure before this with_tutor trial.
+quality_10_notes,action_timeline.csv exists and was used for telemetry review.
+quality_10_status,pass
+quality_11_notes,"VLM calls were present and useful for S08/S18/S19. One S20 transition carried recent S19 visual context, but no participant-visible failure resulted."
+quality_11_status,pass
+quality_12_notes,technical_issue_occurred=no in form; no technical-failure event observed in telemetry export. Participant ID correction: original export P01/T02 is now coded as P09/T01 because P01/T01 and P01/T02 were different people.
+quality_12_status,n/a
+quality_13_notes,Export directory exists under artifacts/experiments/fa18c_quest3_simitutor_2026/P09/T01; external backup not verified from telemetry.
+quality_13_status,pass
+quality_1_notes,Raw log present: logs/P09_T01_with_tutor_20260528_233657.jsonl.
+quality_1_status,pass
+quality_2_notes,No recording_path and no video file found under the exported P09/T01 package.
+quality_2_status,fail
+quality_3_notes,Questionnaire/form CSV exists at the recorded questionnaire_path.
+quality_3_status,pass
+quality_4_notes,quality_gate.json reports passed=true and errors=[].
+quality_4_status,pass
+quality_5_notes,quality_gate.json passed=true.
+quality_5_status,pass
+quality_6_notes,trial_summary.csv condition is with_tutor.
+quality_6_status,pass
+quality_7_notes,trial_summary.csv participant/trial IDs are P09/T01.
+quality_7_status,pass
+quality_8_notes,step_coding.csv contains all S01-S33 rows and was manually coded from telemetry.
+quality_8_status,pass
+quality_9_notes,"help_cycles.csv has 44 rows, matching HelpRequests=44."
+quality_9_status,pass
+quest3_experience,very little
+questionnaire_path,artifacts/experiments/fa18c_quest3_simitutor_2026/P09/T01/P09_T01_with_tutor_2026-05-28.csv
+randomization_method,"Between-participant coding correction: this with_tutor trial was originally exported as P01/T02, but P01/T01 and this trial were different people. The trial is now coded as P09/T01."
+raw_log_path,logs/P09_T01_with_tutor_20260528_233657.jsonl
+recording_path,not recorded in exported telemetry package
+start_time,23:38:04Z
+study_id,fa18c_quest3_simitutor_2026
+technical_issue_occurred,no
+text_model,simtutor-base
+tlx_effort,10
+tlx_frustration,0
+tlx_mental_demand,10
+tlx_performance,2
+tlx_physical_demand,100
+tlx_raw,22.00
+tlx_temporal_demand,10
+trial_id,T01
+trial_outcome_notes,"Completed successfully. TaskTime_sec=1033.24, HelpRequests=44, LLMTriggers=44, VLMCalls=10, OverlayExecuted=44, OverlayRejected=0, CriticalStepsCompleted=29, TotalStepsCompleted=33, StepCompletionAccuracy=1.0. Manual telemetry coding: OM=0, CO=3, OR=0, PA=2, SV=0. Main coded issues were refuel-probe oscillation, extra hook cycle, and RADALT test-switch presses before correct bug adjustment. Participant ID correction: original export P01/T02 is now coded as P09/T01 because P01/T01 and P01/T02 were different people."
+tutor_language,zh
+usability_t1_na,false
+usability_t1_score,6
+usability_t2_na,false
+usability_t2_score,7
+usability_t3_na,false
+usability_t3_score,7
+usability_t4_na,false
+usability_t4_score,7
+usability_t5_na,false
+usability_t5_score,1
+usability_t6_na,false
+usability_t6_score,7
+usability_u1_na,false
+usability_u1_score,6
+usability_u2_na,false
+usability_u2_score,5
+usability_u3_na,false
+usability_u3_score,7
+usability_u4_na,false
+usability_u4_score,7
+usability_u5_na,false
+usability_u5_score,7
+vision_model,simtutor-vision
+vr_discomfort_history,no
+vr_experience,very little
+vr_setup,Quest 3 Link

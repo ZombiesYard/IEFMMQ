@@ -1,0 +1,252 @@
+﻿field,value
+age_range,25-34
+assignment_P01_assigned,n/a
+assignment_P01_experimenter,n/a
+assignment_P01_notes,not part of this exported P04/T01 trial
+assignment_P01_participant,P01
+assignment_P01_suggested,with_tutor
+assignment_P01_trial,T01
+assignment_P02_assigned,n/a
+assignment_P02_experimenter,n/a
+assignment_P02_notes,not part of this exported P04/T01 trial
+assignment_P02_participant,P02
+assignment_P02_suggested,without_tutor
+assignment_P02_trial,T01
+assignment_P03_assigned,n/a
+assignment_P03_experimenter,n/a
+assignment_P03_notes,not part of this exported P04/T01 trial
+assignment_P03_participant,P03
+assignment_P03_suggested,without_tutor
+assignment_P03_trial,T01
+assignment_P04_assigned,with_tutor
+assignment_P04_experimenter,E01
+assignment_P04_notes,Actual exported trial is P04/T01 with_tutor. Raw log session_id is stale/sess-P01-T02 but export metadata was overridden to P04/T01.
+assignment_P04_participant,P04
+assignment_P04_suggested,with_tutor
+assignment_P04_trial,T01
+assignment_P05_assigned,n/a
+assignment_P05_experimenter,n/a
+assignment_P05_notes,not part of this exported P04/T01 trial
+assignment_P05_participant,P05
+assignment_P05_suggested,with_tutor
+assignment_P05_trial,T01
+assignment_P06_assigned,n/a
+assignment_P06_experimenter,n/a
+assignment_P06_notes,not part of this exported P04/T01 trial
+assignment_P06_participant,P06
+assignment_P06_suggested,without_tutor
+assignment_P06_trial,T01
+assignment_P07_assigned,n/a
+assignment_P07_experimenter,n/a
+assignment_P07_notes,not part of this exported P04/T01 trial
+assignment_P07_participant,P07
+assignment_P07_suggested,without_tutor
+assignment_P07_trial,T01
+assignment_P08_assigned,n/a
+assignment_P08_experimenter,n/a
+assignment_P08_notes,not part of this exported P04/T01 trial
+assignment_P08_participant,P08
+assignment_P08_suggested,with_tutor
+assignment_P08_trial,T01
+assignment_P09_assigned,n/a
+assignment_P09_experimenter,n/a
+assignment_P09_notes,not part of this exported P04/T01 trial
+assignment_P09_participant,P09
+assignment_P09_suggested,with_tutor
+assignment_P09_trial,T01
+assignment_P10_assigned,n/a
+assignment_P10_experimenter,n/a
+assignment_P10_notes,not part of this exported P04/T01 trial
+assignment_P10_participant,P10
+assignment_P10_suggested,without_tutor
+assignment_P10_trial,T01
+assignment_P11_assigned,n/a
+assignment_P11_experimenter,n/a
+assignment_P11_notes,not part of this exported P04/T01 trial
+assignment_P11_participant,P11
+assignment_P11_suggested,without_tutor
+assignment_P11_trial,T01
+assignment_P12_assigned,n/a
+assignment_P12_experimenter,n/a
+assignment_P12_notes,not part of this exported P04/T01 trial
+assignment_P12_participant,P12
+assignment_P12_suggested,with_tutor
+assignment_P12_trial,T01
+aviation_english_familiarity,6
+baseline_checklist_format,VR kneeboard
+baseline_checklist_no_hmd_removal,yes
+baseline_checklist_used,yes
+checklist_pages,DCS FA-18C Early Access Guide CN pp.93-98 on VR kneeboard
+cold_start_experience,之前试过
+completed,是的
+condition,with_tutor
+condition_specific_notes,"With-tutor run completed end-to-end. Telemetry/log summary: HelpRequests=19, LLMTriggers=19, VLMCalls=6, OverlayExecuted=22, OverlayRejected=0, FallbackCount=6, TotalStepsCompleted=33/33. Help latency averaged about 4.30s. Main residual issues were stale raw session_id, VLM calls on S09/S20, early bleed-air guidance before right RPM >=60, and repeated four-down guidance after the first four-down cycle had already completed."
+confidence_before,7
+date,2026-05-29
+dcs_aircraft,FA-18C_hornet
+dcs_experience,偶然
+dcs_mission,not recorded; airfield cold-start scenario/profile
+dominant_hand,正确的
+end_reason,完全的
+end_time,23:05:10Z
+experimenter_id,E01
+experimenter_intervention,没有任何
+fa18c_experience,之前试过
+flight_sim_experience,偶然
+git_commit,
+git_dirty,not recorded
+help_hotkey,X1
+hotas_experience,偶然
+launcher_used,no; manual live-dcs command inferred from exported log
+manual_coding_required,yes
+model_endpoint,"not recorded in exported telemetry; model calls succeeded in log (LLM=19, VLM=6)"
+monitor_setup,fa18c_composite_panel_v2
+multi_target_overlay_visible,yes
+notable_request_ids,S08 display power: 041d787d; S08 left DDI page recovery: 4216433e; S09 frequency input: 5d9a378b; S19 FCS BIT: 73232b25; S20 repeated probe guidance: ebb2a355; terminal completion: aff49c66
+obs_1_notes,Important for data provenance; not coded as a participant error.
+obs_1_observation,Raw event session_id is stale: all events use sess-P01-T02 although the file and export are P04/T01.
+obs_1_participant_behavior,No participant-facing effect observed.
+obs_1_request_id,n/a
+obs_1_severity,medium
+obs_1_step_phase,metadata
+obs_1_system_behavior,"Export metadata was overridden to P04/T01, but raw log metadata remains misleading."
+obs_1_time,whole trial
+obs_2_notes,Coded as S06 SV=1 and marked as system-induced.
+obs_2_observation,Tutor instructed BLEED AIR operation while right RPM was still below 60%; participant followed and completed the bleed-air cycle early.
+obs_2_participant_behavior,Participant followed the highlighted/tutor instruction.
+obs_2_request_id,c84bafd5-84c3-4800-b78e-bb881064f8f1
+obs_2_severity,major
+obs_2_step_phase,P2 / S06
+obs_2_system_behavior,Help response targeted bleed_air_knob even though fused missing condition still included rpm_r_gte_60.
+obs_2_time,22:58:50Z
+obs_3_notes,Good example for thesis evidence of grounded guidance.
+obs_3_observation,"S08 display power and left DDI recovery worked well: first help highlighted four power/brightness controls, then VLM saw TAC/BIT anchors and guided left DDI PB18 recovery."
+obs_3_participant_behavior,Participant followed the display power and DDI page guidance.
+obs_3_request_id,041d787d;4216433e
+obs_3_severity,positive
+obs_3_step_phase,P3 / S08
+obs_3_system_behavior,Multi-target highlight and VLM-supported page recovery were effective.
+obs_3_time,22:59:13Z-22:59:44Z
+obs_4_notes,Not coded as participant error; system-side efficiency/data-path issue.
+obs_4_observation,"COMM1 frequency was set correctly to 134.000 via UFC input, but VLM was still called on this non-visual-priority step."
+obs_4_participant_behavior,Participant completed UFC COMM1 input sequence correctly.
+obs_4_request_id,5d9a378b-59e1-4d2f-9eb5-bca37b6dab7a
+obs_4_severity,minor
+obs_4_step_phase,P3 / S09
+obs_4_system_behavior,VLM leakage occurred on S09; response still usable.
+obs_4_time,23:00:01Z-23:00:03Z
+obs_5_notes,"Coded CO/PA on S20, S22, and S24 as system-induced repeated/wrong-intermediate-position actions."
+obs_5_observation,"Probe, launch bar, and hook cycles were completed once, then repeated after later tutor prompts returned to four-down substeps."
+obs_5_participant_behavior,Participant followed repeated tutor/highlight guidance and corrected final states.
+obs_5_request_id,ebb2a355;a47248f8;9dc8dde8
+obs_5_severity,major
+obs_5_step_phase,P5 / S20-S25
+obs_5_system_behavior,Four-down latch/progression memory still allowed repeated guidance after completion.
+obs_5_time,23:02:57Z-23:04:22Z
+obs_6_notes,Trial completed successfully despite earlier repeated four-down guidance.
+obs_6_observation,Terminal help correctly reported S33 satisfied and cold-start complete.
+obs_6_participant_behavior,Participant reached terminal state successfully.
+obs_6_request_id,aff49c66-4d6d-46aa-a3ef-bf62f75aa595
+obs_6_severity,positive
+obs_6_step_phase,P6 / S33
+obs_6_system_behavior,Final evidence consistency validator accepted terminal completion with no overlay target.
+obs_6_time,23:05:07Z
+obs_7_notes,
+obs_7_observation,
+obs_7_participant_behavior,
+obs_7_request_id,
+obs_7_severity,
+obs_7_step_phase,
+obs_7_system_behavior,
+obs_7_time,
+obs_8_notes,
+obs_8_observation,
+obs_8_participant_behavior,
+obs_8_request_id,
+obs_8_severity,
+obs_8_step_phase,
+obs_8_system_behavior,
+obs_8_time,
+open_checklist_access,"The text is too small, and the list is fixed in the space and cannot be zoomed in."
+open_difficult_part,"For some steps, I need to refer to the checklist."
+open_most_confusing,The checklist does not match actual experience.
+open_most_helpful,
+open_other_comments,
+open_tutor_wrong_unclear,
+open_vr_effect,"Easy, spatial memory will be stronger"
+overlay_visible_vr,yes
+participant_group,intermediate
+participant_id,P04
+participant_understood_task,not directly recorded; participant completed the full task with 19 tutor requests and responded effectively to overlay guidance
+pre_trial_notes,P04/T01 with_tutor run. Participant had tried FA-18C cold start before and reported intermediate experience.
+quality_10_notes,action_timeline.csv exists with 280 rows.
+quality_10_status,pass
+quality_11_notes,VLM leakage observed on S09 and S20; VLMCalls=6 instead of only the intended visual-priority steps.
+quality_11_status,fail
+quality_12_notes,Non-blocking system issues were recorded in observation notes; no trial-stopping technical failure occurred.
+quality_12_status,pass
+quality_13_notes,"Export directory exists with raw log, summary, quality gate, step coding, help cycles, action timeline, and trial summary artifacts."
+quality_13_status,pass
+quality_1_notes,logs/P04_T01_with_tutor.jsonl exists and raw_events.jsonl was copied into the export directory.
+quality_1_status,pass
+quality_2_notes,No external recording_path was provided in the exported form.
+quality_2_status,fail
+quality_3_notes,This exported questionnaire/form CSV exists for P04/T01.
+quality_3_status,pass
+quality_4_notes,"Strict export currently fails because questionnaire_ref, recording_ref, dcs_mission, and prompt_version/prompt_hash were missing at export time."
+quality_4_status,fail
+quality_5_notes,"quality_gate.json has passed=true, but strict=false and contains missing-metadata warnings."
+quality_5_status,pass
+quality_6_notes,trial_summary.csv condition is with_tutor.
+quality_6_status,pass
+quality_7_notes,trial_summary.csv participant/trial IDs are P04/T01.
+quality_7_status,pass
+quality_8_notes,step_coding.csv contains all S01-S33 rows.
+quality_8_status,pass
+quality_9_notes,"help_cycles.csv has 19 rows, matching HelpRequests=19."
+quality_9_status,pass
+quest3_experience,偶然
+questionnaire_path,artifacts/experiments/fa18c_quest3_simitutor_2026/P04/T01/P04_T01_with_tutor_2026-05-29.csv
+randomization_method,
+raw_log_path,logs/P04_T01_with_tutor.jsonl
+recording_path,
+start_time,22:57:45Z
+study_id,fa18c_quest3_simitutor_2026
+technical_issue_occurred,yes; non-blocking metadata/VLM-leakage/four-down-repeat issues observed
+text_model,simtutor-base
+tlx_effort,20
+tlx_frustration,10
+tlx_mental_demand,25
+tlx_performance,10
+tlx_physical_demand,75
+tlx_raw,26.33
+tlx_temporal_demand,18
+trial_id,T01
+trial_outcome_notes,"Completed successfully. Telemetry window 22:57:45Z-23:05:10Z, task time 442.03s. HelpRequests=19, LLMTriggers=19, VLMCalls=6, OverlayExecuted=22, OverlayRejected=0, FallbackCount=6, CriticalStepsCompleted=29, TotalStepsCompleted=33, StepCompletionAccuracy=1.0. Manual telemetry coding after fire-test order override: OM=0, CO=3, OR=0, PA=3, SV=1. Main coded issues: bleed-air operation before right RPM >=60 and system-induced repeated probe/launch-bar/hook cycles after the first four-down cycle had already completed."
+tutor_language,zh
+usability_t1_na,false
+usability_t1_score,7
+usability_t2_na,false
+usability_t2_score,7
+usability_t3_na,false
+usability_t3_score,7
+usability_t4_na,false
+usability_t4_score,7
+usability_t5_na,false
+usability_t5_score,1
+usability_t6_na,false
+usability_t6_score,7
+usability_u1_na,false
+usability_u1_score,7
+usability_u2_na,false
+usability_u2_score,3
+usability_u3_na,false
+usability_u3_score,7
+usability_u4_na,false
+usability_u4_score,7
+usability_u5_na,false
+usability_u5_score,7
+vision_model,simtutor-vision
+vr_discomfort_history,不
+vr_experience,偶然
+vr_setup,Quest 3 Link

@@ -1,0 +1,252 @@
+﻿field,value
+age_range,25-34
+assignment_P01_assigned,n/a
+assignment_P01_experimenter,n/a
+assignment_P01_notes,not part of this exported P03/T01 trial
+assignment_P01_participant,P01
+assignment_P01_suggested,with_tutor
+assignment_P01_trial,T01
+assignment_P02_assigned,n/a
+assignment_P02_experimenter,n/a
+assignment_P02_notes,not part of this exported P03/T01 trial
+assignment_P02_participant,P02
+assignment_P02_suggested,without_tutor
+assignment_P02_trial,T01
+assignment_P03_assigned,without_tutor
+assignment_P03_experimenter,E01
+assignment_P03_notes,Actual exported trial is P03/T01 without_tutor/passive.
+assignment_P03_participant,P03
+assignment_P03_suggested,without_tutor
+assignment_P03_trial,T01
+assignment_P04_assigned,n/a
+assignment_P04_experimenter,n/a
+assignment_P04_notes,not part of this exported P03/T01 trial
+assignment_P04_participant,P04
+assignment_P04_suggested,with_tutor
+assignment_P04_trial,T01
+assignment_P05_assigned,n/a
+assignment_P05_experimenter,n/a
+assignment_P05_notes,not part of this exported P03/T01 trial
+assignment_P05_participant,P05
+assignment_P05_suggested,with_tutor
+assignment_P05_trial,T01
+assignment_P06_assigned,n/a
+assignment_P06_experimenter,n/a
+assignment_P06_notes,not part of this exported P03/T01 trial
+assignment_P06_participant,P06
+assignment_P06_suggested,without_tutor
+assignment_P06_trial,T01
+assignment_P07_assigned,n/a
+assignment_P07_experimenter,n/a
+assignment_P07_notes,not part of this exported P03/T01 trial
+assignment_P07_participant,P07
+assignment_P07_suggested,without_tutor
+assignment_P07_trial,T01
+assignment_P08_assigned,n/a
+assignment_P08_experimenter,n/a
+assignment_P08_notes,not part of this exported P03/T01 trial
+assignment_P08_participant,P08
+assignment_P08_suggested,with_tutor
+assignment_P08_trial,T01
+assignment_P09_assigned,n/a
+assignment_P09_experimenter,n/a
+assignment_P09_notes,not part of this exported P03/T01 trial
+assignment_P09_participant,P09
+assignment_P09_suggested,with_tutor
+assignment_P09_trial,T01
+assignment_P10_assigned,n/a
+assignment_P10_experimenter,n/a
+assignment_P10_notes,not part of this exported P03/T01 trial
+assignment_P10_participant,P10
+assignment_P10_suggested,without_tutor
+assignment_P10_trial,T01
+assignment_P11_assigned,n/a
+assignment_P11_experimenter,n/a
+assignment_P11_notes,not part of this exported P03/T01 trial
+assignment_P11_participant,P11
+assignment_P11_suggested,without_tutor
+assignment_P11_trial,T01
+assignment_P12_assigned,n/a
+assignment_P12_experimenter,n/a
+assignment_P12_notes,not part of this exported P03/T01 trial
+assignment_P12_participant,P12
+assignment_P12_suggested,with_tutor
+assignment_P12_trial,T01
+aviation_english_familiarity,5
+baseline_checklist_format,VR kneeboard
+baseline_checklist_no_hmd_removal,yes
+baseline_checklist_used,yes
+checklist_pages,DCS FA-18C Early Access Guide CN pp.93-98 on VR kneeboard
+cold_start_experience,之前试过
+completed,不
+condition,without_tutor
+condition_specific_notes,"Passive without_tutor run: 0 help requests, 0 LLM triggers, 0 VLM calls, 0 overlays. Telemetry-only coding was used; S18/S19 control actions were observed but final visual page/GO confirmation cannot be proven from passive telemetry alone."
+confidence_before,6
+date,2026-05-29
+dcs_aircraft,FA-18C_hornet
+dcs_experience,偶然
+dcs_mission,
+dominant_hand,正确的
+end_reason,参与者停止
+end_time,22:32:48Z
+experimenter_id,E01
+experimenter_intervention,没有任何
+fa18c_experience,之前试过
+flight_sim_experience,偶然
+git_commit,
+git_dirty,not recorded
+help_hotkey,X1
+hotas_experience,偶然
+launcher_used,no; manual/passive live-dcs command inferred from exported log
+manual_coding_required,yes
+model_endpoint,"n/a; without_tutor passive run, no model calls"
+monitor_setup,fa18c_composite_panel_v2
+multi_target_overlay_visible,not applicable
+notable_request_ids,n/a; help_requests=0
+obs_1_notes,Raw fire-test completion timing is treated as unreliable for order scoring; S02 OR was changed from 1 to 0.
+obs_1_observation,Fire-test A/B completion order was not coded as an error after manual review.
+obs_1_participant_behavior,Participant moved the fire-test switch through both sides; observer/user feedback indicates the intended order was correct.
+obs_1_request_id,n/a
+obs_1_severity,minor
+obs_1_step_phase,P1 / S02
+obs_1_system_behavior,n/a; without_tutor passive recording
+obs_1_time,22:28:52Z-22:29:03Z
+obs_2_notes,Final comm1_freq_134_000=false; coded OM=1 plus OR/SV because the partial COMM action occurred before S08 display power was fully complete.
+obs_2_observation,"COMM preset/channel was moved to 1, but no UFC 134.000 input or ENT commit was recorded."
+obs_2_participant_behavior,Participant appears to select the channel/preset but omitted the actual frequency entry sequence.
+obs_2_request_id,n/a
+obs_2_severity,major
+obs_2_step_phase,P3 / S09
+obs_2_system_behavior,n/a; without_tutor passive recording
+obs_2_time,22:30:05Z
+obs_3_notes,Coded OR=1 and SV=1 for S12; the step itself was eventually satisfied.
+obs_3_observation,INS GND and AMPCD PB19 fast-align were completed before the left engine was stabilized above 60% RPM.
+obs_3_participant_behavior,Participant advanced to INS alignment while left RPM was still rising and before the S12 precondition was satisfied.
+obs_3_request_id,n/a
+obs_3_severity,major
+obs_3_step_phase,P4 / S12
+obs_3_system_behavior,n/a; without_tutor passive recording
+obs_3_time,22:30:38Z-22:30:40Z
+obs_4_notes,Coded OM=1 for S16 and OM=1 for S27.
+obs_4_observation,Flap AUTO was never observed; flap_auto remained false at trial end.
+obs_4_participant_behavior,Participant did not move the flap switch to AUTO during either flap-check point.
+obs_4_request_id,n/a
+obs_4_severity,major
+obs_4_step_phase,"P5 / S16,S27"
+obs_4_system_behavior,n/a; without_tutor passive recording
+obs_4_time,trial end
+obs_5_notes,No user error coded from telemetry alone; completion remains visual/manual-review limited.
+obs_5_observation,"Right DDI PB5 and FCS BIT switch/PB5 actions were recorded, but no passive VLM/video evidence confirms FCS-MC page state or final GO."
+obs_5_participant_behavior,Participant likely attempted the FCS-MC/FCS BIT sequence.
+obs_5_request_id,n/a
+obs_5_severity,review
+obs_5_step_phase,"P5 / S18,S19"
+obs_5_system_behavior,n/a; without_tutor passive recording
+obs_5_time,22:31:06Z-22:31:19Z
+obs_6_notes,"Coded OM=1 for S26, S29, and S32."
+obs_6_observation,"Pitot heat, BINGO fuel, and standby attitude uncage were not observed."
+obs_6_participant_behavior,Participant skipped several checklist-memory items after the four-down checks.
+obs_6_request_id,n/a
+obs_6_severity,major
+obs_6_step_phase,"P5/P6 / S26,S29,S32"
+obs_6_system_behavior,n/a; without_tutor passive recording
+obs_6_time,trial end
+obs_7_notes,
+obs_7_observation,
+obs_7_participant_behavior,
+obs_7_request_id,
+obs_7_severity,
+obs_7_step_phase,
+obs_7_system_behavior,
+obs_7_time,
+obs_8_notes,
+obs_8_observation,
+obs_8_participant_behavior,
+obs_8_request_id,
+obs_8_severity,
+obs_8_step_phase,
+obs_8_system_behavior,
+obs_8_time,
+open_checklist_access,"The text is too small, and the list is fixed in the space and cannot be zoomed in."
+open_difficult_part,"For some steps, I need to refer to the checklist."
+open_most_confusing,The checklist does not match actual experience.
+open_most_helpful,
+open_other_comments,
+open_tutor_wrong_unclear,
+open_vr_effect,"Easy, spatial memory will be stronger"
+overlay_visible_vr,not applicable
+participant_group,intermediate
+participant_id,P03
+participant_understood_task,not directly recorded; participant progressed far without tutor but omitted several checklist-memory items
+pre_trial_notes,P03/T01 without_tutor passive baseline; no tutor help was available during the run.
+quality_10_notes,action_timeline.csv exists with 273 rows.
+quality_10_status,pass
+quality_11_notes,No VLM calls were made; leakage count is effectively 0.
+quality_11_status,pass
+quality_12_notes,technical_issue_occurred=no in the form; no model/overlay path was active.
+quality_12_status,pass
+quality_13_notes,"Export directory exists with raw log, summary, quality gate, step coding, action timeline, and trial summary artifacts."
+quality_13_status,pass
+quality_1_notes,logs/P03_T01_without_tutor.jsonl exists and raw_events.jsonl was copied into the export directory.
+quality_1_status,pass
+quality_2_notes,No external recording_path was provided in the exported form.
+quality_2_status,fail
+quality_3_notes,This exported questionnaire/form CSV exists for P03/T01.
+quality_3_status,pass
+quality_4_notes,quality_gate.json reports strict=true and no errors.
+quality_4_status,pass
+quality_5_notes,quality_gate.json passed=true.
+quality_5_status,pass
+quality_6_notes,trial_summary.csv condition is without_tutor.
+quality_6_status,pass
+quality_7_notes,trial_summary.csv participant/trial IDs are P03/T01.
+quality_7_status,pass
+quality_8_notes,step_coding.csv contains all S01-S33 rows.
+quality_8_status,pass
+quality_9_notes,"help_cycles.csv has 0 rows, which is plausible for without_tutor/passive recording."
+quality_9_status,pass
+quest3_experience,偶然
+questionnaire_path,
+randomization_method,
+raw_log_path,logs/P03_T01_without_tutor.jsonl
+recording_path,
+start_time,22:28:45Z
+study_id,fa18c_quest3_simitutor_2026
+technical_issue_occurred,不
+text_model,n/a; no LLM calls in without_tutor passive run
+tlx_effort,25
+tlx_frustration,15
+tlx_mental_demand,45
+tlx_performance,15
+tlx_physical_demand,50
+tlx_raw,26.67
+tlx_temporal_demand,10
+trial_id,T01
+trial_outcome_notes,"Telemetry window 22:28:45Z-22:32:48Z, task time 242.97s. Trial not completed: 24/33 steps completed, critical steps completed=22, step completion accuracy=0.727273. Manual telemetry coding after fire-test order override: OM=7, CO=0, OR=2, PA=0, SV=2. Main coded issues: omitted COMM frequency input, early INS/PB19 before left engine stabilization, flap AUTO omitted, pitot heat omitted, BINGO omitted, standby attitude uncage omitted. S18/S19 control actions were observed but final visual confirmation is unavailable in passive log."
+tutor_language,zh
+usability_t1_na,true
+usability_t1_score,
+usability_t2_na,true
+usability_t2_score,
+usability_t3_na,true
+usability_t3_score,
+usability_t4_na,true
+usability_t4_score,
+usability_t5_na,true
+usability_t5_score,
+usability_t6_na,true
+usability_t6_score,
+usability_u1_na,false
+usability_u1_score,6
+usability_u2_na,false
+usability_u2_score,3
+usability_u3_na,false
+usability_u3_score,6
+usability_u4_na,false
+usability_u4_score,5
+usability_u5_na,false
+usability_u5_score,6
+vision_model,n/a; no VLM calls in without_tutor passive run
+vr_discomfort_history,不
+vr_experience,偶然
+vr_setup,Quest 3 Link

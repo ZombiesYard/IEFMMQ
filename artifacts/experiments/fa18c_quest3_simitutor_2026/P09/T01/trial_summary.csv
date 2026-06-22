@@ -1,0 +1,2 @@
+ParticipantID,Condition,TrialID,Completed,TaskTime_sec,HelpRequests,LLMTriggers,VLMCalls,OverlayExecuted,OverlayRejected,FallbackCount,CriticalStepsCompleted,TotalStepsCompleted,StepCompletionAccuracy
+P09,with_tutor,T01,yes,1033.2423377037048,44,44,10,44,0,9,29,33,1.0

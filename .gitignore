@@ -18,7 +18,11 @@ tests/adapters/__pycache__/
 simtutor/schemas/v1/__pycache__/
 simtutor/__pycache__/
 logs/*.jsonl
-/artifacts/
+/artifacts/*
+!/artifacts/experiments/
+!/artifacts/experiments/fa18c_quest3_simitutor_2026/
+!/artifacts/experiments/fa18c_quest3_simitutor_2026/**
+/artifacts/experiments/fa18c_quest3_simitutor_2026/**/raw_events.jsonl
 /models/
 DCS/Scripts/Hooks/scratchpad-hook.lua
 DCS/Scripts/Hooks/TheWay.lua

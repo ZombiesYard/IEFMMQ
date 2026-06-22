@@ -1,0 +1,252 @@
+﻿field,value
+age_range,25-34
+assignment_P01_assigned,
+assignment_P01_experimenter,
+assignment_P01_notes,
+assignment_P01_participant,P01
+assignment_P01_suggested,with_tutor
+assignment_P01_trial,T01
+assignment_P02_assigned,
+assignment_P02_experimenter,
+assignment_P02_notes,
+assignment_P02_participant,P02
+assignment_P02_suggested,without_tutor
+assignment_P02_trial,T01
+assignment_P03_assigned,
+assignment_P03_experimenter,
+assignment_P03_notes,
+assignment_P03_participant,P03
+assignment_P03_suggested,without_tutor
+assignment_P03_trial,T01
+assignment_P04_assigned,
+assignment_P04_experimenter,
+assignment_P04_notes,
+assignment_P04_participant,P04
+assignment_P04_suggested,with_tutor
+assignment_P04_trial,T01
+assignment_P05_assigned,
+assignment_P05_experimenter,
+assignment_P05_notes,
+assignment_P05_participant,P05
+assignment_P05_suggested,with_tutor
+assignment_P05_trial,T01
+assignment_P06_assigned,
+assignment_P06_experimenter,
+assignment_P06_notes,
+assignment_P06_participant,P06
+assignment_P06_suggested,without_tutor
+assignment_P06_trial,T01
+assignment_P07_assigned,without_tutor
+assignment_P07_experimenter,
+assignment_P07_notes,
+assignment_P07_participant,P07
+assignment_P07_suggested,without_tutor
+assignment_P07_trial,T01
+assignment_P08_assigned,with_tutor
+assignment_P08_experimenter,
+assignment_P08_notes,
+assignment_P08_participant,P08
+assignment_P08_suggested,with_tutor
+assignment_P08_trial,T01
+assignment_P09_assigned,
+assignment_P09_experimenter,
+assignment_P09_notes,
+assignment_P09_participant,P09
+assignment_P09_suggested,with_tutor
+assignment_P09_trial,T01
+assignment_P10_assigned,
+assignment_P10_experimenter,
+assignment_P10_notes,
+assignment_P10_participant,P10
+assignment_P10_suggested,without_tutor
+assignment_P10_trial,T01
+assignment_P11_assigned,
+assignment_P11_experimenter,
+assignment_P11_notes,
+assignment_P11_participant,P11
+assignment_P11_suggested,without_tutor
+assignment_P11_trial,T01
+assignment_P12_assigned,
+assignment_P12_experimenter,
+assignment_P12_notes,
+assignment_P12_participant,P12
+assignment_P12_suggested,with_tutor
+assignment_P12_trial,T01
+aviation_english_familiarity,4
+baseline_checklist_format,n/a
+baseline_checklist_no_hmd_removal,n/a
+baseline_checklist_used,n/a; with_tutor condition
+checklist_pages,
+cold_start_experience,tried before
+completed,是的
+condition,with_tutor
+condition_specific_notes,"With-tutor run completed end-to-end by final telemetry/action review. Raw export summary undercounted completion as 5/33, but final observation and action timeline satisfy S01-S33. Telemetry/log summary from export: HelpRequests=7, LLMTriggers=7, VLMCalls=5, OverlayExecuted=10, OverlayRejected=0, FallbackCount=4. Main residual system issues: VLM was unnecessarily called on S10 and S20, and the final help cycle regressed to S20 after probe/four-down and later checklist states had already been completed."
+confidence_before,5
+date,2026-05-29
+dcs_aircraft,FA-18C_hornet
+dcs_experience,occasional
+dcs_mission,FA-18C cold-start airfield scenario
+dominant_hand,right
+end_reason,Completed full cold-start checklist; final telemetry satisfies S01-S33 despite auto summary undercount.
+end_time,2026-05-31T23:51:05Z
+experimenter_id,Yu Zhang
+experimenter_intervention,
+fa18c_experience,tried before
+flight_sim_experience,occasional
+git_commit,d624df1
+git_dirty,not checked during coding
+help_hotkey,X1
+hotas_experience,very little
+launcher_used,manual CLI live-dcs with tutor
+manual_coding_required,yes
+model_endpoint,remote OpenAI-compatible simtutor base/vision endpoint
+monitor_setup,fa18c_composite_panel_v2
+multi_target_overlay_visible,yes; S08 used four-target display power/brightness overlay
+notable_request_ids,959fea00-ccc4-42e3-8486-fad41f728ee1; c7847985-15ea-44a2-953a-7f5c81b01211; 975e8459-6b51-4c81-87f4-a41bed4eed64; 4ca007cb-5d41-4307-a4d4-b5347220d9c0; d1a2c1f4-56ae-4141-afe7-bf1ceb9b05a6; 9ed4e8f5-879b-403b-bd1b-29e685325db9; ed6cb2aa-c3f5-4f85-b682-107ac9922ae6
+obs_1_notes,No OM/OR coded for Fire Test due established latch/order unreliability policy.
+obs_1_observation,Final fire_test_a_complete=true and fire_test_b_complete=true. Raw A/B timing is not used for order scoring.
+obs_1_participant_behavior,Participant requested help around fire test after initial power/APU activity.
+obs_1_request_id,959fea00-ccc4-42e3-8486-fad41f728ee1
+obs_1_severity,low
+obs_1_step_phase,S02
+obs_1_system_behavior,Tutor highlighted fire_test_switch and instructed TEST A then TEST B.
+obs_1_time,23:45:50Z
+obs_2_notes,This is a good example of useful multi-target and VLM-guided help.
+obs_2_observation,"Final left/right DDI, AMPCD, HUD, and FCS page navigation evidence were satisfied."
+obs_2_participant_behavior,Participant used tutor for display power/page recovery.
+obs_2_request_id,975e8459-6b51-4c81-87f4-a41bed4eed64; 4ca007cb-5d41-4307-a4d4-b5347220d9c0
+obs_2_severity,low
+obs_2_step_phase,S08
+obs_2_system_behavior,"Tutor first gave four-target display power overlay, then guided left DDI PB18 toward SUPT/FCS."
+obs_2_time,23:47:25Z-23:47:50Z
+obs_3_notes,Quality issue only; no user error coded.
+obs_3_observation,engine_crank_left_complete=true and left engine reached idle-ready state.
+obs_3_participant_behavior,Participant requested help before left engine crank and then completed left-engine start.
+obs_3_request_id,d1a2c1f4-56ae-4141-afe7-bf1ceb9b05a6
+obs_3_severity,low
+obs_3_step_phase,S10
+obs_3_system_behavior,"Tutor instruction/highlight were correct, but VLM was called even though S10 is not a visual-priority step."
+obs_3_time,23:48:11Z
+obs_4_notes,No S18/S19 user error coded.
+obs_4_observation,RIGHT_DDI_PB_05 and FCS_BIT_SW sequence were observed; later VLM facts showed fcsmc_final_go_result_visible.
+obs_4_participant_behavior,Participant used tutor to enter FCS-MC and run FCS BIT.
+obs_4_request_id,9ed4e8f5-879b-403b-bd1b-29e685325db9
+obs_4_severity,low
+obs_4_step_phase,S18-S19
+obs_4_system_behavior,Tutor correctly highlighted right DDI PB5.
+obs_4_time,23:49:17Z
+obs_5_notes,"Recorded as non-blocking system issue, not user CO/PA."
+obs_5_observation,Final telemetry still satisfies S20-S33. No repeated probe action occurred after this late wrong prompt before log end.
+obs_5_participant_behavior,"Participant had already completed probe, launch bar, hook, pitot, BINGO, radalt, SAI/parking-brake-related final states before/around this phase."
+obs_5_request_id,ed6cb2aa-c3f5-4f85-b682-107ac9922ae6
+obs_5_severity,medium
+obs_5_step_phase,S20+
+obs_5_system_behavior,Tutor regressed to S20 and highlighted refuel_probe_switch after the probe cycle was already completed; VLM was also called on non-visual S20.
+obs_5_time,23:50:58Z
+obs_6_notes,Not coded as PA/CO because final required parameter was achieved and the extra test toggles did not affect completion.
+obs_6_observation,radar_altimeter_bug_set=true with final value about 185 ft.
+obs_6_participant_behavior,Participant toggled RADALT TEST while adjusting radar-altimeter bug.
+obs_6_request_id,n/a
+obs_6_severity,low
+obs_6_step_phase,S31
+obs_6_system_behavior,No active tutor instruction at that exact control; final radalt bug value was correct.
+obs_6_time,23:50:38Z-23:50:46Z
+obs_7_notes,
+obs_7_observation,
+obs_7_participant_behavior,
+obs_7_request_id,
+obs_7_severity,
+obs_7_step_phase,
+obs_7_system_behavior,
+obs_7_time,
+obs_8_notes,
+obs_8_observation,
+obs_8_participant_behavior,
+obs_8_request_id,
+obs_8_severity,
+obs_8_step_phase,
+obs_8_system_behavior,
+obs_8_time,
+open_checklist_access,
+open_difficult_part,"For some steps, I need to refer to the checklist."
+open_most_confusing,
+open_most_helpful,
+open_other_comments,
+open_tutor_wrong_unclear,
+open_vr_effect,
+overlay_visible_vr,not manually verified in this CSV; overlay requests were emitted and not rejected
+participant_group,intermediate
+participant_id,P08
+participant_understood_task,"Yes with tutor support. Participant completed all S01-S33 final states, using help at key uncertainty points including fire test, lights test, display setup, left engine, FCS-MC, and four-down/probe guidance."
+pre_trial_notes,
+quality_10_notes,action_timeline.csv exists with 316 rows.
+quality_10_status,pass
+quality_11_notes,VLM leakage observed: VLMCalls=5 include expected S08/S18 visual checks plus unintended calls on S10 and S20.
+quality_11_status,fail
+quality_12_notes,Non-blocking technical/system issues were recorded in this form; no trial-stopping failure occurred.
+quality_12_status,pass
+quality_13_notes,"Export directory exists with raw log, summary, quality gate, help cycles, step coding, action timeline, and trial summary artifacts."
+quality_13_status,pass
+quality_1_notes,logs/P08_T01_with_tutor.jsonl exists and raw_events.jsonl was copied into the export directory.
+quality_1_status,pass
+quality_2_notes,No external video/VR recording_path was provided in the exported form.
+quality_2_status,fail
+quality_3_notes,This exported questionnaire/form CSV exists for P08/T01.
+quality_3_status,pass
+quality_4_notes,quality_gate.json reports strict=true and no errors.
+quality_4_status,pass
+quality_5_notes,quality_gate.json passed=true.
+quality_5_status,pass
+quality_6_notes,trial_summary.csv condition is with_tutor.
+quality_6_status,pass
+quality_7_notes,trial_summary.csv participant/trial IDs are P08/T01.
+quality_7_status,pass
+quality_8_notes,step_coding.csv contains all S01-S33 rows and human error columns are filled; Performed/Completed were manually corrected from final telemetry.
+quality_8_status,pass
+quality_9_notes,"help_cycles.csv has 7 rows, matching HelpRequests=7."
+quality_9_status,pass
+quest3_experience,occasional
+questionnaire_path,artifacts/experiments/fa18c_quest3_simitutor_2026/P08/T01/P08_T01_with_tutor_2026-05-29.csv
+randomization_method,
+raw_log_path,logs/P08_T01_with_tutor.jsonl
+recording_path,
+start_time,2026-05-31T23:45:33Z
+study_id,fa18c_quest3_simitutor_2026
+technical_issue_occurred,"yes; non-blocking auto-completion undercount, unintended VLM calls on S10/S20, and a final stale S20 tutor regression after completion"
+text_model,simtutor-base
+tlx_effort,26
+tlx_frustration,24
+tlx_mental_demand,31
+tlx_performance,20
+tlx_physical_demand,73
+tlx_raw,33.00
+tlx_temporal_demand,24
+trial_id,T01
+trial_outcome_notes,"Completed successfully by manual telemetry review. Telemetry window 23:45:33Z-23:51:05Z, task time 332.01s. Auto trial_summary incorrectly reports Completed=no and TotalStepsCompleted=5/33; manual step_coding corrects all S01-S33 to completed. Manual telemetry coding after fire-test latch/order override: OM=0, CO=0, OR=0, PA=0, SV=0. Tutor help was used 7 times and appears to have supported successful completion without user-side coded errors."
+tutor_language,zh
+usability_t1_na,false
+usability_t1_score,7
+usability_t2_na,false
+usability_t2_score,6
+usability_t3_na,false
+usability_t3_score,7
+usability_t4_na,false
+usability_t4_score,6
+usability_t5_na,false
+usability_t5_score,2
+usability_t6_na,false
+usability_t6_score,6
+usability_u1_na,false
+usability_u1_score,6
+usability_u2_na,false
+usability_u2_score,3
+usability_u3_na,false
+usability_u3_score,5
+usability_u4_na,false
+usability_u4_score,6
+usability_u5_na,false
+usability_u5_score,5
+vision_model,simtutor-vision
+vr_discomfort_history,no
+vr_experience,occasional
+vr_setup,Quest 3 Link

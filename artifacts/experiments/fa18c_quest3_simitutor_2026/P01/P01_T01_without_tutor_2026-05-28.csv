@@ -1,0 +1,253 @@
+﻿field,value
+age_range,25-34
+assignment_P01_assigned,without_tutor
+assignment_P01_experimenter,E01
+assignment_P01_notes,Actual exported condition is without_tutor/passive; suggested assignment was with_tutor.
+assignment_P01_participant,P01
+assignment_P01_suggested,with_tutor
+assignment_P01_trial,T01
+assignment_P02_assigned,n/a
+assignment_P02_experimenter,n/a
+assignment_P02_notes,not part of this exported P01/T01 trial
+assignment_P02_participant,P02
+assignment_P02_suggested,without_tutor
+assignment_P02_trial,T01
+assignment_P03_assigned,n/a
+assignment_P03_experimenter,n/a
+assignment_P03_notes,not part of this exported P01/T01 trial
+assignment_P03_participant,P03
+assignment_P03_suggested,without_tutor
+assignment_P03_trial,T01
+assignment_P04_assigned,n/a
+assignment_P04_experimenter,n/a
+assignment_P04_notes,not part of this exported P01/T01 trial
+assignment_P04_participant,P04
+assignment_P04_suggested,with_tutor
+assignment_P04_trial,T01
+assignment_P05_assigned,n/a
+assignment_P05_experimenter,n/a
+assignment_P05_notes,not part of this exported P01/T01 trial
+assignment_P05_participant,P05
+assignment_P05_suggested,with_tutor
+assignment_P05_trial,T01
+assignment_P06_assigned,n/a
+assignment_P06_experimenter,n/a
+assignment_P06_notes,not part of this exported P01/T01 trial
+assignment_P06_participant,P06
+assignment_P06_suggested,without_tutor
+assignment_P06_trial,T01
+assignment_P07_assigned,n/a
+assignment_P07_experimenter,n/a
+assignment_P07_notes,not part of this exported P01/T01 trial
+assignment_P07_participant,P07
+assignment_P07_suggested,without_tutor
+assignment_P07_trial,T01
+assignment_P08_assigned,n/a
+assignment_P08_experimenter,n/a
+assignment_P08_notes,not part of this exported P01/T01 trial
+assignment_P08_participant,P08
+assignment_P08_suggested,with_tutor
+assignment_P08_trial,T01
+assignment_P09_assigned,n/a
+assignment_P09_experimenter,n/a
+assignment_P09_notes,not part of this exported P01/T01 trial
+assignment_P09_participant,P09
+assignment_P09_suggested,with_tutor
+assignment_P09_trial,T01
+assignment_P10_assigned,n/a
+assignment_P10_experimenter,n/a
+assignment_P10_notes,not part of this exported P01/T01 trial
+assignment_P10_participant,P10
+assignment_P10_suggested,without_tutor
+assignment_P10_trial,T01
+assignment_P11_assigned,n/a
+assignment_P11_experimenter,n/a
+assignment_P11_notes,not part of this exported P01/T01 trial
+assignment_P11_participant,P11
+assignment_P11_suggested,without_tutor
+assignment_P11_trial,T01
+assignment_P12_assigned,n/a
+assignment_P12_experimenter,n/a
+assignment_P12_notes,not part of this exported P01/T01 trial
+assignment_P12_participant,P12
+assignment_P12_suggested,with_tutor
+assignment_P12_trial,T01
+aviation_english_familiarity,1
+baseline_checklist_format,VR kneeboard
+baseline_checklist_no_hmd_removal,yes
+baseline_checklist_used,yes
+checklist_pages,DCS FA-18C Early Access Guide CN pp.93-98 on VR kneeboard
+cold_start_experience,none
+completed,no
+condition,without_tutor
+condition_specific_notes,"Passive without_tutor run: 0 help requests, 0 LLM triggers, 0 VLM calls, 0 overlays. Telemetry-only coding was used; visual-only S18 could not be scored from telemetry alone."
+confidence_before,3.5
+date,2026-05-28
+dcs_aircraft,FA-18C_hornet
+dcs_experience,none
+dcs_mission,FA-18C airfield cold-start trial; exact .miz name not recorded in telemetry
+dominant_hand,right
+end_reason,experimenter_stop
+end_time,22:23:40Z
+experimenter_id,E01
+experimenter_intervention,technical only
+fa18c_experience,none
+flight_sim_experience,none
+git_commit,d624df1
+git_dirty,yes; paper/*.tex and paper/references.bib modified at review time
+help_hotkey,disabled/not used in without_tutor passive run
+hotas_experience,none
+launcher_used,no; manual/passive live-dcs command inferred from exported log
+manual_coding_required,yes
+model_endpoint,"n/a; without_tutor passive run, no model calls"
+monitor_setup,fa18c_composite_panel_v2
+multi_target_overlay_visible,not applicable
+notable_request_ids,n/a; help_requests=0
+obs_1_notes,Raw fire-test completion timing is treated as unreliable for order scoring; S02 OR was changed from 1 to 0.
+obs_1_observation,Fire-test A/B completion order was not coded as an error after manual review.
+obs_1_participant_behavior,Participant eventually completed both fire-test positions; observer/user feedback indicates the perceived order was correct.
+obs_1_request_id,n/a
+obs_1_severity,medium
+obs_1_step_phase,S02 fire test
+obs_1_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_1_time,21:54:05Z-21:56:37Z
+obs_2_notes,"Coded OM=1, OR=1, SV=1."
+obs_2_observation,"COMM1/COMM2 channel selector moved to 1, but no UFC 1340/ENT input was recorded and comm1_freq_134_000 remained false."
+obs_2_participant_behavior,Participant interacted with channel selector before the display-power step was fully complete and did not complete frequency programming.
+obs_2_request_id,n/a
+obs_2_severity,high
+obs_2_step_phase,S09 COMM1 frequency entry
+obs_2_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_2_time,22:02:48Z
+obs_3_notes,Coded OM=1.
+obs_3_observation,"INS knob reached GND/airfield mode, but AMPCD PB19 fast-align press/completion was not recorded."
+obs_3_participant_behavior,Participant set the INS mode but omitted the fast-alignment PB19 action.
+obs_3_request_id,n/a
+obs_3_severity,medium
+obs_3_step_phase,S12 INS alignment
+obs_3_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_3_time,22:12:13Z-22:12:18Z
+obs_4_notes,S19 coded OM=1. S18 not coded as error because passive telemetry lacks VLM/video page-state evidence.
+obs_4_observation,"Right DDI PB5 press was observed, but no FCS BIT switch-up and no final GO evidence were recorded."
+obs_4_participant_behavior,Participant pressed PB5 once; telemetry does not support that FCS BIT was started or completed.
+obs_4_request_id,n/a
+obs_4_severity,high
+obs_4_step_phase,S18/S19 FCS-MC and FCS BIT
+obs_4_system_behavior,Passive logging only; no tutor intervention or overlay. S18 is visual-only and left unscored from telemetry alone.
+obs_4_time,22:16:44Z/end-of-trial
+obs_5_notes,S20 coded OM=1. S21 not coded as participant error because retracted state was default-state credit.
+obs_5_observation,Refueling probe never extended; ext_refuel_probe_value stayed 0 and probe_extended stayed false.
+obs_5_participant_behavior,Participant did not perform the probe extension check. Retraction state was true only by default.
+obs_5_request_id,n/a
+obs_5_severity,medium
+obs_5_step_phase,S20/S21 refueling probe check
+obs_5_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_5_time,end-of-trial
+obs_6_notes,S22 coded OM=1. S23 not coded as participant error because retracted state was default-state credit.
+obs_6_observation,Launch bar never extended; launch_bar_switch_value stayed 0 and launch_bar_extended stayed false.
+obs_6_participant_behavior,Participant did not perform the launch-bar extension check. Retraction state was true only by default.
+obs_6_request_id,n/a
+obs_6_severity,medium
+obs_6_step_phase,S22/S23 launch bar check
+obs_6_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_6_time,end-of-trial
+obs_7_notes,S24 coded OM=1. S25 not coded as participant error because hook-up state was default-state credit.
+obs_7_observation,"Arresting hook was not lowered by handle action; hook_extended stayed false. Hook light changes were light-test indications, not handle movement."
+obs_7_participant_behavior,Participant did not perform the hook-down check. Hook-up state was true only by default.
+obs_7_request_id,n/a
+obs_7_severity,medium
+obs_7_step_phase,S24/S25 arresting hook check
+obs_7_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_7_time,end-of-trial
+obs_8_notes,S29 coded OM=1 and S31 coded OM=1.
+obs_8_observation,BINGO fuel and radar-altimeter bug were not set; bingo_fuel_set remained false and radar_altimeter_bug_value remained 0 instead of the 200 ft airfield target.
+obs_8_participant_behavior,Participant omitted the BINGO fuel and radar-altimeter bug setup steps.
+obs_8_request_id,n/a
+obs_8_severity,medium
+obs_8_step_phase,S29/S31 late cockpit setup
+obs_8_system_behavior,Passive logging only; no tutor intervention or overlay.
+obs_8_time,end-of-trial
+open_checklist_access,No
+open_difficult_part,"kneeboard reading, hard to read the image, do not know how to check the correct instruments."
+open_most_confusing,"kneeboard , not fit for begginer"
+open_most_helpful,auto showd native DCS floating switch explain in cockpit
+open_other_comments,No additional participant comment recorded in export.
+open_tutor_wrong_unclear,n/a; without_tutor condition and no help/model calls occurred.
+open_vr_effect,"easier, vision look is wide and space feeling more precision.
+feeling know how to handle the plane in VR instead of playing games in screen"
+overlay_visible_vr,not applicable
+participant_group,novice
+participant_id,P01
+participant_understood_task,not recorded from telemetry
+pre_trial_notes,"Telemetry/form metadata report novice participant with no DCS, flight-sim, HOTAS, or FA-18C cold-start experience; Quest 3 experience very little."
+quality_10_notes,action_timeline.csv exists and was used for telemetry review.
+quality_10_status,pass
+quality_11_notes,n/a for passive without_tutor; VLMCalls=0 and no help cycles occurred.
+quality_11_status,n/a
+quality_12_notes,technical_issue_occurred=no in form; no technical-failure event observed in telemetry export.
+quality_12_status,n/a
+quality_13_notes,Export directory exists under artifacts/experiments/fa18c_quest3_simitutor_2026/P01/T01; external backup not verified from telemetry.
+quality_13_status,pass
+quality_1_notes,Raw log present: logs/P01_T01_without_tutor_20260528_214928.jsonl.
+quality_1_status,pass
+quality_2_notes,No recording_path and no video file found under the exported P01/T01 package.
+quality_2_status,fail
+quality_3_notes,Questionnaire/form CSV exists at the recorded questionnaire_path.
+quality_3_status,pass
+quality_4_notes,quality_gate.json reports passed=true and errors=[].
+quality_4_status,pass
+quality_5_notes,quality_gate.json passed=true.
+quality_5_status,pass
+quality_6_notes,"trial_summary.csv condition is without_tutor, matching the corrected log/export."
+quality_6_status,pass
+quality_7_notes,trial_summary.csv participant/trial IDs are P01/T01.
+quality_7_status,pass
+quality_8_notes,step_coding.csv contains all S01-S33 rows.
+quality_8_status,pass
+quality_9_notes,"without_tutor passive run: help_cycles.csv has header only and 0 rows, which is expected."
+quality_9_status,pass
+quest3_experience,very little
+questionnaire_path,artifacts/experiments/fa18c_quest3_simitutor_2026/P01/P01_T01_without_tutor_2026-05-28.csv
+randomization_method,"Predefined assignment table with manual override: P01 suggested with_tutor, actual exported condition without_tutor."
+raw_log_path,logs/P01_T01_without_tutor_20260528_214928.jsonl
+recording_path,not recorded in exported telemetry package
+start_time,21:50:05Z
+study_id,fa18c_quest3_simitutor_2026
+technical_issue_occurred,no
+text_model,n/a; no LLM calls in without_tutor passive run
+tlx_effort,100
+tlx_frustration,40
+tlx_mental_demand,70
+tlx_performance,15
+tlx_physical_demand,100
+tlx_raw,55.83
+tlx_temporal_demand,10
+trial_id,T01
+trial_outcome_notes,"Telemetry window 21:50:05Z-22:23:40Z, task time 2015.07s. Trial not completed: 23/33 steps completed, critical steps completed=20, step completion accuracy=0.69697. Manual coding from telemetry after fire-test order override: OM=8, OR=1, SV=1, CO=0, PA=0."
+tutor_language,zh
+usability_t1_na,true
+usability_t1_score,n/a
+usability_t2_na,true
+usability_t2_score,n/a
+usability_t3_na,true
+usability_t3_score,n/a
+usability_t4_na,true
+usability_t4_score,n/a
+usability_t5_na,true
+usability_t5_score,n/a
+usability_t6_na,true
+usability_t6_score,n/a
+usability_u1_na,false
+usability_u1_score,3
+usability_u2_na,false
+usability_u2_score,4
+usability_u3_na,false
+usability_u3_score,2
+usability_u4_na,false
+usability_u4_score,6
+usability_u5_na,false
+usability_u5_score,6
+vision_model,n/a; no VLM calls in without_tutor passive run
+vr_discomfort_history,no
+vr_experience,very little
+vr_setup,Quest 3 Link
