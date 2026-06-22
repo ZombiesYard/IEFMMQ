@@ -65,6 +65,10 @@ docs/dev_notes/dev_tunnel_vllm.md
 .label_studio/
 
 # Thesis content lives only on the private paper branch/repo.
+/paper/
+/paper_zh/
+/paperwork/
+/paper_rewriting_output/
 
 docs/dev_notes/thesis_pass5_new_codex_handoff_zh.md
 docs/dev_notes/thesis_pass5_new_codex_handoff.md
