@@ -20,6 +20,7 @@ simtutor/__pycache__/
 logs/*.jsonl
 /artifacts/*
 !/artifacts/experiments/
+/artifacts/experiments/*
 !/artifacts/experiments/fa18c_quest3_simitutor_2026/
 !/artifacts/experiments/fa18c_quest3_simitutor_2026/**
 /artifacts/experiments/fa18c_quest3_simitutor_2026/**/raw_events.jsonl
